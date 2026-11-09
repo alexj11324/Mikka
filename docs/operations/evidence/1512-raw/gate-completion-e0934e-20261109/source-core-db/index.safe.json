@@ -1,0 +1,143 @@
+{
+  "schema": "mikka.issue1512.e093.source-core-db-e2b-index.v1",
+  "repository": "alexj11324/Mikka",
+  "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "actualCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+  "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+  "orderedCheckoutParents": [
+    "d8e09ac218f5656763a5bc42a75e45fc385caede",
+    "e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+  ],
+  "mainRun": {
+    "id": 42678180995,
+    "attempt": 1
+  },
+  "actualSourceProof": "All six original logs print git log -1 exact checkout; Git commit API previously read independently confirmed parents and tree. Event head is not substituted for checkout.",
+  "treeReview": {
+    "gitBlob": "036538a3bdfdd056448a84edf5037408990a048b",
+    "bytes": 39863,
+    "sha256": "0c6f0292cb227ea51b7930736b26c2ff41a8f22040f14340cb5fd55ebb9b1ebf"
+  },
+  "payloadFiles": 9,
+  "payloadBytes": 5436118,
+  "files": [
+    {
+      "path": "changes.original.log",
+      "gitBlob": "68f6fa1a6cc9ef5876880bad56391b7b9fd740e0",
+      "bytes": 583539,
+      "sha256": "5b271d3ef811fe2543b23e0429b37e807aed145500ac8cb97d59dad54a60224c",
+      "kind": "original-decoded-job-log",
+      "jobId": 129365163678,
+      "originalJobLogToolReads": 1
+    },
+    {
+      "path": "e2bTest.original.log",
+      "gitBlob": "72db002db5f00734991bcf20e766a3380bb04bf5",
+      "bytes": 45766,
+      "sha256": "4205878c22b8d6fad1a187e784ad9e692d0af01bcaee211bbe726813b88a05a3",
+      "kind": "original-decoded-job-log",
+      "jobId": 129365164445,
+      "originalJobLogToolReads": 1
+    },
+    {
+      "path": "source.original.log",
+      "gitBlob": "4117dd4953bf9f8541eca0590f01f7672dcbcfb5",
+      "bytes": 137853,
+      "sha256": "f177db9c47b7e3414a7af2999fb37665db526a57c9e9cfd4888ed3071c744936",
+      "kind": "original-decoded-job-log",
+      "jobId": 129365670566,
+      "originalJobLogToolReads": 1
+    },
+    {
+      "path": "core.original.log",
+      "gitBlob": "18b231c1c42708174c1cae7850095d7811b81745",
+      "bytes": 1020937,
+      "sha256": "967fc0570bfb42941e4fcf789c41ab69a7e99f10c169d50cee69d6837aea206c",
+      "kind": "original-decoded-job-log",
+      "jobId": 129365670506,
+      "originalJobLogToolReads": 1
+    },
+    {
+      "path": "pg3.original.log",
+      "gitBlob": "a6e887b69418bc98950b547f5696d1f9488256e3",
+      "bytes": 2739390,
+      "sha256": "1ff26fc7765b2c1e9fad19a5fc03ab9f65853cef2ff5c132b44aa4692e2c477e",
+      "kind": "original-decoded-job-log",
+      "jobId": 129365670688,
+      "originalJobLogToolReads": 1
+    },
+    {
+      "path": "pg4.original.log",
+      "gitBlob": "571d22d89e21606130b7eb054050742a50fc48f5",
+      "bytes": 687242,
+      "sha256": "968c54d1c3a10772c1e90d2977189d28b8000924d5e8680194b140ce3eeac92a",
+      "kind": "original-decoded-job-log",
+      "jobId": 129365670477,
+      "originalJobLogToolReads": 1
+    },
+    {
+      "path": "selection.json",
+      "bytes": 131802,
+      "sha256": "406afa57c42a8fb0e05dbae51c8dafe1e4654ede5724aad9146e341d6fb7fd9a",
+      "gitBlob": "389bfdcfe0ab7e8e7c1c05b28e822c3245cbe39b",
+      "sourceJob": 129365163678,
+      "normalizedOriginalLines": [
+        2673,
+        5742
+      ],
+      "kind": "selector-original-json"
+    },
+    {
+      "path": "pr-e2b-failure.safe.json",
+      "bytes": 6477,
+      "sha256": "ad85ac44df3fb381ea743ca5d8ed40fc5aefc6b293ee00df84e83bd0f3894a58",
+      "gitBlob": "9b0a60613efd52520def32c7a8d7c254a2e144f6",
+      "kind": "failure-review"
+    },
+    {
+      "path": "source-core-pg-validation.safe.json",
+      "bytes": 83112,
+      "sha256": "1ec9a5ebedc971447de7464fdcc00296842bad94d782b74c711c660f2a10a86d",
+      "gitBlob": "ae9994c3c5513fc5d320a311ed638ac5a88dc60b",
+      "kind": "execution-review"
+    }
+  ],
+  "allPayloadGitHashAndByteLengthsVerified": true,
+  "allPayloadGitReadbacksVerified": true,
+  "readbackBoundary": "Changes and E2B originals were already read back before V8 reset and were restored only from their immutable Git blobs. The four later originals plus three derived files were read back after upload. No workflow job log was fetched twice.",
+  "terminalConclusions": {
+    "changes": "success",
+    "source": "success",
+    "core": "success",
+    "postgres3": "success",
+    "postgres4": "success",
+    "prE2bTest": "failure"
+  },
+  "findings": {
+    "source": "361/361 across seven actual reporters; 63 migrations correctly identified",
+    "core": "All 57 selected targets executed with skip-nx-cache; A22 and driver74 exact source names each passed once",
+    "postgres3": "18/18 suites, 1673/1673 tests, zero fail/cancel/skip/todo; B23 exact names all passed",
+    "postgres4": "18/18 suites, 685/685 tests, zero fail/cancel/skip/todo; selected-workspace real PG test compares three statements to one with identical returned revisions",
+    "e2b": "211 tests: 210 pass, one stale Codex 0644-to-0777 rejection assertion; later Python and shell steps skipped"
+  },
+  "references": {
+    "externalLiveProof": {
+      "bytes": 14794,
+      "sha256": "da0716cd1f5d3107b50f1b9fd244c6b27d5dfa76cc05ef3acbe5a59456c7af91",
+      "gitBlob": "ee371e05d3313a297c89d3daf8271be999524aaa"
+    },
+    "unionProof": {
+      "gitBlob": "036538a3bdfdd056448a84edf5037408990a048b",
+      "bytes": 39863,
+      "sha256": "0c6f0292cb227ea51b7930736b26c2ff41a8f22040f14340cb5fd55ebb9b1ebf"
+    }
+  },
+  "limits": [
+    "Only PG shards 3/4 and 4/4 original logs were read; no full four-shard test-count claim.",
+    "No Integration or Native originals were read. Root's separate Live proof is referenced with its reader boundary.",
+    "Known PR E2B failure remains on this exact source; newer owner fixes were not substituted.",
+    "The old manual full-Live UNKNOWN and all earlier Native RED windows remain unchanged.",
+    "This evidence neither proves production runtime rollout nor PostHog ingestion or final #1512 acceptance.",
+    "No new tests, VMs, models, DB resources, workflow actions or git ref edits were performed."
+  ]
+}

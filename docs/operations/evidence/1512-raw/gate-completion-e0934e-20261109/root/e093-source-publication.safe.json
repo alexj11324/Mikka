@@ -1,0 +1,104 @@
+{
+  "schema": "mikka.issue1512.e093.source-publication.v1",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "publishedAtUtc": "2026-11-09T18:54:01Z",
+  "branch": "fix/1512-daemon-fixture-executable-20261109",
+  "priorHead": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "publishedHead": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "publishedTree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+  "normalHistory": [
+    {
+      "sha": "e7dfd5ae919fe9feba69b2f3ce2ad9558c9ab818",
+      "tree": "820a7f6105019ddd18de2ad1961332337904923f",
+      "parents": [
+        "6414a08ddb4a92962bc82e9e427c391d645cacb2"
+      ],
+      "scope": "ten A/B/C read-only observation/revision/snapshot fixes"
+    },
+    {
+      "sha": "272d57836268455e5f3a46b0637df03643cf5af6",
+      "tree": "88d30d357c730e80e28635a556a77fb1546e67d6",
+      "parents": [
+        "e7dfd5ae919fe9feba69b2f3ce2ad9558c9ab818",
+        "d8e09ac218f5656763a5bc42a75e45fc385caede"
+      ]
+    },
+    {
+      "sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+      "parents": [
+        "272d57836268455e5f3a46b0637df03643cf5af6",
+        "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c"
+      ]
+    }
+  ],
+  "actualPrCheckout": {
+    "sha": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+    "parents": [
+      "d8e09ac218f5656763a5bc42a75e45fc385caede",
+      "e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+    ],
+    "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+    "sameTree": true,
+    "readbackVerified": true
+  },
+  "sourceVerification": {
+    "independentProof": {
+      "gitBlob": "036538a3bdfdd056448a84edf5037408990a048b",
+      "bytes": 39863,
+      "sha256": "0c6f0292cb227ea51b7930736b26c2ff41a8f22040f14340cb5fd55ebb9b1ebf"
+    },
+    "leaves": 6820,
+    "conflicts": 0,
+    "rootReadback": "Root independently reconstructed and compared every final mode/type/blob before CAS; later exact commit/tree/parents/ref re-read on2026-11-09 around19:12.",
+    "ordinaryCAS": true,
+    "force": false,
+    "mainChangedByRoot": false
+  },
+  "previousEvidence": {
+    "checkpoint": 41,
+    "commit": "7526d0f057dffa172d90c102eaacce7bac49dcad",
+    "sourcePublishedAtFreeze": false,
+    "explanation": "CP41 remains a correctly frozen pre-publication checkpoint; this subsequent record documents actual publication."
+  },
+  "initialWorkflows": {
+    "CI": 42678180995,
+    "E2B": 42678181268,
+    "attempt": 1,
+    "E2BKnownFailure": "Old Codex420->511 negative fixture atpublish-template-env.test.mjs:180,211=210PASS+1FAIL; no Python execution. Preserved as an actual failure."
+  },
+  "privacy": {
+    "integrationLogScan": [
+      {
+        "name": "unmaskedGitHubToken",
+        "matches": 0
+      },
+      {
+        "name": "unmaskedPostHogPersonalKey",
+        "matches": 0
+      },
+      {
+        "name": "providerApiKey",
+        "matches": 0
+      },
+      {
+        "name": "privateKey",
+        "matches": 0
+      },
+      {
+        "name": "literalBearer",
+        "matches": 0
+      }
+    ],
+    "scope": "Raw decoded CI output only; no production credentials or account payload added. Log contains expected test-fixture data and GitHub masked env values.",
+    "notProofOfAllTelemetryPrivacy": true
+  },
+  "production": {
+    "newCases": 0,
+    "requiredCases": 2,
+    "issueState": "open",
+    "acceptancePassed": false
+  }
+}

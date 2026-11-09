@@ -1,0 +1,931 @@
+{
+  "schema": "mikka.issue1512.shared-runtime-fresh-review.v2",
+  "observedAtUtc": "2026-11-09 18:50:56 UTC",
+  "repository": "alexj11324/Mikka",
+  "scope": "Read-only source, coordination metadata and owner-archived safe Git JSON. No original job log/ZIP, resource, production, model, ref or rerun operation.",
+  "actualMain": {
+    "sha": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+    "tree": "6a088438df9050ac0e4df41ac41de57f2403ac99",
+    "parents": [
+      "ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d",
+      "2ccc930bb5d15ee726b4176667ffe8495155ce19"
+    ],
+    "pr": 1833,
+    "mergedAt": "2026-11-09T18:37:38Z",
+    "lastRefReadUtc": "2026-11-09T18:49:14Z",
+    "relatedFiles": [
+      "lib/mobile-threads.ts",
+      "tests/mobile-bot.db.test.ts"
+    ],
+    "relatedFilesSource": "Owner #1752 comment6748409000; this pass independently read exact commit parents/tree and PR merge metadata, not the full two-file diff."
+  },
+  "actualCoordination": {
+    "sourceOwner": 1833,
+    "sourceIssue": 1772,
+    "actualStart": "2026-11-09T18:34:10Z",
+    "absoluteEnd": "2026-11-09T19:19:10Z",
+    "released": false,
+    "sourceComment": 6748181488,
+    "previousOwner": {
+      "pr": 1815,
+      "releaseComment": 6748137159,
+      "releasedAt": "2026-11-09T18:32:00Z"
+    },
+    "accountState": "No current SMOKE session reported in the latest read coordination receipts. #1833's possible later <=2-minute read-only session is future intent, not an active reservation.",
+    "factory1503": {
+      "opsHead": "437f3d87af6bb388236fd6e8b1f6580cd5936df5",
+      "entryActive": false,
+      "sourceOrSmokeHold": false,
+      "comment": 6748409000
+    },
+    "control1505": {
+      "sourceOrSmokeHold": false,
+      "entryClosed": true,
+      "resourcesReportedAndIndependentlyCheckedInArchivedJSON": "absent"
+    },
+    "notAClaimThatAllUnrelatedAccountsAreFree": true
+  },
+  "fixedSharedCandidate": {
+    "pr": 1835,
+    "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+    "tree": "26cedfb597451f03960f6f582806599d1ca427b0",
+    "parent": "240836cdf60998e1ef548c899c6a6c0423906a90",
+    "baseSnapshot": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+    "open": true,
+    "merged": false,
+    "branch": "root/issue1505-claude-ca-relinks-20261109",
+    "files": [
+      {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "gitBlob": "ed5767a9fe2a96d38c9423fa79fa05d8a1124e1d",
+        "status": "modified",
+        "additions": 81,
+        "deletions": 0
+      },
+      {
+        "path": "docs/operations/evidence/1505-official-path-control-20261109.json",
+        "gitBlob": "1dbd1907aca7c820be90ed6779fc2962717e5fec",
+        "status": "added",
+        "additions": 920,
+        "deletions": 0
+      },
+      {
+        "path": "docs/operations/evidence/1505-official-path-control-20261109.md",
+        "gitBlob": "274f83e8c45c7f04acabf3bd0da15364a9cf879d",
+        "status": "added",
+        "additions": 82,
+        "deletions": 0
+      },
+      {
+        "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.json",
+        "gitBlob": "868d0b251f884079611cbd9810775fc7146a9426",
+        "status": "added",
+        "additions": 558,
+        "deletions": 0
+      },
+      {
+        "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.md",
+        "gitBlob": "95770c84ba87e690e45f2ea665b6e5b57d300616",
+        "status": "added",
+        "additions": 102,
+        "deletions": 0
+      },
+      {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "gitBlob": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+        "status": "modified",
+        "additions": 18,
+        "deletions": 0
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "gitBlob": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+        "status": "modified",
+        "additions": 53,
+        "deletions": 2
+      },
+      {
+        "path": "scripts/e2b/official-files.test.py",
+        "gitBlob": "f980c7258243a77a123207ccfe03911d4483064d",
+        "status": "modified",
+        "additions": 230,
+        "deletions": 7
+      }
+    ],
+    "latestCommitMeaning": "Docs-only recording of predecessor pre-job CI platform failure; product and test content unchanged from parent2408 according to the fixed source comparison/PR description.",
+    "conditionalPremergeRecommendation": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c is the exact currently published Claude+Codex candidate that can be source-reviewed for an ordinary pre-merge onto the task branch. It is not merged main and has not passed current-head CI. The upstream owner retains its own merge and release authority.",
+    "futureInvalidation": "Fresh-read the shared head before integration; any new head/source mutation requires its own delta check.",
+    "workerFingerprint": "No packages/daemon, protocol/config, patches, lockfile, workspace or root package path appears in this eight-file PR delta. This pass did not independently recompute the canonical worker fingerprint."
+  },
+  "ci": {
+    "runs": [
+      {
+        "runId": 42673937047,
+        "workflow": "Browser gate",
+        "path": ".github/workflows/browser-gate.yml",
+        "event": "pull_request",
+        "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure",
+        "createdAt": "2026-11-09T18:25:40Z",
+        "updatedAt": "2026-11-09T18:26:31Z"
+      },
+      {
+        "runId": 42673936949,
+        "workflow": "E2B additive runtime release",
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "event": "pull_request",
+        "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure",
+        "createdAt": "2026-11-09T18:25:40Z",
+        "updatedAt": "2026-11-09T18:26:28Z"
+      },
+      {
+        "runId": 42673937322,
+        "workflow": "Cloud computer backend",
+        "path": ".github/workflows/cloud-computer.yml",
+        "event": "pull_request",
+        "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure",
+        "createdAt": "2026-11-09T18:25:40Z",
+        "updatedAt": "2026-11-09T18:26:51Z"
+      },
+      {
+        "runId": 42673936960,
+        "workflow": "Unattended sandbox acceptance",
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "event": "pull_request",
+        "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure",
+        "createdAt": "2026-11-09T18:25:40Z",
+        "updatedAt": "2026-11-09T18:26:31Z"
+      },
+      {
+        "runId": 42673937331,
+        "workflow": "CI",
+        "path": ".github/workflows/ui-policy.yml",
+        "event": "pull_request",
+        "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure",
+        "createdAt": "2026-11-09T18:25:40Z",
+        "updatedAt": "2026-11-09T18:27:20Z"
+      },
+      {
+        "runId": 42673936855,
+        "workflow": "Workspace governance acceptance",
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "event": "pull_request",
+        "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T18:25:40Z",
+        "updatedAt": "2026-11-09T18:27:53Z"
+      }
+    ],
+    "exactE2BFailure": {
+      "runId": 42673936949,
+      "attempt": 1,
+      "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+      "jobId": 129351380902,
+      "name": "test",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-09T18:26:11Z",
+      "completedAt": "2026-11-09T18:26:25Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Install only the offline gate test dependencies",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+          "status": "completed",
+          "conclusion": "failure"
+        },
+        {
+          "number": 6,
+          "name": "Run python3 scripts/e2b/build-template.test.py",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 7,
+          "name": "Run python3 packages/daemon/scripts/prepare-worker-install.test.py",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 8,
+          "name": "Run python3 scripts/e2b/official-files.test.py",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 9,
+          "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 10,
+          "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 11,
+          "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 21,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 22,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "mainCiJobCount": 0,
+    "discrepancy": {
+      "ownerComment": 6748400785,
+      "ownerClaim": "All five failed A1 workflows have jobs=[]",
+      "observedCorrection": "E2B has actual job129351380902 at the exact cb2 head; setup/checkout/Node/dependencies succeeded and step5 offline Node gate tests failed. Python conservation tests were skipped. Main CI metadata does have zero jobs.",
+      "underlyingTestCause": "unknown; no original job log read"
+    },
+    "proposedOwnerRecovery": "Owner announced one bounded official rerun-interface recovery for five exact runs; announcement is not proof the requests were accepted or that tests passed.",
+    "currentHeadFullCiPassed": false
+  },
+  "codexDesktopControl": {
+    "archiveCommit": "45e0fccdb447dd0ae1943dafedfdb55adb4bf72b",
+    "archivePrefix": "official-path-control-20261109",
+    "package": {
+      "gitBlob": "1dbd1907aca7c820be90ed6779fc2962717e5fec",
+      "bytes": 31180,
+      "sha256": "ba526b6e177f786d4dcb62f17c6f84c08c93a1b963fe8a06af49d849f1f2bad0"
+    },
+    "manifest": {
+      "gitBlob": "8e2fdf8d5b1f2ae90a29e52c09f3373066818818",
+      "bytes": 16211,
+      "sha256": "bb8967427877cadbcc0b8dc1a79b70d8315760b248b8344b04b1942310691e8c"
+    },
+    "run": {
+      "runId": 42670291715,
+      "runAttempt": 1,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42670291715",
+      "jobId": 129344720782,
+      "conclusion": "success",
+      "startedAt": "2026-11-09T18:01:49Z",
+      "completedAt": "2026-11-09T18:03:17Z",
+      "opsCommit": "b75871ea1753f75769daa33b095704475cf9a4a2",
+      "opsTree": "5f87962642912f59980c71748093ffd4f73e10a5",
+      "orderedParents": [
+        "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+        "b52445d24978dc46235b0744783eb7ebb3c3e397"
+      ],
+      "branch": "ops/1505-smoke-github-readonly-20261109",
+      "sdk": "e2b==2.62.0",
+      "sourceContextCommit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+      "notBefore": "2026-11-09T18:01:26Z",
+      "deadline": "2026-11-09T18:16:26Z",
+      "officialBaseIdentity": {
+        "aliases": [
+          "codex",
+          "desktop"
+        ],
+        "immutableTemplateIds": null,
+        "baseBuildIds": null,
+        "envdVersions": null,
+        "status": "not collected; private output build IDs are not upstream base IDs"
+      },
+      "guestWrites": "Only observer and four observation JSON files below /opt/mikka",
+      "mikkaInstallerCommands": 0,
+      "fullFilesystemScans": 0,
+      "modelCalls": 0,
+      "cliCalls": 0,
+      "timerOrAptStateChangesByObserver": 0
+    },
+    "originalJsonMembers": [
+      {
+        "name": "codex.json",
+        "bytes": 3405,
+        "sha256": "c0ce123a741c24d69d5dc686a4d429d3e72b6e5b46380f2ff37696c1bf761357",
+        "gitBlob": "e95517546e32c86d35419155b946874a39668953",
+        "bundleLosslessRoundtrip": true,
+        "largeIntegersPreserved": true
+      },
+      {
+        "name": "desktop.json",
+        "bytes": 10487,
+        "sha256": "57c5c0311f8870840491e87c7b7babc5922015c87f3b266614cf25fca4f217d9",
+        "gitBlob": "4be34a0f433c187f49e33fa388d63a326f5fc5db",
+        "bundleLosslessRoundtrip": true,
+        "largeIntegersPreserved": true
+      },
+      {
+        "name": "summary.json",
+        "bytes": 1640,
+        "sha256": "c00574e265b2935a3b598714b978eb11732309b24471717b6a3bb64e6ab93ffe",
+        "gitBlob": "705cd08992cdf655b592c6e7be6122d47b1e6ed3",
+        "bundleLosslessRoundtrip": true,
+        "largeIntegersPreserved": true
+      }
+    ],
+    "independentValidation": {
+      "count": 67,
+      "errors": 0,
+      "checks": [
+        {
+          "key": "identity_ops",
+          "passed": true
+        },
+        {
+          "key": "identity_run_attempt",
+          "passed": true
+        },
+        {
+          "key": "identity_source",
+          "passed": true
+        },
+        {
+          "key": "targeted_not_release",
+          "passed": true
+        },
+        {
+          "key": "identity_ops",
+          "passed": true
+        },
+        {
+          "key": "identity_run_attempt",
+          "passed": true
+        },
+        {
+          "key": "identity_source",
+          "passed": true
+        },
+        {
+          "key": "targeted_not_release",
+          "passed": true
+        },
+        {
+          "key": "identity_ops",
+          "passed": true
+        },
+        {
+          "key": "identity_run_attempt",
+          "passed": true
+        },
+        {
+          "key": "identity_source",
+          "passed": true
+        },
+        {
+          "key": "targeted_not_release",
+          "passed": true
+        },
+        {
+          "key": "probe_complete_codex",
+          "passed": true
+        },
+        {
+          "key": "cleanup_complete_codex",
+          "passed": true
+        },
+        {
+          "key": "sandbox_exact_absence_codex",
+          "passed": true
+        },
+        {
+          "key": "template_exact_absence_codex",
+          "passed": true
+        },
+        {
+          "key": "summary_cleanup_match_codex",
+          "passed": true
+        },
+        {
+          "key": "four_phases_codex",
+          "passed": true
+        },
+        {
+          "key": "phase_kind_codex_before",
+          "passed": true
+        },
+        {
+          "key": "phase_kind_codex_pre_finalization",
+          "passed": true
+        },
+        {
+          "key": "phase_kind_codex_ready",
+          "passed": true
+        },
+        {
+          "key": "phase_kind_codex_fresh",
+          "passed": true
+        },
+        {
+          "key": "probe_complete_desktop",
+          "passed": true
+        },
+        {
+          "key": "cleanup_complete_desktop",
+          "passed": true
+        },
+        {
+          "key": "sandbox_exact_absence_desktop",
+          "passed": true
+        },
+        {
+          "key": "template_exact_absence_desktop",
+          "passed": true
+        },
+        {
+          "key": "summary_cleanup_match_desktop",
+          "passed": true
+        },
+        {
+          "key": "four_phases_desktop",
+          "passed": true
+        },
+        {
+          "key": "phase_kind_desktop_before",
+          "passed": true
+        },
+        {
+          "key": "phase_kind_desktop_pre_finalization",
+          "passed": true
+        },
+        {
+          "key": "phase_kind_desktop_ready",
+          "passed": true
+        },
+        {
+          "key": "phase_kind_desktop_fresh",
+          "passed": true
+        },
+        {
+          "key": "codex_one_node",
+          "passed": true
+        },
+        {
+          "key": "codex_exact_stat",
+          "passed": true
+        },
+        {
+          "key": "codex_mode_644_644_777_777",
+          "passed": true
+        },
+        {
+          "key": "codex_mode_before_digest",
+          "passed": true
+        },
+        {
+          "key": "codex_boot_groups",
+          "passed": true
+        },
+        {
+          "key": "desktop_two_nodes",
+          "passed": true
+        },
+        {
+          "key": "desktop_all_node_fields_exact_equal_including_int64",
+          "passed": true
+        },
+        {
+          "key": "desktop_apt_units_exact_equal",
+          "passed": true
+        },
+        {
+          "key": "summary_no_model_or_installer",
+          "passed": true
+        },
+        {
+          "key": "codex_top_shape",
+          "passed": true
+        },
+        {
+          "key": "codex_before_observation_shape",
+          "passed": true
+        },
+        {
+          "key": "codex_before_/usr/local/share/ca-certificates/e2b-ca.crt_node_shape",
+          "passed": true
+        },
+        {
+          "key": "codex_pre_finalization_observation_shape",
+          "passed": true
+        },
+        {
+          "key": "codex_pre_finalization_/usr/local/share/ca-certificates/e2b-ca.crt_node_shape",
+          "passed": true
+        },
+        {
+          "key": "codex_ready_observation_shape",
+          "passed": true
+        },
+        {
+          "key": "codex_ready_/usr/local/share/ca-certificates/e2b-ca.crt_node_shape",
+          "passed": true
+        },
+        {
+          "key": "codex_fresh_observation_shape",
+          "passed": true
+        },
+        {
+          "key": "codex_fresh_/usr/local/share/ca-certificates/e2b-ca.crt_node_shape",
+          "passed": true
+        },
+        {
+          "key": "codex_utc_order",
+          "passed": true
+        },
+        {
+          "key": "desktop_top_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_before_observation_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_before_/var/lib/apt/extended_states_node_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_before_/var/backups/apt.extended_states.0_node_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_pre_finalization_observation_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_pre_finalization_/var/lib/apt/extended_states_node_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_pre_finalization_/var/backups/apt.extended_states.0_node_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_ready_observation_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_ready_/var/lib/apt/extended_states_node_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_ready_/var/backups/apt.extended_states.0_node_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_fresh_observation_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_fresh_/var/lib/apt/extended_states_node_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_fresh_/var/backups/apt.extended_states.0_node_shape",
+          "passed": true
+        },
+        {
+          "key": "desktop_utc_order",
+          "passed": true
+        },
+        {
+          "key": "desktop_exact_paths",
+          "passed": true
+        },
+        {
+          "key": "desktop_exact_apt_units",
+          "passed": true
+        }
+      ],
+      "losslessLargeIntegerEncoding": "Unsafe integer JSON lexemes were retained exactly during parse and source-member reconstruction; decimal strings below represent those exact integer values, not rounded floating-point timestamps."
+    },
+    "codex": {
+      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "modeSequence": [
+        420,
+        420,
+        511,
+        511
+      ],
+      "shaSequence": [
+        "713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a",
+        "713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a",
+        "713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a",
+        "545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a"
+      ],
+      "uidGidUnchanged": true,
+      "bootGroups": [
+        {
+          "phase": "before",
+          "bootId": "bfcc8656-5af0-4f30-970e-462ccc9c9cfd",
+          "utcNs": "1794247349350326626",
+          "monotonicNs": 8486921649
+        },
+        {
+          "phase": "pre_finalization",
+          "bootId": "bfcc8656-5af0-4f30-970e-462ccc9c9cfd",
+          "utcNs": "1794247349713781941",
+          "monotonicNs": 8741068548
+        },
+        {
+          "phase": "ready",
+          "bootId": "e15e0619-7d9b-45e5-95e2-eb1798713281",
+          "utcNs": "1794247354016092312",
+          "monotonicNs": 2015132241
+        },
+        {
+          "phase": "fresh",
+          "bootId": "e15e0619-7d9b-45e5-95e2-eb1798713281",
+          "utcNs": "1794247361582618182",
+          "monotonicNs": 7272307103
+        }
+      ],
+      "sizeInodeTimes": "not collected"
+    },
+    "desktop": {
+      "nodes": [
+        {
+          "ctimeNs": "1793630289577333380",
+          "device": 65024,
+          "gid": 0,
+          "inode": 27661,
+          "kind": "file",
+          "mode": 420,
+          "mtimeNs": "1793630289573333238",
+          "path": "/var/lib/apt/extended_states",
+          "sha256": "da850c564cb1797d4ccea654530605994986e9a81497d9f47fa8497504e89347",
+          "size": 64336,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": "1793630234257775707",
+          "device": 65024,
+          "gid": 0,
+          "inode": 375,
+          "kind": "file",
+          "mode": 420,
+          "mtimeNs": "1793630156179741959",
+          "path": "/var/backups/apt.extended_states.0",
+          "sha256": "52f87bdad074b319ed8b601e4c5e97ab0d5ce235bafac3213d32f1873f7413ac",
+          "size": 64273,
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "apt": {
+        "units": {
+          "apt-daily-upgrade.service": {
+            "status": "observed",
+            "values": {
+              "ActiveState": "inactive",
+              "ExecMainExitTimestamp": "n/a",
+              "ExecMainStartTimestamp": "n/a",
+              "InvocationID": "",
+              "MainPID": "0",
+              "Result": "success",
+              "SubState": "dead"
+            }
+          },
+          "apt-daily-upgrade.timer": {
+            "status": "observed",
+            "values": {
+              "LastTriggerUSec": "Mon 2026-11-02 14:36:43 UTC"
+            }
+          },
+          "apt-daily.service": {
+            "status": "observed",
+            "values": {
+              "ActiveState": "inactive",
+              "ExecMainExitTimestamp": "n/a",
+              "ExecMainStartTimestamp": "n/a",
+              "InvocationID": "",
+              "MainPID": "0",
+              "Result": "success",
+              "SubState": "dead"
+            }
+          },
+          "apt-daily.timer": {
+            "status": "observed",
+            "values": {
+              "LastTriggerUSec": "Tue 2026-10-06 13:35:18 UTC"
+            }
+          }
+        }
+      },
+      "fourNodesSnapshotsEqual": true,
+      "fourUnitSnapshotsEqual": true,
+      "writerIdentity": "unknown",
+      "observedMutation": false
+    },
+    "cleanup": {
+      "codex": {
+        "errors": [],
+        "sandbox": {
+          "absenceConfirmedById": true,
+          "id": "idhdaiwdpb5mu9rga5nx3"
+        },
+        "status": "complete",
+        "templates": [
+          {
+            "kind": "codex",
+            "name": "mikka-1505-official-path-control-42670291715-1-codex",
+            "status": "absent",
+            "templateId": "dfkgci7cyrpu3lxurfja"
+          }
+        ]
+      },
+      "desktop": {
+        "errors": [],
+        "sandbox": {
+          "absenceConfirmedById": true,
+          "id": "i60s51yizx5bykzpp83df"
+        },
+        "status": "complete",
+        "templates": [
+          {
+            "kind": "desktop",
+            "name": "mikka-1505-official-path-control-42670291715-1-desktop",
+            "status": "absent",
+            "templateId": "itr4vtex1pbr2lh6a10v"
+          }
+        ]
+      }
+    },
+    "entryClosure": {
+      "commit": "376298951e4eee5970e2f0d00e21acb3ffba4e18",
+      "tree": "6a6b67df65ef69e655865936eaf6e8b67ece9342",
+      "parents": [
+        "b75871ea1753f75769daa33b095704475cf9a4a2"
+      ],
+      "runId": 42670790551,
+      "conclusion": "skipped",
+      "canonicalRefReadback": "376298951e4eee5970e2f0d00e21acb3ffba4e18"
+    },
+    "evidenceScope": [
+      "The same exact Codex root path is a regular file with uid/gid0 throughout, modes644/644/777/777, unchanged digest through ready and a new digest in fresh.",
+      "Before/pre share one boot ID and ready/fresh share another. This identifies an observed interval, not the deployed provider source revision.",
+      "Desktop's live and backup nodes are losslessly identical across all four samples, including inode/device/mtimeNs/ctimeNs; all sampled values of the four fixed APT units are identical.",
+      "The per-kind cleanup matches summary exactly: exact template IDs absent, exact sandbox IDs absenceConfirmedById, complete/errors=[]. This is archived control evidence, not a new live provider API query.",
+      "Immutable official template/build IDs and envd version remain uncollected/unknown. Private output template/build IDs do not establish upstream base identity.",
+      "Codex size/inode/mtime/ctime were not collected. Desktop actual writer PID/process identity was not collected.",
+      "ZIP integrity and its single original download remain the original owner's evidence. This reviewer downloaded zero ZIPs, and independently verified Git member bytes/SHA plus lossless bundle reconstruction."
+    ]
+  },
+  "codexPolicy": {
+    "path": "scripts/e2b/e2b-finalization-files.json",
+    "gitBlob": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+    "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+    "exactRule": {
+      "_kind": "file",
+      "sha256": "per-boot",
+      "mode": {
+        "before": 420,
+        "after": 511
+      }
+    },
+    "boundary": "Only the Codex root regular file gains the observed 420->511 mode pair. The existing per-boot digest rule remains; unchanged owner/group and strict installation proof remain enforced by the unchanged matcher. This rule does not assert a fixed digest across different boots.",
+    "sourceTests": {
+      "gitBlob": "f980c7258243a77a123207ccfe03911d4483064d",
+      "newCodexMethods": 4,
+      "relatedMethods": 4,
+      "actualFixtureDigestsMatchControl": true,
+      "negativeCoverage": [
+        "other mode pairs",
+        "uid/gid changes",
+        "invalid digest",
+        "directory/link conversions",
+        "unlisted path",
+        "official CLI rewrite",
+        "Desktop backup mutation",
+        "receipt tampering",
+        "finalization substituted for strict installation"
+      ]
+    },
+    "redGreen": {
+      "ownerReported": "Four new and four directly related methods: old policy RED; new exact policy8/8 GREEN, repeated8/8 after comment-only clarification.",
+      "rawStdoutGitReferences": "not found in the public references read during this pass; prior Claude34-test proof is not a substitute",
+      "independentlyExecuted": 0,
+      "independentlyReadCodexPolicyStdout": false
+    }
+  },
+  "desktopWriterFollowup": {
+    "historical5ba": {
+      "runId": 42661874195,
+      "attempt": 1,
+      "source": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+      "phase": "builder11/12",
+      "projectionBlob": "fca5f2d08d869aa958c468573ca11bd1e2aac774",
+      "path": "/var/backups/apt.extended_states.0",
+      "oldSha256": "52f87bdad074b319ed8b601e4c5e97ab0d5ce235bafac3213d32f1873f7413ac",
+      "newSha256": "da850c564cb1797d4ccea654530605994986e9a81497d9f47fa8497504e89347",
+      "actualWriter": "unknown"
+    },
+    "ownerRequest": 6747997944,
+    "latestOwnerResult": {
+      "comment": 6748200765,
+      "runId": 42670591517,
+      "source": "ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d",
+      "worker": "75b7462d53f9725cb92d40112c504b4f32d795c0",
+      "allThreeStrictSnapshotSetsEqual": true,
+      "allThreeTemplatesReady": true,
+      "onlyRecordedStructuredRefusal": {
+        "kind": "claude",
+        "stage": "fresh_scan",
+        "code": "official_files_changed",
+        "paths": [
+          "/etc/ssl/certs/1560546e.0",
+          "/etc/ssl/certs/e2b-ca.pem"
+        ]
+      },
+      "reportedCleanup": "three exact templates deleted with GET404; subsequent names absent, sandboxes=[],errors=[]",
+      "unobservedParallelFutureSuccess": "unknown",
+      "evidenceBasis": "Owner's closed public receipt only; no original job log re-read by reviewer"
+    },
+    "latestMainR7": {
+      "runId": 42675680821,
+      "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+      "status": "completed",
+      "conclusion": "failure",
+      "cause": "unknown; metadata only"
+    },
+    "nextAction": "No Desktop waiver or second control. The owner has not published a new actual writer identity/fix in the latest receipts read. Preserve historical unknown; if the next correctly patched R7 passes every existing gate, the negative control does not create a new mandatory experiment."
+  },
+  "nextConcreteBlockers": [
+    "Current1835 head CI is not green; actual E2B Node test step failure must be distinguished from zero-job orchestration failures by its original owner.",
+    "The active1833 source window and real publishers have not been released in the latest coordination read.",
+    "A complete new shared runtime release after the precise certificate policy is still required; old control or historical strict success is not that release."
+  ],
+  "actions": {
+    "sourceRefUpdates": 0,
+    "ciReruns": 0,
+    "jobLogReads": 0,
+    "artifactZipDownloads": 0,
+    "vmOrTemplateCreation": 0,
+    "modelCalls": 0,
+    "productionApiCalls": 0,
+    "posthogQueries": 0,
+    "gitUnreferencedEvidenceBlobCreation": 2
+  },
+  "independentEvidenceGaps": [
+    {
+      "item": "Codex policy RED/GREEN raw stdout",
+      "state": "Owner reported8/8; this reader did not find a public immutable stdout Git reference.",
+      "effect": "An explicit evidence boundary, not a new mandatory pre-merge gate or reason to repeat control/test execution."
+    }
+  ],
+  "supersedesUnreferencedDraft": {
+    "gitBlob": "9a18cd935527ab7fe986dd9fa6a35ed7a8e4bc12",
+    "reason": "Classify the missing Codex stdout reference as an independent evidence gap rather than an added acceptance gate."
+  }
+}

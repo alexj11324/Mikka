@@ -1,0 +1,391 @@
+{
+  "schema": "mikka.issue1512.e093.integration-and-required-db-gate.v1",
+  "observedAtUtc": "2026-11-09T19:13:00Z",
+  "repository": "alexj11324/Mikka",
+  "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "actualCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+  "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+  "run": {
+    "id": 42678180995,
+    "attempt": 1
+  },
+  "integration": {
+    "job": 129365670402,
+    "conclusion": "success",
+    "startedAt": "2026-11-09T18:55:05Z",
+    "completedAt": "2026-11-09T19:00:33Z",
+    "original": {
+      "name": "integration",
+      "gitBlob": "efca608dc9ebd27bf2fc2c71029af6d9bef2a855",
+      "bytes": 680060,
+      "sha256": "9ede0290f2527e902ea5198f305a7f54fbbf97386a9c0de4c7ec1a65812113d7",
+      "gitHashVerified": true
+    },
+    "checkoutAnchors": [
+      {
+        "line": 102,
+        "text": "2026-11-09T18:55:07.2674785Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +114d370f807c465c0f6fe1be47e941aa19adf62a:refs/remotes/pull/1799/merge"
+      },
+      {
+        "line": 104,
+        "text": "2026-11-09T18:55:10.2621259Z  * [new ref]         114d370f807c465c0f6fe1be47e941aa19adf62a -> pull/1799/merge"
+      },
+      {
+        "line": 132,
+        "text": "2026-11-09T18:55:11.0450625Z 114d370f807c465c0f6fe1be47e941aa19adf62a"
+      }
+    ],
+    "targets": [
+      {
+        "line": 4998,
+        "text": "2026-11-09T19:00:29.4531487Z  NX   Successfully ran targets integration-2, integration-3, integration-4, integration-5, integration-6, integration-7, integration-8, integration-9, integration-10, integration-11, integration-12, integration-13, integration-14, integration-15, integration-16, integration-17, integration-18, integration-19, integration-20, integration-21, integration-22, integration-23, integration-24, integration-25, integration-26, integration-27, integration-28, integration-29, integration-factory-activity for project ci-tasks"
+      }
+    ],
+    "cache": [
+      {
+        "line": 5002,
+        "text": "2026-11-09T19:00:29.4596949Z   Cache:             Skipped (--skip-nx-cache)"
+      }
+    ],
+    "liveEntry": [
+      {
+        "line": 963,
+        "text": "2026-11-09T18:56:47.1275229Z ci-tasks: > node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-lists.live.test.tsx scripts/desktop-notification-lifetime.live.test.tsx tests/desktop-notifications.test.ts"
+      }
+    ],
+    "liveAggregate": {
+      "tests": 104,
+      "pass": 104,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 129762.828435,
+      "originalLines": [
+        {
+          "line": 3228,
+          "text": "2026-11-09T18:58:56.9283021Z ci-tasks: ℹ tests 104"
+        },
+        {
+          "line": 3229,
+          "text": "2026-11-09T18:58:56.9283581Z ci-tasks: ℹ suites 0"
+        },
+        {
+          "line": 3230,
+          "text": "2026-11-09T18:58:56.9284081Z ci-tasks: ℹ pass 104"
+        },
+        {
+          "line": 3231,
+          "text": "2026-11-09T18:58:56.9284562Z ci-tasks: ℹ fail 0"
+        },
+        {
+          "line": 3232,
+          "text": "2026-11-09T18:58:56.9285048Z ci-tasks: ℹ cancelled 0"
+        },
+        {
+          "line": 3233,
+          "text": "2026-11-09T18:58:56.9285573Z ci-tasks: ℹ skipped 0"
+        },
+        {
+          "line": 3234,
+          "text": "2026-11-09T18:58:56.9286047Z ci-tasks: ℹ todo 0"
+        },
+        {
+          "line": 3235,
+          "text": "2026-11-09T18:58:56.9286638Z ci-tasks: ℹ duration_ms 129762.828435"
+        }
+      ]
+    },
+    "newSevenCases": [
+      {
+        "line": 3091,
+        "text": "2026-11-09T18:58:44.3678510Z ci-tasks: ✔ native workspace snapshot: committed-after-ready (661.94091ms)"
+      },
+      {
+        "line": 3102,
+        "text": "2026-11-09T18:58:44.8612760Z ci-tasks: ✔ native workspace snapshot: pending-after-ready (489.155201ms)"
+      },
+      {
+        "line": 3117,
+        "text": "2026-11-09T18:58:45.5074692Z ci-tasks: ✔ native workspace snapshot: late-subscription (652.294363ms)"
+      },
+      {
+        "line": 3132,
+        "text": "2026-11-09T18:58:46.1532671Z ci-tasks: ✔ native workspace snapshot: dispatch-before-ready (646.569735ms)"
+      },
+      {
+        "line": 3153,
+        "text": "2026-11-09T18:58:46.8064310Z ci-tasks: ✔ native workspace snapshot: newer-push (652.407092ms)"
+      },
+      {
+        "line": 3186,
+        "text": "2026-11-09T18:58:47.7744415Z ci-tasks: ✔ native workspace snapshot: workspace-change (969.50813ms)"
+      },
+      {
+        "line": 3198,
+        "text": "2026-11-09T18:58:48.7443974Z ci-tasks: ✔ native workspace snapshot: identity-change (968.76441ms)"
+      }
+    ],
+    "newSevenRuntimeReceipts": [
+      {
+        "line": 3092,
+        "timestamp": "2026-11-09T18:58:44.3687771Z",
+        "receipt": {
+          "kind": "native_workspace_snapshot_dispatch",
+          "scenario": "committed-after-ready",
+          "physicalCalls": 1,
+          "counts": {
+            "teams.listTeams": 1,
+            "team-relations.listProjectTeams": 1
+          },
+          "phases": [
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+            "dispatch:1",
+            "response:1"
+          ],
+          "rejected": []
+        }
+      },
+      {
+        "line": 3103,
+        "timestamp": "2026-11-09T18:58:44.8618166Z",
+        "receipt": {
+          "kind": "native_workspace_snapshot_dispatch",
+          "scenario": "pending-after-ready",
+          "physicalCalls": 1,
+          "counts": {
+            "teams.listTeams": 1,
+            "team-relations.listProjectTeams": 1
+          },
+          "phases": [
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+            "dispatch:1",
+            "response:1"
+          ],
+          "rejected": []
+        }
+      },
+      {
+        "line": 3118,
+        "timestamp": "2026-11-09T18:58:45.5078577Z",
+        "receipt": {
+          "kind": "native_workspace_snapshot_dispatch",
+          "scenario": "late-subscription",
+          "physicalCalls": 1,
+          "counts": {
+            "teams.listTeams": 1,
+            "team-relations.listProjectTeams": 1
+          },
+          "phases": [
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+            "dispatch:1",
+            "response:1"
+          ],
+          "rejected": []
+        }
+      },
+      {
+        "line": 3133,
+        "timestamp": "2026-11-09T18:58:46.1540011Z",
+        "receipt": {
+          "kind": "native_workspace_snapshot_dispatch",
+          "scenario": "dispatch-before-ready",
+          "physicalCalls": 2,
+          "counts": {
+            "teams.listTeams": 2,
+            "team-relations.listProjectTeams": 2
+          },
+          "phases": [
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "dispatch:1",
+            "response:1",
+            "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "dispatch:2",
+            "response:2"
+          ],
+          "rejected": []
+        }
+      },
+      {
+        "line": 3154,
+        "timestamp": "2026-11-09T18:58:46.8071026Z",
+        "receipt": {
+          "kind": "native_workspace_snapshot_dispatch",
+          "scenario": "newer-push",
+          "physicalCalls": 2,
+          "counts": {
+            "teams.listTeams": 2,
+            "team-relations.listProjectTeams": 2
+          },
+          "phases": [
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+            "dispatch:1",
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "dispatch:2",
+            "response:2",
+            "response:1"
+          ],
+          "rejected": []
+        }
+      },
+      {
+        "line": 3187,
+        "timestamp": "2026-11-09T18:58:47.7750011Z",
+        "receipt": {
+          "kind": "native_workspace_snapshot_dispatch",
+          "scenario": "workspace-change",
+          "physicalCalls": 2,
+          "counts": {
+            "teams.listTeams": 2,
+            "team-relations.listProjectTeams": 2
+          },
+          "phases": [
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+            "dispatch:1",
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000002",
+            "dispatch:2",
+            "response:2",
+            "response:1"
+          ],
+          "rejected": [
+            {
+              "action": "teams.listTeams",
+              "code": "desktop_session_changed",
+              "status": 409
+            },
+            {
+              "action": "team-relations.listProjectTeams",
+              "code": "desktop_session_changed",
+              "status": 409
+            }
+          ]
+        }
+      },
+      {
+        "line": 3199,
+        "timestamp": "2026-11-09T18:58:48.7452295Z",
+        "receipt": {
+          "kind": "native_workspace_snapshot_dispatch",
+          "scenario": "identity-change",
+          "physicalCalls": 2,
+          "counts": {
+            "teams.listTeams": 2,
+            "team-relations.listProjectTeams": 2
+          },
+          "phases": [
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+            "dispatch:1",
+            "fetcher:teams.listTeams",
+            "enqueue:teams.listTeams",
+            "fetcher:team-relations.listProjectTeams",
+            "enqueue:team-relations.listProjectTeams",
+            "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+            "dispatch:2",
+            "response:2",
+            "response:1"
+          ],
+          "rejected": [
+            {
+              "action": "teams.listTeams",
+              "code": "desktop_session_changed",
+              "status": 409
+            },
+            {
+              "action": "team-relations.listProjectTeams",
+              "code": "desktop_session_changed",
+              "status": 409
+            }
+          ]
+        }
+      }
+    ],
+    "lastCapabilityFallback": [
+      {
+        "line": 3206,
+        "text": "2026-11-09T18:58:49.5540466Z ci-tasks: ✔ native pending dispatch: real 404 capability fallback revokes an already awaited hint (810.669151ms)"
+      },
+      {
+        "line": 3207,
+        "text": "2026-11-09T18:58:49.5546772Z ci-tasks: ℹ {\"kind\":\"native_real_capability_fallback\",\"physical\":5,\"logical\":{\"bots\":2,\"roster\":2},\"phases\":[\"enqueue:roster\",\"enqueue:bots\",\"ready\",\"dispatch:1:desktop.readBatch\",\"flush:bots\",\"flush:bot-chats\",\"batch_404\",\"dispatch:2:bots.pollBots\",\"fallback_held:roster\",\"dispatch:3:coordinator.pollBotChatSummaries\",\"fallback_held:bots\",\"enqueue:roster\",\"dispatch:4:bots.pollBots\",\"catchup:roster\",\"response:4\",\"enqueue:bots\",\"dispatch:5:coordinator.pollBotChatSummaries\",\"catchup:bots\",\"response:5\",\"release_fallback\",\"response:2\",\"response:3\"]}"
+      }
+    ],
+    "teamImport": {
+      "durationMs": 13624.770701,
+      "unchangedDeadlineMs": 15000,
+      "anchors": [
+        {
+          "line": 4940,
+          "text": "2026-11-09T19:00:26.5269986Z ci-tasks: ✔ all real team dependencies and auth export/session metadata load before the denied native SQL boundary (13624.770701ms)"
+        },
+        {
+          "line": 4941,
+          "text": "2026-11-09T19:00:26.5274292Z ci-tasks: ℹ {\"teamImportContract\":true,\"dynamicImportOccurrences\":26,\"uniqueModules\":24,\"scenarios\":22,\"realAuthExports\":[\"MOBILE_APP_ORIGIN\",\"auth\",\"authBaseURL\",\"githubEnabled\",\"githubSignInEnabled\",\"googleEnabled\",\"oauthCallbackBaseURL\"],\"deniedConnections\":1,\"nativeTransportAttempts\":0,\"nativeSqlSubmissions\":0}"
+        }
+      ]
+    }
+  },
+  "requiredDatabaseGate": {
+    "job": 129368726445,
+    "conclusion": "success",
+    "original": {
+      "name": "required-database-gate",
+      "gitBlob": "dcab4ac44213d1ad701427609f8d114225f9fe49",
+      "bytes": 13304,
+      "sha256": "5086612dd68ef1d8d4c556d14072d376dc3f3265794abed5d0fc120318379931",
+      "gitHashVerified": true
+    },
+    "expectedDatabase": true,
+    "databaseResult": "success",
+    "changesResult": "success",
+    "actualScope": "Only required database gate plus CI summary; job label Production build and browser interactions is not evidence of an actual product build/browser run in this job.",
+    "notFinalStrictAggregator": true
+  },
+  "limits": {
+    "oldManualFullLiveRun": "UNKNOWN; no terminal was recovered before original VM deadline. This new canonical run is separate evidence and does not rewrite the old outcome.",
+    "productionSamples": 0,
+    "productionAcceptance": false,
+    "nativeBudgetPending": true,
+    "ciE2bKnownFailure": "42678181268/A1 retains actual obsolete Codex root mode negative fixture failure; this proof does not erase it.",
+    "allOriginalJobReadsOnce": true,
+    "noRerun": true,
+    "noWindowOrThresholdChanges": true
+  }
+}

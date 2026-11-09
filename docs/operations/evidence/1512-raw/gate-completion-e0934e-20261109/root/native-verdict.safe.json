@@ -1,0 +1,293 @@
+{
+  "schema": "mikka.issue1512.e093.native-verdict.v1",
+  "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "actualCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+  "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+  "originals": {
+    "lifecycle": {
+      "gitBlob": "028b012e7b284b08dd52412680237986e5c093e9",
+      "bytes": 714837,
+      "sha256": "315abc8b4dc7e9fd66a833a8e038d6e91ebfaf9ca2ebf9574615ea2f7905c093"
+    },
+    "recomputed": {
+      "path": "root/native-recomputed.safe.json",
+      "gitBlob": "3d878fd46861c3847954f005bbd23e0178ea3d49",
+      "bytes": 25427,
+      "sha256": "5d2542eeca91a57d4dbd195a24d78eff7c35b803cb38377df7f258f84f488640",
+      "kind": "independent-native-recomputation"
+    }
+  },
+  "decision": {
+    "newFull": {
+      "native": 451,
+      "web": 427,
+      "difference": 24,
+      "pass": false
+    },
+    "newFirstPair1": {
+      "native": 205,
+      "hosted": 207,
+      "difference": -2,
+      "pass": true
+    },
+    "oldFull": {
+      "native": 433,
+      "web": 431,
+      "difference": 2,
+      "pass": false
+    },
+    "oldFirstPair1": {
+      "native": 209,
+      "hosted": 147,
+      "difference": 62,
+      "pass": false
+    },
+    "overallNativeBudgetPass": false,
+    "productionAcceptance": false,
+    "explanation": "The newer FIRST comparison is green but does not repair the full-window RED. Native FIRST changed by -4; hosted FIRST changed by +60. No new sample selection or comparator window change was made."
+  },
+  "arithmetic": {
+    "records": 24,
+    "checkpoints": 12,
+    "segments": 8,
+    "bucketCells": 2280,
+    "ordinalRows": 1290,
+    "conservationErrors": [],
+    "budgetFailures": [
+      {
+        "label": "native full-window exceeds web"
+      }
+    ]
+  },
+  "full": {
+    "native": {
+      "total": 451,
+      "email": 19,
+      "pkce": 15,
+      "workspace": 417
+    },
+    "web": {
+      "total": 427,
+      "email": 19,
+      "navigation": 0,
+      "workspace": 408
+    }
+  },
+  "first": {
+    "pair": 1,
+    "native": 205,
+    "hosted": 207,
+    "hostedCrossEnd": {
+      "logicalCount": 1,
+      "action": "coordinator.syncCoordinatorChat",
+      "millisecondsPastEnd": 227,
+      "addedBack": false
+    }
+  },
+  "windowDiagnostics": {
+    "webLogin": {
+      "status": "incomplete",
+      "ordinalRows": 427,
+      "uncaptured": 0,
+      "unknownContext": 87,
+      "unknownStatement": 128,
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ]
+    },
+    "nativeLogin": {
+      "status": "incomplete",
+      "ordinalRows": 451,
+      "uncaptured": 0,
+      "unknownContext": 91,
+      "unknownStatement": 138,
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ]
+    },
+    "startup-bundled": {
+      "status": "incomplete",
+      "ordinalRows": 205,
+      "uncaptured": 0,
+      "unknownContext": 53,
+      "unknownStatement": 75,
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ]
+    },
+    "startup-hosted": {
+      "status": "incomplete",
+      "ordinalRows": 207,
+      "uncaptured": 0,
+      "unknownContext": 53,
+      "unknownStatement": 68,
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ]
+    }
+  },
+  "oldComparison": {
+    "nativeFullChange": 18,
+    "webFullChange": -4,
+    "nativeFirstChange": -4,
+    "hostedFirstChange": 60,
+    "observedExtra": "One third bots.pollBots logical invocation has28 queries instead of2. Other three invocations remain2. Extra26 includes the existing coordinator backfill path.",
+    "offsettingContextChanges": {
+      "issues": -3,
+      "taskRuns": -3,
+      "coordinatorChat": -1,
+      "coordinatorSummaries": -1
+    },
+    "cActions": "teams.listTeams and team-relations.listProjectTeams actual full and FIRST logical counts are unchanged; the targeted C tests do not establish an observed Native count saving.",
+    "singleVariableExperiment": false
+  },
+  "coldStart": {
+    "pairs": 5,
+    "bundledMedianMs": 4086.66,
+    "hostedMedianMs": 4163.67,
+    "differenceMs": -77.01000000000022,
+    "bundledFaster": true,
+    "improvementPercent": 1.85
+  },
+  "cleanup": {
+    "lifecycle": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "fixtures",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "lifecycleNative": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 2,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      }
+    },
+    "lifecycleWorkspace": {
+      "captured": true,
+      "phase": "unchanged",
+      "restored": false,
+      "initialName": {
+        "en": false,
+        "zhCN": true
+      },
+      "initialOwnerMatchesSealedBaseline": false,
+      "beforeName": {
+        "en": false,
+        "zhCN": true
+      },
+      "peerMatchesSealedBaseline": true,
+      "afterName": {
+        "en": false,
+        "zhCN": true
+      },
+      "ownerMatchesSealedBaseline": true
+    },
+    "lifecycleObservation": {
+      "observed": true,
+      "state": "released",
+      "blockedReason": null,
+      "owner": {
+        "matchesSealedBaselineBefore": false,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 1,
+        "changes": [
+          {
+            "table": "workspace_audit_outbox",
+            "beforeRows": 1,
+            "afterRows": 0,
+            "changedFieldValueSets": [
+              "createdAt",
+              "id",
+              "workspaceId"
+            ],
+            "otherChangedFieldCount": 3
+          }
+        ]
+      },
+      "peer": {
+        "matchesSealedBaselineBefore": false,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 1,
+        "changes": [
+          {
+            "table": "workspace_audit_outbox",
+            "beforeRows": 1,
+            "afterRows": 0,
+            "changedFieldValueSets": [
+              "createdAt",
+              "id",
+              "workspaceId"
+            ],
+            "otherChangedFieldCount": 3
+          }
+        ]
+      }
+    },
+    "parityWorkspace": {
+      "captured": true,
+      "phase": "restored",
+      "restored": true,
+      "initialName": {
+        "en": false,
+        "zhCN": true
+      },
+      "initialOwnerMatchesSealedBaseline": false,
+      "beforeName": {
+        "en": true,
+        "zhCN": false
+      },
+      "peerMatchesSealedBaseline": true,
+      "onlyGeneratedNameDifference": true,
+      "afterName": {
+        "en": false,
+        "zhCN": true
+      },
+      "ownerMatchesSealedBaseline": true
+    },
+    "artifactRecoveryVm": {
+      "proofGitBlob": "6f83201a2cf9d5429cdecc7df01237c7b2678785",
+      "stoppedDeletedExactGet404": true,
+      "remainingOwnedResources": 0,
+      "actualCurrencyAmount": null
+    }
+  },
+  "nextAction": "Preserve RED and fix actual unnecessary empty legacy backfill DB work. Prepared publisher-only merge b1ce3e10fe5c5ae95584e6bcbc6008462593ef39 remains unpublished; it will not be used as an unrelated Native rerun-to-green.",
+  "limits": [
+    "Original complete windows include authentication/PKCE/navigation/background and all unknowns.",
+    "No later pair, endpoint shift, ready delay, timing extension, count subtraction or cross-boundary addition.",
+    "100-screen pixel parity is the actual automated comparison; root has not visually viewed all PNGs.",
+    "API pg send/receive counters are protocol bytes, not complete network/TLS cost.",
+    "No production runtime publication, official model acceptance or PostHog ingestion is established."
+  ]
+}

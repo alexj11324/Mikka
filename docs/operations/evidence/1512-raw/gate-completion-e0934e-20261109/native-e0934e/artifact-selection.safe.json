@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-09T19:28:37Z",
+  "runId": 42678180995,
+  "attempt": 1,
+  "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "selection": "exact desktop native/package evidence names; original ZIP bytes not fetched yet",
+  "listingEntriesReturned": 9,
+  "artifacts": [
+    {
+      "id": 13702593301,
+      "name": "desktop-package-evidence-114d370f807c465c0f6fe1be47e941aa19adf62a",
+      "sizeInBytes": 1592,
+      "digest": "sha256:277e26d52569290c37b9c3b4943b99996aceeab6867801f64c23c5de31ad9b1d",
+      "expired": false,
+      "createdAt": "2026-11-09T19:25:52Z",
+      "updatedAt": "2026-11-09T19:25:52Z",
+      "expiresAt": "2026-11-16T19:25:50Z",
+      "workflowRun": {
+        "id": 42678180995,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "fix/1512-daemon-fixture-executable-20261109",
+        "head_sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+      }
+    },
+    {
+      "id": 13702368863,
+      "name": "desktop-native-evidence-114d370f807c465c0f6fe1be47e941aa19adf62a",
+      "sizeInBytes": 14612748,
+      "digest": "sha256:d58b545aebcd383ffee74e01dae19c6f4e478463096a0276026d04ceb722e193",
+      "expired": false,
+      "createdAt": "2026-11-09T19:25:56Z",
+      "updatedAt": "2026-11-09T19:25:56Z",
+      "expiresAt": "2026-11-16T19:25:53Z",
+      "workflowRun": {
+        "id": 42678180995,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "fix/1512-daemon-fixture-executable-20261109",
+        "head_sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+      }
+    }
+  ],
+  "downloadApiCalls": 0
+}

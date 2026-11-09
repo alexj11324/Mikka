@@ -1,0 +1,555 @@
+{
+  "schema": "mikka.issue1512.e093-coordinator-backfill-source-diagnosis.v1",
+  "repository": "alexj11324/Mikka",
+  "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+  "actualCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+  "sourceEntries": [
+    {
+      "path": "app/actions/bots.ts",
+      "ref": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "bytes": 4487,
+      "sha256": "41e0a4ade7d04d478c67d118ca9f48507f588db1e6d8dd7ca67590ff98011557",
+      "gitBlob": "31669b225519bb59eb12df87134b18fd1ac5b24d"
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "ref": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "bytes": 22425,
+      "sha256": "691007c37fea38fbc794c83e6a75e28ac40491ff7e2f57ddf5fc92947b9a7257",
+      "gitBlob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc"
+    },
+    {
+      "path": "lib/computer/auto-runtime.ts",
+      "ref": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "bytes": 5630,
+      "sha256": "a3d60c7f5cd73e5f2f2fb340dd186d59ec6f192884fe6a4bc44c1fe4ed64a933",
+      "gitBlob": "e42b1f98ca05f7e499a181bc1fae2aecdb4a5dde"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "ref": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "bytes": 8743,
+      "sha256": "f7d43f80867ec36c34717006d052dff3d63dc46d5e1f69df188bd56a8ee75313",
+      "gitBlob": "9194b24354d6082c51b661105949ba983d6bd108"
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.cjs",
+      "ref": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "bytes": 18406,
+      "sha256": "763d180bfc0d0a62e67a99624a4815eeca953bbcb7290193a5515bb67e24ccad",
+      "gitBlob": "93fc0510b98e9a3812e6b4452a929ac5900fe458"
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "ref": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "bytes": 65832,
+      "sha256": "d9b998eb6babcaa96ad493d3335a333d0f041cc1c7350d295e5a9fb92fb228b8",
+      "gitBlob": "32a8321c981dd6a534f8859fa35f281e874466e6"
+    }
+  ],
+  "evidence": {
+    "lifecycle": {
+      "gitBlob": "028b012e7b284b08dd52412680237986e5c093e9",
+      "bytes": 714837,
+      "sha256": "315abc8b4dc7e9fd66a833a8e038d6e91ebfaf9ca2ebf9574615ea2f7905c093"
+    },
+    "budgetDiff": {
+      "gitBlob": "7a8f92b45e8e60f7e85d0abefbd9eab56443d802",
+      "bytes": 272776,
+      "sha256": "d4286e51fc8830e786389a95bb0189e25fbbf47b505c7a8d412d37f61d118298"
+    }
+  },
+  "scope": {
+    "workflowOriginalReads": 0,
+    "artifactDownloads": 0,
+    "newResources": 0,
+    "sourceEdits": 0,
+    "refUpdates": 0,
+    "testRuns": 0
+  },
+  "verdict": {
+    "fullNative": 451,
+    "fullWeb": 427,
+    "fullDelta": 24,
+    "fullPassed": false,
+    "firstPair": 1,
+    "firstNative": 205,
+    "firstHosted": 207,
+    "firstPassed": true,
+    "previousNativeFull": 433,
+    "previousWebFull": 431,
+    "nativeChange": 18,
+    "webChange": -4,
+    "botsExtra": 26,
+    "otherNativeReductions": -8,
+    "firstReductionWarning": "Native FIRST changed209->205 (-4); Hosted147->207 (+60). Hosted increase is not code optimization."
+  },
+  "attributedInvocation": {
+    "ctx": {
+      "status": "known",
+      "httpInvocationId": "8b7e8158-123c-4b65-9861-8ab88dec1c93",
+      "invocationId": "1d8876b5-c245-45fb-8318-1b0c88335843",
+      "route": "/api/desktop/rpc",
+      "method": "POST",
+      "rpcAction": "bots.pollBots"
+    },
+    "receipt": {
+      "status": "known",
+      "httpInvocationId": "8b7e8158-123c-4b65-9861-8ab88dec1c93",
+      "invocationId": "1d8876b5-c245-45fb-8318-1b0c88335843",
+      "route": "/api/desktop/rpc",
+      "method": "POST",
+      "rpcAction": "bots.pollBots",
+      "startedAt": "2026-11-09T19:23:18.316Z",
+      "completedAt": "2026-11-09T19:23:18.887Z",
+      "httpStatus": 200
+    },
+    "totalQueries": 28,
+    "ordinaryQueries": 2,
+    "extraQueries": 26,
+    "knownExtraQueriesMapped": 18,
+    "unknownExtraQueriesRetained": 8,
+    "orderedOriginalRows": [
+      {
+        "ordinal": 30296,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "6eda258b3007",
+          "command": "SELECT",
+          "parameterCount": 4
+        },
+        "sourceMatches": []
+      },
+      {
+        "ordinal": 30301,
+        "statement": {
+          "status": "unknown"
+        },
+        "sourceMatches": []
+      },
+      {
+        "ordinal": 30305,
+        "statement": {
+          "status": "unknown"
+        },
+        "sourceMatches": []
+      },
+      {
+        "ordinal": 30308,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "033cd26b1e63",
+          "command": "SELECT",
+          "parameterCount": 2
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/computer/auto-runtime.ts",
+            "line": 23,
+            "sql": "SELECT \"botId\" FROM coordinator_bots WHERE \"ownerId\"=$1 AND \"workspaceId\"=$2"
+          }
+        ]
+      },
+      {
+        "ordinal": 30311,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a8402858d4f1",
+          "command": "BEGIN",
+          "parameterCount": 0
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 128,
+            "sql": "BEGIN"
+          },
+          {
+            "path": "lib/computer/auto-runtime.ts",
+            "line": 29,
+            "sql": "BEGIN"
+          }
+        ]
+      },
+      {
+        "ordinal": 30314,
+        "statement": {
+          "status": "unknown"
+        },
+        "sourceMatches": []
+      },
+      {
+        "ordinal": 30318,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4e43732ac430",
+          "command": "SELECT",
+          "parameterCount": 1
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 130,
+            "sql": "SELECT pg_advisory_xact_lock(hashtextextended($1,0))"
+          },
+          {
+            "path": "lib/computer/auto-runtime.ts",
+            "line": 30,
+            "sql": "SELECT pg_advisory_xact_lock(hashtextextended($1,0))"
+          }
+        ]
+      },
+      {
+        "ordinal": 30322,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ed6dd3385054",
+          "command": "SELECT",
+          "parameterCount": 1
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 133,
+            "sql": "SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired"
+          }
+        ]
+      },
+      {
+        "ordinal": 30325,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ed6dd3385054",
+          "command": "SELECT",
+          "parameterCount": 1
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 133,
+            "sql": "SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired"
+          }
+        ]
+      },
+      {
+        "ordinal": 30329,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "111f66fc035a",
+          "command": "SELECT",
+          "parameterCount": 3
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 136,
+            "sql": "SELECT 1 FROM coordinator_bots WHERE \"ownerId\"=$1 AND \"workspaceId\"=$2 AND \"botId\"=$3"
+          }
+        ]
+      },
+      {
+        "ordinal": 30332,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8fa8add06372",
+          "command": "SELECT",
+          "parameterCount": 1
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 198,
+            "sql": "SELECT i.id FROM issues i WHERE EXISTS (\n    SELECT 1 FROM agent_runs r WHERE r.\"userId\"=$1 AND r.\"botId\" IS NULL AND r.\"issueId\"=i.id\n  ) ORDER BY i.id FOR SHARE OF i NOWAIT"
+          }
+        ]
+      },
+      {
+        "ordinal": 30334,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "64cc340ac54d",
+          "command": "SELECT",
+          "parameterCount": 1
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 201,
+            "sql": "SELECT id FROM factory_tasks WHERE \"userId\"=$1 AND \"botId\" IS NULL ORDER BY id FOR UPDATE NOWAIT"
+          }
+        ]
+      },
+      {
+        "ordinal": 30336,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "282df7a61b50",
+          "command": "SELECT",
+          "parameterCount": 1
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 202,
+            "sql": "SELECT id FROM coordinator_events WHERE \"userId\"=$1 AND \"botId\" IS NULL ORDER BY id FOR UPDATE NOWAIT"
+          }
+        ]
+      },
+      {
+        "ordinal": 30338,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "c21ffbe41d41",
+          "command": "SELECT",
+          "parameterCount": 1
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 203,
+            "sql": "SELECT id FROM agent_runs WHERE \"userId\"=$1 AND \"botId\" IS NULL ORDER BY id FOR UPDATE NOWAIT"
+          }
+        ]
+      },
+      {
+        "ordinal": 30339,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0ce5f5ee5527",
+          "command": "SELECT",
+          "parameterCount": 2
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 152,
+            "sql": "SELECT 1 FROM coordinator_sessions WHERE \"userId\"=$1 AND (\"botId\" IS NULL OR \"botId\"=$2) FOR UPDATE NOWAIT"
+          }
+        ]
+      },
+      {
+        "ordinal": 30341,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "cf77441ea9d1",
+          "command": "SELECT",
+          "parameterCount": 2
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 153,
+            "sql": "SELECT coalesce(max(position),0)::int AS last FROM coordinator_messages WHERE \"userId\"=$1 AND \"botId\"=$2"
+          }
+        ]
+      },
+      {
+        "ordinal": 30342,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1cf25d53cf3c",
+          "command": "UPDATE",
+          "parameterCount": 3
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 155,
+            "sql": "UPDATE coordinator_messages m SET \"botId\"=$2, position=$3 + n.rank\n    FROM (SELECT id, CASE WHEN $3=0 THEN position ELSE row_number() OVER (ORDER BY position) END AS rank\n      FROM coordinator_messages WHERE \"userId\"=$1 AND \"botId\" IS NULL) n\n    WHERE m.id=n.id"
+          }
+        ]
+      },
+      {
+        "ordinal": 30344,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "c9cc491b952f",
+          "command": "SELECT",
+          "parameterCount": 1
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 159,
+            "sql": "SELECT * FROM coordinator_sessions WHERE \"userId\"=$1 AND \"botId\" IS NULL"
+          }
+        ]
+      },
+      {
+        "ordinal": 30345,
+        "statement": {
+          "status": "unknown"
+        },
+        "sourceMatches": []
+      },
+      {
+        "ordinal": 30347,
+        "statement": {
+          "status": "unknown"
+        },
+        "sourceMatches": []
+      },
+      {
+        "ordinal": 30349,
+        "statement": {
+          "status": "unknown"
+        },
+        "sourceMatches": []
+      },
+      {
+        "ordinal": 30350,
+        "statement": {
+          "status": "unknown"
+        },
+        "sourceMatches": []
+      },
+      {
+        "ordinal": 30351,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "01e5dcdf8697",
+          "command": "UPDATE",
+          "parameterCount": 3
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 287,
+            "sql": "UPDATE user_schedules s SET bot_id=$2, workspace_id=$3 WHERE s.owner_id=$1 AND s.bot_id IS NULL\n      AND (s.workspace_id=$3 OR (s.workspace_id IS NULL AND EXISTS (\n        SELECT 1 FROM coordinator_events e WHERE e.id=s.source_event_id AND e.\"userId\"=$1 AND e.\"botId\"=$2)))\n      AND NOT EXISTS (SELECT 1 FROM user_schedules o WHERE o.owner_id=$1 AND o.bot_id=$2 AND o.request_id=s.request_id)"
+          }
+        ]
+      },
+      {
+        "ordinal": 30353,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "cf28f8bf6680",
+          "command": "UPDATE",
+          "parameterCount": 2
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 291,
+            "sql": "UPDATE suggestions SET \"botId\"=$2 WHERE \"userId\"=$1 AND \"botId\" IS NULL"
+          }
+        ]
+      },
+      {
+        "ordinal": 30354,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a6c595831f96",
+          "command": "UPDATE",
+          "parameterCount": 2
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 292,
+            "sql": "UPDATE pending_actions SET \"botId\"=$2 WHERE \"userId\"=$1 AND \"botId\" IS NULL"
+          }
+        ]
+      },
+      {
+        "ordinal": 30356,
+        "statement": {
+          "status": "unknown"
+        },
+        "sourceMatches": []
+      },
+      {
+        "ordinal": 30358,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "79663c1d3b43",
+          "command": "COMMIT",
+          "parameterCount": 0
+        },
+        "sourceMatches": [
+          {
+            "path": "lib/coordinator/coordinator-bot.ts",
+            "line": 142,
+            "sql": "COMMIT"
+          },
+          {
+            "path": "lib/computer/auto-runtime.ts",
+            "line": 41,
+            "sql": "COMMIT"
+          }
+        ]
+      },
+      {
+        "ordinal": 30360,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4c80688f4aac",
+          "command": "SELECT",
+          "parameterCount": 4
+        },
+        "sourceMatches": []
+      }
+    ]
+  },
+  "sourceCause": {
+    "path": "pollBots -> getOwner/loadWorkspaceContext -> listOwnerBots -> coordinatorBot -> expired owner backfill freshness -> personalWorkspaceId + ensureFor -> backfillCoordinatorChat -> list SELECT",
+    "observedMaintenance": "18 known extra structures match exact literal SQL in ensureCoordinatorBot and backfillCoordinatorChat/moveExecutionRows/moveChat/moveKeyedRows. Eight original unknown statements remain unknown; their original rows are not reclassified.",
+    "ttl": {
+      "resolvedMs": 60000,
+      "backfillMs": 600000,
+      "apiStartedAt": 1794251590513,
+      "invocationAt": "2026-11-09T19:23:18.316Z",
+      "apiAgeAtInvocationMs": 607803,
+      "limit": "backfilled map timestamp is not recorded. Ten-minute trigger is supported by source branch and timing; no exact last-cache-write timestamp is invented."
+    },
+    "scope": "The explicit-workspace branch runs for nonempty workspaceId, including an explicitly selected Personal workspace. It is not Team-only.",
+    "rowCountLimit": "Original diagnostics have no parameter values or rowCounts. The actual26 statements do not by themselves prove every mutation was a no-op. A real PostgreSQL empty-state regression must establish proposed skip safety."
+  },
+  "candidate": {
+    "status": "design only; not implemented or executed",
+    "boundary": "Optimize only the already-required active Personal lookup in the explicit-workspace backfill branch; null-workspace direct-bot path remains unchanged.",
+    "selection": "Add an existing Coordinator LEFT JOIN and conservative legacyWork EXISTS disjunction to the same original lookup statement.",
+    "skipCondition": "Found authorized active Personal workspace, existing Coordinator botId, and database legacyWork === false. Missing/null/undefined/type-unknown values follow original ensure/backfill.",
+    "requiredTables": [
+      "coordinator_messages",
+      "coordinator_sessions",
+      "agent_runs",
+      "coordinator_events",
+      "factory_tasks",
+      "bot_model_choices",
+      "chat_preferences",
+      "user_schedules",
+      "suggestions",
+      "pending_actions",
+      "agent_kit_heads"
+    ],
+    "specificPredicates": {
+      "bot_model_choices": "ownerId and Personal w.id and botKey='coordinator', not caller's selected Team id",
+      "schedules": "owner_id and bot_id IS NULL, conservatively including every workspace/source variant",
+      "agentHead": "old owner/coordinator head exists and current owner/Personal bot key head does not exist; an already-copied old head remains retained history"
+    },
+    "fallback": "Extract original missing-workspace creation tail and reuse the already-empty lookup result; do not call personalWorkspaceId to query again.",
+    "invariants": [
+      "Original60-second resolved and10-minute backfilled intervals unchanged",
+      "No new cache, timer, polling, database or deferred task",
+      "Existing ensureFor active membership and original lock transaction remain on nonempty/fallback paths",
+      "backfillCoordinatorChat, all move* logic, NOWAIT order and rollback remain unchanged",
+      "Only successful authoritative empty observation or completed original backfill marks existing freshness; failures retain retry behavior",
+      "A legacy write committed after the empty snapshot is preserved for the next original pass, not reassigned or lost"
+    ],
+    "queryCount": "With existing/primed target and Personal Coordinator, the recorded empty-work sequence would be26->1. This is a source counterfactual, not observed new acceptance. Nonempty existing-home paths reuse the same lookup count; absence paths must avoid a second home SELECT."
+  },
+  "requiredValidation": [
+    "Actual PostgreSQL empty explicit-Team and explicit-Personal cases with preprimed backfill:false target; one pool query, no connect/BEGIN/mutation, same returned Coordinator.",
+    "Existing old and target agent heads do not force a needless migration; retained old head content is unchanged.",
+    "Each of11 source categories alone remains detected and uses the original migration path; Personal model-choice scope and conservative schedules are covered.",
+    "Missing workspace and missing Coordinator preserve creation/authorization and do not add a repeated Personal lookup.",
+    "Database boolean false alone enables skip; null/undefined/other values cannot do so.",
+    "Concurrent legacy commit after the empty snapshot survives unchanged, then migrates exactly once at the original10-minute expiry.",
+    "Lookup failure and busy old locks do not mark fresh; a later legitimate read retries.",
+    "Execute the complete existing coordinator-bot real-PG suite, including publication/chat locks, retained frozen execution/Factory families, late rows and revoked workspace boundaries.",
+    "After genuine implementation fixes, retain and rerun the untouched original complete Native windows and FIRST pair1; never count this source counterfactual as acceptance."
+  ],
+  "conclusion": "The +26 actual SQL maintenance branch explains the Native+18 regression after8 fewer ordinary reads. Source-level empty-work elimination is feasible with the already-required lookup; extending TTL, delaying work, dropping unknown rows, or substituting a later sample is not proposed."
+}

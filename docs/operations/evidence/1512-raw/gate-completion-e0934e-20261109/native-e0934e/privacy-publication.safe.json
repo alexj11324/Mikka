@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "scope": "Exact five selected original JSON files, exact decoded Native job log, hash manifest, recovery code and closed derived public receipts",
+  "credentialCategories": [
+    "private-key",
+    "github-token",
+    "provider-key",
+    "jwt",
+    "credential-url",
+    "authorization",
+    "signed-download-query"
+  ],
+  "emailScanner": true,
+  "selectedOriginals": [
+    {
+      "name": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "4efdd512e846459aa4423786928cf7e75ab46692b6481dd8a0f615c8c4a29202",
+      "gitBlob": "3cdd249241a8654a20dc6342596c8c15af514dff",
+      "findings": []
+    },
+    {
+      "name": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "0039bbfcbac6275b42e8f430f40b7758b8674e07ee64bea7d3626f63461721be",
+      "gitBlob": "eb137e49d3c0eed120bc700c24065d1eacc3545a",
+      "findings": []
+    },
+    {
+      "name": "lifecycle.json",
+      "bytes": 714837,
+      "sha256": "315abc8b4dc7e9fd66a833a8e038d6e91ebfaf9ca2ebf9574615ea2f7905c093",
+      "gitBlob": "028b012e7b284b08dd52412680237986e5c093e9",
+      "findings": []
+    },
+    {
+      "name": "parity.json",
+      "bytes": 116946,
+      "sha256": "4ffa7b7531e0733eb049cfba1d2ecfe55dc350f20bae2c9e2e67b49fab8fec84",
+      "gitBlob": "ebb9040c4d828c3e016d2730fe1ed8d0c633397d",
+      "findings": []
+    },
+    {
+      "name": "smoke.json",
+      "bytes": 3144,
+      "sha256": "17983804b4ca07687b2b83e69cfeadd4a47530e1cb7d1b61a9cc4908bd12cda6",
+      "gitBlob": "358bd6e5e7eff39cc25682a3183713fae0f46ec2",
+      "findings": []
+    }
+  ],
+  "jobLog": {
+    "path": "native-e0934e/job-129369462586.original.log",
+    "kind": "exact_decoded_job_log",
+    "mode": "100644",
+    "bytes": 262049,
+    "sha256": "ed61c690d72a99a67c32febcdc75c46a48fd5168009c5aa422de1b10caf8984f",
+    "gitBlob": "028e89a3b937ea6c21ee9e07bb5f45d4d396a4cd",
+    "remoteConfirmed": true,
+    "scanFindings": [],
+    "findings": []
+  },
+  "recoveryHelpers": {
+    "gitBlob": "dfb471d51d9756bf96b4440375d13ac164515edb",
+    "findings": []
+  },
+  "metadataBoundary": {
+    "unrelatedRawCommitAuthorEmailFieldsNotPublished": true,
+    "externalAppDescriptionContainingEmailNotPublished": true,
+    "projectedOfficialStatusesAndTimesPreserved": true
+  },
+  "privateMaterialNotPublished": [
+    "temporary signed download URLs",
+    "tool response envelopes carrying file references",
+    "raw platform metadata unrelated to status/source/cleanup"
+  ],
+  "originalBytesAltered": false,
+  "originalWithheldForCredentialFindings": [],
+  "limitations": [
+    "Pattern scanning does not prove absence of every conceivable secret.",
+    "Artifact image pixels were not newly inspected; only original parity measurements and hashes are retained.",
+    "The complete ZIP remains its original GitHub artifact; only the five chosen JSON originals and 310-entry hash index are included in this public payload."
+  ]
+}

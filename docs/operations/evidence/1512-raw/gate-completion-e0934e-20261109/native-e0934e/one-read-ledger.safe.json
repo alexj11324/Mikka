@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "runId": 42678180995,
+  "attempt": 1,
+  "originalReads": {
+    "jobLogs": {
+      "native": 1,
+      "otherJobs": 0
+    },
+    "artifactDownloads": 2,
+    "artifactReferenceByteReads": 2,
+    "artifactRefreshOrRedownloads": 0
+  },
+  "compute": {
+    "vmsCreated": 1,
+    "vmExtensions": 0,
+    "businessRuns": 0,
+    "modelCalls": 0,
+    "nativeReruns": 0,
+    "testReruns": 0,
+    "refMutations": 0,
+    "localExecRetries": 0
+  },
+  "vmCleanupBlob": "6f83201a2cf9d5429cdecc7df01237c7b2678785",
+  "ledger": [
+    {
+      "kind": "recovery_boundary",
+      "at": "2026-11-09T19:16:33Z",
+      "priorNativeOriginalReads": 0,
+      "priorArtifactDownloads": 0,
+      "priorVmCreates": 0,
+      "oldRamMetadataLost": true,
+      "finalMetadataWillBeFreshlyClosed": true
+    },
+    {
+      "kind": "main_jobs_metadata",
+      "at": "2026-11-09T19:21:49Z",
+      "total": 21,
+      "nativeStatus": "in_progress",
+      "nativeConclusion": null
+    },
+    {
+      "kind": "main_jobs_metadata",
+      "at": "2026-11-09T19:23:31Z",
+      "total": 21,
+      "nativeStatus": "in_progress",
+      "nativeConclusion": null
+    },
+    {
+      "kind": "main_jobs_metadata",
+      "at": "2026-11-09 19:25:17 UTC",
+      "total": 21,
+      "nativeStatus": "in_progress",
+      "nativeConclusion": null
+    },
+    {
+      "kind": "main_jobs_metadata",
+      "at": "2026-11-09 19:26:38 UTC",
+      "total": 21,
+      "nativeStatus": "in_progress",
+      "nativeConclusion": null
+    },
+    {
+      "kind": "main_jobs_metadata",
+      "at": "2026-11-09 19:28:17 UTC",
+      "total": 21,
+      "nativeStatus": "in_progress",
+      "nativeConclusion": null
+    },
+    {
+      "kind": "artifact_metadata",
+      "at": "2026-11-09T19:28:37Z",
+      "selectedIds": [
+        13702593301,
+        13702368863
+      ],
+      "downloadApiCalls": 0
+    },
+    {
+      "kind": "artifact_download_api",
+      "artifactId": 13702593301,
+      "count": 1,
+      "fileReferenceReturned": true,
+      "urlPublished": false
+    },
+    {
+      "kind": "artifact_download_api",
+      "artifactId": 13702368863,
+      "count": 1,
+      "fileReferenceReturned": true,
+      "urlPublished": false
+    },
+    {
+      "kind": "main_jobs_metadata",
+      "at": "2026-11-09 19:33:35 UTC",
+      "total": 22,
+      "nativeStatus": "completed",
+      "nativeConclusion": "success"
+    },
+    {
+      "kind": "original_native_job_log",
+      "jobId": 129369462586,
+      "count": 1,
+      "bytes": 262049,
+      "sha256": "ed61c690d72a99a67c32febcdc75c46a48fd5168009c5aa422de1b10caf8984f",
+      "gitBlob": "028e89a3b937ea6c21ee9e07bb5f45d4d396a4cd",
+      "published": true
+    }
+  ],
+  "readerBoundary": "Root reads Integration and final strict. current_source_review reads Changes/Source/Core/PR E2B plus its explicitly authorized PG logs. Native reader read only job129369462586 and the two selected Native/package artifacts.",
+  "metadataLimitation": "Earlier volatile metadata cache was lost before any original read; ledger records the explicit recovery boundary. Final metadata closure is freshly complete."
+}

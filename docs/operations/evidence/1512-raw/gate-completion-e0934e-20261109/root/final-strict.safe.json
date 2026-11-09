@@ -1,0 +1,62 @@
+{
+  "schema": "mikka.issue1512.e093-final-strict.v1",
+  "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "actualCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+  "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+  "runId": 42678180995,
+  "attempt": 1,
+  "jobId": 129385461291,
+  "startedAt": "2026-11-09T19:29:59Z",
+  "completedAt": "2026-11-09T19:30:07Z",
+  "conclusion": "success",
+  "original": {
+    "gitBlob": "f2d4fa6eea7493f6b481fa1355c3d40adc2f60b7",
+    "bytes": 14086,
+    "sha256": "76c134bccc91467f1831ef32a79a0660c29082f918e2c9d7a5f7ab6a89d5b9ad",
+    "jobId": 129385461291,
+    "originalJobLogToolReads": 1
+  },
+  "changesResult": "success",
+  "checks": [
+    {
+      "name": "CORE",
+      "expectedTrue": true,
+      "success": true
+    },
+    {
+      "name": "INTEGRATION",
+      "expectedTrue": true,
+      "success": true
+    },
+    {
+      "name": "SOURCE",
+      "expectedTrue": true,
+      "success": true
+    },
+    {
+      "name": "DAEMON",
+      "expectedTrue": true,
+      "success": true
+    },
+    {
+      "name": "IMAGE",
+      "expectedTrue": true,
+      "success": true
+    },
+    {
+      "name": "DESKTOP",
+      "expectedTrue": true,
+      "success": true
+    },
+    {
+      "name": "ANALYTICS",
+      "expectedTrue": true,
+      "success": true
+    }
+  ],
+  "limits": [
+    "These seven actual selected-job gates passed; the separate e093 E2B workflow still failed.",
+    "Native job functional success is not Native SQL budget acceptance. Preliminary original artifact full451>427 is RED and must remain so after exact recomputation.",
+    "This does not prove main deployment, a newly published runtime, or either required real PostHog case."
+  ]
+}

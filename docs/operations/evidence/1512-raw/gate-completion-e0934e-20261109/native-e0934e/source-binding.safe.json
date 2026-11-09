@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+  "actualCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+  "orderedCheckoutParents": [
+    "d8e09ac218f5656763a5bc42a75e45fc385caede",
+    "e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+  ],
+  "ownNativeJobLog": {
+    "path": "native-e0934e/job-129369462586.original.log",
+    "kind": "exact_decoded_job_log",
+    "mode": "100644",
+    "bytes": 262049,
+    "sha256": "ed61c690d72a99a67c32febcdc75c46a48fd5168009c5aa422de1b10caf8984f",
+    "gitBlob": "028e89a3b937ea6c21ee9e07bb5f45d4d396a4cd",
+    "remoteConfirmed": true,
+    "scanFindings": []
+  },
+  "checkoutOccurrences": [
+    {
+      "line": 178,
+      "sha": "114d370f807c465c0f6fe1be47e941aa19adf62a"
+    }
+  ],
+  "originalRevisionFields": {
+    "lifecycle": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+    "smoke": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+    "crypto": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+    "parityApp": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+    "parityHarness": "114d370f807c465c0f6fe1be47e941aa19adf62a"
+  },
+  "parityHarnessSha256": "595f222d7ad053d785068fe632a842e5a0e10217a6b65352e0b5bc581149c061",
+  "treeProof": {
+    "gitBlob": "ae9994c3c5513fc5d320a311ed638ac5a88dc60b",
+    "bytes": 83112,
+    "readAndGitBlobHashVerified": true,
+    "source": "current_source_review independently read exact git commit; Native reader read/hash verified that frozen receipt"
+  },
+  "nativeLogNodeVersions": [
+    "v24.22.2"
+  ],
+  "architecture": "arm64",
+  "platform": "darwin",
+  "packageBinding": "The standalone package JSON has no revision field. Its complete object equals the crypto report package; exact CDHash and all 3 packaged processes are verified.",
+  "job": {
+    "id": 129369462586,
+    "runId": 42678180995,
+    "attempt": 1,
+    "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+    "head_sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-11-09T19:01:46Z",
+    "completed_at": "2026-11-09T19:29:56Z"
+  },
+  "artifacts": [
+    {
+      "id": 13702593301,
+      "name": "desktop-package-evidence-114d370f807c465c0f6fe1be47e941aa19adf62a",
+      "bytes": 1592,
+      "digest": "sha256:277e26d52569290c37b9c3b4943b99996aceeab6867801f64c23c5de31ad9b1d",
+      "expired": false,
+      "createdAt": "2026-11-09T19:25:52Z",
+      "expiresAt": "2026-11-16T19:25:50Z",
+      "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "runId": 42678180995
+    },
+    {
+      "id": 13702368863,
+      "name": "desktop-native-evidence-114d370f807c465c0f6fe1be47e941aa19adf62a",
+      "bytes": 14612748,
+      "digest": "sha256:d58b545aebcd383ffee74e01dae19c6f4e478463096a0276026d04ceb722e193",
+      "expired": false,
+      "createdAt": "2026-11-09T19:25:56Z",
+      "expiresAt": "2026-11-16T19:25:53Z",
+      "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "runId": 42678180995
+    }
+  ],
+  "installedDaemon": [
+    {
+      "mode": "bundled",
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.564",
+        "protocolVersion": 3
+      },
+      "service": {
+        "platform": "darwin",
+        "definition": "file",
+        "profile": "matches",
+        "dev": true,
+        "installedVersion": "0.0.564",
+        "installedRevision": "8db16095f46be955df22f42914e0f89b6e5f3d11"
+      }
+    },
+    {
+      "mode": "hosted",
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.564",
+        "protocolVersion": 3
+      },
+      "service": {
+        "platform": "darwin",
+        "definition": "file",
+        "profile": "matches",
+        "dev": true,
+        "installedVersion": "0.0.564",
+        "installedRevision": "8db16095f46be955df22f42914e0f89b6e5f3d11"
+      }
+    }
+  ],
+  "limits": {
+    "eventHeadIsNotSubstitutedForActualCheckout": true,
+    "installedDaemonRevisionIsSeparateFromAppSource": true,
+    "workerHashNotReportedByTheseOriginals": true,
+    "productionAcceptance": false
+  }
+}

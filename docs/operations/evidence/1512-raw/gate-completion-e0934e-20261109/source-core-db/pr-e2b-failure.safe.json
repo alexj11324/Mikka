@@ -1,0 +1,206 @@
+{
+  "schema": "mikka.issue1512.e093.pr-e2b-test-failure.v1",
+  "repository": "alexj11324/Mikka",
+  "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "actualCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+  "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+  "orderedCheckoutParents": [
+    "d8e09ac218f5656763a5bc42a75e45fc385caede",
+    "e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+  ],
+  "mainRun": {
+    "id": 42678180995,
+    "attempt": 1
+  },
+  "actualSourceProof": "All six original logs print git log -1 exact checkout; Git commit API previously read independently confirmed parents and tree. Event head is not substituted for checkout.",
+  "treeReview": {
+    "gitBlob": "036538a3bdfdd056448a84edf5037408990a048b",
+    "bytes": 39863,
+    "sha256": "0c6f0292cb227ea51b7930736b26c2ff41a8f22040f14340cb5fd55ebb9b1ebf"
+  },
+  "workflowRun": {
+    "id": 42678181268,
+    "attempt": 1,
+    "conclusion": "failure"
+  },
+  "job": {
+    "id": 129365164445,
+    "name": "test",
+    "startedAt": "2026-11-09T18:54:09Z",
+    "completedAt": "2026-11-09T18:54:26Z",
+    "conclusion": "failure"
+  },
+  "original": {
+    "kind": "e2bTest",
+    "jobId": 129365164445,
+    "bytes": 45766,
+    "sha256": "4205878c22b8d6fad1a187e784ad9e692d0af01bcaee211bbe726813b88a05a3",
+    "gitBlob": "72db002db5f00734991bcf20e766a3380bb04bf5",
+    "originalToolReads": 1,
+    "checkoutLine": 122,
+    "node": "v24.22.2",
+    "rawPath": "e2bTest.original.log",
+    "originalByteHashVerified": true
+  },
+  "execution": {
+    "node": "v24.22.2",
+    "command": "node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+    "tests": 211,
+    "pass": 210,
+    "fail": 1,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "durationMs": 2302.311788,
+    "failedStep": 5,
+    "anchors": [
+      {
+        "line": 259,
+        "text": "✖ exact root CA publication rules preserve metadata and reject other certificate or CLI paths (20.232437ms)"
+      },
+      {
+        "line": 377,
+        "text": "ℹ tests 211"
+      },
+      {
+        "line": 379,
+        "text": "ℹ pass 210"
+      },
+      {
+        "line": 380,
+        "text": "ℹ fail 1"
+      },
+      {
+        "line": 381,
+        "text": "ℹ cancelled 0"
+      },
+      {
+        "line": 382,
+        "text": "ℹ skipped 0"
+      },
+      {
+        "line": 383,
+        "text": "ℹ todo 0"
+      },
+      {
+        "line": 384,
+        "text": "ℹ duration_ms 2302.311788"
+      },
+      {
+        "line": 389,
+        "text": "✖ exact root CA publication rules preserve metadata and reject other certificate or CLI paths (20.232437ms)"
+      },
+      {
+        "line": 390,
+        "text": "  AssertionError [ERR_ASSERTION]: Missing expected exception."
+      },
+      {
+        "line": 391,
+        "text": "      at TestContext.<anonymous> (file:///home/runner/work/Mikka/Mikka/scripts/e2b/publish-template-env.test.mjs:180:10)"
+      }
+    ]
+  },
+  "source": {
+    "test": {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "bytes": 33829,
+      "sha256": "ddd4d584ea03f2ceb6efa50623a419d7fcfa8be54cfaba99b06b890a842bf0a3",
+      "gitBlob": "86843115336fa4021df9ac33e387caab5cc04e64",
+      "testDefinitionLine": 144,
+      "failedAssertionLine": 180
+    },
+    "policy": {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "bytes": 6238,
+      "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+      "gitBlob": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+    },
+    "workflow": {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "bytes": 18539,
+      "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+      "gitBlob": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9"
+    }
+  },
+  "cause": {
+    "classification": "deterministic contract mismatch in an existing JavaScript negative fixture",
+    "actualMutationTuple": {
+      "template": "codex",
+      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "kind": "file",
+      "beforeMode": 420,
+      "afterMode": 511,
+      "octalBefore": "0644",
+      "octalAfter": "0777"
+    },
+    "testExpected": "runtime_release_conservation_invalid exception",
+    "actual": "No exception; assertion failed",
+    "policyFact": "The source-bound policy explicitly allows this exact Codex file mode transition. The JavaScript fixture still required rejection.",
+    "notPlatformFailure": true,
+    "limits": "This isolates the observed assertion failure. It does not certify all publication guard invariants or test any later owner fix."
+  },
+  "skippedChecks": [
+    {
+      "step": 6,
+      "command": "python3 scripts/e2b/build-template.test.py"
+    },
+    {
+      "step": 7,
+      "command": "python3 packages/daemon/scripts/prepare-worker-install.test.py"
+    },
+    {
+      "step": 8,
+      "command": "python3 scripts/e2b/official-files.test.py"
+    },
+    {
+      "step": 9,
+      "command": "python3 scripts/e2b/cleanup-template-candidates.test.py"
+    },
+    {
+      "step": 10,
+      "command": "python3 -m py_compile scripts/e2b/validate-official-instances.py"
+    },
+    {
+      "step": 11,
+      "command": "bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh"
+    }
+  ],
+  "releaseJobs": [
+    {
+      "id": 129365343430,
+      "name": "check",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129365346036,
+      "name": "publish",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129365346249,
+      "name": "subscriptions",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129365346275,
+      "name": "await-web",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129365346688,
+      "name": "validate",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129365347273,
+      "name": "cleanup",
+      "conclusion": "skipped"
+    }
+  ],
+  "boundaries": [
+    "Python policy tests were skipped; no 34/38 policy pass claim for this run.",
+    "This PR job is offline test evidence, not production R7 or provider cleanup evidence.",
+    "Runner post-checkout cleanup completed; release cleanup was skipped.",
+    "No rerun, changed policy, raised timeout or new resource was performed by this reader."
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema": "mikka.issue1512.e093-root-ci-coverage.v1",
+  "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "sourceMetadataGitBlob": "4bf5ccbb769890a21ccd726631269f26e40866f7",
+  "sourceMetadataSha256": "279be8152667b101ffaab741be40cdbdffa099ca6b7cc95657fdcb1760ab0474",
+  "workflows": {
+    "total": 10,
+    "conclusions": {
+      "failure": 1,
+      "success": 9
+    }
+  },
+  "jobs": {
+    "total": 40,
+    "conclusions": {
+      "failure": 1,
+      "skipped": 8,
+      "success": 31
+    }
+  },
+  "checks": {
+    "total": 41,
+    "conclusions": {
+      "success": 32,
+      "skipped": 8,
+      "failure": 1
+    }
+  },
+  "extraNonWorkflowCheck": [
+    {
+      "id": 129365173729,
+      "name": "GitGuardian Security Checks",
+      "conclusion": "success"
+    }
+  ],
+  "errors": [],
+  "limits": "Exact-source functional gate metadata; preserves E2B failure and does not override full Native SQL RED or establish production acceptance."
+}

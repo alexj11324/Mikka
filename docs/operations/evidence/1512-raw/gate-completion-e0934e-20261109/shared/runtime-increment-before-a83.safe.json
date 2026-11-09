@@ -1,0 +1,199 @@
+{
+  "schema": "mikka.issue1512.shared-runtime-incremental-review.v1",
+  "observedAtUtc": "2026-11-09 18:57:07 UTC",
+  "afterUtc": "2026-11-09T18:49:00Z",
+  "repository": "alexj11324/Mikka",
+  "previousIndependentControlProof": "93e67ab4759abb6558bf4c4b76ff27f01a90184b",
+  "main": {
+    "sha": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+    "lastDirectRefRead": "2026-11-09T18:55:07Z"
+  },
+  "shared1835": {
+    "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+    "state": "open",
+    "merged": false,
+    "latestUpdate": "2026-11-09T18:50:50Z",
+    "sourceRepairPublished": false,
+    "repairOwner": "Original #1835/#1505 owner; no competing test or policy edit by reviewer"
+  },
+  "ownerIncrement": [
+    {
+      "id": 6748520334,
+      "createdAt": "2026-11-09T18:50:50Z",
+      "updatedAt": "2026-11-09T18:50:50Z",
+      "body": "### 更正：显式 attempt jobs 发现真实 E2B 测试失败；恢复 operator 0 POST\n\n一次恢复运行 [42677288279/A1](https://github.com/alexj11324/Mikka/actions/runs/42677288279) 已完成并关闭，Ops `e313d24c` →正常FF关闭 `195c681d414e958ad43fbd7222872aa13ca0ef05`。固定窗口18:47:57–18:57:57，实际结束18:48:38，无生产资源/账号操作。\n\n**先前默认 jobs 查询返回空，并不足以断言这五条 A1 全部没有 job。** Operator 使用 `/attempts/1/jobs` 做全组预检时，发现 E2B 42673936949 已有 test job，因前提不成立停止，artifact `receipt.targets=[]`，实际 **0 POST**；未发任何重跑。独立显式 attempt 查询也显示 Cloud 有2个成功 job；CI、Browser、Unattended仍0jobs。旧2408 E2B页面的internal-server-error注释仍是其实际证据，但不能拿它覆盖本头不同的失败。\n\n本头 E2B test [129351380902](https://github.com/alexj11324/Mikka/actions/runs/42673936949/job/129351380902) 的唯一原日志已由Root读取：`publish-template-env.test.mjs:180` 在“exact root CA publication rules…”断言 `Missing expected exception`。这是新增官方Codex根证书0644→0777规则后的旧negative fixture未同步。正在修复测试合同，补精确正例及其他mode/type/uid/path拒绝，matcher/policy与发布门槛不放宽。后续只核修复后精确头的完整CI。\n\n恢复artifact ZIP413B/SHA256 `2dbb5dfdd317f111b1efdb4452d0e1f7a4ecb34a142726e30538611193b4e883`，operator原log372938B/SHA`8042477919ef5389d6e46a4e65f64cd4302233e368a47a8c4ddc60c426790460`，E2B test原log45037B/SHA`b93b4543c80dc56115e78d97312d22946f1b4d53d506ff864c5cd6805e1018f3`。正式生产新样本仍0。",
+      "url": "https://github.com/alexj11324/Mikka/pull/1835#issuecomment-6748520334"
+    }
+  ],
+  "directSourceConfirmation": {
+    "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+    "path": "scripts/e2b/publish-template-env.test.mjs",
+    "gitBlob": "86843115336fa4021df9ac33e387caab5cc04e64",
+    "bytes": 33829,
+    "sha256": "ddd4d584ea03f2ceb6efa50623a419d7fcfa8be54cfaba99b06b890a842bf0a3",
+    "anchors": [
+      {
+        "line": 144,
+        "text": "test('exact root CA publication rules preserve metadata and reject other certificate or CLI paths', () => {"
+      },
+      {
+        "line": 179,
+        "text": "codex.finalization.providerChanges[0] = { path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 511 } }"
+      },
+      {
+        "line": 180,
+        "text": "assert.throws(() => assertConservation(codex, 'codex'), /runtime_release_conservation_invalid/)"
+      }
+    ],
+    "conclusion": "This negative fixture conflicts directly with the newly admitted exact Codex root regular-file mode420->511 rule. It corroborates the original owner's Missing expected exception diagnosis without rereading its log.",
+    "expectedRepair": "Owner reports updating precise positive/negative test contract while preserving matcher/policy and release gates. No new fixed repaired head or safe stdout Git reference was published in the read increment."
+  },
+  "recoveryOperator": {
+    "runId": 42677288279,
+    "attempt": 1,
+    "activeOpsPrefix": "e313d24c",
+    "closedOps": "195c681d414e958ad43fbd7222872aa13ca0ef05",
+    "actualPosts": 0,
+    "targets": [],
+    "reason": "Explicit attempt jobs preflight found real E2B job; the prerequisite for recovering zero-job failures was false.",
+    "evidenceBasis": "Owner comment6748520334; no original operator log or artifact downloaded."
+  },
+  "d8R7": {
+    "runId": 42675680821,
+    "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "failure",
+    "updatedAt": "2026-11-09T18:46:38Z",
+    "jobs": [
+      {
+        "id": 129356280112,
+        "name": "test",
+        "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T18:37:45Z",
+        "completedAt": "2026-11-09T18:37:59Z"
+      },
+      {
+        "id": 129356424080,
+        "name": "check",
+        "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T18:38:02Z",
+        "completedAt": "2026-11-09T18:38:23Z"
+      },
+      {
+        "id": 129356626157,
+        "name": "validate / build",
+        "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure",
+        "startedAt": "2026-11-09T18:38:26Z",
+        "completedAt": "2026-11-09T18:46:13Z"
+      },
+      {
+        "id": 129360806354,
+        "name": "await-web",
+        "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T18:46:14Z",
+        "completedAt": "2026-11-09T18:46:13Z"
+      },
+      {
+        "id": 129360808447,
+        "name": "subscriptions",
+        "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T18:46:14Z",
+        "completedAt": "2026-11-09T18:46:14Z"
+      },
+      {
+        "id": 129360814757,
+        "name": "publish",
+        "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T18:46:15Z",
+        "completedAt": "2026-11-09T18:46:14Z"
+      },
+      {
+        "id": 129360815452,
+        "name": "cleanup",
+        "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T18:46:17Z",
+        "completedAt": "2026-11-09T18:46:38Z"
+      }
+    ],
+    "counts": {
+      "total": 7,
+      "success": 3,
+      "failure": 1,
+      "skipped": 3,
+      "active": 0
+    },
+    "timestamps": "Original API timestamp fields retained, including skipped-job completion/start ordering; no duration inferred for skipped jobs.",
+    "originalOwnerProjection": "## 本轮 d8e R7 失败及精确清理（本 owner 唯一读取，勿重复原件）\n\n实际 **R7 42675680821/A1** / source **d8e09ac218f5656763a5bc42a75e45fc385caede**：test/check成功，validate/build **129356626157 FAILURE**；await-web/subscriptions/publish全部SKIPPED，**没有发布新runtime**。check原件实际比较 wanted worker **75b7462d53f9725cb92d40112c504b4f32d795c0** 与当时published worker **a45382985c12c93fb0832eabd8010f60c9b7dabb**；不能把旧有效运行环境当新候选通过。\n\n首次结构化拒绝在 **18:42:52.7260690Z**，`kind=claude, stage=fresh_scan, code=official_files_changed, exitCode=1`，仅两项：\n- `/etc/ssl/certs/1560546e.0`：before普通file、SHA256 **4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1** → link，target=`e2b-ca.pem`。\n- `/etc/ssl/certs/e2b-ca.pem`：同一before file/SHA → link，target=`/usr/local/share/ca-certificates/e2b-ca.crt`。\n\n拒绝行只提供kind/sha256/target，未补造mode/uid/gid。该记录与#1835处理的Claude精确路径相符；**不据缺少另一个拒绝行宣称其他并行future全通过**，也不扩大任何保全规则。源码和新修复继续由既有runtime owner收口，本方不重写/代合。\n\n**本run实际清理已读回**：\n- build finally **18:46:08.7565639Z**，final cleanup job **129360815452 SUCCESS** 的实际receipt时间 **18:46:35.4071245Z**；\n- 两receipt都精确绑定source d8e / run42675680821；\n- `mikka-d8e09ac218f5-42675680821-1-{desktop,claude,codex}` 三个expected名字状态均 **absent**，scoped `sandboxes=[] / errors=[]`。\n这是expected名字absent，未改写为本方亲见DELETE/GET404或全局资源0；其他owner资源未动。\n\n本方各原件只读取一次，保留decoded UTF-8：\n- check129356424080：358577 B，SHA256 **e01a5b4f210032435a70b8eb1b25726826571d649ba81c63d6f03d2c06e4e236**\n- build129356626157：140223 B，SHA256 **41521ebad387d073f6073dc586b1df92a3167d44372fcfea9c7678506b492cde**\n- cleanup129360815452：28693 B，SHA256 **4cdd7bb57e4c2b8979432fe98240f59cf4e9fa8381f9e3b3ae25c75e14322ecd**\n\n执行层暂不可用，摘要和digest从已取得的原件在内存计算，未新增机器/凭据/任务，也未下载重复artifact。原始日志不贴公共评论；以上固定job和摘要供各owner直接复用。\n\nWeb42675680440仍在正常生产上传，原 **18:34:10–19:19:10UTC** 源段不延长；Web/本方发布收口后会明确提前释放。#1772和自动任务仍OPEN/enabled，生产只读复验尚未在新source执行，环境等待不扩成永久source hold。",
+    "originalOwnerProjectionUrl": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6748556299",
+    "knownFailure": {
+      "phase": "fresh_scan",
+      "kind": "claude",
+      "code": "official_files_changed",
+      "exitCode": 1,
+      "at": "2026-11-09T18:42:52.7260690Z",
+      "paths": [
+        "/etc/ssl/certs/1560546e.0",
+        "/etc/ssl/certs/e2b-ca.pem"
+      ],
+      "knownBeforeSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "unknownFields": [
+        "mode",
+        "uid",
+        "gid"
+      ],
+      "evidenceBasis": "Original owner closed projection only"
+    },
+    "wantedWorker": "75b7462d53f9725cb92d40112c504b4f32d795c0",
+    "publishedWorkerObservedByOwner": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+    "releaseProduced": false,
+    "cleanupScope": "Both owner's receipts show the three exact expected names absent with source/run-scoped sandboxes=[] and errors=[]. This reviewer does not promote that to observed DELETE/GET404 or global resource absence.",
+    "otherParallelFutures": "No inferred success from lack of another refusal line."
+  },
+  "currentCoordination": {
+    "actualSourceOwner": 1833,
+    "start": "2026-11-09T18:34:10Z",
+    "absoluteEnd": "2026-11-09T19:19:10Z",
+    "earlyReleaseObserved": false,
+    "latestOwnerStatement": "Web42675680440 still uploading; owner will release after its real publication/cleanup close. The existing absolute source window is not extended.",
+    "smokeOrNewModelActivity": "No new active source-account or SMOKE/model session announced in the read increment.",
+    "noFuturePlanTreatedAsHold": true
+  },
+  "nextMeaningfulEvents": [
+    "#1835 owner publishes the precise repaired source head and its new exact CI evidence.",
+    "#1833 publishes actual Web completion and explicit source release.",
+    "A subsequent properly patched shared R7 completes all original conservation/subscription/publication gates."
+  ],
+  "activity": {
+    "originalJobLogReads": 0,
+    "artifactZipDownloads": 0,
+    "controlRawJsonReads": 0,
+    "newResources": 0,
+    "modelCalls": 0,
+    "productionCalls": 0,
+    "ciReruns": 0,
+    "sourceOrRefUpdates": 0,
+    "onlyNewGitObject": "this unreferenced safe evidence blob"
+  }
+}

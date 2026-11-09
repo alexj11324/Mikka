@@ -1,0 +1,1095 @@
+{
+  "schema": "mikka.issue1512.shared-a83-publisher-review.v1",
+  "observedAtUtc": "2026-11-09 19:17:43 UTC",
+  "repository": "alexj11324/Mikka",
+  "scope": "Independent immutable Git source/diff/tree review and read-only metadata; no application test execution, original CI logs or artifact downloads.",
+  "fixedSources": {
+    "policyBase": {
+      "head": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+      "tree": "26cedfb597451f03960f6f582806599d1ca427b0"
+    },
+    "policyFix": {
+      "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+      "tree": "99833a63d69f6b88c64b7c44b44df06d1a0506c5",
+      "parents": [
+        "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c"
+      ]
+    },
+    "ownCurrent": {
+      "head": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+      "liveRefRead": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+    },
+    "preparedMerge": {
+      "head": "b1ce3e10fe5c5ae95584e6bcbc6008462593ef39",
+      "tree": "d1360faedd0d0067530f1325f7955732a618279d",
+      "parents": [
+        "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+        "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055"
+      ],
+      "published": false,
+      "approvalToPublishOrMerge": false
+    }
+  },
+  "exactTreeDelta": {
+    "method": "Compare every child path/mode/type/SHA in nontruncated immutable Git trees; descend only mismatched tree objects. Equal subtree SHAs preserve all contained leaves. Compare result with complete GitHub cb2...a83 file patch.",
+    "policyTreesRead": [
+      "26cedfb597451f03960f6f582806599d1ca427b0",
+      "99833a63d69f6b88c64b7c44b44df06d1a0506c5",
+      "3633484a30f0d59cb8135071f33fad57ed2e5df6",
+      "df5aae410b532572a41350db5ab51646a1c2dfff",
+      "e97aeaeffd131974d52426f752cc5a0c94c38807",
+      "f407f965fc586c45229279ffe83fae0cb9bc5020",
+      "4dede2f9377d0e75d0a5ad04f0d1aa23eeed58fd",
+      "b01fb25037b4ddada6092010d625a75e5070bf2d",
+      "84bbbe889d23cefebfb3aef18881b701f51d9a2d",
+      "d3b9eaa8ba6a98bef9c332c04f937a92a13eb84a",
+      "231cbc1c1399a0c0a31f492283a1ad4a29a2a925",
+      "efc8be656692c852373a64f23caa16625d16895e"
+    ],
+    "preparedMergeTreesTraversed": [
+      "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+      "d1360faedd0d0067530f1325f7955732a618279d",
+      "248e8979e196017502700b51e14b8deb1e89d2a9",
+      "2baf27bac92fa9a14bfec1df9250422935826fed",
+      "8ea6ff4f076cd98810eb44ec65667526c4e885f5",
+      "46329e2264a040156696d0516ae9cba05894a252",
+      "c1a3ca6b4f66cdef15a2c0d127508a93fd8cf431",
+      "563f073765dd5f751a96e445c605da09afd7bf2d",
+      "0979834bf0521db7f56b93792cad4e54312226ec",
+      "13084098b059b4f70205b8be0ff882fcb7fb2ef2",
+      "231cbc1c1399a0c0a31f492283a1ad4a29a2a925",
+      "efc8be656692c852373a64f23caa16625d16895e"
+    ],
+    "delta": [
+      {
+        "path": "scripts/e2b/publish-template-env.mjs",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "56ca3993bf11e33ca02a28ccf0678a45ee509215"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095"
+        }
+      },
+      {
+        "path": "scripts/e2b/publish-template-env.test.mjs",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "86843115336fa4021df9ac33e387caab5cc04e64"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "52fac123eb4f1e6ba8513b38148295f2c2648458"
+        }
+      },
+      {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ed5767a9fe2a96d38c9423fa79fa05d8a1124e1d"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee"
+        }
+      }
+    ],
+    "policyDeltaExactlyMatchesPreparedMergeDelta": true,
+    "allOtherPathsAndModesUnchanged": true,
+    "criticalSame": {
+      "build-template.py": [
+        {
+          "tree": "84bbbe889d23cefebfb3aef18881b701f51d9a2d",
+          "mode": "100644",
+          "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3"
+        },
+        {
+          "tree": "d3b9eaa8ba6a98bef9c332c04f937a92a13eb84a",
+          "mode": "100644",
+          "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3"
+        }
+      ],
+      "e2b-certificate-relinks.json": [
+        {
+          "tree": "84bbbe889d23cefebfb3aef18881b701f51d9a2d",
+          "mode": "100644",
+          "sha": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+        },
+        {
+          "tree": "d3b9eaa8ba6a98bef9c332c04f937a92a13eb84a",
+          "mode": "100644",
+          "sha": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+        }
+      ],
+      "e2b-finalization-files.json": [
+        {
+          "tree": "84bbbe889d23cefebfb3aef18881b701f51d9a2d",
+          "mode": "100644",
+          "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+        },
+        {
+          "tree": "d3b9eaa8ba6a98bef9c332c04f937a92a13eb84a",
+          "mode": "100644",
+          "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+        }
+      ],
+      "official-files.py": [
+        {
+          "tree": "84bbbe889d23cefebfb3aef18881b701f51d9a2d",
+          "mode": "100644",
+          "sha": "ea0819bf3e2d4ff83e64482b6336567050376591"
+        },
+        {
+          "tree": "d3b9eaa8ba6a98bef9c332c04f937a92a13eb84a",
+          "mode": "100644",
+          "sha": "ea0819bf3e2d4ff83e64482b6336567050376591"
+        }
+      ]
+    }
+  },
+  "fullFixedDiff": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "status": "modified",
+      "blob": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee",
+      "additions": 18,
+      "deletions": 1,
+      "patch": "@@ -1002,7 +1002,8 @@ Desktop 的 active/backup APT 节点在四阶段的摘要、大小、权限、\n inode、device、mtime/ctime 全部相同，四个 APT unit 的已采属性也未变。\n 本次没有复现 Desktop 问题，因此不增加该路径例外。未采 cron 或写者\n PID，不能从四个 unit 的静止状态证明所有后台写入均已排除。此前失败\n-仍保留，后续须定位实际构建首次变化阶段与写入者。\n+仍保留；若正式构建再次出现该变化，须按当轮首次变化阶段定位写入者。\n+阴性对照和未激活的备用诊断不构成额外发布门槛，也不阻止完整 R7 通过后继续验收。\n \n 本对照未采 immutable 官方 base/build ID 或 envd 版本，私有输出 build\n 不能代替它们；控制的四个阶段名也不等于其他 R7 的失败阶段。两个私有\n@@ -1015,3 +1016,19 @@ FF 关闭至 `376298951e4eee5970e2f0d00e21acb3ffba4e18`，关闭运行\n CI 发布门槛，也不替代同一 APP/DPL/runtime/worker/template 元组下\n Claude×3、Codex×3 的生产普通任务、工具与后续回复验收。#1505 仍须\n 六次完整 dispatch→agent 时间各不超过5000ms，目标2000–3000ms。\n+\n+### 2026-11-09：发布端执行同一文件类型合同\n+\n+构建端的 `official-files.py` 为每条 provider 变化无条件记录外层 `kind`，\n+并按策略 `_kind` 校验原节点类型；`before/after` 只包含发生变化的字段。\n+发布端 `assertConservation` 必须执行同一约束：策略声明 `_kind` 时，\n+外层 `change.kind` 必须精确相等，缺失、null 或错误类型均拒绝。当前\n+这两条声明仅为 Claude `/usr/local/share/e2b` 的 directory 与 Codex\n+根证书路径的 file。此校验不要求未变化的字段重复出现在差异中，合法的\n+mode-only、mode+SHA、SHA-only 回执继续使用原合同。\n+\n+Codex 根证书的 `0644→0777` 已由上述官方对照支持，因此发布器旧测试\n+不再将它作为非法转换；负例改用未经许可的 `0644→0755`，并覆盖真实\n+对照的权限和摘要转换，以及类型缺失、错误权限、所有者和路径变化。\n+这次补齐消费端既有类型约束，不修改 Python matcher 或扩大策略允许集合，\n+也不替代 strict 安装前后摘要、官方 CLI、真实订阅和生产时延门槛。"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "status": "modified",
+      "blob": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095",
+      "additions": 1,
+      "deletions": 0,
+      "patch": "@@ -68,6 +68,7 @@ export function assertConservation(proof, kind) {\n   for (const change of final.providerChanges) {\n     const fields = Object.keys(change?.before ?? {}), allowed = rules[change?.path]\n     if (paths.has(change?.path) || !fields.length || !allowed\n+      || (allowed._kind !== undefined && change.kind !== allowed._kind)\n       || !isDeepStrictEqual(fields.sort(), Object.keys(change?.after ?? {}).sort())) fail(`runtime_release_conservation_invalid ${kind}`)\n     paths.add(change.path)\n     const certificate = allowed._certificate"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "status": "modified",
+      "blob": "52fac123eb4f1e6ba8513b38148295f2c2648458",
+      "additions": 31,
+      "deletions": 1,
+      "patch": "@@ -24,9 +24,11 @@ const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {\n const ROOT_CA = '/usr/local/share/ca-certificates/e2b-ca.crt'\n // Desktop is official-only artifact 13538924302; Claude is the d63 fresh-scan\n // failure (42326876749 / 128264238545), not by itself a production gate pass.\n+// Codex is the official-only ready/fresh observation in run 42670291715.\n const ROOT_CA_ROTATIONS = {\n   desktop: ['7177f680c9c87f91ff9ab72a4409511cc4781d7c3dc549f302bfa17bd973b6b9', '88a5a279fec06a155bf9de1dd28abc93aae0f17db5f9febe69d5e25b15f8ff4d'],\n   claude: ['fd1175201e861f159f0d6ae42523b0f5d754ade8a36d105e8b7110b180101862', '21899698fbaa1da5314e42bc049b146f16cddb2e7540822b2a15f009f8342996'],\n+  codex: ['713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a', '545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a'],\n }\n const mcpTiming = (runId, harness) => ({ version: 1, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children',\n   generationCoverage: 'unverified', allFirstPartyHttpComplete: false, remoteMcpServerCount: 0, childPathAuditVersion: 1,\n@@ -176,10 +178,38 @@ test('exact root CA publication rules preserve metadata and reject other certifi\n   const codex = conservation('codex')\n   codex.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }]\n   assert.doesNotThrow(() => assertConservation(codex, 'codex'))\n-  codex.finalization.providerChanges[0] = { path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 511 } }\n+  codex.finalization.providerChanges[0] = { path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 493 } }\n   assert.throws(() => assertConservation(codex, 'codex'), /runtime_release_conservation_invalid/)\n })\n \n+test('Codex observed root CA mode-only finalization does not require a simultaneous digest change', () => {\n+  const proof = conservation('codex')\n+  proof.finalization.originalAfter = { ...PROOF, sha256: 'e'.repeat(64) }\n+  // The official pre_finalization -> ready pair keeps the same 713ed37b digest.\n+  // The producer reports only changed fields; its outer kind is the original kind.\n+  proof.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 511 } }]\n+  assert.doesNotThrow(() => assertConservation(proof, 'codex'))\n+})\n+\n+for (const [kind, path, entryKind, beforeMode] of [\n+  ['claude', '/usr/local/share/e2b', 'directory', 493],\n+  ['codex', ROOT_CA, 'file', 420],\n+]) {\n+  test(`${kind} finalization requires the policy's original ${entryKind} kind`, () => {\n+    const proof = conservation(kind)\n+    proof.finalization.originalAfter = { ...PROOF, sha256: 'e'.repeat(64) }\n+    proof.finalization.providerChanges = [{ path, kind: entryKind, before: { mode: beforeMode }, after: { mode: 511 } }]\n+    assert.doesNotThrow(() => assertConservation(proof, kind))\n+    for (const invalidKind of [undefined, null, 'link', entryKind === 'file' ? 'directory' : 'file', 1]) {\n+      const invalid = structuredClone(proof)\n+      if (invalidKind === undefined) delete invalid.finalization.providerChanges[0].kind\n+      else invalid.finalization.providerChanges[0].kind = invalidKind\n+      assert.throws(() => assertConservation(invalid, kind), /runtime_release_conservation_invalid/,\n+        `reject original kind ${String(invalidKind)}`)\n+    }\n+  })\n+}\n+\n test('certificate conversion proof fixes the original bytes and exact link target', () => {\n   const certificate = JSON.parse(readFileSync(new URL('./e2b-certificate-relinks.json', import.meta.url)))\n     .find(row => row.templates.includes('claude') && !row.providerRoot)"
+    }
+  ],
+  "sourceDigests": {
+    "publisher": {
+      "bytes": 17955,
+      "sha256": "15ed43dd07a4fe1a0ad81e04aa984bc468aa65f1b1d756cff293fd43dcd7b2ea"
+    },
+    "test": {
+      "bytes": 35635,
+      "sha256": "c87eedc8823434026cecca793b5bea924ce510d570dfbce23f73f89aabd898d8"
+    },
+    "producer": {
+      "bytes": 21445,
+      "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5"
+    },
+    "builder": {
+      "bytes": 55730,
+      "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1"
+    },
+    "policy": {
+      "bytes": 6238,
+      "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c"
+    }
+  },
+  "semanticReview": {
+    "publisher": {
+      "guard": "allowed._kind !== undefined && change.kind !== allowed._kind",
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "line": 71,
+      "effect": "Reject missing/null/wrong outer original kind for a path whose existing policy declares _kind; strictly narrows accepted receipts.",
+      "producer": "scripts/e2b/official-files.py L298-300 unconditionally copies original['kind'] to each change.kind; before/after contain changed fields only.",
+      "pythonMatcher": "official-files.py L200-202 already enforces this same expected_kind constraint; blob ea0819bf3e2d4ff83e64482b6336567050376591 unchanged.",
+      "legitimatePartialChangeReceipts": "mode-only, digest-only, or mode+digest must not be forced to repeat unchanged before.kind/after.kind. The new guard correctly uses the stable outer field.",
+      "affectedExistingRules": [
+        "claude /usr/local/share/e2b: directory",
+        "codex /usr/local/share/ca-certificates/e2b-ca.crt: file"
+      ]
+    },
+    "tests": {
+      "oldFalseNegative": "Codex mode420->511 was falsely required to throw; the negative now uses mode420->493.",
+      "positiveCases": [
+        "observed Codex root CA mode420->511 alone, unchanged digest",
+        "Codex official rotation added to existing mode+SHA rotation loop",
+        "exact declared directory/file kinds"
+      ],
+      "negativeCases": [
+        "missing kind",
+        "null kind",
+        "link kind",
+        "opposite file/directory kind",
+        "numeric kind",
+        "existing unrelated mode/uid/gid/path/CLI or certificate-kind changes remain refused"
+      ],
+      "execution": "No tests were executed by this reviewer. Original owner comment6748713810 reports baseline24P/1F, new-test-old-publisher27P/2F, fixed29P/0F/0skip; exact-head E2B metadata independently records every Node/Python/syntax step successful."
+    },
+    "documentation": "ADR describes the same producer/consumer contract and precise Codex observation. It retains old Desktop failure and requires writer investigation if a subsequent actual build repeats it; it does not create a new prerequisite after a complete R7 pass or waive any R7 failure.",
+    "preservation": "Exact three-leaf delta leaves application readers, policy JSON, Python matcher, worker implementation, Native harness/windows/deadlines/pair selection, tracing/Replay, acceptance journal and credentials policy unchanged."
+  },
+  "workerInputs": {
+    "builderBlob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+    "workerPaths": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "packages/daemon",
+      "packages/protocol",
+      "packages/config",
+      "patches"
+    ],
+    "recipePaths": [
+      "scripts/e2b/official-files.py",
+      "scripts/e2b/e2b-finalization-files.json",
+      "scripts/e2b/e2b-certificate-relinks.json",
+      "scripts/e2b/start-prebuilt.sh",
+      "scripts/e2b/build-template.py",
+      "scripts/e2b/template-capabilities.json",
+      "scripts/e2b/acceptance-daemon.mts",
+      "scripts/e2b/acceptance-bootstrap.mts",
+      "scripts/e2b/start-desktop.sh",
+      "scripts/e2b/viewer-gateway.py",
+      "scripts/e2b/lease-driver.py"
+    ],
+    "changedSelectedInputs": [],
+    "conclusion": "All three delta paths are excluded by the canonical worker_hash listing. Root package projections/lock projection and all selected blobs are unchanged relative to cb2 and e093 respectively; this is source-input equality, not execution of Python worker_hash or proof of any new effective runtime.",
+    "limits": "Do not equate this with d8's old published worker. The earlier #1835 policy recipe change e6d19 remains a separate changed canonical input relative to main d8; actual R7 publication is still required."
+  },
+  "ci": {
+    "ownerPR": {
+      "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+      "state": "open",
+      "merged": false
+    },
+    "e2b": {
+      "run": 42678667376,
+      "attempt": 1,
+      "jobs": [
+        {
+          "id": 129366902264,
+          "name": "test",
+          "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:57:15Z",
+          "completedAt": "2026-11-09T18:57:30Z",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Install only the offline gate test dependencies",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Run node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Run python3 scripts/e2b/build-template.test.py",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Run python3 packages/daemon/scripts/prepare-worker-install.test.py",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 8,
+              "name": "Run python3 scripts/e2b/official-files.test.py",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 9,
+              "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 10,
+              "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 11,
+              "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 21,
+              "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 22,
+              "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 23,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 129367067238,
+          "name": "check",
+          "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T18:57:31Z",
+          "completedAt": "2026-11-09T18:57:30Z",
+          "steps": []
+        },
+        {
+          "id": 129367068217,
+          "name": "validate",
+          "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T18:57:31Z",
+          "completedAt": "2026-11-09T18:57:30Z",
+          "steps": []
+        },
+        {
+          "id": 129367070109,
+          "name": "await-web",
+          "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T18:57:31Z",
+          "completedAt": "2026-11-09T18:57:30Z",
+          "steps": []
+        },
+        {
+          "id": 129367070255,
+          "name": "subscriptions",
+          "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T18:57:31Z",
+          "completedAt": "2026-11-09T18:57:30Z",
+          "steps": []
+        },
+        {
+          "id": 129367070873,
+          "name": "publish",
+          "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T18:57:31Z",
+          "completedAt": "2026-11-09T18:57:30Z",
+          "steps": []
+        },
+        {
+          "id": 129367073031,
+          "name": "cleanup",
+          "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T18:57:31Z",
+          "completedAt": "2026-11-09T18:57:31Z",
+          "steps": []
+        }
+      ],
+      "interpretation": "One actual offline test job succeeded; six production check/build/subscription/publish/cleanup jobs skipped by PR conditions. No R7 success claimed."
+    },
+    "mainCI": {
+      "run": 42678667335,
+      "attempt": 1,
+      "jobs": [
+        {
+          "id": 129366902531,
+          "name": "changes / Changed files",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:57:16Z",
+          "completedAt": "2026-11-09T18:58:04Z"
+        },
+        {
+          "id": 129367393352,
+          "name": "Daemon checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:07Z",
+          "completedAt": "2026-11-09T19:01:21Z"
+        },
+        {
+          "id": 129367393355,
+          "name": "Core unit checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:07Z",
+          "completedAt": "2026-11-09T19:03:09Z"
+        },
+        {
+          "id": 129367393426,
+          "name": "Source checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:07Z",
+          "completedAt": "2026-11-09T19:01:21Z"
+        },
+        {
+          "id": 129367393526,
+          "name": "Integration unit checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:07Z",
+          "completedAt": "2026-11-09T19:02:59Z"
+        },
+        {
+          "id": 129367393681,
+          "name": "Database checks (3/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:08Z",
+          "completedAt": "2026-11-09T19:03:59Z"
+        },
+        {
+          "id": 129367393727,
+          "name": "Database checks (4/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:07Z",
+          "completedAt": "2026-11-09T19:02:06Z"
+        },
+        {
+          "id": 129367393732,
+          "name": "Database checks (1/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:08Z",
+          "completedAt": "2026-11-09T19:02:43Z"
+        },
+        {
+          "id": 129367394079,
+          "name": "Database checks (2/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:08Z",
+          "completedAt": "2026-11-09T19:01:59Z"
+        },
+        {
+          "id": 129367395985,
+          "name": "analytics-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:08Z",
+          "completedAt": "2026-11-09T18:59:09Z"
+        },
+        {
+          "id": 129367396206,
+          "name": "image-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:08Z",
+          "completedAt": "2026-11-09T18:59:09Z"
+        },
+        {
+          "id": 129367396319,
+          "name": "desktop-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:07Z",
+          "completedAt": "2026-11-09T18:58:55Z"
+        },
+        {
+          "id": 129367396621,
+          "name": "Cloud credential access (OIDC)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T18:58:05Z",
+          "completedAt": "2026-11-09T18:58:05Z"
+        },
+        {
+          "id": 129367869151,
+          "name": "desktop-checks / icon",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:59Z",
+          "completedAt": "2026-11-09T18:59:22Z"
+        },
+        {
+          "id": 129367869235,
+          "name": "desktop-checks / checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:58Z",
+          "completedAt": "2026-11-09T19:01:04Z"
+        },
+        {
+          "id": 129367869250,
+          "name": "desktop-checks / smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:58:58Z",
+          "completedAt": "2026-11-09T19:03:06Z"
+        },
+        {
+          "id": 129368000005,
+          "name": "analytics-checks / Analytics SSR (full)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T18:59:12Z",
+          "completedAt": "2026-11-09T19:02:51Z"
+        },
+        {
+          "id": 129368000789,
+          "name": "image-checks / image",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-11-09T18:59:12Z",
+          "completedAt": null
+        },
+        {
+          "id": 129370107438,
+          "name": "analytics-checks / analytics-ssr",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T19:02:54Z",
+          "completedAt": "2026-11-09T19:02:58Z"
+        },
+        {
+          "id": 129370240717,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-11-09T19:03:09Z",
+          "completedAt": null
+        },
+        {
+          "id": 129370738399,
+          "name": "Production build and browser interactions",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T19:04:02Z",
+          "completedAt": "2026-11-09T19:04:13Z"
+        }
+      ],
+      "snapshot": "Image and Apple Silicon package still in progress at this metadata read. No complete CI claim; no rerun."
+    },
+    "ownE093": "Original E2B failure is retained. Original Native CI42678180995/A1 must finish before a source ref change that could cancel it."
+  },
+  "coordination": {
+    "main": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+    "previous1833Release": {
+      "at": "2026-11-09T19:11:15Z",
+      "commentId": 6748956060,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6748956060",
+      "release": "Explicit actual early release; the former19:19:10 bound is no longer an active hold.",
+      "web": "Owner observes Web42675680440 SUCCESS and dpl_6fFwi33ZXQff9eXJQKTP2fxYqhg8 READY; this reviewer did not repeat its original log, deployed page or Vercel fetch.",
+      "runtime": "The d8 R7 remains FAIL; owner reports no new runtime publication. Prior cleanup remains exact expected-name absence, not newly observed DELETE/404."
+    },
+    "postDeployConsumers": {
+      "core": {
+        "run": 42679912913,
+        "jobs": [
+          {
+            "id": 129371348364,
+            "name": "Core production offline guards",
+            "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+            "attempt": 1,
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T19:05:07Z",
+            "completedAt": "2026-11-09T19:05:52Z",
+            "steps": [
+              {
+                "number": 1,
+                "name": "Set up job",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 2,
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 3,
+                "name": "Run ./.github/actions/pnpm-install",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 4,
+                "name": "Run node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 7,
+                "name": "Post Run ./.github/actions/pnpm-install",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 8,
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 9,
+                "name": "Complete job",
+                "status": "completed",
+                "conclusion": "success"
+              }
+            ]
+          },
+          {
+            "id": 129371804980,
+            "name": "Core production API and gateway acceptance",
+            "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+            "attempt": 1,
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T19:05:55Z",
+            "completedAt": "2026-11-09T19:07:06Z",
+            "steps": [
+              {
+                "number": 1,
+                "name": "Set up job",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 2,
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 3,
+                "name": "Run ./.github/actions/pnpm-install",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 4,
+                "name": "Verify an open core issue, current main and its actual cloud Web publication before credentials",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 5,
+                "name": "Read the existing smoke email only",
+                "status": "completed",
+                "conclusion": "skipped"
+              },
+              {
+                "number": 6,
+                "name": "Read the existing smoke password only",
+                "status": "completed",
+                "conclusion": "skipped"
+              },
+              {
+                "number": 7,
+                "name": "Verify cloud discovery, owner flags, live and source-daemon gateways with exact cleanup",
+                "status": "completed",
+                "conclusion": "skipped"
+              },
+              {
+                "number": 8,
+                "name": "Retain closed evidence when artifact storage is available",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 15,
+                "name": "Post Run ./.github/actions/pnpm-install",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 16,
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 17,
+                "name": "Complete job",
+                "status": "completed",
+                "conclusion": "success"
+              }
+            ]
+          }
+        ]
+      },
+      "readcache": {
+        "run": 42679913575,
+        "jobs": [
+          {
+            "id": 129372522398,
+            "name": "Read cache production guards",
+            "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+            "attempt": 1,
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T19:07:10Z",
+            "completedAt": "2026-11-09T19:08:17Z",
+            "steps": [
+              {
+                "number": 1,
+                "name": "Set up job",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 2,
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 3,
+                "name": "Run ./.github/actions/pnpm-install",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 4,
+                "name": "Run node --import tsx --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/read-cache-production.test.mjs scripts/acceptance/workflow-migration-production.test.mjs",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 5,
+                "name": "Check whether the one-time migration acceptance is still open",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 9,
+                "name": "Post Run ./.github/actions/pnpm-install",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 10,
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 11,
+                "name": "Complete job",
+                "status": "completed",
+                "conclusion": "success"
+              }
+            ]
+          },
+          {
+            "id": 129373208079,
+            "name": "Read cache production reads",
+            "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+            "attempt": 1,
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T19:08:20Z",
+            "completedAt": "2026-11-09T19:09:13Z",
+            "steps": [
+              {
+                "number": 1,
+                "name": "Set up job",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 2,
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 3,
+                "name": "Run ./.github/actions/pnpm-install",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 4,
+                "name": "Verify the exact production version and its successful Web deployment",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 5,
+                "name": "Read the existing smoke email only",
+                "status": "completed",
+                "conclusion": "skipped"
+              },
+              {
+                "number": 6,
+                "name": "Read the existing smoke password only",
+                "status": "completed",
+                "conclusion": "skipped"
+              },
+              {
+                "number": 7,
+                "name": "Measure existing chat, tasks, activity and Settings reads",
+                "status": "completed",
+                "conclusion": "skipped"
+              },
+              {
+                "number": 8,
+                "name": "Retain the aggregate production evidence",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 15,
+                "name": "Post Run ./.github/actions/pnpm-install",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 16,
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 17,
+                "name": "Complete job",
+                "status": "completed",
+                "conclusion": "success"
+              }
+            ]
+          },
+          {
+            "id": 129373737669,
+            "name": "Issue 1415 production reads and managed reminder",
+            "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+            "attempt": 1,
+            "status": "completed",
+            "conclusion": "skipped",
+            "startedAt": "2026-11-09T19:09:13Z",
+            "completedAt": "2026-11-09T19:09:13Z",
+            "steps": []
+          }
+        ]
+      },
+      "conclusion": "Both workflows completed successfully, but all credential reads and actual production business measurement/gateway steps skipped. Their green wrapper does not prove actual production acceptance; no current hold remains from these terminal jobs."
+    },
+    "current1503": {
+      "announcementComment": 6748990292,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6748990292",
+      "start": "2026-11-09T19:12:47Z",
+      "absoluteEnd": "2026-11-09T20:42:47Z",
+      "scope": "Actual source + SMOKE production acceptance, setup/queue/cleanup included; complete/fail early release, no automatic extension.",
+      "setup": {
+        "head": "4e1044a7569b0c2727452bbb8e30d02f877e4f30",
+        "run": 42681272495,
+        "attempt": 1,
+        "jobs": [
+          {
+            "id": 129376117675,
+            "name": "setup",
+            "head": "4e1044a7569b0c2727452bbb8e30d02f877e4f30",
+            "attempt": 1,
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T19:13:25Z",
+            "completedAt": "2026-11-09T19:14:51Z",
+            "steps": [
+              {
+                "number": 1,
+                "name": "Set up job",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 2,
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 3,
+                "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 4,
+                "name": "Run corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 5,
+                "name": "Read the Vercel team token through Infisical workload identity",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 6,
+                "name": "Record the normal production runtime pair before setup writes",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 7,
+                "name": "Upload the actual runtime witness before setup writes",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 8,
+                "name": "Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 9,
+                "name": "Import the pinned production application database",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 10,
+                "name": "Import the production auth key for normal setup services",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 11,
+                "name": "Import the pinned production workspace database",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 12,
+                "name": "Import the normal GitHub application client identifier",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 13,
+                "name": "Import the normal GitHub application client secret",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 14,
+                "name": "Validate setup configuration before application modules load",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 15,
+                "name": "Prepare the existing smoke workspace and a new scoped GitHub child",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 16,
+                "name": "Upload the actual preflight receipt",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 17,
+                "name": "Enable the normal credit share without starting a task",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 18,
+                "name": "Upload the actual credit-share setup receipt",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 35,
+                "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 36,
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              {
+                "number": 37,
+                "name": "Complete job",
+                "status": "completed",
+                "conclusion": "success"
+              }
+            ]
+          }
+        ],
+        "currentClosedOpsRef": "0f97ac3c64c2a3f571488f68ce2020172af2b63a"
+      },
+      "conclusion": "Unlike a future reservation, actual setup executed and completed its source/runtime witness, child and credit-share setup steps. Closing the setup entry does not itself release the broader announced production acceptance window. Respect the actual owner release/absolute end and fresh execution state."
+    }
+  },
+  "risk": {
+    "level": "medium",
+    "blockingSourceFindings": [],
+    "acceptanceRisk": "Current exact CI, owner normal main merge and real complete R7 still outstanding. Nothing here permits production acceptance to use an old runtime or bypass the finite actual owner window.",
+    "sourceMergeRisk": "Prepared union is exact three-leaf overlay with ordinary ordered parents. No conflict resolution or unrelated source modification was introduced.",
+    "privacy": "Only immutable source and nonsecret metadata were inspected. No credentials, trace/content payloads, original owner logs, artifact ZIPs or runtime witness artifact read."
+  },
+  "activity": {
+    "newResources": 0,
+    "ciReruns": 0,
+    "sourceOrRefUpdates": 0,
+    "productTestExecutions": 0,
+    "originalJobLogReads": 0,
+    "artifactZipDownloads": 0,
+    "productionAccountOrModelCalls": 0
+  }
+}

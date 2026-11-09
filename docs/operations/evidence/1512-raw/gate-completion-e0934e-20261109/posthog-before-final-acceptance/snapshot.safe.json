@@ -1,0 +1,212 @@
+{
+  "schema": "mikka.issue1512.preacceptance-posthog-quota.v1",
+  "observedWindowUtc": {
+    "start": "2026-11-09T19:19:26Z",
+    "end": "2026-11-09T19:24:06Z"
+  },
+  "projectId": 670821,
+  "region": "us",
+  "newAcceptanceSamples": 0,
+  "mutations": 0,
+  "newScoutRuns": 0,
+  "newVisionRuns": 0,
+  "billing": {
+    "plan": "free",
+    "subscriptionLevel": "free",
+    "hasActiveSubscription": false,
+    "period": {
+      "current_period_start": "2026-10-17T17:45:01.620Z",
+      "current_period_end": "2026-11-16T17:45:01.620Z",
+      "interval": "month"
+    },
+    "currentTotalAmountUsd": null,
+    "projectedTotalAmountUsd": null,
+    "productView": [
+      {
+        "type": "session_replay",
+        "current_usage": 22,
+        "free_allocation": 5000,
+        "usage_limit": 5000,
+        "current_amount_usd": null,
+        "subscribed": false,
+        "has_exceeded_limit": false
+      },
+      {
+        "type": "llm_analytics",
+        "current_usage": 1222,
+        "free_allocation": 100000,
+        "usage_limit": 100000,
+        "current_amount_usd": null,
+        "subscribed": false,
+        "has_exceeded_limit": false
+      },
+      {
+        "type": "logs",
+        "current_usage": 492,
+        "free_allocation": 10000,
+        "usage_limit": 10000,
+        "current_amount_usd": null,
+        "subscribed": false,
+        "has_exceeded_limit": false
+      },
+      {
+        "type": "replay_vision",
+        "current_usage": 0,
+        "free_allocation": 2500,
+        "usage_limit": 2500,
+        "current_amount_usd": null,
+        "subscribed": false,
+        "has_exceeded_limit": false
+      },
+      {
+        "type": "inbox",
+        "current_usage": 0,
+        "free_allocation": 4500,
+        "usage_limit": 4500,
+        "current_amount_usd": null,
+        "subscribed": false,
+        "has_exceeded_limit": false
+      },
+      {
+        "type": "inbox_usage",
+        "current_usage": 0,
+        "free_allocation": 0,
+        "usage_limit": null,
+        "current_amount_usd": null,
+        "subscribed": false,
+        "has_exceeded_limit": false
+      }
+    ],
+    "usageSummaryView": {
+      "llm_events": {
+        "usage": 857,
+        "limit": 100000,
+        "todays_usage": 365
+      },
+      "logs_mb_ingested": {
+        "usage": 373,
+        "limit": 10000,
+        "todays_usage": 119
+      },
+      "recordings": {
+        "usage": 16,
+        "limit": 5000,
+        "todays_usage": 6
+      },
+      "replay_vision_credits": {
+        "usage": 0,
+        "limit": 2500,
+        "todays_usage": 0
+      },
+      "signals_credits": {
+        "usage": 0,
+        "limit": 4500,
+        "todays_usage": 0
+      },
+      "signals_spend_credits": {
+        "usage": 0,
+        "limit": null,
+        "billing_start_date": "2026-12-09",
+        "todays_usage": 0
+      }
+    },
+    "interpretation": "Product-view and usage_summary counters are preserved as distinct returned scopes. They are not added together, equated, or used to calculate per-case cost. Monetary null remains UNKNOWN, not zero. Free allocation is quota metadata, not an actual invoice."
+  },
+  "scoutBudget": {
+    "enrolled": true,
+    "banner_message": "Scouts are in early access. Each project gets up to 100 scout runs a day. Contact team-self-driving@posthog.com if you need more.",
+    "limits": {
+      "max_runs_per_tick": 3,
+      "max_runs_per_day": 100,
+      "runs_today": 2,
+      "runs_remaining_today": 98,
+      "max_enabled_scouts": 250
+    }
+  },
+  "scoutConfigurations": {
+    "sourceTool": "scout-config-list",
+    "sourceReturnedRows": 29,
+    "sourceUtf8Bytes": 47738,
+    "sourceSha256": "9af2f805bfdec36705b8971ed41d673564be623ec2a79e0b19504b27cdb3a0ed",
+    "projection": "Only the two pre-existing issue1512 scout status records are retained; unrelated fleet configurations are omitted.",
+    "selected": [
+      {
+        "id": "01a1b247-09d7-7388-be42-a8d96310c44b",
+        "skill_name": "signals-scout-ai-observability",
+        "display_name": "Mikka AI observability scout",
+        "enabled": true,
+        "status": "active",
+        "pause_reason": null,
+        "emit": true,
+        "run_interval_minutes": 1440,
+        "run_cron_schedule": null,
+        "output_destinations": {
+          "slack": null,
+          "webhook": null,
+          "inbox": true
+        },
+        "last_run_at": "2026-11-09T07:30:00Z",
+        "consecutive_failure_count": 0
+      },
+      {
+        "id": "01a1b247-0a2c-7611-9061-0f7e791cfd2e",
+        "skill_name": "signals-scout-apm",
+        "display_name": "Mikka APM regression scout",
+        "enabled": true,
+        "status": "active",
+        "pause_reason": null,
+        "emit": true,
+        "run_interval_minutes": 1440,
+        "run_cron_schedule": null,
+        "output_destinations": {
+          "slack": null,
+          "webhook": null,
+          "inbox": true
+        },
+        "last_run_at": "2026-11-09T06:30:00Z",
+        "consecutive_failure_count": 0
+      }
+    ]
+  },
+  "scopedDailyQuery": {
+    "startDate": "2026-11-09",
+    "endDate": "2026-11-09",
+    "teamIds": [
+      670821
+    ],
+    "type": "timeseries",
+    "rows": 0,
+    "next": null,
+    "interpretation": "The exact scoped time-series response contains no series. This is absent data, not evidence of zero usage, a final case cost, or complete billed spend."
+  },
+  "knownAccessBoundary": "inbox-usage-get is hidden because this app lacks signal_usage:read. Existing billing/Scout metadata were used; no reconnect or capability workaround was attempted.",
+  "originalFiles": [
+    {
+      "path": "billing-overview.original.json",
+      "gitBlob": "ddf2d04e9b1a64b1bf64e87adb308e7ae213b83b",
+      "bytes": 52454,
+      "sha256": "9a7709b13b6f3f561397201461df248dd9cd3869d573685000c5cd4a95e32f36",
+      "kind": "unchanged-posthog-mcp-text-block"
+    },
+    {
+      "path": "scout-metadata.original.json",
+      "gitBlob": "857fb1c7a658c669e5776b2301031d58baa9816e",
+      "bytes": 288,
+      "sha256": "b9baefcef4dcfa5e4fafbb6b3a625e0cc1d2052e6358ee204174967284ac8fac",
+      "kind": "unchanged-posthog-mcp-text-block"
+    },
+    {
+      "path": "scoped-current-day-usage.original.json",
+      "gitBlob": "83323eb3c8e21080617b7a8188430b1029b14ad9",
+      "bytes": 562,
+      "sha256": "bd16c0383312e57bf69f210c7116068963ea937d84cfa22a82258f9e58bae6d8",
+      "kind": "unchanged-posthog-mcp-text-block"
+    }
+  ],
+  "limits": [
+    "Pre-acceptance snapshot only; refresh when actual final cases have completed.",
+    "No claim that Scout daily runs prove today's production traces were evaluated; last_run_at predates the new cases.",
+    "No source/main/runtime/production-account changes were made by these read-only calls.",
+    "No PostHog project-get, tokens, user event payloads, Replay frames, customer prompts or generated content were requested."
+  ]
+}

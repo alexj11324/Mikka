@@ -1,0 +1,1271 @@
+{
+  "schemaVersion": 1,
+  "title": "Independent immutable-object merge review: 6414 fixes + actual main d8e + PR1835 cb2f",
+  "repository": "alexj11324/Mikka",
+  "operationBoundary": {
+    "newGitBlobsOnly": true,
+    "refOrCommitCreated": false,
+    "workflowAction": false,
+    "testExecution": false,
+    "vmOrDatabaseOrModel": false,
+    "workflowLogsOrArtifactsRead": false
+  },
+  "fixedSources": {
+    "base": {
+      "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+      "actualPriorCI": "576c903cd6ede14520a79111d2b71154968ad910",
+      "tree": "05b40c13c233d7f3cef989011705cf624b27c507"
+    },
+    "own": {
+      "commit": "e7dfd5ae919fe9feba69b2f3ce2ad9558c9ab818",
+      "tree": "820a7f6105019ddd18de2ad1961332337904923f",
+      "parents": [
+        "6414a08ddb4a92962bc82e9e427c391d645cacb2"
+      ]
+    },
+    "main": {
+      "commit": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+      "tree": "6a088438df9050ac0e4df41ac41de57f2403ac99",
+      "parents": [
+        "ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d",
+        "2ccc930bb5d15ee726b4176667ffe8495155ce19"
+      ]
+    },
+    "policy": {
+      "commit": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+      "tree": "26cedfb597451f03960f6f582806599d1ca427b0",
+      "parents": [
+        "240836cdf60998e1ef548c899c6a6c0423906a90"
+      ]
+    }
+  },
+  "independentTreeObjectReconstruction": {
+    "method": "Pure V8 Git tree serialization (byte ordering, modes, raw SHA bytes) and SHA1; all six full nontruncated remote input trees reproduced exactly. No git CLI or tests executed.",
+    "inputs": [
+      {
+        "name": "baseTree",
+        "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+        "leaves": 6805,
+        "exact": true
+      },
+      {
+        "name": "ownTree",
+        "tree": "820a7f6105019ddd18de2ad1961332337904923f",
+        "leaves": 6805,
+        "exact": true
+      },
+      {
+        "name": "mainTree",
+        "tree": "6a088438df9050ac0e4df41ac41de57f2403ac99",
+        "leaves": 6816,
+        "exact": true
+      },
+      {
+        "name": "policyTree",
+        "tree": "26cedfb597451f03960f6f582806599d1ca427b0",
+        "leaves": 6809,
+        "exact": true
+      },
+      {
+        "name": "mainBaseTree",
+        "tree": "a59d2e3ff90594a2625b131ab5a403393715cf40",
+        "leaves": 6805,
+        "exact": true
+      },
+      {
+        "name": "policyBaseTree",
+        "tree": "2d10e5970b3f58e085df672c87629645c1072bdb",
+        "leaves": 6805,
+        "exact": true
+      }
+    ]
+  },
+  "ownTenFiles": [
+    {
+      "path": "app/actions/coordinator.ts",
+      "before": {
+        "path": "app/actions/coordinator.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bd24ef4c103b670d92d381d396d5c3e1b6aba083",
+        "size": 25249
+      },
+      "after": {
+        "path": "app/actions/coordinator.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+        "size": 25408
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "before": {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "67503a9abe7131de3e9bf86629532e015085d4ee",
+        "size": 6237
+      },
+      "after": {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e7f6972a23519ae45e059038cd0c404789d44a98",
+        "size": 6301
+      }
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "before": {
+        "path": "components/workspace/issue-workspace.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b043d5c09d02d5f675cd62d28e40bb8dc38b5060",
+        "size": 56571
+      },
+      "after": {
+        "path": "components/workspace/issue-workspace.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "383e0446d95a3e490b8e1c808b6e325b0539faaf",
+        "size": 56675
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "before": {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "076d59eea10b000cd08df46754d32454609ecdc6",
+        "size": 18417
+      },
+      "after": {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5",
+        "size": 26773
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "before": {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+        "size": 6263
+      },
+      "after": {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ec8497366c9c46cdac494814bd832beb1828c880",
+        "size": 8621
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "before": {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b",
+        "size": 1637
+      },
+      "after": {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a40f946620ec874320586cb12ddb90c4b2fc438d",
+        "size": 2241
+      }
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "before": {
+        "path": "lib/live/revision-read.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "445ea81dccbed5f4b6ad16816757df0154a74b76",
+        "size": 2120
+      },
+      "after": {
+        "path": "lib/live/revision-read.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "266aa82ba4a683e88d207bc197fd97cee1f2b1ae",
+        "size": 2332
+      }
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "before": {
+        "path": "lib/personal-policy.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fef80337b9b5244d2e8565236c6dd96f7d329acd",
+        "size": 14410
+      },
+      "after": {
+        "path": "lib/personal-policy.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96",
+        "size": 19713
+      }
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "before": {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a4aec5fe968100f283a8d93b963934430a97fcda",
+        "size": 75804
+      },
+      "after": {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "30ef728a5a2d465d389916a63d40a816d13b1d4c",
+        "size": 84780
+      }
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "before": {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "960eb24ff24aba996a681bc47468290cf6200398",
+        "size": 16071
+      },
+      "after": {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351",
+        "size": 18747
+      }
+    }
+  ],
+  "proposedNormalMerges": [
+    {
+      "base": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+      "orderedParents": [
+        "e7dfd5ae919fe9feba69b2f3ce2ad9558c9ab818",
+        "d8e09ac218f5656763a5bc42a75e45fc385caede"
+      ],
+      "expectedTree": "88d30d357c730e80e28635a556a77fb1546e67d6",
+      "counts": {
+        "unchanged": 6740,
+        "oursOnly": 50,
+        "theirsOnly": 26,
+        "sameBoth": 0,
+        "conflict": 0
+      },
+      "leaves": 6816,
+      "flatLeafSerializationSha256": "a6e77b180f36e20cb040658a962be03a59cd03e84f144bbda873fa1caf2b13d4",
+      "flatLeafSerializationBytes": 633695,
+      "conflicts": []
+    },
+    {
+      "base": "37fb3818728315151083b7cca409c2ffd6ff4f47",
+      "orderedParents": [
+        "the first ordinary merge commit",
+        "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c"
+      ],
+      "expectedTree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+      "counts": {
+        "unchanged": 6740,
+        "oursOnly": 73,
+        "theirsOnly": 7,
+        "sameBoth": 0,
+        "conflict": 0
+      },
+      "leaves": 6820,
+      "flatLeafSerializationSha256": "87fa2a06e2aab7c46623ef18864d49ee5c85c7a624fc4ebc6b090d61a3037f1d",
+      "flatLeafSerializationBytes": 634195,
+      "conflicts": []
+    }
+  ],
+  "finalOverlayRelativeToOwn": [
+    {
+      "path": "apps/mobile/env.d.ts",
+      "before": {
+        "path": "apps/mobile/env.d.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "12818353e787dc9957efbd98254bcd9e1961b694",
+        "size": 89
+      },
+      "after": {
+        "path": "apps/mobile/env.d.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6348e9efe8f814ee98b2296df100101d2ef49b0c",
+        "size": 241
+      }
+    },
+    {
+      "path": "apps/mobile/features/tasks/components/agent-name.tsx",
+      "before": null,
+      "after": {
+        "path": "apps/mobile/features/tasks/components/agent-name.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4de5addd93e811ebf26e1970069d82f9eac42652",
+        "size": 1611
+      }
+    },
+    {
+      "path": "apps/mobile/features/tasks/model/agent-marks.ts",
+      "before": null,
+      "after": {
+        "path": "apps/mobile/features/tasks/model/agent-marks.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ef97a8e88bae8d42435e54c5a5ae2b353c565362",
+        "size": 504
+      }
+    },
+    {
+      "path": "apps/mobile/features/tasks/model/task-conversation.ts",
+      "before": {
+        "path": "apps/mobile/features/tasks/model/task-conversation.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1d68dd6497db7ee3ca7074ebf06061d05f16fdf1",
+        "size": 4866
+      },
+      "after": {
+        "path": "apps/mobile/features/tasks/model/task-conversation.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2547660a03611901985e229c4d31c3434d0ae7d6",
+        "size": 4136
+      }
+    },
+    {
+      "path": "apps/mobile/features/tasks/screens/task-conversation-screen.tsx",
+      "before": {
+        "path": "apps/mobile/features/tasks/screens/task-conversation-screen.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cccc9fe967434782b357623ea6a11a26444f29d4",
+        "size": 14588
+      },
+      "after": {
+        "path": "apps/mobile/features/tasks/screens/task-conversation-screen.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b6506cb28b8998ebdbc03def8ec737f2691167b1",
+        "size": 14643
+      }
+    },
+    {
+      "path": "apps/mobile/features/tasks/screens/task-screen.tsx",
+      "before": {
+        "path": "apps/mobile/features/tasks/screens/task-screen.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8e467252a4cf15e39457283f5b20e43f8154b787",
+        "size": 11659
+      },
+      "after": {
+        "path": "apps/mobile/features/tasks/screens/task-screen.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "be36830bcbbb155ae7cc8c8896278626c2456ef8",
+        "size": 11791
+      }
+    },
+    {
+      "path": "apps/mobile/metro-svg-transformer.js",
+      "before": null,
+      "after": {
+        "path": "apps/mobile/metro-svg-transformer.js",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7e94379c9552333bbbc469dbbead083f4f31e854",
+        "size": 645
+      }
+    },
+    {
+      "path": "apps/mobile/metro.config.js",
+      "before": {
+        "path": "apps/mobile/metro.config.js",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1c4016f1651e77cd3b1e20d46d2dc1b40acb8a30",
+        "size": 654
+      },
+      "after": {
+        "path": "apps/mobile/metro.config.js",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "76e82b29e5abfb7e5a6cecb8b2ba705032d33389",
+        "size": 981
+      }
+    },
+    {
+      "path": "apps/mobile/package.json",
+      "before": {
+        "path": "apps/mobile/package.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d1395d63b840839c199e05fd70a15367941a1715",
+        "size": 1981
+      },
+      "after": {
+        "path": "apps/mobile/package.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cc0946570bbdc34fc1d5dbbf576d9b45c97bf649",
+        "size": 2025
+      }
+    },
+    {
+      "path": "apps/mobile/scripts/tasks-screenshots.mjs",
+      "before": {
+        "path": "apps/mobile/scripts/tasks-screenshots.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4222780b21fdf2927ee9592ef3648e408763c3f2",
+        "size": 13723
+      },
+      "after": {
+        "path": "apps/mobile/scripts/tasks-screenshots.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e947208c8771099198b27835d5ea9101fba43afd",
+        "size": 13822
+      }
+    },
+    {
+      "path": "apps/mobile/tests/messages.test.mts",
+      "before": {
+        "path": "apps/mobile/tests/messages.test.mts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b2f9dd006c95ded34707994bfc0ae1b0d6d21891",
+        "size": 1638
+      },
+      "after": {
+        "path": "apps/mobile/tests/messages.test.mts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "170dfbef3b490e760d630a6c01334fac2337cc14",
+        "size": 1544
+      }
+    },
+    {
+      "path": "apps/mobile/tests/task-groups.test.mts",
+      "before": {
+        "path": "apps/mobile/tests/task-groups.test.mts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c74b2ca09f8c6b1c38f31e2ccce3e452edbdc803",
+        "size": 14419
+      },
+      "after": {
+        "path": "apps/mobile/tests/task-groups.test.mts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0174671b3acc6e60857c90c628c92e8e3bb849db",
+        "size": 15121
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/dark-3-task-before.png",
+      "before": null,
+      "after": {
+        "path": "docs/design/agent-switch-no-verb/dark-3-task-before.png",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "afbbe0fe1e9c289d35ff23acd210e6e4c0f3c661",
+        "size": 85085
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/dark-3-task.png",
+      "before": null,
+      "after": {
+        "path": "docs/design/agent-switch-no-verb/dark-3-task.png",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dbe7ae6530851cae1d5f388350833894695be171",
+        "size": 85772
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/dark-4-conversation-before.png",
+      "before": null,
+      "after": {
+        "path": "docs/design/agent-switch-no-verb/dark-4-conversation-before.png",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6a3cf7d17a2af82c333709b8c6d0e794d2cf3453",
+        "size": 152341
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/dark-4-conversation.png",
+      "before": null,
+      "after": {
+        "path": "docs/design/agent-switch-no-verb/dark-4-conversation.png",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "226fcb49a44c61d0fc0c18dc08810559a2f3d3ca",
+        "size": 147756
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/light-3-task-before.png",
+      "before": null,
+      "after": {
+        "path": "docs/design/agent-switch-no-verb/light-3-task-before.png",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "353de8c95b87a96c532921d58b90df823c66e415",
+        "size": 85560
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/light-3-task.png",
+      "before": null,
+      "after": {
+        "path": "docs/design/agent-switch-no-verb/light-3-task.png",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0704517737422bc8597be372715c933f7a47702b",
+        "size": 86026
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/light-4-conversation-before.png",
+      "before": null,
+      "after": {
+        "path": "docs/design/agent-switch-no-verb/light-4-conversation-before.png",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7940359319777f3416104bcce77bb70d069e0250",
+        "size": 152603
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/light-4-conversation.png",
+      "before": null,
+      "after": {
+        "path": "docs/design/agent-switch-no-verb/light-4-conversation.png",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0585abfb2dac416879533ab3a76ebe210255a75d",
+        "size": 148067
+      }
+    },
+    {
+      "path": "docs/design/components.md",
+      "before": {
+        "path": "docs/design/components.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "da7339503dc2fef5f9876157760b58b8f5bbbbbe",
+        "size": 44943
+      },
+      "after": {
+        "path": "docs/design/components.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cca3d71b98f6b21f39a9fe34180f1bb8716584fd",
+        "size": 45410
+      }
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "before": {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9b410406e21a58c26b30b457de67816f77d135b1",
+        "size": 90005
+      },
+      "after": {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ed5767a9fe2a96d38c9423fa79fa05d8a1124e1d",
+        "size": 94478
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1505-official-path-control-20261109.json",
+      "before": null,
+      "after": {
+        "path": "docs/operations/evidence/1505-official-path-control-20261109.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1dbd1907aca7c820be90ed6779fc2962717e5fec",
+        "size": 31180
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1505-official-path-control-20261109.md",
+      "before": null,
+      "after": {
+        "path": "docs/operations/evidence/1505-official-path-control-20261109.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "274f83e8c45c7f04acabf3bd0da15364a9cf879d",
+        "size": 6713
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.json",
+      "before": null,
+      "after": {
+        "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "868d0b251f884079611cbd9810775fc7146a9426",
+        "size": 18164
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.md",
+      "before": null,
+      "after": {
+        "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "95770c84ba87e690e45f2ea665b6e5b57d300616",
+        "size": 5450
+      }
+    },
+    {
+      "path": "lib/mobile-threads.ts",
+      "before": {
+        "path": "lib/mobile-threads.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7773fa456185fa529bd18efc67c9edd148f3612c",
+        "size": 12314
+      },
+      "after": {
+        "path": "lib/mobile-threads.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "38ec55340fb276134e991c9ce5d61e1e547ce4c4",
+        "size": 12515
+      }
+    },
+    {
+      "path": "messages/en.json",
+      "before": {
+        "path": "messages/en.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7c56dc09490258db5f15a772b3ff176efaf3450c",
+        "size": 252821
+      },
+      "after": {
+        "path": "messages/en.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4d6b1a40230130fbb4d7e8afb1defbc4f5e2dd04",
+        "size": 252645
+      }
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "before": {
+        "path": "messages/zh-CN.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e61e3a62e6879189fb4f469c870abbffbfe7bb73",
+        "size": 243494
+      },
+      "after": {
+        "path": "messages/zh-CN.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1fd3ad6714b3efdb93eede541bb156843b2d74d9",
+        "size": 243343
+      }
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "before": {
+        "path": "pnpm-lock.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4b67909739360248e279efa0c3bb7344379e04fe",
+        "size": 978470
+      },
+      "after": {
+        "path": "pnpm-lock.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+        "size": 978765
+      }
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "before": {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "34324f43a29b3ad9a6cba88602782e8a3ccf30f3",
+        "size": 4355
+      },
+      "after": {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+        "size": 6238
+      }
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "before": {
+        "path": "scripts/e2b/official-files.test.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ce4fbffa210c3e3670cc9c8fbe51c6c11da7a7f4",
+        "size": 54158
+      },
+      "after": {
+        "path": "scripts/e2b/official-files.test.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f980c7258243a77a123207ccfe03911d4483064d",
+        "size": 61113
+      }
+    },
+    {
+      "path": "tests/mobile-bot.db.test.ts",
+      "before": {
+        "path": "tests/mobile-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "db251ff0ce0d0d291db173f490ecc39c99eef1e6",
+        "size": 10124
+      },
+      "after": {
+        "path": "tests/mobile-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f1ed6a60a48a9e22a806ff3fe0cc17f12dc391a3",
+        "size": 13186
+      }
+    }
+  ],
+  "intersections": {
+    "mainChangedPaths": 26,
+    "policyChangedPaths": 7,
+    "mainWithOwnTen": [],
+    "policyWithOwnTen": [],
+    "mainWithPolicy": []
+  },
+  "semanticRead": {
+    "main": {
+      "readAllTextPatches": true,
+      "binaryPNGCount": 8,
+      "binaryPNGBoundary": "Retained exact blobs/modes; images were not downloaded or visually assessed.",
+      "changes": "Mobile task Agent labels now render provider brand marks; only MobileCore.conversation switch text leaves removed. SVG loader is mobile-only and imports one pinned icons package. Mobile thread list filters the already-computed citationSources result to retain detail-reader visibility; it adds no query or relaxation."
+    },
+    "policy": {
+      "readAllRuntimeAndTestPatches": true,
+      "matcherUnchanged": true,
+      "changes": "Adds actual Claude evidence metadata and Codex exact root file mode0644->0777 finalization policy while keeping strict installation and unrelated paths; tests replace superseded same-tuple negative with0755 and add four bounded Codex behavioral groups.",
+      "controlBoundary": "Source/control evidence documents are preserved as supplied. acceptance_review owns independent raw control validation. This review did not repeat their log/ZIP/control acquisition.",
+      "failureBoundary": "Parent reported PR1835 actual E2B test job step5 failure; it is unresolved here. cb2f documentation separately preserves an earlier pre-job platform failure and must not be used to erase the current real failed step."
+    },
+    "own": "All final AB7 and C3 mode/blob entries match the independently reviewed candidates. No union-only edits, conflict resolution, or test changes were invented."
+  },
+  "preservation": {
+    "critical": [
+      {
+        "path": "AGENTS.md",
+        "before": {
+          "path": "AGENTS.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "fa963e4d0a342002661c58772d370484e8af740a",
+          "size": 22984
+        },
+        "after": {
+          "path": "AGENTS.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "fa963e4d0a342002661c58772d370484e8af740a",
+          "size": 22984
+        },
+        "exact": true
+      },
+      {
+        "path": "CONTRIBUTING.md",
+        "before": {
+          "path": "CONTRIBUTING.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "768523980c14db13055f22a68c7e9c5960013508",
+          "size": 12955
+        },
+        "after": {
+          "path": "CONTRIBUTING.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "768523980c14db13055f22a68c7e9c5960013508",
+          "size": 12955
+        },
+        "exact": true
+      },
+      {
+        "path": "docs/dev-workflow.md",
+        "before": {
+          "path": "docs/dev-workflow.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d2b2c72d55da3bcd3cf83a32aa690474cbabfe0d",
+          "size": 15971
+        },
+        "after": {
+          "path": "docs/dev-workflow.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d2b2c72d55da3bcd3cf83a32aa690474cbabfe0d",
+          "size": 15971
+        },
+        "exact": true
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "before": {
+          "path": "docs/operations/tracing.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+          "size": 67256
+        },
+        "after": {
+          "path": "docs/operations/tracing.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+          "size": 67256
+        },
+        "exact": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "before": {
+          "path": "scripts/acceptance/run-observability.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "104075571c73b97a985458f206dba310e4894490",
+          "size": 69119
+        },
+        "after": {
+          "path": "scripts/acceptance/run-observability.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "104075571c73b97a985458f206dba310e4894490",
+          "size": 69119
+        },
+        "exact": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "before": {
+          "path": "scripts/acceptance/run-observability.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+          "size": 94496
+        },
+        "after": {
+          "path": "scripts/acceptance/run-observability.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+          "size": 94496
+        },
+        "exact": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "before": {
+          "path": "scripts/acceptance/run-observability-browser.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+          "size": 25516
+        },
+        "after": {
+          "path": "scripts/acceptance/run-observability-browser.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+          "size": 25516
+        },
+        "exact": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "before": {
+          "path": "scripts/acceptance/run-observability-browser.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+          "size": 29638
+        },
+        "after": {
+          "path": "scripts/acceptance/run-observability-browser.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+          "size": 29638
+        },
+        "exact": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability.md",
+        "before": {
+          "path": "scripts/acceptance/run-observability.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4ca2cf35c1f499b338469556836ae0505649e82a",
+          "size": 19730
+        },
+        "after": {
+          "path": "scripts/acceptance/run-observability.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4ca2cf35c1f499b338469556836ae0505649e82a",
+          "size": 19730
+        },
+        "exact": true
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "before": {
+          "path": "instrumentation-client.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "9109982d1c3245179b85a42d6969003aec2f5047",
+          "size": 2442
+        },
+        "after": {
+          "path": "instrumentation-client.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "9109982d1c3245179b85a42d6969003aec2f5047",
+          "size": 2442
+        },
+        "exact": true
+      },
+      {
+        "path": "lib/replay-readiness.ts",
+        "before": {
+          "path": "lib/replay-readiness.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d60598b09201228e23c5ac7a9df00938192f0e67",
+          "size": 3871
+        },
+        "after": {
+          "path": "lib/replay-readiness.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d60598b09201228e23c5ac7a9df00938192f0e67",
+          "size": 3871
+        },
+        "exact": true
+      },
+      {
+        "path": "lib/analytics-policy.ts",
+        "before": {
+          "path": "lib/analytics-policy.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "152b941ff7b05004a7c57a909f776c6268ede106",
+          "size": 3400
+        },
+        "after": {
+          "path": "lib/analytics-policy.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "152b941ff7b05004a7c57a909f776c6268ede106",
+          "size": 3400
+        },
+        "exact": true
+      },
+      {
+        "path": "tests/replay-readiness.test.mjs",
+        "before": {
+          "path": "tests/replay-readiness.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "58e4706039dafe6901082676f37a3c92da613d43",
+          "size": 7564
+        },
+        "after": {
+          "path": "tests/replay-readiness.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "58e4706039dafe6901082676f37a3c92da613d43",
+          "size": 7564
+        },
+        "exact": true
+      },
+      {
+        "path": "tests/analytics-policy.test.mjs",
+        "before": {
+          "path": "tests/analytics-policy.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+          "size": 26926
+        },
+        "after": {
+          "path": "tests/analytics-policy.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+          "size": 26926
+        },
+        "exact": true
+      },
+      {
+        "path": "apps/api/generated/routes.json",
+        "before": {
+          "path": "apps/api/generated/routes.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+          "size": 76186
+        },
+        "after": {
+          "path": "apps/api/generated/routes.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+          "size": 76186
+        },
+        "exact": true
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "before": {
+          "path": "apps/api/generated/routes.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+          "size": 78570
+        },
+        "after": {
+          "path": "apps/api/generated/routes.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+          "size": 78570
+        },
+        "exact": true
+      },
+      {
+        "path": "package.json",
+        "before": {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+          "size": 80877
+        },
+        "after": {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+          "size": 80877
+        },
+        "exact": true
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "before": {
+          "path": ".github/workflows/ui-policy.yml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+          "size": 22943
+        },
+        "after": {
+          "path": ".github/workflows/ui-policy.yml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+          "size": 22943
+        },
+        "exact": true
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+        "before": {
+          "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+          "mode": "100755",
+          "type": "blob",
+          "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+          "size": 3767
+        },
+        "after": {
+          "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+          "mode": "100755",
+          "type": "blob",
+          "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+          "size": 3767
+        },
+        "exact": true
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+        "before": {
+          "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+          "mode": "100755",
+          "type": "blob",
+          "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+          "size": 4466
+        },
+        "after": {
+          "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+          "mode": "100755",
+          "type": "blob",
+          "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+          "size": 4466
+        },
+        "exact": true
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "before": {
+          "path": ".github/workflows/run-trace-acceptance.yml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+          "size": 14046
+        },
+        "after": {
+          "path": ".github/workflows/run-trace-acceptance.yml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+          "size": 14046
+        },
+        "exact": true
+      }
+    ],
+    "nativeHarness": {
+      "baselineLeafCount": 73,
+      "changed": [],
+      "added": []
+    }
+  },
+  "testDependencyBoundary": {
+    "rootPackageUnchanged": {
+      "path": "package.json",
+      "blob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+    },
+    "rootImporter": {
+      "exactEqual": true,
+      "bytes": 22469,
+      "sha256": "16e4b4c192c41723e59adea424246c9d6984451ce7f040d7248ad26d4a263d72"
+    },
+    "lockDiff": "Only8 inserted lines for @lobehub/icons-static-svg1.102.0: apps/mobile importer, new package integrity record, empty snapshot. No deletion or modification of pre-existing lock lines.",
+    "canonicalCIEntrypointsUnchanged": true,
+    "doesNotClaimCombinedCI": true
+  },
+  "workerInputs": {
+    "builderBlob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+    "computation": "Pure V8 literal translation of fixed builder lock_projection for input comparison; not execution of Python worker_hash or a release.",
+    "selectedLeafCounts": {
+      "base": 480,
+      "own": 480,
+      "final": 480
+    },
+    "ownTenFilesSelected": [],
+    "finalSelectedDelta": [
+      {
+        "path": "pnpm-lock.yaml",
+        "before": {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4b67909739360248e279efa0c3bb7344379e04fe",
+          "size": 978470
+        },
+        "after": {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+          "size": 978765
+        }
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "before": {
+          "path": "scripts/e2b/e2b-finalization-files.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "34324f43a29b3ad9a6cba88602782e8a3ccf30f3",
+          "size": 4355
+        },
+        "after": {
+          "path": "scripts/e2b/e2b-finalization-files.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+          "size": 6238
+        }
+      }
+    ],
+    "rootImporter": {
+      "exactEqual": true,
+      "bytes": 22469,
+      "sha256": "16e4b4c192c41723e59adea424246c9d6984451ce7f040d7248ad26d4a263d72"
+    },
+    "lockProjection": {
+      "exactEqual": true,
+      "bytes": 130563,
+      "sha256": "27d4f15ebccffc05a872408f7726eb779e45a0623626280069c25d2a4daaf89c",
+      "importers": [
+        "packages/config",
+        "packages/daemon",
+        "packages/protocol"
+      ],
+      "packageCount": 411,
+      "snapshotCount": 414,
+      "includesMobileIcons": false
+    },
+    "workerIdentity": "Own10 files do not change canonical inputs. Main raw lock change projects identically. cb2f e2b-finalization-files.json is a selected recipe input and changes the worker hash input; no deployed witness claimed."
+  },
+  "riskReview": {
+    "level": "medium",
+    "sourceMustFix": [],
+    "auth": "Main mobile visibility change tightens the existing readRun-derived list filter; A/B guards and per-item auth remain original. No source-merge authority weakening found.",
+    "freshness": "A/B/C intentionally change reader sharing/proof and require their own actual combined Native evidence; unchanged harness cannot make prior RED valid for this tree.",
+    "runtime": "cb2f finalization policy changes a canonical worker recipe input; no assertion that prior W or published runtime remains applicable.",
+    "reproducibility": "All source identities and modes are preserved by deterministic merge; root test dependency projection remains exact. Root's mock/Node evidence remains distinct from new whole-tree CI and real PG.",
+    "release": "PR1835 current failed E2B test and real runtime release remain outstanding; this is a source-merge review, not approval to claim CI or production acceptance."
+  },
+  "priorEvidence": {
+    "abImplementation": "8a4ac063d4ca099edd038d33bae3e3c385c456d1",
+    "abIndependentReview": "08f0e4df919184dace5e7c87def58a18a5d7abf6",
+    "nativeBudget": "Original6414 full433>431 and FIRST209>147 remain RED; no window/count/baseline/pair changes."
+  }
+}

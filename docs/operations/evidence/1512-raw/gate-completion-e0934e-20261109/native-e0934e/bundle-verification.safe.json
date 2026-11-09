@@ -1,0 +1,51 @@
+{
+  "gzip": {
+    "bytes": 136237,
+    "sha256": "8e401bd6f28feb1101265233245ba62d69b7e9cc48583003720a8a93511b6773"
+  },
+  "json": {
+    "bytes": 1200895,
+    "sha256": "9bd3d1166acc733b1820e934113efac4f63af74f8433303a2aef94dffc0a7a1a"
+  },
+  "gzipCrcAndSizeValidated": true,
+  "independentPythonMatch": true,
+  "chunkCount": 94,
+  "selectedOriginals": [
+    {
+      "name": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "4efdd512e846459aa4423786928cf7e75ab46692b6481dd8a0f615c8c4a29202",
+      "gitBlob": "3cdd249241a8654a20dc6342596c8c15af514dff",
+      "findings": []
+    },
+    {
+      "name": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "0039bbfcbac6275b42e8f430f40b7758b8674e07ee64bea7d3626f63461721be",
+      "gitBlob": "eb137e49d3c0eed120bc700c24065d1eacc3545a",
+      "findings": []
+    },
+    {
+      "name": "lifecycle.json",
+      "bytes": 714837,
+      "sha256": "315abc8b4dc7e9fd66a833a8e038d6e91ebfaf9ca2ebf9574615ea2f7905c093",
+      "gitBlob": "028b012e7b284b08dd52412680237986e5c093e9",
+      "findings": []
+    },
+    {
+      "name": "parity.json",
+      "bytes": 116946,
+      "sha256": "4ffa7b7531e0733eb049cfba1d2ecfe55dc350f20bae2c9e2e67b49fab8fec84",
+      "gitBlob": "ebb9040c4d828c3e016d2730fe1ed8d0c633397d",
+      "findings": []
+    },
+    {
+      "name": "smoke.json",
+      "bytes": 3144,
+      "sha256": "17983804b4ca07687b2b83e69cfeadd4a47530e1cb7d1b61a9cc4908bd12cda6",
+      "gitBlob": "358bd6e5e7eff39cc25682a3183713fae0f46ec2",
+      "findings": []
+    }
+  ],
+  "manifestEntries": 310
+}
