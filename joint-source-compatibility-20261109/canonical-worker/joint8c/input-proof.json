@@ -1,0 +1,3407 @@
+{
+  "source": "8c423db291f8121980267cd48a24e428c992f618",
+  "tree": "195a66e213ca33c100e2900129079c5f83b06272",
+  "parents": [
+    "84e15fe935243ea6cf1399b4b50a436accdd5251"
+  ],
+  "workerHash": "75b7462d53f9725cb92d40112c504b4f32d795c0",
+  "hashCommand": [
+    "python3",
+    "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/joint8c/scripts/e2b/build-template.py",
+    "--worker-hash",
+    "--source-ref",
+    "8c423db291f8121980267cd48a24e428c992f618"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/joint8c",
+  "exitCode": 0,
+  "sourceScript": {
+    "path": "scripts/e2b/build-template.py",
+    "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+    "bytes": 55730,
+    "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1"
+  },
+  "workerPaths": [
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "packages/daemon",
+    "packages/protocol",
+    "packages/config",
+    "patches"
+  ],
+  "recipePaths": [
+    "scripts/e2b/official-files.py",
+    "scripts/e2b/e2b-finalization-files.json",
+    "scripts/e2b/e2b-certificate-relinks.json",
+    "scripts/e2b/start-prebuilt.sh",
+    "scripts/e2b/build-template.py",
+    "scripts/e2b/template-capabilities.json",
+    "scripts/e2b/acceptance-daemon.mts",
+    "scripts/e2b/acceptance-bootstrap.mts",
+    "scripts/e2b/start-desktop.sh",
+    "scripts/e2b/viewer-gateway.py",
+    "scripts/e2b/lease-driver.py"
+  ],
+  "selectedLeaves": 480,
+  "listingSha256": "cdfe8216c85abbcf3ac659c5543d79ad5cc3fd92fe5232eb1ed7d35baa1b02ad",
+  "canonicalInputBytes": 177439,
+  "canonicalInputSha256": "17b87c7278d99fbf4bc6846648d452d675febd086c5be622f4c30146d3288bd0",
+  "canonicalInputSha1": "75b7462d53f9725cb92d40112c504b4f32d795c0",
+  "effective": {
+    "packages/config/check-inert-controls.mjs": {
+      "kind": "git-leaf",
+      "sha256": "9ab0cee8a69b46616bff22be5d14a748a1f5b19dc2f52f358527c30943252f77",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "43bc73dd0b98df65395ecbbbe16a46bc03edd4d3"
+    },
+    "packages/config/eslint.js": {
+      "kind": "git-leaf",
+      "sha256": "d5ad22ca9a820dc1839f71a2fb2d7ba1c0b94908a9f4f1257a11fcd1d73e762c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "40b4e387a629d87744e4f6e557e1d218677a2d5b"
+    },
+    "packages/config/eslint.test.mjs": {
+      "kind": "git-leaf",
+      "sha256": "5f8c29520a5906e3ad568be80c31e8889566c0689c8d812a5c18d903d0d3bea9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b35765f49c940571f34237c11ae9a720326bc290"
+    },
+    "packages/config/tsconfig.base.json": {
+      "kind": "git-leaf",
+      "sha256": "77dd4d4ae32d68b52e6278290bdf9bc903d23ec46a66e8642a4f28f490dd835b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "31a99cbc317758d7cb0e70deeba6e577c7165780"
+    },
+    "packages/daemon/README.md": {
+      "kind": "git-leaf",
+      "sha256": "c781db9586d6812e62e455c359b4637c351c6f3b1c848b0de4f33a31f17363c8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e9704d8fa37f6e6000f3ed6fca220ed87af6f20e"
+    },
+    "packages/daemon/THIRD_PARTY_NOTICES.md": {
+      "kind": "git-leaf",
+      "sha256": "76ad9b6a8ccad1315f58b22fec8162eedc493e4d32ca3656829146db3f337b5e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ab572d51fff2545ebbfe39989bd1d2c43363f346"
+    },
+    "packages/daemon/bin/cloud-model-probe.ts": {
+      "kind": "git-leaf",
+      "sha256": "d6a566d98bd5d1328438a2f89f16349116f408be5f733cf992040641180aa10e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ecb4942a8b724b4acec54f18fadbf56a83a31fea"
+    },
+    "packages/daemon/bin/cloud-worker.ts": {
+      "kind": "git-leaf",
+      "sha256": "ddb822d392207ecc040a051f489ead0ab578a604d327c24b6efa4f925df6af25",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1333ebefe933b780b9951717169819976b0d552f"
+    },
+    "packages/daemon/bin/mikka.ts": {
+      "kind": "git-leaf",
+      "sha256": "70e4ca0f91c1b8e86bfe3680ed1ffbe9a3aa1896fb0432d0e31fdaf47bb261cf",
+      "mode": "100755",
+      "type": "blob",
+      "blob": "fa6896e159acdc6107e6085edfd11656eeb30278"
+    },
+    "packages/daemon/fixtures/ask.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "ea6c1f042eeea638cc8ba529d5562a8074c04ab06ee222f9957565154c9fe455",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f08745cd637650cdd27dc43851ee07886028d5df"
+    },
+    "packages/daemon/fixtures/blocked-question.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "7c1c04e97cc637f519e472ebd1298cd5c4d1f8e1c3ae2d867267795eae30e255",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3b277dfdb9312d9622958a89ea8dda96141a991c"
+    },
+    "packages/daemon/fixtures/check-pass.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "19ee4282359d52528f652ec977acf0bafa76825d2e567843cf84563722e7480a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a1f36efc235129dad4e45e4241a2dc4c4f8df7a8"
+    },
+    "packages/daemon/fixtures/crash.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "97608ecf2f9f6611b49185ee805abdba2aa520b612a47b82e6cf60b6b00fac5f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "fa7b0d927d8120fd990b4111bc7718a05d780d92"
+    },
+    "packages/daemon/fixtures/failure.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "e2c7f36be1e45db359d5b350e377975ad62f88496d6ca1481cf62695826a35c1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e351889036af7f8b47372be667e93a2e031536df"
+    },
+    "packages/daemon/fixtures/long-running.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "c81f9f25691819afad77269eba1f6d48ef9cc1d63653c9e099f0e06d30a74db8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "bab2d75a599fe3f8fd9307ff0ce67976771d47ec"
+    },
+    "packages/daemon/fixtures/plan.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "1d39bd549470b74e436484eb6c55681dd068c3dc4234ec9697254d6dd5e6241d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "76d876a9b9591bcd5608b457deb59ea3d5720da0"
+    },
+    "packages/daemon/fixtures/quota-exhausted.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "47a7f8b9a31f9c283d1da60d974a565dd87a8bbcf3e619ea617f85995f4650fa",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a8dc8a2bd4a326e4e810c058bcb6f6b18eef5842"
+    },
+    "packages/daemon/fixtures/quota.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "7d6c9f2070925863a9a0df59ee2315de053c8e0fb192bf5f1f9a37209d16f023",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "38317a62e4c484eed1188d01b787363c75f05f59"
+    },
+    "packages/daemon/fixtures/run-tests.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "b4bf84fbcc5978275e44ceb7419b3d6e1bee17a47272d77a52b7be3e79c4f039",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "04ea5c5012b92f4e802f1dd0c4e077a5e1662cb6"
+    },
+    "packages/daemon/fixtures/secret-output.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "f93f280bf832b4517f136c21d6ceb646bf02d43e0208f634119d5dfee6fa14c3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1e00619fff324a5064b9870c74bfb11c187a9406"
+    },
+    "packages/daemon/fixtures/self-verify.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "e8c3a2224771645ce9f8a98bde7388f03672673b9291497dfd235273094783ff",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "935960eafad3069f6aebe65bee2485f739c43b36"
+    },
+    "packages/daemon/fixtures/stall.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "b726bf87714ec06f853ae924ce5c4da3d30d024f4f9e7f07d937bdd26a5c4f54",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8703e74f380197492479361af20756ebe3919352"
+    },
+    "packages/daemon/fixtures/success-edit.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "5e94e6419ce38d7fc4f4e4f65f82ff3ada33a1960a33a5643be6d36f1777aa18",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d7e9a01f15968de470f077da3492cb6aeca2c403"
+    },
+    "packages/daemon/fixtures/turn-ended.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "d3fdc6cb38d4f4c3b72add408975538185de4b7b488c8d0c1062fde6565c0ee2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4e999382314208d715d7657a602f599f597d376b"
+    },
+    "packages/daemon/fixtures/verify-fails.jsonl": {
+      "kind": "git-leaf",
+      "sha256": "7724f632c3ba4bbcedcf7bbcd1e49cc75c4a5dfebe00708cfb38f8fe2b72eba8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2ac00e3b000242b49634609c2fa5d4ff233f4cbc"
+    },
+    "packages/daemon/harness/cli.mjs": {
+      "kind": "git-leaf",
+      "sha256": "b0e5b81c32af22f38fb17030aa6366e4817e57dd1590113afb29f9c7a6444d2b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "855da740106056d1dfb88e4ee7b9e266ca008266"
+    },
+    "packages/daemon/harness/install.d.mts": {
+      "kind": "git-leaf",
+      "sha256": "dd339750060c9881f07808faf4d953c6c6a4c084bb9e8da20cb6cd18778834fd",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b03a16871238e26db664cac4ad9cb54b463608b2"
+    },
+    "packages/daemon/harness/install.mjs": {
+      "kind": "git-leaf",
+      "sha256": "2b1b43e3fccf969a46302d68bf6b2b021bdc749c15aed95b412e8b710b0c806e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b81ea4f2bce606195e752b96c210d309a11541c6"
+    },
+    "packages/daemon/harness/pins.json": {
+      "kind": "git-leaf",
+      "sha256": "e31ac10f5e176ba300dac9a9937162cc9293485d0a6a3d64423d91fc15524dc9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6381e459958d791cda1b86ad4bbc31889e555f5e"
+    },
+    "packages/daemon/scripts/build-cloud-worker.mjs": {
+      "kind": "git-leaf",
+      "sha256": "d2e878a1f2dda7f181c9fd8a49d4d1d42abd7c1b46c9571d9151a3c5fc73fee5",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ce864dcd4c83ccce8c1435463f407623e1091694"
+    },
+    "packages/daemon/scripts/build.mjs": {
+      "kind": "git-leaf",
+      "sha256": "7257ff8db53bdaf82cc0914bbc8fbc4bd9753981f98c72edf8278e8a1a2295a9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "13f7a24627b0d3e360488707d32b42dfcdbd5d4f"
+    },
+    "packages/daemon/scripts/official-e2b-instance-bootstrap.sh": {
+      "kind": "git-leaf",
+      "sha256": "4e9b452881e2426e96742b31d9075168611d47d4aa3da263af2808163920d821",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460"
+    },
+    "packages/daemon/scripts/prepare-worker-install.py": {
+      "kind": "git-leaf",
+      "sha256": "a94d44b1fc1c5e770086940ee483f5bcd94eadfbe9317490942e97a9eae672d1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f"
+    },
+    "packages/daemon/scripts/prepare-worker-install.test.py": {
+      "kind": "git-leaf",
+      "sha256": "f82f417a8f273cdf63911b673a217bb6bf3449b9a66a925336eae4b7a78a277a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540"
+    },
+    "packages/daemon/scripts/refresh-cloud-worker.py": {
+      "kind": "git-leaf",
+      "sha256": "6faba70ff89e6a9b4f2b73333a49c65b3e07b19d9102e9d3fa9f28157ed83bc1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "866629a0a0e7e7d5e7fc6788a06135e362d6c4aa"
+    },
+    "packages/daemon/scripts/refresh-cloud-worker.test.py": {
+      "kind": "git-leaf",
+      "sha256": "80bba1c7ff1434e5ccd8fdb42bdbee0d743e471f9c4fddcf984392c23dba2865",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "9dddc36d9d3396752ddea96638901e22c75bb370"
+    },
+    "packages/daemon/scripts/release.mjs": {
+      "kind": "git-leaf",
+      "sha256": "8b442f18412248b90dbf604045c135b6d4bdb36f343ca2897f927bfa59c372b9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "886cc2434cb4840dcb8e3402a02ac3adeb7c8e6e"
+    },
+    "packages/daemon/src/adapters/claude-failure.ts": {
+      "kind": "git-leaf",
+      "sha256": "3b15e6919b31e2c408c588d490cff33d12accc9879b61999cda6476345f87415",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4b8f61f67b5cbbe4dca161031c490644cefad145"
+    },
+    "packages/daemon/src/adapters/claude-prewarm.ts": {
+      "kind": "git-leaf",
+      "sha256": "e0d6408065dc5a9e2c7c3868c08bf703d7632ca6f35fa3c5408b7761e8c04b5d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "cbb45575e495f13d5e76dec1c2b8fd62fb07f16c"
+    },
+    "packages/daemon/src/adapters/claude.ts": {
+      "kind": "git-leaf",
+      "sha256": "ce5f4109a0f4d6d1be718da532c00c85284493461447fbc39dc88da1f1441712",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b5659ce0a1d56aeccd29f964d1aed30dd750282f"
+    },
+    "packages/daemon/src/adapters/codex-failure.ts": {
+      "kind": "git-leaf",
+      "sha256": "fefde796dfa467fa09cdb60a3afec3999eeaada8dd94612837d1277d56eda18d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "53c4cd4d209aaa666cc7fa5d681ace957075a418"
+    },
+    "packages/daemon/src/adapters/codex-mailbox.ts": {
+      "kind": "git-leaf",
+      "sha256": "395db62dc4b40271471f75ffe296c60b495c4c28f61ad41322adf25af42f04b1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448"
+    },
+    "packages/daemon/src/adapters/codex-protocol.ts": {
+      "kind": "git-leaf",
+      "sha256": "2013abc5e016bbc82102e33af61cdd300b221c3d8eff260f5700b9ce158cf3fd",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407"
+    },
+    "packages/daemon/src/adapters/codex.ts": {
+      "kind": "git-leaf",
+      "sha256": "05f09bcaf3e3154bc7ddcd054d2a0bc1aa41d5d3de02deea3b43fe34b8f1aa08",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e85815a955eaff56d7ac389c9d9722c64607345d"
+    },
+    "packages/daemon/src/adapters/cursor.ts": {
+      "kind": "git-leaf",
+      "sha256": "c02b1380a2f74a36cbc3b3e113740d16504add2846b769df253ef8d6c7a0286e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1a3081575602152bb028783d277fc34441c1a721"
+    },
+    "packages/daemon/src/adapters/generation-metrics.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "0690dc28c08e4b8253e6fee1e2ba4da0f2e7e0636f51e1ba54a71ecf2da654f7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7b7878479cf37d95253c3c337a9c755346963d96"
+    },
+    "packages/daemon/src/adapters/generation-metrics.ts": {
+      "kind": "git-leaf",
+      "sha256": "d48c2b62283ed2ffb3e35eb12b43a6a3762d676b4f61e4220617804cb1b974af",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4827af84d7b53cff43cea29e73b19a5a780e8572"
+    },
+    "packages/daemon/src/adapters/mock.ts": {
+      "kind": "git-leaf",
+      "sha256": "29602a0601bda2b8f88d5df813b60da062792a41b4c2128e85a50a3abe2f4c6a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "385357ded14842c6f77de18df288679776db359a"
+    },
+    "packages/daemon/src/adapters/types.ts": {
+      "kind": "git-leaf",
+      "sha256": "321c69a55dcf24447f7e6a005051eabe1a018caec62ce6de02b8b1488636cbf7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "bbd59de65673cf8fcd98ad4bfb365a5aaac7ea28"
+    },
+    "packages/daemon/src/agents/capture-copy.mjs": {
+      "kind": "git-leaf",
+      "sha256": "8c5eb230f0e879001abfc2c23a5d33d51297bce12b9d4ccc6b2d98495de90620",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3634a4cea39efe7b9f81f8da77d8a71760ef06cc"
+    },
+    "packages/daemon/src/agents/chat-files.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "90a1aa8fd16570475bb4622225f4776150bf3c16e4132362538c323c97e62104",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "bcb290243e540453090cf81d14c4d2aeb265b6f2"
+    },
+    "packages/daemon/src/agents/chat-files.ts": {
+      "kind": "git-leaf",
+      "sha256": "b36b769e0f178a3595744f8336679c01989a6db5bf3c56df8d9ca42cc9ea16fb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "925e4672f23e008ecbad1ed0cc2f1ecdad31ad40"
+    },
+    "packages/daemon/src/agents/checkpoint.ts": {
+      "kind": "git-leaf",
+      "sha256": "d6f62c0ee2e70fe3862bee2fea2c8970a3f8e9a5561f7a5eb401d23e5d88dc7a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "62c38cc610f6cac27993c67537b2cc5af81ca783"
+    },
+    "packages/daemon/src/agents/child.ts": {
+      "kind": "git-leaf",
+      "sha256": "7a160d6ee514f6300f189d85eb3582082db6e98cd40dc69ea3917fa167bdba3c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1381a9787e4ac14b759c9e16022dd652afc39025"
+    },
+    "packages/daemon/src/agents/github-credentials.mjs": {
+      "kind": "git-leaf",
+      "sha256": "0d75fa3a96fc0fd050f6a5c84ee950745cf737e63fdecd1f828f84285ce054bd",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "fb9903daa0993818b9c081547bb6eced1be43449"
+    },
+    "packages/daemon/src/agents/github-runtime.ts": {
+      "kind": "git-leaf",
+      "sha256": "b922cf78116126af4df902addcaed51c0a2b7942bb9d116c4b33e1ea728df678",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "50583cb456fa629ee456c5131279b53cdac51a96"
+    },
+    "packages/daemon/src/agents/harness-home.ts": {
+      "kind": "git-leaf",
+      "sha256": "43e597f0a16636a124aeae73342df029227854e0d3011779c594d9b980c823e2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2db35ee687e4251a27c6b663fb27a5bad624cb48"
+    },
+    "packages/daemon/src/agents/jsonl-rpc.ts": {
+      "kind": "git-leaf",
+      "sha256": "9ad55a474c95e4d7705fbb63414da6578d47daa30360e29442a9e54dcf0b07a0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "39a7a2b91f68c9c8a5354ec54762ef269ef7ec00"
+    },
+    "packages/daemon/src/agents/local-git-origin.ts": {
+      "kind": "git-leaf",
+      "sha256": "6c5e0b8906bfd4a7ca2dd853c518666a301406f9dc817a724861aa4a4a7696b3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d495f10f9b811fe177e6fcdd5c7b2bd7d10974ff"
+    },
+    "packages/daemon/src/agents/local-github.ts": {
+      "kind": "git-leaf",
+      "sha256": "779f18cb0714e733156500a9aed21a5e0f23c5043080ac79581085795acccdb5",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e79e8ff3e2a2a5843fefcf27313ec97c98c7f925"
+    },
+    "packages/daemon/src/agents/machine-github.ts": {
+      "kind": "git-leaf",
+      "sha256": "25f359c1a62a54f2f9f4b5130be89d3b6d8b16b14daedd823f7e0644efd72bc9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7fcfe13605e9eb2d3d4d272781f54a983186c31a"
+    },
+    "packages/daemon/src/agents/mikka-mcp-backend.d.mts": {
+      "kind": "git-leaf",
+      "sha256": "e96329d81cbe4e89dc5a359798d56aff36bb3ce74f3f44b716d10c781846566a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "02cf186cbe1fa97af6f673123e78ddfb920823fa"
+    },
+    "packages/daemon/src/agents/mikka-mcp-backend.mjs": {
+      "kind": "git-leaf",
+      "sha256": "88156ef095ada6c08a4c6165b7dd95a37fac213c1c9a4b0d6a4bccb48f6abeff",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "308c9ed7ab78b636876fd661b55d36dd61b478d2"
+    },
+    "packages/daemon/src/agents/mikka-mcp-bridge.ts": {
+      "kind": "git-leaf",
+      "sha256": "b76ba4c9c99309df38ee42268786bdd8ee35122c4129a8678370722a766560b1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c10d98d47f482b5b0c0dec2eef1fb370a686457e"
+    },
+    "packages/daemon/src/agents/mikka-mcp-context.d.mts": {
+      "kind": "git-leaf",
+      "sha256": "0384b4ab534d5af43fe8862ae9561cb0d2190b7dca568701dfc5332db8e0c6fb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "499258edbe870e1917aaf8e7c513cc8ccbd8bccc"
+    },
+    "packages/daemon/src/agents/mikka-mcp-context.mjs": {
+      "kind": "git-leaf",
+      "sha256": "6a6bb88332926615e18bb45c117dad8032985e53bc2b5a0a8c42a91a02cf1038",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04"
+    },
+    "packages/daemon/src/agents/mikka-mcp-worker.mjs": {
+      "kind": "git-leaf",
+      "sha256": "0ebea94f11ce236f84916efe67224fa7419cb2a778999440313f3decd49de3e6",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2ec93fd50826074d8b2ce049fc5f9cb191b75509"
+    },
+    "packages/daemon/src/agents/mikka-mcp.mjs": {
+      "kind": "git-leaf",
+      "sha256": "559f1c6b6ca8f68acbf412c60ad55e4aa500049a5e38198ede69adeaee242b60",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e314a1c43ac0749a5a773bcef2be02a976fc166f"
+    },
+    "packages/daemon/src/agents/native-container.mjs": {
+      "kind": "git-leaf",
+      "sha256": "fbe1e123c4233c1488227235a5cf384e1a3a2d05bab027ae00696c4d17c8dfb3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "005e2d6a292f520d6bbb643a1630a6ea56c0ba36"
+    },
+    "packages/daemon/src/agents/publish.ts": {
+      "kind": "git-leaf",
+      "sha256": "9bbdf0baf10d57e3aa9b443395f73112bac7c01ad88aa8b926a322ee8fd41c2e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "11ecd7ae5e013aaf44b936071672a85ad0958626"
+    },
+    "packages/daemon/src/agents/run-apps.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "89dec3b2f8d45886b1e57e9c6ec1d9004a35787a7f5b562179b95256aea3d001",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "35bf3612aade978723555005c9c35e00bde07811"
+    },
+    "packages/daemon/src/agents/run-apps.ts": {
+      "kind": "git-leaf",
+      "sha256": "1b13f992f455182ecaa809388b22133138b7b1de749193bb37855f4ae4e90b23",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d8e80f54dd7e24999ea3038f6d645023e5135d7b"
+    },
+    "packages/daemon/src/agents/run-context.ts": {
+      "kind": "git-leaf",
+      "sha256": "f2283790bc17c6661e458d1735ad3de430a20e41790f961ebd9a825d3dcc8bc1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f"
+    },
+    "packages/daemon/src/agents/run-credential.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "96a90182cc7a37c3ee2126946e0b172d4b163456897843e7c7f85801527f6d84",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "78dec0063919368b25342a4b67e8699ad4dc26c0"
+    },
+    "packages/daemon/src/agents/run-credential.ts": {
+      "kind": "git-leaf",
+      "sha256": "ea332220bb625317a696cec9949cfcb0350dc1db32fe4437410d7b44807830a7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6650795ca34b9ee908b9b7ed6dca2fd1dbb7d78a"
+    },
+    "packages/daemon/src/agents/sandbox.ts": {
+      "kind": "git-leaf",
+      "sha256": "dbca8aec426cb347188115c4afa49505d0fc7e72e9654232b3f32544258859e5",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2f5ffaf60b73904cd475b6ce1acc1dd6530d0721"
+    },
+    "packages/daemon/src/agents/skill-artifact.ts": {
+      "kind": "git-leaf",
+      "sha256": "086159ee73908baf7ab30b12401c713d45c7948dd584aed53aeaaa19c86aa791",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f84d1a5e956794258cb2f3a2c205b8e034497233"
+    },
+    "packages/daemon/src/agents/tool-approval.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "930d5255c96bd525109c922cdc681de1687133dc634def200442287815b6ff1c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b4ee5d0a1486641d48fbc9f0e18486433d9ee9a5"
+    },
+    "packages/daemon/src/agents/tool-approval.ts": {
+      "kind": "git-leaf",
+      "sha256": "4d687b216ad89b0f9eb21e67d90a4a9ec255f2ffda2d3aa85d5d32e759068fa1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d874aed6045ea4fb9344ae913ad36d5b63b03a79"
+    },
+    "packages/daemon/src/agents/verify.ts": {
+      "kind": "git-leaf",
+      "sha256": "b4cf7d0b76026463e21db10f02ddb8b8d316b3ff4bc0b003254b144f51a5315a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7a2e0b93ae24cd67c093ec7ca585fe4412899b10"
+    },
+    "packages/daemon/src/anonymous-claude-spare.ts": {
+      "kind": "git-leaf",
+      "sha256": "7a58959d56d2b6f4ca478cb5bc274122cdaa19256c3379e4b89bc2acadc32aab",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "39ef017d27cd0c7395abfffe99913a7e509ff3d3"
+    },
+    "packages/daemon/src/anonymous-codex-spare.ts": {
+      "kind": "git-leaf",
+      "sha256": "d1929f9aee735a7c908f9cb13c3ae15ed99ffdbb1d70739a31629efc12797724",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "00f476c51799a68c4af5edc38d9a62c91aeea545"
+    },
+    "packages/daemon/src/api-key-broker.ts": {
+      "kind": "git-leaf",
+      "sha256": "c4f215757d6f0a7e6d2f24ba173d60660256d0719cfab4ee252a4479ce3f6d5e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0afeb81712523e4d2d0d185fdb3675cf4e72f339"
+    },
+    "packages/daemon/src/auto-update.ts": {
+      "kind": "git-leaf",
+      "sha256": "93859e93ec8567b5b5c06338c2c327631ba908cfcc22ee9ff4e1600defedc129",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8c476363d1933178d69619358ff2bef57f570fc1"
+    },
+    "packages/daemon/src/captures.ts": {
+      "kind": "git-leaf",
+      "sha256": "c553c0f54db586752e5cf470797907e167ece3133ad5ef8b21cc823a8f5f249a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5af9ce09d15c20d13e12f6b9299c4e1ea117c4eb"
+    },
+    "packages/daemon/src/chunks.ts": {
+      "kind": "git-leaf",
+      "sha256": "414ae96593ba9f7f59f107d40b571af747da61b1afc116fd3c7321453c46bdfa",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b0e5b7e58a10fb95cf986e80a1d04b99fcdee52f"
+    },
+    "packages/daemon/src/cli.ts": {
+      "kind": "git-leaf",
+      "sha256": "97e6bb61370253c676be95f3b83b4e18157b6437231115790d89a2339a9f247f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0be92f49ab119d6bc10ccfe25286acb1efffe6fd"
+    },
+    "packages/daemon/src/cloud-bootstrap-broker.mjs": {
+      "kind": "git-leaf",
+      "sha256": "0542231591dbceb2fc9d473eb0e4cf6ed8c1fa2e7ce8276f499c24c4f903f5b0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "15c6637c31e308ffca83d35ff9623fc67f120233"
+    },
+    "packages/daemon/src/cloud-bootstrap.ts": {
+      "kind": "git-leaf",
+      "sha256": "9a9871182334be97065bef9c922d93ec958fdad9ca1617299a1152a40620cbed",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "887f668ae7e20c0cb457b5fc4f116b4fecb552fe"
+    },
+    "packages/daemon/src/cloud-model-probe.ts": {
+      "kind": "git-leaf",
+      "sha256": "09ec7b47ccfbe358da39ebc3169bdfa0cd5fe02c0dfbc10be5a491b3d97fecea",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "92fa342ba673e1ba9ca5d0091c51443de1fa44e8"
+    },
+    "packages/daemon/src/cloud-model-receipt.ts": {
+      "kind": "git-leaf",
+      "sha256": "ac1ae79b3ac9d45ff52bb44a8536ac0e1924ea86b2cbeac3ed6765e9ebfa2bd1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3caff6c7e5ebddd4998fcad65201fda4367afc5b"
+    },
+    "packages/daemon/src/cloud-registration.ts": {
+      "kind": "git-leaf",
+      "sha256": "5359354f1f2f6eda0461af1d407d832e6d91ec6a5adbd680ecee4fb107081e7a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b4870fb638b6acbcb73596c764137b8980417756"
+    },
+    "packages/daemon/src/codex-generation-telemetry.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "9b1ebdd4f4f214012df8b34833849d0128ce6905050deddb349409cf5d38be8c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2464d4164da37b6b4355e4338bf039875cf9fd9e"
+    },
+    "packages/daemon/src/codex-generation-telemetry.ts": {
+      "kind": "git-leaf",
+      "sha256": "2cc089b42b10cb8e5c7cb2361bdb2bf25e428c77a8d7e1a1af39ce68d9426927",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10"
+    },
+    "packages/daemon/src/codex-mcp-context.ts": {
+      "kind": "git-leaf",
+      "sha256": "b4ae108d9e71a2d0e92906f8d96c9ad4d1fdc7479b5b428b9fcc98b0df70638f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "beb35030e17a70a219ec9878701df7726bd4fddf"
+    },
+    "packages/daemon/src/codex-startup-config.ts": {
+      "kind": "git-leaf",
+      "sha256": "8c97ddb294d8cbb2c4a3b92f0bb27a4c3498cd9f90ed773c54028737984a46af",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c7724a698dc12e2e301461941eead3a5bec16177"
+    },
+    "packages/daemon/src/computer/broker.d.mts": {
+      "kind": "git-leaf",
+      "sha256": "257fc51f8c5625a473daa1503de4bdaddbbfe30b0a29d990607850a41bc3667a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "fb15fe7ae40d1691b89d73ebd3830a3b96c58eaa"
+    },
+    "packages/daemon/src/computer/broker.mjs": {
+      "kind": "git-leaf",
+      "sha256": "fb522c7af0dbd1209e3c0eb464b362cf377382bea1d2e46371dcb14a1c8609e0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e1cf1926cd8b0c0889863121371e75cdd5c0995e"
+    },
+    "packages/daemon/src/computer/broker.test.mjs": {
+      "kind": "git-leaf",
+      "sha256": "0f142eecc142dcd68eb8703b961df32de5cd826d2f3070b279f075feef0e2025",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ba76765c88202b3e924dd027663285e213d47cbb"
+    },
+    "packages/daemon/src/computer/credential-executor.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "dc1bf4cacf92baf216e62103f881f1e2e92fdf7faf9470427f6e5c921c2a9d58",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8e023859ef53c084382bc909a205cbcc8374afe8"
+    },
+    "packages/daemon/src/computer/credential-executor.ts": {
+      "kind": "git-leaf",
+      "sha256": "702399178c02ff5d450a02d21c3b49844d696e0f73a4c0f3978258490914ea36",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8e42f9a777311820593a06df700fd8b9a859d32d"
+    },
+    "packages/daemon/src/computer/driver.d.mts": {
+      "kind": "git-leaf",
+      "sha256": "36b89e6b300f4f61309239d0d6fbdbd539615ea61a123f4c418e9e182f0e1f57",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "928b2a787545655f2a1fbb30192d2bef67fd429d"
+    },
+    "packages/daemon/src/computer/driver.mjs": {
+      "kind": "git-leaf",
+      "sha256": "44633891fab4282b10e057795bcdaab93488036e5ca9efd3990a563b21e71dde",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "02f29fc0fa8a5fa036d2c7bdaa69a60fc1f079da"
+    },
+    "packages/daemon/src/computer/driver.test.mjs": {
+      "kind": "git-leaf",
+      "sha256": "409e6a06d1649d12e168db5de791cc71123bd1356cf98b328a481aca0a006af9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "be6b3d7064ec0aa6d2a7c3b114bf842378488912"
+    },
+    "packages/daemon/src/computer/local-grant.d.mts": {
+      "kind": "git-leaf",
+      "sha256": "078f43c3e9e3b3050765c3aee28edf12790fad6e2db7bf4d1d78dcf1ee5a298e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "02008836764aa92c86c275cd95082984997ff643"
+    },
+    "packages/daemon/src/computer/local-grant.mjs": {
+      "kind": "git-leaf",
+      "sha256": "4238a405b2adfffd970d75766fd2d44b4c485705baf94bc680e0f3f13d9c9835",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4e47d694a39f80404974efb4398b0ec978a9569b"
+    },
+    "packages/daemon/src/computer/local-grant.test.mjs": {
+      "kind": "git-leaf",
+      "sha256": "13daf2bd77b18ed88ad0109a775314955232b4e94366fad51473079ee4b167a8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "09645d521f1683449aa45658b803c92199e09dbc"
+    },
+    "packages/daemon/src/computer/proxy.mjs": {
+      "kind": "git-leaf",
+      "sha256": "0adac44b8a595660f1af4ef15e33479196e6159ad0f1c3413a1718955310d868",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2680a2623860cc0664cd358685b22d88ea48c757"
+    },
+    "packages/daemon/src/computer/proxy.test.mjs": {
+      "kind": "git-leaf",
+      "sha256": "9045e68713e4c4ebf1b926bdabcc8e92a913c1a83294c0f03b7c1088a1a07965",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0462e22203bf787282359d284bea1896bbd0bc13"
+    },
+    "packages/daemon/src/computer/transport.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "aca4d0f0b5d25984d2d34bcb0155717701b13ef056e217dd2bb4e62520e3770b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "64aa5971bb3f00b406712c8fcfdd2b5cd800c7f3"
+    },
+    "packages/daemon/src/computer/transport.ts": {
+      "kind": "git-leaf",
+      "sha256": "e9af7afa7c07836a987efd29acb25e820c2a1adbcdd4757c957c45d41d1c1bf7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b33aac9cf0123b43b4774bf69f2529f0696efe27"
+    },
+    "packages/daemon/src/computer/web-review-push.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "25c631f0885dc12d1e540e6b673bc0e73d8da86576e44aa5b4d56b76c163d0d9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "fed898d0982902d8973a3b31954488efb1405dee"
+    },
+    "packages/daemon/src/computer/web-review.node.ts": {
+      "kind": "git-leaf",
+      "sha256": "15e57528536bc3c2a0cc60d150fe331211ea960ff0c4275f2030b703f4a0a8f4",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "06f6ff7bc7bc680499c635dd9eafe4e37fb95d75"
+    },
+    "packages/daemon/src/computer/web-review.ts": {
+      "kind": "git-leaf",
+      "sha256": "d22b55154b118e7ee8ae0e305eddd78ec593080e7249b7cf4c0f818463516767",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "62d9dbb6bd1a81baaf241d31fdb1583d6a9bce57"
+    },
+    "packages/daemon/src/computer/xvfb.test.mjs": {
+      "kind": "git-leaf",
+      "sha256": "ed04186beae4f0bc79dd6f146af392412ed37885eb350bd7d38c2869bbd07e1c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6a03f148416b2135ea89ac88faa6a9b381f55e7f"
+    },
+    "packages/daemon/src/coordinator/claude.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "0c729c040c92921c640548f51fb53c7b909a6886ef20b4a1a4101dbb1e66d746",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "73f2c9e12d62a3d2a7e7535665a7b822b9437311"
+    },
+    "packages/daemon/src/coordinator/claude.ts": {
+      "kind": "git-leaf",
+      "sha256": "c1b522747ac2709473654882f058ad5b4b82d0c5cbd7d9f0329c54970bc750eb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ea50f87f580610afba4d425d69436ae74348ff2c"
+    },
+    "packages/daemon/src/coordinator/codex.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "e1d5860ef181b8bb6012e6995d6797dac699c5c22505617fe1581427ed3b37be",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "df2388c8011a03294af8ad5c151fde9486ce1478"
+    },
+    "packages/daemon/src/coordinator/codex.ts": {
+      "kind": "git-leaf",
+      "sha256": "f80c57dcddca8e44a2b1c2ef825464e307a44e3c3b06c216160ef1f30ebbb2b9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c63f94f608c2a299eafa9319d3c6e98465407b49"
+    },
+    "packages/daemon/src/coordinator/contract.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "4a27c49c23becad8ba0393750bdbcb9a2b8a95658cce62aaa24b979692685d8d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "750b0c838d3275b2003b784bb3d119d6b1fa0254"
+    },
+    "packages/daemon/src/coordinator/contract.ts": {
+      "kind": "git-leaf",
+      "sha256": "ab4bcc47b535a4953629ee2c7f5c482b807f7728500ddcc228e020758a2e7a31",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d3abaa8d542e704ecd96fbe85fb1844f5a84431f"
+    },
+    "packages/daemon/src/coordinator/index.ts": {
+      "kind": "git-leaf",
+      "sha256": "f95df10bb512e80d635b9075698f47e676cb44549b303604971144779d599265",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8837501ecf52c424252ae567fbb8c6a363051efb"
+    },
+    "packages/daemon/src/coordinator/runner.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "131fc4055f2da578973885fb49a50a8552c65e1237d0a3c87417ec9355e3302e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "15da2e086b8a0f3ab8363f2e2d09374e2b769e3f"
+    },
+    "packages/daemon/src/coordinator/runner.ts": {
+      "kind": "git-leaf",
+      "sha256": "bd745913408dcc4ce53d428aba4be73a61bfd0a85ae0d2dd30874bc6c613b881",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "25b3666e8b1d671e49ccc1578e1b3186d3353ff3"
+    },
+    "packages/daemon/src/coordinator/tool-result-wait.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "5f3168a8334c707367be3bcf36d81e210281449a865134501eec5dba467dfb5a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "28034f786d0905876b4e14170483dccbc8fe4586"
+    },
+    "packages/daemon/src/credential-globs.ts": {
+      "kind": "git-leaf",
+      "sha256": "3dee3d6e07adeb63eca6bb05ed7a2be44bd83d146d55ace09cb7d84033e7be3f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "caf7eff4133053f99714465c6f2b02e9041bfdc6"
+    },
+    "packages/daemon/src/decision-judgments.ts": {
+      "kind": "git-leaf",
+      "sha256": "611103b4c75a92609b80b3d3082de74d01a2f8e937dab1bd44a9c59f07c0eaa0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "339c5929db4321aab717f88562ac4b906030ce13"
+    },
+    "packages/daemon/src/device-gateway.ts": {
+      "kind": "git-leaf",
+      "sha256": "ab46b84e65a9471d42b95e6505e953111f2cf2d5889f7210919139ace9320125",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "190f0e367ad538df5fc54d9eefcda52994a6a5b3"
+    },
+    "packages/daemon/src/device-type.ts": {
+      "kind": "git-leaf",
+      "sha256": "6077fab4532edab23287652ff0f68b204beb61e6580fed5a16659d6da2215b51",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "78460053a6731f4aea4331f31bcb3b8cf5c54f61"
+    },
+    "packages/daemon/src/device-work-signal.ts": {
+      "kind": "git-leaf",
+      "sha256": "19aa37e22a4c7479509777978f36f905adfdd20581e6a5e0f49935fb2d5d81e6",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0bc49ef43678f5b949313a6af465fbeb6a51d72f"
+    },
+    "packages/daemon/src/env.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "5fc529fecbe26c48bc0c4f2e3bc0f0db0ae2289eeabb2374221656359404bf4f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ab3e0923b67853acbd0020c4b3494903d64ec852"
+    },
+    "packages/daemon/src/env.ts": {
+      "kind": "git-leaf",
+      "sha256": "cde464fea2e6de4f9948e2d45482a26fdfe86a4610cfef4324300c6f2da09da4",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6bc2d7673a9feebecb786f62ad2d25e790d075d9"
+    },
+    "packages/daemon/src/errors.ts": {
+      "kind": "git-leaf",
+      "sha256": "01e3f4857f44ceaa068ef7de6888ead289f20338c03b77bf37524ee938bbdd45",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "07fd88caa07a46a791498f86adeb12d7e5e1daa9"
+    },
+    "packages/daemon/src/fs-browse.ts": {
+      "kind": "git-leaf",
+      "sha256": "549cb11af3d734ff1e7faf3d3033437dbce65419d655acab305085bc62d35578",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "528e8d9138cccd3b262ba7320fda6a560c7bcca5"
+    },
+    "packages/daemon/src/fs-util.ts": {
+      "kind": "git-leaf",
+      "sha256": "2603767a30280c26d6c5d62c0984bd6c035465a3aa7d63d9d8c5aad2d8a61d1b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "eccea99eb0c04aa5a4875d461022e326b88b84ab"
+    },
+    "packages/daemon/src/harness-install.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "f1fb53fb5e22e1eeccaf71c69bfdaa8d0db9157de9f86372af46e30583d66838",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "19e85b2db4c7be7ff5ecf08d2a505ec14fc02a1f"
+    },
+    "packages/daemon/src/harness-install.ts": {
+      "kind": "git-leaf",
+      "sha256": "7db3d3133f0439962ceb42ea2edf229f978c60314fb00657922123426810024e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d754f2e9fac09c54b1521727a5075d65b8c236c2"
+    },
+    "packages/daemon/src/harnesses.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "28e5cba06c22d40c576c82fef5a2c2aa3c49c27dd7aaade258d4af34173152fc",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "cf81f5881c56e8c9c4f18e250ae224f7c0aa4afd"
+    },
+    "packages/daemon/src/harnesses.ts": {
+      "kind": "git-leaf",
+      "sha256": "f9839282a70e1cfa930e0af93017a5b95903db1fc6352474302642368609b7bd",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a4cd61c6633931a8306d86e54c40665a7a1441f6"
+    },
+    "packages/daemon/src/hosted-binaries.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "914e6aa9b2c86321d5e968c0e8c440acebf26fc0af3749672d3b96463274ccf0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e903326b507946fd35e7f8c17c170e4218a017b8"
+    },
+    "packages/daemon/src/hosted-binaries.ts": {
+      "kind": "git-leaf",
+      "sha256": "ae540e642a9bfb4ae11d18502d3c0be10b68474629afc86a8c7b38c4f71ad15f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "79d9ac7da4d33316263339b71f82461ade761e2c"
+    },
+    "packages/daemon/src/hosted-cli-prefetch.ts": {
+      "kind": "git-leaf",
+      "sha256": "d79c83f821b7ea47920d7176d38e649bb7375a0acd79f29e7a6a2b988521c629",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d3136a1667e96faed8e19cc5952f1c06d8bb2fcb"
+    },
+    "packages/daemon/src/ids.ts": {
+      "kind": "git-leaf",
+      "sha256": "769523e3bde3b3e960f7ff7a070bb6706c1b47fe1f574e69a0b77965db7e494b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a9da396c969ae052ba8c7967a9a314a8c3cb8a1c"
+    },
+    "packages/daemon/src/lock.ts": {
+      "kind": "git-leaf",
+      "sha256": "a5cb875df2df8fc6bdd44f5c1ca31585f38f10db08b0fef14d238b95197812ae",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "752e2d2a170eda4bc11a078abccd6fd278f793be"
+    },
+    "packages/daemon/src/log.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "89c1bb6ddf9bdb89c6ea13ede90173dfea291d6ce19e0b6df7dab231ee1cc20e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "43b3050782448f67d0cbe0a9a2e18f2370e73382"
+    },
+    "packages/daemon/src/log.ts": {
+      "kind": "git-leaf",
+      "sha256": "f08db4c239e183a230dd62f18249edae47753c91ab96db9e48174c226a0b3dbf",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7a4e5e2a5da5015d0caa1b14d509c933ff86f844"
+    },
+    "packages/daemon/src/login.ts": {
+      "kind": "git-leaf",
+      "sha256": "4c229831d81a4d76a2e6a49c881764cae1e057d5d05f669fdabae5fcd8d1743b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6b13333c0b1f4f4f4af90c4d4bf940f89389fbe4"
+    },
+    "packages/daemon/src/main.ts": {
+      "kind": "git-leaf",
+      "sha256": "2047651236436346f6c7625c69297d9d9c973986f1a5cac12f4ea04e76be345c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "abe9cf6dc0dd634fb76458b0a192f76258d32b43"
+    },
+    "packages/daemon/src/mcp-http-timing.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "d86ef60d0e702186a475c12ee93d1181f7e2f340fc83d87d517e78ce8b9d75df",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "065ec67cafe2bfa59080e3a5d8b2c520224fea10"
+    },
+    "packages/daemon/src/mcp-http-timing.ts": {
+      "kind": "git-leaf",
+      "sha256": "3e7f7b606660ad2795368dd8feef70ebd41f89c03ab1cd4785479c9239da7be1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "348935cc2784567eef99dd8af85868c6438f5de4"
+    },
+    "packages/daemon/src/model-probe.ts": {
+      "kind": "git-leaf",
+      "sha256": "3d0b93b1ac0a4c9042ac33c4a8da14a2ab20a827a9093a9092124bf34bdea815",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "bbc427d089a8eada65549c6548f3d9550e7b1c68"
+    },
+    "packages/daemon/src/official-cli-timing.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "5709da3d7aa306c06464d1e291881f81e672a9b92c75145498bf9476a18d9f09",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b00fd6b69d3da0ca4d1b679e65265e533f7b2e75"
+    },
+    "packages/daemon/src/official-cli-timing.ts": {
+      "kind": "git-leaf",
+      "sha256": "74679539a5cf891038e6fbbacfcafc88ff558a15523c99212f8b44a44ebe3ce8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8a48352489f3455e0c8b74a532b7adbb09f5c835"
+    },
+    "packages/daemon/src/outbox.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "ab534f84d3e3c283e80400f85d86ff010632bc9c707fbaeca9c0f85e66c2db07",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a1cc853d316676eecf3c840fd6e38c0f6978c51b"
+    },
+    "packages/daemon/src/outbox.ts": {
+      "kind": "git-leaf",
+      "sha256": "30575e3c84580286d13a291afd43f2484ad42106b55f03283f13359a566b27eb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "764b3cfae981dd2ba3f19616ce5782bbb9fcc67a"
+    },
+    "packages/daemon/src/path-search.ts": {
+      "kind": "git-leaf",
+      "sha256": "108bc322e8b16246234a87fba91ce7760f0752c4ccfb3c5481c13623a9b374d7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b275652c194487a81f185678c3c6eb16e6e307c7"
+    },
+    "packages/daemon/src/paths.ts": {
+      "kind": "git-leaf",
+      "sha256": "148d70fbb846b407010ecb4d92901aa79301f2279e079d09bb61a75330d17351",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3d9a8043e63e63a43044e2517ef03ab359341b9b"
+    },
+    "packages/daemon/src/permissions.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "e9f58b698bb0119dbcae1a5f13cdb5a3dfe12d72c7c63d268724a643d4a7ca2d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4c11b5d5e6e4fb857ebf245323165a163887857b"
+    },
+    "packages/daemon/src/permissions.ts": {
+      "kind": "git-leaf",
+      "sha256": "73470af8bbc3d8868f5bb54f7095cbf45fd6b52ac737486ecd7c4da957c2af4f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "fc612dfef206662434f95020e9ce2da6a4707157"
+    },
+    "packages/daemon/src/process-group.ts": {
+      "kind": "git-leaf",
+      "sha256": "da2e58dc3d13fc911761e636f599490314f9efeb8e2a300ba82974eb8c95c1f2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d2192f3de3693b37946797da81f184860001615e"
+    },
+    "packages/daemon/src/quota/claude.ts": {
+      "kind": "git-leaf",
+      "sha256": "ae0fc341a133d9bd92d9c167566120956bd7a43963c95a111a61975fec3a44fd",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b65e76bc97ba0e6cf6099fc3348f646f24e85852"
+    },
+    "packages/daemon/src/quota/codex.ts": {
+      "kind": "git-leaf",
+      "sha256": "531125bb9a7864bb4343adecb91c5aed2394ae1bf8776582b858c5d067a50069",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "32ae574bdf5298702f5957a132fdd9058f706d9b"
+    },
+    "packages/daemon/src/quota/cursor.ts": {
+      "kind": "git-leaf",
+      "sha256": "3dc47b2baf8da0a44945136972f505e5b32f2b04b9dd47a8bc57e2f05587837b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "111d97501a22d4b08a70b19f89cca22818f95904"
+    },
+    "packages/daemon/src/quota/files.ts": {
+      "kind": "git-leaf",
+      "sha256": "998ff519a5fb9661aa37305d76e1ec944896a9f55e9fe3b307a2d72825a51205",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "19813f75b2eeceb05b75bb7e5b54fccc80487501"
+    },
+    "packages/daemon/src/quota/local-credentials.ts": {
+      "kind": "git-leaf",
+      "sha256": "f43fffd0d7a8a7e77c75c21ef2ba303fb3db35001ffadefa480928defa585a87",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a5c91ad997d66c470666e2b1092ab5f276e7a232"
+    },
+    "packages/daemon/src/quota/parse.ts": {
+      "kind": "git-leaf",
+      "sha256": "01851799f66b0f3b972a77bf77eded542eed604d89719c17aa76f1c86ba37efd",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "61d8fd07966d1aadb2ed14690683a34cd2306f9c"
+    },
+    "packages/daemon/src/quota/poller.ts": {
+      "kind": "git-leaf",
+      "sha256": "719145ce719c210898a54b5b0b149fcaa8c87449de48a8fcc00525db5ebe7971",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0f418159b67690036f95e04148f397189b6c689f"
+    },
+    "packages/daemon/src/quota/quota.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "f4d47bc337b57a7565c170b2219090e87344e4bad0268d51272580f59f5eef26",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "77e8aa194eb9032ad3ea754fb59008513cc7df84"
+    },
+    "packages/daemon/src/repositories.ts": {
+      "kind": "git-leaf",
+      "sha256": "953f095d385153fdca951bac64a64a2a448b138f437f25c3d923aa2e5cace43a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "bebf3f981b9c09cc456edbc5eaf741e0e1e58408"
+    },
+    "packages/daemon/src/repository-git-timing.ts": {
+      "kind": "git-leaf",
+      "sha256": "afe558721edfe8174e0627fbc95d1ba57f019bebeac18849c126b60efbdea9f2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "629034e9f747a0cda8d3a7b2792183ba79fc36c6"
+    },
+    "packages/daemon/src/rpc/client.ts": {
+      "kind": "git-leaf",
+      "sha256": "8318ddd4f0d5d9ac7a98082efbefdf65031a00cded1e5c04ee23d7319be5a389",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b5f087764705b44ee7c3c4e95133bb9fd3e64c97"
+    },
+    "packages/daemon/src/rpc/server.ts": {
+      "kind": "git-leaf",
+      "sha256": "19ab29acde126ce03e907b17f0cfd20950c2269db9378fb663f2931bbcbc07b7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b73abd9fc91a6d6419c65a0254dba9104a62cf7b"
+    },
+    "packages/daemon/src/run-isolation.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "7698a513ff02a5c312dff35d18da1dd71e9c9317d5604f75a40b814aae6d7372",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "138fbf39b2e304a4647f7b32f5177569aa5df2f2"
+    },
+    "packages/daemon/src/run-mailbox.ts": {
+      "kind": "git-leaf",
+      "sha256": "fbe878c9615672fb50818750dd3a85f88b4f52900d867165b0602212125613e0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0371266111af0a53c125d54897852d45fb6ebc27"
+    },
+    "packages/daemon/src/run-repository.ts": {
+      "kind": "git-leaf",
+      "sha256": "da5cb8b1dd442816e251e5de178eb36d70736768df95c7d485a895ee1c4cf6e6",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7b810d1e4a9ac73808dd14e681f586d6f76a69e3"
+    },
+    "packages/daemon/src/run-runtime-timing.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "cf124fca9a9bc682733218094e60126a2373de1380b087a5f65095b2e4e067f3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "51aa0a6591be4d7f05aa5541c9d45d83339691d3"
+    },
+    "packages/daemon/src/run-runtime-timing.ts": {
+      "kind": "git-leaf",
+      "sha256": "ce1e88af78c0313e8d5f8de6657f7999281c84a76667afa71af7dfb9f52e3394",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "9332e6e8b732dd06b41fa47518a9f0b1253d1ca5"
+    },
+    "packages/daemon/src/run-scratch.ts": {
+      "kind": "git-leaf",
+      "sha256": "a48f1206deae5b74b31ce5f8dff14ec7409cb1f976df647f83902c5f363af037",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d9020b4a7f152cbc1a720e9e55c410334cdecb4a"
+    },
+    "packages/daemon/src/runs/check.ts": {
+      "kind": "git-leaf",
+      "sha256": "62199af62c200d5e51e5f8c72a83dfeedb11c87c0382b1b46f68dab2f79362d9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4c2f9b288915d82a04950eceb105fccd14276d2e"
+    },
+    "packages/daemon/src/runs/journal.ts": {
+      "kind": "git-leaf",
+      "sha256": "b429a7cfd568318523afddc490a300f0b71d52449f34eadbe5022cfc2dbc5932",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "680cfec0236655e1fd76307bc74c9e4995ae3dda"
+    },
+    "packages/daemon/src/runs/quota-exhausted.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "59bc35e6851e44c3d89bce7a9543e7e8c70b4a2bc1d000806cafc662fc1d1c97",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3c6664e5d2c0e84b5d558fb56121c03e9ae25f87"
+    },
+    "packages/daemon/src/runs/quota-exhausted.ts": {
+      "kind": "git-leaf",
+      "sha256": "f84aac67aea18e1e3de1abea1a718e2ba6121795ac566e2394b3ba9a398547eb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "073aac064e315fe8e53dc9c7010711738d258fea"
+    },
+    "packages/daemon/src/runs/supervisor.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "471f602c2031d4a931a14aca39c758416abeb8b18ce97a70ae43d6a3db4f6302",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3b3b06dff505d2449a531c2637f73f79db924713"
+    },
+    "packages/daemon/src/runs/supervisor.ts": {
+      "kind": "git-leaf",
+      "sha256": "5f5cc496e875f7b5ac3a1a5c6f978daf1292abe742ad8fb2b73bbe436fc5988b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3367adf7b454b4b044d09858fa2e55ef24ae1195"
+    },
+    "packages/daemon/src/secret-mask.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "8d0a8b701a1d66e2b290166a60787f245beb44717b14f6a89c57e41b1d64001d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "18034ae5ad837b56632ae70834dcfec5eb50af17"
+    },
+    "packages/daemon/src/secret-mask.ts": {
+      "kind": "git-leaf",
+      "sha256": "a39fe1a7a9ae0037526c4b8bbbef02d02ba1efda390f10e2e16e955c1a1bac5d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "44cc6c3450a750cd7ac12dd3fe08507fc7d61bb2"
+    },
+    "packages/daemon/src/server-decision.ts": {
+      "kind": "git-leaf",
+      "sha256": "02eabdf00b8b30f47b93cd8d1c49e80bd5ced2f72fac94fc2c65b9bf934f9789",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5fe6835973c6ca79690eada9004545f34642af80"
+    },
+    "packages/daemon/src/server-link-http.ts": {
+      "kind": "git-leaf",
+      "sha256": "57a7bbb0c349a51a4ccc24a9d422c396fb2561de2fd4c222b40316ffec4e104b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8cbbce8d8706f07b6b5e075dbc4a6d738af285ef"
+    },
+    "packages/daemon/src/server-link.ts": {
+      "kind": "git-leaf",
+      "sha256": "bc252b2e72220510060d5e119671d8713332456cd4681e8c5906e2bf2bc8c53c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "34f271c0def0008d7e9120e37098d4167f951578"
+    },
+    "packages/daemon/src/service.ts": {
+      "kind": "git-leaf",
+      "sha256": "42c09c4506e740e553b93d11463ecb639069919c9db32c54329b50a86a7eecdc",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "277fae47e47d1ce4a2061838b1f08f457b7b3355"
+    },
+    "packages/daemon/src/subscription-access-ready.ts": {
+      "kind": "git-leaf",
+      "sha256": "be931c434ee284d00bf2e76c3582b504b9a7e26259014d1abfdd9dd6e2d4349c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1124946c71e80b16dee7a67603a670b91a9fe082"
+    },
+    "packages/daemon/src/subscription-credentials.ts": {
+      "kind": "git-leaf",
+      "sha256": "a621d6d37e212e46bcae7a79a5018f296a5c0fe364a5abc5438cfa89d206c95c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e5d7cf7b6e78206f6ba789de850ae7770c700d5f"
+    },
+    "packages/daemon/src/subscription-hosted-runner.ts": {
+      "kind": "git-leaf",
+      "sha256": "700473db5a3e893f0cfb0892771105131fb8f42e929c0505a8e13e9198ed0109",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "62a2d8edd244293b511a00da618849638a943ac0"
+    },
+    "packages/daemon/src/subscription-launcher.ts": {
+      "kind": "git-leaf",
+      "sha256": "5442ed7c8b8fac958d956e85b6c168515f918d1c04202b2ca6e82372c392324b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "35d242f8ad58a623c4f9bb59b0f5bc12febce4b3"
+    },
+    "packages/daemon/src/subscription-local-runner.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "ffb016c9231606e3aa41f6d941b48ef7299f330d1c727a6fb0dbb35312e1be81",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2e1da8423e1c160e8b277b8be2add26b12c57b41"
+    },
+    "packages/daemon/src/subscription-local-runner.ts": {
+      "kind": "git-leaf",
+      "sha256": "2b2cebd512d8faf0f0514770a580c1bc6e78ffc0bed81963d362f53592887f36",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6d96bade81dd631d5b5068cd1f272d64bcb7bc91"
+    },
+    "packages/daemon/src/subscription-native-broker.ts": {
+      "kind": "git-leaf",
+      "sha256": "1c5432ff22f509f37dbd5303c0d55a4b74e79b291557487e3b6925d59a82dcf3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2192561dc4aef519d226acc82b8af3a666818d53"
+    },
+    "packages/daemon/src/subscription-preflight.ts": {
+      "kind": "git-leaf",
+      "sha256": "996f451f148f17b06b365441ccfa629bb5dbee584355e2e3ed8d8740bdf8760e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b51c5b1de83de18161e17bff61e93c5e34cf2a23"
+    },
+    "packages/daemon/src/subscription-quota.ts": {
+      "kind": "git-leaf",
+      "sha256": "a97bc4265e291db94e95f4de557d811732d275188a416e61f10735868f38bf34",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "535a7a7a230f8a84bce34c4d46f42ca5cc0b553d"
+    },
+    "packages/daemon/src/subscription-worker-client.ts": {
+      "kind": "git-leaf",
+      "sha256": "972f2ec2ca2060d15210540670ead8ff50b1d2b21d7bc7d6455b25bf30a649e5",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e8cf0150fc8ce0962a55ec9723b441abbfb41c02"
+    },
+    "packages/daemon/src/subscription-worker-timing.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "1731c157a3ddb91d4acd39f737dd988bb88ccad6365aa5f832f37c4d533acfc3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a81384d2249da654d52f63d0c426d41d9145636e"
+    },
+    "packages/daemon/src/subscription-worker-timing.ts": {
+      "kind": "git-leaf",
+      "sha256": "bdaaea8f9268d124668999d7e23a2f2f95e4c8919d82caf9ed7a3303b0677829",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "622a0d39f562ff326dc42a4bd7af16b3d1c3d3e0"
+    },
+    "packages/daemon/src/subscription.ts": {
+      "kind": "git-leaf",
+      "sha256": "2c223c4514140b6e8d9cdfe47551ba209b8df38b236db12dec2ef263ae9a2330",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "18338cd3b3fdf5a57a30263a2f0c7319d5f30df1"
+    },
+    "packages/daemon/src/task-env.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "38d807f114f8df2da4c402a6f4bb1d8c14c780ee596c3d68fc14c623cd3e2de5",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7b097f5e72b54f0a54d4b165b917631eac97e841"
+    },
+    "packages/daemon/src/task-env.ts": {
+      "kind": "git-leaf",
+      "sha256": "fd0b07ef1cfc83bb089e418cc06c129f23b3a648ed3f919b93d53e15bded7fdb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "cf4970f88fd504592e1c7564f0a1360fe2fa320f"
+    },
+    "packages/daemon/src/task-secret-bridge.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "f1b632d329db4c660dca37c5a43d7b36c1fb5040c6adb817fb9ec4420c02a01a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4be31ba07bba23de80840cff590a05a1a1a3503d"
+    },
+    "packages/daemon/src/task-secret-bridge.ts": {
+      "kind": "git-leaf",
+      "sha256": "8ed79555d16eede7b19f9c0af2c5bbb34622faf3441ec75664739154b985efa8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7d1f931e7e311b9abaa48a3a06ad19e7ed5be6fb"
+    },
+    "packages/daemon/src/tool-duration.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "25ce0e2393f6ccc6a167d8670b893aad6cd0b3ec4ee5b7e83fad63821f0b19cf",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e2ca7e45b629c9232f3249e3ba82b065dfea5b4b"
+    },
+    "packages/daemon/src/tool-duration.ts": {
+      "kind": "git-leaf",
+      "sha256": "f5dd81680bc678327182ca6efaf79554c66eafb6d9fa694698e42a79749eadd4",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c16c3c18dca3a2de441047e63d48853f06f9d7f3"
+    },
+    "packages/daemon/src/tracing-ai.ts": {
+      "kind": "git-leaf",
+      "sha256": "48a6b9bce69125785e3eaa76ccffc829efda1135b7785dd1b381731bc5064016",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6f7d7414fb07809880603dc4c20f6525616219ab"
+    },
+    "packages/daemon/src/tracing-logs.ts": {
+      "kind": "git-leaf",
+      "sha256": "c17664413bbdfc02cbe136d2038f2bb0ac4d966221807d68aca2113a391dbb6d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e8da68cec5d9976ed404e4494ba59037c9b4966e"
+    },
+    "packages/daemon/src/tracing-sampling.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "ba61f43b84afcc25e779ba420006145167a8cfafc1fea2d544837a0af937bf8b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a8633f4aeb9211e1f580137d71abb6e9037fb9de"
+    },
+    "packages/daemon/src/tracing-sampling.ts": {
+      "kind": "git-leaf",
+      "sha256": "50806689277ec65239cf1dd55264f246c25ce2d5b0cdcf256d8d7e4cfb891a5b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "06d2c47f82853e5d0630dc79feda2d8d0eafe8d3"
+    },
+    "packages/daemon/src/tracing.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "7f53c0298a7e67cae52e3142c5a5d3229881c608eb6e9a30ce85ba93e6691cb9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2c1bdc5fc6896cbe1c1fd54054b98d1845535196"
+    },
+    "packages/daemon/src/tracing.ts": {
+      "kind": "git-leaf",
+      "sha256": "353a6acca50830752e041330e1eee287b866cb6325b431ba6c65cdc7635d6403",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0eed0277c933b0d2457909851bab458a482c184d"
+    },
+    "packages/daemon/src/trusted-endpoint.ts": {
+      "kind": "git-leaf",
+      "sha256": "8727b83c4e74e2aac0e578f0679543af091146a01d29683bf5cf4cb600e2f539",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c9171cd5ae653b43b095ed26fe4f550f1ea49ed8"
+    },
+    "packages/daemon/src/worktrees.ts": {
+      "kind": "git-leaf",
+      "sha256": "8f2f5eb71b4fe2fbe7df5df3747031aa83773733cbd97807d9c97274ae8573a4",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ee09f23b355b6ed9d8960502a8cdb53fa9b493b7"
+    },
+    "packages/daemon/test/adapter-runtime-model.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "383cec57aa4771535a955bbb8977eaccdb1471155a95a6b9bc44ffa94b6f5675",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a6cf54fc1d544a76c0b8ea2090325c762fe94105"
+    },
+    "packages/daemon/test/adapters.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "06979bd5420941288689eb43e5bcf3bf64917fe543be1a6da200c58152454935",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c594202c9db5a0fa8a1c19fb731125d309abc61d"
+    },
+    "packages/daemon/test/agents.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "3ae4a7df9e4534ae6f34820b8020d5bf68e35f3b86926205bfc1657cd8a88e0e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a97e549c984fdd71546ca1500486dc9e94f2a044"
+    },
+    "packages/daemon/test/anonymous-claude-spare.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "427743bad3c4ba56281e290dc0a31ac830a1b3ff9216011266de750c99d319ef",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "263185786d249ea601a0c9de6b0a7df0e49d40ed"
+    },
+    "packages/daemon/test/anonymous-codex-hosted.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "3ff3f62c45c77d7e1146df2a9712fd9ddce214f790b4765b8cfa74ed5f0e13d8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c"
+    },
+    "packages/daemon/test/anonymous-codex-spare.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "e9c54319182fa4602679cce75bea0b12969a315e04a3141d3cd5c1df51ca3032",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6a2e49857783a337e6be23ee53680b66e4f8a0bd"
+    },
+    "packages/daemon/test/auto-update.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "b636d054dc104d03ef35ed8ac29d43033895c57fa0e503b71f1b3c7ecdd77c7f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "48a75e0423deaf0336fa42dd8f96c50b97e60b97"
+    },
+    "packages/daemon/test/candidate-bootstrap.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "bffb8df1f51580cf2acf8f6159253251f98a4920feb785ee687ea4640f4fcc94",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a4cc8dfcbde688b96fb4a9e937056c092eed0262"
+    },
+    "packages/daemon/test/capture-copy.node-test.mjs": {
+      "kind": "git-leaf",
+      "sha256": "c6f5594540c35ab8dcdf1902b377a4d21d9ca5145f7ad93acb454365ef2f77c2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ca2661f8d87fc3e897d3be3cffe5f6b0457c63db"
+    },
+    "packages/daemon/test/captures.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "97f5fd53227bc085612fe6d9ca54a565cfdeefd1c67d76c55f305e938470f5a5",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ed0659c9a828c6c239f6dd6a4c9505b5d36e7828"
+    },
+    "packages/daemon/test/chat-files-http.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "d96f76929790163398c6c17e697c5d5849bd9c9c27708fb4ad30e0a77884a3f0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4141c56d4f2e4add226fd7594f122f8f62c32501"
+    },
+    "packages/daemon/test/chat-files.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "4abf69219b41e664356633f6fcb2112a6341699f8331bdfc85980d794aa2a7be",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "03f301a0fd7a14fa9fd8725c7d0232d74987c697"
+    },
+    "packages/daemon/test/checkpoint-recovery.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "1c8ab8bbf0e600fbbed89f07ee64e2d269ae170f34f9b92e71ba1130fd1391ab",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "49cb2b876095df809b1495fc8b876a1974df5ff9"
+    },
+    "packages/daemon/test/claude-chunks.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "7256b5ba92643780a6f8bccde01f08fde47b1cd0473619da312eefda6d4bbcdd",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d671d1794b5b58ece9020b9772182aad9b33fe61"
+    },
+    "packages/daemon/test/claude-generation-abort.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "deef7c977ecbf1b4a6b503fb14a13ce0d60584c93cd78cc4db542e7dd416f5de",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c9fb96f579fda0c1aa3372756074a1a90713204a"
+    },
+    "packages/daemon/test/claude-prewarm-adapter.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "d2b4f201d74a7d546a418ecb88e497ce50539443705af78b7f572ec2f82bb62c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "9b9173f52679bb524d6eb4472164c00d8fd87448"
+    },
+    "packages/daemon/test/claude-prewarm.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "9ca8edd01343ba039d0b1fa5603cc2478ce461b22616e2ef3f4e27c3e2c21ee9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "dddc01a02e3baf9c546891ce112aeb6dfef671c9"
+    },
+    "packages/daemon/test/claude-resume.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "cfbdd356069a34b51ba185f8ffd22671e09328c275db59bb35f5ac467a1189aa",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b79bb1c4ab98d2f87a23096e808c09426a72d95e"
+    },
+    "packages/daemon/test/claude-subscription.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "4037e2d5ea760c74f4435edefc46bf45d658d4c1abcf13331bf04b8b240e7f48",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "52544fcd53a2b3358e3a71c7490e966418ab3476"
+    },
+    "packages/daemon/test/cli-startup-login.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "8ce7a8fd37c31d3347c7a6d835ff8b690a79dac92b56ec82be2685425bf5ca10",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ce4ef8c1cc61767fa84c267528e0dc33a6f05190"
+    },
+    "packages/daemon/test/cloud-anonymous-hint.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "9f175d5f1d197e86a7dc7469f9d5e16e7bdfcef5c919142788d76b05a5cb8b65",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0f76ab735ab88c21a1acb576a9186e9a2675553a"
+    },
+    "packages/daemon/test/cloud-bootstrap.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "6ab09eaf7e44f56ef4b61ca1940ca30ef50eed6c1dd8d8f7a8ad47edb87e3457",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "96a5453786386f62b25f5c7b4a844fa1403c4573"
+    },
+    "packages/daemon/test/cloud-model-preload.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "0ae267b608702e0dfa3d1f72fb408c571cbe16ea24b34f5c45b921117ed4a3dd",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "742ab443405a88de8d0f952dadfc21fc0456f760"
+    },
+    "packages/daemon/test/cloud-model-probe-bundle.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "c11bd4c1565dca580b670f4c09812b1200d43009f61bd96df3f33fd240cf239c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3bace312b668a27bf7216a32b7ed1bb94612cada"
+    },
+    "packages/daemon/test/cloud-registration.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "f52c086ff77dc15528128963c2a42b3cdf93bcfe3b5f2e5b8fffa590e8d8588c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "00f80b2471ba461baa12e52c8b40424ff401ef57"
+    },
+    "packages/daemon/test/codex-contract.node-test.mts": {
+      "kind": "git-leaf",
+      "sha256": "8e6da3eaf13334b56a799b15ab039b566936f7182cc49d9d55eedc5896cc8f1d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a3806f8f12a600af3ac5d60016c693b0ef8a2753"
+    },
+    "packages/daemon/test/codex-generation-completion.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "ef75c8837b9c1c54cdfbb1d120ce5190d2e083ebcc3db76f72b7e53215fae4f0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "76449ff682615ebd14a533422194946e75441d74"
+    },
+    "packages/daemon/test/codex-generation-wiring.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "b47d1ad44a352e810419f84e0077591c6842ced0882b00ff71f1611e57819017",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "9732fdec477481e961e96404393459ca38f22fd9"
+    },
+    "packages/daemon/test/codex-item-chunks.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "b9d6d81d88715557cc5d341fde3c9e9a31be273be6a7541aa92f7496233f7837",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7a72cbdf6ae495a62ec2b9684ce9889f69635893"
+    },
+    "packages/daemon/test/codex-mailbox-resume.node-test.ts": {
+      "kind": "git-leaf",
+      "sha256": "6bd1561114547b9c9013b3e549fce4b36adf3ccbb99de74d2749f4fa0b66868d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7d40937784ca75dffc01a9ee2cf4cb3948c4ecf5"
+    },
+    "packages/daemon/test/codex-mcp-context.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "59541dfb144b04829bfa20bb2a378735d669e685655ad1ecdcfccd11c2b4251b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b3b755f024c0a1531df3a4b1d849b3b70c145806"
+    },
+    "packages/daemon/test/codex-startup-config.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "3dc656a4aed921700376697c5ae78cdd20dab23719e79932ebf350e28229f984",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "36089f8f5383aa49b3e251b51410b9864642943a"
+    },
+    "packages/daemon/test/codex-subscription.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "47c2a1cad2d2d545c18ac560585a10d871cdbd3f7db72a15ea4a1f95942b5f2c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4e695285660b475102649d90fbabf12a6948b0c2"
+    },
+    "packages/daemon/test/commands-polling.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "3665761aa7b69c2e40e3010b6a37b93caab865a07cbf2a5963e38643f6d3b1cb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f3bf151903c524afda7e0e2fb37e0c3d4762db18"
+    },
+    "packages/daemon/test/commands.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "5f689ee85d29b84db553df928b8e9cb2958531b742c23130a5b0dc7d21cf91f8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8c4730239770b852d3c9b0b95c182e450f4bed43"
+    },
+    "packages/daemon/test/computer-review-lifecycle.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "59a2446a1fbfea0ae4dbea83560bacd00d2cecc45ec6d5f7038085d1b92bf9b8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "985ce1cfd300033fc4caaf07de0cba0d1ecf8964"
+    },
+    "packages/daemon/test/credential-journal.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "bcc3bf726d92cc5dc1722dfb477a7402f9ed28364aec056296187098b111f0ac",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "05c04932d873aa40d9b6af40bae9751fd200b6f1"
+    },
+    "packages/daemon/test/device-file.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "af2625d9880407248482d18b90827b2c60bed99d81ad42c3b52b9e0e35ab750a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "61727b380514e50644906bfad9ff1c0f5e1d10ea"
+    },
+    "packages/daemon/test/device-gateway-reliability.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "294ecbfb8cb84c127170264c6384d6ad2c327d39bc9f8568fb0c8dc69eca302a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2fcec0166e368818b054cb1352b193d75c055ed4"
+    },
+    "packages/daemon/test/device-gateway.node-test.ts": {
+      "kind": "git-leaf",
+      "sha256": "6f782400260cc2a71636423292f5118ce8a5dfe74b23fa39808b8f8d7edf1d25",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "018e37bf3d8be1f4adfc9b0feac69bb1b70f2e4c"
+    },
+    "packages/daemon/test/dispatch-link.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "8a535921a8a48e54a59973be9cf455f79c50fe1a87719e2eb82f5f0d177c3c28",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0eeb5ad8d11435ce1566ca6afeab03cc89288569"
+    },
+    "packages/daemon/test/factory-check.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "4bc447156d2e05a47b2342c3eab2b61dddbd31c80b2fef77994d404986225a4f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "88f60a944d9e3ef70d7d5663cea017a8e8e5c4e8"
+    },
+    "packages/daemon/test/fakes/fake-acp.mjs": {
+      "kind": "git-leaf",
+      "sha256": "c35fe7973accb43bc9d8081eadf205dcbdd8183de6f305f9d26f443218d6c0a6",
+      "mode": "100755",
+      "type": "blob",
+      "blob": "9c110ab853c1a061caa1df9c9843170b5fa26b2d"
+    },
+    "packages/daemon/test/fakes/fake-claude-generation-abort.mjs": {
+      "kind": "git-leaf",
+      "sha256": "c6a854a1afed8e7ddc6789080644e2a86e02a1bffbf38911296fde3cf3574fa8",
+      "mode": "100755",
+      "type": "blob",
+      "blob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+    },
+    "packages/daemon/test/fakes/fake-claude-prewarm.mjs": {
+      "kind": "git-leaf",
+      "sha256": "b522c77feee4494643b4542a984c0d76e03b8cbda6ad88e277b125d6df7ad19c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d0a1bcda35b8da73cbd2f071acc445c499cb31a8"
+    },
+    "packages/daemon/test/fakes/fake-claude-subscription.mjs": {
+      "kind": "git-leaf",
+      "sha256": "d7737529ec81f623f3b35cc33371ce0c4c61faa5fe03ae4a35d3d400ce7d4d6c",
+      "mode": "100755",
+      "type": "blob",
+      "blob": "d2c71520745bb70a96c7d12e1317187c6d8accc5"
+    },
+    "packages/daemon/test/fakes/fake-claude.mjs": {
+      "kind": "git-leaf",
+      "sha256": "c7a7196d239fc3b56db390344a7d2fee3e76453cffe17e8c2ba504c6afa26fe6",
+      "mode": "100755",
+      "type": "blob",
+      "blob": "decf9596be80806b0f314031b2231d88b682047d"
+    },
+    "packages/daemon/test/fakes/fake-codex-generation-completion.mjs": {
+      "kind": "git-leaf",
+      "sha256": "6012f7932795c1503003c4fb49699ba96497a2bb58c9e5aba7081f776b976370",
+      "mode": "100755",
+      "type": "blob",
+      "blob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+    },
+    "packages/daemon/test/fakes/fake-codex-network-approval.mjs": {
+      "kind": "git-leaf",
+      "sha256": "a229ac334dd12b44589dc57c0456e8b202aad8ca316acb2b456c7cd79c880ec8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b7aafba759be41da0a78c23532d69dba23efe7cb"
+    },
+    "packages/daemon/test/fakes/fake-codex-subscription.mjs": {
+      "kind": "git-leaf",
+      "sha256": "8e3e6a0784c9938d5735834601c3d443d9ed620453a1d8b941436d6339664019",
+      "mode": "100755",
+      "type": "blob",
+      "blob": "820d152cad23267fe6a8345882dd70b0041a8aef"
+    },
+    "packages/daemon/test/fakes/fake-codex.mjs": {
+      "kind": "git-leaf",
+      "sha256": "32ebb969d41d9b913754ee2f34f2cd26e1983f7e2aead9c55b57d1b98ed71907",
+      "mode": "100755",
+      "type": "blob",
+      "blob": "4f6eaad867b24c8425e50440a8fcea8b9bf1cb6a"
+    },
+    "packages/daemon/test/fakes/fake-coordinator-claude.mjs": {
+      "kind": "git-leaf",
+      "sha256": "196e2b2668432e725f7b46675ef1f686e3ebd0ae35d82d47d2debd58ba943bfa",
+      "mode": "100755",
+      "type": "blob",
+      "blob": "4bf1d7059ef7e7125e61af2dade8f5834a3305c9"
+    },
+    "packages/daemon/test/fakes/fake-coordinator-codex.mjs": {
+      "kind": "git-leaf",
+      "sha256": "27ff336033f27a675f4fc3b20f3c43538e4092752b5cdc1a4dab72386dc36708",
+      "mode": "100755",
+      "type": "blob",
+      "blob": "37915ab0ef4862cec171a41c66c40d1fb78d53bb"
+    },
+    "packages/daemon/test/fakes/mcp-call.mjs": {
+      "kind": "git-leaf",
+      "sha256": "8a2e1ff034c27def21b8664ac03493aa481a4fd0c999e1b7c78107a82cdf47c1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b588a956abd64ff9bd4c8a394e69a857e07517e0"
+    },
+    "packages/daemon/test/fixtures/claude-code-2.1.309-initialize.json": {
+      "kind": "git-leaf",
+      "sha256": "85e6b8f4c9e33a5fd8255679ca9e0d6f4a586298a98adf8670134902e86bfbb2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "41c17eadf4bb2ed78187b26baecffcae2100ecf1"
+    },
+    "packages/daemon/test/fixtures/codex-0.163.0-model-list.json": {
+      "kind": "git-leaf",
+      "sha256": "a38050b5b4caf25cd6bacb080db98ebb4fddb321c9454db4d2e38fb94f66388a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "829167d547122e3d5d746e6c978db34f5a064e09"
+    },
+    "packages/daemon/test/fixtures/codex-8e-runtime-timing.json": {
+      "kind": "git-leaf",
+      "sha256": "fc6038e1e242b06430978286062a44f186579480fbc004a14346cb57d96b082b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "93bcad709f61c728cd2954a3bdbf249681fffca0"
+    },
+    "packages/daemon/test/fixtures/released-0.0.299/github-credentials.mjs": {
+      "kind": "git-leaf",
+      "sha256": "16c9cea536f38864046be683af68413ddb71cb3076a9306206eb2d8d2e3a865b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "dfe6ff6dad5b2e26a38bd13778aa0e294a87bb3b"
+    },
+    "packages/daemon/test/fixtures/released-0.0.299/http-link.js": {
+      "kind": "git-leaf",
+      "sha256": "226c4274d6ae4c755dc79a616ec7cce56751c7d90dad3085fc0128052ab5bfa0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "00ac59be2bcd1a9ae64621051a79508b17bdd693"
+    },
+    "packages/daemon/test/fixtures/released-0.0.299/release.json": {
+      "kind": "git-leaf",
+      "sha256": "64c196cc0094ca34b1c06694145708c7ab47b934d9cb2b417aca2899c01e50b8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b2592e7fa50368aefb6f596741fc4c83034cc8a7"
+    },
+    "packages/daemon/test/fixtures/released-0.0.456/github-credentials.mjs": {
+      "kind": "git-leaf",
+      "sha256": "75e0e44862c2c00b023cb148afb26e84b765f897d81f49ad4c487cf4aafc7f55",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "90ad639e4611795b6cc93918aa595fc7183ebe91"
+    },
+    "packages/daemon/test/fixtures/released-0.0.456/http-link.js": {
+      "kind": "git-leaf",
+      "sha256": "5adeca18b1068b4bacfe2ff36a9867d69f6e9fde6c7214d18936e5db785b8a05",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "bfbc39da56979bbdc5d3d31d0714731e37299a0a"
+    },
+    "packages/daemon/test/fixtures/released-0.0.456/release.json": {
+      "kind": "git-leaf",
+      "sha256": "68a0bb2fb02763bf1833e2c7fc827ad7d05d7732c53aa2365543c721eb5fd964",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "412d4bd9b5e3e252c5c07e2d423d28362385836b"
+    },
+    "packages/daemon/test/fs-browse.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "b44db527f34966dac55abfb76679868b8db285e56998247762d3d31c8ae16aea",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f23db74a933cf9d442d706ddafce64c98e8c6fab"
+    },
+    "packages/daemon/test/fs-polling.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "adbd09b31d1cb918531da088afd2512313944d6175159e67497b406f60ecb3fb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d7528c2363c2c6de170a2d07b20528a8c24b2066"
+    },
+    "packages/daemon/test/git-prepared-token.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "a2e53fb1a41e1f27584a4b17bf7c9cc70bdf8707f278b8ac2db663d5d6af7762",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "802048c0cc12e244182c59e1c69291b51104bb0e"
+    },
+    "packages/daemon/test/github-credentials.node-test.mjs": {
+      "kind": "git-leaf",
+      "sha256": "051f2c7ee41d38c3e6279d0aa2220acca3c8854e5e5b912c2f9a00a173d72e69",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d53e5a74f65fe6994f63d908e24dfcb4ec16d0ae"
+    },
+    "packages/daemon/test/github-receipt-concurrency.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "8678dfe9760ffe73948546438625694795dd9f9f547c2897d3b0d0261c930b32",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "109885e36eaf645dc833dde932146809dc387957"
+    },
+    "packages/daemon/test/github-runtime.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "9432c26f990d0ff366de203035fefd38b41ecbe28c06db6e6aa64e0ed6bf48d3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b883b231111716bfb74cd974448f17c2a178de83"
+    },
+    "packages/daemon/test/hardening.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "9434c8c053839f2896b62cf2a5b15ac519941e195464abfede49f1dcd15165fc",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d4c57a52ebede43906c6c1642cb511304815113c"
+    },
+    "packages/daemon/test/helpers.ts": {
+      "kind": "git-leaf",
+      "sha256": "f6993723bfdbed3dbb96f85cb6fd6dd29e160741daa9bce9cb854a1593242a00",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d29b149f18f74474508c0f672544f6f4b4759476"
+    },
+    "packages/daemon/test/hosted-cli-prefetch-lifecycle.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "40f92be7d82bddb0c7ac1f339400de052abf3e5d70c73755efd53506a09856f0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "79331e40785b8b45f9b2776d6dfb8c3dabd25613"
+    },
+    "packages/daemon/test/hosted-cli-prefetch.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "d9a602ba3c02c210ad52afdb0a74ccbd957a928960e885086ccd61b76b9ffeef",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1d3df9f8d4075ae622065655d2bd08ae428ef5cf"
+    },
+    "packages/daemon/test/hosted-command.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "86725374200b39eefcfd47fbaa1929766cbce15b3e16c8515c975abda5c004f2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "218472f58b4b521b45bfedcb95bc697b07f7dc6f"
+    },
+    "packages/daemon/test/initial-run-hint.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "99e6c7d1a90f40bb69165beac21e27235b0584a3dfe27b8e148cf0c5483b1871",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "100127bc999f0d724e966982472c27ccd9a0fa1e"
+    },
+    "packages/daemon/test/kill.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "389cb58526795afe68dde7e78ade7e0b75fc1446e351b138cabc26e032ad2aec",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "192dac534272607213418927900a22b4aa3cd279"
+    },
+    "packages/daemon/test/local-computer-adapters.node-test.ts": {
+      "kind": "git-leaf",
+      "sha256": "c037bda93e35fbfe8723ed37faa4a162a5dca1804c753d73b5efd92c60b7b041",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e1320e3e795ff944bca9cd7730ca1e39b4286dc9"
+    },
+    "packages/daemon/test/local-computer-daemon.node-test.ts": {
+      "kind": "git-leaf",
+      "sha256": "8f9d5186f0e2818a755736ca7acf9a555f64f1daec1bbd9a02bb073a32e0caf8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "600f7ba4cc946e1ec80725a56e7c509e83b0cf5f"
+    },
+    "packages/daemon/test/local-git-origin.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "8e669de9e4b6535d4823b82b237b3fcb13b953e380fbeca520f01bb96a5af3b0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7029c700dc9df43c6d8a096182947510466551ec"
+    },
+    "packages/daemon/test/local-github.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "81bffe1753bfa5027d0e3860d24201eb95eaedba30caf62f02d319f015234ffb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ca3bfaa36a495a7ca8f37f96b22099073c68be68"
+    },
+    "packages/daemon/test/machine-github.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "ae2f9afe7bd92e914e93b04e5479a8352d2f2a0011b91172a7c4278f35764044",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c9773d7804cfc6ec732ed947cc4164ca02afd855"
+    },
+    "packages/daemon/test/mailbox-catalogue.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "ed9d531b4a4949b4e229bf96d883f9a779a1462b0d59a05f3f2882765ad1d93d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c599e9f1aedd7855c940e8569eab9f47cb373f63"
+    },
+    "packages/daemon/test/mailbox-notices.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "78b29f5aebf6eff20383da04f1e3b5854a3ffb4034e8b2682c02df72e9a11d6d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "15d10ddc97892e4c644b6ebcf0497aac14fee26e"
+    },
+    "packages/daemon/test/mailbox-preparation.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "044ba2dc2f6014a6d4685f3b05e2b44c329d4d68f9169f4b560e8caee8a80bd2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "237ac3bbf95937a4d577e4bc1f8254e0f02d9683"
+    },
+    "packages/daemon/test/mcp-http-observation.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "51cc26933838a6f3ad6637f817021cf8eb792695cc7850374601b599dcc88926",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c569b06d61ed84855db3c5921f1a6dba05774477"
+    },
+    "packages/daemon/test/mikka-mcp-backend.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "eeaa8a474f2d07e2b61381431ea1aac7f9237a07fc0855965eb34777e4f17137",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b290001cdb08ce9064902cb6f0b858fd8c477565"
+    },
+    "packages/daemon/test/mikka-mcp-bridge.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "59a17744e650a1c01514202793d4ce350a521d8735a062e85b14ca2a24707cd8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "81dc17cc151b67b155ab062148d3639112f3ed39"
+    },
+    "packages/daemon/test/model-probe.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "047236e3d2b4e36f51663e12d642b15e6ef256475a93e8c82c4e389f30bcd51c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "25ebc1052bf0c7d450c233768bc83a6d9ff06488"
+    },
+    "packages/daemon/test/native-companion.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "a99190423f9ea1740fd89148864c62ecc786d07294e5ad489dadedc91139507f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "fa9d25f764d99b37302f2a455926277694cc4770"
+    },
+    "packages/daemon/test/package-runtime.mjs": {
+      "kind": "git-leaf",
+      "sha256": "a5312557d0c80ad18e94e23d630e461c0653f103f7014111bab005b3b4678585",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "299bd9487988c8df8756b20dc8e17a943c28e9b8"
+    },
+    "packages/daemon/test/package.test.mjs": {
+      "kind": "git-leaf",
+      "sha256": "b6960ecadcd8c60af02c2cbc0fc1e9dff6b8e71f53a13dc61fa1d49705ce8495",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ec82d375371303bb44567b5f5ccd6d28933babe8"
+    },
+    "packages/daemon/test/policy-distribution.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "94a81602a80f36e6f3db92572457651a44953809ae95dabad055db6b00319117",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "81515b74e520a3b0266bfe84b09e21c872dbc2ca"
+    },
+    "packages/daemon/test/policy-repository.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "b7135d3d951928f0c57334e0a7830f9b46b11eb0e75dcc235cce60828c10b6e8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6cd4c1b50003e406e43fcfedb0fe518eece3eddf"
+    },
+    "packages/daemon/test/prewarm-preparation.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "ec9e00e52390a5e1a211d4e6e72b660667b71d2aed51339f0744fe3c41b16099",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1de0ebd2c6bcc246282e94d5f41a2adac27d77da"
+    },
+    "packages/daemon/test/prewarm-timing.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "083535b3151728ed8ce38979fb057956954d67c10b22f797b309012df57c8685",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3a55ab20dae3953679351cbf645148a1c3593688"
+    },
+    "packages/daemon/test/project-decisions.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "19b359193bab397486c6ed8704afea05eb223d29a4d0418835734503ad34ab73",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8f3c58b4adaf8698428a4caf38e11288907110dc"
+    },
+    "packages/daemon/test/provider-failure-adapters.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "069b908293a89b8ded9525ecbf578d53a5e877c46df76aa464b7cd0755a69f87",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f458ee16244d35fbbf895b4a27c5968bfdf0729c"
+    },
+    "packages/daemon/test/provider-failure-runs.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "1574b8ff39e9bf91e83955bf584e99758e072c03df41820fe4c789081987863f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f78a556376a956e6c97550fc15f7d9d904bf6055"
+    },
+    "packages/daemon/test/provider-failure.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "85ec764ce17d4d794618d5ce4590d55f0b8245bd59c60df7350eca65ae942a5e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8d64c2dc79f276e122228cd373d40446dfef4458"
+    },
+    "packages/daemon/test/publication-cancel.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "3dda3879643d5b2a8c3a6075f13671c4b439d8d38017bbf334f642f659b26273",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "36c8c56cc3179459b7a98fe24800c60e0d6548d2"
+    },
+    "packages/daemon/test/quota-exhausted-runs.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "eb7060bc3ec3fe0fb5adf65cbb66f8a82507e4101a095d88bce1c51305058f98",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "23a237a2cc1776bf5163f4303fc0eee4b8651c5b"
+    },
+    "packages/daemon/test/quota.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "1beb8cf1d4593137666c3fa54beec62ff5846e738a0c4fd23a24489633eb81b8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "131c8daac9c4b23ec80a4e7ba0cd60d86d5e684a"
+    },
+    "packages/daemon/test/real-agents.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "63df492c45ee8bd53bce66a4264f99864d053a434958f41084e2f414c79121e5",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6153fb4ead3ffc55d8c31451d27608da05300f1f"
+    },
+    "packages/daemon/test/registration-login.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "bf7c13953c22b41a19d679bc63a8d8095c96059b38ca41d9e69f1dfe443176bb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0fbe8a0714941ba7c7d3b0b9eeec65da40bc367a"
+    },
+    "packages/daemon/test/release.node-test.mjs": {
+      "kind": "git-leaf",
+      "sha256": "9c7782079105b28712fc578b2d1de0277733569b584085e40037f2021a4ddc85",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "23a8f892397042c3caef46fa59073523ddc3377c"
+    },
+    "packages/daemon/test/repositories.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "d85c31061dc83eaf0473dcd0fa6b4f1878bf82c19c9cf42c91e3b2cede74e5dc",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "481fe9921576228e6dd8da5ff5cacebd90ea805d"
+    },
+    "packages/daemon/test/repository-cancel.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "61df808f0eb283685b0b5baea8d58341ea2d153fb62f7c7f73297014cf57c70c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a9e4da697b86f06e52bd2e01764fb22f81c73f59"
+    },
+    "packages/daemon/test/repository-git-timing.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "ebe5065a50883865a19d91152d1e7530ffa0e09a5061595818d629fec68db276",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ce608f2016a90e6ea706bd89a951b239f6ded3e1"
+    },
+    "packages/daemon/test/repository-identity-pure.node-test.ts": {
+      "kind": "git-leaf",
+      "sha256": "79346b531a0436fdd182f362df3789311286d937aea7beb1468c367ffd28ccce",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "06a9d5a6fea8bc47071cd67ce52ea86c2589e019"
+    },
+    "packages/daemon/test/retain-resources.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "dff10ff2aca63abfcae51606514319c3e1779f7ac80dc7d44932b37861b30205",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e1f8f19262a944317bb4a2e51905a5eaa5c660a1"
+    },
+    "packages/daemon/test/rpc.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "a1888fbfe46e926123be29ad50a7ecff781b39a34d8626230bab64c5c89fb0a9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ac7aad42b06a6fa3fbb140c58553a7373e7d5811"
+    },
+    "packages/daemon/test/run-control-monitor.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "c1dd7ac5e4482c35741b118af3fcefb318591a65612769838dc57d26d5237902",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "46a9bd956ea178de4a075735d1f4af167dcf6f1b"
+    },
+    "packages/daemon/test/run-diagnostics.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "b4c5488db1158b0b14a3f0aa39aa7248869104fb6edacf8050d477f192a61566",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b5256c5cf9d02fc780e717ff058ca8417dc7e1ed"
+    },
+    "packages/daemon/test/run-mailbox.node-test.ts": {
+      "kind": "git-leaf",
+      "sha256": "f9ec858afa94097334609ab5e349eb8a80902c399e5a5c919472f44cf5a00f65",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ddb91440292341e0bc68e28e64b192f4b01bdc48"
+    },
+    "packages/daemon/test/run-model-credential.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "d8c9289f4eaa4393d8f949903f4921f51a1470728acbdc289710d8a0a8c967b7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a6c6f83c82d21235592b2844d0189907afedaabe"
+    },
+    "packages/daemon/test/runs.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "157700b635288d2464e43a587cc3d7f39606ae91ba904e6d065fc25ed2adc404",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "cd5cc6618128a134541e4844de4f5b35a2a6c4a4"
+    },
+    "packages/daemon/test/server-link-http.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "bb3df3339e6872d64d638277540dc97ee21011f5758ac807df9e039462bf2437",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ffd385549bbdc28ff76ba1593be314932e80db37"
+    },
+    "packages/daemon/test/service.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "9c7d8ef42e47830dd1d8024660cfdcf4bec1c541f29b7028499c2e880e4c790d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "eae448c2b24c426465c78ea3de2df40ae3080b02"
+    },
+    "packages/daemon/test/skill-mounts.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "badfe182faed11217badf13cdc853cde8ad8f269d68e76951b960580e854d98b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c088448b4056724d5c09ff8f66b357d363cb5fae"
+    },
+    "packages/daemon/test/skills.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "85d4f1ef9221fea4b7d7084fad9b357f0030ed4fc11a71f7c8fcc47fd7ddd837",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "55a0f950f8f44a7638b88f48f91eff120e572b69"
+    },
+    "packages/daemon/test/subscription-access-ready.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "41af7370d1d61beaf6404ecf8796b28f3a5b98b19c830dc365919180129d3cde",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "085441e12bbdefb4558a21f4e6d1d421c861b413"
+    },
+    "packages/daemon/test/subscription-credentials.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "b2254e9d396a32d12261f23f7da106864110422abeb1f69b06943e1e943fb119",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "60dc55ceba02c261b96e1a245cc1308234e47621"
+    },
+    "packages/daemon/test/subscription-hosted-runner.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "5d81e1261d7e135c397276e95494ad7d2b307046cfd808913cd4e29257667f6e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2aa4fe5c190c8e80876d8661e3068a7eb7a75848"
+    },
+    "packages/daemon/test/subscription-launcher.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "730ad78a7924576e77b5caeab9e8fdb17e0b5904a3b52defdb750f47000a27af",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7c69e16e5070c1f3ab284f063b5f1e964ccb4976"
+    },
+    "packages/daemon/test/subscription-native-broker.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "1a5af9696dedb1b922bfac97a12d812185aac04dcfcce9845254b725db7e5147",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "72dc26e620653969abeb6259abaf617526121ccf"
+    },
+    "packages/daemon/test/subscription-preflight.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "cea1aefd4280d0e203980dbb14b09d16bc3bd00508692ecfdd56ffc5efd5e04e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "73d3293de5ac6ae1580bca693c7f9e0cd4ace93a"
+    },
+    "packages/daemon/test/subscription-question-resume.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "5c3d7168457aa1f1e39b2ef2f56017e3f6ebc00e81a387639cfbfa55f54017c8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "35b68d1ea6871517efabd55268cf8a3109441543"
+    },
+    "packages/daemon/test/subscription-quota.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "0efbb414162a13d57ba2b496269eaf3117529fb39e606942654682bf0616574c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5240a67dda59f1e0ab02b509b41a55919c91e143"
+    },
+    "packages/daemon/test/subscription-worker-client.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "eff666e972e238c7bd630b364c16e82a315898661a6cace4b56889585082f86b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b9f95e2f0367de766ec513e03410a108fe7fe9b1"
+    },
+    "packages/daemon/test/subscription.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "57719326bb39f63b091f67c52acb9eb86d629d0f426d8a4c1a3ab158c6165448",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "281a3ba77f191240059c4e06cb3390dee3dd1cc7"
+    },
+    "packages/daemon/test/task-secret-child.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "8a5dd4f8167d21076bbdacaf5707c016d76c5cb56344cbf0dd4c8084808f5e2c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d24b9d39944873703db5d4b91fc74b44701f139e"
+    },
+    "packages/daemon/test/terminal-checkpoint.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "149063052cbbf946cf1362f5e2873dc8a0df37d59ab72372ce009968561d7ad3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1615ef8c1645dc35fc7aa39be44e8158431da922"
+    },
+    "packages/daemon/test/tool-approval-admission.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "4450cf3feb9499507ea09208dfcce5cb990fa729d0c79b7166878dd60e5db364",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d0d3889c62518643a0fb7f11230a019c405ba86b"
+    },
+    "packages/daemon/test/tool-approval-claude.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "ac413930f62bb902d75cc477cf34c97a51bb0f4f884a129c4b7460ba2205d879",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b3f08441b0ccda012d71796567a0f0db8e3be143"
+    },
+    "packages/daemon/test/tool-approval-codex.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "978333a7db30132acb55c4f0a1f874110ea3f4693d7e55a64745f6ecc51e87f1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "35a356fddd4159a5d30fe18d13b379569bbf07f0"
+    },
+    "packages/daemon/test/tool-approval-liveness.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "cbed7963b2f78b17e7d6cb9698eb604208422c1fa970cde04e89907e6656302a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "fa513f21e32ab7d013346aacff7fc2ae6234e0d4"
+    },
+    "packages/daemon/test/trusted-endpoint.node-test.ts": {
+      "kind": "git-leaf",
+      "sha256": "86311962681ee0d0bb60fe37cb2ad1550b1bddaa8a2a1c860a0ae739f70e264f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "62736bad09dc07e0b9d12bda66f6582da55f687b"
+    },
+    "packages/daemon/test/verify-artifacts.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "165102d981617d4e48568437e907d76fbf3799882e06e639719f4728c300d0e1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e9b18cc5708fc4a5eb3bec64b50db7fbf2482ae4"
+    },
+    "packages/daemon/test/verify.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "41bbd86546891336be90dcc589bbe6bea4c23d6138ca995c7f93c910ec32644b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d831be90d5735921ac16172143b956c3772bc907"
+    },
+    "packages/daemon/test/worktrees.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "a5cec65442c332ee5d7edd7afc73d1c90aa5951aade4292da320dc6a9c621eb3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d7ddce9f5217817fa402d1244712e18605b37a6d"
+    },
+    "packages/daemon/tsconfig.json": {
+      "kind": "git-leaf",
+      "sha256": "8f2fd4f557044ae93aa2fc0c0e0df182252f44e660acdde0b49d947f35087418",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a1c3ffed7d17fd64f273b6ba6e6098e915d7312d"
+    },
+    "packages/daemon/vitest.config.ts": {
+      "kind": "git-leaf",
+      "sha256": "fb19901161ee2c2d0365db50e182b84ba904f20ef2602da99f403f2414898477",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "fe90bc45619c133938927bf8fd955aa0058daf17"
+    },
+    "packages/protocol/src/accounts.ts": {
+      "kind": "git-leaf",
+      "sha256": "9673e1358dd46705801de69b7653b9285829f12f817e753705ab73ed90b1dcc7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e26ab88f3a50a8396384d28e0b605cb5217a2923"
+    },
+    "packages/protocol/src/agent-policy.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "b9044f13db2611d0df6b8dccdc815e72c7b47c25955d1294eafbbd6fd62e18cf",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f91289fa23064ec7b3faec92ca5e7c7ba554baa9"
+    },
+    "packages/protocol/src/agent-policy.ts": {
+      "kind": "git-leaf",
+      "sha256": "cbad4c866ceb5175fae5be0f390e7e8a47c7e9c7a483abbfd2378ef0bc6b8624",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "84d91baae8062a2590f88516c6972e7dbfb3177f"
+    },
+    "packages/protocol/src/analytics-client.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "d5649a00668856e5c481b56877ba5d18c3c7087069d33128282a38927c9c0a4d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "9d84f3eb38e6a483414a1dc848e528a13a4b4c41"
+    },
+    "packages/protocol/src/analytics-client.ts": {
+      "kind": "git-leaf",
+      "sha256": "35b3dcbfe20f827bcd201dd1fc51a910a44076898bdfb971b9fd8c0b36b118cc",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "cc4bd80409e61f538b4bef00f07f28630d8c1b52"
+    },
+    "packages/protocol/src/analytics.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "e42cd0df32392b734444533557d32b0625337edc080faa9b30ed7625e6623bd0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "9d6430dc54a6642797031a681e7fc4d5b523d61f"
+    },
+    "packages/protocol/src/analytics.ts": {
+      "kind": "git-leaf",
+      "sha256": "25ecab4e00967e5a81fafa3fa9cdf5b01c93a88b0390ca66b3c9641f822ff621",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "838ea5e1d5bc73bf85e68712be2061e24ed7de75"
+    },
+    "packages/protocol/src/api.ts": {
+      "kind": "git-leaf",
+      "sha256": "5e5f7716d2e12cb2bc6fcbd72715935a4ad93624bd7e0c8280799ec958566cd4",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "139ae8a7821a05bc7a93fdc9eca75ae621f128e3"
+    },
+    "packages/protocol/src/artifact-frame.ts": {
+      "kind": "git-leaf",
+      "sha256": "9919393e1d34cca1389088288fc3e9d291ea64212f04fbf6c4024008c4ff636c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "aa5fe1346715bc0633fa788a9ecb9fb865c30857"
+    },
+    "packages/protocol/src/auth.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "2876f405088904e21e4358c8a5fe38c542faf73be4c504354560b51efd5bd9a8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b3437a121a303b0cd8782d82bcb57b13e465725a"
+    },
+    "packages/protocol/src/auth.ts": {
+      "kind": "git-leaf",
+      "sha256": "4f1260d1fa98adca2dcf689ad20a8c0548bd4701d1c1d9418168bbdb0cd017e7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "47ad22419eae4dd7bc93e9c40e71aa8a81366e17"
+    },
+    "packages/protocol/src/bridge.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "e617074a2447d85f2c7293732f83fbc229f94cec656e88b4e67daceec91e707d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a22ce950beaee6f78f120030e737a05ac84d87eb"
+    },
+    "packages/protocol/src/bridge.ts": {
+      "kind": "git-leaf",
+      "sha256": "dd28b09b0e5cd6690befdeba1a6d3980b53a9da93a289cc617d0a19388d27467",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e5824dad52409802333bef3f5208c3a2576ca26b"
+    },
+    "packages/protocol/src/bundled.ts": {
+      "kind": "git-leaf",
+      "sha256": "50f80feccbebc3db2ee3f19be3568a3a10c8e2af2e2686b1e42aca98ea3ae0cf",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "66745c85f58e72aaca78691ba0449562a513d89a"
+    },
+    "packages/protocol/src/capture.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "617db93af7a268c4f06b6804f95d7891558bfe2c341edf05d97fb49b721491c3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5a66721c05dd7e73037068b4b7ae168420481cf0"
+    },
+    "packages/protocol/src/capture.ts": {
+      "kind": "git-leaf",
+      "sha256": "b9c102c047b1bca8ef0f9fc0bcf68219b42621aba5b53a2e7fcfa454bdcdf50a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0c6a498ac350ca140ebef03cd527c0b29bd5b955"
+    },
+    "packages/protocol/src/chat-attachments.ts": {
+      "kind": "git-leaf",
+      "sha256": "79802e26b0505e20edf87a06f9d42d87d8ce0f81ba87ffa2799c9ee096aaf28d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8a967b237ad6f51d97919bacd222ec7cdff0fbe4"
+    },
+    "packages/protocol/src/claude-startup.ts": {
+      "kind": "git-leaf",
+      "sha256": "19bd7afe7655cf4ea342d690d32514565d778d09f23a834b4007666aa25b822c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "938d6bb85c861ed102a5d0d0ff74180510e494bb"
+    },
+    "packages/protocol/src/coded-error.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "3a6b13bc19e8785b18bcd26ea448ffdd61aa4a7c5646ed8b3e7beaa15aa2e578",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5d7664b22983df86555f4a439d940dc3140c4e01"
+    },
+    "packages/protocol/src/coded-error.ts": {
+      "kind": "git-leaf",
+      "sha256": "8117ec80b22693515dfd00e4a32c13c1ece6862d0b412acc4a496d6e60465d1b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "53c619750e667cba008192495928112da5de16f1"
+    },
+    "packages/protocol/src/codex-startup.ts": {
+      "kind": "git-leaf",
+      "sha256": "c61f7f10f8daa26e8c653e1a55008b8a4f770d7a6a2088ebbde843daf4f13420",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1384dc9d5db50800834732800cae8de657e69181"
+    },
+    "packages/protocol/src/collab.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "c138e4691ed831ea2d7bc7da18d1d8b5f8ecb23979c5a256a24ebcf035b7d65d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ffe2d2359d420979b06b6fc4980ab7b598faddd2"
+    },
+    "packages/protocol/src/collab.ts": {
+      "kind": "git-leaf",
+      "sha256": "4bc1808f2d52ea5551bfb2b08a1964203e41e7f829745777ddf64201f4796b9c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "77366c24fe7d1d38ad29b1ff0615205c0a83bd96"
+    },
+    "packages/protocol/src/computer.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "d3a39a007c2b76b6bb9a4aab26f79a9c8521870a2c904149fa4c251a1fdad6e2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c1c573ce218af0ca4c380fc383eaad102e7a91d7"
+    },
+    "packages/protocol/src/computer.ts": {
+      "kind": "git-leaf",
+      "sha256": "97442388bd037073096deedcb59fe4de317c963c850aa6c492531024a00ec06f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "565fac044c4563fdb0647c6cc6f0a4d4845d6cbd"
+    },
+    "packages/protocol/src/coordinator.ts": {
+      "kind": "git-leaf",
+      "sha256": "68dcf8422186b9cb273cae34414e7f8005f27043478c3ed46db501451a90e1ad",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4b477eced2a2d015ed141a609acdd374b5f19dfb"
+    },
+    "packages/protocol/src/cycles.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "d4d1efeed143897697fa706fc6ab296ca70666859c67ba3054eed0c3f0ad2ad6",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "82d4e32ad8bc589ed7f3042f2832fe0bd5b552ea"
+    },
+    "packages/protocol/src/cycles.ts": {
+      "kind": "git-leaf",
+      "sha256": "b84969e09a5e7e88136614b278c943636058c6b5f9b0e991f638fb06971af1da",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5cfbb6cf7dfa1377eb017585d3fa9cfb9f25176f"
+    },
+    "packages/protocol/src/daemon.ts": {
+      "kind": "git-leaf",
+      "sha256": "1d13b7edc9bb94dedc27ea3ce933b6b0bbf86dbb758f6a19d5b7a22432ab6b3b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d22e9b6fc77ffe302f53530fd5798ae9e900f650"
+    },
+    "packages/protocol/src/device-computer.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "4f6c8d363caeff5f7ed69ba3c6a3881b63a49f20f07575029f7495f1f16dc04a",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "20bc5cadb78782fa371628a1a0be2c16c6d073bd"
+    },
+    "packages/protocol/src/device.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "bb4a2b319e33374d566c929a950007574ddc9d77ce7bf53bd5402dc378bf2c1e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3e409d62a5ef4b02579c9adbd633bf278c84511c"
+    },
+    "packages/protocol/src/device.ts": {
+      "kind": "git-leaf",
+      "sha256": "263b83983dd1429891ba12a02cea80fe71d9719a5edf70cc0711fd53ed10746e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "15adb85a11653e8380927843120abbf685c4bce6"
+    },
+    "packages/protocol/src/estimates.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "be258ddce1da721e4ee7449141b1a367709879f59624fcb735d0bc88d17563bf",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "fbc592b9ed8b29610e16d2a41415eb55c499a826"
+    },
+    "packages/protocol/src/estimates.ts": {
+      "kind": "git-leaf",
+      "sha256": "abd9902db9d977969c7930418a4f42402e9cdb6a4e484bcfa983616ebb11485d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4fe8b87b2d8dc8a9fb5e067c0e0f63048c357e96"
+    },
+    "packages/protocol/src/execution.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "e3062176205446dd1efccf3d506df3bb308f21bed89f515a54bf867da2059fe9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "cf9156817a3f7e15a5cd1bacebbfec9002f68a9f"
+    },
+    "packages/protocol/src/export.ts": {
+      "kind": "git-leaf",
+      "sha256": "e78e5381ea33dcc2565dbd27c725255a4930d74e0fdc809e5f4be9cbc91020ec",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "46d4d8b475737deffc12c5f882449e7b0e1e7d70"
+    },
+    "packages/protocol/src/flags.ts": {
+      "kind": "git-leaf",
+      "sha256": "3c44c489e0dc32a4b1c3abba46fe3ea9d317459f1b0dcd699ff2e12870034449",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d312e0dce32a053ce693969042ac373fe681eb55"
+    },
+    "packages/protocol/src/git-remote.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "c45e1abc59cf096e3e9dd619ada78a6e1b8fe74cc8c0d3bfe371cc93c6671b8b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1d8e7ac82d3ec3d09a6f4e56a6af9a1a34225cd7"
+    },
+    "packages/protocol/src/git-remote.ts": {
+      "kind": "git-leaf",
+      "sha256": "6cb1cf9e9fb8655591331d511937fe1d9d1cf6811e08e2ac6c1f6542daa7bac3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2b5dfd9cda4c8e8cb8e5ded1906e72a825d24892"
+    },
+    "packages/protocol/src/harness-preflight.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "8ad6abf0f71669a099519d47c4e6b17d9b0a205927bdf3b227b22cb07fca9f0d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f0bdd8a4b8a2eaf600604cbffd229c2e26eb367c"
+    },
+    "packages/protocol/src/harness.ts": {
+      "kind": "git-leaf",
+      "sha256": "f1e891ad760c53e9ebe7dedaffd4d2ecc133cb81a18285a454b1df2a44ac9e58",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "db967010a054c7e2e37294262205b401026ae188"
+    },
+    "packages/protocol/src/index.ts": {
+      "kind": "git-leaf",
+      "sha256": "4382760f46b1bcba7cb06c495f28fb7d59f4585df174f2957630fb36002417e7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "92a6bbcb35256e020f40b339ab7f2f3c5de56251"
+    },
+    "packages/protocol/src/integrations.ts": {
+      "kind": "git-leaf",
+      "sha256": "3c427d02c91c9a06cbf3f4463ea86dd9fe65a6a0f0c8464674750ddc017c1fcd",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3a0409fa2aecfceea3d98eca135273b3568b0334"
+    },
+    "packages/protocol/src/ipc.ts": {
+      "kind": "git-leaf",
+      "sha256": "d13bee6dc653bb5467f6bacf089ebe9fdda6d062c6322e59367f6462b948ec3f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "23b67e8b9666463384cf9a10f3236cf353ede681"
+    },
+    "packages/protocol/src/issue-share.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "7806b3affbe4116bac7274ca8fbbf9eb83f16df10a900d0d0f4b44ecf7ca5506",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8303faef5b1cb870405eaf2f11944cd5b45e3975"
+    },
+    "packages/protocol/src/issue-share.ts": {
+      "kind": "git-leaf",
+      "sha256": "10c024b4f2aa07d8aca86def4e478d9fd41ab086c94d1dab460d45f88a897d56",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "14f0ba32a94ce12c40f524181be2a1a191ee5438"
+    },
+    "packages/protocol/src/label-colors.ts": {
+      "kind": "git-leaf",
+      "sha256": "ee8f3ffaf6878988ae65ed117ce8bd23db345347199252c1078507134d0056f9",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "248f1e86870d9afb7bdab8c79bbef4b963692c85"
+    },
+    "packages/protocol/src/local-test-mode.ts": {
+      "kind": "git-leaf",
+      "sha256": "44c92f1e6bd8abd60cc39c708555abe485d9fa44d4006bfe792c9ccf0a7549d4",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "02b4d3a979ac917a67b3d280c53896e8e46a33d9"
+    },
+    "packages/protocol/src/mailbox.ts": {
+      "kind": "git-leaf",
+      "sha256": "71f3b35b4b63db9cd58f3d9f7e2cb8442c82cd4a56e3baa8aa25939063547ac7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5930217f14c4848d1acec2392da94861585e70b6"
+    },
+    "packages/protocol/src/members.ts": {
+      "kind": "git-leaf",
+      "sha256": "13bcb882b8ebafec42d7b5e612e1a159e814fd55b425b4994014b860c0e8c285",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f8d1e03a95e2039870b1092b8cd6be33ad012f8f"
+    },
+    "packages/protocol/src/network-bounds.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "a3a3550ef76f3ef03ac18ff0cdaedc00fd46621c55e35dafbb16bbb7b85cf6c2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a324ab8dbe0175f09327d502d93351bef874b928"
+    },
+    "packages/protocol/src/network-bounds.ts": {
+      "kind": "git-leaf",
+      "sha256": "308d89ffb5d050f01de293ea061ed2a87486aa4433b764a0f50ac6626b41de7d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "931da301f59d83313cb29d90de2c2b721e1e6514"
+    },
+    "packages/protocol/src/node-policy-snapshot.ts": {
+      "kind": "git-leaf",
+      "sha256": "9eeed6d03fd5b40c92b4d33f5f4cb623a544bb3b11bdcbc5b34684e1f1d8aab6",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3033049a53608fe39f7f1dfcf72448f4d32a3468"
+    },
+    "packages/protocol/src/orchestrator.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "06b601303387ad654e3f0d746668623d8d2c8e51340cb90db337e71b44543d25",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d9ebac0871c221cac8793e36d057c53010d68ad9"
+    },
+    "packages/protocol/src/orchestrator.ts": {
+      "kind": "git-leaf",
+      "sha256": "e5223ce8aa1f212d3e16042b5d27722b464f61e2060e5406cb87e38ad4194ed1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8d2adb1f5c6f3ef066c678e83740fffd722ab24f"
+    },
+    "packages/protocol/src/personal-agent-message.ts": {
+      "kind": "git-leaf",
+      "sha256": "e6d267f40be7f1398065e73907065b2daaa748bf8dc41ca484390a8a221125f1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f3fcc0eb3c86c53d6f294d960f8c8700d39e600c"
+    },
+    "packages/protocol/src/plan.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "b41c14c091c748771ed8ddba757d38b417e478369f02714049bb976cd967d196",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "755bbb7e4736c94bc81df1f84087b8006ab2dac7"
+    },
+    "packages/protocol/src/plan.ts": {
+      "kind": "git-leaf",
+      "sha256": "c3526107bc3eb973ec1cfb51285033fa7fe66501e972ab68c31b9b110f17149d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1f26093139d355951af8e9683e6944a010d219ef"
+    },
+    "packages/protocol/src/platform.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "48e423135422f059a620ddf120e3b01aab78fe831606683ea74ebb51e10a6630",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "dd71f36b4b4143656fc5b02220d2283822311d42"
+    },
+    "packages/protocol/src/platform.ts": {
+      "kind": "git-leaf",
+      "sha256": "6e6c954b8b2b7485488746a15cb63710889d202db65b51fd2bf7cb7d9b1f323c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4c4280795750be7f7395eef972818b6734e8799c"
+    },
+    "packages/protocol/src/policy-snapshot.ts": {
+      "kind": "git-leaf",
+      "sha256": "bd4107bc2787fc7c448ba1f607e3dbb6834774fbe1774e592bbb8b75d58908a1",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "111505fb017c3f1f48a681f6055026521982ca72"
+    },
+    "packages/protocol/src/preview.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "17ea7b948080e40bf088c9c8bcd994115233619322d89325ddce8d69ca7e4a95",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d68c7226bc39a3ce5363d6d4cebd741cf65ad7f2"
+    },
+    "packages/protocol/src/preview.ts": {
+      "kind": "git-leaf",
+      "sha256": "8cdf9bcc3d534f29f53b1e28d0066c1057286d2d83be1a731a02f27d5153830e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6215c52b3570893d234840c2a2daf579f0b5b746"
+    },
+    "packages/protocol/src/profile.ts": {
+      "kind": "git-leaf",
+      "sha256": "309680254f3fb5d8bdf159c24fb31ffd4548e4932acc1609553bbd12fc750e89",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c12e8d2a5f6444d21cc0c74917d3017ffe9f15ce"
+    },
+    "packages/protocol/src/provider-failure.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "30ea908c9ab0a452c7cd008098f1aa1da17b6e845a19b9145baebc871b96daf4",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0fb402b8385c7fbc586d5738e459b1156f016f9c"
+    },
+    "packages/protocol/src/provider-failure.ts": {
+      "kind": "git-leaf",
+      "sha256": "b54e2075e7c4b74c0d12daa6fa7db9bb2fb099f2a283ff450c83cdccd4d1e942",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c644f2b3695fab049423922e26107288e6049ae4"
+    },
+    "packages/protocol/src/quota.ts": {
+      "kind": "git-leaf",
+      "sha256": "9405d55674b0af562ea6e0d93cfe4d359fc140601e5d469e7a6a439f9ca34da2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5c4e921b1f8e6d4aa115d8a79185234eaf190fa8"
+    },
+    "packages/protocol/src/relay-client.ts": {
+      "kind": "git-leaf",
+      "sha256": "e4f1481e51ccbdbeb17fd2e8ac3cf6e5132690611c30622b8f4c847aae3a8b01",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f8b511659ed4892c472d9ebaff4c66015efab7a1"
+    },
+    "packages/protocol/src/relay.ts": {
+      "kind": "git-leaf",
+      "sha256": "bf803681ac7cb57e8795ecdf7db9173a47775529d7bede4ad2c61c0033c8375b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d5ce937c28b000bc2c8d1f412eceff5a4a4a365c"
+    },
+    "packages/protocol/src/repository.ts": {
+      "kind": "git-leaf",
+      "sha256": "e633048238e228fca4f61554c41793b344e1e7ff5b4dc05a9c1683a6a8bf3f28",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a43fffbfa2653b5c46ce7d5209d892308bddfcaa"
+    },
+    "packages/protocol/src/roles.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "64fb2545de8e7425b2070893c54c2c4f6e59d694723024b9f15c18d3d2c7805d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d6147dcbf09b03502e717c458960fafb21887277"
+    },
+    "packages/protocol/src/roles.ts": {
+      "kind": "git-leaf",
+      "sha256": "3895f048a44f627d381d089c51785c3ba1c5909ad20a0d75829e7ba3e4086e9d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6215ca8d8870bcfdaaa40f38504e95cb0688d336"
+    },
+    "packages/protocol/src/run-failure.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "d08f9e101e6d2e476cbb41b2199ab8b83fd9f09cd863da3b3e8c33779bff12ce",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "dcf3999d7dbebd8d4ce7c003931984bcbd0a8a38"
+    },
+    "packages/protocol/src/run-failure.ts": {
+      "kind": "git-leaf",
+      "sha256": "7f3f75643e8d52e6e26a7774801cf291c585a1487ec16d643ff5ed78a4b36773",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8e476a6b9f6fcbabc2747b9d52e6e5bd6dde186d"
+    },
+    "packages/protocol/src/run-transcript.ts": {
+      "kind": "git-leaf",
+      "sha256": "694c07f86112c6e52f268453257c91705c3e40d1c9775fd0372be7be28c5e7fb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "2f128c679554863867a08de41102dbf1c285ce87"
+    },
+    "packages/protocol/src/run.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "1e306ad121d856d3623b33b374848cd2ef8eaf67127f082f4a535950ed9949f2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5a90c8a9d18c49fd767209c00225be9746b9afdb"
+    },
+    "packages/protocol/src/run.ts": {
+      "kind": "git-leaf",
+      "sha256": "e4dde455bdc769c8ae7f5460e189adf6a9173990d6da508f25e602cdca4dd162",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e1a3ba58d4f00d58876c59462c5a489c7155b17b"
+    },
+    "packages/protocol/src/saved-view.ts": {
+      "kind": "git-leaf",
+      "sha256": "91a69af268e430350eb48d34d9e0187d6309d636fa035647f4e06996cd5635ec",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c0b5253ba2bd2932a2ce68afc274ceaca31f6422"
+    },
+    "packages/protocol/src/skill-artifact.ts": {
+      "kind": "git-leaf",
+      "sha256": "f63d6f083ec7c9784ab63786e7bd7e50dbe40d460078e85f1332e4adeff68521",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "04a6b9da9ba5b2d4b3fe2fd28a1b9d0ecbb026d2"
+    },
+    "packages/protocol/src/skill-presets/index.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "f62a1e81805be77b1c816e93e29d4938ddc9afa9d2053c8012e099bd59581b9f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d681aaa55f98c100723a5f993149a7275b3d83e1"
+    },
+    "packages/protocol/src/skill-presets/index.ts": {
+      "kind": "git-leaf",
+      "sha256": "3f54f4fbb1fca942fc8a2f14ba8795628c84a3b535a7215b27203453dfec7a67",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d9074e56736d973f7a776db5e5ffeacffe5db928"
+    },
+    "packages/protocol/src/skill-presets/planner.ts": {
+      "kind": "git-leaf",
+      "sha256": "5a9de398814fd2fb40f7de83c6920132f8b2e1d6e22b8eeed09d13ac81aed827",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "a9595e52907fd9457de26739cce13d3af879809f"
+    },
+    "packages/protocol/src/skill-presets/researcher.ts": {
+      "kind": "git-leaf",
+      "sha256": "1a0c09b5e0a75bd8e8e399f0371f70d3f838340e1263398f550ad79e4aa049ee",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "532337fb6d1f3a6489b1ec636732a802ab165c48"
+    },
+    "packages/protocol/src/skill-presets/reviewer.ts": {
+      "kind": "git-leaf",
+      "sha256": "047d9e78c79e460dd541c52bbfefa13aff78158d21ddecf9689c92ded348d572",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "68cbf941bf6aab5ccb84ac1a9510734fefdd0d7d"
+    },
+    "packages/protocol/src/skill-presets/security-reviewer.ts": {
+      "kind": "git-leaf",
+      "sha256": "ee9cfb7d985fab5b556410d0431dbbd63a93631d02d4fe164cdd9e8c788b3aa7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "442090483d25e408330edfe1da49b255a0cd106e"
+    },
+    "packages/protocol/src/skill-presets/tester.ts": {
+      "kind": "git-leaf",
+      "sha256": "095438613b34e6fdf4aa9cc130c78df832105575e3b6d9697121ed543d822014",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "37ca0f2d45d471125abf6edbb3eca0e925cff4db"
+    },
+    "packages/protocol/src/skill.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "7b3ef9df72d55d9f85ffa7a7675e9bd766b0466361d18f227d9020822cf64b23",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e56bce3182f15448f6630d45cf410d7794f6644c"
+    },
+    "packages/protocol/src/skill.ts": {
+      "kind": "git-leaf",
+      "sha256": "9d9659d110d82f5512ac4d3217297ef156cc3868811f1a7588bb621c1aa51061",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d7228c89294d2a0c737e35457240d6d4927c18bb"
+    },
+    "packages/protocol/src/subagent.ts": {
+      "kind": "git-leaf",
+      "sha256": "44f97a92e0341a944af95afd2056773bcc6ce67012cfb74a2bce812c31c83770",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5164ddc63d533ad53ebf45d48a732d16de2b4f24"
+    },
+    "packages/protocol/src/subscription.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "b1441bff5ad13292fc0f08032b44a7183e3bf053936fb9fb0f0e0e3cebdb5bf4",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "4f4c1fa4fbf7377f5155064d636a71c6d8a8043d"
+    },
+    "packages/protocol/src/subscription.ts": {
+      "kind": "git-leaf",
+      "sha256": "79f3d1e3551db3e0137c668d5cef21a4c1d681f6c4eeec90769a164ff7ca97f3",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "590bb3a464ee6a0f01f9951b2611c8e3379c3a02"
+    },
+    "packages/protocol/src/task-secrets.ts": {
+      "kind": "git-leaf",
+      "sha256": "927622bedd9d78837795fe743c767a4dfa625ae5b713ac93cd977e5919604b9e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c8c8c408b106c2799f60b7884ccf36ac93503f1c"
+    },
+    "packages/protocol/src/trace-context.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "47dd1724853d2034c4010b6612dc88a173f3e3119dcd2a11995290210576f9d7",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "daf6e94d4ab860aad8616b924e5a73559cbb826f"
+    },
+    "packages/protocol/src/trace-context.ts": {
+      "kind": "git-leaf",
+      "sha256": "946e767f03889008f9a5d65f3d7371f5bdee10dc99a2540b3656aedd0c2b6d47",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530"
+    },
+    "packages/protocol/src/tracing.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "60c857aa58ff061d6e26c46c7f6c977425f8794215cabc5e17b79ec93ad05e71",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "97ec537dbe61eaed204094c3bf01d445a07d2d25"
+    },
+    "packages/protocol/src/tracing.ts": {
+      "kind": "git-leaf",
+      "sha256": "d5f63cdaa58e6923a58b7d9e8d873e3d9b9f42fcfd0021debe1da5148c27b395",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502"
+    },
+    "packages/protocol/src/user-error-codes.ts": {
+      "kind": "git-leaf",
+      "sha256": "800cb03068de9648cd2dda4209d60dd0c9b1e333715ae7a4cad8bc90a0a841e8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "12ff6ff36f8d4aca528c9882ac31b085901db1a3"
+    },
+    "packages/protocol/src/version.test.ts": {
+      "kind": "git-leaf",
+      "sha256": "f04ed7e2bb39edd427a6032ed5647a6f6e8574fa83be7db50b13fef83b62e4db",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "77e475b199c8f7a2808a5acbb1336b97a7766d92"
+    },
+    "packages/protocol/src/version.ts": {
+      "kind": "git-leaf",
+      "sha256": "ee7e76d5018874f265b6e062347c7e7b5c4f202dd0771a1009c777222bb7a574",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "92d192f02b53d981b1489353009afb6249b9c8ae"
+    },
+    "packages/protocol/src/web-url-policy.ts": {
+      "kind": "git-leaf",
+      "sha256": "2ba983a2737268e480baad644493a5da2ae7aa04f3892b16f6d16e216d63c6fb",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b1b51cdf8821e1ad6bf547d7889a5635624b4d58"
+    },
+    "packages/protocol/src/web-url-schema.ts": {
+      "kind": "git-leaf",
+      "sha256": "f62a815be9e7f2d6f104060475b2d1a2070136ec2b609c9dc37763f5c250895d",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "8e608f1942e706287d1a1cd0bedc7d18eb5992c1"
+    },
+    "packages/protocol/tsconfig.json": {
+      "kind": "git-leaf",
+      "sha256": "cfa6931d87c75dd4c2efa5bd9bd32eaa4f60d5c8ed0235752b4bd0bdad44882b",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "9bce643a1fe788558993f58a3d9f3ea6c0c8d58c"
+    },
+    "patches/@novnc__novnc@1.6.0.patch": {
+      "kind": "git-leaf",
+      "sha256": "cfea7b766b51c70a388dec2782a2eb898c09b7f0d3942e16520a2f8f71f09d16",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7eda74881659d35007d87eb3fc8f1f308ee02589"
+    },
+    "patches/ffmpeg-static@5.3.0.patch": {
+      "kind": "git-leaf",
+      "sha256": "6712629cb2a7e929b56f4e8405f6d1d184c43e9b6ca90a6018ccd49ea18ecb15",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa"
+    },
+    "pnpm-workspace.yaml": {
+      "kind": "git-leaf",
+      "sha256": "d465e2fbfb3d0f95baca134772fb70e0100c14abbf753177907a0548804334c0",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d"
+    },
+    "scripts/e2b/acceptance-bootstrap.mts": {
+      "kind": "git-leaf",
+      "sha256": "b66bd55c9d6cd9fb5398aed712dce95c4b8bffef016edbb5815803f929539c9c",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "e41ff490bc9e9eb0b22ae3e8a7119cea077befad"
+    },
+    "scripts/e2b/acceptance-daemon.mts": {
+      "kind": "git-leaf",
+      "sha256": "41d58c25a75c5135a9785b04c41f684bbcec3ba785078fe1099acac6ceca3059",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "bf546a0ef670b41f273d9f4c2e391220cfb6837c"
+    },
+    "scripts/e2b/build-template.py": {
+      "kind": "git-leaf",
+      "sha256": "d66e0e73c3e13cfa9981cdff04856d291b79089d614e65b5fc7b56d4523813b8",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3"
+    },
+    "scripts/e2b/e2b-certificate-relinks.json": {
+      "kind": "git-leaf",
+      "sha256": "eabd5fdca9eb67fb96d4a4a3b552876fc911642361ce139b31031288b8f33481",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "335540475a9d8aaae8f34915e087b5a862699b95"
+    },
+    "scripts/e2b/e2b-finalization-files.json": {
+      "kind": "git-leaf",
+      "sha256": "8a19d44b7a5bf097c0e989398526fa4370195690b9b0cc67834752ef94997a94",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "16d858b40d2948ac8c4ce18188843c02960bc40e"
+    },
+    "scripts/e2b/lease-driver.py": {
+      "kind": "git-leaf",
+      "sha256": "2c0256977f3c4a07128da1bb28a0667d135d61b5b23d0e00e087fc358df4c3f2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "09875ebc971e631131883b4ef595329cf8b45266"
+    },
+    "scripts/e2b/official-files.py": {
+      "kind": "git-leaf",
+      "sha256": "0f0a4bd6d0d5ef83f84bc5906fa559eea7b034c668ddf26d0ff0ec6dd82d62f2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ea0819bf3e2d4ff83e64482b6336567050376591"
+    },
+    "scripts/e2b/start-desktop.sh": {
+      "kind": "git-leaf",
+      "sha256": "512c7928e4ffaee44c4a8a5cf9ca702e8a15651fd7b4f1a961a4ad9adf79548e",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "d65b652c6aba5739dafa4120e928638276719f13"
+    },
+    "scripts/e2b/start-prebuilt.sh": {
+      "kind": "git-leaf",
+      "sha256": "eea333c55625bd91c7b11dc167f7a8c448704a5384008fdfaed9dfd80b83744f",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "f3896e388043441ec99baf57b179b7cc44597017"
+    },
+    "scripts/e2b/template-capabilities.json": {
+      "kind": "git-leaf",
+      "sha256": "939aa45d6c917ae0e9a9edb40b20ea683d1d6e47f9b676b20079b06f15649d95",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "dbebb3a7d80185bd409c7d8fc0ba13d137f5c50c"
+    },
+    "scripts/e2b/viewer-gateway.py": {
+      "kind": "git-leaf",
+      "sha256": "7f1d2ea711ddd679a52a18473e559de008c3b026506818bc40083d9aa81481c2",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c3d0d4586be6c934c8eb610ab85bfaad2e8d3d25"
+    },
+    "package.json": {
+      "kind": "package-projection",
+      "sha256": "beadcc6726c56813e43207e10f581d2a628753bd22da045455060c961d4b3b02",
+      "projectionSha256": "c464a70eb912204856a2e4fdfc90eeb9ba0e1125d7349b4b217e98653d9f5093",
+      "projectionBytes": 59
+    },
+    "packages/config/package.json": {
+      "kind": "package-projection",
+      "sha256": "bcea619e1122addcb7825dca5c6534dde9d43e58daf851b848d744f129d86fa2",
+      "projectionSha256": "6d5506026155b9f04195f819f0d8be9b8fba1ff079bb9374b2b34aa5ca078d61",
+      "projectionBytes": 283
+    },
+    "packages/daemon/package.json": {
+      "kind": "package-projection",
+      "sha256": "240a6d447ce8cde4e40426bf3de0c9a17ef68e7e4119ff28abb9946a031cde25",
+      "projectionSha256": "dca834598c8d96850e727375ae6a8fd78db7812f3a506834a7c71b5970b31425",
+      "projectionBytes": 890
+    },
+    "packages/protocol/package.json": {
+      "kind": "package-projection",
+      "sha256": "14f05c9762f99ca2ff38444e181a5f5df55d4697795636cc71e645a9bccb3ac4",
+      "projectionSha256": "12896d546a74b2f34fb054a756a7c6653f531d29b1084f8ee262e4d71e7214cf",
+      "projectionBytes": 229
+    },
+    "pnpm-lock.yaml": {
+      "kind": "lock-projection",
+      "sha256": "259d65138df0925d5d52e2272781a135559ff938bc5c4594d4936a4b75871c4f",
+      "projectionSha256": "27d4f15ebccffc05a872408f7726eb779e45a0623626280069c25d2a4daaf89c",
+      "projectionBytes": 130563
+    }
+  }
+}

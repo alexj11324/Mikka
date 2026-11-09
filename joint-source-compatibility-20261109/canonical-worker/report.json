@@ -1,0 +1,996 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-09T16:27:33.321177+00:00",
+  "directory": "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q",
+  "activity": "source-only hash calculation; no tests/build/CI/VM/provider/model/DB/ref writes",
+  "environmentKeys": [
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_NOSYSTEM",
+    "GIT_DIR",
+    "GIT_NO_LAZY_FETCH",
+    "GIT_OPTIONAL_LOCKS",
+    "LANG",
+    "LC_ALL",
+    "PATH",
+    "PYTHONDONTWRITEBYTECODE"
+  ],
+  "credentialEnvironmentPresent": false,
+  "gitObjectAccess": "private bare object store with read-only alternate; exactly three missing fixed public blobs copied after SHA verification; GIT_NO_LAZY_FETCH=1",
+  "sources": {
+    "joint8c": {
+      "source": "8c423db291f8121980267cd48a24e428c992f618",
+      "tree": "195a66e213ca33c100e2900129079c5f83b06272",
+      "parents": [
+        "84e15fe935243ea6cf1399b4b50a436accdd5251"
+      ],
+      "workerHash": "75b7462d53f9725cb92d40112c504b4f32d795c0",
+      "hashCommand": [
+        "python3",
+        "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/joint8c/scripts/e2b/build-template.py",
+        "--worker-hash",
+        "--source-ref",
+        "8c423db291f8121980267cd48a24e428c992f618"
+      ],
+      "cwd": "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/joint8c",
+      "exitCode": 0,
+      "sourceScript": {
+        "path": "scripts/e2b/build-template.py",
+        "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+        "bytes": 55730,
+        "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1"
+      },
+      "workerPaths": [
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "packages/daemon",
+        "packages/protocol",
+        "packages/config",
+        "patches"
+      ],
+      "recipePaths": [
+        "scripts/e2b/official-files.py",
+        "scripts/e2b/e2b-finalization-files.json",
+        "scripts/e2b/e2b-certificate-relinks.json",
+        "scripts/e2b/start-prebuilt.sh",
+        "scripts/e2b/build-template.py",
+        "scripts/e2b/template-capabilities.json",
+        "scripts/e2b/acceptance-daemon.mts",
+        "scripts/e2b/acceptance-bootstrap.mts",
+        "scripts/e2b/start-desktop.sh",
+        "scripts/e2b/viewer-gateway.py",
+        "scripts/e2b/lease-driver.py"
+      ],
+      "selectedLeaves": 480,
+      "listingSha256": "cdfe8216c85abbcf3ac659c5543d79ad5cc3fd92fe5232eb1ed7d35baa1b02ad",
+      "canonicalInputBytes": 177439,
+      "canonicalInputSha256": "17b87c7278d99fbf4bc6846648d452d675febd086c5be622f4c30146d3288bd0",
+      "canonicalInputSha1": "75b7462d53f9725cb92d40112c504b4f32d795c0"
+    },
+    "pr1805_4c": {
+      "source": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+      "tree": "00ce4e05bb696a492183f361e4ada67eb9627e30",
+      "parents": [
+        "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb"
+      ],
+      "workerHash": "330b07a15ab6b5b0670d798736062ec1d053694e",
+      "hashCommand": [
+        "python3",
+        "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/pr1805_4c/scripts/e2b/build-template.py",
+        "--worker-hash",
+        "--source-ref",
+        "4c2efa6e9c57af88168c2d57039982ae29a9b54e"
+      ],
+      "cwd": "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/pr1805_4c",
+      "exitCode": 0,
+      "sourceScript": {
+        "path": "scripts/e2b/build-template.py",
+        "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+        "bytes": 55730,
+        "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1"
+      },
+      "workerPaths": [
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "packages/daemon",
+        "packages/protocol",
+        "packages/config",
+        "patches"
+      ],
+      "recipePaths": [
+        "scripts/e2b/official-files.py",
+        "scripts/e2b/e2b-finalization-files.json",
+        "scripts/e2b/e2b-certificate-relinks.json",
+        "scripts/e2b/start-prebuilt.sh",
+        "scripts/e2b/build-template.py",
+        "scripts/e2b/template-capabilities.json",
+        "scripts/e2b/acceptance-daemon.mts",
+        "scripts/e2b/acceptance-bootstrap.mts",
+        "scripts/e2b/start-desktop.sh",
+        "scripts/e2b/viewer-gateway.py",
+        "scripts/e2b/lease-driver.py"
+      ],
+      "selectedLeaves": 479,
+      "listingSha256": "c285762c2a87ec4c8b95aac63a4305d66f645bbdcaf02eced9d4a582f5196ca3",
+      "canonicalInputBytes": 177210,
+      "canonicalInputSha256": "56fef62e906f07cba7af9549aebcf00806836eddf8746ff18be0c753d02ee0d3",
+      "canonicalInputSha1": "330b07a15ab6b5b0670d798736062ec1d053694e"
+    },
+    "main_e189": {
+      "source": "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+      "tree": "74b7be77de23f66162ae9558c863bb2fc9b06a56",
+      "parents": [
+        "76537e4c2996f717cbd19589e1efae328028aa4a",
+        "486e8542a1201c285f15e4bd51987292c91bdc8e"
+      ],
+      "workerHash": "425451558243799262de400b4c55eff193a349c6",
+      "hashCommand": [
+        "python3",
+        "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/main_e189/scripts/e2b/build-template.py",
+        "--worker-hash",
+        "--source-ref",
+        "e189d7652fd2fce48b77a3697abf5bb177d8ebd1"
+      ],
+      "cwd": "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/main_e189",
+      "exitCode": 0,
+      "sourceScript": {
+        "path": "scripts/e2b/build-template.py",
+        "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+        "bytes": 55730,
+        "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1"
+      },
+      "workerPaths": [
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "packages/daemon",
+        "packages/protocol",
+        "packages/config",
+        "patches"
+      ],
+      "recipePaths": [
+        "scripts/e2b/official-files.py",
+        "scripts/e2b/e2b-finalization-files.json",
+        "scripts/e2b/e2b-certificate-relinks.json",
+        "scripts/e2b/start-prebuilt.sh",
+        "scripts/e2b/build-template.py",
+        "scripts/e2b/template-capabilities.json",
+        "scripts/e2b/acceptance-daemon.mts",
+        "scripts/e2b/acceptance-bootstrap.mts",
+        "scripts/e2b/start-desktop.sh",
+        "scripts/e2b/viewer-gateway.py",
+        "scripts/e2b/lease-driver.py"
+      ],
+      "selectedLeaves": 476,
+      "listingSha256": "e789c365bfdeb4f7fac2fca4a2a2f8357d7255bcd8f1bf2b8e6fcc8131c1b4ec",
+      "canonicalInputBytes": 176899,
+      "canonicalInputSha256": "b21f7b33fbf26ac99a57056ac8b50453d7bd29e38d1bd6f41a282891b9457325",
+      "canonicalInputSha1": "425451558243799262de400b4c55eff193a349c6"
+    }
+  },
+  "comparisons": {
+    "pr1805_4c__to__joint8c": {
+      "comparison": "exact endpoint selected inputs, not three-dot merge-base diff",
+      "rawSelectedChanges": [
+        {
+          "path": "package.json",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2464da06d4a809c500aff11195f60a9c6b66c70b"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "568cfeee161309202699acefd0a57a8edc52bf6e"
+          }
+        },
+        {
+          "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+          },
+          "after": {
+            "mode": "100755",
+            "type": "blob",
+            "blob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+          }
+        },
+        {
+          "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+          },
+          "after": {
+            "mode": "100755",
+            "type": "blob",
+            "blob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+          }
+        },
+        {
+          "path": "patches/ffmpeg-static@5.3.0.patch",
+          "before": null,
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa"
+          }
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "a7a956ac98dfcf7de9ebfe508853b8475fd10106"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "4b67909739360248e279efa0c3bb7344379e04fe"
+          }
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cc47ee1a48b9585e06c87e0f5ed6f14211601c0c"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d"
+          }
+        }
+      ],
+      "effectiveChanges": [
+        {
+          "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "9ec3104d5bd55e9353962764f7e2e7e9457fed51d011ec830b074b8c689c4858",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "c6a854a1afed8e7ddc6789080644e2a86e02a1bffbf38911296fde3cf3574fa8",
+            "mode": "100755",
+            "type": "blob",
+            "blob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+          }
+        },
+        {
+          "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "4513a88fcbc6ab1a124ccb2d07e76b68c82dc215ef6e46f3685d72a87ea39c21",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "6012f7932795c1503003c4fb49699ba96497a2bb58c9e5aba7081f776b976370",
+            "mode": "100755",
+            "type": "blob",
+            "blob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+          }
+        },
+        {
+          "path": "patches/ffmpeg-static@5.3.0.patch",
+          "before": null,
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "6712629cb2a7e929b56f4e8405f6d1d184c43e9b6ca90a6018ccd49ea18ecb15",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa"
+          }
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "before": {
+            "kind": "lock-projection",
+            "sha256": "54ac1478081f66e34266af5d0aee7cecaf03c2a07d4b6d8ef93813210ba8ce2c",
+            "projectionSha256": "5fcda28bf43db78880c6a41a112988a622cf59ae22d39db041adffef68be7571",
+            "projectionBytes": 130421
+          },
+          "after": {
+            "kind": "lock-projection",
+            "sha256": "259d65138df0925d5d52e2272781a135559ff938bc5c4594d4936a4b75871c4f",
+            "projectionSha256": "27d4f15ebccffc05a872408f7726eb779e45a0623626280069c25d2a4daaf89c",
+            "projectionBytes": 130563
+          }
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "4df76c0b5f5e818fba5ebae61908ced000c5df87206754534b90f0299c6bb802",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cc47ee1a48b9585e06c87e0f5ed6f14211601c0c"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "d465e2fbfb3d0f95baca134772fb70e0100c14abbf753177907a0548804334c0",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d"
+          }
+        }
+      ],
+      "sameWorkerHash": false
+    },
+    "main_e189__to__joint8c": {
+      "comparison": "exact endpoint selected inputs, not three-dot merge-base diff",
+      "rawSelectedChanges": [
+        {
+          "path": "package.json",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "568cfeee161309202699acefd0a57a8edc52bf6e"
+          }
+        },
+        {
+          "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "27c2146b45054c3eb5510afc94ea7ee9696dcb87"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460"
+          }
+        },
+        {
+          "path": "packages/daemon/scripts/prepare-worker-install.py",
+          "before": null,
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f"
+          }
+        },
+        {
+          "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+          "before": null,
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540"
+          }
+        },
+        {
+          "path": "packages/daemon/src/adapters/codex-protocol.ts",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "838f6407a4c92ef13c95663a405804cebbd97f47"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407"
+          }
+        },
+        {
+          "path": "packages/daemon/src/adapters/codex.ts",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "e85815a955eaff56d7ac389c9d9722c64607345d"
+          }
+        },
+        {
+          "path": "packages/daemon/test/codex-item-chunks.test.ts",
+          "before": null,
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "7a72cbdf6ae495a62ec2b9684ce9889f69635893"
+          }
+        },
+        {
+          "path": "patches/ffmpeg-static@5.3.0.patch",
+          "before": null,
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa"
+          }
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "a7a956ac98dfcf7de9ebfe508853b8475fd10106"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "4b67909739360248e279efa0c3bb7344379e04fe"
+          }
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cc47ee1a48b9585e06c87e0f5ed6f14211601c0c"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d"
+          }
+        },
+        {
+          "path": "scripts/e2b/e2b-certificate-relinks.json",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2ad3c6f9dd5f06c387bd22e66d4711dd39a96831"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "335540475a9d8aaae8f34915e087b5a862699b95"
+          }
+        },
+        {
+          "path": "scripts/e2b/e2b-finalization-files.json",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "e3bc3b603578e6bcd8c5ed1db8041adeba14a40a"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "16d858b40d2948ac8c4ce18188843c02960bc40e"
+          }
+        },
+        {
+          "path": "scripts/e2b/official-files.py",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "66d74dd81568eb8fcd6c9efed82a199bcbf695d4"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ea0819bf3e2d4ff83e64482b6336567050376591"
+          }
+        }
+      ],
+      "effectiveChanges": [
+        {
+          "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "3bca8eba7c19211b9fc633883247bbc369c2375cf4f9a8dce536c912a1a3fa9e",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "27c2146b45054c3eb5510afc94ea7ee9696dcb87"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "4e9b452881e2426e96742b31d9075168611d47d4aa3da263af2808163920d821",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460"
+          }
+        },
+        {
+          "path": "packages/daemon/scripts/prepare-worker-install.py",
+          "before": null,
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "a94d44b1fc1c5e770086940ee483f5bcd94eadfbe9317490942e97a9eae672d1",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f"
+          }
+        },
+        {
+          "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+          "before": null,
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "f82f417a8f273cdf63911b673a217bb6bf3449b9a66a925336eae4b7a78a277a",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540"
+          }
+        },
+        {
+          "path": "packages/daemon/src/adapters/codex-protocol.ts",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "f692a9481da2e49cfdd98a8a50c871bac5980204f79d2b8ffada901468e5acb0",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "838f6407a4c92ef13c95663a405804cebbd97f47"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "2013abc5e016bbc82102e33af61cdd300b221c3d8eff260f5700b9ce158cf3fd",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407"
+          }
+        },
+        {
+          "path": "packages/daemon/src/adapters/codex.ts",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "c6e7d46c358e4febfca8d6d95cd11ee56578a7dd89c2f5d838f6a84981a04337",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "05f09bcaf3e3154bc7ddcd054d2a0bc1aa41d5d3de02deea3b43fe34b8f1aa08",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "e85815a955eaff56d7ac389c9d9722c64607345d"
+          }
+        },
+        {
+          "path": "packages/daemon/test/codex-item-chunks.test.ts",
+          "before": null,
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "b9d6d81d88715557cc5d341fde3c9e9a31be273be6a7541aa92f7496233f7837",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "7a72cbdf6ae495a62ec2b9684ce9889f69635893"
+          }
+        },
+        {
+          "path": "patches/ffmpeg-static@5.3.0.patch",
+          "before": null,
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "6712629cb2a7e929b56f4e8405f6d1d184c43e9b6ca90a6018ccd49ea18ecb15",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa"
+          }
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "before": {
+            "kind": "lock-projection",
+            "sha256": "54ac1478081f66e34266af5d0aee7cecaf03c2a07d4b6d8ef93813210ba8ce2c",
+            "projectionSha256": "5fcda28bf43db78880c6a41a112988a622cf59ae22d39db041adffef68be7571",
+            "projectionBytes": 130421
+          },
+          "after": {
+            "kind": "lock-projection",
+            "sha256": "259d65138df0925d5d52e2272781a135559ff938bc5c4594d4936a4b75871c4f",
+            "projectionSha256": "27d4f15ebccffc05a872408f7726eb779e45a0623626280069c25d2a4daaf89c",
+            "projectionBytes": 130563
+          }
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "4df76c0b5f5e818fba5ebae61908ced000c5df87206754534b90f0299c6bb802",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cc47ee1a48b9585e06c87e0f5ed6f14211601c0c"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "d465e2fbfb3d0f95baca134772fb70e0100c14abbf753177907a0548804334c0",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d"
+          }
+        },
+        {
+          "path": "scripts/e2b/e2b-certificate-relinks.json",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "c73d35eefd9d788e770570a0bd7883559fba67ee105d113926013a8302c01e0f",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2ad3c6f9dd5f06c387bd22e66d4711dd39a96831"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "eabd5fdca9eb67fb96d4a4a3b552876fc911642361ce139b31031288b8f33481",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "335540475a9d8aaae8f34915e087b5a862699b95"
+          }
+        },
+        {
+          "path": "scripts/e2b/e2b-finalization-files.json",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "d436861bc8d531c2c01a5bce676a43d80bf929d31fd018e92b8c03d2fc7ed872",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "e3bc3b603578e6bcd8c5ed1db8041adeba14a40a"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "8a19d44b7a5bf097c0e989398526fa4370195690b9b0cc67834752ef94997a94",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "16d858b40d2948ac8c4ce18188843c02960bc40e"
+          }
+        },
+        {
+          "path": "scripts/e2b/official-files.py",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "7bce074883e612ba0d7117fef14d6dcf51e6dc17b0c5a71ea7250e43c6dd3894",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "66d74dd81568eb8fcd6c9efed82a199bcbf695d4"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "0f0a4bd6d0d5ef83f84bc5906fa559eea7b034c668ddf26d0ff0ec6dd82d62f2",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ea0819bf3e2d4ff83e64482b6336567050376591"
+          }
+        }
+      ],
+      "sameWorkerHash": false
+    },
+    "pr1805_4c__to__main_e189": {
+      "comparison": "exact endpoint selected inputs, not three-dot merge-base diff",
+      "rawSelectedChanges": [
+        {
+          "path": "package.json",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2464da06d4a809c500aff11195f60a9c6b66c70b"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b"
+          }
+        },
+        {
+          "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "27c2146b45054c3eb5510afc94ea7ee9696dcb87"
+          }
+        },
+        {
+          "path": "packages/daemon/scripts/prepare-worker-install.py",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f"
+          },
+          "after": null
+        },
+        {
+          "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540"
+          },
+          "after": null
+        },
+        {
+          "path": "packages/daemon/src/adapters/codex-protocol.ts",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "838f6407a4c92ef13c95663a405804cebbd97f47"
+          }
+        },
+        {
+          "path": "packages/daemon/src/adapters/codex.ts",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "e85815a955eaff56d7ac389c9d9722c64607345d"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7"
+          }
+        },
+        {
+          "path": "packages/daemon/test/codex-item-chunks.test.ts",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "7a72cbdf6ae495a62ec2b9684ce9889f69635893"
+          },
+          "after": null
+        },
+        {
+          "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+          },
+          "after": {
+            "mode": "100755",
+            "type": "blob",
+            "blob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+          }
+        },
+        {
+          "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+          },
+          "after": {
+            "mode": "100755",
+            "type": "blob",
+            "blob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+          }
+        },
+        {
+          "path": "scripts/e2b/e2b-certificate-relinks.json",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "335540475a9d8aaae8f34915e087b5a862699b95"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2ad3c6f9dd5f06c387bd22e66d4711dd39a96831"
+          }
+        },
+        {
+          "path": "scripts/e2b/e2b-finalization-files.json",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "16d858b40d2948ac8c4ce18188843c02960bc40e"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "e3bc3b603578e6bcd8c5ed1db8041adeba14a40a"
+          }
+        },
+        {
+          "path": "scripts/e2b/official-files.py",
+          "before": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ea0819bf3e2d4ff83e64482b6336567050376591"
+          },
+          "after": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "66d74dd81568eb8fcd6c9efed82a199bcbf695d4"
+          }
+        }
+      ],
+      "effectiveChanges": [
+        {
+          "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "4e9b452881e2426e96742b31d9075168611d47d4aa3da263af2808163920d821",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "3bca8eba7c19211b9fc633883247bbc369c2375cf4f9a8dce536c912a1a3fa9e",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "27c2146b45054c3eb5510afc94ea7ee9696dcb87"
+          }
+        },
+        {
+          "path": "packages/daemon/scripts/prepare-worker-install.py",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "a94d44b1fc1c5e770086940ee483f5bcd94eadfbe9317490942e97a9eae672d1",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f"
+          },
+          "after": null
+        },
+        {
+          "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "f82f417a8f273cdf63911b673a217bb6bf3449b9a66a925336eae4b7a78a277a",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540"
+          },
+          "after": null
+        },
+        {
+          "path": "packages/daemon/src/adapters/codex-protocol.ts",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "2013abc5e016bbc82102e33af61cdd300b221c3d8eff260f5700b9ce158cf3fd",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "f692a9481da2e49cfdd98a8a50c871bac5980204f79d2b8ffada901468e5acb0",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "838f6407a4c92ef13c95663a405804cebbd97f47"
+          }
+        },
+        {
+          "path": "packages/daemon/src/adapters/codex.ts",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "05f09bcaf3e3154bc7ddcd054d2a0bc1aa41d5d3de02deea3b43fe34b8f1aa08",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "e85815a955eaff56d7ac389c9d9722c64607345d"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "c6e7d46c358e4febfca8d6d95cd11ee56578a7dd89c2f5d838f6a84981a04337",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7"
+          }
+        },
+        {
+          "path": "packages/daemon/test/codex-item-chunks.test.ts",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "b9d6d81d88715557cc5d341fde3c9e9a31be273be6a7541aa92f7496233f7837",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "7a72cbdf6ae495a62ec2b9684ce9889f69635893"
+          },
+          "after": null
+        },
+        {
+          "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "9ec3104d5bd55e9353962764f7e2e7e9457fed51d011ec830b074b8c689c4858",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "c6a854a1afed8e7ddc6789080644e2a86e02a1bffbf38911296fde3cf3574fa8",
+            "mode": "100755",
+            "type": "blob",
+            "blob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+          }
+        },
+        {
+          "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "4513a88fcbc6ab1a124ccb2d07e76b68c82dc215ef6e46f3685d72a87ea39c21",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "6012f7932795c1503003c4fb49699ba96497a2bb58c9e5aba7081f776b976370",
+            "mode": "100755",
+            "type": "blob",
+            "blob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+          }
+        },
+        {
+          "path": "scripts/e2b/e2b-certificate-relinks.json",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "eabd5fdca9eb67fb96d4a4a3b552876fc911642361ce139b31031288b8f33481",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "335540475a9d8aaae8f34915e087b5a862699b95"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "c73d35eefd9d788e770570a0bd7883559fba67ee105d113926013a8302c01e0f",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2ad3c6f9dd5f06c387bd22e66d4711dd39a96831"
+          }
+        },
+        {
+          "path": "scripts/e2b/e2b-finalization-files.json",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "8a19d44b7a5bf097c0e989398526fa4370195690b9b0cc67834752ef94997a94",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "16d858b40d2948ac8c4ce18188843c02960bc40e"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "d436861bc8d531c2c01a5bce676a43d80bf929d31fd018e92b8c03d2fc7ed872",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "e3bc3b603578e6bcd8c5ed1db8041adeba14a40a"
+          }
+        },
+        {
+          "path": "scripts/e2b/official-files.py",
+          "before": {
+            "kind": "git-leaf",
+            "sha256": "0f0a4bd6d0d5ef83f84bc5906fa559eea7b034c668ddf26d0ff0ec6dd82d62f2",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ea0819bf3e2d4ff83e64482b6336567050376591"
+          },
+          "after": {
+            "kind": "git-leaf",
+            "sha256": "7bce074883e612ba0d7117fef14d6dcf51e6dc17b0c5a71ea7250e43c6dd3894",
+            "mode": "100644",
+            "type": "blob",
+            "blob": "66d74dd81568eb8fcd6c9efed82a199bcbf695d4"
+          }
+        }
+      ],
+      "sameWorkerHash": false
+    }
+  },
+  "rootCheckoutAfter": "",
+  "notPublicationProof": true,
+  "initialMissingObjectFailurePreserved": "joint8c/initial-missing-object-hash.stderr"
+}

@@ -1,0 +1,3388 @@
+{
+  "refs": {
+    "joint": "8c423db291f8121980267cd48a24e428c992f618",
+    "acceptance": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+    "main": "e189d7652fd2fce48b77a3697abf5bb177d8ebd1"
+  },
+  "entries": {
+    "joint": {
+      ".github/workflows/e2b-official-runtime.yml": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9",
+        "size": 18539
+      },
+      ".github/workflows/web-deploy.yml": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+        "size": null
+      },
+      "AGENTS.md": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fa963e4d0a342002661c58772d370484e8af740a",
+        "size": 22984
+      },
+      "CONTRIBUTING.md": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "768523980c14db13055f22a68c7e9c5960013508",
+        "size": 12955
+      },
+      "lib/tracing/ai.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5bb43681fd29ebce3c378b8f55bcdfee88165f72",
+        "size": 16491
+      },
+      "lib/tracing/ai.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+        "size": 13617
+      },
+      "lib/tracing/clients.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f14238d92fb56c7e2e44d086f5239fe739a9e6df",
+        "size": 16234
+      },
+      "lib/tracing/config.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+        "size": 3376
+      },
+      "lib/tracing/context.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fe005d26c2ea903250683d9351334b95ef328383",
+        "size": 4360
+      },
+      "lib/tracing/daemon-settings.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "10e3141e48802b2e4f854e74765e8ede5568ed09",
+        "size": 3386
+      },
+      "lib/tracing/flush.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0149083f1f9e36adca769c2e799afe84a90bd139",
+        "size": 657
+      },
+      "lib/tracing/jobs.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6cec226926da96c89acc06479a6b6c13902b0470",
+        "size": 2650
+      },
+      "lib/tracing/labels.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+        "size": 2278
+      },
+      "lib/tracing/logs.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8e6dc9b951d1126376ab29d4d0a80f276391a58a",
+        "size": 3342
+      },
+      "lib/tracing/logs.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ac6a917887a94a6a673410753d4645e2dba25d21",
+        "size": 4312
+      },
+      "lib/tracing/node.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+        "size": 7106
+      },
+      "lib/tracing/run-context.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "96f800cbec92a5ea4b8ff464155e2fd98683b7e9",
+        "size": 7825
+      },
+      "lib/tracing/sampling.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+        "size": 4983
+      },
+      "lib/tracing/sanitize.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9857985199066a39fdc96ba73f7047d21ba6406f",
+        "size": null
+      },
+      "lib/tracing/spans.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+        "size": 9992
+      },
+      "lib/tracing/tracing.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7708a00e2f9efe1afff7228e55096e7c170fa5db",
+        "size": 23179
+      },
+      "lib/tracing/workflow-transport.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a92aa052db23cb4448bd73538da70d3cab0634e6",
+        "size": null
+      },
+      "packages/daemon/scripts/build-cloud-worker.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ce864dcd4c83ccce8c1435463f407623e1091694",
+        "size": 3086
+      },
+      "packages/daemon/scripts/build.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "13f7a24627b0d3e360488707d32b42dfcdbd5d4f",
+        "size": 4100
+      },
+      "packages/daemon/scripts/official-e2b-instance-bootstrap.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+        "size": 12114
+      },
+      "packages/daemon/scripts/prepare-worker-install.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f",
+        "size": 4990
+      },
+      "packages/daemon/scripts/prepare-worker-install.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540",
+        "size": 5659
+      },
+      "packages/daemon/scripts/refresh-cloud-worker.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "866629a0a0e7e7d5e7fc6788a06135e362d6c4aa",
+        "size": 10673
+      },
+      "packages/daemon/scripts/refresh-cloud-worker.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9dddc36d9d3396752ddea96638901e22c75bb370",
+        "size": 15939
+      },
+      "packages/daemon/scripts/release.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "886cc2434cb4840dcb8e3402a02ac3adeb7c8e6e",
+        "size": 2936
+      },
+      "packages/daemon/src/adapters/claude-failure.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4b8f61f67b5cbbe4dca161031c490644cefad145",
+        "size": 3991
+      },
+      "packages/daemon/src/adapters/claude-prewarm.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cbb45575e495f13d5e76dec1c2b8fd62fb07f16c",
+        "size": 9298
+      },
+      "packages/daemon/src/adapters/claude.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b5659ce0a1d56aeccd29f964d1aed30dd750282f",
+        "size": 51190
+      },
+      "packages/daemon/src/adapters/codex-failure.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "53c4cd4d209aaa666cc7fa5d681ace957075a418",
+        "size": 2591
+      },
+      "packages/daemon/src/adapters/codex-mailbox.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448",
+        "size": 5930
+      },
+      "packages/daemon/src/adapters/codex-protocol.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407",
+        "size": 3995
+      },
+      "packages/daemon/src/adapters/codex.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e85815a955eaff56d7ac389c9d9722c64607345d",
+        "size": 51844
+      },
+      "packages/daemon/src/adapters/cursor.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1a3081575602152bb028783d277fc34441c1a721",
+        "size": 15971
+      },
+      "packages/daemon/src/adapters/generation-metrics.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7b7878479cf37d95253c3c337a9c755346963d96",
+        "size": 7083
+      },
+      "packages/daemon/src/adapters/generation-metrics.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+        "size": 6748
+      },
+      "packages/daemon/src/adapters/mock.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "385357ded14842c6f77de18df288679776db359a",
+        "size": 10537
+      },
+      "packages/daemon/src/adapters/types.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bbd59de65673cf8fcd98ad4bfb365a5aaac7ea28",
+        "size": 8818
+      },
+      "scripts/acceptance/auth-audit-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e9f72f31621144b6ac844d8d823cd176e9aa27de",
+        "size": 9917
+      },
+      "scripts/acceptance/auth-audit-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c13cce4162c3153b7f1dbefe88b4645645fec185",
+        "size": 8379
+      },
+      "scripts/acceptance/cloud-lease-audit.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba11de700e55258f6036d4f3c56fd5301b32d122",
+        "size": 10803
+      },
+      "scripts/acceptance/cloud-lease-audit.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8df2fb52d14eec9d27252003871375210dfc0351",
+        "size": 13309
+      },
+      "scripts/acceptance/cloud-lease-probe.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "60275f2517cdda374f464b02adaa05d0102a6fd8",
+        "size": 3553
+      },
+      "scripts/acceptance/cloud-lease-recovery.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "85c95cba12ef8096147ffd75cceb24976ce3da63",
+        "size": 7093
+      },
+      "scripts/acceptance/cloud-lease-recovery.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "38ee2a33b2a184d3a918028dab47218c4fbcf995",
+        "size": 7315
+      },
+      "scripts/acceptance/cloud-startup-evidence.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b5a85b795d3026c350ced9823eaac9488a3e0cda",
+        "size": 22658
+      },
+      "scripts/acceptance/cloud-startup-report.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "86bb748591d8f454a36346d048d13f2297155b4a",
+        "size": 25154
+      },
+      "scripts/acceptance/cloud-startup-report.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "08eef9e155717afecd0231e8390d6c9a3c1abf83",
+        "size": 10023
+      },
+      "scripts/acceptance/cloud-startup.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9",
+        "size": 85323
+      },
+      "scripts/acceptance/cloud-startup.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6ae54051916032d788864a725711975ad1ea007f",
+        "size": 118044
+      },
+      "scripts/acceptance/deployed-browser-session.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ea8708f9bde53d4e7732f3758ed1418d893aac4c",
+        "size": 19092
+      },
+      "scripts/acceptance/deployed-browser-session.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7fa3f0a6ba2b0bef365ec9ce48e5108fc7cc3506",
+        "size": 23027
+      },
+      "scripts/acceptance/deployed-target.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fdba775917bd62a7cd41f4679247ae9f46dd76aa",
+        "size": 10989
+      },
+      "scripts/acceptance/deployed-target.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b93a2fda4a430b7192ffb9f91d5d822096098f5c",
+        "size": 11274
+      },
+      "scripts/acceptance/device-closeout-child.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8398398dcc51e76477727ca442b8d6e3ffdd2183",
+        "size": 3818
+      },
+      "scripts/acceptance/device-closeout.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e36c62e39bb0598b326820d952fd98ffbf689cb8",
+        "size": 10470
+      },
+      "scripts/acceptance/factory-continuation.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "948dc10fb070e34c794eca24b4f9865c94904170",
+        "size": 10654
+      },
+      "scripts/acceptance/factory-continuation.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "586fccd4f52bdbb92d324c4854892ae7d830a63c",
+        "size": 4197
+      },
+      "scripts/acceptance/local-installer-macos.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "858b521f583e605340adc7be0685de17de2c60a8",
+        "size": 9689
+      },
+      "scripts/acceptance/mcp-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a9c2bd597454aee86dcd78c8bbb6574fdabd21f2",
+        "size": 23616
+      },
+      "scripts/acceptance/mcp-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "509aadc1583a80d57c0a33939dacc95c23f5eae7",
+        "size": 30129
+      },
+      "scripts/acceptance/model-provider-fallback.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5eab2af9d34ee74bb970b5beceb8a292d897eeb0",
+        "size": 51628
+      },
+      "scripts/acceptance/model-provider-fallback.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "01ee70b3ebd24da944772da75243ee78186b656e",
+        "size": 32659
+      },
+      "scripts/acceptance/owned-process-supervisor.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "388f1f6e55601af33b72ca7712f8053f697e2404",
+        "size": 4407
+      },
+      "scripts/acceptance/owned-process-tree.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "32dc6542562b85ff0be3850199028ae95073d57d",
+        "size": 3317
+      },
+      "scripts/acceptance/production-readiness-plan.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d9455bff532b2bf8fa2272af148724fe21387342",
+        "size": 126
+      },
+      "scripts/acceptance/production-readiness.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "29141ad221001ab7046224b2fd964dff65263f63",
+        "size": 25874
+      },
+      "scripts/acceptance/production-readiness.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cf1277feafac2ac03f953ad58f5ff154c9bf347f",
+        "size": 27942
+      },
+      "scripts/acceptance/project-decisions.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2596d005253c3e06f51e76a25ef78205e74817dd",
+        "size": 50205
+      },
+      "scripts/acceptance/project-decisions.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "da8a5f4c56cc85be8edee2df99ec02c873404cb8",
+        "size": 38588
+      },
+      "scripts/acceptance/read-action-transport.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ef8f9c901a257e78db7241b3b386d9b7f1f5afee",
+        "size": 3915
+      },
+      "scripts/acceptance/read-cache-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c78f117c23e5c17922bf38e83309dae6f83a0ed9",
+        "size": 29371
+      },
+      "scripts/acceptance/read-cache-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a88834e28bea18aebcd9cfcdcc294a06c091d578",
+        "size": 45648
+      },
+      "scripts/acceptance/read-cache.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e52d513455b35b6761e0abc74bf21969cbdb728d",
+        "size": null
+      },
+      "scripts/acceptance/read-cache.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5ceba58aec854622c614394c97c2ae722bec5bce",
+        "size": 23089
+      },
+      "scripts/acceptance/response-cookie-jar.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2bb8fa35a4432c2245a744c6cac1c80b715da7a8",
+        "size": 2277
+      },
+      "scripts/acceptance/run-github-token-500.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9322dff3a8882399c0402fc48b62ffd01c69a674",
+        "size": 8102
+      },
+      "scripts/acceptance/run-observability-browser.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+        "size": 24958
+      },
+      "scripts/acceptance/run-observability-browser.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "58170f27b9586752ca966e377c9255ac6e6174a9",
+        "size": 26414
+      },
+      "scripts/acceptance/run-observability-workflow.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+        "size": 11693
+      },
+      "scripts/acceptance/run-observability-workflow.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fd1327b287b8d97424a3c3ca5c01c4abd0f8b8f2",
+        "size": 16308
+      },
+      "scripts/acceptance/run-observability.md": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "176e3aead0068d801f829dcadaafcd02a61e67a3",
+        "size": 19025
+      },
+      "scripts/acceptance/run-observability.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+        "size": 59415
+      },
+      "scripts/acceptance/run-observability.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d",
+        "size": 55389
+      },
+      "scripts/acceptance/run-read-cache.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c3c420ad12a69edd144322d1f2c827fde2e8a41f",
+        "size": 25227
+      },
+      "scripts/acceptance/run-read-cache.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "71f8a98af1c6a528453b50fc58625a5289199f76",
+        "size": 20721
+      },
+      "scripts/acceptance/runtime-performance-cache.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a4e6c36a86aca7ea5879c59a2ae23e53595b79f4",
+        "size": 4643
+      },
+      "scripts/acceptance/runtime-performance.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "80630bb36b16250979832044793064ea5fb2ee1c",
+        "size": 26562
+      },
+      "scripts/acceptance/self-hosted-daemon.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d9cce74d9afc2d027284534ebb70bb531bc950d2",
+        "size": 15286
+      },
+      "scripts/acceptance/self-hosted-daemon.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "979e5faf46e202792f0d475269e3469ec00e3cd3",
+        "size": 7308
+      },
+      "scripts/acceptance/self-hosted-fixtures.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fdf276b2439e5b2f88a7aaa8d0b4d83881039617",
+        "size": 13311
+      },
+      "scripts/acceptance/self-hosted-model.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "284d88d53a065aa4a0597245d02b8f43efc22b0e",
+        "size": 2924
+      },
+      "scripts/acceptance/self-hosted-production-probes.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8455796e01b87f03e0ba25201c537d04fed2901e",
+        "size": 8898
+      },
+      "scripts/acceptance/self-hosted-production-target.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "feaf9dab99a8205c545dc95674056327a28d2114",
+        "size": 8022
+      },
+      "scripts/acceptance/self-hosted-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f1ec2f0e65548280ab4d5f672dc29b4dafcacf01",
+        "size": 2123
+      },
+      "scripts/acceptance/self-hosted-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "aef887299558132358adef61531da164f478f916",
+        "size": 13461
+      },
+      "scripts/acceptance/self-hosted-services.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6476b547c2c07e280629793dc4ca4a6d66c0a2eb",
+        "size": 29980
+      },
+      "scripts/acceptance/shared-account-queue.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "892e354b8e8a652fe013e75719a6636a27031506",
+        "size": 1635
+      },
+      "scripts/acceptance/task-secrets-ci.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a55edb760f77913f12595e476e55b9f47645f35c",
+        "size": 22447
+      },
+      "scripts/acceptance/task-secrets-ci.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8ae662c66dc5641c6a02c0b2a1fa57854e9dbcfc",
+        "size": 30240
+      },
+      "scripts/acceptance/task-secrets-fixture-runtime.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b5ae654973a2dddb010d3c18f46aa9f6420e4665",
+        "size": 9666
+      },
+      "scripts/acceptance/task-secrets-fixture.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "720d5b40cdbb645f0725588d266f2eb2b086fbc6",
+        "size": 7491
+      },
+      "scripts/acceptance/task-secrets-native.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6a210fcc83743d70cff1e90072e208e3271707ff",
+        "size": 17521
+      },
+      "scripts/acceptance/task-secrets.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b948c0921e6ff1f3a45d03029515e002775423cd",
+        "size": 30528
+      },
+      "scripts/acceptance/task-secrets.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b0e809572a9f89f087d8bdb4b572858db8c2dcdf",
+        "size": 34811
+      },
+      "scripts/acceptance/team-workspace.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f",
+        "size": 6653
+      },
+      "scripts/acceptance/team-workspace.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "513e5d9c3f692934974a4206b4c29033750966b5",
+        "size": 12305
+      },
+      "scripts/acceptance/thread-lifecycle-ci.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8fb0e7d0cd1934315f1bd33826bc75fd8212b601",
+        "size": 18638
+      },
+      "scripts/acceptance/thread-lifecycle-ci.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1e6db52b36680b6137a16f39c4499672527c595b",
+        "size": 24422
+      },
+      "scripts/acceptance/thread-lifecycle.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3068076819e52ef93642e429aa1edfb4759af0ed",
+        "size": 51277
+      },
+      "scripts/acceptance/thread-lifecycle.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d3290eae6c1c3b0466d2490811f5336940dce178",
+        "size": 53045
+      },
+      "scripts/acceptance/wake-consumer-closeout.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9dde861b685babb83321aee04fdd4ef11d08d8fe",
+        "size": 9653
+      },
+      "scripts/acceptance/workflow-migration-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ce3063fb1f6f37f7e16ea1b796d3bb62af683c56",
+        "size": 50711
+      },
+      "scripts/acceptance/workflow-migration-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "924daf8782753d70248db8e756511979da16c073",
+        "size": 56746
+      },
+      "scripts/e2b/.gitignore": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7a60b85e148f80966a550e5ab6a762a907c69ca6",
+        "size": 19
+      },
+      "scripts/e2b/acceptance-bootstrap.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e41ff490bc9e9eb0b22ae3e8a7119cea077befad",
+        "size": 7290
+      },
+      "scripts/e2b/acceptance-daemon.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bf546a0ef670b41f273d9f4c2e391220cfb6837c",
+        "size": 7331
+      },
+      "scripts/e2b/bootstrap-desktop.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4caea3c670c13df22933fcf1f8ba5da1a43068cf",
+        "size": 1241
+      },
+      "scripts/e2b/bootstrap.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e5c7bc03495b31f8e61154a10106dda383a49aa",
+        "size": 1186
+      },
+      "scripts/e2b/broker-websocket.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2e0329cad689fe7112502d94b385e1b31a3f30c",
+        "size": 24507
+      },
+      "scripts/e2b/build-template.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+        "size": 55730
+      },
+      "scripts/e2b/build-template.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5092c4b27d32827c4a35c98277822d46c3f6264d",
+        "size": 55286
+      },
+      "scripts/e2b/cleanup-template-candidates.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6fb47f15aaae3a0e256c47bb4db8df16380d001b",
+        "size": 7437
+      },
+      "scripts/e2b/cleanup-template-candidates.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4b7ebcdb65c8bdb78e913743bbadedf327dd8b25",
+        "size": 16915
+      },
+      "scripts/e2b/cloud-acceptance-release.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "642dd5828fbab0a76971bb63c12ca8df26f86793",
+        "size": 2827
+      },
+      "scripts/e2b/cloud-acceptance-release.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "828b411d9dafd4653d5544a7636c9fbdb451b847",
+        "size": 3602
+      },
+      "scripts/e2b/cloud-local-acceptance.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3572622f70dedf63ed1caa978d06669e66519745",
+        "size": 25253
+      },
+      "scripts/e2b/desktop-probe.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "270138742ec45b278c51a4c43bc2979eaad16bae",
+        "size": 2811
+      },
+      "scripts/e2b/e2b-certificate-relinks.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "335540475a9d8aaae8f34915e087b5a862699b95",
+        "size": 106048
+      },
+      "scripts/e2b/e2b-finalization-files.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+        "size": 4355
+      },
+      "scripts/e2b/inspect-retained-deliverable.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4ae9b22468cba6f2b95b31f3708dd0e3808a5ab4",
+        "size": 9074
+      },
+      "scripts/e2b/lease-driver.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "09875ebc971e631131883b4ef595329cf8b45266",
+        "size": 1487
+      },
+      "scripts/e2b/lease-driver.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "98cf431ef6b85497c752ad6255e86eaf040c2918",
+        "size": 1765
+      },
+      "scripts/e2b/local-api-relay.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8aea8be2e26167c4b02442cb8717862954ebf37b",
+        "size": 10530
+      },
+      "scripts/e2b/local-api-relay.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "87611bf7d4a230b9dfd071b2e45a1cd1f874247a",
+        "size": 11483
+      },
+      "scripts/e2b/local-api-relay.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "857b62d684ae15f89a2020aca50a2cccff965491",
+        "size": 5212
+      },
+      "scripts/e2b/local-api-relay.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "64ded751a42749be790f717f7c8492935b3af9e7",
+        "size": 13912
+      },
+      "scripts/e2b/measure-thread-start.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "48ec1606fae5bb387e658f1c8aa7907179ee114b",
+        "size": 5939
+      },
+      "scripts/e2b/mock-device-server.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2f1864a6cc315d4ccc732a6d957dcb671afafc2",
+        "size": 4382
+      },
+      "scripts/e2b/official-files.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ea0819bf3e2d4ff83e64482b6336567050376591",
+        "size": 21445
+      },
+      "scripts/e2b/official-files.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21",
+        "size": 47201
+      },
+      "scripts/e2b/publish-template-env.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56ca3993bf11e33ca02a28ccf0678a45ee509215",
+        "size": 17883
+      },
+      "scripts/e2b/publish-template-env.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "86843115336fa4021df9ac33e387caab5cc04e64",
+        "size": 33829
+      },
+      "scripts/e2b/runtime-report.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9f5a61c221f8e05d6b23252d86af528dc26bba3c",
+        "size": 6202
+      },
+      "scripts/e2b/runtime-report.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5cf4c76c6114dc235dfe642ae6ce1a77d7837d3d",
+        "size": 14223
+      },
+      "scripts/e2b/screen-capture.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "153ae94d66409d245c02db625542d9eed152ea13",
+        "size": 2674
+      },
+      "scripts/e2b/start-desktop.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d65b652c6aba5739dafa4120e928638276719f13",
+        "size": 2033
+      },
+      "scripts/e2b/start-prebuilt.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f3896e388043441ec99baf57b179b7cc44597017",
+        "size": 929
+      },
+      "scripts/e2b/store-live.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "21ee2772a161b2138a724b6344ac04fac4581ee8",
+        "size": 9687
+      },
+      "scripts/e2b/subagent-cdp.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "814d0e464c63f8c95e4ef66b4e755a2bb285aace",
+        "size": 2459
+      },
+      "scripts/e2b/subagent-gateway.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6033ae4853e06b43e73896a50894b3e8c83b463c",
+        "size": 43652
+      },
+      "scripts/e2b/subagent-guard-browser.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ab0768f538bb5173589c8ac8d1062bbfb2dd65b",
+        "size": 2027
+      },
+      "scripts/e2b/subagent-guard.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ff57c48bbd7f493a586e113676f16e18d4e1bde3",
+        "size": 10231
+      },
+      "scripts/e2b/subagent-live-acceptance.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b9881fc9b3dd56f73dc14e8118be3755d742ab72",
+        "size": 5841
+      },
+      "scripts/e2b/subagent-viewer.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ded1d3a090223ed70a12561159185e820e7ad1e7",
+        "size": 3496
+      },
+      "scripts/e2b/subagent-visual-browser.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d560fecc4791fff8543c86c18bbf182feec4196d",
+        "size": 7993
+      },
+      "scripts/e2b/template-capabilities.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dbebb3a7d80185bd409c7d8fc0ba13d137f5c50c",
+        "size": 93
+      },
+      "scripts/e2b/thread-lifecycle-acceptance.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5bd2b6ff2a37532a4cf87a26f37acb454923d80d",
+        "size": 6204
+      },
+      "scripts/e2b/thread-lifecycle-acceptance.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0971dc0fa9eebbb955ca97c8363cbbbd0e4fb7b0",
+        "size": 29750
+      },
+      "scripts/e2b/thread-lifecycle-archive.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ae4d21b058399fd9aa5167ef3b306847d976564f",
+        "size": 2256
+      },
+      "scripts/e2b/thread-lifecycle-archive.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2241a3e8dfb9462f53be61e1295d9fae3f982fc7",
+        "size": 2420
+      },
+      "scripts/e2b/validate-official-instances.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e3de9a58070c4222798ef16ed87f0bf3cb9137a9",
+        "size": 3809
+      },
+      "scripts/e2b/validate-template-subscriptions.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ee7564fe213ce3fba762fee8685eb9a4bb31329",
+        "size": 31628
+      },
+      "scripts/e2b/validate-template-subscriptions.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a70f45e7395309a1cf93ae295e880e06ad521ef2",
+        "size": 57524
+      },
+      "scripts/e2b/viewer-gateway.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c3d0d4586be6c934c8eb610ab85bfaad2e8d3d25",
+        "size": 4062
+      },
+      "scripts/e2b/viewer-probe.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bb107f7cd9bab7af20e6c30f3d779de5a6cb1e28",
+        "size": 4364
+      },
+      "scripts/e2b/worker-live.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2d82b63c786169c29160d3ff5941fc14e878b240",
+        "size": 19504
+      },
+      "scripts/release/web-deploy.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b",
+        "size": 20124
+      }
+    },
+    "acceptance": {
+      ".github/workflows/e2b-official-runtime.yml": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9",
+        "size": 18539
+      },
+      ".github/workflows/web-deploy.yml": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e15741a3ae51a294593eeb2151311378babd8ce4",
+        "size": 11619
+      },
+      "AGENTS.md": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fa963e4d0a342002661c58772d370484e8af740a",
+        "size": 22984
+      },
+      "CONTRIBUTING.md": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "768523980c14db13055f22a68c7e9c5960013508",
+        "size": 12955
+      },
+      "lib/tracing/ai.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5bb43681fd29ebce3c378b8f55bcdfee88165f72",
+        "size": 16491
+      },
+      "lib/tracing/ai.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+        "size": 13617
+      },
+      "lib/tracing/clients.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f14238d92fb56c7e2e44d086f5239fe739a9e6df",
+        "size": 16234
+      },
+      "lib/tracing/config.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+        "size": 3376
+      },
+      "lib/tracing/context.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fe005d26c2ea903250683d9351334b95ef328383",
+        "size": 4360
+      },
+      "lib/tracing/daemon-settings.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "10e3141e48802b2e4f854e74765e8ede5568ed09",
+        "size": 3386
+      },
+      "lib/tracing/flush.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0149083f1f9e36adca769c2e799afe84a90bd139",
+        "size": 657
+      },
+      "lib/tracing/jobs.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6cec226926da96c89acc06479a6b6c13902b0470",
+        "size": 2650
+      },
+      "lib/tracing/labels.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+        "size": 2278
+      },
+      "lib/tracing/logs.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8e6dc9b951d1126376ab29d4d0a80f276391a58a",
+        "size": 3342
+      },
+      "lib/tracing/logs.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ac6a917887a94a6a673410753d4645e2dba25d21",
+        "size": 4312
+      },
+      "lib/tracing/node.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+        "size": 7106
+      },
+      "lib/tracing/run-context.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "96f800cbec92a5ea4b8ff464155e2fd98683b7e9",
+        "size": 7825
+      },
+      "lib/tracing/sampling.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+        "size": 4983
+      },
+      "lib/tracing/sanitize.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+        "size": 6160
+      },
+      "lib/tracing/spans.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+        "size": 9992
+      },
+      "lib/tracing/tracing.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7708a00e2f9efe1afff7228e55096e7c170fa5db",
+        "size": 23179
+      },
+      "packages/daemon/scripts/build-cloud-worker.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ce864dcd4c83ccce8c1435463f407623e1091694",
+        "size": 3086
+      },
+      "packages/daemon/scripts/build.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "13f7a24627b0d3e360488707d32b42dfcdbd5d4f",
+        "size": 4100
+      },
+      "packages/daemon/scripts/official-e2b-instance-bootstrap.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+        "size": 12114
+      },
+      "packages/daemon/scripts/prepare-worker-install.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f",
+        "size": 4990
+      },
+      "packages/daemon/scripts/prepare-worker-install.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540",
+        "size": 5659
+      },
+      "packages/daemon/scripts/refresh-cloud-worker.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "866629a0a0e7e7d5e7fc6788a06135e362d6c4aa",
+        "size": 10673
+      },
+      "packages/daemon/scripts/refresh-cloud-worker.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9dddc36d9d3396752ddea96638901e22c75bb370",
+        "size": 15939
+      },
+      "packages/daemon/scripts/release.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "886cc2434cb4840dcb8e3402a02ac3adeb7c8e6e",
+        "size": 2936
+      },
+      "packages/daemon/src/adapters/claude-failure.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4b8f61f67b5cbbe4dca161031c490644cefad145",
+        "size": 3991
+      },
+      "packages/daemon/src/adapters/claude-prewarm.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cbb45575e495f13d5e76dec1c2b8fd62fb07f16c",
+        "size": 9298
+      },
+      "packages/daemon/src/adapters/claude.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b5659ce0a1d56aeccd29f964d1aed30dd750282f",
+        "size": 51190
+      },
+      "packages/daemon/src/adapters/codex-failure.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "53c4cd4d209aaa666cc7fa5d681ace957075a418",
+        "size": 2591
+      },
+      "packages/daemon/src/adapters/codex-mailbox.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448",
+        "size": 5930
+      },
+      "packages/daemon/src/adapters/codex-protocol.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407",
+        "size": 3995
+      },
+      "packages/daemon/src/adapters/codex.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e85815a955eaff56d7ac389c9d9722c64607345d",
+        "size": 51844
+      },
+      "packages/daemon/src/adapters/cursor.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1a3081575602152bb028783d277fc34441c1a721",
+        "size": 15971
+      },
+      "packages/daemon/src/adapters/generation-metrics.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7b7878479cf37d95253c3c337a9c755346963d96",
+        "size": 7083
+      },
+      "packages/daemon/src/adapters/generation-metrics.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+        "size": 6748
+      },
+      "packages/daemon/src/adapters/mock.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "385357ded14842c6f77de18df288679776db359a",
+        "size": 10537
+      },
+      "packages/daemon/src/adapters/types.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bbd59de65673cf8fcd98ad4bfb365a5aaac7ea28",
+        "size": 8818
+      },
+      "scripts/acceptance/auth-audit-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e9f72f31621144b6ac844d8d823cd176e9aa27de",
+        "size": 9917
+      },
+      "scripts/acceptance/auth-audit-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c13cce4162c3153b7f1dbefe88b4645645fec185",
+        "size": 8379
+      },
+      "scripts/acceptance/cloud-lease-audit.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba11de700e55258f6036d4f3c56fd5301b32d122",
+        "size": 10803
+      },
+      "scripts/acceptance/cloud-lease-audit.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8df2fb52d14eec9d27252003871375210dfc0351",
+        "size": 13309
+      },
+      "scripts/acceptance/cloud-lease-probe.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "60275f2517cdda374f464b02adaa05d0102a6fd8",
+        "size": 3553
+      },
+      "scripts/acceptance/cloud-lease-recovery.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "85c95cba12ef8096147ffd75cceb24976ce3da63",
+        "size": 7093
+      },
+      "scripts/acceptance/cloud-lease-recovery.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "38ee2a33b2a184d3a918028dab47218c4fbcf995",
+        "size": 7315
+      },
+      "scripts/acceptance/cloud-startup-evidence.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b5a85b795d3026c350ced9823eaac9488a3e0cda",
+        "size": 22658
+      },
+      "scripts/acceptance/cloud-startup-report.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "86bb748591d8f454a36346d048d13f2297155b4a",
+        "size": 25154
+      },
+      "scripts/acceptance/cloud-startup-report.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "08eef9e155717afecd0231e8390d6c9a3c1abf83",
+        "size": 10023
+      },
+      "scripts/acceptance/cloud-startup.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9",
+        "size": 85323
+      },
+      "scripts/acceptance/cloud-startup.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6ae54051916032d788864a725711975ad1ea007f",
+        "size": 118044
+      },
+      "scripts/acceptance/deployed-browser-session.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ea8708f9bde53d4e7732f3758ed1418d893aac4c",
+        "size": 19092
+      },
+      "scripts/acceptance/deployed-browser-session.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7fa3f0a6ba2b0bef365ec9ce48e5108fc7cc3506",
+        "size": 23027
+      },
+      "scripts/acceptance/deployed-target.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fdba775917bd62a7cd41f4679247ae9f46dd76aa",
+        "size": 10989
+      },
+      "scripts/acceptance/deployed-target.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b93a2fda4a430b7192ffb9f91d5d822096098f5c",
+        "size": 11274
+      },
+      "scripts/acceptance/device-closeout-child.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8398398dcc51e76477727ca442b8d6e3ffdd2183",
+        "size": 3818
+      },
+      "scripts/acceptance/device-closeout.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e36c62e39bb0598b326820d952fd98ffbf689cb8",
+        "size": 10470
+      },
+      "scripts/acceptance/factory-continuation.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "948dc10fb070e34c794eca24b4f9865c94904170",
+        "size": 10654
+      },
+      "scripts/acceptance/factory-continuation.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "586fccd4f52bdbb92d324c4854892ae7d830a63c",
+        "size": 4197
+      },
+      "scripts/acceptance/local-installer-macos.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "858b521f583e605340adc7be0685de17de2c60a8",
+        "size": 9689
+      },
+      "scripts/acceptance/mcp-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a9c2bd597454aee86dcd78c8bbb6574fdabd21f2",
+        "size": 23616
+      },
+      "scripts/acceptance/mcp-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "509aadc1583a80d57c0a33939dacc95c23f5eae7",
+        "size": 30129
+      },
+      "scripts/acceptance/model-provider-fallback.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5eab2af9d34ee74bb970b5beceb8a292d897eeb0",
+        "size": 51628
+      },
+      "scripts/acceptance/model-provider-fallback.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "01ee70b3ebd24da944772da75243ee78186b656e",
+        "size": 32659
+      },
+      "scripts/acceptance/owned-process-supervisor.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "388f1f6e55601af33b72ca7712f8053f697e2404",
+        "size": 4407
+      },
+      "scripts/acceptance/owned-process-tree.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "32dc6542562b85ff0be3850199028ae95073d57d",
+        "size": 3317
+      },
+      "scripts/acceptance/production-readiness-plan.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d9455bff532b2bf8fa2272af148724fe21387342",
+        "size": 126
+      },
+      "scripts/acceptance/production-readiness.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "29141ad221001ab7046224b2fd964dff65263f63",
+        "size": 25874
+      },
+      "scripts/acceptance/production-readiness.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cf1277feafac2ac03f953ad58f5ff154c9bf347f",
+        "size": 27942
+      },
+      "scripts/acceptance/project-decisions.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2596d005253c3e06f51e76a25ef78205e74817dd",
+        "size": 50205
+      },
+      "scripts/acceptance/project-decisions.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "da8a5f4c56cc85be8edee2df99ec02c873404cb8",
+        "size": 38588
+      },
+      "scripts/acceptance/read-action-transport.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ef8f9c901a257e78db7241b3b386d9b7f1f5afee",
+        "size": 3915
+      },
+      "scripts/acceptance/read-cache-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c78f117c23e5c17922bf38e83309dae6f83a0ed9",
+        "size": 29371
+      },
+      "scripts/acceptance/read-cache-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a88834e28bea18aebcd9cfcdcc294a06c091d578",
+        "size": 45648
+      },
+      "scripts/acceptance/read-cache.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a445a880fd950adf65b0f43bc3a5f30cdc3d96d6",
+        "size": 33310
+      },
+      "scripts/acceptance/read-cache.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5ceba58aec854622c614394c97c2ae722bec5bce",
+        "size": 23089
+      },
+      "scripts/acceptance/response-cookie-jar.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2bb8fa35a4432c2245a744c6cac1c80b715da7a8",
+        "size": 2277
+      },
+      "scripts/acceptance/run-github-token-500.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9322dff3a8882399c0402fc48b62ffd01c69a674",
+        "size": 8102
+      },
+      "scripts/acceptance/run-observability-browser.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+        "size": 24958
+      },
+      "scripts/acceptance/run-observability-browser.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "58170f27b9586752ca966e377c9255ac6e6174a9",
+        "size": 26414
+      },
+      "scripts/acceptance/run-observability-workflow.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+        "size": 11693
+      },
+      "scripts/acceptance/run-observability-workflow.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fd1327b287b8d97424a3c3ca5c01c4abd0f8b8f2",
+        "size": 16308
+      },
+      "scripts/acceptance/run-observability.md": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "176e3aead0068d801f829dcadaafcd02a61e67a3",
+        "size": 19025
+      },
+      "scripts/acceptance/run-observability.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+        "size": 59415
+      },
+      "scripts/acceptance/run-observability.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d",
+        "size": 55389
+      },
+      "scripts/acceptance/run-read-cache.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c3c420ad12a69edd144322d1f2c827fde2e8a41f",
+        "size": 25227
+      },
+      "scripts/acceptance/run-read-cache.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "71f8a98af1c6a528453b50fc58625a5289199f76",
+        "size": 20721
+      },
+      "scripts/acceptance/runtime-performance-cache.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a4e6c36a86aca7ea5879c59a2ae23e53595b79f4",
+        "size": 4643
+      },
+      "scripts/acceptance/runtime-performance.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "80630bb36b16250979832044793064ea5fb2ee1c",
+        "size": 26562
+      },
+      "scripts/acceptance/self-hosted-daemon.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d9cce74d9afc2d027284534ebb70bb531bc950d2",
+        "size": 15286
+      },
+      "scripts/acceptance/self-hosted-daemon.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "979e5faf46e202792f0d475269e3469ec00e3cd3",
+        "size": 7308
+      },
+      "scripts/acceptance/self-hosted-fixtures.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fdf276b2439e5b2f88a7aaa8d0b4d83881039617",
+        "size": 13311
+      },
+      "scripts/acceptance/self-hosted-model.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "284d88d53a065aa4a0597245d02b8f43efc22b0e",
+        "size": 2924
+      },
+      "scripts/acceptance/self-hosted-production-probes.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8455796e01b87f03e0ba25201c537d04fed2901e",
+        "size": 8898
+      },
+      "scripts/acceptance/self-hosted-production-target.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "feaf9dab99a8205c545dc95674056327a28d2114",
+        "size": 8022
+      },
+      "scripts/acceptance/self-hosted-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f1ec2f0e65548280ab4d5f672dc29b4dafcacf01",
+        "size": 2123
+      },
+      "scripts/acceptance/self-hosted-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "aef887299558132358adef61531da164f478f916",
+        "size": 13461
+      },
+      "scripts/acceptance/self-hosted-services.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6476b547c2c07e280629793dc4ca4a6d66c0a2eb",
+        "size": 29980
+      },
+      "scripts/acceptance/shared-account-queue.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "892e354b8e8a652fe013e75719a6636a27031506",
+        "size": 1635
+      },
+      "scripts/acceptance/task-secrets-ci.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a55edb760f77913f12595e476e55b9f47645f35c",
+        "size": 22447
+      },
+      "scripts/acceptance/task-secrets-ci.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8ae662c66dc5641c6a02c0b2a1fa57854e9dbcfc",
+        "size": 30240
+      },
+      "scripts/acceptance/task-secrets-fixture-runtime.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b5ae654973a2dddb010d3c18f46aa9f6420e4665",
+        "size": 9666
+      },
+      "scripts/acceptance/task-secrets-fixture.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "720d5b40cdbb645f0725588d266f2eb2b086fbc6",
+        "size": 7491
+      },
+      "scripts/acceptance/task-secrets-native.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6a210fcc83743d70cff1e90072e208e3271707ff",
+        "size": 17521
+      },
+      "scripts/acceptance/task-secrets.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b948c0921e6ff1f3a45d03029515e002775423cd",
+        "size": 30528
+      },
+      "scripts/acceptance/task-secrets.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b0e809572a9f89f087d8bdb4b572858db8c2dcdf",
+        "size": 34811
+      },
+      "scripts/acceptance/team-workspace.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f",
+        "size": 6653
+      },
+      "scripts/acceptance/team-workspace.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "513e5d9c3f692934974a4206b4c29033750966b5",
+        "size": 12305
+      },
+      "scripts/acceptance/thread-lifecycle-ci.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8fb0e7d0cd1934315f1bd33826bc75fd8212b601",
+        "size": 18638
+      },
+      "scripts/acceptance/thread-lifecycle-ci.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1e6db52b36680b6137a16f39c4499672527c595b",
+        "size": 24422
+      },
+      "scripts/acceptance/thread-lifecycle.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3068076819e52ef93642e429aa1edfb4759af0ed",
+        "size": 51277
+      },
+      "scripts/acceptance/thread-lifecycle.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d3290eae6c1c3b0466d2490811f5336940dce178",
+        "size": 53045
+      },
+      "scripts/acceptance/wake-consumer-closeout.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9dde861b685babb83321aee04fdd4ef11d08d8fe",
+        "size": 9653
+      },
+      "scripts/acceptance/workflow-migration-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ce3063fb1f6f37f7e16ea1b796d3bb62af683c56",
+        "size": 50711
+      },
+      "scripts/acceptance/workflow-migration-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "924daf8782753d70248db8e756511979da16c073",
+        "size": 56746
+      },
+      "scripts/e2b/.gitignore": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7a60b85e148f80966a550e5ab6a762a907c69ca6",
+        "size": 19
+      },
+      "scripts/e2b/acceptance-bootstrap.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e41ff490bc9e9eb0b22ae3e8a7119cea077befad",
+        "size": 7290
+      },
+      "scripts/e2b/acceptance-daemon.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bf546a0ef670b41f273d9f4c2e391220cfb6837c",
+        "size": 7331
+      },
+      "scripts/e2b/bootstrap-desktop.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4caea3c670c13df22933fcf1f8ba5da1a43068cf",
+        "size": 1241
+      },
+      "scripts/e2b/bootstrap.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e5c7bc03495b31f8e61154a10106dda383a49aa",
+        "size": 1186
+      },
+      "scripts/e2b/broker-websocket.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2e0329cad689fe7112502d94b385e1b31a3f30c",
+        "size": 24507
+      },
+      "scripts/e2b/build-template.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+        "size": 55730
+      },
+      "scripts/e2b/build-template.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5092c4b27d32827c4a35c98277822d46c3f6264d",
+        "size": 55286
+      },
+      "scripts/e2b/cleanup-template-candidates.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6fb47f15aaae3a0e256c47bb4db8df16380d001b",
+        "size": 7437
+      },
+      "scripts/e2b/cleanup-template-candidates.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4b7ebcdb65c8bdb78e913743bbadedf327dd8b25",
+        "size": 16915
+      },
+      "scripts/e2b/cloud-acceptance-release.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "642dd5828fbab0a76971bb63c12ca8df26f86793",
+        "size": 2827
+      },
+      "scripts/e2b/cloud-acceptance-release.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "828b411d9dafd4653d5544a7636c9fbdb451b847",
+        "size": 3602
+      },
+      "scripts/e2b/cloud-local-acceptance.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3572622f70dedf63ed1caa978d06669e66519745",
+        "size": 25253
+      },
+      "scripts/e2b/desktop-probe.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "270138742ec45b278c51a4c43bc2979eaad16bae",
+        "size": 2811
+      },
+      "scripts/e2b/e2b-certificate-relinks.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "335540475a9d8aaae8f34915e087b5a862699b95",
+        "size": 106048
+      },
+      "scripts/e2b/e2b-finalization-files.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+        "size": 4355
+      },
+      "scripts/e2b/inspect-retained-deliverable.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4ae9b22468cba6f2b95b31f3708dd0e3808a5ab4",
+        "size": 9074
+      },
+      "scripts/e2b/lease-driver.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "09875ebc971e631131883b4ef595329cf8b45266",
+        "size": 1487
+      },
+      "scripts/e2b/lease-driver.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "98cf431ef6b85497c752ad6255e86eaf040c2918",
+        "size": 1765
+      },
+      "scripts/e2b/local-api-relay.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8aea8be2e26167c4b02442cb8717862954ebf37b",
+        "size": 10530
+      },
+      "scripts/e2b/local-api-relay.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "87611bf7d4a230b9dfd071b2e45a1cd1f874247a",
+        "size": 11483
+      },
+      "scripts/e2b/local-api-relay.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "857b62d684ae15f89a2020aca50a2cccff965491",
+        "size": 5212
+      },
+      "scripts/e2b/local-api-relay.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "64ded751a42749be790f717f7c8492935b3af9e7",
+        "size": 13912
+      },
+      "scripts/e2b/measure-thread-start.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "48ec1606fae5bb387e658f1c8aa7907179ee114b",
+        "size": 5939
+      },
+      "scripts/e2b/mock-device-server.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2f1864a6cc315d4ccc732a6d957dcb671afafc2",
+        "size": 4382
+      },
+      "scripts/e2b/official-files.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ea0819bf3e2d4ff83e64482b6336567050376591",
+        "size": 21445
+      },
+      "scripts/e2b/official-files.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21",
+        "size": 47201
+      },
+      "scripts/e2b/publish-template-env.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56ca3993bf11e33ca02a28ccf0678a45ee509215",
+        "size": 17883
+      },
+      "scripts/e2b/publish-template-env.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "86843115336fa4021df9ac33e387caab5cc04e64",
+        "size": 33829
+      },
+      "scripts/e2b/runtime-report.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9f5a61c221f8e05d6b23252d86af528dc26bba3c",
+        "size": 6202
+      },
+      "scripts/e2b/runtime-report.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5cf4c76c6114dc235dfe642ae6ce1a77d7837d3d",
+        "size": 14223
+      },
+      "scripts/e2b/screen-capture.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "153ae94d66409d245c02db625542d9eed152ea13",
+        "size": 2674
+      },
+      "scripts/e2b/start-desktop.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d65b652c6aba5739dafa4120e928638276719f13",
+        "size": 2033
+      },
+      "scripts/e2b/start-prebuilt.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f3896e388043441ec99baf57b179b7cc44597017",
+        "size": 929
+      },
+      "scripts/e2b/store-live.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "21ee2772a161b2138a724b6344ac04fac4581ee8",
+        "size": 9687
+      },
+      "scripts/e2b/subagent-cdp.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "814d0e464c63f8c95e4ef66b4e755a2bb285aace",
+        "size": 2459
+      },
+      "scripts/e2b/subagent-gateway.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6033ae4853e06b43e73896a50894b3e8c83b463c",
+        "size": 43652
+      },
+      "scripts/e2b/subagent-guard-browser.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ab0768f538bb5173589c8ac8d1062bbfb2dd65b",
+        "size": 2027
+      },
+      "scripts/e2b/subagent-guard.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ff57c48bbd7f493a586e113676f16e18d4e1bde3",
+        "size": 10231
+      },
+      "scripts/e2b/subagent-live-acceptance.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b9881fc9b3dd56f73dc14e8118be3755d742ab72",
+        "size": 5841
+      },
+      "scripts/e2b/subagent-viewer.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ded1d3a090223ed70a12561159185e820e7ad1e7",
+        "size": 3496
+      },
+      "scripts/e2b/subagent-visual-browser.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d560fecc4791fff8543c86c18bbf182feec4196d",
+        "size": 7993
+      },
+      "scripts/e2b/template-capabilities.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dbebb3a7d80185bd409c7d8fc0ba13d137f5c50c",
+        "size": 93
+      },
+      "scripts/e2b/thread-lifecycle-acceptance.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5bd2b6ff2a37532a4cf87a26f37acb454923d80d",
+        "size": 6204
+      },
+      "scripts/e2b/thread-lifecycle-acceptance.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0971dc0fa9eebbb955ca97c8363cbbbd0e4fb7b0",
+        "size": 29750
+      },
+      "scripts/e2b/thread-lifecycle-archive.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ae4d21b058399fd9aa5167ef3b306847d976564f",
+        "size": 2256
+      },
+      "scripts/e2b/thread-lifecycle-archive.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2241a3e8dfb9462f53be61e1295d9fae3f982fc7",
+        "size": 2420
+      },
+      "scripts/e2b/validate-official-instances.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e3de9a58070c4222798ef16ed87f0bf3cb9137a9",
+        "size": 3809
+      },
+      "scripts/e2b/validate-template-subscriptions.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ee7564fe213ce3fba762fee8685eb9a4bb31329",
+        "size": 31628
+      },
+      "scripts/e2b/validate-template-subscriptions.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a70f45e7395309a1cf93ae295e880e06ad521ef2",
+        "size": 57524
+      },
+      "scripts/e2b/viewer-gateway.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c3d0d4586be6c934c8eb610ab85bfaad2e8d3d25",
+        "size": 4062
+      },
+      "scripts/e2b/viewer-probe.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bb107f7cd9bab7af20e6c30f3d779de5a6cb1e28",
+        "size": 4364
+      },
+      "scripts/e2b/worker-live.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2d82b63c786169c29160d3ff5941fc14e878b240",
+        "size": 19504
+      },
+      "scripts/release/web-deploy.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b",
+        "size": 20124
+      }
+    },
+    "main": {
+      ".github/workflows/e2b-official-runtime.yml": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+        "size": 18463
+      },
+      ".github/workflows/web-deploy.yml": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e15741a3ae51a294593eeb2151311378babd8ce4",
+        "size": 11619
+      },
+      "AGENTS.md": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fa963e4d0a342002661c58772d370484e8af740a",
+        "size": 22984
+      },
+      "CONTRIBUTING.md": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "768523980c14db13055f22a68c7e9c5960013508",
+        "size": 12955
+      },
+      "lib/tracing/ai.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5bb43681fd29ebce3c378b8f55bcdfee88165f72",
+        "size": 16491
+      },
+      "lib/tracing/ai.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+        "size": 13617
+      },
+      "lib/tracing/clients.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f14238d92fb56c7e2e44d086f5239fe739a9e6df",
+        "size": 16234
+      },
+      "lib/tracing/config.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+        "size": 3376
+      },
+      "lib/tracing/context.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fe005d26c2ea903250683d9351334b95ef328383",
+        "size": 4360
+      },
+      "lib/tracing/daemon-settings.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "10e3141e48802b2e4f854e74765e8ede5568ed09",
+        "size": 3386
+      },
+      "lib/tracing/flush.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0149083f1f9e36adca769c2e799afe84a90bd139",
+        "size": 657
+      },
+      "lib/tracing/jobs.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6cec226926da96c89acc06479a6b6c13902b0470",
+        "size": 2650
+      },
+      "lib/tracing/labels.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+        "size": 2278
+      },
+      "lib/tracing/logs.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8e6dc9b951d1126376ab29d4d0a80f276391a58a",
+        "size": 3342
+      },
+      "lib/tracing/logs.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ac6a917887a94a6a673410753d4645e2dba25d21",
+        "size": 4312
+      },
+      "lib/tracing/node.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+        "size": 7106
+      },
+      "lib/tracing/run-context.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "96f800cbec92a5ea4b8ff464155e2fd98683b7e9",
+        "size": 7825
+      },
+      "lib/tracing/sampling.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+        "size": 4983
+      },
+      "lib/tracing/sanitize.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+        "size": 6160
+      },
+      "lib/tracing/spans.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+        "size": 9992
+      },
+      "lib/tracing/tracing.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7708a00e2f9efe1afff7228e55096e7c170fa5db",
+        "size": 23179
+      },
+      "packages/daemon/scripts/build-cloud-worker.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ce864dcd4c83ccce8c1435463f407623e1091694",
+        "size": 3086
+      },
+      "packages/daemon/scripts/build.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "13f7a24627b0d3e360488707d32b42dfcdbd5d4f",
+        "size": 4100
+      },
+      "packages/daemon/scripts/official-e2b-instance-bootstrap.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+        "size": 11661
+      },
+      "packages/daemon/scripts/refresh-cloud-worker.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "866629a0a0e7e7d5e7fc6788a06135e362d6c4aa",
+        "size": 10673
+      },
+      "packages/daemon/scripts/refresh-cloud-worker.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9dddc36d9d3396752ddea96638901e22c75bb370",
+        "size": 15939
+      },
+      "packages/daemon/scripts/release.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "886cc2434cb4840dcb8e3402a02ac3adeb7c8e6e",
+        "size": 2936
+      },
+      "packages/daemon/src/adapters/claude-failure.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4b8f61f67b5cbbe4dca161031c490644cefad145",
+        "size": 3991
+      },
+      "packages/daemon/src/adapters/claude-prewarm.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cbb45575e495f13d5e76dec1c2b8fd62fb07f16c",
+        "size": 9298
+      },
+      "packages/daemon/src/adapters/claude.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b5659ce0a1d56aeccd29f964d1aed30dd750282f",
+        "size": 51190
+      },
+      "packages/daemon/src/adapters/codex-failure.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "53c4cd4d209aaa666cc7fa5d681ace957075a418",
+        "size": 2591
+      },
+      "packages/daemon/src/adapters/codex-mailbox.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448",
+        "size": 5930
+      },
+      "packages/daemon/src/adapters/codex-protocol.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "838f6407a4c92ef13c95663a405804cebbd97f47",
+        "size": 3943
+      },
+      "packages/daemon/src/adapters/codex.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7",
+        "size": 51717
+      },
+      "packages/daemon/src/adapters/cursor.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1a3081575602152bb028783d277fc34441c1a721",
+        "size": 15971
+      },
+      "packages/daemon/src/adapters/generation-metrics.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7b7878479cf37d95253c3c337a9c755346963d96",
+        "size": 7083
+      },
+      "packages/daemon/src/adapters/generation-metrics.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+        "size": 6748
+      },
+      "packages/daemon/src/adapters/mock.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "385357ded14842c6f77de18df288679776db359a",
+        "size": 10537
+      },
+      "packages/daemon/src/adapters/types.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bbd59de65673cf8fcd98ad4bfb365a5aaac7ea28",
+        "size": 8818
+      },
+      "scripts/acceptance/auth-audit-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e9f72f31621144b6ac844d8d823cd176e9aa27de",
+        "size": 9917
+      },
+      "scripts/acceptance/auth-audit-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c13cce4162c3153b7f1dbefe88b4645645fec185",
+        "size": 8379
+      },
+      "scripts/acceptance/cloud-lease-audit.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba11de700e55258f6036d4f3c56fd5301b32d122",
+        "size": 10803
+      },
+      "scripts/acceptance/cloud-lease-audit.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8df2fb52d14eec9d27252003871375210dfc0351",
+        "size": 13309
+      },
+      "scripts/acceptance/cloud-lease-probe.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "60275f2517cdda374f464b02adaa05d0102a6fd8",
+        "size": 3553
+      },
+      "scripts/acceptance/cloud-lease-recovery.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "85c95cba12ef8096147ffd75cceb24976ce3da63",
+        "size": 7093
+      },
+      "scripts/acceptance/cloud-lease-recovery.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "38ee2a33b2a184d3a918028dab47218c4fbcf995",
+        "size": 7315
+      },
+      "scripts/acceptance/cloud-startup-evidence.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b5a85b795d3026c350ced9823eaac9488a3e0cda",
+        "size": 22658
+      },
+      "scripts/acceptance/cloud-startup-report.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "86bb748591d8f454a36346d048d13f2297155b4a",
+        "size": 25154
+      },
+      "scripts/acceptance/cloud-startup-report.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "08eef9e155717afecd0231e8390d6c9a3c1abf83",
+        "size": 10023
+      },
+      "scripts/acceptance/cloud-startup.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+        "size": 83254
+      },
+      "scripts/acceptance/cloud-startup.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6b57f0699db92b2c55b5add63efc23db1f403b0c",
+        "size": 105234
+      },
+      "scripts/acceptance/deployed-browser-session.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ea8708f9bde53d4e7732f3758ed1418d893aac4c",
+        "size": 19092
+      },
+      "scripts/acceptance/deployed-browser-session.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7fa3f0a6ba2b0bef365ec9ce48e5108fc7cc3506",
+        "size": 23027
+      },
+      "scripts/acceptance/deployed-target.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fdba775917bd62a7cd41f4679247ae9f46dd76aa",
+        "size": 10989
+      },
+      "scripts/acceptance/deployed-target.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b93a2fda4a430b7192ffb9f91d5d822096098f5c",
+        "size": 11274
+      },
+      "scripts/acceptance/device-closeout-child.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8398398dcc51e76477727ca442b8d6e3ffdd2183",
+        "size": 3818
+      },
+      "scripts/acceptance/device-closeout.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e36c62e39bb0598b326820d952fd98ffbf689cb8",
+        "size": 10470
+      },
+      "scripts/acceptance/factory-continuation.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "948dc10fb070e34c794eca24b4f9865c94904170",
+        "size": 10654
+      },
+      "scripts/acceptance/factory-continuation.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "586fccd4f52bdbb92d324c4854892ae7d830a63c",
+        "size": 4197
+      },
+      "scripts/acceptance/local-installer-macos.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "858b521f583e605340adc7be0685de17de2c60a8",
+        "size": 9689
+      },
+      "scripts/acceptance/mcp-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a9c2bd597454aee86dcd78c8bbb6574fdabd21f2",
+        "size": 23616
+      },
+      "scripts/acceptance/mcp-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "509aadc1583a80d57c0a33939dacc95c23f5eae7",
+        "size": 30129
+      },
+      "scripts/acceptance/model-provider-fallback.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5eab2af9d34ee74bb970b5beceb8a292d897eeb0",
+        "size": 51628
+      },
+      "scripts/acceptance/model-provider-fallback.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "01ee70b3ebd24da944772da75243ee78186b656e",
+        "size": 32659
+      },
+      "scripts/acceptance/owned-process-supervisor.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "388f1f6e55601af33b72ca7712f8053f697e2404",
+        "size": 4407
+      },
+      "scripts/acceptance/owned-process-tree.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "32dc6542562b85ff0be3850199028ae95073d57d",
+        "size": 3317
+      },
+      "scripts/acceptance/production-readiness-plan.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d9455bff532b2bf8fa2272af148724fe21387342",
+        "size": 126
+      },
+      "scripts/acceptance/production-readiness.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "29141ad221001ab7046224b2fd964dff65263f63",
+        "size": 25874
+      },
+      "scripts/acceptance/production-readiness.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cf1277feafac2ac03f953ad58f5ff154c9bf347f",
+        "size": 27942
+      },
+      "scripts/acceptance/project-decisions.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2596d005253c3e06f51e76a25ef78205e74817dd",
+        "size": 50205
+      },
+      "scripts/acceptance/project-decisions.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "da8a5f4c56cc85be8edee2df99ec02c873404cb8",
+        "size": 38588
+      },
+      "scripts/acceptance/read-action-transport.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ef8f9c901a257e78db7241b3b386d9b7f1f5afee",
+        "size": 3915
+      },
+      "scripts/acceptance/read-cache-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c78f117c23e5c17922bf38e83309dae6f83a0ed9",
+        "size": 29371
+      },
+      "scripts/acceptance/read-cache-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a88834e28bea18aebcd9cfcdcc294a06c091d578",
+        "size": 45648
+      },
+      "scripts/acceptance/read-cache.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e52d513455b35b6761e0abc74bf21969cbdb728d",
+        "size": null
+      },
+      "scripts/acceptance/read-cache.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5ceba58aec854622c614394c97c2ae722bec5bce",
+        "size": 23089
+      },
+      "scripts/acceptance/response-cookie-jar.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2bb8fa35a4432c2245a744c6cac1c80b715da7a8",
+        "size": 2277
+      },
+      "scripts/acceptance/run-github-token-500.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9322dff3a8882399c0402fc48b62ffd01c69a674",
+        "size": 8102
+      },
+      "scripts/acceptance/run-observability-browser.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+        "size": 24958
+      },
+      "scripts/acceptance/run-observability-browser.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "58170f27b9586752ca966e377c9255ac6e6174a9",
+        "size": 26414
+      },
+      "scripts/acceptance/run-observability-workflow.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+        "size": 11693
+      },
+      "scripts/acceptance/run-observability-workflow.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fd1327b287b8d97424a3c3ca5c01c4abd0f8b8f2",
+        "size": 16308
+      },
+      "scripts/acceptance/run-observability.md": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "176e3aead0068d801f829dcadaafcd02a61e67a3",
+        "size": 19025
+      },
+      "scripts/acceptance/run-observability.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+        "size": 59415
+      },
+      "scripts/acceptance/run-observability.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d",
+        "size": 55389
+      },
+      "scripts/acceptance/run-read-cache.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c3c420ad12a69edd144322d1f2c827fde2e8a41f",
+        "size": 25227
+      },
+      "scripts/acceptance/run-read-cache.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "71f8a98af1c6a528453b50fc58625a5289199f76",
+        "size": 20721
+      },
+      "scripts/acceptance/runtime-performance-cache.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a4e6c36a86aca7ea5879c59a2ae23e53595b79f4",
+        "size": 4643
+      },
+      "scripts/acceptance/runtime-performance.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "80630bb36b16250979832044793064ea5fb2ee1c",
+        "size": 26562
+      },
+      "scripts/acceptance/self-hosted-daemon.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d9cce74d9afc2d027284534ebb70bb531bc950d2",
+        "size": 15286
+      },
+      "scripts/acceptance/self-hosted-daemon.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "979e5faf46e202792f0d475269e3469ec00e3cd3",
+        "size": 7308
+      },
+      "scripts/acceptance/self-hosted-fixtures.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fdf276b2439e5b2f88a7aaa8d0b4d83881039617",
+        "size": 13311
+      },
+      "scripts/acceptance/self-hosted-model.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "284d88d53a065aa4a0597245d02b8f43efc22b0e",
+        "size": 2924
+      },
+      "scripts/acceptance/self-hosted-production-probes.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8455796e01b87f03e0ba25201c537d04fed2901e",
+        "size": 8898
+      },
+      "scripts/acceptance/self-hosted-production-target.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "feaf9dab99a8205c545dc95674056327a28d2114",
+        "size": 8022
+      },
+      "scripts/acceptance/self-hosted-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f1ec2f0e65548280ab4d5f672dc29b4dafcacf01",
+        "size": 2123
+      },
+      "scripts/acceptance/self-hosted-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "aef887299558132358adef61531da164f478f916",
+        "size": 13461
+      },
+      "scripts/acceptance/self-hosted-services.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6476b547c2c07e280629793dc4ca4a6d66c0a2eb",
+        "size": 29980
+      },
+      "scripts/acceptance/shared-account-queue.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "892e354b8e8a652fe013e75719a6636a27031506",
+        "size": 1635
+      },
+      "scripts/acceptance/task-secrets-ci.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a55edb760f77913f12595e476e55b9f47645f35c",
+        "size": 22447
+      },
+      "scripts/acceptance/task-secrets-ci.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8ae662c66dc5641c6a02c0b2a1fa57854e9dbcfc",
+        "size": 30240
+      },
+      "scripts/acceptance/task-secrets-fixture-runtime.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b5ae654973a2dddb010d3c18f46aa9f6420e4665",
+        "size": 9666
+      },
+      "scripts/acceptance/task-secrets-fixture.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "720d5b40cdbb645f0725588d266f2eb2b086fbc6",
+        "size": 7491
+      },
+      "scripts/acceptance/task-secrets-native.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6a210fcc83743d70cff1e90072e208e3271707ff",
+        "size": 17521
+      },
+      "scripts/acceptance/task-secrets.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b948c0921e6ff1f3a45d03029515e002775423cd",
+        "size": 30528
+      },
+      "scripts/acceptance/task-secrets.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ce4f154b8ec73ec0a9dd42902f073a3b83ba66f",
+        "size": 34196
+      },
+      "scripts/acceptance/team-workspace.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f",
+        "size": 6653
+      },
+      "scripts/acceptance/team-workspace.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "513e5d9c3f692934974a4206b4c29033750966b5",
+        "size": 12305
+      },
+      "scripts/acceptance/thread-lifecycle-ci.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8fb0e7d0cd1934315f1bd33826bc75fd8212b601",
+        "size": 18638
+      },
+      "scripts/acceptance/thread-lifecycle-ci.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1e6db52b36680b6137a16f39c4499672527c595b",
+        "size": 24422
+      },
+      "scripts/acceptance/thread-lifecycle.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3068076819e52ef93642e429aa1edfb4759af0ed",
+        "size": 51277
+      },
+      "scripts/acceptance/thread-lifecycle.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d3290eae6c1c3b0466d2490811f5336940dce178",
+        "size": 53045
+      },
+      "scripts/acceptance/wake-consumer-closeout.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9dde861b685babb83321aee04fdd4ef11d08d8fe",
+        "size": 9653
+      },
+      "scripts/acceptance/workflow-migration-production.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ce3063fb1f6f37f7e16ea1b796d3bb62af683c56",
+        "size": 50711
+      },
+      "scripts/acceptance/workflow-migration-production.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "924daf8782753d70248db8e756511979da16c073",
+        "size": 56746
+      },
+      "scripts/e2b/.gitignore": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7a60b85e148f80966a550e5ab6a762a907c69ca6",
+        "size": 19
+      },
+      "scripts/e2b/acceptance-bootstrap.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e41ff490bc9e9eb0b22ae3e8a7119cea077befad",
+        "size": 7290
+      },
+      "scripts/e2b/acceptance-daemon.mts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bf546a0ef670b41f273d9f4c2e391220cfb6837c",
+        "size": 7331
+      },
+      "scripts/e2b/bootstrap-desktop.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4caea3c670c13df22933fcf1f8ba5da1a43068cf",
+        "size": 1241
+      },
+      "scripts/e2b/bootstrap.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e5c7bc03495b31f8e61154a10106dda383a49aa",
+        "size": 1186
+      },
+      "scripts/e2b/broker-websocket.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2e0329cad689fe7112502d94b385e1b31a3f30c",
+        "size": 24507
+      },
+      "scripts/e2b/build-template.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+        "size": 55730
+      },
+      "scripts/e2b/build-template.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5092c4b27d32827c4a35c98277822d46c3f6264d",
+        "size": 55286
+      },
+      "scripts/e2b/cleanup-template-candidates.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6fb47f15aaae3a0e256c47bb4db8df16380d001b",
+        "size": 7437
+      },
+      "scripts/e2b/cleanup-template-candidates.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4b7ebcdb65c8bdb78e913743bbadedf327dd8b25",
+        "size": 16915
+      },
+      "scripts/e2b/cloud-acceptance-release.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "642dd5828fbab0a76971bb63c12ca8df26f86793",
+        "size": 2827
+      },
+      "scripts/e2b/cloud-acceptance-release.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "828b411d9dafd4653d5544a7636c9fbdb451b847",
+        "size": 3602
+      },
+      "scripts/e2b/cloud-local-acceptance.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3572622f70dedf63ed1caa978d06669e66519745",
+        "size": 25253
+      },
+      "scripts/e2b/desktop-probe.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "270138742ec45b278c51a4c43bc2979eaad16bae",
+        "size": 2811
+      },
+      "scripts/e2b/e2b-certificate-relinks.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2ad3c6f9dd5f06c387bd22e66d4711dd39a96831",
+        "size": 105561
+      },
+      "scripts/e2b/e2b-finalization-files.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e3bc3b603578e6bcd8c5ed1db8041adeba14a40a",
+        "size": null
+      },
+      "scripts/e2b/inspect-retained-deliverable.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4ae9b22468cba6f2b95b31f3708dd0e3808a5ab4",
+        "size": 9074
+      },
+      "scripts/e2b/lease-driver.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "09875ebc971e631131883b4ef595329cf8b45266",
+        "size": 1487
+      },
+      "scripts/e2b/lease-driver.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "98cf431ef6b85497c752ad6255e86eaf040c2918",
+        "size": 1765
+      },
+      "scripts/e2b/local-api-relay.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8aea8be2e26167c4b02442cb8717862954ebf37b",
+        "size": 10530
+      },
+      "scripts/e2b/local-api-relay.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "87611bf7d4a230b9dfd071b2e45a1cd1f874247a",
+        "size": 11483
+      },
+      "scripts/e2b/local-api-relay.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "857b62d684ae15f89a2020aca50a2cccff965491",
+        "size": 5212
+      },
+      "scripts/e2b/local-api-relay.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "64ded751a42749be790f717f7c8492935b3af9e7",
+        "size": 13912
+      },
+      "scripts/e2b/measure-thread-start.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "48ec1606fae5bb387e658f1c8aa7907179ee114b",
+        "size": 5939
+      },
+      "scripts/e2b/mock-device-server.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2f1864a6cc315d4ccc732a6d957dcb671afafc2",
+        "size": 4382
+      },
+      "scripts/e2b/official-files.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "66d74dd81568eb8fcd6c9efed82a199bcbf695d4",
+        "size": null
+      },
+      "scripts/e2b/official-files.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b6a469a778f52179e1ce7eb4394a6242818481e1",
+        "size": null
+      },
+      "scripts/e2b/publish-template-env.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56ca3993bf11e33ca02a28ccf0678a45ee509215",
+        "size": 17883
+      },
+      "scripts/e2b/publish-template-env.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "86843115336fa4021df9ac33e387caab5cc04e64",
+        "size": 33829
+      },
+      "scripts/e2b/runtime-report.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9f5a61c221f8e05d6b23252d86af528dc26bba3c",
+        "size": 6202
+      },
+      "scripts/e2b/runtime-report.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5cf4c76c6114dc235dfe642ae6ce1a77d7837d3d",
+        "size": 14223
+      },
+      "scripts/e2b/screen-capture.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "153ae94d66409d245c02db625542d9eed152ea13",
+        "size": 2674
+      },
+      "scripts/e2b/start-desktop.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d65b652c6aba5739dafa4120e928638276719f13",
+        "size": 2033
+      },
+      "scripts/e2b/start-prebuilt.sh": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f3896e388043441ec99baf57b179b7cc44597017",
+        "size": 929
+      },
+      "scripts/e2b/store-live.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "21ee2772a161b2138a724b6344ac04fac4581ee8",
+        "size": 9687
+      },
+      "scripts/e2b/subagent-cdp.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "814d0e464c63f8c95e4ef66b4e755a2bb285aace",
+        "size": 2459
+      },
+      "scripts/e2b/subagent-gateway.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6033ae4853e06b43e73896a50894b3e8c83b463c",
+        "size": 43652
+      },
+      "scripts/e2b/subagent-guard-browser.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ab0768f538bb5173589c8ac8d1062bbfb2dd65b",
+        "size": 2027
+      },
+      "scripts/e2b/subagent-guard.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ff57c48bbd7f493a586e113676f16e18d4e1bde3",
+        "size": 10231
+      },
+      "scripts/e2b/subagent-live-acceptance.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b9881fc9b3dd56f73dc14e8118be3755d742ab72",
+        "size": 5841
+      },
+      "scripts/e2b/subagent-viewer.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ded1d3a090223ed70a12561159185e820e7ad1e7",
+        "size": 3496
+      },
+      "scripts/e2b/subagent-visual-browser.test.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d560fecc4791fff8543c86c18bbf182feec4196d",
+        "size": 7993
+      },
+      "scripts/e2b/template-capabilities.json": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dbebb3a7d80185bd409c7d8fc0ba13d137f5c50c",
+        "size": 93
+      },
+      "scripts/e2b/thread-lifecycle-acceptance.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5bd2b6ff2a37532a4cf87a26f37acb454923d80d",
+        "size": 6204
+      },
+      "scripts/e2b/thread-lifecycle-acceptance.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0971dc0fa9eebbb955ca97c8363cbbbd0e4fb7b0",
+        "size": 29750
+      },
+      "scripts/e2b/thread-lifecycle-archive.test.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ae4d21b058399fd9aa5167ef3b306847d976564f",
+        "size": 2256
+      },
+      "scripts/e2b/thread-lifecycle-archive.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2241a3e8dfb9462f53be61e1295d9fae3f982fc7",
+        "size": 2420
+      },
+      "scripts/e2b/validate-official-instances.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e3de9a58070c4222798ef16ed87f0bf3cb9137a9",
+        "size": 3809
+      },
+      "scripts/e2b/validate-template-subscriptions.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ee7564fe213ce3fba762fee8685eb9a4bb31329",
+        "size": 31628
+      },
+      "scripts/e2b/validate-template-subscriptions.test.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a70f45e7395309a1cf93ae295e880e06ad521ef2",
+        "size": 57524
+      },
+      "scripts/e2b/viewer-gateway.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c3d0d4586be6c934c8eb610ab85bfaad2e8d3d25",
+        "size": 4062
+      },
+      "scripts/e2b/viewer-probe.py": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bb107f7cd9bab7af20e6c30f3d779de5a6cb1e28",
+        "size": 4364
+      },
+      "scripts/e2b/worker-live.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2d82b63c786169c29160d3ff5941fc14e878b240",
+        "size": 19504
+      },
+      "scripts/release/web-deploy.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "948caacb60d05c04f21e5d0a55303716192771da",
+        "size": 19867
+      }
+    }
+  },
+  "changes": {
+    "acceptance_to_joint": [
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e15741a3ae51a294593eeb2151311378babd8ce4",
+          "size": 11619
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+          "size": null
+        }
+      },
+      {
+        "path": "lib/tracing/sanitize.ts",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+          "size": 6160
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "9857985199066a39fdc96ba73f7047d21ba6406f",
+          "size": null
+        }
+      },
+      {
+        "path": "lib/tracing/workflow-transport.test.ts",
+        "from": null,
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a92aa052db23cb4448bd73538da70d3cab0634e6",
+          "size": null
+        }
+      },
+      {
+        "path": "scripts/acceptance/read-cache.mjs",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a445a880fd950adf65b0f43bc3a5f30cdc3d96d6",
+          "size": 33310
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e52d513455b35b6761e0abc74bf21969cbdb728d",
+          "size": null
+        }
+      }
+    ],
+    "main_to_joint": [
+      {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+          "size": 18463
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9",
+          "size": 18539
+        }
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e15741a3ae51a294593eeb2151311378babd8ce4",
+          "size": 11619
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+          "size": null
+        }
+      },
+      {
+        "path": "lib/tracing/sanitize.ts",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+          "size": 6160
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "9857985199066a39fdc96ba73f7047d21ba6406f",
+          "size": null
+        }
+      },
+      {
+        "path": "lib/tracing/workflow-transport.test.ts",
+        "from": null,
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a92aa052db23cb4448bd73538da70d3cab0634e6",
+          "size": null
+        }
+      },
+      {
+        "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+          "size": 11661
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+          "size": 12114
+        }
+      },
+      {
+        "path": "packages/daemon/scripts/prepare-worker-install.py",
+        "from": null,
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f",
+          "size": 4990
+        }
+      },
+      {
+        "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+        "from": null,
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540",
+          "size": 5659
+        }
+      },
+      {
+        "path": "packages/daemon/src/adapters/codex-protocol.ts",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "838f6407a4c92ef13c95663a405804cebbd97f47",
+          "size": 3943
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407",
+          "size": 3995
+        }
+      },
+      {
+        "path": "packages/daemon/src/adapters/codex.ts",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7",
+          "size": 51717
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e85815a955eaff56d7ac389c9d9722c64607345d",
+          "size": 51844
+        }
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup.mjs",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+          "size": 83254
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9",
+          "size": 85323
+        }
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup.test.mjs",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6b57f0699db92b2c55b5add63efc23db1f403b0c",
+          "size": 105234
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6ae54051916032d788864a725711975ad1ea007f",
+          "size": 118044
+        }
+      },
+      {
+        "path": "scripts/acceptance/task-secrets.test.mjs",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "0ce4f154b8ec73ec0a9dd42902f073a3b83ba66f",
+          "size": 34196
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "b0e809572a9f89f087d8bdb4b572858db8c2dcdf",
+          "size": 34811
+        }
+      },
+      {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2ad3c6f9dd5f06c387bd22e66d4711dd39a96831",
+          "size": 105561
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "335540475a9d8aaae8f34915e087b5a862699b95",
+          "size": 106048
+        }
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e3bc3b603578e6bcd8c5ed1db8041adeba14a40a",
+          "size": null
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+          "size": 4355
+        }
+      },
+      {
+        "path": "scripts/e2b/official-files.py",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "66d74dd81568eb8fcd6c9efed82a199bcbf695d4",
+          "size": null
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ea0819bf3e2d4ff83e64482b6336567050376591",
+          "size": 21445
+        }
+      },
+      {
+        "path": "scripts/e2b/official-files.test.py",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "b6a469a778f52179e1ce7eb4394a6242818481e1",
+          "size": null
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21",
+          "size": 47201
+        }
+      },
+      {
+        "path": "scripts/release/web-deploy.mjs",
+        "from": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "948caacb60d05c04f21e5d0a55303716192771da",
+          "size": 19867
+        },
+        "to": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b",
+          "size": 20124
+        }
+      }
+    ]
+  }
+}

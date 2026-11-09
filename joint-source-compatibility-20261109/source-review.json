@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "scope": "fixed-source compatibility and previously completed canonical hash computation only",
+  "driverPath": "scripts/acceptance/cloud-startup.mjs",
+  "sources": {
+    "joint8c": {
+      "commit": "8c423db291f8121980267cd48a24e428c992f618",
+      "tree": "195a66e213ca33c100e2900129079c5f83b06272",
+      "workerHash": "75b7462d53f9725cb92d40112c504b4f32d795c0"
+    },
+    "pr1805_4c": {
+      "commit": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+      "tree": "00ce4e05bb696a492183f361e4ada67eb9627e30",
+      "workerHash": "330b07a15ab6b5b0670d798736062ec1d053694e"
+    },
+    "main_e189": {
+      "commit": "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+      "tree": "74b7be77de23f66162ae9558c863bb2fc9b06a56",
+      "workerHash": "425451558243799262de400b4c55eff193a349c6"
+    }
+  },
+  "scopedComparison": [
+    {
+      "prefix": "packages/daemon/src/adapters/",
+      "jointEntries": 12,
+      "acceptanceEntries": 12,
+      "changedPaths": []
+    },
+    {
+      "prefix": "packages/daemon/scripts/",
+      "jointEntries": 8,
+      "acceptanceEntries": 8,
+      "changedPaths": []
+    },
+    {
+      "prefix": "scripts/e2b/",
+      "jointEntries": 53,
+      "acceptanceEntries": 53,
+      "changedPaths": []
+    },
+    {
+      "prefix": "scripts/acceptance/",
+      "jointEntries": 76,
+      "acceptanceEntries": 76,
+      "changedPaths": [
+        "scripts/acceptance/read-cache.mjs"
+      ]
+    }
+  ],
+  "additionalExactBlobs": {
+    "joint": {
+      "lib/computer/startup-tracing.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "baa08e0fc6cc28b60402e7994ea335307d2de75e"
+      },
+      "lib/dispatch-timing.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "7f5ca1b72b28823f00936a820edac001766f5e71"
+      },
+      "lib/smoke-account.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "7c669d4bee8636ba063ee92ace07dbaf75023033"
+      },
+      "packages/daemon/src/tracing.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "0eed0277c933b0d2457909851bab458a482c184d"
+      },
+      "scripts/acceptance/team-workspace.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f"
+      }
+    },
+    "acceptance": {
+      "lib/computer/startup-tracing.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "baa08e0fc6cc28b60402e7994ea335307d2de75e"
+      },
+      "lib/dispatch-timing.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "7f5ca1b72b28823f00936a820edac001766f5e71"
+      },
+      "lib/smoke-account.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "7c669d4bee8636ba063ee92ace07dbaf75023033"
+      },
+      "packages/daemon/src/tracing.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "0eed0277c933b0d2457909851bab458a482c184d"
+      },
+      "scripts/acceptance/team-workspace.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f"
+      }
+    },
+    "main": {
+      "lib/computer/startup-tracing.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "baa08e0fc6cc28b60402e7994ea335307d2de75e"
+      },
+      "lib/dispatch-timing.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "7f5ca1b72b28823f00936a820edac001766f5e71"
+      },
+      "lib/smoke-account.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "7c669d4bee8636ba063ee92ace07dbaf75023033"
+      },
+      "packages/daemon/src/tracing.ts": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "0eed0277c933b0d2457909851bab458a482c184d"
+      },
+      "scripts/acceptance/team-workspace.mjs": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f"
+      }
+    }
+  },
+  "formalContract": {
+    "sourceCommit": "f2e59c778a6e04df30a4ad633aa7c6f7265caf86",
+    "path": "evidence/1505-startup-timing-20261108/formal-renderer/workflow.template.yml.in",
+    "acceptanceSourceCheckoutLines": [
+      48,
+      207,
+      208
+    ],
+    "applicationDriverOptionLines": [
+      725,
+      733
+    ],
+    "runtimeReleaseLines": [
+      67,
+      728,
+      737
+    ],
+    "serverStages": {
+      "dispatch": 8,
+      "thread": 17,
+      "claim": 8,
+      "spans": 6,
+      "total": 39,
+      "definitionLines": [
+        454,
+        463
+      ]
+    },
+    "versionObservations": {
+      "total": 14,
+      "composition": "initial + 6 pairs + final",
+      "lines": [
+        739,
+        771
+      ]
+    },
+    "sourceEqualityBetweenAcceptanceAndApplicationRequired": false,
+    "sourceEqualityBetweenAcceptanceAndRuntimeRequired": false,
+    "thresholdMs": 5000,
+    "runs": 6,
+    "perHarness": 3,
+    "models": [
+      "claude-haiku-5-5",
+      "gpt-6-luna"
+    ],
+    "ordinaryTaskPathRetained": true
+  },
+  "conclusion": "No concrete wiring contradiction found for ACCEPTANCE_SOURCE=4c and separately pinned future actual APP/R source. Candidate 8c W differs from old 4c W; actual published pins remain required by the existing contract.",
+  "rawCanonicalChangesFrom4c": 6,
+  "effectiveCanonicalChangesFrom4c": 5,
+  "canonicalReport": {
+    "path": "canonical-worker/report.json",
+    "bytes": 34576,
+    "sha256": "aa320aa72a4d390f953fb732f81b2e235b7dca5ad4616dca8a194a2a18484efa"
+  },
+  "additionalTestsRun": 0,
+  "canonicalHashRerunWhilePackaging": false,
+  "productionCalls": 0,
+  "logsOrArtifactsRead": false,
+  "refsUpdated": false,
+  "newGateAdded": false
+}

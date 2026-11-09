@@ -1,0 +1,20 @@
+{
+  "568cfeee161309202699acefd0a57a8edc52bf6e": [
+    {
+      "source": "8c423db291f8121980267cd48a24e428c992f618",
+      "path": "package.json"
+    }
+  ],
+  "4b67909739360248e279efa0c3bb7344379e04fe": [
+    {
+      "source": "8c423db291f8121980267cd48a24e428c992f618",
+      "path": "pnpm-lock.yaml"
+    }
+  ],
+  "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b": [
+    {
+      "source": "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+      "path": "package.json"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+fatal: bad object 8c423db291f8121980267cd48a24e428c992f618:package.json
+Traceback (most recent call last):
+  File "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/joint8c/scripts/e2b/build-template.py", line 939, in <module>
+    main()
+  File "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/joint8c/scripts/e2b/build-template.py", line 890, in main
+    print(worker_hash(args.source_ref))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/263e36984c81/canonical-worker-8c-nbr4iw7q/joint8c/scripts/e2b/build-template.py", line 270, in worker_hash
+    raw = subprocess.check_output(['git', 'show', f'{sha}:{path}'], cwd=ROOT)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 466, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['git', 'show', '8c423db291f8121980267cd48a24e428c992f618:package.json']' returned non-zero exit status 128.

@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "frozenAt": "2026-11-09T16:29:36.766343+00:00",
+  "files": [
+    {
+      "path": "report.json",
+      "bytes": 34576,
+      "sha256": "aa320aa72a4d390f953fb732f81b2e235b7dca5ad4616dca8a194a2a18484efa"
+    },
+    {
+      "path": "review.md",
+      "bytes": 3815,
+      "sha256": "3fd01ea57d44133f7b6fcea5f5e55801eadaa97a884e8f6ee58aa28581291501"
+    },
+    {
+      "path": "lock-projection.diff",
+      "bytes": 402,
+      "sha256": "d3d3c4506cc47e2b06764d65cb43313dd72975e292e623e416649c7e9880983d"
+    },
+    {
+      "path": "missing-objects.json",
+      "bytes": 467,
+      "sha256": "a8d7afbef9af0eaac41e16b9ac2a5656482003620a0b2ce23e25b8c183ac031c"
+    },
+    {
+      "path": "joint8c/hash.stdout",
+      "bytes": 41,
+      "sha256": "f5cf9f202ff15412c6eedf61ca531c9b15a2e500b47e7ffcde9de2fc3cf39f90"
+    },
+    {
+      "path": "joint8c/hash.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "joint8c/canonical-ls-tree.txt",
+      "bytes": 45654,
+      "sha256": "cdfe8216c85abbcf3ac659c5543d79ad5cc3fd92fe5232eb1ed7d35baa1b02ad"
+    },
+    {
+      "path": "joint8c/input-proof.json",
+      "bytes": 132055,
+      "sha256": "f073993fed8691da9822662e26198939ce3b32a7cb83627431b5c18553326320"
+    },
+    {
+      "path": "pr1805_4c/hash.stdout",
+      "bytes": 41,
+      "sha256": "0362f7d1d56ae321ceb505b7ecec0bd9c0acf264f6273aa55e3ea5c0a35b9036"
+    },
+    {
+      "path": "pr1805_4c/hash.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pr1805_4c/canonical-ls-tree.txt",
+      "bytes": 45567,
+      "sha256": "c285762c2a87ec4c8b95aac63a4305d66f645bbdcaf02eced9d4a582f5196ca3"
+    },
+    {
+      "path": "pr1805_4c/input-proof.json",
+      "bytes": 131796,
+      "sha256": "cdad2eda35ba4a798715906aa13ea4c76589f108dff766181a544179705c674b"
+    },
+    {
+      "path": "main_e189/hash.stdout",
+      "bytes": 41,
+      "sha256": "7033cc0b7ed245433a50238fb2d1d191dbe3ae9fda3afdc9b3c888b52bfed2d6"
+    },
+    {
+      "path": "main_e189/hash.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "main_e189/canonical-ls-tree.txt",
+      "bytes": 45256,
+      "sha256": "e789c365bfdeb4f7fac2fca4a2a2f8357d7255bcd8f1bf2b8e6fcc8131c1b4ec"
+    },
+    {
+      "path": "main_e189/input-proof.json",
+      "bytes": 131005,
+      "sha256": "50e31134a0e53e50ef941fc9739f3033c46b7a95a5d664af194e6151bf9e7817"
+    },
+    {
+      "path": "joint8c/initial-missing-object-hash.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "joint8c/initial-missing-object-hash.stderr",
+      "bytes": 1215,
+      "sha256": "cb0ca8bdf8a65253862ce437e4d91420ef4b7fd18a136eeb1015457a4a5a2a76"
+    }
+  ],
+  "excludedReconstructible": [
+    "objects.git/ (private Git object storage)",
+    "received/ (fixed Git-backed package/lock blobs)",
+    "*/scripts/e2b/build-template.py (exact Git-backed source copies; blob references in report)"
+  ],
+  "refsModified": false,
+  "testsRun": 0,
+  "productionCalls": 0
+}
