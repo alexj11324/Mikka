@@ -1,0 +1,42 @@
+name: PR 1782 isolated ingress kernel regression
+on:
+  push:
+    branches: [ops/1782-ingress-kernel-20261109]
+permissions:
+  contents: read
+concurrency:
+  group: issue1782-ingress-kernel-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  kernel:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1782-ingress-kernel-20261109'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        control: [product-policy, marked-listener-mechanism]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install real kernel test dependencies
+        timeout-minutes: 3
+        run: |
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y iproute2 nftables
+      - name: Exercise provider startup and forbidden listeners on real veth paths
+        env:
+          CONTROL: ${{ matrix.control }}
+        run: |
+          args=()
+          if [[ "$CONTROL" == marked-listener-mechanism ]]; then args+=(--mark-provider-listener); fi
+          sudo -n python3 scripts/ops/issue1782-ingress-kernel.py --guard "$GITHUB_WORKSPACE/packages/daemon/scripts/workspace-ingress.py" "${args[@]}" > "$RUNNER_TEMP/ingress-kernel.json"
+      - name: Preserve the exact regression result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ingress-kernel-${{ matrix.control }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ingress-kernel.json
+          if-no-files-found: error
+          retention-days: 14
