@@ -196,9 +196,10 @@ check uses server-authorized access, including a current team share. See
 The accepted structure follows [tasks-only lists](decisions/2026-11-07-2045-tasks-only-threads-inside.md),
 [one task conversation](decisions/2026-11-07-2300-one-conversation-per-task.md)
 and the [iOS header decision](decisions/2026-11-08-0120-ios-header-like-comma.md).
-The shared web source exposes slots for this structure. Public defaults can
-retain legacy thread lists and single-thread panels; official builds select
-the private layer through [UI slots](../ui-overlay.md). The map describes
+The web source exposes slots for this structure. Official builds fill them
+from `mikka-hosted-ui` ([UI slots](../ui-overlay.md)); the defaults in this
+repository can still show older thread lists and only have to compile
+([one UI](decisions/2026-11-08-2133-one-ui.md)). The map describes
 accepted navigation, with implementation boundaries listed after it.
 
 ### Web and desktop

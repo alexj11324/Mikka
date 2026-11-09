@@ -113,7 +113,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true, usable: e2bKey.configured !== false }
   const quotaUnchecked = order?.entries.some(entry => entry.block?.reason === 'checking')
   const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, usable: taskMachineUsable(item, order?.readyDeviceIds ?? []),
-    status: !item.enabled ? t('notParticipating') : !item.online ? t('offline') : !order ? t('loadingPlacement') : !order.readyDeviceIds.includes(item.id) ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('online') }))
+    status: !item.enabled ? t('notParticipating') : !item.online ? item.lastSeenAt ? t('offline') : tDevices('neverOnline') : !order ? t('loadingPlacement') : !order.readyDeviceIds.includes(item.id) ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('online') }))
   const machines: Machine[] = [cloud, ...own]
   const inherited = defaultTaskMachine(machines, order)
   const defaults: Machine = { value: 'auto', label: order ? `${t('workspaceDefault')} · ${inherited?.label ?? locationT(order.location)}` : t('workspaceDefault'),

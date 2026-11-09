@@ -10,9 +10,11 @@ component covers.
 
 ## Build selection
 
-The public components below include the default UI slots. Official builds can
-replace those slots through the private [hosted UI layer](../ui-overlay.md).
-`@ui-slot/*` resolution determines which implementation ships. The accepted
+The components below include the default UI slots. Official builds fill some
+slots from `mikka-hosted-ui` ([UI slots](../ui-overlay.md)), and `@ui-slot/*`
+resolution decides which implementation ships. There is one UI
+([decision](decisions/2026-11-08-2133-one-ui.md)): the defaults only have to
+compile. The accepted
 navigation lists tasks and joins a task's attempts in one conversation
 ([task lists](decisions/2026-11-07-2045-tasks-only-threads-inside.md),
 [conversation](decisions/2026-11-07-2300-one-conversation-per-task.md)); public
@@ -81,6 +83,7 @@ before claiming implementation parity.
 | Connected cloud default model | `CloudModelSettings` in `components/settings/cloud-settings.tsx`, existing `BotModelPicker`, `FailureReason` and its shared `CloudFailureAction` | Composes `SettingsSection`, `SettingRow`, `MikkaMarkSmall` and `Button`; scope-dependent listing and an explicit-click cloud-workspace billing link. Current and historical failures share that action; the current notice retains the existing `Alert`. [Spec](self-hosted-cloud-models.md) |
 | 计费 免费额度 / 余额 / 账单记录, and Mikka 默认 refusals (#523–#527, #558, #559) | `components/billing/`: `FreeAllowanceSection` (BIL-1/3c/5), `BalanceSection` (余额, 充值, 账单记录), `HostedRefusalNotice` (ALW-1/1b/2/3, above the composer); `components/auth/turnstile.tsx` (sign-up and 重新发送验证邮件) | Server calls go through `lib/billing/verification-client.ts` only. Card entry and payment are Stripe Checkout pages, never a form of ours. Mikka 默认 carries `MikkaMarkSmall`, the subscription button the Claude and OpenAI marks (R-74) |
 | Desktop server choice: Mikka Cloud or a self-hosted address, probed before use; the server row under the desktop sign-in card; Settings › 账户 › 服务器 (#1557) | `ServerDialog`, `ServerName`, `useDesktopServers` (`components/desktop/desktop-server.tsx`); `DesktopServerSettings` (`components/settings/desktop-server-settings.tsx`); the account switcher's per-account server label in `WorkspaceMenu` | `Dialog` with the bordered `RadioGroup` of `Label` rows from 添加 API Key, `Input` + `FieldError` for the address and why it cannot be used, a muted `Item` with the server's name and version once probed; the sign-in row is `ServerName` (lucide `Server` icon, R-74) and a link `Button` 更改; settings rows are `SettingRow` with secondary `Button`s 切换 / 断开 and the `AlertDialog` confirm. No subtitle (R-40). New because no component chose a server. [Decision](decisions/2026-11-06-2300-desktop-connects-to-self-hosted-servers.md) |
+| Native iOS Apple sign-in | `AppleAuthenticationButton` from `expo-apple-authentication`, rendered by `apps/mobile/components/SignIn.tsx` | Apple's system control owns its logo, label and accessibility. Its 52-point height and 26-point radius follow the provider controls. Availability and the selected server's Apple capability gate it. |
 | Desktop sign-in in a browser that already has a web session (以 <账号> 继续 / 换个账号) | `DesktopAccountChoice` (`components/auth/desktop-account-choice.tsx`), shown by `AuthForm` for a `desktop=1` handoff; step chosen by `desktopBrowserStep` (`lib/desktop-auth.ts`) | The sign-in card's frame (`SignInCard`: `Card`, title 登录 Mikka), the account as a muted `Item` with `UserAvatar` and email, then `Button` 以 <名字> 继续 (a link to `/api/desktop/return`) and outline `Button` 换个账号 (the provider's account picker, `prompt=select_account`). No subtitle (R-40). [Decision](decisions/2026-11-06-1900-desktop-sign-in-returns-to-the-app.md) |
 | Agent outputs (documents, web pages) | `components/artifacts/`: `ArtifactCard` (in chat), `ArtifactChip` (chat beside the reader), `ArtifactViewer` (reader), `ArtifactQuoteChip` / `ArtifactQuoteLine` | Figma `178:11626`. Quoted text is marked by `remarkMarks`, never by touching the DOM |
 | Chat input and sent attachments | `components/chat/chat-file-cards.tsx`, `use-chat-files.ts`; existing `components/ui/attachment.tsx` primitives; native `ChatFiles.tsx` | Accepted Figma page `917:456`, A1–A10; filenames and metadata truncate to one line |

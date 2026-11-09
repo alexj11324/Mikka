@@ -27,7 +27,9 @@ mock.module('swr', { defaultExport: (key: string) => String(key).includes('view=
   ? { data: ledger, mutate: () => {} }
   : key === '/api/factory/tasks/t1/flow' ? { data: publicFlow, mutate: () => {} }
     : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr, namedExports: { useSWRConfig: () => ({ cache, mutate: async () => undefined }) } })
-mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '' }) } })
+// The report's CI checks row reads the review summary (its own SWR and live keys); these tests cover the flow, not that row.
+mock.module(new URL('../../hooks/code-review/use-review-summary.ts', import.meta.url).href, { namedExports: { useReviewSummary: () => ({ data: undefined }) } })
+mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '', relativeTime: () => '' }), useNow: () => new Date('2026-11-05T01:00:00.000Z') } })
 mock.module(new URL('./issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 
 let FactoryAcceptance: typeof import('./factory-acceptance')['FactoryAcceptance']
