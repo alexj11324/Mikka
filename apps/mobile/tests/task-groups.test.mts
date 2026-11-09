@@ -1,3 +1,4 @@
+import { mobileMessages } from '../lib/messages.ts'
 // Lists show tasks only, grouped 待处理 · 进行中 · 待办 · 已完成 (decisions/2026-11-07-2045-tasks-only-threads-inside.md).
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -29,7 +30,7 @@ test('groups come in order with counts; 已完成 starts folded and opens when t
   ]
   const rows = taskListRows(tasks, new Set())
   assert.deepEqual(rows.map(row => row.kind === 'section' ? `${row.title}${row.count}${row.folded ? '+' : ''}` : (row.task as { id: string }).id),
-    ['等待你1', 'd', '进行中1', 'c', '待办1', 'b', '已完成2+'])
+    [`${mobileMessages.MobileCore.groups.pending}1`, 'd', `${mobileMessages.MobileCore.groups.running}1`, 'c', `${mobileMessages.MobileCore.groups.todo}1`, 'b', `${mobileMessages.MobileCore.groups.done}2+`])
   const opened = taskListRows(tasks, new Set(['done', 'pending']))
   assert.deepEqual(opened.map(row => row.kind === 'section' ? row.id : (row.task as { id: string }).id),
     ['pending', 'running', 'c', 'todo', 'b', 'done', 'a', 'e'])
@@ -44,28 +45,28 @@ test('a filter shows its group alone; an empty group has no header', () => {
 
 // 2026-11-07-2230: each row shows its own state's icon; the hand is only 等你处理.
 test('a row shows the API\'s state; the app writes the reason\'s words', () => {
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'failed', reason: null }), { state: 'failed', reason: '失败' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'review', state: 'waiting', reason: 'pr_review' }), { state: 'waiting', reason: '待审阅' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'waiting', reason: 'approval' }), { state: 'waiting', reason: '等你确认' })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'failed', reason: null }), { state: 'failed', reason: mobileMessages.MobileCore.states.failed })
+  assert.deepEqual(rowState({ group: 'pending', status: 'review', state: 'waiting', reason: 'pr_review' }), { state: 'waiting', reason: mobileMessages.MobileCore.reasons.pr_review })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'waiting', reason: 'approval' }), { state: 'waiting', reason: mobileMessages.MobileCore.reasons.approval })
   assert.deepEqual(rowState({ group: 'running', status: 'doing', state: 'queued', reason: null }), { state: 'queued', reason: null })
   // todo, done, canceled and duplicate show the board's icon.
-  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: 'todo', reason: 'blocked_by', blockedBy: 'MIK-12' }), { state: null, reason: '等 MIK-12' })
+  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: 'todo', reason: 'blocked_by', blockedBy: 'MIK-12' }), { state: null, reason: mobileMessages.MobileCore.reasons.blocked_by.replace('{task}', 'MIK-12') })
   assert.deepEqual(rowState({ group: 'done', status: 'canceled', state: 'canceled', reason: null }), { state: null, reason: null })
-  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: 'todo', reason: 'flagged' }), { state: null, reason: '已标记受阻' })
+  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: 'todo', reason: 'flagged' }), { state: null, reason: mobileMessages.MobileCore.reasons.flagged })
 })
 
 test('until then, a failed attempt is a triangle, not a hand, and waiting rows say why', () => {
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'failed', blocker: null } }), { state: 'failed', reason: '失败' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'question', blocker: null } }), { state: 'waiting', reason: '等你回复' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'review' }), { state: 'waiting', reason: '待审阅' })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'failed', blocker: null } }), { state: 'failed', reason: mobileMessages.MobileCore.states.failed })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'question', blocker: null } }), { state: 'waiting', reason: mobileMessages.MobileCore.reasons.needs_input })
+  assert.deepEqual(rowState({ group: 'pending', status: 'review' }), { state: 'waiting', reason: mobileMessages.MobileCore.reasons.pr_review })
   assert.deepEqual(rowState({ group: 'running', status: 'doing' }), { state: 'running', reason: null })
   assert.deepEqual(rowState({ group: 'todo', status: 'backlog' }), { state: null, reason: null })
   assert.deepEqual(rowState({ group: 'done', status: 'canceled' }), { state: null, reason: null })
 })
 
 test('waiting on another task, or flagged, never gets the hand; it says why', () => {
-  assert.deepEqual(rowState({ group: 'pending', status: 'todo', blocked: { reason: 'dependency', blocker: 'MIK-12' } }), { state: null, reason: '等 MIK-12' })
-  assert.deepEqual(rowState({ group: 'todo', status: 'todo', blocked: { reason: 'flagged', blocker: null } }), { state: null, reason: '已标记受阻' })
+  assert.deepEqual(rowState({ group: 'pending', status: 'todo', blocked: { reason: 'dependency', blocker: 'MIK-12' } }), { state: null, reason: mobileMessages.MobileCore.reasons.blocked_by.replace('{task}', 'MIK-12') })
+  assert.deepEqual(rowState({ group: 'todo', status: 'todo', blocked: { reason: 'flagged', blocker: null } }), { state: null, reason: mobileMessages.MobileCore.reasons.flagged })
 })
 
 test('an attempt shows its own result, never the hand: running, paused, done, failed, blocked', () => {
@@ -83,9 +84,9 @@ test('an attempt shows its own result, never the hand: running, paused, done, fa
 
 // 受阻 (quota, login, key, a device offline) is its own state, the octagon: not the hand.
 test('受阻 is its own state, with the API\'s code or read from the board until then', () => {
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'blocked', reason: 'quota' }), { state: 'blocked', reason: '额度用完' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'quota', blocker: null } }), { state: 'blocked', reason: '额度用完' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'run', blocker: null } }), { state: 'blocked', reason: '受阻' })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'blocked', reason: 'quota' }), { state: 'blocked', reason: mobileMessages.MobileCore.reasons.quota })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'quota', blocker: null } }), { state: 'blocked', reason: mobileMessages.MobileCore.reasons.quota })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'run', blocker: null } }), { state: 'blocked', reason: mobileMessages.MobileCore.reasons.blocked })
 })
 
 // Alex 2026-11-07: the second run comes after the first. A task has one conversation.
@@ -107,15 +108,15 @@ test('runs with the same Agent read as one; a divider only where the Agent chang
   // Same Agent: nothing between them, however many runs (follow-ups, waiting for a reply).
   assert.equal(boundary(r1, r2), null)
   // The Agent changed after a failure: the one that failed is named, nothing is numbered.
-  assert.deepEqual(boundary(r3, r4), { kind: 'switch', text: 'Codex 没跑通 · 换 Claude Code 继续' })
+  assert.deepEqual(boundary(r3, r4), { kind: 'switch', text: mobileMessages.MobileCore.conversation.switchedAfterFailure.replace('{previous}', 'Codex').replace('{agent}', 'Claude Code') })
   // The Agent changed without a failure.
-  assert.deepEqual(boundary(r4, r5), { kind: 'switch', text: '换 Cursor 继续' })
+  assert.deepEqual(boundary(r4, r5), { kind: 'switch', text: mobileMessages.MobileCore.conversation.switched.replace('{agent}', 'Cursor') })
 })
 
 // 2026-11-04-2200: verification belongs to 实现, and 审阅 is its own result card; only a fix is marked inline.
 test('a fix starting with the same Agent is a small marker; review, verify, implement and no stage are not', () => {
   const run = (runId: string, n: number, stage?: string | null) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness: 'codex', createdAt: '', failed: false, ...(stage === undefined ? {} : { stage }) }) as never
-  assert.deepEqual(boundary(run('r2', 2, 'review'), run('r4', 4, 'fix')), { kind: 'stage', text: '修复' })
+  assert.deepEqual(boundary(run('r2', 2, 'review'), run('r4', 4, 'fix')), { kind: 'stage', text: mobileMessages.MobileCore.conversation.fix })
   assert.equal(boundary(run('r1', 1, 'implement'), run('r2', 2, 'review')), null)
   assert.equal(boundary(run('r2', 2, 'review'), run('r3', 3, 'verify')), null)
   assert.equal(boundary(run('r1', 1), run('r2', 2)), null)
@@ -127,12 +128,13 @@ test('a fix starting with the same Agent is a small marker; review, verify, impl
 
 test('a factory task shows one stage and what it needs from you; 审阅 has one verdict; nothing without a flow', async () => {
   const { stageLine, verdictWord } = await import('../features/tasks/model/task-flow.ts')
-  assert.equal(stageLine({ stage: 'review' }), '审阅')
-  assert.equal(stageLine({ stage: 'handoff', needsYou: { kind: 'pr_review', since: '' } }), '交给你 · 需要你：PR 待审')
-  assert.equal(stageLine({ stage: 'spec', needsYou: { kind: 'spec_review', since: '' } }), '方案 · 需要你：方案待审')
+  const flow = mobileMessages.FactoryFlow, needs = (what: string) => mobileMessages.MobileCore.conversation.needsYou.replace('{what}', what)
+  assert.equal(stageLine({ stage: 'review' }), flow.stages.review)
+  assert.equal(stageLine({ stage: 'handoff', needsYou: { kind: 'pr_review', since: '' } }), `${flow.stages.handoff} · ${needs(flow.card.needsYou.pr_review)}`)
+  assert.equal(stageLine({ stage: 'spec', needsYou: { kind: 'spec_review', since: '' } }), `${flow.stages.spec} · ${needs(flow.card.needsYou.spec_review)}`)
   assert.equal(stageLine(null), null)
   assert.equal(stageLine(undefined), null)
-  assert.deepEqual(['passed', 'changes_requested', 'needs_judgment'].map(verdict => verdictWord({ stage: 'review', review: { verdict: verdict as never } })), ['通过', '需要修改', '需要你判断'])
+  assert.deepEqual(['passed', 'changes_requested', 'needs_judgment'].map(verdict => verdictWord({ stage: 'review', review: { verdict: verdict as never } })), [mobileMessages.MobileCore.conversation.verdicts.passed, mobileMessages.MobileCore.conversation.verdicts.changes_requested, mobileMessages.MobileCore.conversation.verdicts.needs_judgment])
   assert.equal(verdictWord({ stage: 'review', review: { verdict: null } }), null)
   assert.equal(verdictWord(undefined), null)
 })
@@ -142,5 +144,5 @@ test('活动 merges an Agent\'s runs in a row into one row; a switch starts 「�
   // The server sends 活动 newest first.
   const activity = [run('r4', 4, 'claude_code'), run('r3', 3, 'codex'), run('r2', 2, 'codex'), run('r1', 1, 'codex'), { kind: 'created' as const, by: 'Coordinator', createdAt: '2026-11-05T09:00:00.000Z' }]
   const entries = activityEntries(activity)
-  assert.deepEqual(entries.map(entry => entry.kind === 'agent' ? [agentRunTitle(entry), entry.run.attempts.map(item => item.runId)] : entry.kind), ['created', ['Codex', ['r1', 'r2', 'r3']], ['换 Claude Code', ['r4']]])
+  assert.deepEqual(entries.map(entry => entry.kind === 'agent' ? [agentRunTitle(entry), entry.run.attempts.map(item => item.runId)] : entry.kind), ['created', ['Codex', ['r1', 'r2', 'r3']], [mobileMessages.MobileCore.conversation.switchedTo.replace('{agent}', 'Claude Code'), ['r4']]])
 })

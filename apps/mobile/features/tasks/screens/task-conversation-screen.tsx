@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
@@ -25,7 +26,7 @@ import { useLiveApi } from '@/lib/useApi'
 import { useStop } from '@/lib/useStop'
 import { colors } from '@/lib/theme'
 import { boundary, conversationSegments, currentAgent, reviewRun, type Attempt } from '../model/task-conversation'
-import { stageLine, verdictWord, type TaskFlow } from '../model/task-flow'
+import { STAGE_WORD, stageLine, verdictWord, type TaskFlow } from '../model/task-flow'
 
 type Conversation = { detail: TaskDetail; threads: Record<string, ThreadDetail> }
 
@@ -109,10 +110,10 @@ export function TaskConversationScreen() {
       />
       <KeyboardChatScrollView ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={styles.center}><Spinner /></View> : null}
-        <ReadNotice error={error} hasData={Boolean(data)} label="对话" onRetry={reload} />
+        <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
         {/* A factory task's one stage, and what it needs from you (2026-11-04-2200); nothing without a flow. */}
         {stageLine(data?.detail.task.flow) ? <Text style={styles.stageLine}>{stageLine(data?.detail.task.flow)}</Text> : null}
-        {data && !segments.length ? <Text style={styles.empty}>还没开始</Text> : null}
+        {data && !segments.length ? <Text style={styles.empty}>{mobileMessages.MobileCore.notStarted}</Text> : null}
         {segments.map((segment, index) => (
           <View key={segment.attempt.runId} style={styles.segment}
             onLayout={event => { offsets.current.set(segment.attempt.runId, event.nativeEvent.layout.y); place() }}>
@@ -132,7 +133,7 @@ export function TaskConversationScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: the conversation ends in the composer; a message to an ended attempt runs it again (R-81). */}
-      {live && newest ? <Composer placeholder="给这个任务发消息" onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id: newest }}
+      {live && newest ? <Composer placeholder={mobileMessages.MobileCore.messageTask} onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id: newest }}
         onStop={composerStops(live) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
@@ -144,7 +145,7 @@ function Item({ item, live }: { item: ThreadItem; live: boolean }) {
       return (
         <View style={styles.step}>
           {live ? <Spinner size={14} /> : <Check size={15} color={colors.secondary} strokeWidth={2.2} />}
-          <Text style={styles.stepText}>{item.count} 步</Text>
+          <Text style={styles.stepText}>{mobileMessages.MobileCore.steps.replace('{count}', String(item.count))}</Text>
         </View>
       )
     case 'agent': return <View style={styles.message}><BotBubble><Markdown text={item.text} /></BotBubble></View>
@@ -161,7 +162,7 @@ function AttemptError({ raw }: { raw: string }) {
     <View style={styles.cause}>
       <Text style={styles.causeLine}>{line}</Text>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(value => !value)} hitSlop={8}>
-        <Text style={styles.detailsToggle}>详情</Text>
+        <Text style={styles.detailsToggle}>{mobileMessages.IssueThreads.errorDetails}</Text>
       </Pressable>
       {open ? <Text selectable style={styles.details}>{raw}</Text> : null}
     </View>
@@ -174,14 +175,14 @@ function AttemptError({ raw }: { raw: string }) {
  */
 function ReviewCard({ flow, running, children }: { flow: TaskFlow | null | undefined; running: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false)
-  const verdict = running ? '进行中' : verdictWord(flow)
+  const verdict = running ? mobileMessages.MobileCore.groups.running : verdictWord(flow)
   const Chevron = open ? ChevronDown : ChevronRight
   return (
     <View style={styles.review}>
-      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={['审阅', verdict].filter(Boolean).join('，')}
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={[STAGE_WORD.review, verdict].filter(Boolean).join(' · ')}
         onPress={() => setOpen(value => !value)} style={({ pressed }) => [styles.reviewHead, pressed && { opacity: 0.6 }]}>
         {running ? <Spinner size={16} /> : <ScanSearch size={18} color={flow?.review?.verdict === 'passed' ? colors.success : flow?.review?.verdict ? colors.orange : colors.secondary} strokeWidth={2} />}
-        <Text style={styles.reviewTitle}>审阅</Text>
+        <Text style={styles.reviewTitle}>{STAGE_WORD.review}</Text>
         {verdict ? <Text style={[styles.reviewVerdict, flow?.review?.verdict === 'passed' ? { color: colors.success } : flow?.review?.verdict ? { color: colors.orange } : null]}>{verdict}</Text> : null}
         <View style={{ flex: 1 }} />
         <Chevron size={16} color={colors.tertiary} strokeWidth={2.2} />

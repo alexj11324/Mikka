@@ -1,4 +1,5 @@
 import { HARNESS } from '@/lib/harness'
+import { mobileMessages } from '@/lib/messages'
 import type { TaskActivity, ThreadItem } from '@/lib/types'
 import { attemptState } from './task-groups'
 
@@ -37,7 +38,7 @@ export type AgentRun = { harness: string; attempts: Attempt[] }
  * A factory stage's start, marked inline in the conversation (2026-11-04-2200). Implementing is the conversation
  * itself, and verification belongs to it, so neither is marked; 审阅 is its own result card (reviewRun), not a marker.
  */
-const STAGE_MARK: Partial<Record<NonNullable<Attempt['stage']>, string>> = { fix: '修复' }
+const STAGE_MARK: Partial<Record<NonNullable<Attempt['stage']>, string>> = { fix: mobileMessages.MobileCore.conversation.fix }
 
 /** The factory's review: one run per task, drawn as a 审阅 result card that opens to its transcript. */
 export const reviewRun = (attempt: Pick<Attempt, 'stage'>) => attempt.stage === 'review'
@@ -51,8 +52,10 @@ export const reviewRun = (attempt: Pick<Attempt, 'stage'>) => attempt.stage === 
 export type Boundary = { kind: 'switch'; text: string } | { kind: 'stage'; text: string } | null
 export function boundary(previous: Attempt, next: Attempt): Boundary {
   if (next.harness !== previous.harness) {
-    const switched = `换 ${agent(next.harness)} 继续`
-    return { kind: 'switch', text: attemptState(previous) === 'failed' ? `${agent(previous.harness)} 没跑通 · ${switched}` : switched }
+    const words = mobileMessages.MobileCore.conversation
+    return { kind: 'switch', text: attemptState(previous) === 'failed'
+      ? words.switchedAfterFailure.replace('{previous}', agent(previous.harness)).replace('{agent}', agent(next.harness))
+      : words.switched.replace('{agent}', agent(next.harness)) }
   }
   const mark = next.stage ? STAGE_MARK[next.stage] : undefined
   return mark ? { kind: 'stage', text: mark } : null
@@ -75,7 +78,7 @@ export function activityEntries(activity: readonly TaskActivity[]): ActivityEntr
 }
 
 /** An Agent's row in 活动: 「Codex」, or 「换 Claude Code」 where the task switched to it. */
-export const agentRunTitle = (entry: Extract<ActivityEntry, { kind: 'agent' }>) => entry.switched ? `换 ${agent(entry.run.harness)}` : agent(entry.run.harness)
+export const agentRunTitle = (entry: Extract<ActivityEntry, { kind: 'agent' }>) => entry.switched ? mobileMessages.MobileCore.conversation.switchedTo.replace('{agent}', agent(entry.run.harness)) : agent(entry.run.harness)
 
 /** The Agent of the newest attempt, under the task's title. */
 export const currentAgent = (segments: readonly Segment[]) => segments.length ? agent(segments[segments.length - 1]!.attempt.harness) : null
