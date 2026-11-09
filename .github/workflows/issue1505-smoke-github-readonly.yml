@@ -15,7 +15,7 @@ concurrency:
   queue: max
 jobs:
   cleanup:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -24,7 +24,7 @@ jobs:
       queue: max
     env:
       MIKKA_EDITION: cloud
-      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-http-v6'
+      MIKKA_GITHUB_REPAIR_GO: ''
       MIKKA_1505_CLEANUP_WINDOW_START: '2026-11-09T13:33:00.000Z'
       MIKKA_1505_CLEANUP_ENTRY_DEADLINE: '2026-11-09T13:49:00.000Z'
       MIKKA_1505_CLEANUP_HARD_END: '2026-11-09T13:59:00.000Z'
