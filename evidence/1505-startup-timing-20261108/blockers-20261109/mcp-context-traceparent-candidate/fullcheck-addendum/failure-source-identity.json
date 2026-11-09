@@ -1,0 +1,23 @@
+{
+  "comparison": "Static source equality only; no new baseline execution",
+  "files": [
+    {
+      "path": "components/workspace/issue-workspace-settings.test.tsx",
+      "upstreamMain0eBlob": "33876bcc1333f227e3e4c3891cd25dae4d816cc0",
+      "candidateBlob": "33876bcc1333f227e3e4c3891cd25dae4d816cc0",
+      "same": true
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "upstreamMain0eBlob": "b043d5c09d02d5f675cd62d28e40bb8dc38b5060",
+      "candidateBlob": "b043d5c09d02d5f675cd62d28e40bb8dc38b5060",
+      "same": true
+    },
+    {
+      "path": "components/suggestions/suggestion-feed.tsx",
+      "upstreamMain0eBlob": "3be20b5c40964444221e0e5264f6c5083c0ea693",
+      "candidateBlob": "3be20b5c40964444221e0e5264f6c5083c0ea693",
+      "same": true
+    }
+  ]
+}

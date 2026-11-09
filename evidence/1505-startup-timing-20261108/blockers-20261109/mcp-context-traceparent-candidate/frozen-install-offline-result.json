@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/vercel/ops-1505/source-checks-7c014579/bin/pnpm",
+    "install",
+    "--frozen-lockfile",
+    "--offline"
+  ],
+  "exitCode": 1,
+  "durationSeconds": 17.672,
+  "lockSha256Before": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+  "lockSha256After": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363"
+}

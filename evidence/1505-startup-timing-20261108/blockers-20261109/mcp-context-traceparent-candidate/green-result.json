@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/vercel/ops-1505/source-checks-7c014579/bin/pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "test/codex-mcp-context.test.ts",
+    "test/mcp-http-observation.test.ts",
+    "test/mikka-mcp-backend.test.ts"
+  ],
+  "cwd": "/vercel/mikka-1505-factory-id-semantics/packages/daemon",
+  "exitCode": 0,
+  "durationSeconds": 4.951
+}

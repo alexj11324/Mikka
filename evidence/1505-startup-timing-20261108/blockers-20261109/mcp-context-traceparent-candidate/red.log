@@ -1,0 +1,44 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/vercel/mikka-1505-factory-id-semantics/packages/daemon[39m
+
+ [31m❯[39m test/mcp-http-observation.test.ts [2m([22m[2m18 tests[22m[2m | [22m[31m2 failed[39m[2m | [22m[33m16 skipped[39m[2m)[22m[32m 129[2mms[22m[39m
+   [2m[90m↓[39m[22m uses the prepared canonical catalogue without a startup HTTP request and preserves the real decision write
+   [2m[90m↓[39m[22m observes the exact prepared catalogue separately from physical HTTP without retaining its contents
+   [2m[90m↓[39m[22m does not fetch a replacement for an invalid prepared catalogue
+   [2m[90m↓[39m[22m does not fetch a replacement for an invalid prepared catalogue
+   [2m[90m↓[39m[22m does not fetch a replacement for an invalid prepared catalogue
+   [2m[90m↓[39m[22m does not fetch a replacement for an invalid prepared catalogue
+   [2m[90m↓[39m[22m observes the real MCP child catalogue and decision fetches, preserving cache and business contents without retaining them
+   [2m[90m↓[39m[22m records headers before a held response body and measures the real body completion without another business send
+   [2m[90m↓[39m[22m records a real http_error at the physical send without changing the fixed business error
+   [2m[90m↓[39m[22m records a real connection_error at the physical send without changing the fixed business error
+   [2m[90m↓[39m[22m keeps business success and HTTP failure behavior unchanged when the observer URL is closed
+   [2m[90m↓[39m[22m keeps business success and HTTP failure behavior unchanged when the observer URL is invalid
+   [2m[90m↓[39m[22m makes observer rejection unavailable evidence while the same real child still completes its business request
+   [2m[90m↓[39m[22m preserves immediate SIGTERM and reports an in-flight fetch as pending without fabricating child termination
+   [2m[90m↓[39m[22m puts the host observation URL only in the claude_code Mikka MCP child environment
+   [2m[90m↓[39m[22m puts the host observation URL only in the codex Mikka MCP child environment
+[31m   [31m×[31m passes the real run trace carrier 00-11111111111111111111111111111111-2222222222222222-01 through the late wrapper and observes the exact claim catalogue[39m[32m 79[2mms[22m[39m
+[31m   [31m×[31m passes the real run trace carrier undefined through the late wrapper and observes the exact claim catalogue[39m[32m 48[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/mcp-http-observation.test.ts[2m > [22mpasses the real run trace carrier 00-11111111111111111111111111111111-2222222222222222-01 through the late wrapper and observes the exact claim catalogue
+[41m[1m FAIL [22m[49m test/mcp-http-observation.test.ts[2m > [22mpasses the real run trace carrier undefined through the late wrapper and observes the exact claim catalogue
+[31m[1mError[22m: MCP child closed: 2[39m
+[36m [2m❯[22m ChildProcess.<anonymous> test/mcp-http-observation.test.ts:[2m61:60[22m[39m
+    [90m 59|[39m   child.once('close', (code, signal) => {
+    [90m 60|[39m     closing.resolve({ code, signal })
+    [90m 61|[39m     for (const pending of waiting.values()) pending.reject(new Error('…
+    [90m   |[39m                                                            [31m^[39m
+    [90m 62|[39m     waiting.clear()
+    [90m 63|[39m   })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[33m16 skipped[39m[90m (18)[39m
+[2m   Start at [22m 03:44:36
+[2m   Duration [22m 1.22s[2m (import 51%, transform 37%, tests 12%)[22m
+

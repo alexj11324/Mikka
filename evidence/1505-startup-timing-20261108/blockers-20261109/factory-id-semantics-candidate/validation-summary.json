@@ -1,0 +1,39 @@
+{
+  "summaries": {
+    "red": [
+      "\u2139 tests 4",
+      "\u2139 pass 0",
+      "\u2139 fail 4",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0"
+    ],
+    "green": [
+      "\u2139 tests 17",
+      "\u2139 pass 17",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0"
+    ],
+    "green-final": [
+      "\u2139 tests 17",
+      "\u2139 pass 17",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0"
+    ],
+    "schema-boundary": [
+      "\u2139 tests 1",
+      "\u2139 pass 1",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  "firstTypecheckExitCode": 2,
+  "firstTypecheckErrors": 31,
+  "newTestNarrowingErrors": 6,
+  "finalRootTypecheckExitCode": 0,
+  "fullPnpmCheckRun": false,
+  "apiFrontendTypecheckRun": false,
+  "noDatabaseProviderOrModelExecuted": true
+}

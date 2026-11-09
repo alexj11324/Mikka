@@ -1,0 +1,36 @@
+{
+  "base": "79aa2e7411b41c506b6ce19a97f41bd68964d8cf",
+  "baseTree": "110c66fffb99eee005e9266c7deaa643efd3b58e",
+  "compared0aSource": "0a355918330f6dac04d2b0ee4716cd056c263162",
+  "originalThreeBlobsMatchGitHub0a": true,
+  "products": [
+    {
+      "path": "workflows/coordinator/factory-tools.ts",
+      "onlyDescriptionAndTaskIdDescribeChanged": true,
+      "beforeBlob": "b483c3918e8362f8aaadd7b16e75f54b1a2dc93c",
+      "afterBlob": "77a21b83c8060b0dd9e1bcfb76fb9e7d6b7300b5",
+      "beforeDescriptionUtf8Bytes": 246,
+      "afterDescriptionUtf8Bytes": 129,
+      "parameterDescriptionUtf8Bytes": 90
+    },
+    {
+      "path": "workflows/coordinator/tools.ts",
+      "onlyDescriptionAndTaskIdDescribeChanged": true,
+      "beforeBlob": "16455d96572667cd232752dca2e58f46007685b3",
+      "afterBlob": "9bcf14a127aaa09e8028d2d0040d18aef1142bb6",
+      "beforeDescriptionUtf8Bytes": 276,
+      "afterDescriptionUtf8Bytes": 141,
+      "parameterDescriptionUtf8Bytes": 90
+    }
+  ],
+  "changedPaths": [
+    "lib/agent-kit/tool-defaults-compat.test.ts",
+    "workflows/coordinator/factory-tools.ts",
+    "workflows/coordinator/tools.ts"
+  ],
+  "executeCallbacksUnchanged": true,
+  "allOtherTrackedFilesUnchanged": true,
+  "sqlGuardsUnchanged": true,
+  "newRequiredCalls": 0,
+  "modelExecutionVerified": false
+}

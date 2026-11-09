@@ -1,0 +1,17 @@
+{
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./tests/support/server-only.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-name-pattern",
+    "Factory task readers distinguish",
+    "lib/agent-kit/tool-defaults-compat.test.ts"
+  ],
+  "exitCode": 1,
+  "durationSeconds": 1.669,
+  "productionModified": false
+}

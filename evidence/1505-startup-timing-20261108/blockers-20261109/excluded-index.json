@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "excluded": [
+    {
+      "path": "factory-id-semantics-candidate/product.patch",
+      "bytes": 3702,
+      "sha256": "1d6364d69cecee93fb072a6f6b3662ccf729921752092bd0b83e6cea662ac882",
+      "gitBlob": "f93afad234c5c7824d93fb51f274dd5777e1b2fd",
+      "mode": "100644",
+      "reason": "Git-backed source diff; reconstruct from the fixed commit chain",
+      "sourceRecovery": {
+        "remoteCommit": "b293885a0945807995bd6cb8054e04f2e739085b",
+        "parent": "79aa2e7411b41c506b6ce19a97f41bd68964d8cf",
+        "localEquivalent": "5ba78cc1c930c7c78869e2e133c2581b925d32f0",
+        "sourceFiles": [
+          "workflows/coordinator/factory-tools.ts",
+          "workflows/coordinator/tools.ts",
+          "lib/agent-kit/tool-defaults-compat.test.ts"
+        ]
+      }
+    },
+    {
+      "path": "factory-id-semantics-candidate/source.diff",
+      "bytes": 11993,
+      "sha256": "e53f20291b23113c7b28761aa55f70fe79863ae1545bb03b584067e51b785328",
+      "gitBlob": "bc145f64bc1a1e505d66c452e95e1b41f41795c6",
+      "mode": "100644",
+      "reason": "Git-backed source diff; reconstruct from the fixed commit chain",
+      "sourceRecovery": {
+        "remoteCommit": "b293885a0945807995bd6cb8054e04f2e739085b",
+        "parent": "79aa2e7411b41c506b6ce19a97f41bd68964d8cf",
+        "localEquivalent": "5ba78cc1c930c7c78869e2e133c2581b925d32f0",
+        "sourceFiles": [
+          "workflows/coordinator/factory-tools.ts",
+          "workflows/coordinator/tools.ts",
+          "lib/agent-kit/tool-defaults-compat.test.ts"
+        ]
+      }
+    },
+    {
+      "path": "factory-id-semantics-candidate/test.diff",
+      "bytes": 8291,
+      "sha256": "c975c022a46f03db162c695fd4e87e3ec406bd483c252ae136fd96ba0843a617",
+      "gitBlob": "c92adc596e26198fca28c5be66f48432ae672861",
+      "mode": "100644",
+      "reason": "Git-backed source diff; reconstruct from the fixed commit chain",
+      "sourceRecovery": {
+        "remoteCommit": "b293885a0945807995bd6cb8054e04f2e739085b",
+        "parent": "79aa2e7411b41c506b6ce19a97f41bd68964d8cf",
+        "localEquivalent": "5ba78cc1c930c7c78869e2e133c2581b925d32f0",
+        "sourceFiles": [
+          "workflows/coordinator/factory-tools.ts",
+          "workflows/coordinator/tools.ts",
+          "lib/agent-kit/tool-defaults-compat.test.ts"
+        ]
+      }
+    },
+    {
+      "path": "mcp-context-traceparent-candidate/final.patch",
+      "bytes": 8125,
+      "sha256": "76c7ffdef07f05d1532e83593b6b3a4978215efe041db27e6291f621a33bd7bf",
+      "gitBlob": "c2e3c43e2ce53a97421ea9b62a22b37ad5f0369f",
+      "mode": "100644",
+      "reason": "Git-backed source diff; reconstruct from the fixed commit chain",
+      "sourceRecovery": {
+        "remoteCommit": "9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8",
+        "remoteParent": "0a89902188e31a202153c663a2e8448feddb01f4",
+        "localEquivalent": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+        "localParent": "16653e580d81d3d89f444affcf1a6062e47e76eb",
+        "sourceFiles": [
+          "packages/daemon/src/agents/mikka-mcp-context.mjs",
+          "packages/daemon/test/codex-mcp-context.test.ts",
+          "packages/daemon/test/mcp-http-observation.test.ts"
+        ]
+      }
+    },
+    {
+      "path": "mcp-context-traceparent-candidate/product.patch",
+      "bytes": 1066,
+      "sha256": "43b1424ab77a2a8c72cc28c53f08549844a248a6cac7ac80405eff8d00ce627e",
+      "gitBlob": "ff463ebb903bc83b8a1c2c52ea5ee62c48edba4e",
+      "mode": "100644",
+      "reason": "Git-backed source diff; reconstruct from the fixed commit chain",
+      "sourceRecovery": {
+        "remoteCommit": "9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8",
+        "remoteParent": "0a89902188e31a202153c663a2e8448feddb01f4",
+        "localEquivalent": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+        "localParent": "16653e580d81d3d89f444affcf1a6062e47e76eb",
+        "sourceFiles": [
+          "packages/daemon/src/agents/mikka-mcp-context.mjs",
+          "packages/daemon/test/codex-mcp-context.test.ts",
+          "packages/daemon/test/mcp-http-observation.test.ts"
+        ]
+      }
+    },
+    {
+      "path": "primary-recovery/production-0a/e2b-0a-final-cleanup.zip",
+      "bytes": 414,
+      "sha256": "bc93af3fc5f569fe221d96170a38113c3e892a62e432430fd0aae3f17b97548c",
+      "gitBlob": "ebe6d637e13228c2d4afde9357ea409c7aeb1021",
+      "mode": "100644",
+      "reason": "binary ZIP excluded; extracted closed text JSON retained",
+      "sourceRecovery": {
+        "recovery": "Corresponding extracted closed JSON is retained; no binary copied"
+      }
+    },
+    {
+      "path": "primary-recovery/production-0a/e2b-0a-subscription-diagnostics.zip",
+      "bytes": 2458,
+      "sha256": "16735ef5ffaa8f08761dbcd24291ab4263cb4a79ce0797153d775361e0da8559",
+      "gitBlob": "6a08fb40140222dd6096c2bc4f203a56b96c0963",
+      "mode": "100644",
+      "reason": "binary ZIP excluded; extracted closed text JSON retained",
+      "sourceRecovery": {
+        "recovery": "Corresponding extracted closed JSON is retained; no binary copied"
+      }
+    }
+  ],
+  "exclusionCount": 7,
+  "originalBytesUnmodified": true,
+  "exactDiffWrapperReconstructionNotPromised": true
+}

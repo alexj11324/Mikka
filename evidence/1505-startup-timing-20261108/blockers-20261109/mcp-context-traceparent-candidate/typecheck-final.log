@@ -1,0 +1,1 @@
+../../lib/project-map/contracts.ts(2,34): error TS2307: Cannot find module '@/lib/issue-visibility' or its corresponding type declarations.

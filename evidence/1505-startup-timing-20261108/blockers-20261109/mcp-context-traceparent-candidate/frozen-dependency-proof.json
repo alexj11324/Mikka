@@ -1,0 +1,31 @@
+{
+  "lockSha256": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+  "cachePaths": [
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/node_modules",
+      "realpath": "/vercel/mikka-1505-factory-id-semantics/node_modules",
+      "symlink": false,
+      "exists": true
+    },
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/node_modules/.vite",
+      "realpath": "/vercel/mikka-1505-factory-id-semantics/node_modules/.vite",
+      "symlink": false,
+      "exists": false
+    },
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/packages/daemon/node_modules",
+      "realpath": "/vercel/mikka-1505-factory-id-semantics/packages/daemon/node_modules",
+      "symlink": false,
+      "exists": true
+    },
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/packages/daemon/node_modules/.vite",
+      "realpath": "/vercel/mikka-1505-factory-id-semantics/packages/daemon/node_modules/.vite",
+      "symlink": false,
+      "exists": true
+    }
+  ],
+  "installReceipt": "frozen-install-result.json",
+  "oldGreenUsesPriorLock": true
+}

@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/vercel/ops-1505/source-checks-7c014579/bin/pnpm",
+    "exec",
+    "tsgo",
+    "--noEmit",
+    "-p",
+    "tsconfig.json"
+  ],
+  "cwd": "/vercel/mikka-1505-factory-id-semantics/packages/daemon",
+  "startedAt": "2026-11-09T03:55:32.818423+00:00",
+  "exitCode": 0,
+  "durationSeconds": 5.132,
+  "lockSha256": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363"
+}

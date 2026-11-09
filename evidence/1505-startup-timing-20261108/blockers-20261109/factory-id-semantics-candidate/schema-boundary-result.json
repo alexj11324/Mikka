@@ -1,0 +1,10 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "tests/workflow-schema-boundary.test.mjs"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 0.574,
+  "nodeOptions": "--max-old-space-size=3072"
+}

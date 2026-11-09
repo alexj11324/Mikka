@@ -1,0 +1,6 @@
+{
+  "firstCommandId": "cmd_5aba454ab55b4c71a9f37b62b082",
+  "timeoutProvidedMs": 600,
+  "result": "Python wrapper ended before writing result; test child log shows 41 passes but no recorded exit status. No child remains. Preserve green-frozen.log and repeat the same three files once with corrected bounded execution limit.",
+  "log": "green-frozen.log"
+}

@@ -1,0 +1,6 @@
+{
+  "originalPath": ".oxlintrc.json",
+  "originalSha256": "8b23eb05fa1495c5e5faf871a01c5a22483845084ad6b74e692ddd97c49498e2",
+  "rulesAndOtherFieldsUnchanged": true,
+  "difference": "Only ignorePatterns removed for three explicitly named files that the root config excludes under packages/**. Earlier zero-files attempts are not lint passes."
+}

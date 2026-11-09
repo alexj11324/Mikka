@@ -1,0 +1,14 @@
+{
+  "donor": "/vercel/Mikka-native-readiness-navigation-followup",
+  "donorHead": "8982e68cf1d4087146364ad7587c2aa28a02f0a4",
+  "lockSha256": "345a6e1d97bb3a0028497f3294a86944bc9f617af892de71990d40d2cdf36054",
+  "aliases": {
+    "protocol": "/vercel/mikka-1505-factory-id-semantics/packages/protocol"
+  },
+  "versions": {
+    "ai": "7.0.148",
+    "zod": "4.6.7",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

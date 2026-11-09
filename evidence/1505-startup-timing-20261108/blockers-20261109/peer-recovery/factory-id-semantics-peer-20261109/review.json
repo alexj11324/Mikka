@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-11-09T03:36:00Z",
+  "reviewer": "daemon_start",
+  "result": "no_static_blocker",
+  "risk": "medium",
+  "scope": "Independent read-only peer of the fixed Factory task ID metadata candidate; no test reruns, product mutations, remote writes, production reads, model calls, or resource creation.",
+  "identity": {
+    "commit": "5ba78cc1c930c7c78869e2e133c2581b925d32f0",
+    "tree": "0af9e4bfdbebccf75516f79fd5df35ad806e80c0",
+    "parent": "79aa2e7411b41c506b6ce19a97f41bd68964d8cf",
+    "worktree": "/vercel/mikka-1505-factory-id-semantics",
+    "trackedClean": true,
+    "changedPaths": 3
+  },
+  "source": [
+    {
+      "path": "workflows/coordinator/factory-tools.ts",
+      "bytes": 9781,
+      "blob": "77a21b83c8060b0dd9e1bcfb76fb9e7d6b7300b5",
+      "sha256": "9b87a7defef22c04dbe34f484bee3acc1cc8b1546ed7885bc597751c3146dabc",
+      "parentBlob": "b483c3918e8362f8aaadd7b16e75f54b1a2dc93c",
+      "location": "get_factory_task, lines 26–27"
+    },
+    {
+      "path": "workflows/coordinator/tools.ts",
+      "bytes": 35810,
+      "blob": "9bcf14a127aaa09e8028d2d0040d18aef1142bb6",
+      "sha256": "363abc4e720e78f687f6d543bc8ec637ec00646dbe3d33284c1e3a0b7109ffd4",
+      "parentBlob": "16455d96572667cd232752dca2e58f46007685b3",
+      "location": "issueTools && factoryRouting scoped get_factory_task override, line 124"
+    },
+    {
+      "path": "lib/agent-kit/tool-defaults-compat.test.ts",
+      "bytes": 27589,
+      "blob": "9bad4eef4e08e3a67bcfd1cf0062969cf4ebe23f",
+      "sha256": "16de855a95cde9afc5ef3ee73269562b5b01d6dfd1a85bd2bd837f28b75278e8"
+    }
+  ],
+  "findings": [
+    {
+      "id": "actual_surfaces",
+      "conclusion": "Both the direct factoryCoordinatorTools export and the effective scoped override are changed. The real registry tests cover named Bot, Coordinator, and direct export; the shadowed path is not omitted."
+    },
+    {
+      "id": "receipt_provenance",
+      "conclusion": "Factory task IDs originate from the Factory route/intake receipt: V2 readTask.input.taskId or binding.taskId; legacy task.id. Factory task identity is distinct from Issue identity. Ordinary dispatch_run is not represented as a guaranteed Factory ID source.",
+      "sources": [
+        "lib/factory/public-receipt.ts@97e8fda2a01f6e20b43b57abd8a6f10c470a5036",
+        "lib/factory/task-dispatch.ts@342e84bfdb7ead0c31e1897a89741e42f85d03d0",
+        "lib/factory/store.ts@5627c86ca458738f3ca74a698c25963829e1a8bf"
+      ]
+    },
+    {
+      "id": "conservation",
+      "conclusion": "Independent reversal of only the two description strings and new taskId.describe calls restores both complete parent product files byte for byte. Existing execute callbacks, scope/Bot binding, tools gates, UUID validation, strictness, SQL/read/write paths, and timing remain unchanged. No forced Factory pre-creation or extra read is introduced."
+    },
+    {
+      "id": "id_validation",
+      "conclusion": "Both UUIDs remain syntactically valid; this is a tool-semantics clarification, not an Issue-to-Factory resolver or new server-side type discrimination. Existing factoryNotFound and ownership/scope fences remain correct and unchanged."
+    },
+    {
+      "id": "metadata_budget",
+      "conclusion": "Author evidence serializes actual ai.asSchema(inputSchema).jsonSchema together with name and description. Named Bot and Coordinator each decrease 692 to 664 UTF-8 bytes; direct export decreases 662 to 652. This measures the tool-definition projection, not complete model HTTP payload, tokenization, whole-Task DB/wire, performance, or eventual model behavior."
+    },
+    {
+      "id": "final_test_type_fix",
+      "conclusion": "Final test uses an explicitly typed ToolSet case array and a real typeof description === string assertion before string operations. Initial six candidate test type errors are preserved separately from missing package/environment errors. No non-null assertion masks the final description union."
+    },
+    {
+      "id": "successor_handoff",
+      "conclusion": "Observed P0 and Team tools.ts blob dc56cd658ff20fe55dae65b17c8208d35bad12c7 contains five later botId callback additions unrelated to this metadata hunk. Integrate the narrow metadata change, not the full old tools.ts blob; preserve those five additions. No successor combined CI or production success is claimed."
+    }
+  ],
+  "validationEvidence": {
+    "directory": "/vercel/ops-1505/factory-id-semantics-candidate",
+    "manifest": {
+      "bytes": 7515,
+      "sha256": "5c18f1699d67dac2b2f26ff915c9129f41fc2b87aa0b73f6344b406e8411e027",
+      "membersIndependentlyRehashed": 32,
+      "memberBytes": 60770,
+      "mismatches": []
+    },
+    "productPatch": {
+      "bytes": 3702,
+      "sha256": "1d6364d69cecee93fb072a6f6b3662ccf729921752092bd0b83e6cea662ac882"
+    },
+    "red": {
+      "file": "red.log",
+      "bytes": 4782,
+      "sha256": "0d1e06c2ce0c42f6fc0d612016e1cb1300e4ffd0a7440fbf148d0c83592af94e",
+      "result": "3 failing surface subtests plus their parent group; Node aggregate 0/4, not four independent experiments"
+    },
+    "green": {
+      "file": "green-final.log",
+      "bytes": 2476,
+      "sha256": "29fd54f2533713437d39ce32c1003b73061f7467e81e180bf28032c27d6154a0",
+      "result": "17/17; zero fail, skip, cancel"
+    },
+    "initialTypeFailure": {
+      "file": "typecheck.log",
+      "bytes": 6402,
+      "sha256": "f2b92a214f7c0a4f380a3e3994902c17b52bca94aeb941825658e3611fd9da05",
+      "result": "retained; includes candidate test errors and dependency errors"
+    },
+    "finalType": {
+      "resultFile": "typecheck-final-result.json",
+      "sha256": "c8a522c3d16c210d69272e0190ef8468c9681b9f06a73a23743491937d3052d9",
+      "command": "fixed pnpm 10.34.3 exec tsrs --noEmit",
+      "exitCode": 0,
+      "logBytes": 0
+    },
+    "lint": {
+      "file": "lint-final.log",
+      "sha256": "65afcf25336f5a222b5909e8f8b217b42445b0791c8c61f3fe24cee9ab317a8f",
+      "result": "3 actual files, zero warnings/errors"
+    },
+    "schema": {
+      "file": "schema-boundary.log",
+      "sha256": "b659c22fa273fcf004afc6c701388200c88b8349f0750252954e368f2113058d",
+      "result": "1/1"
+    },
+    "independentlyReranTests": false
+  },
+  "limits": [
+    "Read-only source/record review only.",
+    "No actual model invocation or formal sample validates corrected model tool selection yet.",
+    "No complete Task SQL/rows/wire measurement; unchanged deterministic execute paths and reduced metadata projection are the supported claims.",
+    "No new formal acceptance result, release approval, production mutation, or remote merge authorization is implied."
+  ]
+}

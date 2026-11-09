@@ -1,0 +1,240 @@
+{
+  "version": 1,
+  "frozenAt": "2026-11-09T03:58:34.029777+00:00",
+  "commit": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+  "tree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+  "files": [
+    {
+      "path": "candidate-identity.json",
+      "bytes": 1795,
+      "sha256": "378ce01c47ce835f7c7936f01d38cd2884a27ef54b395d64e026ec329eeecb1b"
+    },
+    {
+      "path": "catalogue-serialization-proof.json",
+      "bytes": 448,
+      "sha256": "e1e7b83cae82fb1c32d7c361b043850977d332bcdcf1e8ac7fc0ee287871b10f"
+    },
+    {
+      "path": "catalogue-serialization.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "commit.log",
+      "bytes": 172,
+      "sha256": "8f0fbedd814d7569907ba9a10e685586e1711ed1e973e29f508ff63b4708b982"
+    },
+    {
+      "path": "dependency-isolation-before-install.json",
+      "bytes": 1734,
+      "sha256": "9dce304fda47e5f20e6c0987654a02f2f964e3c9c7df030a05725568e356bbb3"
+    },
+    {
+      "path": "exact-fetch.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "final.patch",
+      "bytes": 8125,
+      "sha256": "76c7ffdef07f05d1532e83593b6b3a4978215efe041db27e6291f621a33bd7bf"
+    },
+    {
+      "path": "frozen-check-wrapper-limit.json",
+      "bytes": 356,
+      "sha256": "db4286e5ed1cdccb6b37d22d1d7d8e47f5b3491f40832d2cd76a6d6406bb960b"
+    },
+    {
+      "path": "frozen-dependency-proof.json",
+      "bytes": 1089,
+      "sha256": "13d66c1d5b0c80e91ecd61876dbd8de8a1cb35fa7e2ae90bc066e3fc0472bb91"
+    },
+    {
+      "path": "frozen-install-offline-result.json",
+      "bytes": 360,
+      "sha256": "68e92951e2cf453fda7f77bbcbe96c3176fc0f50aef586c0d64edcde5ab1f585"
+    },
+    {
+      "path": "frozen-install-offline.log",
+      "bytes": 1501,
+      "sha256": "bfad728428b9db6f8be51841c32d3c14b7c437dc50652141f943ee27b67bcd94"
+    },
+    {
+      "path": "frozen-install-result.json",
+      "bytes": 343,
+      "sha256": "c0f7387ce42af14ab6279a9310d7df955df33d4346c0d6dce4bd362bf6706382"
+    },
+    {
+      "path": "frozen-install.log",
+      "bytes": 6766,
+      "sha256": "60fe3057a348219782f407a268a7742639ffb36502291be05894491c65f51823"
+    },
+    {
+      "path": "green-current-lock-result.json",
+      "bytes": 480,
+      "sha256": "14d38017a4ef52898dd2ad74ab81e4bf728e2cc82c899189a8523b001b1f4e87"
+    },
+    {
+      "path": "green-current-lock.log",
+      "bytes": 808,
+      "sha256": "aaaba5bfac2542f2b5e855dd37206606b80a357d3df19f9fa92ae4e68cb7e666"
+    },
+    {
+      "path": "green-final-result.json",
+      "bytes": 480,
+      "sha256": "761daa4c558b03979bcf5c6c315aecdaaf00c53548e3fcdab01451480903f6d2"
+    },
+    {
+      "path": "green-final.log",
+      "bytes": 937,
+      "sha256": "29c3a601269001d4034c9eb0c4f48845aac397db4f1021066f71465b41d6aa97"
+    },
+    {
+      "path": "green-frozen.log",
+      "bytes": 809,
+      "sha256": "486b3b80aeb0fe16ec7d0db46053faebeb64fd852fbfa2c021f4a0a37308a275"
+    },
+    {
+      "path": "green-result.json",
+      "bytes": 345,
+      "sha256": "6be0a85487ff1b547a00c9efaaf1187c93786fa7949a6f3120ece20996a34bab"
+    },
+    {
+      "path": "green.log",
+      "bytes": 808,
+      "sha256": "323474cd3cab679880db4e074fe3898d6a288f103770757d832e58b37a6ca726"
+    },
+    {
+      "path": "lint-config-proof.json",
+      "bytes": 345,
+      "sha256": "a8110a2bd79340f7134cc4dc81aa139263ac0feeda77332fdc9a7082788384f5"
+    },
+    {
+      "path": "lint-final-result.json",
+      "bytes": 378,
+      "sha256": "513207e0483976c27b6657ff2bee825fd729d024c09fe7cec488d512c92056ec"
+    },
+    {
+      "path": "lint-final-verified-result.json",
+      "bytes": 765,
+      "sha256": "892f9f8c069f1634c4f310ae84cd54f8091a889c01ea73774870b01a7d683dbb"
+    },
+    {
+      "path": "lint-final-verified.log",
+      "bytes": 89,
+      "sha256": "85e4ff1f2e1c5fe95f2e1f0b4f542a7e4347827037a414f9de21d8e2ab556abb"
+    },
+    {
+      "path": "lint-final.log",
+      "bytes": 127,
+      "sha256": "dedc898467fd9c4d4c4703d9d40366d30617f479839cb355ef925fce2c457818"
+    },
+    {
+      "path": "lint-result.json",
+      "bytes": 359,
+      "sha256": "7431e3d3d35f7c8dae42dc12b567507881021042ae2cdf213de5535f5fde4639"
+    },
+    {
+      "path": "lint-selected-config.json",
+      "bytes": 481,
+      "sha256": "f8e729cd0f2c2c2357cb1295060aeda0dc22b93f97ce22bf6632169c74da4808"
+    },
+    {
+      "path": "lint-verified-result.json",
+      "bytes": 765,
+      "sha256": "053dd43d3424c3de8e25dee8272e25d663140bb5c319c2deab3f0d937411e3b3"
+    },
+    {
+      "path": "lint-verified.log",
+      "bytes": 90,
+      "sha256": "6e41983783d09142196874890456ca8777d91a6e895577ecc73c590f6816e232"
+    },
+    {
+      "path": "lint.log",
+      "bytes": 127,
+      "sha256": "dedc898467fd9c4d4c4703d9d40366d30617f479839cb355ef925fce2c457818"
+    },
+    {
+      "path": "main0e-to-merge-inventory.json",
+      "bytes": 2136,
+      "sha256": "912e5f795d46d47c134084262fa57def9f84e5578d543bae74908b6dff8797ab"
+    },
+    {
+      "path": "merge-identity.json",
+      "bytes": 481,
+      "sha256": "8c79f4c8c2207e0a7a0f3f0f46bfb62e9cd6f79d7f411e7b32b7bdc4063d30b3"
+    },
+    {
+      "path": "merge.log",
+      "bytes": 17635,
+      "sha256": "0b36c2049850b221b71b54a4fd4c020bf082c84d1b9f3fac757ae78e26a79f66"
+    },
+    {
+      "path": "product.patch",
+      "bytes": 1066,
+      "sha256": "43b1424ab77a2a8c72cc28c53f08549844a248a6cac7ac80405eff8d00ce627e"
+    },
+    {
+      "path": "red-result.json",
+      "bytes": 351,
+      "sha256": "4512abfca6072d47cf8996e9554e20ab96b52a7a794ecf15639fbb2945034fe2"
+    },
+    {
+      "path": "red.log",
+      "bytes": 3890,
+      "sha256": "49163fb48fe72c7adbd3b7862d8ed550b0c0daaa0208f5da538b21b60b75f0de"
+    },
+    {
+      "path": "review.md",
+      "bytes": 4071,
+      "sha256": "f4d563f4fe338faa300ea60419103a920781395587c598b475cd6386022aed86"
+    },
+    {
+      "path": "run-fullcheck.py",
+      "bytes": 4282,
+      "sha256": "1b3be67eec18d18b3bfe8bb2a44b4df77425cb50936c4ddc55766b44e44a8340"
+    },
+    {
+      "path": "source-conservation.json",
+      "bytes": 2378,
+      "sha256": "0991346f4ad7786d6f2e41ea4c2f60f18e48161e0dfa7b4d3df7caf33c906e41"
+    },
+    {
+      "path": "test-catalogue-loading-note.json",
+      "bytes": 481,
+      "sha256": "1e805b68265371a7c0d6e5efd514567bf66ca0ae58c07928f3e775ea0ceb1520"
+    },
+    {
+      "path": "typecheck-final-result.json",
+      "bytes": 396,
+      "sha256": "bd6c47c4308003418176f19014400cbd73f6867a90792a1d49585a3a69b267b1"
+    },
+    {
+      "path": "typecheck-final.log",
+      "bytes": 140,
+      "sha256": "b98974b78f81992fd2f82b2fc06fd0e129f983bbd443715bc5ba749e2bbf7664"
+    },
+    {
+      "path": "typecheck-verified-result.json",
+      "bytes": 397,
+      "sha256": "42f2a588fcbaad2f54e6cf188436a7a2a2d350d99f410f815da3193776b8917c"
+    },
+    {
+      "path": "typecheck-verified.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "fileCount": 44,
+  "totalBytes": 68586,
+  "excludedActiveDirectory": "fullcheck-addendum",
+  "fullCheckStatusAtCoreFreeze": "running",
+  "targeted": {
+    "passed": 41,
+    "lintFiles": 3,
+    "lintExit": 0,
+    "daemonTypeExit": 0
+  },
+  "productionAcceptance": "not_run",
+  "remoteWrites": false
+}

@@ -1,0 +1,27 @@
+{
+  "recoveredAt": "2026-11-09T04:13:01.569183+00:00",
+  "reason": "Primary executor unavailable; reobtained only the same two prior small artifacts, exact original archive and member hashes verified. No new production measurement.",
+  "source": "0a355918330f6dac04d2b0ee4716cd056c263162",
+  "releaseRunId": 42553110217,
+  "items": [
+    {
+      "artifactId": 13647815752,
+      "archive": "e2b-0a-subscription-diagnostics.zip",
+      "archiveBytes": 2458,
+      "archiveSha256": "16735ef5ffaa8f08761dbcd24291ab4263cb4a79ce0797153d775361e0da8559",
+      "member": "subscription-diagnostics.json",
+      "bytes": 6201,
+      "sha256": "9536bd4b5f674a8c496483307c85d20b3b6d5a83b4c12a63713589685143ab20"
+    },
+    {
+      "artifactId": 13647198940,
+      "archive": "e2b-0a-final-cleanup.zip",
+      "archiveBytes": 414,
+      "archiveSha256": "bc93af3fc5f569fe221d96170a38113c3e892a62e432430fd0aae3f17b97548c",
+      "member": "release-cleanup.json",
+      "bytes": 639,
+      "sha256": "73990da98f3897a28dcb4fc25fda91ae55b82430f3892f440c338c8fbf85d822"
+    }
+  ],
+  "signedUrlsRetained": false
+}

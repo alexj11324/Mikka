@@ -1,0 +1,144 @@
+(node:11653) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11653) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+(node:11653) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+✖ a cold Settings chunk keeps the same frame, bar and rail; returning keeps pending browser notes and draft (946.333354ms)
+✖ legacy Settings also loads inside the frame and keeps it when returning to chat (0.229746ms)
+✖ hosted Settings preserves pending browser notes and the computer registry across its distinct frame (0.189169ms)
+✖ hosted Settings providers still retire state when the owner or workspace changes (0.160507ms)
+✖ routed Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive (0.18467ms)
+✖ legacy Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive (0.199427ms)
+✖ Settings search and repeated Back/Forward restore the addressed bot when the router renders after popstate (0.136648ms)
+✖ Settings search and repeated Back/Forward restore the addressed bot when the router renders before popstate (0.136798ms)
+✖ the existing authenticated scope boundary still discards annotations across owners and workspaces (0.179016ms)
+✖ a standalone Settings shell still provides its frame and route-specific members content (0.145354ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 0
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1593.323153
+
+✖ failing tests:
+
+test at components/workspace/issue-workspace-settings.test.tsx:1:12238
+✖ a cold Settings chunk keeps the same frame, bar and rail; returning keeps pending browser notes and draft (946.333354ms)
+  /vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace.tsx:66
+  import { SuggestionFeed, SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
+                           ^
+  SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace-settings.test.tsx:130:26)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at components/workspace/issue-workspace-settings.test.tsx:1:14742
+✖ legacy Settings also loads inside the frame and keeps it when returning to chat (0.229746ms)
+  /vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace.tsx:66
+  import { SuggestionFeed, SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
+                           ^
+  SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace-settings.test.tsx:130:26)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at components/workspace/issue-workspace-settings.test.tsx:1:15662
+✖ hosted Settings preserves pending browser notes and the computer registry across its distinct frame (0.189169ms)
+  /vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace.tsx:66
+  import { SuggestionFeed, SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
+                           ^
+  SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace-settings.test.tsx:130:26)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at components/workspace/issue-workspace-settings.test.tsx:1:17349
+✖ hosted Settings providers still retire state when the owner or workspace changes (0.160507ms)
+  /vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace.tsx:66
+  import { SuggestionFeed, SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
+                           ^
+  SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace-settings.test.tsx:130:26)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at components/workspace/issue-workspace-settings.test.tsx:1:18207
+✖ routed Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive (0.18467ms)
+  /vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace.tsx:66
+  import { SuggestionFeed, SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
+                           ^
+  SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace-settings.test.tsx:130:26)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at components/workspace/issue-workspace-settings.test.tsx:1:18207
+✖ legacy Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive (0.199427ms)
+  /vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace.tsx:66
+  import { SuggestionFeed, SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
+                           ^
+  SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace-settings.test.tsx:130:26)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at components/workspace/issue-workspace-settings.test.tsx:1:19800
+✖ Settings search and repeated Back/Forward restore the addressed bot when the router renders after popstate (0.136648ms)
+  /vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace.tsx:66
+  import { SuggestionFeed, SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
+                           ^
+  SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace-settings.test.tsx:130:26)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at components/workspace/issue-workspace-settings.test.tsx:1:19800
+✖ Settings search and repeated Back/Forward restore the addressed bot when the router renders before popstate (0.136798ms)
+  /vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace.tsx:66
+  import { SuggestionFeed, SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
+                           ^
+  SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace-settings.test.tsx:130:26)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at components/workspace/issue-workspace-settings.test.tsx:1:21560
+✖ the existing authenticated scope boundary still discards annotations across owners and workspaces (0.179016ms)
+  /vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace.tsx:66
+  import { SuggestionFeed, SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
+                           ^
+  SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace-settings.test.tsx:130:26)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)
+
+test at components/workspace/issue-workspace-settings.test.tsx:1:22113
+✖ a standalone Settings shell still provides its frame and route-specific members content (0.145354ms)
+  /vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace.tsx:66
+  import { SuggestionFeed, SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
+                           ^
+  SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+      at async node:internal/modules/esm/loader:647:26
+      at async TestContext.<anonymous> (/vercel/mikka-1505-mcp-baseline-main0e/components/workspace/issue-workspace-settings.test.tsx:130:26)
+      at async TestHook.run (node:internal/test_runner/test:1409:7)

@@ -1,0 +1,2 @@
+[fix/1505-factory-id-semantics-local-20261109 d6835377c8] fix(daemon): accept decision trace context in late MCP wrapper
+ 3 files changed, 55 insertions(+), 6 deletions(-)

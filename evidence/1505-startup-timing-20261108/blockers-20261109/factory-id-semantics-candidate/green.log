@@ -1,0 +1,32 @@
+(node:818) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:818) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a new builtin execution retains every existing core tool from the real integration factories (567.026426ms)
+✔ all exposed tool schemas have object roots and skill evaluation retains strict command validation (20.486108ms)
+✔ all four existing flag combinations preserve the actual pre-kit catalogue for newly initialized definitions (26.736729ms)
+✔ Gmail reads retain the real input schema, host owner and native scope; account writes go through the host write step (2.979405ms)
+✔ explicit model account selection travels with the host owner and scope (2.219366ms)
+✔ conditional computer defaults keep the named Bot boundary and disabled capabilities fail closed (4.403027ms)
+✔ existing custom and legacy execution snapshots never acquire new capabilities from the host defaults (26.201048ms)
+✔ Factory gates narrow frozen grants, preserve ordinary tools and keep named Bots on scoped entry points (80.650863ms)
+✔ new deployment defaults cannot rewrite a persisted builtin/custom head or a replayed execution (1.887359ms)
+✔ Factory dispatch and ordinary dispatch keep separate host entry points and frozen capability selection (5.876407ms)
+✔ tools a saved version gets from the ledger keep the scheduled read-only and native scope limits (4.133006ms)
+✔ project decisions use the same host-bound step in hosted and native Coordinator turns (10.530141ms)
+✔ repository discovery adds workspace facts only for hosted turns that omit the live repository list (17.733876ms)
+▶ Factory task readers distinguish receipt IDs without changing validation, host bindings or metadata budget
+  ✔ named Bot (1.544807ms)
+  ✔ Coordinator (0.596942ms)
+  ✔ Factory export (0.427921ms)
+✔ Factory task readers distinguish receipt IDs without changing validation, host bindings or metadata budget (6.714606ms)
+ℹ {"surface":"named Bot","beforeBytes":692,"afterBytes":664,"deltaBytes":-28}
+ℹ {"surface":"Coordinator","beforeBytes":692,"afterBytes":664,"deltaBytes":-28}
+ℹ {"surface":"Factory export","beforeBytes":662,"afterBytes":652,"deltaBytes":-10}
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1449.634627

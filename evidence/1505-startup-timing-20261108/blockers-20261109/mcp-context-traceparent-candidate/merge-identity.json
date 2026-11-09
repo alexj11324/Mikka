@@ -1,0 +1,15 @@
+{
+  "from": "5ba78cc1c930c7c78869e2e133c2581b925d32f0",
+  "upstream": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "existingObject": false,
+  "exitCode": 0,
+  "head": "16653e580d81d3d89f444affcf1a6062e47e76eb",
+  "status": "",
+  "conflicts": [],
+  "tree": "8f96bae0e397cf031741ab5f96ddad6b5bd6e710",
+  "parents": [
+    "5ba78cc1c930c7c78869e2e133c2581b925d32f0",
+    "0e4118020311ae8f9083d0d21cfb990be0282f25"
+  ],
+  "runContextBlob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f"
+}

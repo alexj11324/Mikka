@@ -1,0 +1,23 @@
+{
+  "base": "79aa2e7411b41c506b6ce19a97f41bd68964d8cf",
+  "files": [
+    {
+      "path": "workflows/coordinator/factory-tools.ts",
+      "bytes": 9781,
+      "sha256": "9b87a7defef22c04dbe34f484bee3acc1cc8b1546ed7885bc597751c3146dabc",
+      "blob": "77a21b83c8060b0dd9e1bcfb76fb9e7d6b7300b5"
+    },
+    {
+      "path": "workflows/coordinator/tools.ts",
+      "bytes": 35810,
+      "sha256": "363abc4e720e78f687f6d543bc8ec637ec00646dbe3d33284c1e3a0b7109ffd4",
+      "blob": "9bcf14a127aaa09e8028d2d0040d18aef1142bb6"
+    },
+    {
+      "path": "lib/agent-kit/tool-defaults-compat.test.ts",
+      "bytes": 27427,
+      "sha256": "16bfce51441c4d97784399c2ead55130538e2037a9ff5bd9c17e7c7b1cf10170",
+      "blob": "c146178a254fdd513def9660e3598aef003c1079"
+    }
+  ]
+}

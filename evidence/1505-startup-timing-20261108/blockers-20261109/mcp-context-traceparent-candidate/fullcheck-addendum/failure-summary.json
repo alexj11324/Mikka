@@ -1,0 +1,40 @@
+{
+  "result": {
+    "head": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+    "tree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+    "lockSha256Before": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+    "lockSha256After": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+    "startedAt": "2026-11-09T03:56:54.295763+00:00",
+    "finishedAt": "2026-11-09T04:03:23.461966+00:00",
+    "durationSeconds": 389.163,
+    "exitCode": 1,
+    "timedOut": false,
+    "trackedCleanAfter": true,
+    "logBytes": 341425,
+    "logSha256": "ad84e736523e27c4babda7d8bb6e75f0ee66249841c1704019b606cc1df898fe"
+  },
+  "mainCommandCount": 84,
+  "completedPrefixCount": 27,
+  "failedCommandIndexOneBased": 28,
+  "failedCommand": "pnpm test:view-state",
+  "notExecutedSuffixCount": 56,
+  "observedErrors": [
+    "SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'"
+  ],
+  "firstViewStateFailure": "\u2716 a cold Settings chunk keeps the same frame, bar and rail; returning keeps pending browser notes and draft (912.498122ms)",
+  "viewStateSummary": [
+    "\u2139 tests 33",
+    "\u2139 suites 0",
+    "\u2139 pass 23",
+    "\u2139 fail 10",
+    "\u2139 cancelled 0",
+    "\u2139 skipped 0",
+    "\u2139 todo 0",
+    "\u2139 duration_ms 7235.673692"
+  ],
+  "noNewBaselineTest": false,
+  "fixtureSourceEqualsActualMain0e": true,
+  "earlierAuthClientFailureDoesNotSubstituteForThisError": true,
+  "baselineComparison": "baseline/comparison.json",
+  "baselineExecutedOnce": true
+}

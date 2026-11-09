@@ -1,0 +1,67 @@
+{
+  "head": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "worktree": "/vercel/mikka-1505-mcp-baseline-main0e",
+  "dependencyDonor": "/vercel/mikka-1505-factory-id-semantics",
+  "lockEqual": true,
+  "packageEqual": true,
+  "lockSha256": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+  "nodeVersion": "v24.22.1",
+  "originalEntry": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/hooks/view-state.test.tsx components/nav/thread-view-state.test.tsx components/workspace/issue-workspace-settings.test.tsx components/workspace/board-view-state.test.tsx hooks/use-resizable-width.test.tsx",
+  "actualCommand": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "components/workspace/issue-workspace-settings.test.tsx"
+  ],
+  "singleFileScope": true,
+  "startedAt": "2026-11-09T04:06:16.393534+00:00",
+  "ownDependencyEntrypoints": [
+    {
+      "path": "/vercel/mikka-1505-mcp-baseline-main0e/node_modules",
+      "ownDirectory": true,
+      "cache": "/vercel/mikka-1505-mcp-baseline-main0e/node_modules/.cache",
+      "vite": "/vercel/mikka-1505-mcp-baseline-main0e/node_modules/.vite"
+    },
+    {
+      "path": "/vercel/mikka-1505-mcp-baseline-main0e/apps/desktop/node_modules",
+      "ownDirectory": true,
+      "cache": "/vercel/mikka-1505-mcp-baseline-main0e/apps/desktop/node_modules/.cache",
+      "vite": "/vercel/mikka-1505-mcp-baseline-main0e/apps/desktop/node_modules/.vite"
+    },
+    {
+      "path": "/vercel/mikka-1505-mcp-baseline-main0e/apps/frontend/node_modules",
+      "ownDirectory": true,
+      "cache": "/vercel/mikka-1505-mcp-baseline-main0e/apps/frontend/node_modules/.cache",
+      "vite": "/vercel/mikka-1505-mcp-baseline-main0e/apps/frontend/node_modules/.vite"
+    },
+    {
+      "path": "/vercel/mikka-1505-mcp-baseline-main0e/apps/mobile/node_modules",
+      "ownDirectory": true,
+      "cache": "/vercel/mikka-1505-mcp-baseline-main0e/apps/mobile/node_modules/.cache",
+      "vite": "/vercel/mikka-1505-mcp-baseline-main0e/apps/mobile/node_modules/.vite"
+    },
+    {
+      "path": "/vercel/mikka-1505-mcp-baseline-main0e/packages/config/node_modules",
+      "ownDirectory": true,
+      "cache": "/vercel/mikka-1505-mcp-baseline-main0e/packages/config/node_modules/.cache",
+      "vite": "/vercel/mikka-1505-mcp-baseline-main0e/packages/config/node_modules/.vite"
+    },
+    {
+      "path": "/vercel/mikka-1505-mcp-baseline-main0e/packages/daemon/node_modules",
+      "ownDirectory": true,
+      "cache": "/vercel/mikka-1505-mcp-baseline-main0e/packages/daemon/node_modules/.cache",
+      "vite": "/vercel/mikka-1505-mcp-baseline-main0e/packages/daemon/node_modules/.vite"
+    },
+    {
+      "path": "/vercel/mikka-1505-mcp-baseline-main0e/packages/protocol/node_modules",
+      "ownDirectory": true,
+      "cache": "/vercel/mikka-1505-mcp-baseline-main0e/packages/protocol/node_modules/.cache",
+      "vite": "/vercel/mikka-1505-mcp-baseline-main0e/packages/protocol/node_modules/.vite"
+    }
+  ],
+  "tmpdir": "/vercel/mikka-1505-mcp-baseline-main0e/node_modules/.cache/tmp"
+}

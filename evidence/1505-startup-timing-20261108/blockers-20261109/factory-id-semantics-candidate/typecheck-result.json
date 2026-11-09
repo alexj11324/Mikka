@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/vercel/ops-1505/source-checks-7c014579/bin/pnpm",
+    "exec",
+    "tsrs",
+    "--noEmit"
+  ],
+  "exitCode": 2,
+  "durationSeconds": 6.995,
+  "nodeOptions": "--max-old-space-size=3072"
+}

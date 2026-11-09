@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-11-09 04:10:25 UTC",
+  "candidate": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+  "tree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+  "originalPeer": {
+    "path": "review.json",
+    "bytes": 9269,
+    "sha256": "42637adc9afc76a8f0d7a3512c7dc625f96bf038f871c23c23189eb0427fd892",
+    "unchanged": true
+  },
+  "conclusion": "The source peer remains no_static_blocker. The complete pnpm check gate is FAILED, not timed out or passed. Its first error also occurs once on exact main0e under the same dependency/Node environment, without this candidate. The 56 unexecuted suffix commands remain unverified.",
+  "fullCheck": {
+    "command": "pnpm check",
+    "startedAt": "2026-11-09T03:56:54.295763+00:00",
+    "finishedAt": "2026-11-09T04:03:23.461966+00:00",
+    "exitCode": 1,
+    "timedOut": false,
+    "durationSeconds": 389.163,
+    "commandCount": 84,
+    "completedPrefixCount": 27,
+    "failedCommandIndexOneBased": 28,
+    "failedCommand": "pnpm test:view-state",
+    "unexecutedSuffixCount": 56,
+    "viewStateResults": {
+      "tests": 33,
+      "pass": 23,
+      "fail": 10,
+      "skipped": 0
+    },
+    "firstError": "SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'",
+    "notTheEarlierAuthClientFailure": true,
+    "candidateRerun": false,
+    "lockSha256": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+    "trackedClean": true
+  },
+  "baseline": {
+    "source": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+    "executedOnce": true,
+    "command": [
+      "node",
+      "--experimental-test-module-mocks",
+      "--import",
+      "./scripts/server-test.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "components/workspace/issue-workspace-settings.test.tsx"
+    ],
+    "node": "v24.22.1",
+    "sameLockAndPackage": true,
+    "exitCode": 1,
+    "durationSeconds": 1.646,
+    "results": {
+      "tests": 10,
+      "pass": 0,
+      "fail": 10,
+      "skipped": 0
+    },
+    "sameError": true,
+    "normalizedFirstStackEqual": true,
+    "directSourceAndConfigScope": "fixture and issue-workspace direct local import/mock source plus test loader/root config/lock",
+    "independentlyVerifiedEqualGitBlobs": 81,
+    "mismatches": [],
+    "externalPackagesNotCopied": 14,
+    "limitations": "This proves reproduction in the same local validation environment without the candidate; it is not a fresh CI result or proof that every dependency/possible execution path is equivalent."
+  },
+  "readEvidence": {
+    "directory": "/vercel/ops-1505/mcp-context-traceparent-candidate",
+    "manifest": {
+      "bytes": 10412,
+      "sha256": "d522e34cd36fd270adb9f3c1e798134b12e24d27d3b1e89d88be40228f212470",
+      "independentlyRehashedFiles": 59,
+      "memberBytes": 470822,
+      "mismatches": []
+    },
+    "files": [
+      {
+        "path": "fullcheck-addendum/check.log",
+        "bytes": 341425,
+        "sha256": "ad84e736523e27c4babda7d8bb6e75f0ee66249841c1704019b606cc1df898fe"
+      },
+      {
+        "path": "fullcheck-addendum/result.json",
+        "bytes": 595,
+        "sha256": "d5a3c52ae06be61aee7a5de8e832233156a5261142f50324e798ac702e90d5d7"
+      },
+      {
+        "path": "fullcheck-addendum/failure-summary.json",
+        "bytes": 1575,
+        "sha256": "5800996291850d18a10bcdfeffce4d88e25d13931c9a64b800a6a6cd4c85640a"
+      },
+      {
+        "path": "fullcheck-addendum/baseline/comparison.json",
+        "bytes": 1261,
+        "sha256": "d5586518b26d206b51d9fbecbe422cb2ec9a7f1c1b6faf9267ca640f4f51f7db"
+      },
+      {
+        "path": "fullcheck-addendum/baseline/target.log",
+        "bytes": 11090,
+        "sha256": "0a693cae3fb088ac444dccc3d600c0b6599366667c2cfd6547f81d968865d20e"
+      },
+      {
+        "path": "fullcheck-addendum/baseline/direct-source-and-config-equality.json",
+        "bytes": 24670,
+        "sha256": "94b047758bca6980e35914f8e08ed8a05253ada9c6708fa95356901cd880c700"
+      }
+    ]
+  },
+  "actionsByReviewer": {
+    "testsRerun": 0,
+    "productChanges": 0,
+    "productionCalls": 0,
+    "remoteWrites": 0,
+    "scopeChanges": 0,
+    "files": "Only this separate peer status addendum and its hash manifest; old peer/core receipts retained byte for byte."
+  },
+  "remainingBoundary": "No full check PASS, final CI, production acceptance, new formal six samples, or publication approval is asserted."
+}

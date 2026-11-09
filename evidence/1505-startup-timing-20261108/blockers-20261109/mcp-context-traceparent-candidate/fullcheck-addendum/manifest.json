@@ -1,0 +1,77 @@
+{
+  "head": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+  "tree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+  "fullCheck": "FAIL",
+  "actualFailure": "SuggestionsRefresh mock export missing",
+  "completedMainCommands": 27,
+  "failedMainCommand": 28,
+  "notExecutedMainCommands": 56,
+  "baseline": "same error reproduced once on exact main0e",
+  "files": [
+    {
+      "path": "baseline/comparison.json",
+      "bytes": 1261,
+      "sha256": "d5586518b26d206b51d9fbecbe422cb2ec9a7f1c1b6faf9267ca640f4f51f7db"
+    },
+    {
+      "path": "baseline/direct-source-and-config-equality.json",
+      "bytes": 24670,
+      "sha256": "94b047758bca6980e35914f8e08ed8a05253ada9c6708fa95356901cd880c700"
+    },
+    {
+      "path": "baseline/input.json",
+      "bytes": 3174,
+      "sha256": "c40f98d286c9312e9aded13d08637b220b6e09a7f4bdcb4255087c9a0f09e29f"
+    },
+    {
+      "path": "baseline/result.json",
+      "bytes": 279,
+      "sha256": "21d1db3e29fadfc817c1bf897696bcd3b4bf4daa036731d6df128bb75aa961be"
+    },
+    {
+      "path": "baseline/target.log",
+      "bytes": 11090,
+      "sha256": "0a693cae3fb088ac444dccc3d600c0b6599366667c2cfd6547f81d968865d20e"
+    },
+    {
+      "path": "baseline/worktree-add.log",
+      "bytes": 138,
+      "sha256": "e6068135cb73a4cb66a8c7572aced3bbed942b3f80f95a4ae42a41f69e744f47"
+    },
+    {
+      "path": "check.log",
+      "bytes": 341425,
+      "sha256": "ad84e736523e27c4babda7d8bb6e75f0ee66249841c1704019b606cc1df898fe"
+    },
+    {
+      "path": "failure-source-identity.json",
+      "bytes": 797,
+      "sha256": "04b912b2aa641dd874665b52f7a096b6ed1b9d8dc029954c9664518facd4133c"
+    },
+    {
+      "path": "failure-summary.json",
+      "bytes": 1575,
+      "sha256": "5800996291850d18a10bcdfeffce4d88e25d13931c9a64b800a6a6cd4c85640a"
+    },
+    {
+      "path": "input.json",
+      "bytes": 6049,
+      "sha256": "e49e0f59ca8631951a6e49170e554fa3f911de7f88e98225c5c164b5d771d6a5"
+    },
+    {
+      "path": "process.json",
+      "bytes": 157,
+      "sha256": "0d80b9f825e54309af5988d0b108a628889d89c47e291d62e29ac79c668ba1d6"
+    },
+    {
+      "path": "result.json",
+      "bytes": 595,
+      "sha256": "d5a3c52ae06be61aee7a5de8e832233156a5261142f50324e798ac702e90d5d7"
+    },
+    {
+      "path": "summary.md",
+      "bytes": 1323,
+      "sha256": "871d337edb4d1b84c012722986a9f7817d48d16317e44b64548872f03aa792af"
+    }
+  ]
+}

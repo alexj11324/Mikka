@@ -1,0 +1,6 @@
+{
+  "reason": "Direct app catalogue import pulls the app-only @/lib/issue-visibility type alias into the separate daemon TypeScript project.",
+  "change": "Load the exact same fixed app source file by URL at runtime, then validate its export with the existing protocol schema; no copied catalogue, product change, tsconfig change, or provider access.",
+  "initialFailure": "typecheck-final.log",
+  "testSha256": "2387a35f2b03ebece300f7601343bfa40da9bb5ab6b4676b0bd5e6783b043599"
+}

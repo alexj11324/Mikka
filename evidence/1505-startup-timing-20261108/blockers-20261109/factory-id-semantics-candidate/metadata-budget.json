@@ -1,0 +1,25 @@
+{
+  "serializer": "ai@7.0.148 asSchema(inputSchema).jsonSchema; UTF-8 JSON.stringify({name,description,inputSchema})",
+  "results": [
+    {
+      "surface": "named Bot",
+      "beforeBytes": 692,
+      "afterBytes": 664,
+      "deltaBytes": -28
+    },
+    {
+      "surface": "Coordinator",
+      "beforeBytes": 692,
+      "afterBytes": 664,
+      "deltaBytes": -28
+    },
+    {
+      "surface": "Factory export",
+      "beforeBytes": 662,
+      "afterBytes": 652,
+      "deltaBytes": -10
+    }
+  ],
+  "actualModelHttpMeasured": false,
+  "extraRequiredToolCalls": 0
+}

@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-11-09T03:59:19Z",
+  "reviewer": "daemon_start",
+  "conclusion": "no_static_blocker",
+  "risk": "medium",
+  "scope": "Independent static peer and readback of frozen local validation records. No tests, SQL, model calls, production reads, remote writes, source edits, installations or VM lifecycle operations were performed by this reviewer.",
+  "identity": {
+    "commit": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+    "tree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+    "parent": "16653e580d81d3d89f444affcf1a6062e47e76eb",
+    "mergeTree": "8f96bae0e397cf031741ab5f96ddad6b5bd6e710",
+    "mergeParents": [
+      "5ba78cc1c930c7c78869e2e133c2581b925d32f0",
+      "0e4118020311ae8f9083d0d21cfb990be0282f25"
+    ],
+    "worktree": "/vercel/mikka-1505-factory-id-semantics"
+  },
+  "mergeVerification": {
+    "mergeBase": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+    "independentlyComparedLeaves": 6695,
+    "bothModifiedDistinct": [],
+    "unexpectedLeaves": [],
+    "factoryThreeFilesExactlyRetained": true,
+    "actualProducerBackendAndStdioTakenFrom0e": true
+  },
+  "changedFiles": [
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-context.mjs",
+      "bytes": 2781,
+      "blob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+      "sha256": "bed5e23a0a3e72d73864594aa126a8240c8a1baba4a186c29a7df74e4ea243ce"
+    },
+    {
+      "path": "packages/daemon/test/codex-mcp-context.test.ts",
+      "bytes": 5195,
+      "blob": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+      "sha256": "625992d7422d38eb0d13a0ae04d89fa3b69b2f44150356fbfa345fbca2708f3e"
+    },
+    {
+      "path": "packages/daemon/test/mcp-http-observation.test.ts",
+      "bytes": 22837,
+      "blob": "c569b06d61ed84855db3c5921f1a6dba05774477",
+      "sha256": "2387a35f2b03ebece300f7601343bfa40da9bb5ab6b4676b0bd5e6783b043599"
+    }
+  ],
+  "findings": [
+    {
+      "id": "real_source_boundary",
+      "result": "The initial 5ba/79aa RunContext did not emit TRACEPARENT. This was raised before accepting the regression. Author normally merged fixed actual main0e; the final regression uses its real RunContext, stdio entry, and backend rather than manually pretending the old producer emitted the key.",
+      "sources": [
+        "packages/daemon/src/agents/run-context.ts@61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f",
+        "packages/daemon/src/agents/mikka-mcp-backend.mjs@308c9ed7ab78b636876fd661b55d36dd61b478d2",
+        "packages/daemon/src/agents/mikka-mcp.mjs@e314a1c43ac0749a5a773bcef2be02a976fc166f"
+      ]
+    },
+    {
+      "id": "minimal_fix",
+      "result": "The sole product change adds MIKKA_DECISION_MCP_TRACEPARENT to KEYS. Independent removal of that one occurrence restores the entire parent reader byte for byte. No parser broadening, new observer, synthesized catalogue event, relaxed acceptance predicate, token logic, tool permission, or authority change is introduced."
+    },
+    {
+      "id": "carrier_boundary",
+      "result": "Actual0e RunContext line250 always writes mcp?.traceparent ?? ''. The unchanged reader assigns the validated private-file env to the child before importing stdio, so an empty host carrier replaces an inherited value. Stdio line33 passes that value as config.decisionTraceparent. Backend336–338 retains its lower-case W3C v00/nonzero trace and span validation; line354 sends a traceparent header only for a validated value. New tools/list tests do not themselves make a decision HTTP request, so header behavior is a source-preservation claim, not newly measured header evidence."
+    },
+    {
+      "id": "private_file_and_lifecycle",
+      "result": "All existing owner-private directory/file checks, 0700/0600 modes, O_NOFOLLOW, owner UID, single hardlink, 64KiB bound, exact runId/nonce/version/ENTRY, bounded args and string env checks remain unchanged. Unknown env keys still reject. Native thread config still contains only the private file path and empty env, not the run token. Fresh adoption, consume/revoke checks, restart-until-close and drain-before-collector-close paths are unchanged."
+    },
+    {
+      "id": "meaningful_red_green",
+      "result": "Old actual0e producer through the real writer and late wrapper exits2 for both valid-carrier and absent-carrier cases. The repaired path runs the real stdio child, loads the actual app claim catalogue, waits for real catalogue_ready, and checks exact SHA, one observed child, zero rejected events, no truncation, and requests:[]. The unrelated-env negative still rejects in both the direct reader and real child with a fixed error. This is a local child/loopback regression, not a live official Codex model/release result."
+    },
+    {
+      "id": "catalogue_identity",
+      "result": "Final test loads the actual fixed root module by URL and strictly parses its export with the existing protocol schema; no fixture copy or error fallback is present. Author separately measured export JSON and parsed JSON as byte-identical (7327B, SHA d96e51357662f6a9d2fe03dcf7d90dc42514c185ef15b670934e36ac1ee54ac1). Root source blob is e6e0f558026ec3f2fb7d2a4b74c349463a3d3d95. The initial static-import TS alias failure remains recorded; the final runtime import avoids dragging the app-only type alias into daemon typecheck."
+    },
+    {
+      "id": "test_install_boundary",
+      "result": "Existing Node22 and publish-daemon workflows perform full root pnpm install --frozen-lockfile before running filtered daemon tests. Root package declares zod and @mikka/protocol. Standalone package tests do not run the new Vitest source and assert tarballs contain no .ts files. No filtered-install missing-root-zod blocker was found in these actual entry points. This is static compatibility, not an execution of the new candidate on Node22.",
+      "sources": [
+        {
+          "path": ".github/workflows/local-device-node22.yml",
+          "blob": "d195f389292e1a84967fd9864063ac536b91bbaf",
+          "lines": "54,57,61,80,93"
+        },
+        {
+          "path": ".github/workflows/publish-daemon.yml",
+          "blob": "c6f861a5ec36468ee9a65bc226613fbbabc797c2",
+          "lines": "62,65,81"
+        },
+        {
+          "path": "packages/daemon/test/package.test.mjs",
+          "blob": "ec82d375371303bb44567b5f5ccd6d28933babe8",
+          "lines": "12,32,36"
+        }
+      ]
+    }
+  ],
+  "frozenEvidence": {
+    "directory": "/vercel/ops-1505/mcp-context-traceparent-candidate",
+    "coreManifest": {
+      "bytes": 7332,
+      "sha256": "967d8e76a2ea6a45c17e3142331d19244987af3b52aebabd4f0540499409c152",
+      "independentlyRehashedFiles": 44,
+      "memberBytes": 68586,
+      "mismatches": []
+    },
+    "patch": {
+      "path": "final.patch",
+      "bytes": 8125,
+      "sha256": "76c7ffdef07f05d1532e83593b6b3a4978215efe041db27e6291f621a33bd7bf"
+    },
+    "lockSha256": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+    "results": [
+      {
+        "path": "red.log",
+        "bytes": 3890,
+        "sha256": "49163fb48fe72c7adbd3b7862d8ed550b0c0daaa0208f5da538b21b60b75f0de",
+        "result": "2 selected cases fail on child exit2; 16 unselected skipped"
+      },
+      {
+        "path": "green-final.log",
+        "bytes": 937,
+        "sha256": "29c3a601269001d4034c9eb0c4f48845aac397db4f1021066f71465b41d6aa97",
+        "result": "new-lock 41/41 (6 context +18 observation +17 backend)"
+      },
+      {
+        "path": "lint-final-verified.log",
+        "bytes": 89,
+        "sha256": "85e4ff1f2e1c5fe95f2e1f0b4f542a7e4347827037a414f9de21d8e2ab556abb",
+        "result": "3 actual files, zero warnings/errors; selected config differs from root only in ignorePatterns, rules identical"
+      },
+      {
+        "path": "typecheck-verified-result.json",
+        "bytes": 397,
+        "sha256": "42f2a588fcbaad2f54e6cf188436a7a2a2d350d99f410f815da3193776b8917c",
+        "result": "new-lock daemon tsgo --noEmit -p tsconfig.json exit0"
+      },
+      {
+        "path": "catalogue-serialization-proof.json",
+        "bytes": 448,
+        "sha256": "e1e7b83cae82fb1c32d7c361b043850977d332bcdcf1e8ac7fc0ee287871b10f",
+        "result": "actual export/parsed JSON exact bytes"
+      }
+    ],
+    "preservedFailuresAndLimits": [
+      "Initial wrong-dependency-environment GREEN is not upgraded to final new-lock evidence.",
+      "Initial zero-file lint and TS2307/type-alias failures remain preserved.",
+      "No fresh performance, whole-Task wire, production adoption or formal sample result is inferred.",
+      "The reviewer initially requested a nonexistent final.diff path; direct immutable git diff was subsequently read in full and matched final.patch bytes/SHA. No source or artifact changed."
+    ]
+  },
+  "fullCheck": {
+    "status": "pending",
+    "authorStartedAt": "2026-11-09T03:56:54Z",
+    "evidenceDirectory": "/vercel/ops-1505/mcp-context-traceparent-candidate/fullcheck-addendum",
+    "note": "Excluded from frozen core. Candidate-identity's not_started_yet is an earlier receipt retained unchanged. Completion will be a separate status addendum; targeted GREEN is not full-check PASS."
+  },
+  "approvalBoundary": "Suitable for root's further source integration/CI review; no production, deployment, acceptance, ref activation, or merge approval is implied."
+}

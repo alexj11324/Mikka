@@ -1,0 +1,13 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/vercel/mikka-1505-factory-id-semantics/packages/daemon[39m
+
+ [32m✓[39m test/mcp-http-observation.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 1338[2mms[22m[39m
+ [32m✓[39m test/codex-mcp-context.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1066[2mms[22m[39m
+   [33m[2m✓[22m[39m resolves the late entry beside the real stdio assets after bundling[33m 785[2mms[22m[39m
+ [32m✓[39m test/mikka-mcp-backend.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 378[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m41 passed[39m[22m[90m (41)[39m
+[2m   Start at [22m 03:53:23
+[2m   Duration [22m 4.08s[2m (tests 74%, import 23%, transform 3%)[22m
+

@@ -1,0 +1,34 @@
+{
+  "baseline": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "candidate": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+  "baselineExecutedOnce": true,
+  "candidateFullCheckExecutedOnce": true,
+  "baselineScope": "one actual failing fixture file using original Node test loader flags",
+  "sameNode": "v24.22.1",
+  "sameLockSha256": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+  "sameError": "SyntaxError: The requested module '@/components/suggestions/suggestion-feed' does not provide an export named 'SuggestionsRefresh'",
+  "normalizedFirstStackEqual": true,
+  "baselineSummary": [
+    "\u2139 tests 10",
+    "\u2139 suites 0",
+    "\u2139 pass 0",
+    "\u2139 fail 10",
+    "\u2139 cancelled 0",
+    "\u2139 skipped 0",
+    "\u2139 todo 0",
+    "\u2139 duration_ms 1593.323153"
+  ],
+  "directSourceFileCount": 81,
+  "allDirectBlobsEqual": true,
+  "candidateFullCheckRerun": false,
+  "productOrFixtureChanged": false,
+  "baselineResult": {
+    "exitCode": 1,
+    "durationSeconds": 1.646,
+    "startedAt": "2026-11-09T04:06:16.393534+00:00",
+    "finishedAt": "2026-11-09T04:06:18.039574+00:00",
+    "logBytes": 11090,
+    "logSha256": "0a693cae3fb088ac444dccc3d600c0b6599366667c2cfd6547f81d968865d20e",
+    "trackedClean": true
+  }
+}

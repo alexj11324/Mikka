@@ -1,0 +1,34 @@
+{
+  "linked": [
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/packages/config/node_modules",
+      "donor": "/vercel/Mikka-native-readiness-navigation-followup/packages/config/node_modules",
+      "aliases": {}
+    },
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/packages/daemon/node_modules",
+      "donor": "/vercel/Mikka-native-readiness-navigation-followup/packages/daemon/node_modules",
+      "aliases": {
+        "config": "/vercel/mikka-1505-factory-id-semantics/packages/config",
+        "protocol": "/vercel/mikka-1505-factory-id-semantics/packages/protocol"
+      }
+    },
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/packages/protocol/node_modules",
+      "donor": "/vercel/Mikka-native-readiness-navigation-followup/packages/protocol/node_modules",
+      "aliases": {
+        "config": "/vercel/mikka-1505-factory-id-semantics/packages/config"
+      }
+    },
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/apps/desktop/node_modules",
+      "donor": "/vercel/Mikka-native-readiness-navigation-followup/apps/desktop/node_modules",
+      "aliases": {
+        "config": "/vercel/mikka-1505-factory-id-semantics/packages/config",
+        "daemon": "/vercel/mikka-1505-factory-id-semantics/packages/daemon",
+        "protocol": "/vercel/mikka-1505-factory-id-semantics/packages/protocol"
+      }
+    }
+  ],
+  "donorModified": false
+}

@@ -1,0 +1,2 @@
+[fix/1505-factory-id-semantics-local-20261109 5ba78cc1c9] fix: distinguish Factory task IDs from issue IDs
+ 3 files changed, 72 insertions(+), 5 deletions(-)

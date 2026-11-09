@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "frozenAt": "2026-11-09T03:34:30.426121+00:00",
+  "identity": {
+    "commit": "5ba78cc1c930c7c78869e2e133c2581b925d32f0",
+    "tree": "0af9e4bfdbebccf75516f79fd5df35ad806e80c0",
+    "parents": [
+      "79aa2e7411b41c506b6ce19a97f41bd68964d8cf"
+    ],
+    "worktree": "/vercel/mikka-1505-factory-id-semantics",
+    "status": "clean",
+    "files": [
+      {
+        "path": "workflows/coordinator/factory-tools.ts",
+        "blob": "77a21b83c8060b0dd9e1bcfb76fb9e7d6b7300b5",
+        "mode": "100644",
+        "bytes": 9781,
+        "sha256": "9b87a7defef22c04dbe34f484bee3acc1cc8b1546ed7885bc597751c3146dabc"
+      },
+      {
+        "path": "workflows/coordinator/tools.ts",
+        "blob": "9bcf14a127aaa09e8028d2d0040d18aef1142bb6",
+        "mode": "100644",
+        "bytes": 35810,
+        "sha256": "363abc4e720e78f687f6d543bc8ec637ec00646dbe3d33284c1e3a0b7109ffd4"
+      },
+      {
+        "path": "lib/agent-kit/tool-defaults-compat.test.ts",
+        "blob": "9bad4eef4e08e3a67bcfd1cf0062969cf4ebe23f",
+        "mode": "100644",
+        "bytes": 27589,
+        "sha256": "16de855a95cde9afc5ef3ee73269562b5b01d6dfd1a85bd2bd837f28b75278e8"
+      }
+    ]
+  },
+  "validation": {
+    "summaries": {
+      "red": [
+        "\u2139 tests 4",
+        "\u2139 pass 0",
+        "\u2139 fail 4",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0"
+      ],
+      "green": [
+        "\u2139 tests 17",
+        "\u2139 pass 17",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0"
+      ],
+      "green-final": [
+        "\u2139 tests 17",
+        "\u2139 pass 17",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0"
+      ],
+      "schema-boundary": [
+        "\u2139 tests 1",
+        "\u2139 pass 1",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0"
+      ]
+    },
+    "firstTypecheckExitCode": 2,
+    "firstTypecheckErrors": 31,
+    "newTestNarrowingErrors": 6,
+    "finalRootTypecheckExitCode": 0,
+    "fullPnpmCheckRun": false,
+    "apiFrontendTypecheckRun": false,
+    "noDatabaseProviderOrModelExecuted": true
+  },
+  "metadataBudget": [
+    {
+      "surface": "named Bot",
+      "beforeBytes": 692,
+      "afterBytes": 664,
+      "deltaBytes": -28
+    },
+    {
+      "surface": "Coordinator",
+      "beforeBytes": 692,
+      "afterBytes": 664,
+      "deltaBytes": -28
+    },
+    {
+      "surface": "Factory export",
+      "beforeBytes": 662,
+      "afterBytes": 652,
+      "deltaBytes": -10
+    }
+  ],
+  "noActiveCommandOrPendingSourceMutation": true,
+  "members": [
+    {
+      "path": "README.md",
+      "bytes": 2136,
+      "sha256": "444bc3dd88e89bb34f2ca2bbcdf251bae4c15c308d612fcdf9b24c1fd7187772"
+    },
+    {
+      "path": "baseline-source-index.json",
+      "bytes": 765,
+      "sha256": "d99d15c9cadc20f47e17361502c55f655d9bd66411ca3ee689ee279433643f75"
+    },
+    {
+      "path": "commit-final.log",
+      "bytes": 158,
+      "sha256": "c9552ed25d3eb4c5d16f387dda49737caee7d42e175fbf35feab3ec6543959e2"
+    },
+    {
+      "path": "commit-identity.json",
+      "bytes": 1038,
+      "sha256": "8d55e16d69046a00722b1a58c1e52a5414cb369485766ee62e5f2b30d0d7f399"
+    },
+    {
+      "path": "commit.log",
+      "bytes": 337,
+      "sha256": "21785104849f63587e6f3a303f6f9990fe7dc030444a22cb64e6b3701132428d"
+    },
+    {
+      "path": "dependencies.json",
+      "bytes": 417,
+      "sha256": "cb1b85450a38813a85d348fa808b8ded03dfc67ec729e2868f6bb2d243956c5c"
+    },
+    {
+      "path": "green-final-result.json",
+      "bytes": 265,
+      "sha256": "78be6467c99a08d579e6e3eceaa7c66f011c08f70d5369f0db286462288d0a28"
+    },
+    {
+      "path": "green-final.log",
+      "bytes": 2476,
+      "sha256": "29fd54f2533713437d39ce32c1003b73061f7467e81e180bf28032c27d6154a0"
+    },
+    {
+      "path": "green-result.json",
+      "bytes": 265,
+      "sha256": "fd167147830188b5ac99f3377f9c13209f76563225d53b7508565052f20685ec"
+    },
+    {
+      "path": "green.log",
+      "bytes": 2475,
+      "sha256": "660748cccb1c58f1d13542559c892dab45dda64dbb902cd1dc3c1f5e187986d5"
+    },
+    {
+      "path": "lint-final-result.json",
+      "bytes": 306,
+      "sha256": "b800c73cf3fc6d7a302b664014e4de728e342700362c9f1941118497c6d8306f"
+    },
+    {
+      "path": "lint-final.log",
+      "bytes": 89,
+      "sha256": "65afcf25336f5a222b5909e8f8b217b42445b0791c8c61f3fe24cee9ab317a8f"
+    },
+    {
+      "path": "lint-result.json",
+      "bytes": 351,
+      "sha256": "bb4a1a45992bdf39a3ace17585ebc4864b956ff1c91d47754b2987903db129e1"
+    },
+    {
+      "path": "lint.log",
+      "bytes": 90,
+      "sha256": "5d703830c44d8253549fced2c38bfcaec52ab91fd353621f98ee2b25b70197bc"
+    },
+    {
+      "path": "metadata-budget.json",
+      "bytes": 567,
+      "sha256": "25ecbf1293b73462c723f6837a33b311206ae1da12c70b0e9d9af6812f7c8e49"
+    },
+    {
+      "path": "operator-notes.json",
+      "bytes": 943,
+      "sha256": "eacbf7d51594ca042bd126ff876f783066471438b40d870aca9d50ced566e05f"
+    },
+    {
+      "path": "package-dependency-links.json",
+      "bytes": 1401,
+      "sha256": "2ee8b3e910b16d917ec501d1bf5a80aa138c0a085ab2937bd9a711455be7c253"
+    },
+    {
+      "path": "product.patch",
+      "bytes": 3702,
+      "sha256": "1d6364d69cecee93fb072a6f6b3662ccf729921752092bd0b83e6cea662ac882"
+    },
+    {
+      "path": "red-result.json",
+      "bytes": 363,
+      "sha256": "02ee8f8eae4f8ca5d0e7ddff0aec863a75fd68aef8d55367c524087ec5c79930"
+    },
+    {
+      "path": "red.log",
+      "bytes": 4782,
+      "sha256": "0d1e06c2ce0c42f6fc0d612016e1cb1300e4ffd0a7440fbf148d0c83592af94e"
+    },
+    {
+      "path": "schema-boundary-result.json",
+      "bytes": 186,
+      "sha256": "39ea59119c050fbd4aaca23f58df860a4f82762ad33866b4f83822d1d4c5aadf"
+    },
+    {
+      "path": "schema-boundary.log",
+      "bytes": 224,
+      "sha256": "b659c22fa273fcf004afc6c701388200c88b8349f0750252954e368f2113058d"
+    },
+    {
+      "path": "source-conservation.json",
+      "bytes": 1310,
+      "sha256": "b4c05af5aeb6ea8e9e6ce6f71733f1ba6ce95b006934aa41fa7a972166b48273"
+    },
+    {
+      "path": "source.diff",
+      "bytes": 11993,
+      "sha256": "e53f20291b23113c7b28761aa55f70fe79863ae1545bb03b584067e51b785328"
+    },
+    {
+      "path": "test.diff",
+      "bytes": 8291,
+      "sha256": "c975c022a46f03db162c695fd4e87e3ec406bd483c252ae136fd96ba0843a617"
+    },
+    {
+      "path": "typecheck-final-result.json",
+      "bytes": 163,
+      "sha256": "c8a522c3d16c210d69272e0190ef8468c9681b9f06a73a23743491937d3052d9"
+    },
+    {
+      "path": "typecheck-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "typecheck-initial-diagnosis.json",
+      "bytes": 7442,
+      "sha256": "fcdf74ac32d382c01c3b7b9154dc816d30a548f3128a0ba32c48f64d01220545"
+    },
+    {
+      "path": "typecheck-result.json",
+      "bytes": 209,
+      "sha256": "c81d584dcd952fc332a02296d6d49db4121e5d9e0286501feab090c19bbca1fc"
+    },
+    {
+      "path": "typecheck.log",
+      "bytes": 6402,
+      "sha256": "f2b92a214f7c0a4f380a3e3994902c17b52bca94aeb941825658e3611fd9da05"
+    },
+    {
+      "path": "validation-summary.json",
+      "bytes": 859,
+      "sha256": "1ae15432ab12a9f093aa133eb3f836a63839dbf5faf7a4c28036284b302875e5"
+    },
+    {
+      "path": "working-source-index.json",
+      "bytes": 765,
+      "sha256": "99806bed21d69a0b3f99715feb384fb9b1c7ad72e3167be4fcc8c58d3ac1be02"
+    }
+  ],
+  "memberCount": 32,
+  "memberBytes": 60770
+}

@@ -1,0 +1,45 @@
+{
+  "before": {
+    "lockSha256": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+    "packageSha256": "50bfe650e5abdcbbe73a29e210760b9ce720cad8437038843b63d8ac4032f290"
+  },
+  "removedOnlyOwnedPaths": [
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/node_modules",
+      "wasSymlink": false,
+      "cacheLinks": {
+        ".vite": "/vercel/Mikka-native-readiness-navigation-followup/node_modules/.vite"
+      }
+    },
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/packages/config/node_modules",
+      "wasSymlink": false,
+      "cacheLinks": {
+        ".vite": "/vercel/Mikka-native-readiness-navigation-followup/packages/config/node_modules/.vite"
+      }
+    },
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/packages/daemon/node_modules",
+      "wasSymlink": false,
+      "cacheLinks": {
+        ".vite": "/vercel/Mikka-native-readiness-navigation-followup/packages/daemon/node_modules/.vite"
+      }
+    },
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/packages/protocol/node_modules",
+      "wasSymlink": false,
+      "cacheLinks": {
+        ".vite": "/vercel/Mikka-native-readiness-navigation-followup/packages/protocol/node_modules/.vite"
+      }
+    },
+    {
+      "path": "/vercel/mikka-1505-factory-id-semantics/apps/desktop/node_modules",
+      "wasSymlink": false,
+      "cacheLinks": {
+        ".vite": "/vercel/Mikka-native-readiness-navigation-followup/apps/desktop/node_modules/.vite"
+      }
+    }
+  ],
+  "donorPathsNotRemoved": true,
+  "priorCacheLinkCaveat": "Earlier Vitest checks inherited shared .vite links; no claim that those cache targets were untouched. All such links are removed before final fixed-dependency verification."
+}

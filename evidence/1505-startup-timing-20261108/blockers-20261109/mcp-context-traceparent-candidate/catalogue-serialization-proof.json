@@ -1,0 +1,9 @@
+{
+  "sameSerializedBytes": true,
+  "bytes": 7327,
+  "exportSha256": "d96e51357662f6a9d2fe03dcf7d90dc42514c185ef15b670934e36ac1ee54ac1",
+  "parsedSha256": "d96e51357662f6a9d2fe03dcf7d90dc42514c185ef15b670934e36ac1ee54ac1",
+  "source": "lib/project-map/mcp-tool.ts",
+  "sourceBlob": "e6e0f558026ec3f2fb7d2a4b74c349463a3d3d95",
+  "validation": "Existing protocol schema parses the actual exported claim catalogue without changing serialized bytes."
+}

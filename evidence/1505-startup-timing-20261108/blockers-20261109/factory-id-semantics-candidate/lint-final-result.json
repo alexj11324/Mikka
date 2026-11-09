@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/vercel/ops-1505/source-checks-7c014579/bin/pnpm",
+    "exec",
+    "oxlint",
+    "--deny-warnings",
+    "workflows/coordinator/factory-tools.ts",
+    "workflows/coordinator/tools.ts",
+    "lib/agent-kit/tool-defaults-compat.test.ts"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 0.414
+}

@@ -1,0 +1,47 @@
+{
+  "commit": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+  "tree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+  "parents": [
+    "16653e580d81d3d89f444affcf1a6062e47e76eb"
+  ],
+  "worktree": "/vercel/mikka-1505-factory-id-semantics",
+  "trackedClean": true,
+  "mergeCommit": "16653e580d81d3d89f444affcf1a6062e47e76eb",
+  "mergeTree": "8f96bae0e397cf031741ab5f96ddad6b5bd6e710",
+  "mergeParents": [
+    "5ba78cc1c930c7c78869e2e133c2581b925d32f0",
+    "0e4118020311ae8f9083d0d21cfb990be0282f25"
+  ],
+  "upstreamMain": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "factoryCommit": "5ba78cc1c930c7c78869e2e133c2581b925d32f0",
+  "factoryRemoteUnreferencedEquivalent": "b293885a0945807995bd6cb8054e04f2e739085b",
+  "lockSha256": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+  "patchSha256": "76c7ffdef07f05d1532e83593b6b3a4978215efe041db27e6291f621a33bd7bf",
+  "mcpFiles": [
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-context.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+      "bytes": 2781,
+      "sha256": "bed5e23a0a3e72d73864594aa126a8240c8a1baba4a186c29a7df74e4ea243ce"
+    },
+    {
+      "path": "packages/daemon/test/codex-mcp-context.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+      "bytes": 5195,
+      "sha256": "625992d7422d38eb0d13a0ae04d89fa3b69b2f44150356fbfa345fbca2708f3e"
+    },
+    {
+      "path": "packages/daemon/test/mcp-http-observation.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "blob": "c569b06d61ed84855db3c5921f1a6dba05774477",
+      "bytes": 22837,
+      "sha256": "2387a35f2b03ebece300f7601343bfa40da9bb5ab6b4676b0bd5e6783b043599"
+    }
+  ],
+  "fullCheck": "not_started_yet"
+}

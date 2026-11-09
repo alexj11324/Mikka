@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/vercel/ops-1505/source-checks-7c014579/bin/pnpm",
+    "exec",
+    "tsrs",
+    "--noEmit"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 8.808
+}

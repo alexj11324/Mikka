@@ -1,0 +1,65 @@
+{
+  "head": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+  "merge": "16653e580d81d3d89f444affcf1a6062e47e76eb",
+  "main": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "readerInverseExactlyOriginal": true,
+  "onlyAddedKey": "MIKKA_DECISION_MCP_TRACEPARENT",
+  "unchanged": [
+    {
+      "path": "packages/daemon/src/agents/run-context.ts",
+      "blob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f",
+      "bytes": 30602,
+      "sha256": "3948a2e3dcdef7b5bf8614de738665bf8a639c6a2ba1d36719988cf0802e19b3",
+      "sameAsActualMain0e": true
+    },
+    {
+      "path": "packages/daemon/src/codex-mcp-context.ts",
+      "blob": "beb35030e17a70a219ec9878701df7726bd4fddf",
+      "bytes": 1888,
+      "sha256": "d5a84df216bc4445f8e77eaa50a05b3bd5101ec1b5a49bb99d8d10f7e3ff4d6f",
+      "sameAsActualMain0e": true
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "blob": "308c9ed7ab78b636876fd661b55d36dd61b478d2",
+      "bytes": 50533,
+      "sha256": "96a0c7551fffd1d6bdd0386f9aa2ea8d37613dd969a244d2caf562a0594b13a9",
+      "sameAsActualMain0e": true
+    },
+    {
+      "path": "packages/daemon/src/mcp-http-timing.ts",
+      "blob": "348935cc2784567eef99dd8af85868c6438f5de4",
+      "bytes": 9646,
+      "sha256": "e409979c42fca874ed3d7915e4a7d940ca6887c58dfb47a1d8c6a3409d9271a2",
+      "sameAsActualMain0e": true
+    },
+    {
+      "path": "lib/project-map/mcp-tool.ts",
+      "blob": "e6e0f558026ec3f2fb7d2a4b74c349463a3d3d95",
+      "bytes": 1335,
+      "sha256": "7f92c54e0cce0f4bdd3f847bc7d0ec511ea4ef3c849beab99f9a259d3b092bc6",
+      "sameAsActualMain0e": true
+    },
+    {
+      "path": "lib/project-map/contracts.ts",
+      "blob": "e1a9709b67c41d319f54db5e1203941c49b724c9",
+      "bytes": 5778,
+      "sha256": "69052563e41de7c95383de1a403e346f19c023b8c1da751bf4116134aa2acf9f",
+      "sameAsActualMain0e": true
+    },
+    {
+      "path": "packages/daemon/tsconfig.json",
+      "blob": "a1c3ffed7d17fd64f273b6ba6e6098e915d7312d",
+      "bytes": 259,
+      "sha256": "8bd1508259b26a1f7eeb1c1dc09989ce37615f830debfbe79855989c54ebe01d",
+      "sameAsActualMain0e": true
+    },
+    {
+      "path": "packages/daemon/vitest.config.ts",
+      "blob": "fe90bc45619c133938927bf8fd955aa0058daf17",
+      "bytes": 316,
+      "sha256": "52372f2592654c670fe5829ac835112846c95fb46e27cfadc5d22b2c4716efb1",
+      "sameAsActualMain0e": true
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "next/server",
+            "importNames": [
+              "after"
+            ],
+            "message": "Use afterJob from @/lib/background, so the deferred work is traced and labelled as its own job (docs/operations/tracing.md)."
+          }
+        ]
+      }
+    ]
+  }
+}

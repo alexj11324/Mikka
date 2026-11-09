@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/vercel/ops-1505/source-checks-7c014579/bin/pnpm",
+    "exec",
+    "oxlint",
+    "--deny-warnings",
+    "src/agents/mikka-mcp-context.mjs",
+    "test/codex-mcp-context.test.ts",
+    "test/mcp-http-observation.test.ts"
+  ],
+  "cwd": "/vercel/mikka-1505-factory-id-semantics/packages/daemon",
+  "exitCode": 1,
+  "durationSeconds": 0.419
+}

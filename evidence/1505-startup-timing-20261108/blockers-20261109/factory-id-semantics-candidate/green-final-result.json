@@ -1,0 +1,14 @@
+{
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./tests/support/server-only.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "lib/agent-kit/tool-defaults-compat.test.ts"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 1.417
+}
