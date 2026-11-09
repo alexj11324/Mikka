@@ -47,17 +47,19 @@ export function trailingSlashRedirect(request) {
   return new Response(null, { status: 308, headers: { location: url.href } })
 }
 
-export function pageRedirect(request, { production = process.env.NODE_ENV === 'production', legacyHost = process.env.MIKKA_LEGACY_APP_HOST, origin = process.env.BETTER_AUTH_URL, edition = process.env.MIKKA_EDITION } = {}) {
+export function pageRedirect(request, { production = process.env.NODE_ENV === 'production', legacyHost = process.env.MIKKA_LEGACY_APP_HOST, edition = process.env.MIKKA_EDITION } = {}) {
+  const url = new URL(request.url)
+  // A retired app host must never enter the application, even for API paths,
+  // trailing slashes or URLs carrying old authentication/share tokens.
+  if (legacyHost && url.host === legacyHost) {
+    return new Response(null, { status: 301, headers: { location: 'https://aspectlylabs.com/mikka', 'referrer-policy': 'no-referrer' } })
+  }
   const canonical = trailingSlashRedirect(request)
   if (canonical) return canonical
-  const url = new URL(request.url), path = url.pathname
+  const path = url.pathname
   const redirect = (pathname, status = 307, reset = false) => {
     const target = new URL(url); target.pathname = pathname; if (reset) target.search = ''
     return new Response(null, { status, headers: { location: target.href } })
-  }
-  if (legacyHost && origin && url.host === legacyHost) {
-    const target = new URL(origin); target.pathname = `/mikka${path === '/' ? '' : path}`; target.search = url.search
-    return new Response(null, { status: 308, headers: { location: target.href } })
   }
   if (path === '/') return redirect('/mikka')
   // The official App keeps /mikka as its Setup URL. Only the cloud broker's
