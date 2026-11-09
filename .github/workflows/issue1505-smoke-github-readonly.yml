@@ -15,12 +15,12 @@ concurrency:
   queue: max
 jobs:
   prepare:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       MIKKA_EDITION: cloud
-      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-readonly-v1'
+      MIKKA_GITHUB_REPAIR_GO: ''
     permissions:
       contents: read
       actions: read
