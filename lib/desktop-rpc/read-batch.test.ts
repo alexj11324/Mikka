@@ -5,6 +5,7 @@ import { WorkspaceError } from '../workspace-error'
 import { withRequestLog } from '../request-log'
 import { createDesktopRpc, type DesktopActions } from './handler'
 import { createReadBatch } from './read-batch'
+import { readBatchOwnerRevisions } from './read-batch-context'
 import { READ_BATCH_ACTION, READ_BATCH_ACTIONS, type BatchReadAction, type ReadBatchCall } from './read-batch-contract'
 import { desktopActionSchemas } from './schemas'
 import { currentDesktopSession, withDesktopSession } from './session'
@@ -162,4 +163,34 @@ test('batch readers share the API request memo while later requests authorize a 
     { ok: false, status: 403, error: { code: 'workspaceAccessDenied' } },
   ])
   assert.equal(reads, 2, 'a later HTTP request cannot retain the prior membership observation')
+})
+
+test('only the validated prepared owner readers contribute revision kinds across different readiness times', async () => {
+  let release!: () => void
+  const started = new Promise<void>(resolve => { release = resolve })
+  const queries: string[][][] = []
+  const database = { query: async (_sql: string, values: string[][]) => {
+    queries.push(values)
+    return { rows: values[0].map((kind, index) => ({ kind, id: values[1][index], revision: '7' })) }
+  } } as unknown as Parameters<typeof readBatchOwnerRevisions>[0]
+  const home = { ownerId: owner, workspaceId: owner }
+  const f = fixture({
+    'task-runs.pollTaskRuns': async () => {
+      const revisions = await readBatchOwnerRevisions(database, [{ kind: 'task_run_list', id: owner }], home)
+      release(); return { revisions }
+    },
+    'issues.syncIssueList': async () => {
+      await started
+      return { revisions: await readBatchOwnerRevisions(database, [{ kind: 'issue_list', id: owner }], home) }
+    },
+  })
+  const response = await f.handle(request([task, { action: 'issues.syncIssueList', args: [] },
+    { action: 'bots.pollBots', args: [] }, { action: 'coordinator.syncCoordinatorChat', args: [owner] }, teams]))
+  assert.equal(response.status, 200)
+  assert.deepEqual(queries, [[['issue_list', 'task_run_list'], [owner, owner]]], 'unrequested lists and bot entity keys are not guessed')
+  const items = decode((await response.json()).result) as { ok: true; result: { revisions: Record<string, number> } }[]
+  assert.deepEqual(items.slice(0, 2), [
+    { ok: true, result: { revisions: { [`task_run_list:${owner}`]: 7 } } },
+    { ok: true, result: { revisions: { [`issue_list:${owner}`]: 7 } } },
+  ])
 })

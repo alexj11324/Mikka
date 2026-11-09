@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { useEffect, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
@@ -47,10 +48,10 @@ export function HomeScreen() {
       <NavBar
         title="Bot"
         topTitle
-        right={{ icon: 'plus', label: '新建', web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push('/new-bot'),
+        right={{ icon: 'plus', label: mobileMessages.Nav.create, web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push('/new-bot'),
           items: [
-            { label: '新建 Bot', icon: 'person.crop.circle.badge.plus', onPress: () => router.push('/new-bot') },
-            { label: '新建群聊', icon: 'person.2', onPress: () => router.push('/new-group') },
+            { label: mobileMessages.Nav.newBot, icon: 'person.crop.circle.badge.plus', onPress: () => router.push('/new-bot') },
+            { label: mobileMessages.Nav.newGroup, icon: 'person.2', onPress: () => router.push('/new-group') },
           ] }}
       />
       <FlatList<HomeItem<HomeChat>>
@@ -62,11 +63,11 @@ export function HomeScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         ListHeaderComponent={
           <View>
-            <ReadNotice error={error} hasData={chats.length > 0} label="对话列表" onRetry={reload} />
+            <ReadNotice error={error} hasData={chats.length > 0} label={mobileMessages.MobileCore.chatList} onRetry={reload} />
             {updateReady ? (
               <Pressable accessibilityRole="button" onPress={restartToUpdate} style={({ pressed }) => [styles.update, pressed && { opacity: 0.6 }]}>
                 <Symbol name="arrow.down.circle" size={17} color={colors.accent} />
-                <Text style={styles.updateText}>重启以更新</Text>
+                <Text style={styles.updateText}>{mobileMessages.MobileCore.restartToUpdate}</Text>
               </Pressable>
             ) : null}
             <PinnedGrid pinned={pinned} actions={actions} />
@@ -76,7 +77,7 @@ export function HomeScreen() {
         ListFooterComponent={hidden > 0 ? (
           <Pressable accessibilityRole="button" onPress={() => router.push('/hidden-chats')} style={({ pressed }) => [styles.hidden, pressed && { opacity: 0.6 }]}>
             <Symbol name="eye.slash" size={15} color={colors.secondary} />
-            <Text style={styles.hiddenText}>隐藏的聊天</Text>
+            <Text style={styles.hiddenText}>{mobileMessages.MobileCore.hiddenChats}</Text>
             <Text style={styles.hiddenCount}>{hidden}</Text>
             <ChevronRight size={16} color={colors.tertiary} strokeWidth={2} />
           </Pressable>

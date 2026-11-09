@@ -4,7 +4,7 @@ import type { SavedAccount } from '../lib/server-store.ts'
 
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done }); return { promise, resolve } }
 const cloud: SavedAccount = { id: 'legacy', user: { id: 'same-id', name: 'A', email: 'a@example.test' }, server: {
-  url: 'https://cloud.example/mikka', name: 'Cloud', version: null, edition: 'cloud', signIn: { email: true, google: false, github: false }, mobileReady: true } }
+  url: 'https://cloud.example/mikka', name: 'Cloud', version: null, edition: 'cloud', signIn: { email: true, google: false, github: false, apple: false }, mobileReady: true } }
 const self: SavedAccount = { ...cloud, id: '1', server: { ...cloud.server, url: 'https://self.example/mikka' } }
 let current = cloud, changed: () => void = () => {}, state = 'unknown'
 let token: () => Promise<{ data: string }> = async () => ({ data: 'ExpoPushToken[fixture]' })

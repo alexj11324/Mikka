@@ -1,6 +1,6 @@
 # Agent as Code
 
-Alex requested the full Agent-as-Code engineering layer on 2026-10-26: declarative definitions, shared tools, evaluations, immutable execution provenance, lazy Skills, registered hooks, import/export and controlled improvement proposals. This change is backend-only. Bot creation, layout and native coding sessions remain unchanged.
+This implementation reference describes declarative Agent definitions, shared tools, evaluations, immutable execution provenance, lazy Skills, registered hooks, import/export and controlled improvement proposals. It records the backend scope Alex requested on 2026-10-26. Runtime acceptance follows [acceptance.md](../acceptance.md).
 
 ## Ownership boundaries
 
@@ -11,7 +11,7 @@ Alex requested the full Agent-as-Code engineering layer on 2026-10-26: declarati
 
 ## Rollout
 
-Apply the additive `20261027181000_agent_kit.sql` migration to the isolated test database before enabling `MIKKA_AGENT_KIT=1` in a local or Docker production build (branches have no Vercel Preview; deployment migrates production). The flag is off by default; no production configuration is changed by this PR. With the flag off, Coordinator tools and prompts follow the old path. Enabling does not change the user's selected harness.
+The additive `20261027181000_agent_kit.sql` migration runs through the normal deployment migration flow. Versioned definitions are enabled by default in `lib/agent-kit/config.ts` and `lib/deployment-switches.ts`. The PostHog `mikka-agent-kit-off` kill switch and legacy `MIKKA_AGENT_KIT=0` override retain the disabled path. Live evaluation has its separate paid-use gate. The selected harness remains part of the run definition.
 
 A new execution records an immutable definition revision, content digest, exact host instructions and their digest, effective tools, and the selected runtime/model where known. An execution replay reuses that record even if the user edits the Bot. Memory is loaded separately under the current owner/Bot scope. The host prompt snapshot is not a model's hidden internal system prompt and does not claim to capture provider-internal state.
 
@@ -49,7 +49,7 @@ Version writes use a locked head, optimistic version checks and idempotency keys
 
 Evals check observed tool use, known fixture facts, nonempty replies, outcome categories and the no-unauthorized-effect boundary. They do not prescribe an entire tool sequence. Test code fixes the core cases and thresholds; a definition cannot edit them.
 
-`fixture` is a plumbing smoke test with synthetic output. It cannot activate a candidate. `live` performs real model inference against the same tool schemas, but replaces **every tool implementation** with an inert synthetic fixture before execution. It cannot send mail, edit calendars, write memory or dispatch a worker. Live evaluation requires both `MIKKA_AGENT_KIT_LIVE_EVAL=1` and explicit request consent to model usage. It is not native-CLI, real-account, browser or production acceptance.
+`fixture` is a plumbing smoke test with synthetic output. It cannot activate a candidate. `live` performs real model inference against the same tool schemas, but replaces **every tool implementation** with an inert synthetic fixture before execution. It cannot send mail, edit calendars, write memory or dispatch a worker. Live evaluation requires the `agentKitLiveEval` deployment switch (`mikka-agent-kit-live-eval`, with legacy `MIKKA_AGENT_KIT_LIVE_EVAL=1`) and explicit request consent to model usage. It is not native-CLI, real-account, browser or production acceptance.
 
 Failures produce structural, synthetic regression cases, not copied private conversations. At least three distinct failed executions of the current definition are needed for a proposal. The current generator is deliberately rule-based: it proposes additive reliability guidance for the observed failure categories. It does not claim autonomous model training or guaranteed improvement.
 
@@ -61,14 +61,14 @@ Skill artifact publication and Factory review/verification in #316 remain separa
 
 Run the pure definition/loader/tool/eval/HTTP suite with `pnpm test:agent-kit`. `pnpm test:agent-kit-db` uses only the existing Actions loopback service or an explicitly named isolated cloud-sandbox database; it refuses application/cloud URLs. The actual migration is applied repeatedly, and concurrency, immutable snapshots, tenant isolation, idempotency, proposal gates and HTTP-to-Postgres paths are exercised. Existing native relay and scope tests remain mandatory.
 
-Passing these suites establishes implementation contracts, not model quality. Real model comparisons and authenticated acceptance (local/Docker production build before merge, production after) must be reported separately, with their exact version and any missing authorization or configuration.
+Passing these suites establishes implementation contracts. Report real model comparisons and authenticated acceptance separately, with the exact revision and environment. Model-execution acceptance covers official Claude Code subscription (`claude-haiku-5-5`) and official Codex subscription (`gpt-6-luna`) under [acceptance.md](../acceptance.md). Record a blocked subscription independently and continue the other path. API-key execution does not gate acceptance.
 
 ## Current main compatibility
 
 The shared registry retains main's attention decisions and optional Bot-computer tools. The cloud catalog is advertised only when the existing computer/BYOS feature gate is enabled; a definition selecting an unavailable capability fails closed. Existing saved definitions retain their explicit tool list. The fresh built-in definition includes `record_attention`; adding it or cloud capabilities to an existing definition is an explicit versioned edit, not an automatic permission expansion.
 
-Both local and cloud dispatch capture the standing worker instructions and, when selected, the exact subscription binding/model/route as non-secret snapshot metadata. Claim and retries preserve that selection and refuse a missing, changed or disabled pinned subscription instead of choosing a later binding. Cloud retries retain their Bot desktop binding and stay on its cloud device. These source contracts do not establish real CC/Codex or provider execution.
+Both local and cloud dispatch capture the standing worker instructions and, when selected, the exact subscription binding/model/route as non-secret snapshot metadata. Claim and retries preserve that selection and refuse a missing, changed or disabled pinned subscription instead of choosing a later binding. Cloud retries preserve the task's dedicated machine binding. These source contracts do not establish real CC/Codex or provider execution.
 
-The Agent Kit migration now follows current main as `20261027181000_agent_kit.sql`. Its SQL bytes are unchanged; the migrator recognizes the former filename only with the approved exact SQL hash. The combined tree has 62 migrations, versus main's 61. No combined schema has been applied by this review.
+The migrator recognizes the Agent Kit migration's former filename only with its approved exact SQL hash. Migration counts and review results belong to the revision-bound CI evidence.
 
-Native subscription requests recheck the run's current owned device and its selected broker capability, then match the frozen subscription rather than the Agent's mutable harness/device assignment. Run views also display the frozen harness when recorded. The actual combined-schema native request and lease-retry SQL still require the separately scoped PostgreSQL gate.
+Admission and claim validate the owned device and frozen subscription against the execution snapshot. The [machine authority decision](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md) governs native CLI authentication and direct provider calls. Other third-party Secrets follow the separate [exposure decision](decisions/2026-11-08-0240-credential-exposure-boundary.md). The source implementation separates ordinary/direct environment values from protected capabilities under [task Secret delivery](../security/task-secret-delivery.md). Deployment and runtime protection need their own evidence. Run views display the frozen harness when recorded. Native request and lease-retry SQL require matching isolated PostgreSQL evidence for the tested revision.

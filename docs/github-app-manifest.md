@@ -62,9 +62,10 @@ The production handlers are exercised by
 `test:github-connections-db` suite. Its separate schema keeps the singleton
 fixture from affecting concurrently running database suites. Local source
 tests cover encryption, origin and organization validation, fixed provider
-endpoints, account-scoped settings and fresh-session reads. This cloud
-workspace has no PostgreSQL binary, so the real database suite must run in
-the existing CI PostgreSQL environment before acceptance can be claimed.
+endpoints, account-scoped settings and fresh-session reads. The original implementation workspace could not run PostgreSQL. That
+constraint records its evidence boundary. New database validation uses the
+isolated CI PostgreSQL environment, and new runtime evidence follows
+[acceptance](acceptance.md).
 
 UI reuse: `SettingsSection`, `SettingRow`, `AppTile`, `Button`, `Dialog`,
 `FieldGroup`, `Field`, `FieldLabel`, `Input`, `Select`, `Alert` and `FieldError`.

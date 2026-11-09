@@ -1,5 +1,11 @@
 # Controlled improvement: validation and handoff
 
+This is the historical validation and handoff report for the baseline commit
+below. Test totals, browser jobs and pending integration items describe that
+revision. Use [the implementation overview](self-improvement.md) and
+[acceptance guide](../acceptance.md) for the implemented interfaces and required
+checks. This documentation refresh does not establish a later runtime result.
+
 > Note (2026-11-03): the fixed trigger of 25 distinct failures or a seven-day-old
 > failure named below was later replaced by the Decision API's `propose` answer
 > (`lib/self-improvement/proposal-judgment.ts`,

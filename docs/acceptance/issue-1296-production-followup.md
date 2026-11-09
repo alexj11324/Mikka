@@ -1,5 +1,9 @@
 # Issue #1296：生产验收与修复跟进
 
+> 本文保留当次版本的三路模型证据与失败。现行验收使用共享 SMOKE 账号，
+> 官方 Claude Code 与 Codex 两条订阅路径独立记录。DeepSeek/API-key 路径
+> 已退出合并及验收门槛，后续执行按 [验收指南](../acceptance.md)。
+
 日期：2026-11-05；文中时间均为 UTC。
 
 跟踪：[Mikka #1296](https://github.com/alexj11324/Mikka/issues/1296)。本文补充[主 UI／可用性／motion 审计报告](issue-1296-ui-audit.md)，记录主 PR 上线后的真实生产验收、发现的问题、最小修复与 Docker 回归。本文不修改既有验收规则，也不把模型菜单可选、合成测试、Web 截图或 binary 构建视为其它层次的验收结果。

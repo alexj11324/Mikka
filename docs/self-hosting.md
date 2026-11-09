@@ -283,6 +283,13 @@ Configure these server-only variables with values from **your own** Infisical in
 
 The access path uses the same project unless `MIKKA_BYOS_ACCESS_INFISICAL_PROJECT` is set. The supported static-token alternative uses `MIKKA_BYOS_INFISICAL_TOKEN` for custody and a different `MIKKA_BYOS_ACCESS_INFISICAL_TOKEN` for access-only reads, with the same permissions. Do not mix in Mikka's project, identities, paths or provider grants. Supply these values as runtime secrets; the [environment template](../.env.example) lists the standard configuration.
 
+An existing usable custody identity can also serve the shared-custody mode.
+Set `MIKKA_BYOS_SHARED_CUSTODY_IDENTITY=1` with its custody client ID/secret and
+the two distinct storage paths. The application authorizes the exact binding,
+consumer, run and membership before reading an access-only projection. This
+mode keeps the custody identity on the application side. Use the existing
+authorized configuration described in the [subscription worker guide](../packages/subscription-worker/README.md).
+
 After configuring this backend, each user connects their existing subscription through the normal provider OAuth flow in **Settings → Models and subscriptions**. Community defaults enable BYOS and both OAuth routes; an explicit administrator override can disable them. The owner, workspace permissions, model availability and quota are checked before use. Missing backend configuration is reported as unavailable and does not fall back to Mikka's credentials. The separate operator enrollment receiver has additional configuration; it is not required for the signed-in Settings connection flow. See the [subscription worker documentation](../packages/subscription-worker/README.md) for that custody boundary and recovery behavior.
 
 The image acceptance check executes both packaged binaries and verifies their build digests, the worker's pinned CPA version, and rejection of an empty configuration. It makes no provider requests. A real Claude Code subscription task and a real Codex subscription task remain separate acceptance checks after OAuth authorization; the local synthetic model fixture does not establish either.

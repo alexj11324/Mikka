@@ -1,7 +1,10 @@
 # Bundled desktop renderer
 
-Tracks [#1415](https://github.com/alexj11324/Mikka/issues/1415). Decision:
-[2026-11-05](decisions/2026-11-05-1615-desktop-bundled-renderer.md).
+This implementation reference tracks [#1415](https://github.com/alexj11324/Mikka/issues/1415) and the
+[2026-11-05 decision](decisions/2026-11-05-1615-desktop-bundled-renderer.md).
+`apps/desktop/src/main/index.ts` selects the bundled renderer by default.
+`MIKKA_DESKTOP_RENDERER=hosted` selects the retained hosted path. The baseline
+inventory and validation plan record the architecture change's original scope.
 
 ## Baseline inventory
 
@@ -47,8 +50,8 @@ part of the route inventory rather than being silently dropped.
    Ticket acquisition and the authenticated socket live in main. Reconnecting
    is event-driven and no idle database polling is added.
 
-The implementation and final RPC/version contract are recorded with its tests
-in this PR. The server is never allowed to import or execute arbitrary names
+The RPC/version contract is implemented in `lib/desktop-rpc/` and its tests.
+The main-process transport lives in `apps/desktop/src/main/bundled-*.ts`. The server is never allowed to import or execute arbitrary names
 provided by the client.
 
 ### Native session cache and fresh authorization
@@ -127,5 +130,7 @@ idle-budget test is not represented as the one-hour runtime measurement.
 
 ## Acceptance status
 
-Implementation and runtime validation are in progress. No item in #1415 is
-marked complete until its recorded evidence satisfies that item.
+The bundled renderer is present and selected by default in source. This page
+does not establish completion of every #1415 acceptance item. Use the
+revision-bound records under `docs/acceptance/issue-1415/` and the owning issue
+for measured results and remaining gates.

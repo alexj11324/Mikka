@@ -832,7 +832,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "38fe0c41d60482f1314b414e1f3177add2f667ffa8ad3546794d15f5e9fce6aa"
+      "sourceHash": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4"
     },
     {
       "path": "/mikka/api/devices/ssh",
@@ -1348,7 +1348,7 @@
         "POST",
         "PUT"
       ],
-      "sourceHash": "9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09"
+      "sourceHash": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17"
     },
     {
       "path": "/mikka/api/mobile/open",
