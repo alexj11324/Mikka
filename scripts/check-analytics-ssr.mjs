@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { gunzip } from 'node:zlib'
+import { load as loadYaml } from 'js-yaml'
 import { POSTER_BINARY_ARCHIVE, POSTER_BINARY_MANIFEST, POSTER_BINARY_MAX_BYTES,
   POSTER_LICENSE_FILES, POSTER_RUNTIME_DIRECTORY } from '../lib/captures/poster-binary.mjs'
 import { readCompiledBuild } from './start-app.mjs'
@@ -41,9 +42,9 @@ async function regularBytes(root, path) {
   return regularPathBytes(root, path)
 }
 
-async function pinnedPosterBytes(root, path) {
-  assert.match(path, /^node_modules\/\.pnpm\/ffmpeg-static@\d+\.\d+\.\d+\/node_modules\/ffmpeg-static\/(?:ffmpeg|ffmpeg\.(?:README|LICENSE)|LICENSE|README\.md|package\.json)$/)
-  return regularPathBytes(root, path)
+async function pinnedPosterBytes(root, directory, filename) {
+  assert.match(filename, /^(?:ffmpeg|ffmpeg\.(?:README|LICENSE)|LICENSE|README\.md|package\.json)$/)
+  return regularPathBytes(root, `${directory}/${filename}`)
 }
 
 async function regularPathBytes(root, path) {
@@ -64,9 +65,26 @@ async function regularPathBytes(root, path) {
 async function posterPackageDirectory(root) {
   const version = JSON.parse(await regularBytes(root, 'package.json')).dependencies?.['ffmpeg-static']
   assert.match(version, /^\d+\.\d+\.\d+$/)
-  const directory = `node_modules/.pnpm/ffmpeg-static@${version}/node_modules/ffmpeg-static`
+  const lock = loadYaml((await regularBytes(root, 'pnpm-lock.yaml')).toString())
+  const dependency = lock?.importers?.['.']?.dependencies?.['ffmpeg-static']
+  assert.equal(dependency?.specifier, version, 'FFmpeg specifier must match the frozen lock')
+  const key = `ffmpeg-static@${version}`, patch = lock?.patchedDependencies?.[key]
+  let resolution = version, store = key
+  if (patch !== undefined) {
+    assert.equal(version, '5.3.0', 'Only the reviewed FFmpeg version may use a patch')
+    assert.equal(patch?.path, 'patches/ffmpeg-static@5.3.0.patch', 'FFmpeg patch path must be exact')
+    assert.match(patch?.hash, /^[a-f0-9]{64}$/)
+    // pnpm 10 hashes patch text after normalizing CRLF to LF.
+    const patchText = (await regularPathBytes(root, patch.path)).toString().replaceAll('\r\n', '\n')
+    assert.equal(hash(patchText), patch.hash, 'FFmpeg patch must match its frozen lock hash')
+    resolution += `(patch_hash=${patch.hash})`
+    store += `_patch_hash=${patch.hash}`
+  }
+  assert.equal(dependency?.version, resolution, 'FFmpeg resolution must match the frozen lock')
+  assert.ok(Object.hasOwn(lock?.snapshots ?? {}, `ffmpeg-static@${resolution}`), 'FFmpeg snapshot must exist in the frozen lock')
+  const directory = `node_modules/.pnpm/${store}/node_modules/ffmpeg-static`
   assert.equal(await realpath(join(root, 'node_modules/ffmpeg-static')), join(root, directory), 'FFmpeg must be the exact pinned pnpm package')
-  const metadata = JSON.parse(await pinnedPosterBytes(root, `${directory}/package.json`))
+  const metadata = JSON.parse(await pinnedPosterBytes(root, directory, 'package.json'))
   assert.equal(metadata.name, 'ffmpeg-static'); assert.equal(metadata.version, version)
   return directory
 }
@@ -91,7 +109,7 @@ export async function verifyRuntimeResources(root, built) {
       const license = POSTER_LICENSE_FILES.find(name => resource.path === `${POSTER_RUNTIME_DIRECTORY}/${name}`)
       if (!license) continue
       posterPackage ??= await posterPackageDirectory(root)
-      const source = await pinnedPosterBytes(root, `${posterPackage}/${license}`)
+      const source = await pinnedPosterBytes(root, posterPackage, license)
       assert.equal(source.length, resource.bytes); assert.equal(hash(source), resource.sha256)
     } else {
       const source = await regularBytes(root, resource.path)
@@ -106,7 +124,7 @@ export async function verifyRuntimeResources(root, built) {
     for (const size of [manifest.bytes, manifest.gzipBytes]) assert.ok(Number.isSafeInteger(size) && size > 0 && size <= POSTER_BINARY_MAX_BYTES)
     for (const digest of [manifest.sha256, manifest.gzipSha256]) assert.match(digest, /^[a-f0-9]{64}$/)
     posterPackage ??= await posterPackageDirectory(root)
-    const source = await pinnedPosterBytes(root, `${posterPackage}/ffmpeg`), packed = posters.get(POSTER_BINARY_ARCHIVE)
+    const source = await pinnedPosterBytes(root, posterPackage, 'ffmpeg'), packed = posters.get(POSTER_BINARY_ARCHIVE)
     assert.equal(source.length, manifest.bytes); assert.equal(hash(source), manifest.sha256)
     assert.equal(packed.length, manifest.gzipBytes); assert.equal(hash(packed), manifest.gzipSha256)
     const expanded = await decompress(packed, { maxOutputLength: manifest.bytes })

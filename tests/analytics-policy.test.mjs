@@ -195,6 +195,7 @@ test('generated FFmpeg evidence verifies the pinned pnpm source, real decompress
   const digest = bytes => createHash('sha256').update(bytes).digest('hex')
   const packageDirectory = 'node_modules/.pnpm/ffmpeg-static@5.3.0/node_modules/ffmpeg-static'
   await write('package.json', JSON.stringify({ dependencies: { 'ffmpeg-static': '5.3.0' } }))
+  await write('pnpm-lock.yaml', JSON.stringify({ importers: { '.': { dependencies: { 'ffmpeg-static': { specifier: '5.3.0', version: '5.3.0' } } } }, snapshots: { 'ffmpeg-static@5.3.0': {} } }))
   await write(`${packageDirectory}/package.json`, JSON.stringify({ name: 'ffmpeg-static', version: '5.3.0' }))
   const original = Buffer.from('locked executable fixture\n'), archive = gzipSync(original)
   await write(`${packageDirectory}/ffmpeg`, original)
@@ -308,4 +309,74 @@ test('the CI AppArmor helper refuses non-executable or non-ELF files', async t =
   await chmod(executable, 0o755)
   await writeFile(executable, '#!/bin/sh\nexit 0\n')
   await assert.rejects(analyticsBrowserProfile(root), /ANALYTICS_BROWSER_EXECUTABLE_NOT_ELF/)
+})
+
+test('patched FFmpeg provenance accepts only the exact frozen patch hash and original source boundaries', async t => {
+  const { root, built, write } = await analyticsBuildFixture(t)
+  const digest = bytes => createHash('sha256').update(bytes).digest('hex')
+  const patch = '--- a/install.js\n+++ b/install.js\n@@ -1 +1 @@\n-old\n+bounded\n'
+  const patchPath = 'patches/ffmpeg-static@5.3.0.patch', patchHash = digest(patch)
+  const lockedVersion = `5.3.0(patch_hash=${patchHash})`
+  const packageDirectory = `node_modules/.pnpm/ffmpeg-static@5.3.0_patch_hash=${patchHash}/node_modules/ffmpeg-static`
+  const lock = {
+    patchedDependencies: { 'ffmpeg-static@5.3.0': { hash: patchHash, path: patchPath } },
+    importers: { '.': { dependencies: { 'ffmpeg-static': { specifier: '5.3.0', version: lockedVersion } } } },
+    snapshots: { [`ffmpeg-static@${lockedVersion}`]: {} },
+  }
+  const writeLock = () => write('pnpm-lock.yaml', JSON.stringify(lock))
+  await write('package.json', JSON.stringify({ dependencies: { 'ffmpeg-static': '5.3.0' } }))
+  await writeLock(); await write(patchPath, patch)
+  await write(`${packageDirectory}/package.json`, JSON.stringify({ name: 'ffmpeg-static', version: '5.3.0' }))
+  const original = Buffer.from('locked executable fixture\n'), archive = gzipSync(original)
+  await write(`${packageDirectory}/ffmpeg`, original)
+  const publicLink = join(root, 'node_modules/ffmpeg-static')
+  await symlink(join(root, packageDirectory), publicLink, 'dir')
+  const manifest = { version: 1, bytes: original.length, sha256: digest(original), gzipBytes: archive.length, gzipSha256: digest(archive) }
+  const packed = async (path, bytes) => {
+    await write(`.output/${path}`, bytes)
+    built.resources.push({ path, bytes: Buffer.byteLength(bytes), sha256: digest(bytes) })
+  }
+  for (const name of POSTER_LICENSE_FILES) {
+    const bytes = `pinned upstream ${name}\n`
+    await write(`${packageDirectory}/${name}`, bytes)
+    await packed(`${POSTER_RUNTIME_DIRECTORY}/${name}`, bytes)
+  }
+  await packed(POSTER_BINARY_ARCHIVE, archive)
+  await packed(POSTER_BINARY_MANIFEST, JSON.stringify(manifest))
+  built.posterBinary = manifest
+  assert.equal((await verifyRuntimeResources(root, built)).count, requiredRuntimeResources.length + 6)
+
+  // pnpm hashes patch text after CRLF normalization, not arbitrary store suffixes.
+  await write(patchPath, patch.replaceAll('\n', '\r\n'))
+  assert.equal((await verifyRuntimeResources(root, built)).count, requiredRuntimeResources.length + 6)
+  await write(patchPath, patch + 'changed\n')
+  await assert.rejects(verifyRuntimeResources(root, built), /FFmpeg patch must match its frozen lock hash/)
+  await write(patchPath, patch)
+
+  lock.importers['.'].dependencies['ffmpeg-static'].version = '5.3.0'
+  await writeLock()
+  await assert.rejects(verifyRuntimeResources(root, built), /FFmpeg resolution must match the frozen lock/)
+  lock.importers['.'].dependencies['ffmpeg-static'].version = lockedVersion
+  await writeLock()
+
+  lock.patchedDependencies['ffmpeg-static@5.3.0'].path = 'patches/unrelated.patch'
+  await writeLock()
+  await assert.rejects(verifyRuntimeResources(root, built), /FFmpeg patch path must be exact/)
+  lock.patchedDependencies['ffmpeg-static@5.3.0'].path = patchPath
+  await writeLock()
+
+  const wrongDirectory = `node_modules/.pnpm/ffmpeg-static@5.3.0_patch_hash=${'0'.repeat(64)}/node_modules/ffmpeg-static`
+  await mkdir(join(root, wrongDirectory), { recursive: true })
+  await rm(publicLink); await symlink(join(root, wrongDirectory), publicLink, 'dir')
+  await assert.rejects(verifyRuntimeResources(root, built), /exact pinned pnpm package/)
+  await rm(publicLink); await symlink(join(root, packageDirectory), publicLink, 'dir')
+
+  await write('saved.patch', patch)
+  await rm(join(root, patchPath)); await symlink(join(root, 'saved.patch'), join(root, patchPath))
+  await assert.rejects(verifyRuntimeResources(root, built), /symlinks/)
+  await rm(join(root, patchPath)); await write(patchPath, patch)
+  await write(`${packageDirectory}/alternate`, original)
+  await rm(join(root, packageDirectory, 'ffmpeg'))
+  await symlink(join(root, packageDirectory, 'alternate'), join(root, packageDirectory, 'ffmpeg'))
+  await assert.rejects(verifyRuntimeResources(root, built), /symlinks/)
 })
