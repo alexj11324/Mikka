@@ -11,7 +11,6 @@ import { createSessionClient, smokeAcceptanceAccount } from '../acceptance/cloud
 
 export const MAIN = 'e189d7652fd2fce48b77a3697abf5bb177d8ebd1'
 export const ORIGIN = 'https://app.aspectlylabs.com'
-const ADMIN_HASH = '0049e13c050f799070a7d1a95bb843f2a0519b5e8732bf6986e2e1613b8941c3'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const SHA = /^[0-9a-f]{40}$/
 const LABELS = new Set(['workspace', 'personal'])
@@ -109,31 +108,32 @@ export async function selectScope(client, email, observeInventory = () => {}) {
   check(typeof ownerId === 'string' && ownerId.length > 0 && session.user.email?.trim().toLowerCase() === email.trim().toLowerCase(), 'account_refused')
   const initial = await client.json('/api/workspace')
   check(initial.currentUserId === ownerId && Array.isArray(initial.choices), 'workspace_refused')
-  const choices = initial.choices.filter(row => row.kind === 'team')
-  check(choices.length > 0 && choices.length <= 32 && choices.every(row => UUID.test(row.id))
-    && new Set(choices.map(row => row.id)).size === choices.length, 'workspace_refused')
-  const matches = []
-  for (const choice of choices) {
-    const value = await client.json('/api/workspace?workspace=' + choice.id)
-    check(value.currentUserId === ownerId && value.workspace?.id === choice.id && value.workspace.kind === 'team'
-      && ['member', 'admin'].includes(value.role) && Array.isArray(value.members), 'workspace_refused')
-    const admins = value.members.filter(member => member.userId !== ownerId && member.role === 'admin' && member.status === 'active'
-      && typeof member.email === 'string' && hash(member.email.trim().toLowerCase()) === ADMIN_HASH)
-    if (admins.length === 1) matches.push(choice.id)
-    check(admins.length <= 1, 'workspace_refused')
-  }
-  check(matches.length === 1, 'workspace_refused')
-  const workspaceId = matches[0]
+  // loadWorkspaceContext's normal choices admit Personal only when its creator
+  // is the signed-in user. Membership alone in somebody else's Personal is not
+  // sufficient. Refuse ambiguity instead of guessing from a name or cookie.
+  const choices = initial.choices.filter(row => row?.kind === 'personal')
+  check(choices.length === 1 && UUID.test(choices[0].id), 'workspace_refused')
+  const workspaceId = choices[0].id
+  ownedPersonalWorkspace(await client.json('/api/workspace?workspace=' + workspaceId), ownerId, workspaceId, 'workspace_refused')
   const { candidateTaskIds } = await searchCandidates(client, { ownerId, workspaceId }, observeInventory)
   check(candidateTaskIds.length > 0, 'sample_missing')
-  return { ownerId, workspaceId, candidateTaskIds }
+  return { ownerId, workspaceId, workspaceKind: 'personal', candidateTaskIds }
+}
+
+function ownedPersonalWorkspace(value, ownerId, workspaceId, code) {
+  check(value?.currentUserId === ownerId && value.workspace?.id === workspaceId && value.workspace.kind === 'personal'
+    && ['member', 'admin'].includes(value.role) && Array.isArray(value.choices) && Array.isArray(value.members), code)
+  const choices = value.choices.filter(row => row?.kind === 'personal')
+  const members = value.members.filter(row => row?.userId === ownerId)
+  check(choices.length === 1 && choices[0].id === workspaceId && members.length === 1
+    && members[0].status === 'active' && members[0].role === value.role, code)
 }
 
 export async function verifyScope(client, scope) {
   const session = await client.json('/api/auth/get-session')
   const workspace = await client.json('/api/workspace?workspace=' + scope.workspaceId)
-  check(session?.user?.id === scope.ownerId && workspace.currentUserId === scope.ownerId
-    && workspace.workspace?.id === scope.workspaceId && ['member', 'admin'].includes(workspace.role), 'sample_changed')
+  check(session?.user?.id === scope.ownerId && scope.workspaceKind === 'personal', 'sample_changed')
+  ownedPersonalWorkspace(workspace, scope.ownerId, scope.workspaceId, 'sample_changed')
   // Exact IDs can be older than the newest list page. The existing request
   // preference is membership checked, and does not mutate the account's cookie.
   // Normal getIssue performs fresh authorization; no body, title or prompt enters the report.
@@ -272,6 +272,8 @@ async function main(operation) {
     const scope = await selectScope(client, email, counts => { report.apiTaskInventory = counts })
     report.candidateCount = scope.candidateTaskIds.length
     report.workspaceId = scope.workspaceId
+    report.workspaceKind = scope.workspaceKind
+    report.selectionBasis = 'normal_api_unique_owned_personal_workspace_and_active_membership'
     report.ownerSha256 = hash(scope.ownerId)
     report.databaseTargetSha256 = hash('app-db-target\0' + target.hostname + '\0' + target.pathname)
     await guardMain(env)

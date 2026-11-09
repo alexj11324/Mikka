@@ -5,7 +5,9 @@ import { createSessionClient } from '../acceptance/cloud-startup.mjs'
 import { candidateInventory, guardContext, guardMain, MAIN, projectRows, publicFailure, searchCandidates, selectScope, snapshot, SQL, verifyScope } from './domain-history-before-1782.mjs'
 
 const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
-const scope = { ownerId: 'smoke-owner', workspaceId: id(90), taskIds: [id(1), id(2)], candidateTaskIds: [id(1), id(2)] }
+const scope = { ownerId: 'smoke-owner', workspaceId: id(90), workspaceKind: 'personal', taskIds: [id(1), id(2)], candidateTaskIds: [id(1), id(2)] }
+const personalView = () => ({ currentUserId: scope.ownerId, workspace: { id: scope.workspaceId, kind: 'personal' }, role: 'admin',
+  choices: [{ id: scope.workspaceId, kind: 'personal' }], members: [{ userId: scope.ownerId, role: 'admin', status: 'active' }] })
 const fixture = () => ({ task: scope.taskIds.map(value => ({ id: value, owner: scope.ownerId,
   workspace: scope.workspaceId, scope: 'workspace', identifier: 'MIK-' + value.slice(-1) })),
 publication: scope.taskIds.map((value, index) => ({ id: id(index + 3), issueId: value, identifier: 'MIK-' + (index + 1), branch: 'private-branch', baseBranch: 'main', remoteKey: 'private-repo' })),
@@ -188,9 +190,7 @@ test('each candidate collection has a hard one-hundred UUID bound', () => {
 })
 
 test('post-query API authorization loss invalidates evidence', async () => {
-  const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : {
-    currentUserId: scope.ownerId, workspace: { id: scope.workspaceId }, role: 'member',
-  }, rpc: async (action, [value]) => {
+  const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : personalView(), rpc: async (action, [value]) => {
     assert.equal(action, 'issues.getIssue')
     return { issue: { id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'workspace' } }
   } }
@@ -200,9 +200,7 @@ test('post-query API authorization loss invalidates evidence', async () => {
 })
 
 test('post-query API verifies the same owner and Workspace for a personal-label Task', async () => {
-  const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : {
-    currentUserId: scope.ownerId, workspace: { id: scope.workspaceId }, role: 'member',
-  }, rpc: async (action, [value]) => {
+  const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : personalView(), rpc: async (action, [value]) => {
     assert.equal(action, 'issues.getIssue')
     return { issue: { id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } }
   } }
@@ -324,8 +322,7 @@ test('rollback evidence follows the actual ACK on success or failure, never a fa
 
 test('exact older Task revalidation never depends on the newest list or includes another tenant', async () => {
   const seen = [], client = {
-    json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : {
-      currentUserId: scope.ownerId, workspace: { id: scope.workspaceId }, role: 'member' },
+    json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : personalView(),
     rpc: async (action, [value], options) => { seen.push({ action, value });
       assert.deepEqual(options, { headers: { 'x-mikka-workspace-id': scope.workspaceId } }); return { issue: {
       id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal', content: 'never-recorded',
@@ -347,7 +344,7 @@ test('the existing session transport reads fixed Tasks in an authorized request 
     assert.equal(init.headers.cookie, 'mikka-workspace=' + selectedWorkspace)
     if (url.pathname.endsWith('/api/workspace')) {
       assert.equal(url.searchParams.get('workspace'), scope.workspaceId)
-      return new Response(JSON.stringify({ currentUserId: scope.ownerId, workspace: { id: scope.workspaceId }, role: 'member' }))
+      return new Response(JSON.stringify(personalView()))
     }
     assert.equal(url.pathname, '/mikka/api/rpc')
     const body = JSON.parse(init.body)
@@ -360,4 +357,69 @@ test('the existing session transport reads fixed Tasks in an authorized request 
   })
   await verifyScope(client, scope)
   assert.deepEqual(paths, ['/mikka/api/auth/get-session', '/mikka/api/workspace', '/mikka/api/rpc', '/mikka/api/rpc'])
+})
+
+test('normal session transport selects its unique owned Personal Workspace and revalidates fixed Tasks without switching the Team cookie', async () => {
+  const teamId = id(999), email = 'synthetic@example.invalid', calls = []
+  const client = createSessionClient('https://synthetic.invalid', async (url, init) => {
+    calls.push({ path: url.pathname, search: url.search, body: init.body })
+    if (url.pathname.endsWith('/api/auth/get-session')) return new Response(JSON.stringify({ user: { id: scope.ownerId, email } }), {
+      headers: { 'set-cookie': 'mikka-workspace=' + teamId + '; Path=/mikka' },
+    })
+    assert.equal(init.headers.cookie, 'mikka-workspace=' + teamId)
+    if (url.pathname.endsWith('/api/workspace')) {
+      const value = personalView(); value.choices.push({ id: teamId, kind: 'team' })
+      if (url.searchParams.has('workspace')) assert.equal(url.searchParams.get('workspace'), scope.workspaceId)
+      else value.workspace = { id: teamId, kind: 'team' }
+      return new Response(JSON.stringify(value))
+    }
+    if (url.pathname.endsWith('/api/issues/search')) {
+      assert.equal(url.searchParams.get('workspaceId'), scope.workspaceId)
+      return new Response(JSON.stringify({ items: [{ id: id(501), ownerId: scope.ownerId }, { id: id(502), ownerId: 'another-owner' }],
+        nextCursor: null, truncated: false }))
+    }
+    assert.equal(url.pathname, '/mikka/api/rpc')
+    const body = JSON.parse(init.body)
+    assert.equal(body.action, 'issues.getIssue')
+    assert.equal(init.headers['x-mikka-workspace-id'], scope.workspaceId)
+    return new Response(JSON.stringify({ ok: true, result: { issue: { id: body.args[0], userId: scope.ownerId,
+      workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } } }))
+  })
+  const selected = await selectScope(client, email)
+  assert.equal(selected.workspaceId, scope.workspaceId)
+  assert.equal(selected.workspaceKind, 'personal')
+  assert.deepEqual(selected.candidateTaskIds, [id(501)])
+  await verifyScope(client, { ...selected, taskIds: selected.candidateTaskIds })
+  assert.equal(calls.filter(row => row.path.endsWith('/api/issues/search')).length, 1)
+  assert.deepEqual(calls.filter(row => row.body).map(row => JSON.parse(row.body).action), ['issues.getIssue'])
+})
+
+for (const [name, change] of [
+  ['missing Personal choice', value => { value.choices = [] }],
+  ['ambiguous Personal choices', value => { value.choices.push({ id: id(998), kind: 'personal' }) }],
+  ['another session owner', value => { value.currentUserId = 'other' }],
+  ['another explicit Workspace', value => { value.workspace.id = id(998) }],
+  ['a Team returned for the Personal target', value => { value.workspace.kind = 'team' }],
+  ['no own membership', value => { value.members = [{ userId: 'other', role: 'admin', status: 'active' }] }],
+  ['suspended own membership', value => { value.members[0].status = 'suspended' }],
+  ['duplicate own membership', value => { value.members.push({ ...value.members[0] }) }],
+  ['membership role mismatch', value => { value.members[0].role = 'member' }],
+]) test('Personal selection rejects ' + name + ' before searching Task IDs', async () => {
+  const email = 'synthetic@example.invalid'
+  const client = { json: async path => {
+    if (path.includes('get-session')) return { user: { id: scope.ownerId, email } }
+    assert.ok(path.startsWith('/api/workspace'), 'refused scope never reaches Task search')
+    const value = personalView()
+    if (path.includes('?workspace=') || name.startsWith('missing') || name.startsWith('ambiguous')) change(value)
+    return value
+  } }
+  await assert.rejects(selectScope(client, email))
+})
+
+test('a revoked Personal membership fails fixed-UUID revalidation before any Task read', async () => {
+  const client = { json: async path => {
+    if (path.includes('get-session')) return { user: { id: scope.ownerId } }
+    const value = personalView(); value.members[0].status = 'suspended'; return value
+  }, rpc: async () => { assert.fail('revoked membership cannot read a Task') } }
+  await assert.rejects(verifyScope(client, scope))
 })

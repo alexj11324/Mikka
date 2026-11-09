@@ -588,3 +588,104 @@ test('workflow retains the original sole credential and gives cleanup time outsi
   assert.equal(timeouts[0], 75)
   assert.ok(timeouts.slice(1).reduce((sum, value) => sum + value, 0) <= 75, 'step ceilings must leave cleanup inside the job limit')
 })
+
+function projectConservationFailure(events) {
+  const value = fixtureReceipts()
+  value.buildReport = { identity, status: 'failed', stage: 'conservation_claude', code: 'operation_failed' }
+  value.outcomes.build = 'failure'; value.outcomes.acceptance = 'skipped'
+  const baseline = summarizeAcceptance(context, value)
+  value.buildReport.diagnostic = {
+    buildLogs: { claude: { events } },
+    statusLookup: { identityMatched: true, status: 'error', debugLogs: { events: events.map(event => ({ ...event, count: 2 })) } },
+  }
+  const result = summarizeAcceptance(context, value)
+  assert.equal(result.passed, false)
+  assert.deepEqual({ ...result, build: { ...result.build, diagnostic: baseline.build.diagnostic } }, baseline,
+    'diagnostic projection changes neither the original failed verdict nor any cleanup result')
+  return { result, normal: result.build.diagnostic.buildLogs.claude.events,
+    debug: result.build.diagnostic.statusLookup.debugLogs.events }
+}
+
+test('fresh conservation failures retain every closed stage/code in both evidence paths and keep the failed verdict', () => {
+  const stages = ['preload_receipts', 'preload_validation', 'fresh_scan', 'fresh_receipt', 'fresh_validation', 'unknown']
+  const details = ['official_manifest_invalid', 'official_conservation_invalid', 'official_conservation_missing',
+    'official_files_removed', 'official_files_changed', 'e2b_certificate_target_invalid', 'conservation_failed',
+    'conservation_diagnostic_too_large', 'conservation_metadata_invalid', 'conservation_diagnostic_invalid']
+  const expected = stages.flatMap(stage => details.map(detail => ({ phase: 'conservation_failed', stage, detail })))
+  const privateText = 'synthetic-private-conservation-SDK-path-target-digest'
+  const { result, normal, debug } = projectConservationFailure(expected.map(event => ({ ...event,
+    raw: privateText, message: privateText, path: privateText, target: privateText, sha256: privateText })))
+  assert.equal(expected.length, 60)
+  assert.deepEqual(normal, expected)
+  assert.deepEqual(debug, expected.map(event => ({ ...event, count: 2 })))
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+  const known = { phase: 'conservation_failed', stage: 'fresh_scan', detail: 'conservation_failed' }
+  const capped = projectConservationFailure(Array.from({ length: 65 }, () => known))
+  assert.equal(capped.normal.length, 64); assert.equal(capped.debug.length, 64)
+})
+
+test('unknown conservation detail or stage drops only that extension event and preserves known failure evidence', () => {
+  const known = { phase: 'conservation_failed', stage: 'unknown', detail: 'conservation_failed' }
+  const host = { phase: 'host_failure', detail: 'official_files_changed' }
+  const privateText = 'synthetic-private-foreign-conservation-stage'
+  const invalid = [undefined, null, true, 1, {}, ['fresh_scan'], privateText]
+  const events = [known, host,
+    ...invalid.map(stage => ({ ...known, stage })),
+    ...invalid.map(detail => ({ ...known, detail })),
+    { ...known, stage: 'worker_exec' }, { ...known, detail: 'operation_failed' },
+    { ...known, phase: 'synthetic-foreign-phase' },
+  ]
+  const { result, normal, debug } = projectConservationFailure(events)
+  assert.deepEqual(normal, [known, host])
+  assert.deepEqual(debug, [known, host].map(event => ({ ...event, count: 2 })))
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+})
+
+test('conservation optional check/status/path codes are independently closed and integer zero is retained', () => {
+  const base = { phase: 'conservation_failed', stage: 'fresh_receipt', detail: 'official_conservation_missing' }
+  const checks = ['pid_file', 'pid_read', 'pid_alive', 'worker_waiting', 'official_files']
+  const paths = ['provider_shared_directory', 'provider_root_certificate', 'provider_certificate_reference',
+    'provider_hashed_certificate_reference', 'redacted']
+  const expected = checks.map((check, index) => ({ ...base, check, exitCode: [-255, -1, 0, 1, 255][index], removedPathCode: paths[index] }))
+  const projected = projectConservationFailure(expected)
+  assert.deepEqual(projected.normal, expected)
+  assert.deepEqual(projected.debug, expected.map(event => ({ ...event, count: 2 })))
+  for (const field of ['check', 'exitCode', 'removedPathCode']) {
+    const invalid = field === 'exitCode' ? [undefined, null, true, false, '1', -256, 256, 1.5, NaN, Infinity]
+      : [undefined, null, true, 1, {}, ['official_files'], 'synthetic-private-path-or-check', 'ingress_ready']
+    for (const value of invalid) {
+      const retained = { ...expected[2] }; delete retained[field]
+      const { normal, debug, result } = projectConservationFailure([{ ...expected[2], [field]: value }])
+      assert.deepEqual(normal, [retained]); assert.deepEqual(debug, [{ ...retained, count: 2 }])
+      assert.equal(JSON.stringify(result).includes('synthetic-private-path-or-check'), false)
+    }
+  }
+})
+
+test('fresh conservation changes reuse the strict existing sanitizer and never retain paths, targets or digests', () => {
+  const privateText = 'synthetic-private-fresh-conservation-path-target-sha'
+  const conservation = { observedChanges: 2, redactedChanges: 1, truncated: false,
+    changes: [{ pathCode: 'provider_shared_directory', kind: 'directory', fields: ['mode'],
+      before: { mode: 493 }, after: { mode: 511 }, contentChanged: false, targetChanged: false }] }
+  const base = { phase: 'conservation_failed', stage: 'fresh_scan', detail: 'official_files_changed',
+    check: 'official_files', exitCode: 1 }
+  const expected = { ...base, conservation }
+  const projected = projectConservationFailure([{ ...expected, raw: privateText, path: privateText,
+    conservation: { ...conservation, raw: privateText, changes: [{ ...conservation.changes[0],
+      path: privateText, target: privateText, sha256: privateText }] } }])
+  assert.deepEqual(projected.normal, [expected])
+  assert.deepEqual(projected.debug, [{ ...expected, count: 2 }])
+  assert.equal(JSON.stringify(projected.result).includes(privateText), false)
+  for (const mutate of [row => { row.changes[0].pathCode = privateText }, row => { row.changes[0].before.credential = privateText },
+    row => { row.changes[0].fields = [privateText] }, row => { row.changes[0].after.mode = true },
+    row => { row.changes[0].after.mode = 4096 }, row => { row.observedChanges = true },
+    row => { row.redactedChanges = 3 }, row => { row.truncated = true },
+    row => { row.changes[0].contentChanged = true }, row => { row.changes[0].targetChanged = true }]) {
+    const invalid = structuredClone(conservation); mutate(invalid)
+    const result = projectConservationFailure([{ ...base, conservation: invalid }])
+    assert.deepEqual(result.normal, [base]); assert.deepEqual(result.debug, [{ ...base, count: 2 }])
+    assert.equal(JSON.stringify(result.result).includes(privateText), false)
+  }
+  const redacted = { observedChanges: 1, redactedChanges: 1, truncated: false, changes: [] }
+  assert.deepEqual(projectConservationFailure([{ ...base, conservation: redacted }]).normal, [{ ...base, conservation: redacted }])
+})

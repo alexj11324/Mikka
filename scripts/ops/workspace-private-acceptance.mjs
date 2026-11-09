@@ -9,18 +9,18 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '6497e18714e6762ca7fed3307832b125168952d1',
-  tree: 'd95743203ee33b9208d2a347f6b05971c748a6a5',
-  workerSha: '702546600fc8448e5ef7b19c3e64b0d334620bf9',
+  source: '101042b50ec67550614f2d21b905df994b2820cc',
+  tree: '35ab370b034d71a7cc986ae5a9949863d10044ad',
+  workerSha: 'e3177ad16a2652207c2be86ed50a974ced21531f',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
     'package.json': 'f61c704ee260347da03809685b26a135d742c0855a0a2882d63e9fdbad201312',
     'pnpm-lock.yaml': 'ddfb2c81f1e50b1b619e4a690dd38c33cc0700352434ed4424eda27c86907277',
     'pnpm-workspace.yaml': 'e8529ab36b3014adf400dfc4b82082b86f84aeadafe686f890b1b26ac2f7e117',
-    'scripts/e2b/workspace-candidates.py': '37942f1888ab7c61fb9932eeb91591dbf9fa308f9e32e6c4bfae2b0f93db331a',
-    'scripts/e2b/workspace-candidates.test.py': '907bfc8d139f783a26a7dda58a7cf3b32ddae09faaf4d8440504f5fbc5da58a0',
-    'scripts/e2b/build-template.py': '13cb14ce95cb6499aae40e69f779de1790fb590e2e781834d423aed08b0438a4',
-    'scripts/e2b/build-template.test.py': '62a66dc88e46be4f1548d712c20264cad97e01ef0067d4fd6733adaa17210599',
+    'scripts/e2b/workspace-candidates.py': '2440d02b368288e4a6e8a618f65e2ecca88f5a0251a0a005f9c71b6c0c977237',
+    'scripts/e2b/workspace-candidates.test.py': 'ce408974f1841de2ba164cd108b69c7dfc1d3bcab8c4cc84c9d1cc7db5622b37',
+    'scripts/e2b/build-template.py': '3927d62d13683aab6fc44b869dfccf2b3d76aa5804bfb47b9399838b9667d325',
+    'scripts/e2b/build-template.test.py': '10154108d0f34948aabaaf902a12a9f47e63c05d69345b266234935293fce7c1',
     'scripts/e2b/official-files.py': '66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5',
     'scripts/e2b/official-files.test.py': 'a02db5389d866cadcbfa743bad6eaecaefb6b1effbfb0bc863a9287d59849b84',
     'scripts/e2b/cleanup-template-candidates.py': '893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d',
@@ -96,6 +96,13 @@ const BUILD_HOST_ERRORS = ['official_cli_kind_invalid', 'official_cli_path_inval
   'runtime_cli_changed', 'runtime_cli_unavailable', 'official_cli_manifest_changed', 'e2b_finalization_policy_invalid',
   'e2b_certificate_policy_invalid', 'official_conservation_invalid', 'official_manifest_invalid', 'official_files_removed',
   'official_files_changed', 'e2b_certificate_target_invalid', 'terminal_control_install_refused']
+const CONSERVATION_FAILURE_CODES = ['official_manifest_invalid', 'official_conservation_invalid', 'official_conservation_missing',
+  'official_files_removed', 'official_files_changed', 'e2b_certificate_target_invalid', 'conservation_failed',
+  'conservation_diagnostic_too_large', 'conservation_metadata_invalid', 'conservation_diagnostic_invalid']
+const CONSERVATION_FAILURE_STAGES = ['preload_receipts', 'preload_validation', 'fresh_scan', 'fresh_receipt', 'fresh_validation', 'unknown']
+const CONSERVATION_FAILURE_CHECKS = ['pid_file', 'pid_read', 'pid_alive', 'worker_waiting', 'official_files']
+const CONSERVATION_REMOVED_PATH_CODES = ['provider_shared_directory', 'provider_root_certificate',
+  'provider_certificate_reference', 'provider_hashed_certificate_reference', 'redacted']
 const BUILD_STAGES = ['identity', 'credential', 'preflight', 'build', 'complete', 'cleanup', 'probe_cleanup',
   ...KINDS.flatMap(kind => ['build', 'private', 'models', 'conservation'].map(prefix => `${prefix}_${kind}`))]
 const RUNTIME_STAGES = ['create', 'identity', 'prelistener_guard', 'initial_ingress', 'gateway_listener_wiring',
@@ -222,6 +229,14 @@ function buildEvents(rows, debug = false) {
         event = { phase: row.phase,
           detail: one(row.detail, debug ? [...BUILD_HOST_ERRORS, 'anonymous_worker_unavailable'] : BUILD_HOST_ERRORS),
           ...(conservation ? { conservation } : {}) }; break
+      }
+      case 'conservation_failed': {
+        if (!CONSERVATION_FAILURE_CODES.includes(row.detail) || !CONSERVATION_FAILURE_STAGES.includes(row.stage)) return []
+        const conservation = conservationChanges(row.conservation), code = exitCode(row.exitCode)
+        event = { phase: row.phase, detail: row.detail, stage: row.stage,
+          ...(CONSERVATION_FAILURE_CHECKS.includes(row.check) ? { check: row.check } : {}),
+          ...(code !== null ? { exitCode: code } : {}), ...(conservation ? { conservation } : {}),
+          ...(CONSERVATION_REMOVED_PATH_CODES.includes(row.removedPathCode) ? { removedPathCode: row.removedPathCode } : {}) }; break
       }
       case 'official_capture': event = { phase: row.phase, entries: count(row.entries) }; break
       case 'ready_rejected':
