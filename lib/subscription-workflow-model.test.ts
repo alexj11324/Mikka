@@ -5,9 +5,11 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
 import { cacheableInstructions, withCacheBreakpoints } from './prompt-cache'
 const calls: {selection: unknown; signal: unknown; options?: unknown}[] = []
+let resolverObservation: (() => Promise<void>) | undefined
 const streamResult = {stream: new ReadableStream({start(controller) {controller.close()}})}
 mock.module(new URL('./subscription-workflow-model-runtime.ts', import.meta.url).href, {namedExports: {
   resolveSubscriptionWorkflowModel: async (selection: unknown, signal: unknown) => {
+    await resolverObservation?.()
     const call = {selection, signal, options: undefined as unknown}; calls.push(call)
     return {specificationVersion: 'v4', doStream: async (options: unknown) => {call.options = options; return {...streamResult, stream: new ReadableStream({start(controller) {controller.close()}})}}}
   },
@@ -149,4 +151,28 @@ test('timing reports whether the actual Codex layout was applied without changin
     assert.equal(line.codexLayoutApplied, sample.expected, 'actual_codex_layout_not_reported')
     assert.equal(Object.hasOwn(line, 'codexLayoutApplied'), sample.expected !== undefined)
   }
+})
+
+test('setup quota workers are observed before the provider request without logging their inputs', async t => {
+  const { currentSubscriptionTiming } = await import('../packages/daemon/src/subscription-worker-timing')
+  const logs: { setupMs: number; subscriptionStages: { workers: { method: string }[] } }[] = []
+  t.mock.method(console, 'info', (line: string) => { logs.push(JSON.parse(line)) })
+  resolverObservation = async () => {
+    await Promise.resolve()
+    for (const method of ['prepare', 'quota']) {
+      const worker = currentSubscriptionTiming()?.startWorker(method)
+      worker?.beginIdentity()()
+      worker?.configWrite()
+      worker?.settle('result')
+    }
+  }
+  try {
+    const result = await new SubscriptionWorkflowModel(selection).doStream({ prompt: [] })
+    await result.stream.pipeTo(new WritableStream())
+    assert.equal(logs.length, 1)
+    assert.deepEqual(logs[0].subscriptionStages.workers.map(worker => worker.method), ['prepare', 'quota'])
+    assert.ok(logs[0].setupMs >= 0)
+    assert.equal(JSON.stringify(logs).includes(selection.bindingId), false)
+    assert.equal(JSON.stringify(logs).includes(selection.ownerId), false)
+  } finally { resolverObservation = undefined }
 })
