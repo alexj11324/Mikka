@@ -190,6 +190,64 @@ test('build diagnostics retain bounded type/status/host phase evidence without c
   assert.equal(JSON.stringify(result).includes(privateText), false)
 })
 
+test('prebuilt startup and readiness failures survive both evidence paths without claiming runtime success', () => {
+  const value = fixtureReceipts(), privateText = 'synthetic-private-prebuilt-command'
+  const start = ['entry', 'preconditions_verified', 'guard_prepare', 'guard_prepared',
+    'control_install', 'control_installed', 'worker_exec']
+  const ready = ['pid_file', 'pid_read', 'pid_alive', 'worker_waiting', 'ingress_ready',
+    'bootstrap_absent', 'device_absent', 'viewer_key_absent', 'viewer_unauthorized', 'official_files']
+  const expected = [
+    ...start.map(detail => ({ phase: 'prebuilt_start', detail })),
+    { phase: 'prebuilt_start_failed', detail: 'guard_prepare', exitCode: 1 },
+    ...ready.map(detail => ({ phase: 'prebuilt_ready_failed', detail, exitCode: 255 })),
+  ]
+  value.buildReport = { identity, status: 'failed', stage: 'build_claude', code: 'template_build_failed', diagnostic: {
+    buildLogs: { claude: { events: expected.map(event => ({ ...event, raw: privateText, argv: [privateText] })) } },
+    statusLookup: { identityMatched: true, status: 'error', debugLogs: {
+      events: expected.map(event => ({ ...event, count: 2, message: privateText, path: privateText })),
+    } },
+  } }
+  const result = summarizeAcceptance(context, value)
+  assert.equal(result.passed, false)
+  assert.equal(result.build.code, 'template_build_failed')
+  assert.equal(result.build.stage, 'build_claude')
+  assert.deepEqual(result.build.diagnostic.buildLogs.claude.events, expected)
+  assert.deepEqual(result.build.diagnostic.statusLookup.debugLogs.events,
+    expected.map(event => ({ ...event, count: 2 })))
+  assert.equal(result.productionTaskAuthorityTested, false)
+  assert.equal(result.subscriptionsTested, false)
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+})
+
+test('prebuilt evidence rejects foreign phases and invalid failure statuses within the existing event cap', () => {
+  const value = fixtureReceipts(), privateText = 'synthetic-private-prebuilt-phase'
+  const invalid = [
+    { phase: 'prebuilt_start', detail: privateText },
+    { phase: 'prebuilt_start', detail: 'pid_file' },
+    { phase: 'prebuilt_start_failed', detail: 'pid_file', exitCode: 1 },
+    { phase: 'prebuilt_ready_failed', detail: 'worker_exec', exitCode: 1 },
+    { phase: 'prebuilt_ready_failed', detail: privateText, exitCode: 1 },
+    ...[undefined, null, false, true, 0, -1, 256, 1.5, '1', privateText].map(exitCode =>
+      ({ phase: 'prebuilt_ready_failed', detail: 'pid_file', exitCode })),
+  ]
+  value.buildReport = { identity, status: 'failed', stage: 'build_claude', code: 'template_build_failed', diagnostic: {
+    buildLogs: { claude: { events: invalid } },
+    statusLookup: { identityMatched: true, status: 'error', debugLogs: {
+      events: invalid.map(event => ({ ...event, count: 1 })),
+    } },
+  } }
+  let result = summarizeAcceptance(context, value)
+  assert.deepEqual(result.build.diagnostic.buildLogs.claude.events, [])
+  assert.deepEqual(result.build.diagnostic.statusLookup.debugLogs.events, [])
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+  const known = { phase: 'prebuilt_start', detail: 'entry' }
+  value.buildReport.diagnostic.buildLogs.claude.events = [
+    ...Array.from({ length: 64 }, () => known), { phase: 'prebuilt_start', detail: 'worker_exec' },
+  ]
+  result = summarizeAcceptance(context, value)
+  assert.deepEqual(result.build.diagnostic.buildLogs.claude.events, Array.from({ length: 64 }, () => known))
+})
+
 test('ingress command diagnostics retain only known observations without copying private process data', () => {
   const value = fixtureReceipts(), privateText = 'synthetic-private-netfilter-argument'
   const command = { family: 'ipv6', operation: 'provider_rule', failureKind: 'exit', returnCode: 2,

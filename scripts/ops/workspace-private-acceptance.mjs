@@ -9,18 +9,18 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '4e40fba5768a6bcc1341b7638cf6f04f09a0191a',
-  tree: 'a5647074e85709cb5950e5c3ed82e86d96831cf4',
-  workerSha: '53cf8c2af0d6fd9df0cdc7758930ac0eaa5982fc',
+  source: 'eb02785e496ddf4cf55fa7799392841ff824bc70',
+  tree: 'f71bef14f38f7af0c7650b3527e5f49f131ea173',
+  workerSha: '0c458522caf8b2b1cada4d165f087d0601bea3b8',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
-    'package.json': 'c56b9a7aab200373926c23b914111825b5293efb8fae80b85fe4f16682cc020d',
-    'pnpm-lock.yaml': '345a6e1d97bb3a0028497f3294a86944bc9f617af892de71990d40d2cdf36054',
+    'package.json': '4800a1000222526f3373b84ad077c3b71953ef2add9142f285ebea40b54e5357',
+    'pnpm-lock.yaml': 'c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363',
     'pnpm-workspace.yaml': '8977ce9916b92a015e0f4dad1d45bcf51c9427637a5988fcdc585a1a21a0301e',
-    'scripts/e2b/workspace-candidates.py': 'a8f545db1ce50954231215f95a0cfb7bb78ee9728c9ccf9c69c28b1eaa884311',
-    'scripts/e2b/workspace-candidates.test.py': '59af23d4d0677fdb4c5a445682c728704a371b25694ddd1fe940e93d79670d18',
-    'scripts/e2b/build-template.py': 'efe0a20a73749a06b4e2f20fb4b1c8a1bd99a7b7a4fdae961fee9d410b424d85',
-    'scripts/e2b/build-template.test.py': '78e367541f0e6441c60944b107b179b78a75ea754bee0d729df0aa9f5bd4749e',
+    'scripts/e2b/workspace-candidates.py': '3ffa20bf4c23f6111505eedb5e1e7f439c7e7b5e006a2e602d3aa993d950b766',
+    'scripts/e2b/workspace-candidates.test.py': 'd144801b19bd8f2c337acfdaeda88cca1eee49456a26c025cac01b755ee53c55',
+    'scripts/e2b/build-template.py': '13cb14ce95cb6499aae40e69f779de1790fb590e2e781834d423aed08b0438a4',
+    'scripts/e2b/build-template.test.py': '62a66dc88e46be4f1548d712c20264cad97e01ef0067d4fd6733adaa17210599',
     'scripts/e2b/official-files.py': '6191212b14205c7cb8043efcfb85eaff05670f8cb65c4c801052cf9d3a28babe',
     'scripts/e2b/official-files.test.py': '973c9e7b699032526052f48b4326ef26b0bb7e9db621dd1910a5d00ca0a23c10',
     'scripts/e2b/cleanup-template-candidates.py': '893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d',
@@ -79,6 +79,10 @@ const BUILDER_ERROR_TYPES = ['CandidateError', 'Exception', 'RuntimeError', 'Val
   'ConnectError', 'ReadError', 'WriteError', 'RemoteProtocolError', 'ConnectTimeout', 'ReadTimeout', 'WriteTimeout',
   'PoolTimeout', 'UnexpectedStatus']
 const BOOTSTRAP_PHASES = ['validation', 'source', 'node', 'gh', 'dependencies', 'build', 'cli', 'journal', 'desktop', 'finalize']
+const PREBUILT_START_PHASES = ['entry', 'preconditions_verified', 'guard_prepare', 'guard_prepared',
+  'control_install', 'control_installed', 'worker_exec']
+const PREBUILT_READY_PHASES = ['pid_file', 'pid_read', 'pid_alive', 'worker_waiting', 'ingress_ready',
+  'bootstrap_absent', 'device_absent', 'viewer_key_absent', 'viewer_unauthorized', 'official_files']
 const INGRESS_DETAILS = ['listener', 'boot', 'identity', 'state', 'receipt', 'provider', 'command', 'tool', 'backend',
   'rule_order', 'late_install', 'worker', 'worker_order', 'operation', 'runtime']
 const INGRESS_COMMAND_OPERATIONS = ['new_chain', 'provider_rule', 'reply_rule', 'output_jump', 'check_output',
@@ -167,6 +171,15 @@ function buildEvents(rows, debug = false) {
     switch (row?.phase) {
       case 'template_created': event = { phase: row.phase }; break
       case 'bootstrap': event = { phase: row.phase, detail: one(row.detail, BOOTSTRAP_PHASES), elapsedMs: count(row.elapsedMs) }; break
+      case 'prebuilt_start':
+        if (!PREBUILT_START_PHASES.includes(row.detail)) return []
+        event = { phase: row.phase, detail: row.detail }; break
+      case 'prebuilt_start_failed':
+      case 'prebuilt_ready_failed': {
+        const phases = row.phase === 'prebuilt_start_failed' ? PREBUILT_START_PHASES : PREBUILT_READY_PHASES
+        if (!phases.includes(row.detail) || !Number.isInteger(row.exitCode) || row.exitCode < 1 || row.exitCode > 255) return []
+        event = { phase: row.phase, detail: row.detail, exitCode: row.exitCode }; break
+      }
       case 'ingress': {
         const command = row.detail === 'command' ? ingressCommand(row.command) : null
         event = { phase: row.phase, detail: one(row.detail, INGRESS_DETAILS), ...(command ? { command } : {}) }; break
