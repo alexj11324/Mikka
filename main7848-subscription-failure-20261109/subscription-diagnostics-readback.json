@@ -1,0 +1,12 @@
+{
+  "artifactId": 13709237613,
+  "zipBytes": 2505,
+  "zipSha256": "4d6dae20e348292050483b2aed981d877e0f723357eac95cbe375f4cb65c201b",
+  "members": [
+    "subscription-diagnostics.json"
+  ],
+  "crc": "passed",
+  "memberBytes": 6384,
+  "memberSha256": "ca8ad628f11addabacbadfe4c7475d4186b0dfc0ec52ba50860b559f4122541e",
+  "redactedKeys": []
+}

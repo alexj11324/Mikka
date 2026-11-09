@@ -1,0 +1,35 @@
+{
+  "artifactId": 13708229594,
+  "zipBytes": 416,
+  "zipSha256": "71bad071f86b8a13c78ce848ad4bd90a1fcd51b5db0870223029269428a7e547",
+  "member": "release-cleanup.json",
+  "memberBytes": 639,
+  "memberSha256": "53cafa6f10bda0586271551280d4584a2e694d0d42aafe2d640077be247dca03",
+  "crc": "passed",
+  "receipt": {
+    "sourceCommit": "7848e79df9c5af67e526aeed1c828858db392066",
+    "runId": "42690423873",
+    "sandboxes": [],
+    "templates": [
+      {
+        "name": "mikka-7848e79df9c5-42690423873-1-desktop",
+        "kind": "desktop",
+        "templateId": "v1xqsfwvj54bqtzhydjm",
+        "status": "deleted"
+      },
+      {
+        "name": "mikka-7848e79df9c5-42690423873-1-claude",
+        "kind": "claude",
+        "templateId": "0bezoohwbmqnvmrq5tbs",
+        "status": "deleted"
+      },
+      {
+        "name": "mikka-7848e79df9c5-42690423873-1-codex",
+        "kind": "codex",
+        "templateId": "qsw2vcrplrgskul36ok3",
+        "status": "deleted"
+      }
+    ],
+    "errors": []
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "artifactId": 13707487038,
+  "zipBytes": 268,
+  "zipSha256": "a31d34b276307ebb5ca696a27165b8fd769616008b7e39e6697abfb3b46ace51",
+  "member": "build-cleanup.json",
+  "memberBytes": 145,
+  "memberSha256": "1122e159c509669ecf68c3537ad3ff5f3306f05abc26ea5350fcb0c99d024232",
+  "crc": "passed",
+  "receipt": {
+    "sourceCommit": "7848e79df9c5af67e526aeed1c828858db392066",
+    "runId": "42690423873",
+    "sandboxes": [],
+    "templates": [],
+    "errors": []
+  }
+}

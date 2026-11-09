@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "status": "failed",
+  "code": "template_gate_subscription_or_cleanup_failed",
+  "candidates": [
+    {
+      "kind": "claude",
+      "stage": "receipt",
+      "code": "passed",
+      "runIdHash": "3a5a10acfe63afd8",
+      "sampleStatus": "execution_proved_awaiting_server_timing",
+      "sampleError": null,
+      "cleanupErrors": [],
+      "passedReceipt": {
+        "status": "passed",
+        "templateId": "0bezoohwbmqnvmrq5tbs",
+        "sourceCommit": "7848e79df9c5af67e526aeed1c828858db392066",
+        "workerSha": "aa7efbbe2969d8b1578bdba093e6400a26749e07",
+        "harness": "claude_code",
+        "model": "claude-haiku-5-5",
+        "credentialRoute": "subscription",
+        "replyVerified": true,
+        "replyVerifiedAfterTool": true,
+        "toolEvidence": {
+          "toolCallHash": "55ab65ec02b0ccf8",
+          "outcome": "ok"
+        },
+        "runId": "79e00976-724a-45f1-a730-c714bd2ec401",
+        "deviceId": "c618dcad-5036-475c-a3ad-dbbec2b2f065",
+        "officialBinarySha256": "4f4178ce41d83e23341ebfbaecdbcf8ea6bf7baea0690025abe49eeec3a5d01d",
+        "officialCliVersion": "2.1.312",
+        "bootstrapAcceptance": {
+          "version": 1,
+          "runIdHash": "3a5a10acfe63afd8",
+          "harness": "claude_code",
+          "source": "bootstrap_claude_start",
+          "preparationTiming": {
+            "version": 1,
+            "runIdHash": "3a5a10acfe63afd8",
+            "harness": "claude_code",
+            "startedAt": 1794257130834,
+            "endedAt": 1794257136817,
+            "ms": 5982.553,
+            "outcome": "ok",
+            "phases": [
+              {
+                "name": "daemon.adapter.cli_init.prewarm",
+                "startMs": 33.916,
+                "endMs": 1287.841,
+                "ms": 1253.925,
+                "outcome": "ok"
+              },
+              {
+                "name": "daemon.adapter.cli_init",
+                "startMs": 5980.095,
+                "endMs": 5981.182,
+                "ms": 1.087,
+                "outcome": "ok"
+              },
+              {
+                "name": "daemon.adapter.account_check.account_info",
+                "startMs": 5981.21,
+                "endMs": 5981.492,
+                "ms": 0.282,
+                "outcome": "ok"
+              },
+              {
+                "name": "daemon.adapter.account_check",
+                "startMs": 5981.504,
+                "endMs": 5981.988,
+                "ms": 0.484,
+                "outcome": "ok"
+              }
+            ],
+            "truncated": false,
+            "source": "bootstrap_claude_start",
+            "claimAuthentication": "oauth_environment",
+            "observedAuthSource": "oauth_environment"
+          },
+          "startupTiming": {
+            "version": 1,
+            "runIdHash": "3a5a10acfe63afd8",
+            "harness": "claude_code",
+            "startedAt": 1794257136469,
+            "endedAt": 1794257136818,
+            "ms": 348.383,
+            "outcome": "ok",
+            "phases": [],
+            "truncated": false
+          },
+          "bootstrapSha256": "5b5555d3aa3e8b6c94e3b16698f24fe61834ccbcfa40f50c4038ec05303d07a2",
+          "hintSha256": "e3848437a535d725fdedf221a15fa7b99c00dc24e7579b06dfd1011bbf56beb4"
+        },
+        "sharedScope": {
+          "verified": true,
+          "access": "workspace_share",
+          "requesterHash": "b823ba1c5729768b",
+          "payerHash": "b86765f1f6d3a988",
+          "workspaceHash": "fb00a1d8c63a0ae1c56ff3273bd259fd0756b8631b83e42f226926d389b3dade",
+          "connectionHash": "ccca34377eae9409",
+          "bindingHash": "c3b3d13e466a871c",
+          "connectionRevision": "2",
+          "profileVersion": 1,
+          "profileDigest": "2a0d43cbb52767c89ee730f8dedd30d112bf97264bbeac9eef4eb0ad26ac1572"
+        },
+        "agentAcceptance": {
+          "runIdHash": "3a5a10acfe63afd8",
+          "harness": "claude_code",
+          "kind": "claude_user_ack",
+          "at": 1794257137810,
+          "ms": 4280.47
+        },
+        "runtimeAuthorization": {
+          "source": "http_server_link",
+          "scope": "daemon_http_server_link_and_task_fetch",
+          "complete": true,
+          "truncated": false,
+          "hostAuthorizationComplete": true,
+          "basis": "host_authorization_census_and_closed_mcp_business_paths",
+          "allFirstPartyHttpComplete": false,
+          "extraRemoteCalls": 0,
+          "mcpHttpTiming": {
+            "version": 3,
+            "source": "mikka_mcp_physical_fetch",
+            "scope": "observed_mikka_mcp_children",
+            "generationCoverage": "unverified",
+            "allFirstPartyHttpComplete": false,
+            "remoteMcpServerCount": 0,
+            "childPathAuditVersion": 2,
+            "expectedCatalogueSha256": "d96e51357662f6a9d2fe03dcf7d90dc42514c185ef15b670934e36ac1ee54ac1",
+            "runIdHash": "3a5a10acfe63afd8",
+            "harness": "claude_code",
+            "startedAt": 1794257130835,
+            "endedAt": 1794257147091,
+            "expectedChildren": 1,
+            "observedChildren": 1,
+            "closedChildren": 1,
+            "observedComplete": true,
+            "childLifecycleComplete": true,
+            "rejectedEvents": 0,
+            "truncated": false,
+            "children": [
+              {
+                "child": 1,
+                "startedAt": 1794257136711,
+                "closedAt": 1794257147082,
+                "lastSequence": 3,
+                "sent": 0,
+                "completed": 0,
+                "lost": 0,
+                "catalogue": {
+                  "source": "claim",
+                  "sha256": "d96e51357662f6a9d2fe03dcf7d90dc42514c185ef15b670934e36ac1ee54ac1",
+                  "readyAt": 1794257136716
+                }
+              }
+            ],
+            "requests": []
+          },
+          "observedProviderEvents": 6,
+          "officialDelivery": "best_effort_not_a_complete_call_count"
+        }
+      }
+    },
+    {
+      "kind": "codex",
+      "stage": "receipt",
+      "code": "template_gate_bootstrap_adoption_missing",
+      "runIdHash": "99ed755ee48b24e9",
+      "sampleStatus": "execution_proved_awaiting_server_timing",
+      "sampleError": null,
+      "cleanupErrors": [],
+      "observation": {
+        "lastStatus": "succeeded",
+        "agentStart": true,
+        "providerChunk": true,
+        "agentStartStage": {
+          "ok": true,
+          "ms": 1549
+        },
+        "cliInit": {
+          "outcome": "ok",
+          "ms": 88.531
+        },
+        "replyVerified": true,
+        "replyVerifiedAfterTool": true,
+        "successfulTool": true,
+        "runtimeTimingStatus": "complete",
+        "expectedAgentAck": true,
+        "runtimeEvidence": {
+          "status": "passed",
+          "reason": null
+        }
+      },
+      "fixture": {
+        "issueId": "979061ce-d22c-472b-9aff-66924a717cde",
+        "runId": "79b23f4e-fda3-412c-a9be-6d4b60044ff9"
+      },
+      "candidateProof": {
+        "sourceCommit": "7848e79df9c5af67e526aeed1c828858db392066",
+        "workerSha": "aa7efbbe2969d8b1578bdba093e6400a26749e07",
+        "templateId": "qsw2vcrplrgskul36ok3",
+        "harness": "codex",
+        "deviceId": "1b5309d9-0f13-4d09-8233-e9da2751b407",
+        "binary": "/usr/local/lib/node_modules/@openai/codex/bin/codex.js",
+        "binarySha256": "e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af",
+        "version": "0.167.0"
+      },
+      "bootstrapDiagnostics": {
+        "version": 1,
+        "runIdHash": "99ed755ee48b24e9",
+        "harness": "codex",
+        "startupTimingStatus": "complete",
+        "preparationTimingStatus": "unavailable",
+        "startupTiming": {
+          "version": 1,
+          "runIdHash": "99ed755ee48b24e9",
+          "harness": "codex",
+          "startedAt": 1794257195695,
+          "endedAt": 1794257197244,
+          "ms": 1548.509,
+          "outcome": "ok",
+          "phases": [
+            {
+              "name": "daemon.adapter.cli_init",
+              "startMs": 12.521,
+              "endMs": 101.052,
+              "ms": 88.531,
+              "outcome": "ok"
+            },
+            {
+              "name": "daemon.adapter.auth.token",
+              "startMs": 101.448,
+              "endMs": 101.856,
+              "ms": 0.408,
+              "outcome": "ok"
+            },
+            {
+              "name": "daemon.adapter.account_check.login",
+              "startMs": 102.042,
+              "endMs": 172.514,
+              "ms": 70.472,
+              "outcome": "ok"
+            }
+          ],
+          "truncated": false
+        },
+        "preparationTiming": null,
+        "adoptionChecks": {
+          "startupTimingStatus": true,
+          "preparationTimingStatus": false,
+          "startupReceipt": true,
+          "preparationReceipt": false,
+          "startupUntruncated": true,
+          "preparationUntruncated": false,
+          "startupOutcome": true,
+          "preparationOutcome": false,
+          "preparationSource": false,
+          "preparationPhases": false,
+          "prewarmPhaseCount": false,
+          "cliInitPhaseCount": false,
+          "claimAuthentication": true,
+          "observedAuthSource": true
+        },
+        "bindingChecks": {
+          "registrationMode": true,
+          "workspaceId": true,
+          "bootstrapVersion": true,
+          "bootstrapRun": true,
+          "bootstrapHarness": true,
+          "bootstrapDigest": true,
+          "hintDigest": true,
+          "bootstrapShape": true,
+          "publicationVersion": true,
+          "publicationRun": true,
+          "publicationHarness": true,
+          "publicationBootstrapDigest": true,
+          "publicationHintDigest": true,
+          "publicationShape": true,
+          "expectedWorkspace": true
+        },
+        "projectionTruncated": false
+      }
+    }
+  ]
+}

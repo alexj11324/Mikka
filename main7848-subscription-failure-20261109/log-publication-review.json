@@ -1,0 +1,33 @@
+{
+  "status": "included_original_bytes_after_public_package_classification",
+  "originalCachePath": "main7848-r7-failure-1505/subscriptions-original.log",
+  "originalBytes": 37018,
+  "originalSha256": "25808a0a17d1ea242c79e4ea946fcb2fbc62b3835f78f060f9bdc7b7a9e378a6",
+  "source": "Already downloaded and masked Actions log, copied from local cache only.",
+  "scan": {
+    "knownTokenPrefixCandidates": 2,
+    "resolvedStaticPackageFalsePositives": [
+      {
+        "line": 213,
+        "classification": "public_python_package_filename",
+        "package": "e2b_dockerfile_utils"
+      },
+      {
+        "line": 248,
+        "classification": "public_python_package_filename",
+        "package": "e2b_dockerfile_utils"
+      }
+    ],
+    "unclassifiedTokenPrefixCandidates": 0,
+    "jwtShaped": 0,
+    "bearerValue": 0,
+    "databaseCredentialUrl": 0,
+    "privateKeyMarker": 0,
+    "credentialAssignmentLiteral": 0,
+    "maskTriples": 13
+  },
+  "classification": "Root classified both matches as public e2b_dockerfile_utils wheel filenames; this subtask independently verified the exact package prefix in Downloading *.whl or *.whl.metadata lines. Token and credential scans retained unchanged.",
+  "limits": "This bounded scan is evidence of the performed checks, not a universal guarantee about arbitrary log content.",
+  "newLogDownloads": 0,
+  "originalBytesAltered": false
+}
