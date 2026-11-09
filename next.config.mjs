@@ -75,8 +75,8 @@ const nextConfig = {
   env: { MIKKA_BASE_PATH: basePath, NEXT_PUBLIC_MIKKA_BUILD: appBuild(), NEXT_PUBLIC_COMPUTER_DEPLOYMENT: process.env.VERCEL_ENV ?? '', MIKKA_TEST_BUILD_SHA: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '' },
   async redirects() {
     return [
-      // The app's previous address; keep its links working.
-      { source: '/:path*', has: [{ type: 'host', value: 'mikka.aspectlylabs.com' }], destination: `https://app.aspectlylabs.com${basePath}/:path*`, basePath: false, permanent: true },
+      // Retired app hostname: send all old paths to the public product homepage.
+      { source: '/:path*', has: [{ type: 'host', value: 'mikka.aspectlylabs.com' }], destination: 'https://aspectlylabs.com/mikka', basePath: false, statusCode: 301 },
       { source: '/', destination: basePath, basePath: false, permanent: false },
       // Devices is one section of Settings, not a page of its own (Figma 503:7105).
       { source: '/devices', destination: '/settings?section=devices', permanent: false },
