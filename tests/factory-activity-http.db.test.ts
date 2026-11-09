@@ -11,7 +11,7 @@ import { Pool } from 'pg'
 import { stopOwnedApplication } from '../apps/desktop/test/production-application.mjs'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { bootstrapEnvironment, recordRunnerEvidenceSecrets } from '../scripts/test-accounts/bootstrap.mjs'
-import { assertDeploymentIdentity } from '../scripts/test-accounts/environment.mjs'
+import { assertDeploymentIdentity, EnvironmentError } from '../scripts/test-accounts/environment.mjs'
 import { acquireTestAccounts, recordAuthenticationSecrets, type AccountScope } from '../scripts/test-accounts/session.mjs'
 import { capturePosterBinary } from '../lib/captures/poster'
 import { decode, DESKTOP_RPC_VERSION, encode } from '../lib/desktop-rpc/wire'
@@ -81,8 +81,11 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
     assert.ok(!process.env[key],`HTTP fixture cannot use ${key}`)
   const environment=await bootstrapEnvironment({connectionString:target.toString(),origin,deploymentSha:revision,
     id:`activity-http-${randomUUID()}`,outputFile:descriptor,authorizeDatabase:async (database:Pool)=>{
-      const {rows:[actual]}=await database.query('SELECT current_database() AS name,inet_server_addr()::text AS address')
-      assert.equal(actual.name,name);assert.ok(['127.0.0.1','::1'].includes(actual.address))
+      // inet::text retains /32 or /128; host() returns the IP we compare with
+      // the same exact loopback allowlist used by the existing bootstrap.
+      const {rows:[actual]}=await database.query('SELECT current_database() AS name,host(inet_server_addr()) AS address')
+      if(actual.name!==name)throw new EnvironmentError('ACTUAL_DATABASE_MISMATCH')
+      if(!['127.0.0.1','::1'].includes(actual.address))throw new EnvironmentError('LOCAL_DATABASE_UNVERIFIED')
     }})
   await recordRunnerEvidenceSecrets(environment)
   let stdoutBytes=0,stderrBytes=0
@@ -178,6 +181,7 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
     assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store')
     const view=await response.json() as FactoryActivityView
     assert.equal(view.version,1);assert.equal(view.agents.length,24);assert.equal(view.timeline.attempts.length,24)
+    assert.equal(view.liveWorkspaceId,workspace.id)
     assert.equal(view.artifacts.filter(artifact=>'captureId' in artifact).length,25)
     for(const id of [...images,movie])assert.ok(view.artifacts.some(artifact=>artifact.id===id))
     assert.ok(!view.artifacts.some(artifact=>artifact.id===unrelated))

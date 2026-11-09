@@ -1,10 +1,21 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { after } from 'node:test'
 import { gzipSync } from 'node:zlib'
 import type { Pool, PoolClient } from 'pg'
 import { createRetainedDeliverableObserver, type RetainedDeliverableRuntime } from './retained-deliverable'
 import { retainedDeliverableForRecovery, type RetainedDeliverableScope } from '../factory/deliverable-recovery'
 import type { FactoryTask } from '../factory/store'
+
+// The provider-orchestration fixture has no real node-postgres executor.
+// Keep inherited app configuration out; live commit semantics use real PG tests.
+const liveEnvironment = { DEVICE_GATEWAY_URL:process.env.DEVICE_GATEWAY_URL, DEVICE_GATEWAY_PUSH_SECRET:process.env.DEVICE_GATEWAY_PUSH_SECRET }
+process.env.DEVICE_GATEWAY_URL = 'https://unused-retained-fixture.invalid'
+delete process.env.DEVICE_GATEWAY_PUSH_SECRET
+after(() => {
+  for (const [key,value] of Object.entries(liveEnvironment)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value
+  }
+})
 
 const id = (n: number) => `71660000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const instant = Date.parse('2026-11-04T04:00:00Z')

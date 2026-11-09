@@ -66,7 +66,7 @@ test('task media uses real owner/task/run relations and private cached video cov
     (await tx.query(`SELECT 1 FROM issues i JOIN memberships m ON m.workspace=i.workspace AND m."userId"=$1 AND m.active WHERE i.id=$2`,[user,issue])).rowCount === 1,bot))
   const task = (await database.query<FactoryTask>('SELECT * FROM factory_tasks WHERE id=$1',[taskId])).rows[0]
   const path = join(directory,'source.mp4')
-  await execute(capturePosterBinary(),['-nostdin','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:s=96x64:d=0.12','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-movflags','+faststart',path],{timeout:15_000})
+  await execute(await capturePosterBinary(),['-nostdin','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:s=96x64:d=0.12','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-movflags','+faststart',path],{timeout:15_000})
   const video = new Uint8Array(await readFile(path))
   const png = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])
   const capture = async (run: string, options: {owner?:string;issue?:string|null;kind?:'image'|'video';status?:string;inline?:boolean}={}) => {

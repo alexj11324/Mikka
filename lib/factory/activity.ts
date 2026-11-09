@@ -233,4 +233,6 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
   }
 }
 
-export type FactoryActivityView = Awaited<ReturnType<typeof readFactoryActivity>>
+export type FactoryActivitySnapshot = Awaited<ReturnType<typeof readFactoryActivity>>
+/** HTTP response: the route adds the authorized live subscription scope. */
+export type FactoryActivityView = FactoryActivitySnapshot & { liveWorkspaceId: string | null }
