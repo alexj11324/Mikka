@@ -487,10 +487,22 @@ export function observeChunks(record, detail, observedAt) {
   // executed. Resolve known handoff identities across this replay first: an
   // input-start can omit the name that a later input-available supplies.
   const handoffCalls = new Set()
+  const codexNativeCalls = new Map()
+  const codexInputs = new Set()
+  let codexStarted = false
   for (const { chunk } of detail.chunks ?? []) {
-    if (['tool-input-start', 'tool-input-available'].includes(chunk?.type) && HANDOFF_TOOLS.has(chunk.toolName)
+    if (chunk?.type === 'data-run-stage' && chunk.data?.stage === 'agent_start'
+      && Number.isFinite(chunk.data.ms) && chunk.data.ok === true) codexStarted = true
+    if (['tool-input-start', 'tool-input-available'].includes(chunk?.type)
       && typeof chunk.toolCallId === 'string' && chunk.toolCallId.length > 0 && chunk.toolCallId.length <= 512) {
-      handoffCalls.add(sha(chunk.toolCallId).slice(0, 16))
+      const toolCallHash = sha(chunk.toolCallId).slice(0, 16)
+      if (HANDOFF_TOOLS.has(chunk.toolName)) handoffCalls.add(toolCallHash)
+      // Match the execution pass's first 64 inputs, while accepting a later
+      // name for an already admitted call. Never downgrade a known native tool.
+      if (record.harness === 'codex' && codexStarted && (codexInputs.has(toolCallHash) || codexInputs.size < 64)) {
+        codexInputs.add(toolCallHash)
+        if (!codexNativeCalls.has(toolCallHash) && ['bash', 'apply_patch'].includes(chunk.toolName)) codexNativeCalls.set(toolCallHash, chunk.toolName)
+      }
     }
   }
   const submittedReplies = new Set()
@@ -541,7 +553,13 @@ export function observeChunks(record, detail, observedAt) {
           && typeof chunk.input?.summary === 'string' && chunk.input.summary.includes(`STARTUP_OK_${record.sampleId}`)) submittedReplies.add(toolCallHash)
         if (chunk.type === 'tool-output-available' && submittedReplies.has(toolCallHash) && Number.isFinite(at)) submittedAt = at
         if (chunk.type.startsWith('tool-input-') && toolInputs.size < 64) toolInputs.add(toolCallHash)
-        if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash) && !handoffCalls.has(toolCallHash)) successfulExecutionTools.add(toolCallHash)
+        if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash) && !handoffCalls.has(toolCallHash)) {
+          const native = codexNativeCalls.get(toolCallHash)
+          const succeeded = native === 'bash' ? chunk.output?.exitCode === 0
+            : native === 'apply_patch' ? chunk.output?.status === 'completed' : true
+          if (succeeded) successfulExecutionTools.add(toolCallHash)
+          else successfulExecutionTools.delete(toolCallHash)
+        }
         if (chunk.type === 'tool-output-error') successfulExecutionTools.delete(toolCallHash)
         completedTool = successfulExecutionTools.size > 0
         let tool = toolCalls.find(call => call.toolCallHash === toolCallHash)
