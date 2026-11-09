@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "kind": "supplement-to-preserved-production-preparation",
+  "issue": 1512,
+  "observedAt": "2026-11-09T06:41:11Z",
+  "candidate": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+  "candidateTree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+  "candidateReleased": false,
+  "priorEvidenceCommit": "fa72b1541911af60898b659d76f0b379c9171afe",
+  "priorRecipeBlob": "108179ebec341e9bad46106eb4bb84c138bd5e33",
+  "sourceFingerprints": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "blob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+      "bytes": 59415,
+      "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01",
+      "changedSincePriorRecipe": false,
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/025118ed953ab80803ac3ba9548c3a309c5c69b4/scripts/acceptance/run-observability.mjs"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "blob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+      "bytes": 11693,
+      "sha256": "811ba05e172f6a896867949d701911b845289db290950339b29a0a8c5463ec6a",
+      "changedSincePriorRecipe": false,
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/025118ed953ab80803ac3ba9548c3a309c5c69b4/scripts/acceptance/run-observability-workflow.mjs"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "blob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "bytes": 25516,
+      "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606",
+      "changedSincePriorRecipe": true,
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/025118ed953ab80803ac3ba9548c3a309c5c69b4/scripts/acceptance/run-observability-browser.mjs"
+    },
+    {
+      "path": "scripts/ops/posthog-export-evidence.mjs",
+      "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "blob": "a986e913cc0f5b79386f5bf50cef8fbefae6ac0e",
+      "bytes": 11762,
+      "sha256": "94282fae71b089bfe7154b907c1ebd45fc5c352e16c3369e184b64a1374b8045",
+      "changedSincePriorRecipe": false,
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/025118ed953ab80803ac3ba9548c3a309c5c69b4/scripts/ops/posthog-export-evidence.mjs"
+    },
+    {
+      "path": "scripts/ops/posthog-replay-evidence.mjs",
+      "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "blob": "fe28b5927b8df35d42bce2984a95dcfdd50e6965",
+      "bytes": 13579,
+      "sha256": "4df87f17ee6175a0b3498652f9af4ac61afec35dea022c116d81050396a0bddf",
+      "changedSincePriorRecipe": false,
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/025118ed953ab80803ac3ba9548c3a309c5c69b4/scripts/ops/posthog-replay-evidence.mjs"
+    },
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "blob": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "bytes": 19846,
+      "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+      "changedSincePriorRecipe": false,
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/025118ed953ab80803ac3ba9548c3a309c5c69b4/scripts/ops/run-trace-benchmark.ts"
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "blob": "a02e4a5100c066d8564902ec287c9c92fee0d20e",
+      "bytes": 66977,
+      "sha256": "4340486262e1e506033a4dcf42834aadf2dc4459c1aab53a4dea74847d082f11",
+      "changedSincePriorRecipe": true,
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/025118ed953ab80803ac3ba9548c3a309c5c69b4/docs/operations/tracing.md"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "blob": "4ca2cf35c1f499b338469556836ae0505649e82a",
+      "bytes": 19730,
+      "sha256": "b7440f5402350d0c3513576dbddc60978bb7b37d701632e1247b73725d93aa1a",
+      "changedSincePriorRecipe": true,
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/025118ed953ab80803ac3ba9548c3a309c5c69b4/scripts/acceptance/run-observability.md"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "blob": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23",
+      "bytes": 13984,
+      "sha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4",
+      "changedSincePriorRecipe": false,
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/025118ed953ab80803ac3ba9548c3a309c5c69b4/.github/workflows/run-trace-acceptance.yml"
+    },
+    {
+      "path": ".github/workflows/issue1512-git-transport.yml",
+      "bytes": 7630,
+      "sha256": "610dc8cc67aff5e6cb7cd7c778be9fc4cf8d2ab4b69b4ed170ccc79853ad7b8a",
+      "blob": "7429381cee94f6188303ac997cb4e0c89906672a",
+      "revision": "a0dd581c5b573e9809ef7cc362da93f1429dee13",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/a0dd581c5b573e9809ef7cc362da93f1429dee13/.github/workflows/issue1512-git-transport.yml",
+      "currentStatus": "Transport last observed at prior receipt; must read exact ref again immediately before dispatch mutation."
+    }
+  ],
+  "changes": [
+    "Owned browser uses the official bot-filter opt-in before page scripts, within the existing bounded actor deadline; ordinary browser default and privacy masking remain.",
+    "Acceptance README now describes the actual temporary-if-absent / revision-checked restore-implicit path.",
+    "Tracing documentation explains the official opt-in, closed browser classification and initialization-only deadline."
+  ],
+  "operationalSemantics": {
+    "inputsUnchanged": true,
+    "actualACMECaseCount": 0,
+    "eachOperationFreshRequestId": true,
+    "expectedDeploymentSha": "Replace with the real released main SHA after all source/publisher checks; candidate head is not a production version.",
+    "beforeMutation": "Refresh actual ops transport branch head and bounded account/source queue; use expected SHA lease without force.",
+    "exportId": "Use only the numeric saved insight id returned after actual production trace queries; notebook node UUID is not an insight id.",
+    "notebook": {
+      "shortId": "C9vQAc1L",
+      "versionAtRead": 15,
+      "timelineNodeId": "3f5a1c64-b0de-4a32-be51-341666af8a79"
+    },
+    "models": "Existing ACME personal-workspace Haiku 5.5 and GPT-6 Luna official subscriptions, one actual case each; no API or Pro fallback.",
+    "noRepositoryCaseNeedsNoGitHubChild": true
+  },
+  "documentationDelta": {
+    "path": "scripts/acceptance/run-observability.md",
+    "fixedSource": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+    "lines": [
+      100,
+      101
+    ],
+    "before": "running. chosen=false remains a blocker because the normal model API cannot\nrestore an inherited choice. Global model order is never changed.",
+    "after": "running. A verified absent composer preference uses a temporary selection receipt\nand restores absence; an existing explicit choice must be restorable. Global model order is never changed.",
+    "basis": "Actual driver preflightCase checks preferenceState=absent with chosen=false; temporary-if-absent returns bindingId/revision, restore-implicit uses that receipt. No requirement for a pre-existing explicit model choice.",
+    "applied": true,
+    "appliedAtCommit": "34d0f2bc1f9537491c9737e4e23d96b1a1beee21",
+    "currentBlob": "4ca2cf35c1f499b338469556836ae0505649e82a"
+  },
+  "mutationPerformed": false,
+  "newSessions": 0,
+  "newModels": 0
+}

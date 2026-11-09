@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-peer1790-three-way-source-review",
+  "preparedAtUTC": "2026-11-09T06:31:16.458Z",
+  "observedMain": {
+    "sha": "927260894305e066e15a4ad50114abce433e6001",
+    "tree": "38e99074df7121191c933ab98193e87c7d128494",
+    "parents": [
+      "88b144d52d091d7ff566c63fce6e902e33edc59e",
+      "d51295d6ef645bf3592d24c8ce10b4fb4c3da37c"
+    ],
+    "origin": "actual merged PR1790, Git commit API and PR API agree",
+    "mergedAt": "2026-11-09T06:24:05Z"
+  },
+  "peer": {
+    "pr": 1790,
+    "head": "d51295d6ef645bf3592d24c8ce10b4fb4c3da37c",
+    "state": "closed",
+    "merged": true,
+    "mergeCommit": "927260894305e066e15a4ad50114abce433e6001",
+    "initialChangedFiles": 9,
+    "actualChangeOverMain88": [
+      {
+        "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+        "blob": "946d198e7f3885cfb94fca3d78cbae5700c03942",
+        "additions": 7,
+        "deletions": 1
+      },
+      {
+        "path": "apps/api/generated/routes.json",
+        "blob": "8962037c3ef428b77d4417bfc12281aeb7e30c11",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "blob": "78fe57ce3f6ceeed2489d569c14b1ae0642aebe0",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "lib/factory/execution-claim.test.ts",
+        "blob": "4abdffc0e55d849f893c5d397e2aa6242f88aed1",
+        "additions": 84,
+        "deletions": 1
+      },
+      {
+        "path": "lib/factory/questions/continuation-delivery-context.ts",
+        "blob": "498310506663ad484ab237a3296b7edbbddee6d8",
+        "additions": 39,
+        "deletions": 0
+      },
+      {
+        "path": "lib/self-improvement/benchmark-claim.test.ts",
+        "blob": "f0c4d4b67ad13020b14961f3eb3bf0d734038f27",
+        "additions": 2,
+        "deletions": 0
+      }
+    ]
+  },
+  "own": {
+    "pr": 1799,
+    "observedHead": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "headTree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+    "main88UnionTree": "6a30bfd1287a25bb52e61682ea0491d00bb2647d",
+    "browserFixCommit": "34d0f2bc1f9537491c9737e4e23d96b1a1beee21",
+    "browserFixTree": "ba7301d2ee3867db780b467c2229d20ed135a052",
+    "ownedPaths": [
+      "app/v1/devices/[deviceId]/repos/route.ts",
+      "app/v1/devices/[deviceId]/runs/route.ts",
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts",
+      "docs/operations/tracing.md",
+      "lib/coordinator/repository-resolution.test.ts",
+      "lib/coordinator/repository-resolution.ts",
+      "lib/desktop-rpc/read-batch-context.ts",
+      "lib/device-enrollment.db.test.ts",
+      "lib/device-enrollment.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "lib/device-management.ts",
+      "lib/device-unit-fence.db.test.ts",
+      "lib/dispatch-timing.ts",
+      "lib/personal-policy.test.ts",
+      "lib/personal-policy.ts",
+      "lib/tracing/logs.test.ts",
+      "lib/tracing/node.ts",
+      "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "scripts/e2b/validate-template-subscriptions.mjs",
+      "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "tests/cloud-dispatch-startup.test.ts",
+      "workflows/coordinator/factory-steps.ts",
+      "workflows/coordinator/steps.ts"
+    ],
+    "browserOptInImplementationReviewed": false
+  },
+  "intersections": {
+    "mainD72To88WithOwn25": [],
+    "peerWithOwn25": [
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts"
+    ],
+    "actualMain927WithOwn25": [
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts"
+    ],
+    "coordinatorSteps": [],
+    "factorySteps": [],
+    "tracing": [],
+    "runsReposAuthorityImplementation": [],
+    "sharedMcpFilesAlreadyIdenticalOnMain88": [
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-context.mjs",
+        "peerBlob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+        "ownBlob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+        "main88Blob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04"
+      },
+      {
+        "path": "packages/daemon/test/codex-mcp-context.test.ts",
+        "peerBlob": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+        "ownBlob": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+        "main88Blob": "b3b755f024c0a1531df3a4b1d849b3b70c145806"
+      },
+      {
+        "path": "packages/daemon/test/mcp-http-observation.test.ts",
+        "peerBlob": "c569b06d61ed84855db3c5921f1a6dba05774477",
+        "ownBlob": "c569b06d61ed84855db3c5921f1a6dba05774477",
+        "main88Blob": "c569b06d61ed84855db3c5921f1a6dba05774477"
+      }
+    ]
+  },
+  "generatedComparison": {
+    "routeCount": 243,
+    "methodCount": 315,
+    "header": {
+      "version": 1,
+      "basePath": "/mikka"
+    },
+    "variants": [
+      {
+        "label": "main88",
+        "routeCount": 243,
+        "methodCount": 315,
+        "tsMatchesJson": true,
+        "onlySourceHashTextDiffersInBothFiles": true,
+        "differences": []
+      },
+      {
+        "label": "peer",
+        "routeCount": 243,
+        "methodCount": 315,
+        "tsMatchesJson": true,
+        "onlySourceHashTextDiffersInBothFiles": true,
+        "differences": [
+          {
+            "index": 223,
+            "source": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+            "old": "1310564b0ba665075a28204da7383013e25ca8d4b3356d3befcf33fe2707bf67",
+            "next": "9bb84ac20c797b121b668fce590fc80f5f6a46ca5ea9972a56ffb58712829c59"
+          }
+        ]
+      },
+      {
+        "label": "own",
+        "routeCount": 243,
+        "methodCount": 315,
+        "tsMatchesJson": true,
+        "onlySourceHashTextDiffersInBothFiles": true,
+        "differences": [
+          {
+            "index": 220,
+            "source": "app/v1/devices/[deviceId]/repos/route.ts",
+            "old": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9",
+            "next": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888"
+          },
+          {
+            "index": 221,
+            "source": "app/v1/devices/[deviceId]/runs/route.ts",
+            "old": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54",
+            "next": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c"
+          }
+        ]
+      }
+    ]
+  },
+  "generatedSourceFingerprints": [
+    {
+      "label": "main88",
+      "path": "apps/api/generated/routes.json",
+      "bytes": 76186,
+      "sha256": "5c42935fd06eaf597a8b1200c6884acdf5f006cbc7b9c6e8b505f0b296003757",
+      "blob": "29b7e32a9dc2ec660998d6258b80f2caead92745"
+    },
+    {
+      "label": "main88",
+      "path": "apps/api/generated/routes.ts",
+      "bytes": 78570,
+      "sha256": "362c31be71608405b823742674343f366f8819683b02904ee03028c6a5567358",
+      "blob": "e0f403171f936b63a34f62cc9aad3e2394cbc2fc"
+    },
+    {
+      "label": "peer",
+      "path": "apps/api/generated/routes.json",
+      "bytes": 76186,
+      "sha256": "cd4fab7b9b3d407d72f66482d12cbf7938a02cbcf3b7a509f84bdb2dc76a5159",
+      "blob": "8962037c3ef428b77d4417bfc12281aeb7e30c11"
+    },
+    {
+      "label": "peer",
+      "path": "apps/api/generated/routes.ts",
+      "bytes": 78570,
+      "sha256": "1c5e5d3d31de6325f452078ecd54f4c14be8bc5a6d309f6d5416de9846fe88f2",
+      "blob": "78fe57ce3f6ceeed2489d569c14b1ae0642aebe0"
+    },
+    {
+      "label": "own",
+      "path": "apps/api/generated/routes.json",
+      "bytes": 76186,
+      "sha256": "863f86e0065cef6eed66526ed3644176904915bd673718f4cc43746bfc48b0d6",
+      "blob": "cafa02602d36b04eb80cdb18ea1b54d8a2aa80a8"
+    },
+    {
+      "label": "own",
+      "path": "apps/api/generated/routes.ts",
+      "bytes": 78570,
+      "sha256": "d1b8dd401148a5fd42b66c2d655bd7443f2e4c8c148eb5bbf85c8493a71ac8d9",
+      "blob": "d7cb3ee93e7de084a4001c0248fc739f00a7414c"
+    }
+  ],
+  "exactChangedRouteSourceFingerprints": [
+    {
+      "label": "own",
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "bytes": 1983,
+      "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+      "blob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "generatedSourceHashMatches": true
+    },
+    {
+      "label": "own",
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "bytes": 1305,
+      "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+      "blob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "generatedSourceHashMatches": true
+    },
+    {
+      "label": "peer",
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "bytes": 45073,
+      "sha256": "9bb84ac20c797b121b668fce590fc80f5f6a46ca5ea9972a56ffb58712829c59",
+      "blob": "946d198e7f3885cfb94fca3d78cbae5700c03942",
+      "generatedSourceHashMatches": true
+    }
+  ],
+  "mergeAdvice": {
+    "browser34Commit": "34d0f2bc1f9537491c9737e4e23d96b1a1beee21",
+    "browser34Tree": "ba7301d2ee3867db780b467c2229d20ed135a052",
+    "main927": "927260894305e066e15a4ad50114abce433e6001",
+    "main927Tree": "38e99074df7121191c933ab98193e87c7d128494",
+    "details": [
+      {
+        "path": "apps/api/generated/routes.json",
+        "currentBrowser34Blob": "cafa02602d36b04eb80cdb18ea1b54d8a2aa80a8",
+        "currentBytes": 76186,
+        "currentSHA256": "863f86e0065cef6eed66526ed3644176904915bd673718f4cc43746bfc48b0d6",
+        "main927Blob": "8962037c3ef428b77d4417bfc12281aeb7e30c11",
+        "replacement": {
+          "old": "1310564b0ba665075a28204da7383013e25ca8d4b3356d3befcf33fe2707bf67",
+          "next": "9bb84ac20c797b121b668fce590fc80f5f6a46ca5ea9972a56ffb58712829c59",
+          "exactOldOccurrenceCount": 1,
+          "newOccurrenceBefore": 0,
+          "newOccurrenceAfter": 1,
+          "changedLineCount": 1
+        },
+        "preservedOwnSourceHashes": {
+          "repos": {
+            "value": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+            "count": 1
+          },
+          "runs": {
+            "value": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+            "count": 1
+          }
+        },
+        "expectedCombinedContent": {
+          "bytes": 76186,
+          "sha256": "d9a59533489e8a98d80cf7da37f10385475ae415e5410fa151f6270d29008342",
+          "gitBlob": "06017439de4b98555310e13c35c079bca379174f",
+          "calculatedOnly": true,
+          "uploaded": false,
+          "codeFileWritten": false
+        }
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "currentBrowser34Blob": "d7cb3ee93e7de084a4001c0248fc739f00a7414c",
+        "currentBytes": 78570,
+        "currentSHA256": "d1b8dd401148a5fd42b66c2d655bd7443f2e4c8c148eb5bbf85c8493a71ac8d9",
+        "main927Blob": "78fe57ce3f6ceeed2489d569c14b1ae0642aebe0",
+        "replacement": {
+          "old": "1310564b0ba665075a28204da7383013e25ca8d4b3356d3befcf33fe2707bf67",
+          "next": "9bb84ac20c797b121b668fce590fc80f5f6a46ca5ea9972a56ffb58712829c59",
+          "exactOldOccurrenceCount": 1,
+          "newOccurrenceBefore": 0,
+          "newOccurrenceAfter": 1,
+          "changedLineCount": 1
+        },
+        "preservedOwnSourceHashes": {
+          "repos": {
+            "value": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+            "count": 1
+          },
+          "runs": {
+            "value": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+            "count": 1
+          }
+        },
+        "expectedCombinedContent": {
+          "bytes": 78570,
+          "sha256": "3c3d145814c4657cae36cee2147b9728a6d14353c0a217b97941a99327efd84a",
+          "gitBlob": "16fe573dc6d192566f6bf2810b9ba94e186cba82",
+          "calculatedOnly": true,
+          "uploaded": false,
+          "codeFileWritten": false
+        }
+      }
+    ]
+  },
+  "semantics": {
+    "peerChange": "The claim response decorates only an existing Factory native-question followUp with host-admitted publication context after existing policy/claim checks. The new helper is pure, has no imports, adds no DB/network call and returns the original claim unless all existing native-resume/execution/readOnly=false/git_push=allow/repository/branch guards match.",
+    "unchangedAuthority": "Our runs/repos GET implementations retain authenticateDevice and readUnderDeviceAuthority snapshot ownership semantics. Peer modifies a separate run claim route, not those readers or their shared authority code.",
+    "unchangedTraceFixes": "Peer does not edit withRunSpan refusal wrappers, repository-resolution/dispatch refusal markers, lib/tracing/node forceFlush, or personal policy/read-batch implementation. Union Git tree confirms owned coordinator/tracing blob identities.",
+    "acmeInference": "The normal #1512 no-repository deliverable has no admitted repository/native-question resume context; the new helper's guards imply an unchanged claim for that path. This is source reasoning, not a real production-case pass."
+  },
+  "preservePlan": [
+    "Use the actual927 main as the incoming normal merge, preserving its six added/changed paths and all pre-existing main88 changes.",
+    "For the two generated files, preserve own repos/runs hashes and incoming claim hash; do not choose entire old union or entire incoming generated file.",
+    "The requested minimal resolution from browser34 is exactly one old-claim-hash replacement per generated file, changing one line each. All other bytes can remain identical.",
+    "Predicted combined hashes were calculated only in memory; no source file, Git blob/tree/commit/ref or merge patch was written by this review.",
+    "Existing canonical generation/type/CI gates can validate the eventual combined source; this review ran no tests and read no peer logs."
+  ],
+  "operations": {
+    "sourceReadsOnly": true,
+    "peerLogsRead": 0,
+    "testsRun": 0,
+    "codeFilesWritten": 0,
+    "gitObjectsCreated": 0,
+    "refsModified": 0,
+    "posthogQueries": 0,
+    "resourcesCreated": 0
+  }
+}

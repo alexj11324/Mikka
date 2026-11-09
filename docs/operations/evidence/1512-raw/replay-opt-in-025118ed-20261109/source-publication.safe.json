@@ -1,0 +1,600 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "kind": "source-publication-and-new-canonical-ci-checkpoint",
+  "capturedAt": "2026-11-09T06:41:11Z",
+  "repository": "alexj11324/Mikka",
+  "pr": 1799,
+  "branch": "fix/1512-daemon-fixture-executable-20261109",
+  "priorHead": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+  "actualMainAtPublication": "927260894305e066e15a4ad50114abce433e6001",
+  "publishedHead": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+  "publishedTree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+  "history": [
+    {
+      "sha": "e1a7f25e145f05a594f05c8c0685af22492dd3b9",
+      "parents": [
+        "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+        "88b144d52d091d7ff566c63fce6e902e33edc59e"
+      ],
+      "kind": "ordinary merge"
+    },
+    {
+      "sha": "34d0f2bc1f9537491c9737e4e23d96b1a1beee21",
+      "parents": [
+        "e1a7f25e145f05a594f05c8c0685af22492dd3b9"
+      ],
+      "kind": "nine-file Replay source and documentation repair"
+    },
+    {
+      "sha": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "parents": [
+        "34d0f2bc1f9537491c9737e4e23d96b1a1beee21",
+        "927260894305e066e15a4ad50114abce433e6001"
+      ],
+      "kind": "ordinary merge preserving actual #1790"
+    }
+  ],
+  "publication": {
+    "main": "927260894305e066e15a4ad50114abce433e6001",
+    "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "passed": true,
+    "finalCommit": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+    "finalTree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+    "blobs": 6729,
+    "ownedPaths": 33,
+    "nonOwnedMainBlobsPreserved": 6696,
+    "publishedAtUTC": "2026-11-09 06:31:23 UTC",
+    "force": false,
+    "mainWritten": false,
+    "intermediateRefUpdates": 0,
+    "refResult": {
+      "success": true
+    }
+  },
+  "deltaFromCurrentMain": [
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5a4c4f8486239161b325b9774b3086afe666dfa9"
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "06017439de4b98555310e13c35c079bca379174f"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "16fe573dc6d192566f6bf2810b9ba94e186cba82"
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a02e4a5100c066d8564902ec287c9c92fee0d20e"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9109982d1c3245179b85a42d6969003aec2f5047"
+    },
+    {
+      "path": "lib/analytics-policy.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "152b941ff7b05004a7c57a909f776c6268ede106"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a5157f09e8022bf9077053686d36aa02760a4e94"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47"
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "071b2243d35cd6fdd97b7be0f17f21728578c537"
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8fe53cb39985150e5fc05daa6370121cb5426d53"
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "27bbb720ac8f5bd3716787db62eb11833e9f3530"
+    },
+    {
+      "path": "lib/device-management.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c2243c5732d67b3ff5444196ce3b45e9aca67805"
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f82563e766f5c0477479b2d487e0f92e60a08b75"
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fef80337b9b5244d2e8565236c6dd96f7d329acd"
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+    },
+    {
+      "path": "lib/replay-readiness.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d60598b09201228e23c5ac7a9df00938192f0e67"
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "737fa373e4a8333a4a703bf6133f9a533d585460"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "00775a5928228262a66b12b845ee0dc18f6c6047"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2f6cb3ab32695c64fa67191653c0add6e8720b39"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "56412efdfe5bc638496b89de56281360b4cbe9b5"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ca2cf35c1f499b338469556836ae0505649e82a"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "628395f91d97a64655afb80117788d70207200c0"
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c904b35e3405353be5a549b0d53e2858e19c3454"
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "609029dde521868c00ab7eb687394ad5cacd6183"
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "58e4706039dafe6901082676f37a3c92da613d43"
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0e2ecce921c4b56795ad1096f2b1eae987299e95"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894"
+    }
+  ],
+  "sourceFix": {
+    "files": [
+      {
+        "path": "lib/replay-readiness.ts",
+        "baseBlob": "899a9dcf33af282913c3e25c99b0826566b2c56b",
+        "gitBlobSha": "d60598b09201228e23c5ac7a9df00938192f0e67",
+        "mode": "100644",
+        "bytes": 3871,
+        "sha256": "4f799c2aff37a1a9db293484a39f88ba5eb30ae82000c49081b4db4d7b3f3550"
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "baseBlob": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+        "gitBlobSha": "9109982d1c3245179b85a42d6969003aec2f5047",
+        "mode": "100644",
+        "bytes": 2442,
+        "sha256": "4a3754d2791fe87607ef12414673d411172415cbf77ac3323c88e076fb6a57dc"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "baseBlob": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+        "gitBlobSha": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+        "mode": "100644",
+        "bytes": 25516,
+        "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606"
+      },
+      {
+        "path": "tests/replay-readiness.test.mjs",
+        "baseBlob": "2c67bead9d3d211e58dd6a7a684d60139d7df16c",
+        "gitBlobSha": "58e4706039dafe6901082676f37a3c92da613d43",
+        "mode": "100644",
+        "bytes": 7564,
+        "sha256": "d44ef6745776cef67de40d093e9ae58be0d4370e9e8fcd0b408d1489a180ad90"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "baseBlob": "58170f27b9586752ca966e377c9255ac6e6174a9",
+        "gitBlobSha": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+        "mode": "100644",
+        "bytes": 29638,
+        "sha256": "b9b3eb221835ec336089e89974e9fd2bbc873277a6602c285c96e087c2bca9e4"
+      },
+      {
+        "path": "lib/analytics-policy.ts",
+        "baseBlob": "9529e8f563ef43d3e7c1eedd992165626eb86085",
+        "gitBlobSha": "152b941ff7b05004a7c57a909f776c6268ede106",
+        "mode": "100644",
+        "bytes": 3400,
+        "sha256": "93405210710d755ceabc9c4a75f9e2f826f37ede63b1d1fea9bf5ceecc91035f"
+      },
+      {
+        "path": "tests/analytics-policy.test.mjs",
+        "baseBlob": "74c4933788dda4e33caca2675738bc223442adda",
+        "gitBlobSha": "c904b35e3405353be5a549b0d53e2858e19c3454",
+        "mode": "100644",
+        "bytes": 22455,
+        "sha256": "5caff4e596b385226695ea9d35899b3f21ea34cb95ea4ef160400d0eb77d69e7"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.md",
+        "baseBlob": "176e3aead0068d801f829dcadaafcd02a61e67a3",
+        "gitBlobSha": "4ca2cf35c1f499b338469556836ae0505649e82a",
+        "mode": "100644",
+        "bytes": 19730,
+        "sha256": "b7440f5402350d0c3513576dbddc60978bb7b37d701632e1247b73725d93aa1a"
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "baseBlob": "35694355877eea55393ba9299f7796c2c171ccb7",
+        "gitBlobSha": "a02e4a5100c066d8564902ec287c9c92fee0d20e",
+        "mode": "100644",
+        "bytes": 66977,
+        "sha256": "4340486262e1e506033a4dcf42834aadf2dc4459c1aab53a4dea74847d082f11"
+      }
+    ],
+    "tracingDocumentationDelta": "\nOrdinary browser sessions keep the SDK's bot filter. The production acceptance\nrunner explicitly opts in only its fresh automated browser context: before page\nscripts run, it installs a non-enumerable, in-memory deadline marker in the\nofficial Mikka main document. A valid marker enables the SDK's public\n`opt_out_useragent_filter` option for that instance. It does not alter the user\nagent, WebDriver signals, consent, project settings or recording privacy. The\nofficial `$browser_type` value survives the privacy filter only when it is exactly\n`bot` or `browser`, for both ordinary events and snapshots. The marker deadline\nlimits eligibility at initialization; it is not an automatic timer that resets\nan already initialized SDK. The runner closes its owned context during cleanup.\n\nThis opt-in never fabricates a snapshot or bypasses readiness: the same session\nmust still produce a natural `$snapshot` before the single UI submission. Browser\nreadiness alone does not prove ingestion or playback. See the\n[SDK configuration contract](https://posthog.com/docs/references/posthog-js/types/PostHogConfig)\nand the [acceptance driver contract](../../scripts/acceptance/run-observability.md).\n"
+  },
+  "generated": {
+    "baseMain": "927260894305e066e15a4ad50114abce433e6001",
+    "routes": 243,
+    "methods": 315,
+    "deltaFromMain": [
+      {
+        "index": 220,
+        "source": "app/v1/devices/[deviceId]/repos/route.ts",
+        "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888"
+      },
+      {
+        "index": 221,
+        "source": "app/v1/devices/[deviceId]/runs/route.ts",
+        "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c"
+      }
+    ],
+    "claimSourceHash": "9bb84ac20c797b121b668fce590fc80f5f6a46ca5ea9972a56ffb58712829c59",
+    "jsonTsExactlyAgree": true,
+    "canonicalGeneratorExecutedLocally": false,
+    "files": [
+      {
+        "path": "apps/api/generated/routes.json",
+        "mode": "100644",
+        "gitBlobSha": "06017439de4b98555310e13c35c079bca379174f",
+        "bytes": 76186,
+        "sha256": "d9a59533489e8a98d80cf7da37f10385475ae415e5410fa151f6270d29008342"
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "mode": "100644",
+        "gitBlobSha": "16fe573dc6d192566f6bf2810b9ba94e186cba82",
+        "bytes": 78570,
+        "sha256": "3c3d145814c4657cae36cee2147b9728a6d14353c0a217b97941a99327efd84a"
+      }
+    ],
+    "canonicalCiGenerator": {
+      "jobId": 129016429612,
+      "command": "node apps/api/scripts/generate-routes.mjs --check",
+      "conclusion": "success",
+      "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+    }
+  },
+  "posthogContract": {
+    "sdk": "posthog-js@1.438.13",
+    "sdkCommit": "f831af3d33eab4d8cea8c3e4d360d76038912ee4",
+    "sourceInference": "The default bot filter rejects the current unmodified headless actor before before_send; Replay uses that capture path.",
+    "supportedConfiguration": "opt_out_useragent_filter",
+    "ordinarySessions": false,
+    "ownedAcceptanceContext": true,
+    "classification": [
+      "bot",
+      "browser"
+    ],
+    "uaSpoofing": false,
+    "webdriverMutation": false,
+    "consentMutation": false,
+    "projectSettingsMutation": false,
+    "publicBridgeReadOnly": true,
+    "globalSdkAssumption": false,
+    "deadlineMeaning": "Initialization eligibility only; owned context closure ends the SDK instance.",
+    "sources": [
+      "https://posthog.com/docs/product-analytics/troubleshooting",
+      "https://posthog.com/docs/libraries/js/config",
+      "https://posthog.com/docs/web-analytics/troubleshooting",
+      "https://posthog.com/docs/references/posthog-js/types/PostHogConfig"
+    ],
+    "authority": "Official PostHog MCP docs-search and posthog:filtering-bot-traffic plus exact pinned SDK source; no actual production replay was run."
+  },
+  "ci": {
+    "runId": 42573554116,
+    "head": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+    "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+    "actualCheckoutTree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+    "selection": {
+      "full": true,
+      "core": 57,
+      "integration": 29,
+      "dbSuites": 72,
+      "file": {
+        "path": "ci025-selection.safe.json",
+        "bytes": 130135,
+        "sha256": "fcdd46be6b33804415b5f5032e0c12de71829a264feead2b43f118de10a0f926",
+        "gitBlobSha": "981090e57913693c7dcd610e4ff24e2418043c0a",
+        "mode": "100644"
+      }
+    },
+    "jobsAsObserved": [
+      {
+        "id": 129016131517,
+        "name": "changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:31:31Z",
+        "completedAt": "2026-11-09T06:32:24Z"
+      },
+      {
+        "id": 129016429612,
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:35:46Z"
+      },
+      {
+        "id": 129016429666,
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:37:15Z"
+      },
+      {
+        "id": 129016429667,
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:37:04Z"
+      },
+      {
+        "id": 129016429683,
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:35:15Z"
+      },
+      {
+        "id": 129016429700,
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:36:17Z"
+      },
+      {
+        "id": 129016429745,
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:35:25Z"
+      },
+      {
+        "id": 129016429772,
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:38:53Z"
+      },
+      {
+        "id": 129016429779,
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:39:25Z"
+      },
+      {
+        "id": 129016430123,
+        "name": "analytics-checks / changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:33:23Z"
+      },
+      {
+        "id": 129016430252,
+        "name": "image-checks / changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:33:19Z"
+      },
+      {
+        "id": 129016430271,
+        "name": "desktop-checks / changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:32:26Z",
+        "completedAt": "2026-11-09T06:33:19Z"
+      },
+      {
+        "id": 129016431453,
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T06:32:24Z",
+        "completedAt": "2026-11-09T06:32:24Z"
+      },
+      {
+        "id": 129016728982,
+        "name": "desktop-checks / checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:33:21Z",
+        "completedAt": "2026-11-09T06:35:37Z"
+      },
+      {
+        "id": 129016728990,
+        "name": "desktop-checks / icon",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:33:23Z",
+        "completedAt": "2026-11-09T06:33:52Z"
+      },
+      {
+        "id": 129016729069,
+        "name": "desktop-checks / smoke",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:33:21Z",
+        "completedAt": "2026-11-09T06:38:27Z"
+      },
+      {
+        "id": 129016731808,
+        "name": "image-checks / image",
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T06:33:21Z",
+        "completedAt": null
+      },
+      {
+        "id": 129016749438,
+        "name": "analytics-checks / Analytics SSR (full)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:33:25Z",
+        "completedAt": "2026-11-09T06:38:29Z"
+      },
+      {
+        "id": 129018381654,
+        "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T06:38:29Z",
+        "completedAt": null
+      },
+      {
+        "id": 129018392528,
+        "name": "analytics-checks / analytics-ssr",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:38:31Z",
+        "completedAt": "2026-11-09T06:38:35Z"
+      },
+      {
+        "id": 129018515769,
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T06:38:55Z",
+        "completedAt": "2026-11-09T06:39:08Z"
+      }
+    ],
+    "overallComplete": false,
+    "nativePending": true
+  },
+  "boundaries": {
+    "canonicalNodeNowExecuted": true,
+    "sourceReviewReceiptsRetainTheirEarlierPendingAsOf": true,
+    "posthogSdkAndChromiumActualProductionNotExecuted": true,
+    "productionAcceptedCases": 0,
+    "issueClosed": false,
+    "mainWritten": false,
+    "ownSourceOrAccountWindow": false
+  }
+}

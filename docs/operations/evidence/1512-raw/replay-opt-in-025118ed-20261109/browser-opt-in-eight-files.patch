@@ -1,0 +1,283 @@
+diff --git a/lib/replay-readiness.ts b/lib/replay-readiness.ts
+--- a/lib/replay-readiness.ts
++++ b/lib/replay-readiness.ts
+@@ -1,3 +1,15 @@
++export const ACCEPTANCE_REPLAY_MARKER = '__mikkaAcceptanceReplayUntil'
++
++/** An owned document may explicitly admit automation during bounded acceptance.
++ * This qualifies initialization only; closing the context ends the SDK instance. */
++export function acceptanceReplayOptIn(target: object, now = Date.now()): boolean {
++  try {
++    const deadline = Object.getOwnPropertyDescriptor(target, ACCEPTANCE_REPLAY_MARKER)?.value
++    return typeof deadline === 'number' && Number.isSafeInteger(deadline)
++      && deadline > now && deadline <= now + 600_000
++  } catch { return false }
++}
++
+ type ReplayClient = {
+   onSessionId(callback: (sessionId: string) => void): () => void
+   sessionRecordingStarted(): boolean
+diff --git a/instrumentation-client.ts b/instrumentation-client.ts
+--- a/instrumentation-client.ts
++++ b/instrumentation-client.ts
+@@ -3,7 +3,7 @@
+ import { redactReplayRequest, sanitizeAnalyticsEvent } from '@/lib/analytics-policy'
+ import { watchRemovedActions } from '@/lib/app-build'
+ import { setLiveTelemetrySink } from '@/lib/live/telemetry'
+-import { installReplayReadiness } from '@/lib/replay-readiness'
++import { acceptanceReplayOptIn, installReplayReadiness } from '@/lib/replay-readiness'
+ 
+ // Obsolete actions stop old traffic and offer a refresh without discarding the page.
+ watchRemovedActions(window)
+@@ -16,6 +16,7 @@
+   defaults: '2026-05-30',
+   persistence: 'memory',
+   reuseAnonymousId: true,
++  opt_out_useragent_filter: acceptanceReplayOptIn(window),
+   person_profiles: 'identified_only',
+   save_campaign_params: false,
+   save_referrer: false,
+diff --git a/scripts/acceptance/run-observability-browser.mjs b/scripts/acceptance/run-observability-browser.mjs
+--- a/scripts/acceptance/run-observability-browser.mjs
++++ b/scripts/acceptance/run-observability-browser.mjs
+@@ -5,6 +5,7 @@
+ import { mkdir, writeFile } from 'node:fs/promises'
+ import { isDeepStrictEqual } from 'node:util'
+ import { CASES, fixtureTask, ORIGIN } from './run-observability.mjs'
++import { ACCEPTANCE_REPLAY_MARKER } from '../../lib/replay-readiness.ts'
+ 
+ const REPORT = 'production-run-observability-report/browser-actor.receipt.json'
+ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+@@ -243,6 +244,12 @@
+     await allocate('browser', () => chromium.launch({ headless: true, timeout: Math.min(30_000, config.deadline - now()), env: launchEnv }))
+     await allocate('context', () => owned.browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } }))
+     report.freshContext = true
++    // Only this owned context opts real automation into the official SDK filter.
++    await run(() => owned.context.addInitScript(({ marker, origin, deadline }) => {
++      if (window.top !== window || window.location.origin !== origin
++        || !/^\/mikka(?:\/|$)/.test(window.location.pathname) || Date.now() >= deadline) return
++      Object.defineProperty(window, marker, { value: deadline })
++    }, { marker: ACCEPTANCE_REPLAY_MARKER, origin: ORIGIN, deadline: config.deadline }))
+     await allocate('page', () => owned.context.newPage())
+     owned.page.on('pageerror', () => { report.pageErrorCount = Math.min(1_000_000, report.pageErrorCount + 1) })
+     owned.page.on('request', request => {
+diff --git a/tests/replay-readiness.test.mjs b/tests/replay-readiness.test.mjs
+--- a/tests/replay-readiness.test.mjs
++++ b/tests/replay-readiness.test.mjs
+@@ -2,7 +2,7 @@
+ import test from 'node:test'
+ import { readFileSync } from 'node:fs'
+ import { runInNewContext } from 'node:vm'
+-import { installReplayReadiness } from '../lib/replay-readiness.ts'
++import { ACCEPTANCE_REPLAY_MARKER, acceptanceReplayOptIn, installReplayReadiness } from '../lib/replay-readiness.ts'
+ import { sanitizeAnalyticsEvent, redactReplayRequest } from '../lib/analytics-policy.ts'
+ 
+ const A = '77777777-7777-4777-8777-777777777777'
+@@ -93,17 +93,19 @@
+   assert.doesNotThrow(() => installReplayReadiness(Object.freeze({})))
+ })
+ 
+-test('real bootstrap preserves sanitizer return/drop behavior and masking while publishing only a reader', () => {
++for (const optedIn of [false, true]) test(`real bootstrap keeps masking and natural readiness with acceptance opt-in ${optedIn}`, () => {
+   const source = readFileSync(new URL('../instrumentation-client.ts', import.meta.url), 'utf8')
+     .replace(/^import .*\n/gm, '')
+   const f = fixture()
+   let config
+   const client = { ...f.client, register() {}, capture() {} }
+   const target = { location: { hostname: 'example.invalid' } }
++  if (optedIn) Object.defineProperty(target, ACCEPTANCE_REPLAY_MARKER, { value: Date.now() + 60_000 })
+   runInNewContext(source, { window: target, process: { env: { NODE_ENV: 'test' } },
+     posthogConfig: { token: 'SYNTHETIC_PUBLIC_PROJECT_TOKEN', apiHost: 'https://example.invalid', uiHost: 'https://example.invalid' },
+     posthog: { init(_token, value) { config = value } }, watchRemovedActions() {},
+-    setLiveTelemetrySink() {}, installReplayReadiness, sanitizeAnalyticsEvent, redactReplayRequest })
++    setLiveTelemetrySink() {}, acceptanceReplayOptIn, installReplayReadiness, sanitizeAnalyticsEvent, redactReplayRequest })
++  assert.equal(config.opt_out_useragent_filter, optedIn)
+   assert.equal(typeof target.__mikkaReplayReadiness, 'function')
+   assert.equal(config.before_send({ event: 'unknown', properties: { message: CANARY } }), null)
+   const input = { event: '$snapshot', properties: { $session_id: A, $snapshot_data: [{ type: 2 }], prompt: CANARY } }
+@@ -118,3 +120,19 @@
+   assert.equal(config.session_recording.recordBody, false)
+   assert.equal(config.session_recording.recordHeaders, false)
+ })
++
++test('acceptance opt-in requires an unexpired bounded own data marker without reading accessors', () => {
++  const now = 1_800_000_000_000
++  const marked = value => Object.defineProperty({}, ACCEPTANCE_REPLAY_MARKER, { value })
++  assert.equal(acceptanceReplayOptIn({}, now), false)
++  for (const value of [now + 1, now + 600_000]) assert.equal(acceptanceReplayOptIn(marked(value), now), true)
++  for (const value of [undefined, null, true, 'true', String(now + 1), CANARY, NaN, Infinity, now - 1, now, now + 0.5, now + 600_001])
++    assert.equal(acceptanceReplayOptIn(marked(value), now), false)
++  let reads = 0
++  const accessor = Object.defineProperty({}, ACCEPTANCE_REPLAY_MARKER, { get() { reads++; throw new Error(CANARY) } })
++  assert.equal(acceptanceReplayOptIn(accessor, now), false)
++  assert.equal(reads, 0)
++  assert.equal(acceptanceReplayOptIn(Object.create(marked(now + 1)), now), false)
++  assert.equal(acceptanceReplayOptIn(marked(now + 1), now + 1), false)
++  assert.equal(acceptanceReplayOptIn(new Proxy({}, { getOwnPropertyDescriptor() { throw new Error(CANARY) } }), now), false)
++})
+diff --git a/scripts/acceptance/run-observability-browser.test.mjs b/scripts/acceptance/run-observability-browser.test.mjs
+--- a/scripts/acceptance/run-observability-browser.test.mjs
++++ b/scripts/acceptance/run-observability-browser.test.mjs
+@@ -6,6 +6,7 @@
+ import { runObservabilityWorkflow } from './run-observability-workflow.mjs'
+ import { startObservabilityBrowser, ObservabilityBrowserError } from './run-observability-browser.mjs'
+ import { CASES, fixtureTask, ORIGIN } from './run-observability.mjs'
++import { ACCEPTANCE_REPLAY_MARKER, acceptanceReplayOptIn } from '../../lib/replay-readiness.ts'
+ 
+ const revision = 'a'.repeat(40), owner = 'synthetic-browser-owner'
+ const workspaceId = '77777777-7777-4777-8777-777777777777'
+@@ -182,6 +183,10 @@
+   }
+   const context = {
+     request: api,
++    async addInitScript(script, arg) {
++      calls.push({ type: 'addInitScript', script, arg })
++      if (options.initScriptFails) throw new Error(CANARY)
++    },
+     async newPage() { calls.push({ type: 'newPage' }); return page },
+     async close() { calls.push({ type: 'close', resource: 'context' }); state.contextClosed = true },
+   }
+@@ -471,3 +476,52 @@
+     assert.equal(f.calls.find(call => call.type === 'api' && call.path.endsWith('/sign-out')).pageClosed, true)
+   })
+ }
++
++test('acceptance marker is installed before the first document and stays on the official top-level app', async () => {
++  const input = inputs(), f = browserFixture(input)
++  const session = await startObservabilityBrowser(f.args)
++  const entry = f.calls.find(call => call.type === 'addInitScript')
++  assert.ok(entry)
++  assert.equal(f.calls.filter(call => call.type === 'addInitScript').length, 1)
++  assert.equal(f.calls.indexOf(entry) < f.calls.findIndex(call => call.type === 'newPage'), true)
++  assert.deepEqual(entry.arg, { marker: ACCEPTANCE_REPLAY_MARKER, origin: ORIGIN, deadline: Date.parse(input.ready.expiresAt) })
++  const execute = ({ url = HOME, child = false, now = input.now() } = {}) => {
++    const location = new URL(url), navigator = { webdriver: true, userAgent: 'HeadlessChrome', userAgentData: { brands: [{ brand: 'HeadlessChrome' }] } }
++    const window = { location, navigator }
++    window.top = child ? {} : window
++    Object.defineProperty(window, 'localStorage', { get() { throw new Error(CANARY) } })
++    Object.defineProperty(window, 'sessionStorage', { get() { throw new Error(CANARY) } })
++    runInNewContext('(' + entry.script.toString() + ')(arg)', { window, arg: entry.arg, Date: { now: () => now } })
++    assert.equal(navigator.webdriver, true)
++    assert.equal(navigator.userAgent, 'HeadlessChrome')
++    assert.equal(navigator.userAgentData.brands[0].brand, 'HeadlessChrome')
++    assert.equal(Object.hasOwn(window, '__mikkaReplayReadiness'), false)
++    assert.equal(Object.hasOwn(window, 'posthog'), false)
++    return window
++  }
++  for (const url of [ORIGIN + '/mikka', HOME + '/sign-in', HOME]) {
++    const target = execute({ url })
++    assert.equal(acceptanceReplayOptIn(target, input.now()), true)
++    const descriptor = Object.getOwnPropertyDescriptor(target, ACCEPTANCE_REPLAY_MARKER)
++    assert.equal(descriptor.enumerable, false)
++    assert.equal(descriptor.writable, false)
++    assert.equal(descriptor.configurable, false)
++  }
++  for (const options of [{ url: 'https://unrelated.example/mikka/en' }, { url: ORIGIN + '/' },
++    { url: ORIGIN + '/mikka-other' }, { child: true }, { now: entry.arg.deadline }, { now: entry.arg.deadline + 1 }]) {
++    const target = execute(options)
++    assert.equal(Object.hasOwn(target, ACCEPTANCE_REPLAY_MARKER), false)
++    assert.equal(acceptanceReplayOptIn(target, options.now ?? input.now()), false)
++  }
++  assert.equal(f.state.submitAttempts, 1)
++  await session.close()
++})
++
++test('an acceptance marker installation failure submits nothing and closes the allocated context', async () => {
++  const f = browserFixture(inputs(), { initScriptFails: true })
++  await assert.rejects(startObservabilityBrowser(f.args), error => { safeFailure(error, f.reports); return true })
++  assert.equal(f.calls.some(call => call.type === 'newPage' || call.type === 'goto'), false)
++  assert.equal(f.state.submitAttempts, 0)
++  assert.equal(f.state.contextClosed, true)
++  assert.equal(f.state.browserClosed, true)
++})
+diff --git a/lib/analytics-policy.ts b/lib/analytics-policy.ts
+--- a/lib/analytics-policy.ts
++++ b/lib/analytics-policy.ts
+@@ -24,18 +24,19 @@
+ }
+ 
+ export function sanitizeAnalyticsEvent<T extends { event: string; properties: Record<string, unknown> }>(event: T | null): T | null {
+-  if (!event) return null
++  if (!event || event.event !== '$snapshot' && !allowedEvents.has(event.event)) return null
++  const browserType = event.properties.$browser_type
++  const classification = browserType === 'bot' || browserType === 'browser' ? { $browser_type: browserType } : {}
+   // rrweb masks the DOM before serialization (instrumentation-client.ts).
+   // Its transport needs the opaque snapshot payload and session identifiers;
+   // ordinary event properties still go through the narrow allowlist below.
+   if (event.event === '$snapshot') {
+     const keys = new Set(['token', 'distinct_id', '$session_id', '$window_id', '$lib', '$lib_version', '$snapshot_bytes', '$snapshot_data'])
+-    const snapshot = { ...event, properties: Object.fromEntries(Object.entries(event.properties).filter(([key]) => keys.has(key))) }
++    const snapshot = { ...event, properties: { ...Object.fromEntries(Object.entries(event.properties).filter(([key]) => keys.has(key))), ...classification } }
+     for (const key of ['$set', '$set_once', '$unset']) Reflect.deleteProperty(snapshot, key)
+     return snapshot
+   }
+-  if (!allowedEvents.has(event.event)) return null
+-  const properties: Record<string, unknown> = Object.fromEntries(Object.entries(event.properties).filter(([key]) => allowedProperties.has(key)))
++  const properties: Record<string, unknown> = { ...Object.fromEntries(Object.entries(event.properties).filter(([key]) => allowedProperties.has(key))), ...classification }
+   if (typeof event.properties.$current_url === 'string') {
+     try {
+       const url = new URL(event.properties.$current_url)
+diff --git a/tests/analytics-policy.test.mjs b/tests/analytics-policy.test.mjs
+--- a/tests/analytics-policy.test.mjs
++++ b/tests/analytics-policy.test.mjs
+@@ -65,6 +65,29 @@
+   assert.match(source, /recordBody: false/)
+ })
+ 
++test('SDK browser classification keeps only bot or browser on normal events and masked Replay', () => {
++  const payload = [{ type: 2, data: { node: { textContent: '***' } } }]
++  for (const event of ['$pageview', '$snapshot']) {
++    for (const browserType of ['bot', 'browser']) {
++      const properties = { $browser_type: browserType, $session_id: 'session', $raw_user_agent: 'PRIVATE_UA_CANARY',
++        userAgent: 'PRIVATE_UA_CANARY', private: 'PRIVATE_CLASSIFICATION_CANARY',
++        ...(event === '$snapshot' ? { $snapshot_data: payload, $snapshot_bytes: 10 } : {}) }
++      const sanitized = sanitizeAnalyticsEvent({ event, properties })
++      assert.deepEqual(sanitized.properties, { $browser_type: browserType, $session_id: 'session',
++        ...(event === '$snapshot' ? { $snapshot_data: payload, $snapshot_bytes: 10 } : {}) })
++      if (event === '$snapshot') assert.equal(sanitized.properties.$snapshot_data, payload)
++      assert.equal(JSON.stringify(sanitized).includes('PRIVATE_'), false)
++    }
++    for (const value of [undefined, null, true, 1, 'BOT', 'human', 'bot ', 'private@example.invalid', 'x'.repeat(4096), { type: 'bot' }]) {
++      const sanitized = sanitizeAnalyticsEvent({ event, properties: { $browser_type: value } })
++      assert.equal(Object.hasOwn(sanitized.properties, '$browser_type'), false)
++      assert.deepEqual(sanitized.properties, {})
++    }
++  }
++  assert.equal(sanitizeAnalyticsEvent({ event: 'unknown', properties: { $browser_type: 'bot' } }), null)
++  assert.equal(sanitizeAnalyticsEvent({ event: 'unknown', get properties() { throw new Error('PRIVATE_CLASSIFICATION_CANARY') } }), null)
++})
++
+ test('all upcoming features fail closed, even if the remote switch is accidentally enabled', () => {
+   for (const [feature, definition] of Object.entries(upcomingFeatures)) {
+     assert.equal(definition.implemented, false)
+diff --git a/scripts/acceptance/run-observability.md b/scripts/acceptance/run-observability.md
+--- a/scripts/acceptance/run-observability.md
++++ b/scripts/acceptance/run-observability.md
+@@ -97,8 +97,8 @@
+ --prepare temporarily disables subscription-to-API-Key fallback and existing
+ enabled Profiles through normal application APIs. It validates the other gates
+ first; in all mode, an unavailable case does not prevent an available case from
+-running. chosen=false remains a blocker because the normal model API cannot
+-restore an inherited choice. Global model order is never changed.
++running. chosen=false with preferenceState=absent uses temporary-if-absent;
++cleanup uses revision-checked restore-implicit. Global model order is never changed.
+ 
+ Before each preparation or restoration write, both existing owner-wide run
+ readers must report only terminal runs, including other workspaces. Each exposes
+@@ -202,6 +202,16 @@
+ submission. The original driver still observes the actual persisted UI message
+ and verifies all task, Factory, native-run and Artifact evidence.
+ 
++The actor explicitly admits its real automation through PostHog's public
++`opt_out_useragent_filter` option for this fresh browser context. Before its
++first page, it installs a non-persistent marker only on the official app's
++top-level documents. An unexpired marker at initialization enables this option;
++the ten-minute bound does not reset a running SDK. Closing the owned context
++ends that instance. Ordinary visitor instances keep the default bot filter.
++The browser retains its actual user agent and automation signals, and the
++sanitizer preserves only the SDK's `bot` or `browser` classification. Replay
++records the actual automated UI actions under the unchanged masking policy.
++
+ Before the paid click, the actor checks that the active PostHog session has
+ loaded its SDK, started recording and observed a sanitized snapshot. It reads
+ the session again immediately before submission. It does not force recording,

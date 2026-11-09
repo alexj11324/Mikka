@@ -1,0 +1,268 @@
+{
+  "projectId": 670821,
+  "notebook": {
+    "shortId": "C9vQAc1L",
+    "title": "Mikka 运行时间线 · #1512",
+    "version": 15,
+    "url": "https://us.posthog.com/project/670821/notebooks/C9vQAc1L",
+    "readAccessVerified": true,
+    "kernel": {
+      "status": "stopped",
+      "cpu_cores": 1,
+      "memory_gb": 2,
+      "idle_timeout_seconds": 3600
+    },
+    "variableValues": [
+      {
+        "name": "run_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "thread_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "task_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "trace_id",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "lookback_hours",
+        "type": "number",
+        "value": 24
+      }
+    ],
+    "cellCounts": {
+      "total": 17,
+      "sql": 3,
+      "markdown": 14,
+      "python": 0
+    },
+    "sqlCells": [
+      {
+        "nodeId": "8f15f2e8-8c0b-4505-b0d7-e6150c8d5cb3",
+        "dataframeName": "recent_runtime_traces",
+        "status": "done",
+        "querySHA256": "08a86412357564d773b33a2a53e234f534664f3c4b2bf6724230ee69df608ad6",
+        "queryCharacters": 1036,
+        "lastRun": {
+          "run_id": "01a1b262-df84-760e-9658-030194df8010",
+          "status": "done",
+          "finished_at": "2026-11-06T19:43:08.934656Z",
+          "row_count": 40,
+          "columns": [
+            "started_utc",
+            "trace_id_hex",
+            "services",
+            "run_ids",
+            "thread_ids",
+            "task_ids",
+            "observed_spans",
+            "error_spans",
+            "observed_elapsed_ms"
+          ],
+          "error": null
+        },
+        "visualization": null,
+        "dependsOn": [],
+        "dependents": []
+      },
+      {
+        "nodeId": "3f5a1c64-b0de-4a32-be51-341666af8a79",
+        "dataframeName": "runtime_span_timeline",
+        "status": "done",
+        "querySHA256": "3b151c0b6157266b6082873247d752133b799824eb61c48df5d45366d1073222",
+        "queryCharacters": 1702,
+        "lastRun": {
+          "run_id": "01a1b262-e934-79a3-8139-debe602c6ba0",
+          "status": "done",
+          "finished_at": "2026-11-06T19:43:11.424491Z",
+          "row_count": 0,
+          "columns": [
+            "started_utc",
+            "trace_id_hex",
+            "span_id_hex",
+            "parent_span_id_hex",
+            "service_name",
+            "stage",
+            "offset_ms",
+            "duration_ms",
+            "status_code",
+            "is_root_span",
+            "run_id",
+            "thread_id",
+            "task_id",
+            "workflow_run_id",
+            "error_code",
+            "error_type",
+            "session_id"
+          ],
+          "error": null
+        },
+        "visualization": null,
+        "dependsOn": [],
+        "dependents": []
+      },
+      {
+        "nodeId": "3c4b2757-6de2-4d50-bfe8-0b6991b68b00",
+        "dataframeName": "runtime_logs",
+        "status": "done",
+        "querySHA256": "d81f0259ddb5f9e7118830913f5d66300d5db8c1167c79c9f0ffeb25ca4bac5f",
+        "queryCharacters": 1564,
+        "lastRun": {
+          "run_id": "01a1b262-f2d9-7add-86c5-f62913eba8da",
+          "status": "done",
+          "finished_at": "2026-11-06T19:43:13.869304Z",
+          "row_count": 0,
+          "columns": [
+            "logged_utc",
+            "trace_id_hex",
+            "span_id_hex",
+            "service_name",
+            "severity_text",
+            "event_name",
+            "stage",
+            "duration_ms",
+            "run_id",
+            "thread_id",
+            "task_id",
+            "workflow_run_id",
+            "error_code",
+            "error_type"
+          ],
+          "error": null
+        },
+        "visualization": null,
+        "dependsOn": [],
+        "dependents": []
+      }
+    ],
+    "currentQueryResultsAreNotCurrentAcceptance": true
+  },
+  "suppliedTimelineId": {
+    "value": "3f5a1c64-b0de-4a32-be51-341666af8a79",
+    "actualType": "notebook SQL cell node_id",
+    "dataframeName": "runtime_span_timeline",
+    "numericInsightId": null
+  },
+  "savedInsightSearch": {
+    "scope": "saved=true metadata only; exact searches1512 and运行时间线; no broad enumeration or data query",
+    "search1512": {
+      "count": 4,
+      "hasNext": false,
+      "results": [
+        {
+          "id": 13703203,
+          "shortId": "E31K4pde",
+          "name": "7d 每小时数据库查询 · route Top 15 · 按采样率加权"
+        },
+        {
+          "id": 13703160,
+          "shortId": "kFw6Ai83",
+          "name": "24h 每小时数据库查询 · route Top 15 · 按采样率加权"
+        },
+        {
+          "id": 13703206,
+          "shortId": "iSpRMGJo",
+          "name": "24h 每小时返回 JSON 近似字节 · route Top 15 · 按采样率加权"
+        },
+        {
+          "id": 13703208,
+          "shortId": "7F8ewK9A",
+          "name": "7d 每小时返回 JSON 近似字节 · route Top 15 · 按采样率加权"
+        }
+      ]
+    },
+    "searchTimeline": {
+      "count": 0,
+      "hasNext": false
+    },
+    "conclusion": "No saved APM timeline insight found in these bounded issue/title searches; supplied UUID belongs to notebook cell and has no numeric insight mapping.",
+    "doesNotClaimProjectWideExhaustiveAbsence": true
+  },
+  "actualReadProof": [
+    {
+      "command": "call notebooks-get {\"short_id\":\"C9vQAc1L\"} --json",
+      "observedAtUTC": "2026-11-09T05:57:16.968Z",
+      "responseBytes": 29040,
+      "responseSHA256": "e394fa49c834bd5704d97054fff68a97ec6bb97d6aece07e8e8414e4b17a014f",
+      "rawStoreKey": "posthogObjectPrep20261109:read:call notebooks-get {\"short_id\":\"C9vQAc1L\"} --json"
+    },
+    {
+      "command": "call insights-list {\"saved\":true,\"search\":\"1512\",\"limit\":20,\"offset\":0} --json",
+      "observedAtUTC": "2026-11-09T05:59:29.657Z",
+      "responseBytes": 5636,
+      "responseSHA256": "cbb135999867f55b6c137b776ab3fd5434c93f79474609c040d9782e6438b36b",
+      "rawStoreKey": "posthogObjectPrep20261109:read:call insights-list {\"saved\":true,\"search\":\"1512\",\"limit\":20,\"offset\":0} --json"
+    },
+    {
+      "command": "call insights-list {\"saved\":true,\"search\":\"运行时间线\",\"limit\":20,\"offset\":0} --json",
+      "observedAtUTC": "2026-11-09T06:00:20.437Z",
+      "responseBytes": 207,
+      "responseSHA256": "273991f62c661e9580e6fa5efc3b9b838edd44caa0ab9eec46b55b471fa976cd",
+      "rawStoreKey": "posthogObjectPrep20261109:read:call insights-list {\"saved\":true,\"search\":\"运行时间线\",\"limit\":20,\"offset\":0} --json"
+    }
+  ],
+  "capabilities": {
+    "notebookMetadataRead": "verified",
+    "savedInsightMetadataSearch": "verified",
+    "writeCreateUpdate": "metadata schema available, not exercised",
+    "pngExport": "existing GHA helper supports numeric insight/dashboard only; no export executed",
+    "notebookCellRun": "schema available, not executed",
+    "replay": "reuse frozen recipe blob172ad5046ecb143e63cc2c768c212457c2dbbe46; no new read/scan"
+  },
+  "futureMinimalDelta": [
+    "Read fresh notebook variables; for each required actual run_id/thread_id/task_id entry, set the complete five-variable list with only that one actual ID nonempty and bounded lookback_hours. Then exercise the existing timeline cell and verify the actual trace set. No old/fake IDs.",
+    "Run only runtime_span_timeline and runtime_logs SQL cells. Do not run recent_runtime_traces or run-all; existing three SQL cells have no Python/dataframe dependencies.",
+    "Read actual returned run IDs to terminal and compare row_count/columns with frozen APM/logs reconciliation; previews are capped and current limits2000/1000 are not completeness proofs.",
+    "After actual trace+fixed UTC and row conservation are verified, create a native DataVisualizationNode/ActionsTable HogQL saved insight using the existing frozen safe plan; no placeholder create now.",
+    "Take the actual returned positive numeric insight id, verify via insight-get and actual insight-query output as needed, then pass it to existing export workflow. Node UUID cannot be export-id.",
+    "Verify actual PNG pixels and every page row/stage coverage, source/trace/window/hash binding. This is a native saved APM SQL timeline table, not Tracing drawer or local image.",
+    "Use actual browser session and matching APM trace for optional one-segment readback and frozen Replay Vision recipe; segment retrieval is not playback."
+  ],
+  "operations": {
+    "notebookGets": 1,
+    "limitedInsightListQueries": 2,
+    "eventsOrAPMDataQueries": 0,
+    "notebookCellRuns": 0,
+    "variableWrites": 0,
+    "insightWrites": 0,
+    "pngExports": 0,
+    "recordingEnumeration": 0,
+    "replayVisionCalls": 0,
+    "models": 0,
+    "browserAuth": 0,
+    "resourcesCreated": 0
+  },
+  "duplicateRecipeFileCreated": false,
+  "notebookEntrySemantics": {
+    "run_id": "Exact attributes['mikka.run_id'] string",
+    "thread_id": "Exact attributes['mikka.thread_id'] string",
+    "task_id": "Exact attributes['mikka.task_id'] string",
+    "trace_id": "Actual32hex trace converted with base64Encode(unhex(...))",
+    "matching": "Nonempty input fields are ORed, then matched trace_ids are fully expanded within the lookback window.",
+    "taskNumberResolution": "No task_number-to-task_id lookup exists in this notebook query.",
+    "futureEntryProof": "Exercise run_id, thread_id and task_id separately using actual values from reconciled case evidence, with all other ID fields empty. Run the existing timeline SQL each time and verify its resolved trace set against that case; a trace_id-only run does not prove the three entry paths."
+  },
+  "pngVerification": {
+    "requiredFiniteCoverage": "The actual screenshot pixels must show the same trace's stages from sending through the agent's first model invocation, including daemon/cloud-machine stages and measured durations.",
+    "terminology": "Native PostHog saved HogQL APM timeline table PNG; never call it a Tracing drawer waterfall or a local redraw.",
+    "queryDataset": "Reuse frozen fourteen-query two-snapshot reconciliation and safe phase projection. Full spans/generations remain in those raw receipts.",
+    "paging": "Official DataVisualizationNode tableSettings exposes columns/pinning/transpose, not a page-size input. Use the existing verified SQL LIMIT/OFFSET method with stable timestamp/duration/span-ID ordering when multiple pages are required; retain exact trace, fixed UTC, page bounds and expected span IDs per page.",
+    "separateChecks": [
+      "full queried row-count conservation",
+      "actual PNG visible row-count and all required phase coverage",
+      "no horizontal truncation of phase/duration columns",
+      "no vertical clipping/virtualized-only rows or hidden critical stages",
+      "PNG hash/dimensions plus actual numeric insight id and source query hash"
+    ],
+    "actualRenderNotYetVerified": true
+  }
+}

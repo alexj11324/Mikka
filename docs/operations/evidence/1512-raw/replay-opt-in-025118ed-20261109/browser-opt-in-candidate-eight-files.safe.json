@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "acceptance-replay-opt-in-candidate",
+  "baseCommit": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+  "baseTree": "2d1e3a8e9b1cbadf4df8245e32782d7fefa32d9f",
+  "files": [
+    {
+      "path": "lib/replay-readiness.ts",
+      "mode": "100644",
+      "baseBlob": "899a9dcf33af282913c3e25c99b0826566b2c56b",
+      "newBlob": "d60598b09201228e23c5ac7a9df00938192f0e67",
+      "bytes": 3871,
+      "sha256": "4f799c2aff37a1a9db293484a39f88ba5eb30ae82000c49081b4db4d7b3f3550",
+      "baseBytes": 3291,
+      "baseSha256": "631dd02d31a88cf879b4f4ed919ca0b6210347ef8aab6a9c67ec93bd1b2352fd"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "mode": "100644",
+      "baseBlob": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+      "newBlob": "9109982d1c3245179b85a42d6969003aec2f5047",
+      "bytes": 2442,
+      "sha256": "4a3754d2791fe87607ef12414673d411172415cbf77ac3323c88e076fb6a57dc",
+      "baseBytes": 2360,
+      "baseSha256": "f306b61971a1cc3c7501ca4623d733fa5cbd60e3a586d7b2f3a91190af07b854"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "mode": "100644",
+      "baseBlob": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+      "newBlob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "bytes": 25516,
+      "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606",
+      "baseBytes": 24958,
+      "baseSha256": "c859d81c3dcac798efee6d9d89dd5a5412d72c1b85b9737568aaac73cefb89cf"
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "mode": "100644",
+      "baseBlob": "2c67bead9d3d211e58dd6a7a684d60139d7df16c",
+      "newBlob": "58e4706039dafe6901082676f37a3c92da613d43",
+      "bytes": 7564,
+      "sha256": "d44ef6745776cef67de40d093e9ae58be0d4370e9e8fcd0b408d1489a180ad90",
+      "baseBytes": 6214,
+      "baseSha256": "17fd9075fce07d1be5beaf0ce8049e04251c5ae618d878ad684e7b466ffbd053"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "mode": "100644",
+      "baseBlob": "58170f27b9586752ca966e377c9255ac6e6174a9",
+      "newBlob": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+      "bytes": 29638,
+      "sha256": "b9b3eb221835ec336089e89974e9fd2bbc873277a6602c285c96e087c2bca9e4",
+      "baseBytes": 26414,
+      "baseSha256": "48acfc7dfeba2c9bf673f1d4765578f59dda00f50307978d4f11d0dedcfe25ff"
+    },
+    {
+      "path": "lib/analytics-policy.ts",
+      "mode": "100644",
+      "baseBlob": "9529e8f563ef43d3e7c1eedd992165626eb86085",
+      "newBlob": "152b941ff7b05004a7c57a909f776c6268ede106",
+      "bytes": 3400,
+      "sha256": "93405210710d755ceabc9c4a75f9e2f826f37ede63b1d1fea9bf5ceecc91035f",
+      "baseBytes": 3166,
+      "baseSha256": "2357cf1e09032fb2fca2cea0068b01e9ee4e5274bd06317310a905351b2b38a2"
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "mode": "100644",
+      "baseBlob": "74c4933788dda4e33caca2675738bc223442adda",
+      "newBlob": "c904b35e3405353be5a549b0d53e2858e19c3454",
+      "bytes": 22455,
+      "sha256": "5caff4e596b385226695ea9d35899b3f21ea34cb95ea4ef160400d0eb77d69e7",
+      "baseBytes": 20826,
+      "baseSha256": "38fe009f2af0a29abc1bfc6efef821c9cd79b7424c4c5b97d41b06014e10e66f"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "mode": "100644",
+      "baseBlob": "176e3aead0068d801f829dcadaafcd02a61e67a3",
+      "newBlob": "4ca2cf35c1f499b338469556836ae0505649e82a",
+      "bytes": 19730,
+      "sha256": "b7440f5402350d0c3513576dbddc60978bb7b37d701632e1247b73725d93aa1a",
+      "baseBytes": 19025,
+      "baseSha256": "ab6522ff9f964e580af3e66e972f105e21db2eacc499b516d0e3a1c308b8ae69"
+    }
+  ],
+  "filesCount": 8,
+  "totalBytes": 114616,
+  "patch": {
+    "bytes": 17223,
+    "sha256": "fdcaeb3581695d960dd204172f6289bae5feef029155bca7d29c308f2340533e",
+    "gitBlobSha1": "0ead3e5d0a6617b58a221c0d35c0114927780511",
+    "blob": "0ead3e5d0a6617b58a221c0d35c0114927780511"
+  },
+  "published": false,
+  "refsChanged": false,
+  "verification": {
+    "sourceBoundV8Only": true,
+    "nodeTestSuiteRun": false,
+    "actualSDKRun": false,
+    "chromiumRun": false,
+    "networkReplayRun": false,
+    "originalAndCandidatePatchRoundtrip": true
+  },
+  "rootOwnedAdditionalPath": "docs/operations/tracing.md excluded from this 8-file manifest"
+}

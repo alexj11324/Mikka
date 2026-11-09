@@ -1,0 +1,419 @@
+{
+  "schemaVersion": 1,
+  "kind": "independent-source-review-replay-automation-opt-in",
+  "issue": "https://github.com/alexj11324/Mikka/issues/1512",
+  "repository": "alexj11324/Mikka",
+  "reviewer": "current_source_review",
+  "reviewedAt": "2026-11-09T06:30:25.967Z",
+  "decision": "no_source_blocker_to_integrate_exact_candidate_and_run_required_ci",
+  "mustFix": [],
+  "reviewedScope": {
+    "implementationBaseCommit": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+    "implementationBaseTree": "2d1e3a8e9b1cbadf4df8245e32782d7fefa32d9f",
+    "implementationFiles": 8,
+    "rootDocumentationFiles": 1,
+    "exactFileCount": 9,
+    "rootDocumentationBaseCommit": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "method": "Read exact Git blobs and patch, independently verify UTF-8 bytes/SHA-256/Git-blob identities, replay all eight file patches in RAM against fixed base content, inspect complete root documentation insertion and existing CI entrypoint source.",
+    "scopeExclusions": [
+      "No source edit",
+      "No ref update",
+      "No workflow trigger",
+      "No production/browser/model request",
+      "No local VM or shell",
+      "No duplicate unit, SDK or Chromium execution"
+    ]
+  },
+  "evidence": {
+    "implementationManifest": {
+      "bytes": 4299,
+      "sha256": "3f52088df7cb753e865ff0f7aa60921463511e9718e683cf1be16298f194eb58",
+      "gitBlob": "05dac3bee39ffd7ec71303f2bfd0010734cfcf90"
+    },
+    "implementationPatch": {
+      "bytes": 17223,
+      "sha256": "fdcaeb3581695d960dd204172f6289bae5feef029155bca7d29c308f2340533e",
+      "gitBlob": "0ead3e5d0a6617b58a221c0d35c0114927780511"
+    },
+    "implementationBoundaryReceipt": {
+      "bytes": 22597,
+      "sha256": "a2eef4b7064c055fb28280ad07c5044fe14ae31be49d3e3441753ff478bcc002",
+      "gitBlob": "88711673bf1931ae66d2ce21c1caa36b5bec6d49"
+    },
+    "allThreeHashIdentitiesIndependentlyVerified": true,
+    "authorBoundaryResultsIndependentlyRerun": false
+  },
+  "files": [
+    {
+      "path": "lib/replay-readiness.ts",
+      "mode": "100644",
+      "base": {
+        "bytes": 3291,
+        "sha256": "631dd02d31a88cf879b4f4ed919ca0b6210347ef8aab6a9c67ec93bd1b2352fd",
+        "gitBlob": "899a9dcf33af282913c3e25c99b0826566b2c56b"
+      },
+      "candidate": {
+        "bytes": 3871,
+        "sha256": "4f799c2aff37a1a9db293484a39f88ba5eb30ae82000c49081b4db4d7b3f3550",
+        "gitBlob": "d60598b09201228e23c5ac7a9df00938192f0e67"
+      },
+      "verification": {
+        "patchReplayExact": true,
+        "hunks": 1,
+        "additions": 12,
+        "deletions": 0
+      }
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "mode": "100644",
+      "base": {
+        "bytes": 2360,
+        "sha256": "f306b61971a1cc3c7501ca4623d733fa5cbd60e3a586d7b2f3a91190af07b854",
+        "gitBlob": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a"
+      },
+      "candidate": {
+        "bytes": 2442,
+        "sha256": "4a3754d2791fe87607ef12414673d411172415cbf77ac3323c88e076fb6a57dc",
+        "gitBlob": "9109982d1c3245179b85a42d6969003aec2f5047"
+      },
+      "verification": {
+        "patchReplayExact": true,
+        "hunks": 2,
+        "additions": 2,
+        "deletions": 1
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "mode": "100644",
+      "base": {
+        "bytes": 24958,
+        "sha256": "c859d81c3dcac798efee6d9d89dd5a5412d72c1b85b9737568aaac73cefb89cf",
+        "gitBlob": "0ed07cf1751a0fc2885109201caf89cda71f704b"
+      },
+      "candidate": {
+        "bytes": 25516,
+        "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606",
+        "gitBlob": "2f6cb3ab32695c64fa67191653c0add6e8720b39"
+      },
+      "verification": {
+        "patchReplayExact": true,
+        "hunks": 2,
+        "additions": 7,
+        "deletions": 0
+      }
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "mode": "100644",
+      "base": {
+        "bytes": 6214,
+        "sha256": "17fd9075fce07d1be5beaf0ce8049e04251c5ae618d878ad684e7b466ffbd053",
+        "gitBlob": "2c67bead9d3d211e58dd6a7a684d60139d7df16c"
+      },
+      "candidate": {
+        "bytes": 7564,
+        "sha256": "d44ef6745776cef67de40d093e9ae58be0d4370e9e8fcd0b408d1489a180ad90",
+        "gitBlob": "58e4706039dafe6901082676f37a3c92da613d43"
+      },
+      "verification": {
+        "patchReplayExact": true,
+        "hunks": 3,
+        "additions": 21,
+        "deletions": 3
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "mode": "100644",
+      "base": {
+        "bytes": 26414,
+        "sha256": "48acfc7dfeba2c9bf673f1d4765578f59dda00f50307978d4f11d0dedcfe25ff",
+        "gitBlob": "58170f27b9586752ca966e377c9255ac6e6174a9"
+      },
+      "candidate": {
+        "bytes": 29638,
+        "sha256": "b9b3eb221835ec336089e89974e9fd2bbc873277a6602c285c96e087c2bca9e4",
+        "gitBlob": "56412efdfe5bc638496b89de56281360b4cbe9b5"
+      },
+      "verification": {
+        "patchReplayExact": true,
+        "hunks": 3,
+        "additions": 54,
+        "deletions": 0
+      }
+    },
+    {
+      "path": "lib/analytics-policy.ts",
+      "mode": "100644",
+      "base": {
+        "bytes": 3166,
+        "sha256": "2357cf1e09032fb2fca2cea0068b01e9ee4e5274bd06317310a905351b2b38a2",
+        "gitBlob": "9529e8f563ef43d3e7c1eedd992165626eb86085"
+      },
+      "candidate": {
+        "bytes": 3400,
+        "sha256": "93405210710d755ceabc9c4a75f9e2f826f37ede63b1d1fea9bf5ceecc91035f",
+        "gitBlob": "152b941ff7b05004a7c57a909f776c6268ede106"
+      },
+      "verification": {
+        "patchReplayExact": true,
+        "hunks": 1,
+        "additions": 5,
+        "deletions": 4
+      }
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "mode": "100644",
+      "base": {
+        "bytes": 20826,
+        "sha256": "38fe009f2af0a29abc1bfc6efef821c9cd79b7424c4c5b97d41b06014e10e66f",
+        "gitBlob": "74c4933788dda4e33caca2675738bc223442adda"
+      },
+      "candidate": {
+        "bytes": 22455,
+        "sha256": "5caff4e596b385226695ea9d35899b3f21ea34cb95ea4ef160400d0eb77d69e7",
+        "gitBlob": "c904b35e3405353be5a549b0d53e2858e19c3454"
+      },
+      "verification": {
+        "patchReplayExact": true,
+        "hunks": 1,
+        "additions": 23,
+        "deletions": 0
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "mode": "100644",
+      "base": {
+        "bytes": 19025,
+        "sha256": "ab6522ff9f964e580af3e66e972f105e21db2eacc499b516d0e3a1c308b8ae69",
+        "gitBlob": "176e3aead0068d801f829dcadaafcd02a61e67a3"
+      },
+      "candidate": {
+        "bytes": 19730,
+        "sha256": "b7440f5402350d0c3513576dbddc60978bb7b37d701632e1247b73725d93aa1a",
+        "gitBlob": "4ca2cf35c1f499b338469556836ae0505649e82a"
+      },
+      "verification": {
+        "patchReplayExact": true,
+        "hunks": 2,
+        "additions": 12,
+        "deletions": 2
+      }
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "baseCommit": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "base": {
+        "bytes": 65784,
+        "sha256": "817d0020dbf8f961b338c276e0a0b10da523febe47b4c813dd665be4303738b4",
+        "gitBlob": "35694355877eea55393ba9299f7796c2c171ccb7"
+      },
+      "candidate": {
+        "bytes": 66977,
+        "sha256": "4340486262e1e506033a4dcf42834aadf2dc4459c1aab53a4dea74847d082f11",
+        "gitBlob": "a02e4a5100c066d8564902ec287c9c92fee0d20e"
+      },
+      "verification": {
+        "commonPrefixLines": 728,
+        "commonSuffixLines": 293,
+        "addedLines": 17,
+        "removedLines": 0,
+        "originalLinesPreserved": 1021
+      }
+    }
+  ],
+  "findings": [
+    {
+      "area": "Explicit, limited browser-instance opt-in",
+      "conclusion": "No blocker",
+      "source": [
+        "lib/replay-readiness.ts",
+        "instrumentation-client.ts",
+        "scripts/acceptance/run-observability-browser.mjs"
+      ],
+      "facts": [
+        "Reader accepts only an own data-descriptor primitive safe-integer deadline strictly after now and at most 600000 ms ahead; missing, inherited, accessor, invalid and expired markers return false.",
+        "Driver installs the marker with context.addInitScript before the first page, and only for the official origin, a top-level document and /mikka or its slash-delimited descendants.",
+        "Object.defineProperty creates a non-enumerable in-memory value. No marker is sent through URL, cookie, persistent storage, credential or server authorization.",
+        "Only the documented posthog.init opt_out_useragent_filter option changes. Unmarked ordinary instances keep the effective false default.",
+        "The deadline bounds eligibility during initialization; it does not reset an already initialized SDK instance. Existing context cleanup ends the instance.",
+        "The marker is an explicit analytics qualification signal, not an authentication or authorization boundary."
+      ]
+    },
+    {
+      "area": "Classification and privacy",
+      "conclusion": "No blocker",
+      "source": [
+        "lib/analytics-policy.ts",
+        "tests/analytics-policy.test.mjs"
+      ],
+      "facts": [
+        "Both ordinary allowed events and $snapshot retain $browser_type only when exactly bot or browser; arbitrary strings, objects and other values are omitted.",
+        "The candidate does not mask automation signals, change navigator/user-agent, alter consent/project settings or expose the SDK singleton.",
+        "Existing snapshot payload reference and recording privacy configuration are retained. No new raw UA, headers, body, credential or arbitrary string projection is introduced.",
+        "Unknown event rejection remains in force and occurs before event properties are inspected."
+      ]
+    },
+    {
+      "area": "Acceptance and cleanup conservation",
+      "conclusion": "No blocker",
+      "source": [
+        "scripts/acceptance/run-observability-browser.mjs",
+        "tests/replay-readiness.test.mjs",
+        "scripts/acceptance/run-observability-browser.test.mjs"
+      ],
+      "facts": [
+        "Existing repository/source/account/version/deadline checks, model policy and fresh-context requirements remain.",
+        "Same-session naturally captured sanitized snapshot readiness remains required before the single UI submission. No synthetic snapshot or readiness bypass is added.",
+        "Paid submission remains a single click, without a retry path.",
+        "Existing page/browser/context cleanup and session logout behavior remain; a new init-script failure regression exercises cleanup before page creation or click.",
+        "Local readiness retains unknown upload acknowledgement and does not establish backend ingestion, playback or trace-to-Replay correlation."
+      ]
+    },
+    {
+      "area": "Documentation",
+      "conclusion": "No blocker",
+      "facts": [
+        "run-observability.md has two distinct hunks: the Replay opt-in contract and an explicitly authorized correction of two stale chosen=false sentences.",
+        "The chosen=false correction matches the existing exact-source driver: preferenceState=absent permits the current implicit selection, temporary-if-absent must return bindingId/revision, and restore-implicit targets that acknowledged revision; uncertain writes are not guessed.",
+        "The independently read supporting run-observability.mjs blob is 07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e.",
+        "Root tracing.md adds 17 lines after the privacy reference, retaining all original 1021 lines. Its bounded initialization, classification, natural snapshot and cleanup statements match the candidate.",
+        "The relative acceptance-driver documentation link resolves within the repository; the SDK configuration URL is a reference, not evidence of runtime execution."
+      ]
+    }
+  ],
+  "ciEntrypoints": {
+    "packageBlob": "4d4d856e9f90ea102c4e42cf42114e9d5daad731",
+    "analytics": {
+      "target": "ci-core-46",
+      "command": "pnpm test:analytics",
+      "tests": [
+        "tests/analytics-policy.test.mjs",
+        "tests/replay-readiness.test.mjs"
+      ]
+    },
+    "browser": {
+      "target": "ci-core-53",
+      "command": "pnpm test:dev-local",
+      "test": "scripts/acceptance/run-observability-browser.test.mjs"
+    },
+    "selector": {
+      "blob": "f9c11d8a660556d509a5cffb5c23b1dc68230f37",
+      "reason": "GLOBAL matches modified scripts/acceptance/run-observability-browser.mjs; full=true; both core tasks selected"
+    },
+    "runner": {
+      "blob": "21d811ee3dadbc6560cbab70a8cf9b4ba4bd615e",
+      "skipNxCache": true
+    },
+    "nodeVersion": 24,
+    "executionStatus": "source_entrypoints_verified; candidate_not_executed",
+    "sources": [
+      {
+        "path": "package.json",
+        "gitBlob": "4d4d856e9f90ea102c4e42cf42114e9d5daad731"
+      },
+      {
+        "path": "scripts/ci/tasks.json",
+        "gitBlob": "fe7715fd098982effaf532a9f5330fa83df0532f"
+      },
+      {
+        "path": "scripts/ci/select.mjs",
+        "gitBlob": "f9c11d8a660556d509a5cffb5c23b1dc68230f37"
+      },
+      {
+        "path": "scripts/ci/run-units.mjs",
+        "gitBlob": "21d811ee3dadbc6560cbab70a8cf9b4ba4bd615e"
+      },
+      {
+        "path": ".github/workflows/ci-selection.yml",
+        "gitBlob": "5d541b4ff7be9cb365b18b804bbbe7c3db235580"
+      },
+      {
+        "path": "scripts/ci/bootstrap.sh",
+        "gitBlob": "c0b966a2ff573f66d27c85f3f8b7058ef58537eb"
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "gitBlob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212"
+      }
+    ],
+    "conclusion": "Existing canonical Node 24 core tasks select every changed test. Modified scripts/ path forces full selection. This establishes wiring, not candidate CI completion."
+  },
+  "verificationBoundary": {
+    "independentPerformed": [
+      "Exact source and diff review",
+      "Eight strict patch replays in RAM",
+      "Nine candidate byte/hash checks",
+      "Three evidence byte/hash checks",
+      "CI entrypoint and full-selection source inspection",
+      "Documentation/source comparison"
+    ],
+    "authorReceiptInspected": {
+      "runtime": "Pure V8 with actual source bodies and explicit TypeScript-annotation erasure / SDK stubs as recorded by author",
+      "baselineBootstrap": {
+        "passed": 1,
+        "failed": 1
+      },
+      "baselineClassification": {
+        "passed": 0,
+        "failed": 4
+      },
+      "candidateMarkerBootstrapInjection": {
+        "passed": 34,
+        "failed": 0
+      },
+      "candidateClassification": {
+        "passed": 25,
+        "failed": 0
+      },
+      "originalsAndFailuresPreserved": true
+    },
+    "actualSDKExecuted": false,
+    "canonicalNodeSuitesExecutedForCandidate": false,
+    "actualChromiumExecuted": false,
+    "networkCaptureExecuted": false,
+    "productionPlaybackObserved": false,
+    "priorCIReusableAsCandidateCompletion": false,
+    "productionAcceptance": null
+  },
+  "risks": [
+    {
+      "category": "Behavior",
+      "assessment": "No source blocker. Explicit opt-in affects only the initialized marked instance; marker expiry is not a post-initialization stop timer."
+    },
+    {
+      "category": "Privacy and authorization",
+      "assessment": "Closed classification introduces no raw metadata projection; marker grants no server privilege. Actual deployed capture/masking still requires the existing production checks."
+    },
+    {
+      "category": "Performance",
+      "assessment": "Adds a small initialization descriptor read and closed event classification projection. No business SQL, polling or separate network API is added; an explicitly opted-in SDK instance can now make its normal recording uploads. No performance measurement is claimed."
+    },
+    {
+      "category": "Regression coverage",
+      "assessment": "Canonical test entrypoints include changed tests and full selection is source-proven. V8 boundary checks are not a replacement for actual Node/SDK/Chromium execution."
+    },
+    {
+      "category": "Evidence and operations",
+      "assessment": "Exact candidate is ready for integration and required CI. Backend recording, matching trace session, playback and cleanup remain actual production gates; previous green source is not relabeled as this candidate."
+    }
+  ],
+  "resources": {
+    "newVMs": 0,
+    "newBrowsers": 0,
+    "newModels": 0,
+    "newWorkflows": 0,
+    "refsChanged": 0,
+    "activeOwnedResources": 0
+  },
+  "publication": {
+    "format": "safe source hashes and review assertions only",
+    "rawPlatformEnvelopesIncluded": false,
+    "credentialsIncluded": false,
+    "refUpdate": false
+  }
+}

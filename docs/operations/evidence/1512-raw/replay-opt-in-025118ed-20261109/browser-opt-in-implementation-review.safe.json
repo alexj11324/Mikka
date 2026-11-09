@@ -1,0 +1,695 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "replay-headless-source-contract-and-candidate-verification",
+  "base": {
+    "commit": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+    "tree": "2d1e3a8e9b1cbadf4df8245e32782d7fefa32d9f"
+  },
+  "candidateManifest": {
+    "blob": "05dac3bee39ffd7ec71303f2bfd0010734cfcf90",
+    "bytes": 4299,
+    "sha256": "3f52088df7cb753e865ff0f7aa60921463511e9718e683cf1be16298f194eb58"
+  },
+  "patch": {
+    "bytes": 17223,
+    "sha256": "fdcaeb3581695d960dd204172f6289bae5feef029155bca7d29c308f2340533e",
+    "gitBlobSha1": "0ead3e5d0a6617b58a221c0d35c0114927780511",
+    "blob": "0ead3e5d0a6617b58a221c0d35c0114927780511"
+  },
+  "rootCause": {
+    "sdkVersion": "posthog-js@1.438.13",
+    "sdkCommit": "f831af3d33eab4d8cea8c3e4d360d76038912ee4",
+    "chain": [
+      "Mikka actor uses headless Chromium with no UA or automation-signal overrides",
+      "SDK default opt_out_useragent_filter=false",
+      "isLikelyBot matches blocked UA/brands or navigator.webdriver",
+      "capture returns before before_send for detected bots",
+      "Replay recorder sends through capture('$snapshot')",
+      "Mikka bridge observes only sanitized snapshots in before_send",
+      "Therefore default actor cannot satisfy its pre-submit snapshot readiness gate"
+    ],
+    "scope": "Source-derived blocker for the current standard actor. No historical session query or claim that every prior zero-session result has this cause."
+  },
+  "publicInstance": {
+    "moduleEntry": "init_as_module returns the module singleton without assigning window.posthog",
+    "globalAssignment": "Only init_from_snippet assigns window.posthog",
+    "appSearches": {
+      "windowPosthogMatches": 0,
+      "globalThisPosthogMatches": 0
+    },
+    "decision": "No hidden bundle access or SDK-object exposure; configure existing import at initialization with a bounded explicit document marker."
+  },
+  "candidateContract": {
+    "marker": "__mikkaAcceptanceReplayUntil",
+    "reader": "Own data descriptor only; safe integer strictly future and at most 600000ms ahead; inherited/getter/expired/invalid values fail closed",
+    "injection": "One context.addInitScript before newPage; exact app origin, /mikka path boundary, top document, unexpired deadline",
+    "expiry": "Initialization qualification only. No automatic reversion of an already initialized SDK; owned context closure ends the instance.",
+    "sdkOption": "opt_out_useragent_filter",
+    "ordinaryVisitors": "False when no valid explicit own marker; no project-wide configuration change",
+    "classification": "Preserve only SDK-produced exact bot/browser strings on allowed ordinary and snapshot events; no raw UA or additional property capture"
+  },
+  "conservation": {
+    "observerBodyUnchanged": true,
+    "actorOriginalContractUnchanged": true,
+    "sourceVersionChecksUnchanged": true,
+    "singleClickWindowUnchanged": true,
+    "cleanupBodyUnchanged": true,
+    "uaOverrideAdded": false,
+    "webdriverOverrideAdded": false,
+    "consentOverrideAdded": false,
+    "startRecordingCallAdded": false,
+    "sdkInstanceExposed": false,
+    "storageWritesAdded": false,
+    "projectSettingsChanged": false,
+    "sourceRefsChanged": false,
+    "allFilesEndSingleLF": true,
+    "candidateTrailingWhitespace": []
+  },
+  "sourceReview": {
+    "masking": "maskAllInputs=true; maskTextSelector=*; maskAllElementAttributes=true; media/contenteditable/hidden/file surfaces blocked; bodies/headers/console off. The fixed SDK accepts these masking options before rrweb serialization.",
+    "sessionTrace": "SDK restricts attribution headers to configured app hostnames; server validates opaque sessionId/distinctId and applies them to the request span/trace metadata; safe run carrier retains these fields. Actual correlated backend span still needs readback.",
+    "actions": "Normal sign-in, workspace selection, New task, coordinator/cloud/profile choices, task fill and a single submit are actual UI actions. No Playwright screenshot/video/HAR is claimed.",
+    "readiness": "SDK loaded/recording started/same-session sanitized snapshot is local capture evidence. uploadAcknowledged stays null, driver browserReplayVerified stays false.",
+    "remoteLimits": [
+      "Public ingestion token must be present in the actual deployed bundle",
+      "SDK remote recording configuration, consent, recorder load and capture transport still must succeed",
+      "Backend recording content, matching trace sessionId and actual playback/masking must be independently observed",
+      "Code review does not establish actual stylesheet/media rendering fidelity"
+    ]
+  },
+  "docCorrection": {
+    "hunks": 2,
+    "first": "The exact two stale chosen=false lines are replaced under the root's explicit authorization.",
+    "chosenFalse": "preferenceState=absent permits chosen=false; temporary-if-absent returns acknowledged bindingId+xmin revision; restore-implicit deletes only that same revision under normal scope",
+    "noUncertainWriteGuess": true,
+    "globalModelOrderUnchanged": true,
+    "second": "Document explicit context-only automation opt-in, SDK classification, unchanged masking and initialization-only deadline."
+  },
+  "verification": {
+    "baselineBootstrap": {
+      "kind": "pure-v8-real-instrumentation-config-boundary",
+      "source": "88b144d52d091d7ff566c63fce6e902e33edc59e:instrumentation-client.ts",
+      "results": [
+        {
+          "marked": false,
+          "effectiveOptOut": false,
+          "explicitValue": null,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "marked": true,
+          "effectiveOptOut": false,
+          "explicitValue": null,
+          "expected": true,
+          "passed": false
+        }
+      ],
+      "passed": 1,
+      "failed": 1,
+      "actualSDKExecuted": false,
+      "actualChromiumExecuted": false,
+      "canonicalNodeTestsExecuted": false,
+      "networkCaptureExecuted": false
+    },
+    "markerAndBootstrap": {
+      "kind": "pure-v8-source-bound-boundary-checks",
+      "base": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+      "annotationsErasedOnly": [
+        "export keyword in helper",
+        "target: object",
+        "): boolean"
+      ],
+      "results": [
+        {
+          "name": "marker_absent",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "next_millisecond",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "max_bound",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "expired",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "expires_now",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "over_bound",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "fractional",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "null",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "boolean",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "numeric_string",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "NaN",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "Infinity",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "own_accessor_rejected",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "accessor_not_invoked",
+          "got": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "name": "inherited_marker_rejected",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "throwing_descriptor_rejected",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "candidate_bootstrap_ordinary_filter",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "candidate_bootstrap_owned_opt_in",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_home",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_home_automation_unchanged",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_english",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_english_automation_unchanged",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_sign_in",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_sign_in_automation_unchanged",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_wrong_origin",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "inject_wrong_origin_automation_unchanged",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_wrong_path",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "inject_wrong_path_automation_unchanged",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_prefix_mismatch",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "inject_prefix_mismatch_automation_unchanged",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_frame",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "inject_frame_automation_unchanged",
+          "got": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "name": "inject_expired",
+          "got": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "name": "inject_expired_automation_unchanged",
+          "got": true,
+          "expected": true,
+          "passed": true
+        }
+      ],
+      "passed": 34,
+      "failed": 0,
+      "actualSDKExecuted": false,
+      "actualChromiumExecuted": false,
+      "canonicalNodeTestsExecuted": false,
+      "networkCaptureExecuted": false
+    },
+    "classification": {
+      "kind": "pure-v8-exact-sanitizer-body-boundary",
+      "annotationErasureOnly": true,
+      "actualSDKExecuted": false,
+      "actualChromiumExecuted": false,
+      "canonicalNodeTestsExecuted": false,
+      "baseline": {
+        "passed": 0,
+        "failed": 4
+      },
+      "candidate": {
+        "passed": 25,
+        "failed": 0
+      },
+      "results": [
+        {
+          "phase": "baseline",
+          "event": "$pageview",
+          "case": "bot",
+          "passed": false,
+          "retainsOnlyClosedProperties": false,
+          "rawSensitiveRejected": true,
+          "sameSnapshotReference": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "bot",
+          "passed": true,
+          "retainsOnlyClosedProperties": true,
+          "rawSensitiveRejected": true,
+          "sameSnapshotReference": true
+        },
+        {
+          "phase": "baseline",
+          "event": "$pageview",
+          "case": "browser",
+          "passed": false,
+          "retainsOnlyClosedProperties": false,
+          "rawSensitiveRejected": true,
+          "sameSnapshotReference": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "browser",
+          "passed": true,
+          "retainsOnlyClosedProperties": true,
+          "rawSensitiveRejected": true,
+          "sameSnapshotReference": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "reject_missing",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "reject_null",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "reject_boolean",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "reject_number",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "reject_uppercase",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "reject_human",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "reject_trailing_space",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "reject_private_string",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "reject_long_string",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$pageview",
+          "case": "reject_object",
+          "passed": true
+        },
+        {
+          "phase": "baseline",
+          "event": "$snapshot",
+          "case": "bot",
+          "passed": false,
+          "retainsOnlyClosedProperties": false,
+          "rawSensitiveRejected": true,
+          "sameSnapshotReference": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "bot",
+          "passed": true,
+          "retainsOnlyClosedProperties": true,
+          "rawSensitiveRejected": true,
+          "sameSnapshotReference": true
+        },
+        {
+          "phase": "baseline",
+          "event": "$snapshot",
+          "case": "browser",
+          "passed": false,
+          "retainsOnlyClosedProperties": false,
+          "rawSensitiveRejected": true,
+          "sameSnapshotReference": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "browser",
+          "passed": true,
+          "retainsOnlyClosedProperties": true,
+          "rawSensitiveRejected": true,
+          "sameSnapshotReference": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "reject_missing",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "reject_null",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "reject_boolean",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "reject_number",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "reject_uppercase",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "reject_human",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "reject_trailing_space",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "reject_private_string",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "reject_long_string",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "$snapshot",
+          "case": "reject_object",
+          "passed": true
+        },
+        {
+          "phase": "candidate",
+          "event": "unknown",
+          "case": "no_properties_read",
+          "passed": true
+        }
+      ]
+    },
+    "nodeUnitSuitesExecuted": false,
+    "actualSDKExecuted": false,
+    "actualChromiumExecuted": false,
+    "networkCaptureExecuted": false,
+    "productionPlaybackObserved": false,
+    "canonicalPendingCommands": [
+      "pnpm test:analytics",
+      "node --test scripts/acceptance/run-observability.test.mjs scripts/acceptance/run-observability-workflow.test.mjs scripts/acceptance/run-observability-browser.test.mjs",
+      "pnpm check"
+    ]
+  },
+  "sourceManifest": {
+    "application": [
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "bytes": 24958,
+        "sha256": "c859d81c3dcac798efee6d9d89dd5a5412d72c1b85b9737568aaac73cefb89cf",
+        "gitBlobSha1": "0ed07cf1751a0fc2885109201caf89cda71f704b"
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "bytes": 2360,
+        "sha256": "f306b61971a1cc3c7501ca4623d733fa5cbd60e3a586d7b2f3a91190af07b854",
+        "gitBlobSha1": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a"
+      },
+      {
+        "path": "lib/replay-readiness.ts",
+        "bytes": 3291,
+        "sha256": "631dd02d31a88cf879b4f4ed919ca0b6210347ef8aab6a9c67ec93bd1b2352fd",
+        "gitBlobSha1": "899a9dcf33af282913c3e25c99b0826566b2c56b"
+      },
+      {
+        "path": "lib/analytics-policy.ts",
+        "bytes": 3166,
+        "sha256": "2357cf1e09032fb2fca2cea0068b01e9ee4e5274bd06317310a905351b2b38a2",
+        "gitBlobSha1": "9529e8f563ef43d3e7c1eedd992165626eb86085"
+      },
+      {
+        "path": "lib/posthog-config.ts",
+        "bytes": 358,
+        "sha256": "cd149157b6e4f2ed3c524e512274b9181858889a1dceca8eab5f38d429560545",
+        "gitBlobSha1": "b90fa7ae1d89462360dce3e5688852fb12a41977"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "bytes": 59415,
+        "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01",
+        "gitBlobSha1": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-workflow.mjs",
+        "bytes": 11693,
+        "sha256": "811ba05e172f6a896867949d701911b845289db290950339b29a0a8c5463ec6a",
+        "gitBlobSha1": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7"
+      },
+      {
+        "path": "app/api/mobile/model/route.ts",
+        "bytes": 4840,
+        "sha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+        "gitBlobSha1": "3dafb8efb5792af91aaa26a386e9426a9a2478a6"
+      },
+      {
+        "path": "lib/execution-settings.ts",
+        "bytes": 23629,
+        "sha256": "12fc04116782566b78b17a5f2068756a6230e45930eff36912b3d2fa0045abf6",
+        "gitBlobSha1": "0c0b7accd10ea84957428a79d9e58a9924b9d841"
+      },
+      {
+        "path": "apps/api/runtime/request-trace.ts",
+        "bytes": 2883,
+        "sha256": "a7c9c6bcb0b5e68dfebb96d7841171f4dc07c09061d0889404482d2594124ca9",
+        "gitBlobSha1": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b"
+      },
+      {
+        "path": "packages/protocol/src/trace-context.ts",
+        "bytes": 5523,
+        "sha256": "eb882501a08c02178edb4d2bd1293316923f5bca18210bbac43081f41fdb3acc",
+        "gitBlobSha1": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530"
+      }
+    ],
+    "sdk": [
+      {
+        "path": "packages/browser/package.json",
+        "bytes": 8015,
+        "sha256": "22c4372e1ddc06064ccd34937da02486d849f2ca83a3bacf82ec65c832597cb4",
+        "gitBlobSha1": "5e4189a54fc419aa461f00dfd38e3869997b8c66"
+      },
+      {
+        "path": "packages/core/src/utils/bot-detection.ts",
+        "bytes": 4504,
+        "sha256": "eba6768bc938f1649315b25d6ae986f7008d095945e9f335a3cd328783e7e897",
+        "gitBlobSha1": "1b249ed08b8dd6a0f84af9db9d6961f77d285bf9"
+      },
+      {
+        "path": "packages/browser-common/src/utils/blocked-uas.ts",
+        "bytes": 2356,
+        "sha256": "5605e8bbf2c2a494fac7b47a3496b75cae9c135a688fae9f7d3f46c90ddd9290",
+        "gitBlobSha1": "e976edcbc0062d1535a352564a129ce42c639763"
+      },
+      {
+        "path": "packages/browser/src/posthog-core.ts",
+        "bytes": 217982,
+        "sha256": "c664dc0f5dd4943039cf7637f2deca8ba30f8487b247a197ac4434402b3b5efa",
+        "gitBlobSha1": "34cf61875a44fb7844dd3ac6c6edbdea49f177e2"
+      },
+      {
+        "path": "packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts",
+        "bytes": 136195,
+        "sha256": "b640dadf371ce8498dfc507a846f6eb2d9833fc3c2349aaee85ee052ba6d0589",
+        "gitBlobSha1": "533b7eee11994d3a660381a03ca2301bbb486e81"
+      },
+      {
+        "path": "packages/browser/src/extensions/replay/session-recording.ts",
+        "bytes": 21786,
+        "sha256": "2f2883aca94a9dd7d105ace399a975253f9299b6f46aa29a5972002b157ce5cc",
+        "gitBlobSha1": "dd7cfaef68559a08b4ccd54c2f2694302c889a32"
+      },
+      {
+        "path": "packages/browser/src/entrypoints/module.no-external.es.ts",
+        "bytes": 416,
+        "sha256": "c196fc6cae34b237bd87693a741b3dd890f34806246659877f1bc3f0f5dd3c72",
+        "gitBlobSha1": "213fdf79d9c5e1e666469cdd62c198c02cf902ee"
+      },
+      {
+        "path": "packages/browser/src/entrypoints/tracing-headers.ts",
+        "bytes": 10422,
+        "sha256": "d7c063dc16d504a9a3935bd41c58469f8c04509f23d62ff276f55461d03209b1",
+        "gitBlobSha1": "88f9324aa36a578cf6b45882374b29e3a9e4c339"
+      }
+    ]
+  },
+  "resources": {
+    "newVMs": 0,
+    "newBrowsers": 0,
+    "newModels": 0,
+    "activeOwnedResources": 0,
+    "githubRefsChanged": 0
+  },
+  "documentationScope": {
+    "readme": "scripts/acceptance/run-observability.md only in this patch",
+    "rootOwnedTracingDoc": "a02e4a5100c066d8564902ec287c9c92fee0d20e separate"
+  },
+  "publication": "Immutable candidate Git blobs only; root owns integration, validation, refs and production acceptance."
+}

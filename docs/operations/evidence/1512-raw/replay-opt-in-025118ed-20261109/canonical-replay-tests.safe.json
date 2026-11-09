@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "kind": "canonical-ci-executed-new-replay-tests",
+  "issue": 1512,
+  "runId": 42573554116,
+  "jobId": 129016429779,
+  "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+  "head": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+  "conclusion": "success",
+  "coreTargets": 57,
+  "selection": {
+    "path": "ci025-selection.safe.json",
+    "bytes": 130135,
+    "sha256": "fcdd46be6b33804415b5f5032e0c12de71829a264feead2b43f118de10a0f926",
+    "gitBlobSha": "981090e57913693c7dcd610e4ff24e2418043c0a",
+    "mode": "100644"
+  },
+  "originalLog": {
+    "bytes": 1002072,
+    "sha256": "0ded6c2d82bf47b50f137efb727a084b382f4af1dc96f3d56b224dc6c760b1d9",
+    "downloadCount": 1
+  },
+  "commandEntrypoints": [
+    {
+      "project": "ci-core-46",
+      "target": "ci-tasks:core-46",
+      "command": "pnpm test:analytics",
+      "reason": "full validation"
+    },
+    {
+      "project": "ci-core-53",
+      "target": "ci-tasks:core-53",
+      "command": "pnpm test:dev-local",
+      "reason": "full validation"
+    }
+  ],
+  "actualPassedTestLines": [
+    "2026-11-09T06:37:01.4692258Z ci-tasks: ✔ SDK browser classification keeps only bot or browser on normal events and masked Replay (0.857235ms)",
+    "2026-11-09T06:37:01.8351012Z ci-tasks: ✔ only a natural session, live SDK state and same-session snapshot form readiness (6.830355ms)",
+    "2026-11-09T06:37:01.8386705Z ci-tasks: ✔ snapshot-before-loaded ordering works and natural session changes invalidate old evidence (1.717825ms)",
+    "2026-11-09T06:37:01.8396633Z ci-tasks: ✔ observer never reads snapshot payload and exposes only frozen metadata (6.953004ms)",
+    "2026-11-09T06:37:01.8402865Z ci-tasks: ✔ duplicate entry replaces subscriptions; unavailable or failing SDK remains unknown without throwing (0.494626ms)",
+    "2026-11-09T06:37:01.8461368Z ci-tasks: ✔ real bootstrap keeps masking and natural readiness with acceptance opt-in false (9.316949ms)",
+    "2026-11-09T06:37:01.8473954Z ci-tasks: ✔ real bootstrap keeps masking and natural readiness with acceptance opt-in true (9.067151ms)",
+    "2026-11-09T06:37:01.8519074Z ci-tasks: ✔ acceptance opt-in requires an unexpired bounded own data marker without reading accessors (0.488144ms)",
+    "2026-11-09T06:37:20.3459039Z ci-tasks: ✔ Replay becomes ready before the one paid click and reports no upload acknowledgement (4.97931ms)",
+    "2026-11-09T06:37:20.3460715Z ci-tasks: ✔ Replay missing bridge fails closed before paid submission and cleans owned resources (9.05079ms)",
+    "2026-11-09T06:37:20.3462314Z ci-tasks: ✔ Replay SDK exception fails closed before paid submission and cleans owned resources (3.551888ms)",
+    "2026-11-09T06:37:20.3463821Z ci-tasks: ✔ Replay no SDK fails closed before paid submission and cleans owned resources (4.730273ms)",
+    "2026-11-09T06:37:20.3465717Z ci-tasks: ✔ Replay unstarted recording fails closed before paid submission and cleans owned resources (3.176234ms)",
+    "2026-11-09T06:37:20.3467350Z ci-tasks: ✔ Replay no snapshot fails closed before paid submission and cleans owned resources (3.661253ms)",
+    "2026-11-09T06:37:20.3468916Z ci-tasks: ✔ Replay malformed true fails closed before paid submission and cleans owned resources (6.343743ms)",
+    "2026-11-09T06:37:20.3470575Z ci-tasks: ✔ Replay invalid session fails closed before paid submission and cleans owned resources (4.766752ms)",
+    "2026-11-09T06:37:20.3472446Z ci-tasks: ✔ Replay last-moment session change fails closed before paid submission and cleans owned resources (3.097388ms)",
+    "2026-11-09T06:37:20.3473835Z ci-tasks: ✔ Replay pending abort cannot submit after a late ready result (4.737838ms)",
+    "2026-11-09T06:37:20.3475407Z ci-tasks: ✔ Replay pending timeout cannot submit after a late ready result (33.619976ms)",
+    "2026-11-09T06:37:20.3476981Z ci-tasks: ✔ acceptance marker is installed before the first document and stays on the official top-level app (13.14461ms)",
+    "2026-11-09T06:37:20.3478674Z ci-tasks: ✔ an acceptance marker installation failure submits nothing and closes the allocated context (0.920843ms)"
+  ],
+  "limitations": [
+    "These canonical Node unit tests include mocks/stubs and establish code behavior; they are not actual production SDK ingestion or Replay rendering.",
+    "All required full CI jobs have not finished as of this checkpoint.",
+    "Prior authored V8 receipts remain historical pre-CI evidence."
+  ],
+  "productionAcceptedCases": 0
+}

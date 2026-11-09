@@ -1,0 +1,209 @@
+{
+  "schema": 1,
+  "checkpoint": 21,
+  "capturedAt": "2026-11-09T06:41:11Z",
+  "previousEvidenceCommit": "fa72b1541911af60898b659d76f0b379c9171afe",
+  "source": {
+    "pr": 1799,
+    "head": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+    "tree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+    "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+    "workflowRunId": 42573554116,
+    "mainAtPublication": "927260894305e066e15a4ad50114abce433e6001"
+  },
+  "prefix": "docs/operations/evidence/1512-raw/replay-opt-in-025118ed-20261109",
+  "fileCountExcludingIndex": 20,
+  "decodedBytesExcludingIndex": 3370675,
+  "verification": {
+    "newSourceFiles": 9,
+    "strictEightFilePatchReplay": "author and independent reviewer",
+    "nonOwnedMainBlobsPreserved": 6696,
+    "canonicalGenerator": "success",
+    "canonicalNewNodeTests": "success",
+    "fullCIComplete": false,
+    "currentNativeComplete": false,
+    "selection": {
+      "full": true,
+      "core": 57,
+      "integration": 29,
+      "dbSuites": 72
+    }
+  },
+  "production": {
+    "acceptedACMECases": 0,
+    "issueClosed": false,
+    "mainWritten": false,
+    "dispatchPerformed": false,
+    "ownAccountWindow": false,
+    "ownSourceWindow": false
+  },
+  "privacy": {
+    "metadataOnly": true,
+    "analyticsPublicCopy": {
+      "jobId": 129016749438,
+      "redactions": 10,
+      "replacement": "[REDACTED_POSTHOG_PUBLIC_CAPTURE_KEY]",
+      "original": {
+        "bytes": 226397,
+        "sha256": "5778904d6fba9a87c86a8a82f52ffabe80194c9e44ad11e1123b926e5c25cc51",
+        "downloadCount": 1
+      },
+      "public": {
+        "bytes": 226637,
+        "sha256": "bc4a5d9fffcebc61c4a2df8d5eca76e38623966e7cb6e03d33e4532a57947f52",
+        "redactions": 10,
+        "githubTokenShapes": 0
+      }
+    }
+  },
+  "notableLimits": [
+    "This checkpoint is a pending-CI snapshot; later Native/image/production evidence must be additive.",
+    "Exact source-derived bot-filter blocker does not explain every historical missing replay.",
+    "Official opt-in plus Node tests does not prove production replay ingestion or render.",
+    "Notebook node UUID is not a numeric saved insight ID.",
+    "Aggregate job 129018515769 was read twice across agents; its name is not browser proof.",
+    "Previous full Native windows remain historical and are not reused as the current source result."
+  ],
+  "files": [
+    {
+      "path": "browser-opt-in-candidate-eight-files.safe.json",
+      "gitBlobSha": "05dac3bee39ffd7ec71303f2bfd0010734cfcf90",
+      "bytes": 4299,
+      "sha256": "3f52088df7cb753e865ff0f7aa60921463511e9718e683cf1be16298f194eb58",
+      "mode": "100644"
+    },
+    {
+      "path": "browser-opt-in-eight-files.patch",
+      "gitBlobSha": "0ead3e5d0a6617b58a221c0d35c0114927780511",
+      "bytes": 17223,
+      "sha256": "fdcaeb3581695d960dd204172f6289bae5feef029155bca7d29c308f2340533e",
+      "mode": "100644"
+    },
+    {
+      "path": "browser-opt-in-implementation-review.safe.json",
+      "gitBlobSha": "88711673bf1931ae66d2ce21c1caa36b5bec6d49",
+      "bytes": 22597,
+      "sha256": "a2eef4b7064c055fb28280ad07c5044fe14ae31be49d3e3441753ff478bcc002",
+      "mode": "100644"
+    },
+    {
+      "path": "browser-opt-in-independent-nine-file-review.safe.json",
+      "gitBlobSha": "4d6f7f664badec289712264eb7597873f5a5353d",
+      "bytes": 16635,
+      "sha256": "4c520398dc25e2b4304e665e6416893ebfe688c8416e54fdba3b9911600afe3e",
+      "mode": "100644"
+    },
+    {
+      "path": "posthog-object-preparation-20261109/public/notebook-and-export-identifiers.safe.json",
+      "bytes": 10990,
+      "sha256": "7ca42795a454c6e3618d7f707eec843dd6899654bb61e60c5b0a0a4f61db35cb",
+      "gitBlobSha": "9e9d89e980511b824c4eefcb592b0353421ad4c2",
+      "mode": "100644"
+    },
+    {
+      "path": "ci025-selection.safe.json",
+      "bytes": 130135,
+      "sha256": "fcdd46be6b33804415b5f5032e0c12de71829a264feead2b43f118de10a0f926",
+      "gitBlobSha": "981090e57913693c7dcd610e4ff24e2418043c0a",
+      "mode": "100644"
+    },
+    {
+      "path": "source-publication.safe.json",
+      "bytes": 20482,
+      "sha256": "567a791b104994d849c992c697a067801aa7368ccda931bb8e3047c159a7b5cb",
+      "gitBlobSha": "c009e20dc271b7f3d32eb14edf489683fdbc316a",
+      "mode": "100644"
+    },
+    {
+      "path": "canonical-replay-tests.safe.json",
+      "bytes": 4515,
+      "sha256": "9bc679ffb0c3afba4b0397f0722992a17163405365e79149885cf2d47e7b4a75",
+      "gitBlobSha": "593dbd06bc7f4f4e5051a34623ee7e2600d5ca3a",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016131517.original.log",
+      "bytes": 563713,
+      "sha256": "989576b859a3214f44ed84dc08eb819cd441ce7fa32ab24e4618ff1f268516d5",
+      "gitBlobSha": "53f65ae48b53a2f5dd3494a4aaa26da474e2d3ff",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016429612.original.log",
+      "bytes": 133520,
+      "sha256": "c09c2e65b77357a2e0e11ca843f0acb959e5db9d5b9721cb4bec86ec063e8b1b",
+      "gitBlobSha": "22f2b551585e02db7e7288c0bb6d6939cbfbbda0",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016429666.original.log",
+      "bytes": 647529,
+      "sha256": "c8d1227fed05d09254efd983f2eb99fc1e5a97e0028a7c1ce0b5335b2d8002af",
+      "gitBlobSha": "d131546485339c5f49fa6c6e9d2132c46187b1ae",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016429683.original.log",
+      "bytes": 114172,
+      "sha256": "632bcf035d09de8e1ae7a031db28fffe7215fb70ac4f395f3aa0c3787560b5a3",
+      "gitBlobSha": "76cc501c24d48355befe212efa8251f417febf3b",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016728982.original.log",
+      "bytes": 102759,
+      "sha256": "512f61da2013af2a80d9a6ca439022a49547df7c31739c6c368958c4dc165043",
+      "gitBlobSha": "178bace4830b2a8e7d828191f0cab03bfff8a8b4",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016728990.original.log",
+      "bytes": 16599,
+      "sha256": "dfb5ae6d0ab36f79ee97694f97e0eb0be3d4e91b8c925673f829ad0d70cd3871",
+      "gitBlobSha": "87870766046888c659cd89d9ecc3c88889d9fae8",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016729069.original.log",
+      "bytes": 309923,
+      "sha256": "aa3653713a7d05a477aee09930318e24b9297c6e3b9537c201eff382782bee0b",
+      "gitBlobSha": "be960b80225ee1892cf606daa19b3b6a524b2936",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016749438.redacted.log",
+      "bytes": 226637,
+      "sha256": "bc4a5d9fffcebc61c4a2df8d5eca76e38623966e7cb6e03d33e4532a57947f52",
+      "gitBlobSha": "cab4dbf77649699d15ad3727915e2c6c4c69723f",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016429779.original.log",
+      "bytes": 1002072,
+      "sha256": "0ded6c2d82bf47b50f137efb727a084b382f4af1dc96f3d56b224dc6c760b1d9",
+      "gitBlobSha": "d10f312c981eababfa032da66bd3e9413d584548",
+      "mode": "100644"
+    },
+    {
+      "path": "production-preparation-source-update.safe.json",
+      "bytes": 7801,
+      "sha256": "ea8366965644e97408649a97712f32353d1d8989aaa436b0be5493023c3c07fb",
+      "gitBlobSha": "cdf2ea5de08ac3265b4e26c9b1a20ed34c006632",
+      "mode": "100644"
+    },
+    {
+      "path": "peer1790-compatibility-20261109/public/source-compatibility.safe.json",
+      "bytes": 14022,
+      "sha256": "5e45d391411774e57c8dda89562d741b436f6df940b494dc65507ec07af4c153",
+      "gitBlobSha": "40d16d8b9c9ad75537db7589d226503852b5e67a",
+      "mode": "100644"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5052,
+      "sha256": "b0434307e4d73533c911300eddf28e699f5a3f6ca589a20f9943627a8283bfa7",
+      "gitBlobSha": "c58a1bad6092241338df43452f663943faaf1ad4",
+      "mode": "100644"
+    }
+  ]
+}
