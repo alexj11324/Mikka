@@ -20,14 +20,14 @@ concurrency:
 jobs:
   observe:
     # Disabled preparation. Bind one absolute <=15-minute window only after review.
-    if: github.ref == 'refs/heads/ops/issue1506-e2b-conservation-control-2' && github.run_attempt == 1
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       PYTHONDONTWRITEBYTECODE: '1'
-      CONTROL_GO: 'true'
-      CONTROL_NOT_BEFORE: 2026-11-09T12:42:35Z
-      CONTROL_DEADLINE: 2026-11-09T12:57:35Z
+      CONTROL_GO: 'false'
+      CONTROL_NOT_BEFORE: UNBOUND
+      CONTROL_DEADLINE: UNBOUND
     steps:
       - name: Check out the fixed product source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
