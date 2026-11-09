@@ -1,0 +1,299 @@
+﻿2026-11-09T08:51:48.1934263Z Current runner version: '2.338.2'
+2026-11-09T08:51:48.1985471Z ##[group]Runner Image Provisioner
+2026-11-09T08:51:48.1986359Z Hosted Compute Agent
+2026-11-09T08:51:48.1987125Z Version: 20261028.624
+2026-11-09T08:51:48.1987773Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T08:51:48.1988679Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T08:51:48.1989490Z Worker ID: {439bff16-ca5d-43e6-8152-0aa5c0bd9591}
+2026-11-09T08:51:48.1990215Z Region: westus
+2026-11-09T08:51:48.1990830Z Cloud: Azure
+2026-11-09T08:51:48.1991396Z ##[endgroup]
+2026-11-09T08:51:48.1993143Z ##[group]Operating System
+2026-11-09T08:51:48.1993938Z Ubuntu
+2026-11-09T08:51:48.1994483Z 24.04.5
+2026-11-09T08:51:48.1995125Z LTS
+2026-11-09T08:51:48.1995669Z ##[endgroup]
+2026-11-09T08:51:48.1996242Z ##[group]Runner Image
+2026-11-09T08:51:48.1996906Z Image: ubuntu-24.04
+2026-11-09T08:51:48.1997492Z Version: 20261101.360.1
+2026-11-09T08:51:48.1998911Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T08:51:48.2000490Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T08:51:48.2001513Z ##[endgroup]
+2026-11-09T08:51:48.2003086Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T08:51:48.2005483Z Contents: read
+2026-11-09T08:51:48.2006120Z Metadata: read
+2026-11-09T08:51:48.2006699Z ##[endgroup]
+2026-11-09T08:51:48.2008878Z Secret source: Actions
+2026-11-09T08:51:48.2009906Z Cache mode: write
+2026-11-09T08:51:48.2010962Z Prepare workflow directory
+2026-11-09T08:51:48.2362700Z Prepare all required actions
+2026-11-09T08:51:48.2413717Z Getting action download info
+2026-11-09T08:51:48.6188662Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T08:51:48.7436371Z Download action repository 'Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d' (SHA:d2e351f16c6ca20d17c85e6c992e04bdeb64e87d)
+2026-11-09T08:51:49.0802697Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-09T08:51:49.2940912Z Complete job name: cleanup
+2026-11-09T08:51:49.3827798Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T08:51:49.3828892Z with:
+2026-11-09T08:51:49.3829356Z   persist-credentials: false
+2026-11-09T08:51:49.3829894Z   repository: alexj11324/Mikka
+2026-11-09T08:51:49.3833777Z   token: ***
+2026-11-09T08:51:49.3834230Z   ssh-strict: true
+2026-11-09T08:51:49.3834680Z   ssh-user: git
+2026-11-09T08:51:49.3835109Z   clean: true
+2026-11-09T08:51:49.3835571Z   sparse-checkout-cone-mode: true
+2026-11-09T08:51:49.3836104Z   fetch-depth: 1
+2026-11-09T08:51:49.3836538Z   fetch-tags: false
+2026-11-09T08:51:49.3836982Z   show-progress: true
+2026-11-09T08:51:49.3837433Z   lfs: false
+2026-11-09T08:51:49.3837848Z   submodules: false
+2026-11-09T08:51:49.3838300Z   set-safe-directory: true
+2026-11-09T08:51:49.3838855Z   allow-unsafe-pr-checkout: false
+2026-11-09T08:51:49.3839684Z ##[endgroup]
+2026-11-09T08:51:49.6459371Z Syncing repository: alexj11324/Mikka
+2026-11-09T08:51:49.6461359Z ##[group]Getting Git version info
+2026-11-09T08:51:49.6462878Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T08:51:49.6464085Z [command]/usr/bin/git version
+2026-11-09T08:51:49.6547883Z git version 2.56.0
+2026-11-09T08:51:49.6574124Z ##[endgroup]
+2026-11-09T08:51:49.6589992Z Temporarily overriding HOME='/home/runner/work/_temp/1157aae5-1168-441d-8a7d-54002d66a32d' before making global git config changes
+2026-11-09T08:51:49.6595816Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T08:51:49.6596960Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T08:51:49.6651178Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T08:51:49.6655416Z ##[group]Initializing the repository
+2026-11-09T08:51:49.6661212Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T08:51:49.6782447Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T08:51:49.6783784Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T08:51:49.6784736Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T08:51:49.6785482Z hint: call:
+2026-11-09T08:51:49.6786177Z hint:
+2026-11-09T08:51:49.6786734Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T08:51:49.6787348Z hint:
+2026-11-09T08:51:49.6787926Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T08:51:49.6789136Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T08:51:49.6789914Z hint:
+2026-11-09T08:51:49.6790340Z hint: 	git branch -m <name>
+2026-11-09T08:51:49.6790818Z hint:
+2026-11-09T08:51:49.6791524Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T08:51:49.6795018Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T08:51:49.6808383Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T08:51:49.6857917Z ##[endgroup]
+2026-11-09T08:51:49.6859191Z ##[group]Disabling automatic garbage collection
+2026-11-09T08:51:49.6862942Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T08:51:49.6899645Z ##[endgroup]
+2026-11-09T08:51:49.6900878Z ##[group]Setting up auth
+2026-11-09T08:51:49.6907591Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T08:51:49.6951105Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T08:51:49.7364706Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T08:51:49.7415114Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T08:51:49.7666299Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T08:51:49.7713221Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T08:51:49.7956692Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T08:51:49.8007082Z ##[endgroup]
+2026-11-09T08:51:49.8007880Z ##[group]Fetching the repository
+2026-11-09T08:51:49.8021211Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +89870a876fa436da51598aa7e089d74d0f177001:refs/remotes/origin/main
+2026-11-09T08:51:53.8549720Z From https://github.com/alexj11324/Mikka
+2026-11-09T08:51:53.8550759Z  * [new ref]         89870a876fa436da51598aa7e089d74d0f177001 -> origin/main
+2026-11-09T08:51:53.8556642Z ##[endgroup]
+2026-11-09T08:51:53.8563889Z ##[group]Determining the checkout info
+2026-11-09T08:51:53.8565063Z ##[endgroup]
+2026-11-09T08:51:53.8575149Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T08:51:53.8637515Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T08:51:53.8677124Z ##[group]Checking out the ref
+2026-11-09T08:51:53.8681371Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-11-09T08:51:54.5641858Z Switched to a new branch 'main'
+2026-11-09T08:51:54.5648779Z branch 'main' set up to track 'origin/main'.
+2026-11-09T08:51:54.5672493Z ##[endgroup]
+2026-11-09T08:51:54.5728582Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T08:51:54.5764253Z 89870a876fa436da51598aa7e089d74d0f177001
+2026-11-09T08:51:54.5774473Z ##[group]Removing auth
+2026-11-09T08:51:54.5777877Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T08:51:54.5818453Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T08:51:54.6071828Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T08:51:54.6110189Z http.https://github.com/.extraheader
+2026-11-09T08:51:54.6119170Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T08:51:54.6163514Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T08:51:54.6415027Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T08:51:54.6457061Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T08:51:54.6708772Z ##[endgroup]
+2026-11-09T08:51:54.6974544Z ##[group]Run python3 -m venv "$RUNNER_TEMP/e2b-cleanup"
+2026-11-09T08:51:54.6975107Z [36;1mpython3 -m venv "$RUNNER_TEMP/e2b-cleanup"[0m
+2026-11-09T08:51:54.6975678Z [36;1m"$RUNNER_TEMP/e2b-cleanup/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'[0m
+2026-11-09T08:51:54.6999615Z shell: /usr/bin/bash -e {0}
+2026-11-09T08:51:54.6999951Z ##[endgroup]
+2026-11-09T08:51:58.1431687Z Collecting e2b==2.62.0
+2026-11-09T08:51:58.2268076Z   Downloading e2b-2.62.0-py3-none-any.whl.metadata (5.4 kB)
+2026-11-09T08:51:58.2618270Z Collecting python-dateutil>=2.8.2 (from e2b==2.62.0)
+2026-11-09T08:51:58.2824375Z   Downloading python_dateutil-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+2026-11-09T08:51:58.3176999Z Collecting wcmatch<12,>=10.1 (from e2b==2.62.0)
+2026-11-09T08:51:58.3387128Z   Downloading wcmatch-11.2-py3-none-any.whl.metadata (6.0 kB)
+2026-11-09T08:51:58.3627478Z Collecting protobuf-py<0.7,>=0.6.0 (from e2b==2.62.0)
+2026-11-09T08:51:58.3832987Z   Downloading protobuf_py-0.6.0-py3-none-any.whl.metadata (10 kB)
+2026-11-09T08:51:58.4248936Z Collecting httpx<1.0.0,>=0.27.0 (from e2b==2.62.0)
+2026-11-09T08:51:58.4455289Z   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+2026-11-09T08:51:58.4748012Z Collecting h2<5,>=4.4.1 (from e2b==2.62.0)
+2026-11-09T08:51:58.4957887Z   Downloading h2-4.4.1-py3-none-any.whl.metadata (3.8 kB)
+2026-11-09T08:51:58.5255690Z Collecting attrs>=23.2.0 (from e2b==2.62.0)
+2026-11-09T08:51:58.5463117Z   Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+2026-11-09T08:51:58.5823449Z Collecting packaging>=24.1 (from e2b==2.62.0)
+2026-11-09T08:51:58.6034761Z   Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+2026-11-09T08:51:58.6374439Z Collecting typing-extensions>=4.10.0 (from e2b==2.62.0)
+2026-11-09T08:51:58.6582818Z   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+2026-11-09T08:51:58.7329333Z Collecting rich>=14.0.0 (from e2b==2.62.0)
+2026-11-09T08:51:58.7537984Z   Downloading rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+2026-11-09T08:51:58.7846320Z Collecting connectrpc<0.13,>=0.12.1 (from e2b==2.62.0)
+2026-11-09T08:51:58.8055872Z   Downloading connectrpc-0.12.1-py3-none-any.whl.metadata (7.2 kB)
+2026-11-09T08:51:58.8745271Z Collecting pyqwest<0.13,>=0.12.0 (from e2b==2.62.0)
+2026-11-09T08:51:58.8956633Z   Downloading pyqwest-0.12.0-cp311-abi3-manylinux_2_28_x86_64.whl.metadata (3.1 kB)
+2026-11-09T08:51:58.9166494Z Collecting e2b-dockerfile-utils<0.2,>=0.1.0 (from e2b==2.62.0)
+2026-11-09T08:51:58.9379423Z   Downloading e2b_dockerfile_utils-0.1.1-py3-none-any.whl.metadata (2.3 kB)
+2026-11-09T08:51:58.9703744Z Collecting hyperframe<7,>=6.1 (from h2<5,>=4.4.1->e2b==2.62.0)
+2026-11-09T08:51:58.9914058Z   Downloading hyperframe-6.1.0-py3-none-any.whl.metadata (4.3 kB)
+2026-11-09T08:51:59.0146088Z Collecting hpack<5,>=4.2 (from h2<5,>=4.4.1->e2b==2.62.0)
+2026-11-09T08:51:59.0358640Z   Downloading hpack-4.2.0-py3-none-any.whl.metadata (3.3 kB)
+2026-11-09T08:51:59.0898814Z Collecting anyio (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T08:51:59.1107881Z   Downloading anyio-4.16.0-py3-none-any.whl.metadata (4.7 kB)
+2026-11-09T08:51:59.1453307Z Collecting certifi (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T08:51:59.1658878Z   Downloading certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
+2026-11-09T08:51:59.2008479Z Collecting httpcore==1.* (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T08:51:59.2215640Z   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+2026-11-09T08:51:59.2588697Z Collecting idna (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T08:51:59.2799203Z   Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+2026-11-09T08:51:59.3099619Z Collecting h11>=0.16 (from httpcore==1.*->httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T08:51:59.3306178Z   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-11-09T08:51:59.3864662Z Collecting protobuf-py-ext==0.6.0 (from protobuf-py<0.7,>=0.6.0->e2b==2.62.0)
+2026-11-09T08:51:59.4071298Z   Downloading protobuf_py_ext-0.6.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (1.1 kB)
+2026-11-09T08:51:59.4527392Z Collecting opentelemetry-api>=1.39.1 (from pyqwest<0.13,>=0.12.0->e2b==2.62.0)
+2026-11-09T08:51:59.4735506Z   Downloading opentelemetry_api-1.45.2-py3-none-any.whl.metadata (1.4 kB)
+2026-11-09T08:51:59.5042112Z Collecting tzdata (from python-dateutil>=2.8.2->e2b==2.62.0)
+2026-11-09T08:51:59.5251548Z   Downloading tzdata-2026.6-py2.py3-none-any.whl.metadata (1.4 kB)
+2026-11-09T08:51:59.5615404Z Collecting markdown-it-py>=2.2.0 (from rich>=14.0.0->e2b==2.62.0)
+2026-11-09T08:51:59.5836155Z   Downloading markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+2026-11-09T08:51:59.6207297Z Collecting pygments<3.0.0,>=2.13.0 (from rich>=14.0.0->e2b==2.62.0)
+2026-11-09T08:51:59.6415096Z   Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+2026-11-09T08:51:59.6723061Z Collecting bracex>=3.2 (from wcmatch<12,>=10.1->e2b==2.62.0)
+2026-11-09T08:51:59.6931243Z   Downloading bracex-3.2.2-py3-none-any.whl.metadata (3.3 kB)
+2026-11-09T08:51:59.7583180Z Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich>=14.0.0->e2b==2.62.0)
+2026-11-09T08:51:59.7792541Z   Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+2026-11-09T08:51:59.8456142Z Downloading e2b-2.62.0-py3-none-any.whl (426 kB)
+2026-11-09T08:51:59.9118919Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 426.4/426.4 kB 6.6 MB/s eta 0:00:00
+2026-11-09T08:51:59.9333671Z Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+2026-11-09T08:51:59.9375984Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.5/67.5 kB 25.4 MB/s eta 0:00:00
+2026-11-09T08:51:59.9590234Z Downloading connectrpc-0.12.1-py3-none-any.whl (70 kB)
+2026-11-09T08:51:59.9630468Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 70.1/70.1 kB 27.0 MB/s eta 0:00:00
+2026-11-09T08:51:59.9836913Z Downloading e2b_dockerfile_utils-0.1.1-py3-none-any.whl (19 kB)
+2026-11-09T08:52:00.0064398Z Downloading h2-4.4.1-py3-none-any.whl (62 kB)
+2026-11-09T08:52:00.0102442Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.6/62.6 kB 25.7 MB/s eta 0:00:00
+2026-11-09T08:52:00.0307835Z Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+2026-11-09T08:52:00.0348514Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.5/73.5 kB 27.9 MB/s eta 0:00:00
+2026-11-09T08:52:00.0555578Z Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+2026-11-09T08:52:00.0594261Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.8/78.8 kB 32.1 MB/s eta 0:00:00
+2026-11-09T08:52:00.0800755Z Downloading packaging-26.3-py3-none-any.whl (129 kB)
+2026-11-09T08:52:00.0845302Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 130.0/130.0 kB 42.6 MB/s eta 0:00:00
+2026-11-09T08:52:00.1054837Z Downloading protobuf_py-0.6.0-py3-none-any.whl (216 kB)
+2026-11-09T08:52:00.1119068Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 216.1/216.1 kB 45.3 MB/s eta 0:00:00
+2026-11-09T08:52:00.1350106Z Downloading protobuf_py_ext-0.6.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (500 kB)
+2026-11-09T08:52:00.1569324Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 500.5/500.5 kB 24.5 MB/s eta 0:00:00
+2026-11-09T08:52:00.1778823Z Downloading pyqwest-0.12.0-cp311-abi3-manylinux_2_28_x86_64.whl (5.7 MB)
+2026-11-09T08:52:00.2380717Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.7/5.7 MB 98.0 MB/s eta 0:00:00
+2026-11-09T08:52:00.2588263Z Downloading python_dateutil-4.0.0-py3-none-any.whl (92 kB)
+2026-11-09T08:52:00.2627072Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 92.9/92.9 kB 38.2 MB/s eta 0:00:00
+2026-11-09T08:52:00.2844563Z Downloading rich-15.0.0-py3-none-any.whl (310 kB)
+2026-11-09T08:52:00.2895144Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 310.7/310.7 kB 91.1 MB/s eta 0:00:00
+2026-11-09T08:52:00.3105700Z Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-11-09T08:52:00.3141360Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.6/45.6 kB 17.8 MB/s eta 0:00:00
+2026-11-09T08:52:00.3349832Z Downloading wcmatch-11.2-py3-none-any.whl (44 kB)
+2026-11-09T08:52:00.3386110Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 44.4/44.4 kB 17.0 MB/s eta 0:00:00
+2026-11-09T08:52:00.3593064Z Downloading bracex-3.2.2-py3-none-any.whl (14 kB)
+2026-11-09T08:52:00.3817918Z Downloading hpack-4.2.0-py3-none-any.whl (34 kB)
+2026-11-09T08:52:00.4043675Z Downloading hyperframe-6.1.0-py3-none-any.whl (13 kB)
+2026-11-09T08:52:00.4273969Z Downloading markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+2026-11-09T08:52:00.4315505Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 91.7/91.7 kB 35.3 MB/s eta 0:00:00
+2026-11-09T08:52:00.4524387Z Downloading opentelemetry_api-1.45.2-py3-none-any.whl (60 kB)
+2026-11-09T08:52:00.4561027Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.3/60.3 kB 24.6 MB/s eta 0:00:00
+2026-11-09T08:52:00.4771688Z Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+2026-11-09T08:52:00.4868014Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 159.7 MB/s eta 0:00:00
+2026-11-09T08:52:00.5076508Z Downloading anyio-4.16.0-py3-none-any.whl (134 kB)
+2026-11-09T08:52:00.5116189Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.5/134.5 kB 52.8 MB/s eta 0:00:00
+2026-11-09T08:52:00.5324842Z Downloading idna-3.20-py3-none-any.whl (69 kB)
+2026-11-09T08:52:00.5368460Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 69.6/69.6 kB 28.1 MB/s eta 0:00:00
+2026-11-09T08:52:00.5580616Z Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+2026-11-09T08:52:00.5623444Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.1/135.1 kB 52.2 MB/s eta 0:00:00
+2026-11-09T08:52:00.5834375Z Downloading tzdata-2026.6-py2.py3-none-any.whl (348 kB)
+2026-11-09T08:52:00.5888507Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 348.2/348.2 kB 91.6 MB/s eta 0:00:00
+2026-11-09T08:52:00.6094185Z Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+2026-11-09T08:52:00.6322757Z Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+2026-11-09T08:52:00.7438178Z Installing collected packages: tzdata, typing-extensions, pygments, protobuf-py-ext, packaging, mdurl, idna, hyperframe, hpack, h11, e2b-dockerfile-utils, certifi, bracex, attrs, wcmatch, python-dateutil, protobuf-py, opentelemetry-api, markdown-it-py, httpcore, h2, anyio, rich, pyqwest, httpx, connectrpc, e2b
+2026-11-09T08:52:02.9765665Z Successfully installed anyio-4.16.0 attrs-26.1.0 bracex-3.2.2 certifi-2026.10.23 connectrpc-0.12.1 e2b-2.62.0 e2b-dockerfile-utils-0.1.1 h11-0.16.0 h2-4.4.1 hpack-4.2.0 httpcore-1.0.9 httpx-0.28.1 hyperframe-6.1.0 idna-3.20 markdown-it-py-4.2.0 mdurl-0.1.2 opentelemetry-api-1.45.2 packaging-26.3 protobuf-py-0.6.0 protobuf-py-ext-0.6.0 pygments-2.21.0 pyqwest-0.12.0 python-dateutil-4.0.0 rich-15.0.0 typing-extensions-4.16.0 tzdata-2026.6 wcmatch-11.2
+2026-11-09T08:52:03.0736212Z ##[group]Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+2026-11-09T08:52:03.0736645Z with:
+2026-11-09T08:52:03.0736830Z   method: oidc
+2026-11-09T08:52:03.0737068Z   identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+2026-11-09T08:52:03.0737388Z   oidc-audience: mikka-infisical
+2026-11-09T08:52:03.0737679Z   project-id: 89850d6a-f020-4936-863e-df77380dfe40
+2026-11-09T08:52:03.0737964Z   env-slug: prod
+2026-11-09T08:52:03.0738167Z   secret-path: /vercel
+2026-11-09T08:52:03.0738415Z   secret-name: E2B_API_KEY
+2026-11-09T08:52:03.0738645Z   include-imports: false
+2026-11-09T08:52:03.0738897Z   domain: https://app.infisical.com
+2026-11-09T08:52:03.0739157Z   export-type: env
+2026-11-09T08:52:03.0739368Z   file-output-path: /.env
+2026-11-09T08:52:03.0739589Z   recursive: false
+2026-11-09T08:52:03.0739794Z ##[endgroup]
+2026-11-09T08:52:03.4657150Z (node:2497) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T08:52:03.4659344Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T08:52:03.9318414Z Injected secrets as environment variables
+2026-11-09T08:52:03.9471303Z ##[group]Run python3 - <<'PY'
+2026-11-09T08:52:03.9471640Z [36;1mpython3 - <<'PY'[0m
+2026-11-09T08:52:03.9471892Z [36;1mimport os,pathlib[0m
+2026-11-09T08:52:03.9472829Z [36;1mpathlib.Path(os.environ['RUNNER_TEMP'],'cleanup-identities.json').write_text(os.environ.get('CANDIDATE_IDENTITIES') or '')[0m
+2026-11-09T08:52:03.9473435Z [36;1mPY[0m
+2026-11-09T08:52:03.9473634Z [36;1margs=()[0m
+2026-11-09T08:52:03.9473979Z [36;1mif [ "$IDENTITIES_REQUIRED" = true ]; then args+=(--identities-required); fi[0m
+2026-11-09T08:52:03.9474969Z [36;1m"$RUNNER_TEMP/e2b-cleanup/bin/python" scripts/e2b/cleanup-template-candidates.py --identities-file "$RUNNER_TEMP/cleanup-identities.json" "${args[@]}" --output "$RUNNER_TEMP/release-cleanup.json"[0m
+2026-11-09T08:52:03.9496088Z shell: /usr/bin/bash -e {0}
+2026-11-09T08:52:03.9496382Z env:
+2026-11-09T08:52:03.9496874Z   E2B_API_KEY: ***
+2026-11-09T08:52:03.9498664Z   CANDIDATE_IDENTITIES: {"version":1,"sourceCommit":"89870a876fa436da51598aa7e089d74d0f177001","runId":"42585048193","runAttempt":"1","templates":{"desktop":{"baseTemplate":"desktop","name":"mikka-89870a876fa4-42585048193-1-desktop","templateId":"z6d1q9uyolzncsugk7ou"},"claude":{"baseTemplate":"claude","name":"mikka-89870a876fa4-42585048193-1-claude","templateId":"kvcybow3cop30j1ykno5"},"codex":{"baseTemplate":"codex","name":"mikka-89870a876fa4-42585048193-1-codex","templateId":"r9gaugt35qtr5dug3rip"}}}
+2026-11-09T08:52:03.9500478Z   IDENTITIES_REQUIRED: true
+2026-11-09T08:52:03.9500722Z ##[endgroup]
+2026-11-09T08:52:06.4523447Z mikka-release-cleanup {"sourceCommit":"89870a876fa436da51598aa7e089d74d0f177001","runId":"42585048193","sandboxes":[],"templates":[{"name":"mikka-89870a876fa4-42585048193-1-desktop","kind":"desktop","templateId":"z6d1q9uyolzncsugk7ou","status":"deleted"},{"name":"mikka-89870a876fa4-42585048193-1-claude","kind":"claude","templateId":"kvcybow3cop30j1ykno5","status":"deleted"},{"name":"mikka-89870a876fa4-42585048193-1-codex","kind":"codex","templateId":"r9gaugt35qtr5dug3rip","status":"deleted"}],"errors":[]}
+2026-11-09T08:52:06.5116728Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+2026-11-09T08:52:06.5117160Z with:
+2026-11-09T08:52:06.5117404Z   name: e2b-runtime-release-cleanup-42585048193-1
+2026-11-09T08:52:06.5117949Z   path: /home/runner/work/_temp/release-cleanup.json
+2026-11-09T08:52:06.5118264Z   if-no-files-found: warn
+2026-11-09T08:52:06.5118499Z   retention-days: 7
+2026-11-09T08:52:06.5118714Z   compression-level: 6
+2026-11-09T08:52:06.5118929Z   overwrite: false
+2026-11-09T08:52:06.5119143Z   include-hidden-files: false
+2026-11-09T08:52:06.5119377Z env:
+2026-11-09T08:52:06.5119710Z   E2B_API_KEY: ***
+2026-11-09T08:52:06.5119910Z ##[endgroup]
+2026-11-09T08:52:06.6831541Z (node:2519) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T08:52:06.6832966Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T08:52:06.6877826Z With the provided path, there will be 1 file uploaded
+2026-11-09T08:52:06.6903024Z Artifact name is valid!
+2026-11-09T08:52:06.6905508Z Root directory input is valid!
+2026-11-09T08:52:07.1256563Z Beginning upload of artifact content to blob storage
+2026-11-09T08:52:07.1456111Z (node:2519) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T08:52:07.4034510Z Uploaded bytes 415
+2026-11-09T08:52:07.4764076Z Finished uploading artifact content to blob storage!
+2026-11-09T08:52:07.4765182Z SHA256 digest of uploaded artifact zip is cf8b8a5ffdad999ce769ca03b0a8ceeb9c06cb4bc810efd77ff283dc3dda2c1d
+2026-11-09T08:52:07.4766443Z Finalizing artifact upload
+2026-11-09T08:52:07.9610225Z Artifact e2b-runtime-release-cleanup-42585048193-1.zip successfully finalized. Artifact ID 13660721208
+2026-11-09T08:52:07.9611751Z Artifact e2b-runtime-release-cleanup-42585048193-1 has been successfully uploaded! Final size is 415 bytes. Artifact ID is 13660721208
+2026-11-09T08:52:07.9617539Z Artifact download URL: https://github.com/alexj11324/Mikka/actions/runs/42585048193/artifacts/13660721208
+2026-11-09T08:52:07.9840670Z Post job cleanup.
+2026-11-09T08:52:08.0756840Z [command]/usr/bin/git version
+2026-11-09T08:52:08.0804779Z git version 2.56.0
+2026-11-09T08:52:08.0845999Z Temporarily overriding HOME='/home/runner/work/_temp/c75f7e40-da33-4be8-b289-844ae002a9f6' before making global git config changes
+2026-11-09T08:52:08.0847348Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T08:52:08.0851517Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T08:52:08.0895340Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T08:52:08.0938858Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T08:52:08.1220106Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T08:52:08.1273419Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T08:52:08.1558062Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T08:52:08.1618463Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T08:52:08.2039007Z Cleaning up orphan processes
+2026-11-09T08:52:08.2415762Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

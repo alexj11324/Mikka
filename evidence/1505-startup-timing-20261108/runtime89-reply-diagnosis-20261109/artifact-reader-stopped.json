@@ -1,0 +1,30 @@
+{
+  "session": {
+    "id": "sbx_7enXA6BR7FxiuPxG36FfmmVLhBvW",
+    "runtime": "python3.13",
+    "architecture": "amd64",
+    "requestedAt": 1794214538275,
+    "startedAt": 1794214538301,
+    "requestedStopAt": 1794215149666,
+    "stoppedAt": 1794215149901,
+    "status": "stopped",
+    "duration": 611600,
+    "vcpus": 1,
+    "memory": 2048,
+    "timeout": 900000,
+    "region": "iad1",
+    "cwd": "/vercel/sandbox",
+    "workloadType": "sandbox",
+    "createdAt": 1794214538275,
+    "updatedAt": 1794214538313,
+    "interactivePort": 26661,
+    "activeCpuDurationMs": 5680,
+    "networkTransfer": {
+      "ingress": 37881,
+      "egress": 35934
+    },
+    "sourceSandboxName": "issue1505-reply-receipt-reader-20261109",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+  },
+  "routes": []
+}

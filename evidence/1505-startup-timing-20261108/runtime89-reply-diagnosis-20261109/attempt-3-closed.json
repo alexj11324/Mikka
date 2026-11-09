@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "kind": "retained_record_marker_replay",
+  "identity": {
+    "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "runId": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+    "taskId": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+    "requesterHash": "b823ba1c5729768b",
+    "candidateBinding": "awaiting_original_candidate_identity_receipt"
+  },
+  "result": "retained_record_replay_completed",
+  "formalVerdict": "not_evaluated",
+  "newModels": 0,
+  "businessWrites": 0,
+  "sourceVerification": {
+    "files": [
+      {
+        "path": "scripts/acceptance/cloud-startup.mjs",
+        "bytes": 83254,
+        "blob": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+        "sha256": "e3ae3c84925100ac0c79a2b0d7dac70933312acd2e235fef5f2fe9d572da65b2"
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup-evidence.mjs",
+        "bytes": 22658,
+        "blob": "b5a85b795d3026c350ced9823eaac9488a3e0cda",
+        "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9"
+      },
+      {
+        "path": "scripts/acceptance/team-workspace.mjs",
+        "bytes": 6653,
+        "blob": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f",
+        "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5"
+      },
+      {
+        "path": "lib/smoke-account.ts",
+        "bytes": 417,
+        "blob": "7c669d4bee8636ba063ee92ace07dbaf75023033",
+        "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997"
+      }
+    ],
+    "psqlVersion": "psql (PostgreSQL) 16.15 (Ubuntu 16.15-1.pgdg24.04+2)"
+  },
+  "queryProcess": {
+    "connectionErrorKinds": [],
+    "startupParameterNames": [],
+    "exitCode": 0,
+    "signal": null,
+    "timedOut": false,
+    "postgresSqlState": null
+  },
+  "snapshotAt": "2026-11-09T09:01:23.307785+00:00",
+  "coverage": {
+    "rowCap": 2048,
+    "lastSeq": 48,
+    "firstSeq": 1,
+    "textBytes": 170,
+    "countCapped": 48,
+    "storedBytes": 10581,
+    "limitExceeded": false,
+    "byteLimitExceeded": false,
+    "contiguousObserved": true,
+    "unsupportedStageNumbers": 0
+  },
+  "targetFound": true,
+  "scopeMatches": true,
+  "scopeChecks": {
+    "title": true,
+    "model": true,
+    "subscription": true,
+    "time": true,
+    "identity": true,
+    "profile": true
+  },
+  "binding": {
+    "scopeMatches": true,
+    "metadataMikkaDeletedAtPresent": true,
+    "metadataLegacyDeletedAtPresent": false,
+    "markerBindingVerified": true,
+    "requesterHash": "b823ba1c5729768b",
+    "profileIdHash": "ac9c4e230fb29b11",
+    "profileDigest": "b764aeea50231766c611870b0f68bc5bad6a7b09bc97a33af311b6a597752280",
+    "promptMarker": true,
+    "issueTextMarker": true,
+    "harnessMatches": true,
+    "isolatedRun": true,
+    "parentEdge": false,
+    "childEdge": false,
+    "status": "succeeded",
+    "summarySource": "report"
+  },
+  "replyProof": {
+    "postStartTextMarker": false,
+    "postToolTextMarker": false,
+    "markerBindingVerified": true,
+    "reportSummaryMarker": false,
+    "submittedOutputMatched": false,
+    "finishedAtFinite": true,
+    "finishedAtAtOrAfterSubmit": false,
+    "singleSucceededUiErrorIsNull": true,
+    "replayReplyVerified": false,
+    "replayReplyVerifiedAfterTool": false,
+    "replySource": null,
+    "firstProviderChunkObserved": true,
+    "agentStartObserved": true,
+    "successfulToolCountAtReplayEnd": 1,
+    "counts": {
+      "stageStarts": 1,
+      "canonicalSubmitInputs": 1,
+      "submitInputsWithMarker": 0,
+      "eligibleSubmitInputs": 0,
+      "matchingSubmitOutputs": 0,
+      "textChunks": 34
+    },
+    "seq": {
+      "agentStartSeq": 5,
+      "completedToolSeq": 8,
+      "textSeq": 10
+    },
+    "submitEvents": [
+      {
+        "seq": 7,
+        "toolCallHash": "11484828efc3e744",
+        "inputIsObject": true,
+        "inputSummaryIsString": true,
+        "marker": false,
+        "priorCompletedTool": false
+      }
+    ],
+    "submitEventsTruncated": false,
+    "lastMatchedSubmitSeq": null,
+    "lastMatchedSubmitStoredAt": null,
+    "finishedAt": "2026-11-09T07:54:10.043Z"
+  },
+  "limitations": [
+    "not_the_original_http_detail_snapshot",
+    "candidate_identity_not_finally_bound",
+    "no_full_runtime_or_native_acceptance_verdict",
+    "no_new_formal_samples",
+    "no_cross_host_latency_subtraction",
+    "metadata_deleted_at_presence_is_not_full_cleanup_verification"
+  ]
+}

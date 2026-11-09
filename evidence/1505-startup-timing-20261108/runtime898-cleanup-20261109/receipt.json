@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "run": 42585048193,
+  "attempt": 1,
+  "source": "89870a876fa436da51598aa7e089d74d0f177001",
+  "job": 129065732736,
+  "readCount": 1,
+  "bytes": 29286,
+  "sha256": "dcb23461f2b0e736493b3a94088064022ace5d618e0edab8b9be41090dbb9332",
+  "lines": [
+    "2026-11-09T08:52:06.4523447Z mikka-release-cleanup {\"sourceCommit\":\"89870a876fa436da51598aa7e089d74d0f177001\",\"runId\":\"42585048193\",\"sandboxes\":[],\"templates\":[{\"name\":\"mikka-89870a876fa4-42585048193-1-desktop\",\"kind\":\"desktop\",\"templateId\":\"z6d1q9uyolzncsugk7ou\",\"status\":\"deleted\"},{\"name\":\"mikka-89870a876fa4-42585048193-1-claude\",\"kind\":\"claude\",\"templateId\":\"kvcybow3cop30j1ykno5\",\"status\":\"deleted\"},{\"name\":\"mikka-89870a876fa4-42585048193-1-codex\",\"kind\":\"codex\",\"templateId\":\"r9gaugt35qtr5dug3rip\",\"status\":\"deleted\"}],\"errors\":[]}"
+  ],
+  "subscriptionsStage": "Refuse an obsolete source before real subscription work failed; no subscription original log read by root",
+  "publish": "skipped",
+  "candidateTemplates": [
+    {
+      "kind": "desktop",
+      "id": "z6d1q9uyolzncsugk7ou",
+      "result": "deleted"
+    },
+    {
+      "kind": "claude",
+      "id": "kvcybow3cop30j1ykno5",
+      "result": "deleted"
+    },
+    {
+      "kind": "codex",
+      "id": "r9gaugt35qtr5dug3rip",
+      "result": "deleted"
+    }
+  ],
+  "sandboxes": [],
+  "errors": []
+}

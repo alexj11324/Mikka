@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "issue": 1505,
+  "historicalRelease": {
+    "run": 42579094044,
+    "attempt": 1,
+    "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "candidateIdentity": "awaiting_original_candidate_identity_receipt",
+    "originalCandidateArtifactNotDownloadedByThisReader": true
+  },
+  "target": {
+    "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "runId": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+    "taskId": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+    "requesterHash": "b823ba1c5729768b",
+    "candidateBinding": "awaiting_original_candidate_identity_receipt"
+  },
+  "operatorBranch": "ops/1505-codex-reply-diagnosis-20261109",
+  "operatorHistory": [
+    {
+      "head": "5dcbe67137b473afd0a7ba274bbad076b26cc58d",
+      "run": 42588827977,
+      "result": "failure_before_jobs",
+      "jobs": 0,
+      "oidc": 0,
+      "sql": 0,
+      "cause": "runner context invalid in job env; no annotation text was retrieved"
+    },
+    {
+      "commit": "f8fc967eb556ddde9b1e26cfc4514ad0ead90490",
+      "tree": "9d07bf968f7e37f82d8488b25178129d6a5df323",
+      "parent": "5dcbe67137b473afd0a7ba274bbad076b26cc58d",
+      "workflowBlob": "c70868522198a906931c2cc7451d7c81cb1ded66",
+      "workflowBytes": 3806,
+      "workflowSha256": "f92a9a25a51d174c433063cdd00260540b8c7709400d896be0cf14135d36e1d8",
+      "collectorBlob": "8fccff2b1ac1c831ac6ce58d217f5c3f07759711",
+      "collectorSha256": "8612ce46b956cb3f32a92fdfbfd5563879a8a8b48f4dd4c6e78026126d751f85",
+      "branch": "ops/1505-codex-reply-diagnosis-20261109",
+      "priorRun": 42588827977,
+      "priorJobs": 0,
+      "priorSqlExecutions": 0,
+      "run": 42589112679,
+      "job": 129066073737,
+      "result": "readonly_query_failed",
+      "log": {
+        "run": 42589112679,
+        "job": 129066073737,
+        "readCount": 1,
+        "bytes": 32692,
+        "sha256": "d60f9c2ceef420369cdaa5e1717ed0de2c5c095b66cb0f4e845b42663db15d12"
+      },
+      "artifact": {
+        "id": 13660402373,
+        "kind": "metadata",
+        "zipBytes": 1037,
+        "zipSha256": "b9b9caf77c2496c6e0a3b0cc7cf3c8aa92595414f8e560dc7729743041c4fa1a",
+        "jsonBytes": 1712,
+        "jsonSha256": "ad466272395db7c500d2f061da989712181a0c9aee9e5eb488fb6a14b4de69e4",
+        "member": "issue1505-reply-observation.json",
+        "toolDownloads": 1,
+        "zipContentReads": 1
+      }
+    },
+    {
+      "commit": "e0fd784616b8936ce8f4fb831a6bb1754f62cf78",
+      "tree": "3c3445c88f26c9bb1ecf2fbf4453b5e51f55a130",
+      "parent": "f8fc967eb556ddde9b1e26cfc4514ad0ead90490",
+      "collectorBlob": "d716573a613d87fd2543dc639f325c09922f7333",
+      "collectorSha256": "eccd29515bc82a4f0f961c0ab019f8632e335c75a9a6b39e91464bde9b15fcda",
+      "collectorBytes": 26707,
+      "workflowBlob": "29cf048029574b13973a0a7ca6ef6c4028177710",
+      "workflowSha256": "9032713ba0e355cbfb596cf037598b92ed38624df26e7c0f358484f28bef6b40",
+      "workflowBytes": 3806,
+      "branch": "ops/1505-codex-reply-diagnosis-20261109",
+      "run": 42589824119,
+      "job": 129068456707,
+      "result": "unsupported_startup_parameter_statement_timeout",
+      "log": {
+        "run": 42589824119,
+        "job": 129068456707,
+        "readCount": 1,
+        "bytes": 32701,
+        "sha256": "1014a536c786c6165ae1341f49a1266d01e610d2916d943d824dd0073af334fe"
+      },
+      "artifact": {
+        "id": 13659944328,
+        "kind": "metadata",
+        "zipBytes": 1099,
+        "zipSha256": "97ca781e0c6397c94371aa116a83145ab27ee5716eff1cdbe4cd2ad9b7007485",
+        "jsonBytes": 1851,
+        "jsonSha256": "47f0e1ff6d6010109d92e63052f926851cea5176c34f2ca3a3c40062bf1d27fe",
+        "parts": 5,
+        "toolDownloads": 1,
+        "zipContentReads": 1
+      }
+    },
+    {
+      "commit": "be493b18904232d64e8d35fcd815ac24e4bd1136",
+      "tree": "556b08caffa68b18b748f2a698558f06a4289c3d",
+      "parent": "e0fd784616b8936ce8f4fb831a6bb1754f62cf78",
+      "collectorBlob": "0d05f0fd8be0942be045498fa5d7a2c5cedf5ef5",
+      "collectorSha256": "6839b077ca483428fce740a7520d081a81a3d638e7aad1b82cc046f07c058cdc",
+      "collectorBytes": 26561,
+      "workflowBlob": "f7fbeae2b3b28618bdaed109059ba588ec64f034",
+      "workflowSha256": "83d561c63895a7d120028e0eb800d75b13e6542820b4873593ec17d410c4e246",
+      "workflowBytes": 3806,
+      "branch": "ops/1505-codex-reply-diagnosis-20261109",
+      "queryUnchanged": true,
+      "run": 42590143436,
+      "job": 129069505960,
+      "result": "retained_record_replay_completed",
+      "log": {
+        "bytes": 32917,
+        "sha256": "67d29b370e93f0b90f8a44b465039b11100dbcfbc5d80c9aa74a485336fb4a54",
+        "jobId": 129069505960,
+        "runId": 42590143436,
+        "readCount": 1
+      },
+      "artifact": {
+        "id": 13660439328,
+        "zipBytes": 1993,
+        "zipSha256": "9bb78666af69cb3cb4b525f4c95942572f50157afcdcaad6213599ca72c21de0",
+        "jsonBytes": 4351,
+        "jsonSha256": "639695e9acb51b34d26c34fe2b2c8be25de2085ca4bf32bb1bf9d23b3f1c230f",
+        "downloadCount": 1,
+        "zipContentReadCount": 1,
+        "localFramingRetry": 1
+      }
+    },
+    {
+      "commit": "420b52565f5c01d0147e46fa29e9b98e0427e35d",
+      "tree": "617245bfbce8accf0472597bd968fd5930c800bc",
+      "parent": "be493b18904232d64e8d35fcd815ac24e4bd1136",
+      "workflowBlob": "20680fbc1d10d8b68d64218887e1adc084ff9fbc",
+      "run": 42590859516,
+      "job": 129071836323,
+      "result": "skipped_no_runner_no_oidc_no_query"
+    }
+  ],
+  "scope": {
+    "newModels": 0,
+    "newTasks": 0,
+    "businessWrites": 0,
+    "diagnosticSql": "one successful bounded read-only transaction, with original SQL timeouts, no automatic retry",
+    "secrets": "runner OIDC /vercel MIKKA_DATABASE_URL only; no secret exported to reader VM or primary",
+    "reader": "1 vCPU/2 GiB, only closed artifacts, verified stopped"
+  },
+  "limitations": [
+    "not_the_original_http_detail_snapshot",
+    "candidate_identity_not_finally_bound",
+    "no_full_runtime_or_native_acceptance_verdict",
+    "no_new_formal_samples",
+    "no_cross_host_latency_subtraction",
+    "metadata_deleted_at_presence_is_not_full_cleanup_verification"
+  ],
+  "files": [
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/attempt-1-connection-failure.log",
+      "encoding": "utf-8",
+      "bytes": 32692,
+      "sha256": "d60f9c2ceef420369cdaa5e1717ed0de2c5c095b66cb0f4e845b42663db15d12"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/attempt-1-closed.json",
+      "encoding": "utf-8",
+      "bytes": 1712,
+      "sha256": "ad466272395db7c500d2f061da989712181a0c9aee9e5eb488fb6a14b4de69e4"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/attempt-1-artifact.zip",
+      "encoding": "base64",
+      "originalZip": true
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/attempt-2-classified-failure.log",
+      "encoding": "utf-8",
+      "bytes": 32701,
+      "sha256": "1014a536c786c6165ae1341f49a1266d01e610d2916d943d824dd0073af334fe"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/attempt-2-closed.json",
+      "encoding": "utf-8",
+      "bytes": 1851,
+      "sha256": "47f0e1ff6d6010109d92e63052f926851cea5176c34f2ca3a3c40062bf1d27fe"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/attempt-2-artifact.zip",
+      "encoding": "base64",
+      "originalZip": true
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/attempt-3-readonly-replay.log",
+      "encoding": "utf-8",
+      "bytes": 32917,
+      "sha256": "67d29b370e93f0b90f8a44b465039b11100dbcfbc5d80c9aa74a485336fb4a54"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/attempt-3-closed.json",
+      "encoding": "utf-8",
+      "bytes": 4351,
+      "sha256": "639695e9acb51b34d26c34fe2b2c8be25de2085ca4bf32bb1bf9d23b3f1c230f"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/attempt-3-artifact.zip",
+      "encoding": "base64",
+      "originalZip": true
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/artifact-reader-stopped.json",
+      "encoding": "utf-8",
+      "bytes": 795,
+      "sha256": "47115ec102f130a75c69975fe87c5569cecbc68c7f9a71b013707804b178f06c"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/operator-closed-jobs.json",
+      "encoding": "utf-8",
+      "bytes": 1145,
+      "sha256": "74a974f7fdcdc2f11ee689574eedb8c16a0600583349b1b65ac4ae2d0029f27e"
+    }
+  ]
+}
