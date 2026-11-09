@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One bounded normal-owner production API proof. It runs no daemon service,
 // agents, model calls, cloud machines or SQL. Credentials never enter reports.
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -39,6 +39,40 @@ const tokenIdentity = token => JSON.stringify([token.id, token.name, token.creat
   token.revokedAt, token.revokedBy, token.boundDeviceId])
 const deviceIdentity = device => JSON.stringify([device.id, device.name, device.enabled,
   device.hostname, device.platform, device.arch, device.harnesses])
+const resourceFingerprint = (kind, value) => createHash('sha256').update(kind + '\0' + value).digest('hex')
+
+// Cleanup responses can contain cookies, credential values, owner ids or raw
+// database errors. Keep a closed projection, including redacting unknown keys.
+const CLEANUP_BODY_FIELDS = new Set(['error', 'code', 'detail', 'message', 'tokenId', 'revokedAt', 'revokedBy',
+  'unattributedActiveRuns', 'version', 'ok', 'success', 'result', 'id', 'uninstall', 'revokedTokens',
+  'tokens', 'devices', 'nextCursor', 'live', 'user'])
+const CLEANUP_BODY_CODES = new Set(['originRejected', 'authRequired', 'unknownCredential', 'internal_error',
+  'deviceNotFound', 'deviceHasActiveRuns', 'queued', 'not_possible'])
+const CLEANUP_BODY_NUMBERS = new Set(['version', 'unattributedActiveRuns', 'revokedTokens'])
+function cleanupBody(value, field, depth = 0) {
+  if (value === null || typeof value === 'boolean') return value
+  if (typeof value === 'number') return CLEANUP_BODY_NUMBERS.has(field) ? value : '[redacted]'
+  if (typeof value === 'string') return ['error', 'code', 'detail', 'uninstall'].includes(field)
+    && CLEANUP_BODY_CODES.has(value) ? value : '[redacted]'
+  if (Array.isArray(value)) return { type: 'array', count: value.length }
+  if (!value || typeof value !== 'object' || depth >= 3) return '[redacted]'
+  const body = {}, entries = Object.entries(value)
+  let redactedFields = 0
+  for (const [key, item] of entries) {
+    if (CLEANUP_BODY_FIELDS.has(key)) body[key] = cleanupBody(item, key, depth + 1)
+    else redactedFields++
+  }
+  if (redactedFields) body.redactedFields = redactedFields
+  return body
+}
+
+function cleanupOperation(path, body) {
+  if (path === '/api/rpc') return body.action
+  if (path.endsWith('/revoke')) return 'device-tokens.revoke'
+  if (path.startsWith('/api/device-tokens')) return 'device-tokens.list'
+  if (path === '/api/auth/sign-out') return 'auth.sign-out'
+  return 'auth.get-session'
+}
 
 export function proofConfiguration(env, event) {
   if (env.MIKKA_ACCEPTANCE_TARGET_MODE === CORE_MODE) {
@@ -116,17 +150,23 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   }
   const jar = responseCookieJar(now)
   const marker = (core ? 'selfhost-core-' : 'm1415-wire-') + randomUUID()
+  // The normal owner can match a later complete inventory to these exact
+  // resources, without publishing ids, the nonce or a usable credential.
+  report.resourceBindings = { algorithm: 'sha256', credentialId: null, deviceId: null,
+    deviceNonce: resourceFingerprint('device-nonce', marker) }
   const unusedDeviceId = randomUUID()
   let phase = 'configuration', ownerId, teamWorkspaceId, teamRole, ownerLiveWorkspaceId, tokenId, credential, deviceId, client, contract
   let liveSocket, deviceSocket
   let beforeTokens, beforeDevices, registrationAttempted = false, signInStarted = false, signedIn = false, primaryPassed = false
+  let cleanupResponse
   let targetProof = attestation
   const error = cause => {
     if (cause instanceof DeployedTargetError) report.targetFailure = publicTargetFailure(cause)
     if (cause instanceof TeamWorkspaceError) report.teamFailure = publicTeamWorkspaceFailure(cause)
     if (cause instanceof CoreProductionError) report.targetFailure = coreTargetFailure(cause)
     report.errors.push({ phase, ...(cause instanceof CoreProductionError || cause instanceof CoreProbeError
-      ? { code: cause.code, detail: cause.detail } : { code: cause instanceof DeployedTargetError ? cause.code : failureCode(cause) }) })
+      ? { code: cause.code, detail: cause.detail } : { code: cause instanceof DeployedTargetError ? cause.code : failureCode(cause) }),
+    ...(cleanupResponse?.phase === phase ? { http: cleanupResponse.http } : {}) })
   }
   const verifyDeployment = async () => {
     if (core) {
@@ -149,10 +189,14 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     report.client.sourceRevision = proof.driverRevision
   }
 
-  async function json(response) {
+  async function json(response, cleanupHttp) {
     const text = await response.text()
+    if (cleanupHttp) cleanupHttp.body = { format: 'non-json', bytes: Buffer.byteLength(text) }
     check(Buffer.byteLength(text) <= 8_000_000, 'response_invalid')
-    try { return JSON.parse(text) } catch { throw new ProofError('response_invalid') }
+    let body
+    try { body = JSON.parse(text) } catch { throw new ProofError('response_invalid') }
+    if (cleanupHttp) cleanupHttp.body = cleanupBody(body)
+    return body
   }
   async function owner(path, method = 'GET', body, cookieOverride) {
     const known = new Set(['/api/auth/sign-in/email', '/api/auth/sign-out',
@@ -167,6 +211,9 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       'request_rejected')
     const url = new URL(BASE + path, ORIGIN)
     const cookie = cookieOverride ?? jar.header(url)
+    const cleanupHttp = phase.startsWith('cleanup-') || phase === 'sign-out'
+      ? { operation: cleanupOperation(path, body), method, status: null, body: { format: 'unavailable' } } : undefined
+    if (cleanupHttp) cleanupResponse = { phase, http: cleanupHttp }
     let response
     try {
       report.requests.owner++
@@ -176,9 +223,10 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
           ...(path === '/api/rpc' ? { 'x-mikka-rpc': '1' } : {}) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(30_000) })
     } catch { throw new ProofError('transport_failed') }
+    if (cleanupHttp) cleanupHttp.status = response.status
     check(!response.redirected && (!response.url || response.url === url.href), 'response_invalid')
     jar.receive(url, response.headers)
-    return { status: response.status, body: await json(response) }
+    return { status: response.status, body: await json(response, cleanupHttp) }
   }
   async function rpc(action, args = []) {
     check(ACTIONS.includes(action) || core && CORE_RPC_ACTIONS.includes(action), 'request_rejected')
@@ -252,6 +300,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
         && matches[0].harnesses.length === 0, 'device_identity')
       if (deviceId) check(matches[0].id === deviceId, 'device_identity')
       deviceId = matches[0].id
+      report.resourceBindings.deviceId = resourceFingerprint('device-id', deviceId)
     }
     return rows
   }
@@ -345,6 +394,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     report.checks.enrollment = true
     phase = 'credential-identity'
     tokenId = newEnrollmentCredential(beforeTokens, await tokens())
+    report.resourceBindings.credentialId = resourceFingerprint('device-token-id', tokenId)
     phase = 'register'
     const liveReceipt = liveSocket?.expectDeviceList()
     registrationAttempted = true
@@ -403,7 +453,10 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
         // The exchange must have returned its valid credential. An uncertain
         // exchange cannot adopt an unrelated concurrent SSH token by timing.
         check(report.resources.issuedCredentials === 1 && credential, 'credential_ambiguous')
-        if (!tokenId) tokenId = newEnrollmentCredential(beforeTokens, await tokens())
+        if (!tokenId) {
+          tokenId = newEnrollmentCredential(beforeTokens, await tokens())
+          report.resourceBindings.credentialId = resourceFingerprint('device-token-id', tokenId)
+        }
         const revoked = await owner('/api/device-tokens/' + tokenId + '/revoke', 'POST')
         check(revoked.status === 200 && revoked.body?.tokenId === tokenId
           && revoked.body.revokedBy === ownerId && Number.isFinite(Date.parse(revoked.body.revokedAt)),

@@ -150,8 +150,13 @@ function fixture(options = {}) {
       }
       if (path.endsWith('/api/devices/enrollment')) return response({ token: GRANT })
       if (path.endsWith('/api/device-tokens/' + NEW_TOKEN + '/revoke')) {
+        if (options.revokeReply) {
+          const { body: failure, status } = options.revokeReply
+          return typeof failure === 'string' ? new Response(failure, { status }) : response(failure, status)
+        }
         const token = tokenRows.find(row => row.id === NEW_TOKEN)
         token.revokedAt = new Date(clock).toISOString(); token.revokedBy = OWNER
+        if (options.wrongRevokeReceipt) return response({ tokenId: OLD_TOKEN, revokedAt: token.revokedAt, revokedBy: OWNER })
         return response({ tokenId: token.id, revokedAt: token.revokedAt, revokedBy: token.revokedBy, unattributedActiveRuns: 0 })
       }
       if (path.endsWith('/api/rpc')) {
@@ -180,6 +185,7 @@ function fixture(options = {}) {
           assert.equal(tokenRows.find(row => row.id === NEW_TOKEN)?.revokedBy, OWNER)
           assert.equal(newDevice.online, false)
           assert.equal(newDevice.enabled, false)
+          if (options.removeReply) return response(options.removeReply.body, options.removeReply.status)
           removed = true
           result = { id: NEW_DEVICE, revokedTokens: 0, uninstall: 'not_possible' }
         } else assert.fail('Unexpected RPC action')
@@ -227,7 +233,8 @@ function fixture(options = {}) {
     }
     assert.fail('Unexpected path: ' + path)
   }
-  return { requests, tokenRows, oldDevice, fetchImpl, socketFactory, sockets, now: () => clock, get removed() { return removed },
+  return { requests, tokenRows, oldDevice, fetchImpl, socketFactory, sockets, now: () => clock,
+    get removed() { return removed }, get deviceName() { return newDevice?.name },
     run: overrides => runMobileDaemonProof({ env: ENV, fetchImpl, now: () => clock,
       wait: async ms => { clock += ms }, deploymentGate: async () => {}, ...overrides }) }
 }
@@ -263,6 +270,11 @@ test('real source HTTP client proves mobile owner, enroll, disabled heartbeat, r
   assert.equal(f.removed, true)
   assert.equal(f.tokenRows.find(row => row.id === OLD_TOKEN).revokedAt, null)
   assert.equal(f.oldDevice.enabled, true)
+  assert.deepEqual(report.resourceBindings, { algorithm: 'sha256',
+    credentialId: createHash('sha256').update('device-token-id\0' + NEW_TOKEN).digest('hex'),
+    deviceId: createHash('sha256').update('device-id\0' + NEW_DEVICE).digest('hex'),
+    deviceNonce: createHash('sha256').update('device-nonce\0' + f.deviceName).digest('hex') })
+  assert.equal(JSON.stringify(report).includes(f.deviceName), false)
   noSensitiveReport(report)
 })
 
@@ -275,6 +287,63 @@ test('complete paginated token history preserves all 263 originals through enrol
   assert.equal(f.tokenRows.filter(row => row.revokedAt !== null).length, 1)
   assert.equal(f.tokenRows.find(row => row.id === NEW_TOKEN).revokedBy, OWNER)
   assert.ok(f.requests.filter(row => row.path.endsWith('/api/device-tokens') && row.search.startsWith('?cursor=')).length >= 6)
+  noSensitiveReport(report)
+})
+
+test('cleanup retains failed revoke HTTP status and redacted body without replaying the mutation', async () => {
+  for (const [status, code] of [[500, 'internal_error'], [401, 'authRequired']]) {
+    const f = fixture({ revokeReply: { status, body: { error: code, message: CREDENTIAL,
+      cookie: COOKIE, [ENV.SMOKE_OWNER_PASSWORD]: ENV.SMOKE_OWNER_EMAIL } } })
+    const report = await f.run()
+    const failure = report.errors.find(row => row.phase === 'cleanup-credential')
+    assert.equal(report.status, 'fail')
+    assert.equal(failure.code, 'token_revoke_failed')
+    assert.deepEqual(failure.http, { operation: 'device-tokens.revoke', method: 'POST', status,
+      body: { error: code, message: '[redacted]', redactedFields: 2 } })
+    assert.equal(report.cleanup.credentialRevoked, false)
+    assert.equal(report.cleanup.oldCredentialRejected, false)
+    assert.equal(report.cleanup.deviceRemoved, false)
+    assert.equal(report.cleanup.sessionClosed, true)
+    assert.equal(f.requests.filter(row => row.path.endsWith('/revoke')).length, 1)
+    assert.equal(f.requests.some(row => row.action === 'agents.removeDevice'), false)
+    assert.equal(f.tokenRows.find(row => row.id === OLD_TOKEN).revokedAt, null)
+    noSensitiveReport(report)
+  }
+})
+
+test('a 200 revoke reply with another token still fails and exposes only contract diagnostics', async () => {
+  const f = fixture({ wrongRevokeReceipt: true }), report = await f.run()
+  const failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.equal(failure.code, 'token_revoke_failed')
+  assert.deepEqual(failure.http, { operation: 'device-tokens.revoke', method: 'POST', status: 200,
+    body: { tokenId: '[redacted]', revokedAt: '[redacted]', revokedBy: '[redacted]' } })
+  assert.equal(report.cleanup.credentialRevoked, false)
+  assert.equal(f.removed, false)
+  noSensitiveReport(report)
+})
+
+test('a non-JSON revoke error keeps its status and size while withholding the raw body', async () => {
+  const body = '<html>' + CREDENTIAL + COOKIE + '</html>'
+  const f = fixture({ revokeReply: { status: 502, body } }), report = await f.run()
+  const failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.equal(failure.code, 'response_invalid')
+  assert.deepEqual(failure.http, { operation: 'device-tokens.revoke', method: 'POST', status: 502,
+    body: { format: 'non-json', bytes: Buffer.byteLength(body) } })
+  assert.equal(report.cleanup.sessionClosed, true)
+  assert.equal(f.removed, false)
+  noSensitiveReport(report)
+})
+
+test('device removal failure records its own RPC response rather than the prior revoke response', async () => {
+  const f = fixture({ removeReply: { status: 503, body: { version: 1, ok: false,
+    error: { code: 'deviceNotFound', message: COOKIE, private: CREDENTIAL } } } })
+  const report = await f.run(), failure = report.errors.find(row => row.phase === 'cleanup-device')
+  assert.deepEqual(failure.http, { operation: 'agents.removeDevice', method: 'POST', status: 503,
+    body: { version: 1, ok: false, error: { code: 'deviceNotFound', message: '[redacted]', redactedFields: 1 } } })
+  assert.equal(report.cleanup.credentialRevoked, true)
+  assert.equal(report.cleanup.oldCredentialRejected, true)
+  assert.equal(report.cleanup.deviceRemoved, false)
+  assert.equal(report.cleanup.sessionClosed, true)
   noSensitiveReport(report)
 })
 
