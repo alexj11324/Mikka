@@ -1,0 +1,245 @@
+{
+  "schemaVersion": 1,
+  "sourceRun": 42561752062,
+  "sourceJob": 128979483613,
+  "sourceDriver": "4ad50f96b509a4cc88073e27d0dce21e5983a242",
+  "originalWorkflowConclusion": "failure",
+  "originalReportStatus": "partial",
+  "verifiedScope": "real_selfhost_official_subscription_clone_commit_push_pull_request_receipts",
+  "deliveryReceiptsPassed": true,
+  "fullFactoryAcceptanceClaimed": false,
+  "selfHostedApplication": "9bcdefc5fe0c047393d581eea867ffa801f53dbe",
+  "image": {
+    "source": "9bcdefc5fe0c047393d581eea867ffa801f53dbe",
+    "workerSha": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+    "imageId": "sha256:24126f5e7cabe44d33ff422cf8ad0fa1dbdbb090609747a166f1c8a5f2dde7b1",
+    "repositoryDigest": "ghcr.io/alexj11324/mikka@sha256:477a4178fcc5989ff030ed350075ff9cc4f7937f9ee998a006a2e6aa2675227c",
+    "operatorRuntimeOverride": false
+  },
+  "worker": {
+    "source": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+    "sha": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+    "templates": {
+      "desktop": "254vai4zmh475r5hppcj",
+      "claude": "0zd73b9wo0mv4pkk80mm",
+      "codex": "zlsft5zfm3rbeginw6d8"
+    }
+  },
+  "sharedPublicAtStart": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "sharedPublicAtEnd": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "privateCloudAtStart": {
+    "id": "dpl_H844syuBfzTwdsPxkdb8F7hRZVyi",
+    "state": "READY",
+    "source": "4b6b116a2ecffc00dd44a0c096c65a3f2329df16"
+  },
+  "privateCloudAtEnd": {
+    "id": "dpl_H844syuBfzTwdsPxkdb8F7hRZVyi",
+    "state": "READY",
+    "source": "4b6b116a2ecffc00dd44a0c096c65a3f2329df16"
+  },
+  "cases": [
+    {
+      "harness": "claude_code",
+      "model": "claude-haiku-5-5",
+      "subscription": true,
+      "officialCli": {
+        "version": "2.1.305",
+        "binarySha256": "86cb722ab68348877dba7971e4d0c659919e05e6228c05e006e83da320e656ef"
+      },
+      "runId": "87210acd-2816-4ebd-a6b8-30b0ffa6626b",
+      "issueId": "1424c8c7-5f68-4110-a4a9-ae2f7a7c6750",
+      "startupObservation": {
+        "clock": "driver_monotonic_observation_upper_bound",
+        "calledAt": "2026-11-09T04:27:46.008Z",
+        "underFiveSecondTargetAsserted": false,
+        "dispatchAcknowledgedAfterMs": 1108,
+        "agentStartObservedAfterMs": 30100,
+        "firstProviderChunkObservedAfterMs": 34365
+      },
+      "nativeObservedExecution": {
+        "agentStarted": true,
+        "providerChunk": true,
+        "replyAfterTool": true
+      },
+      "originalDriverCaseStatus": "failed",
+      "originalDriverCode": "COMMUNITY_THREAD_COMPLETE",
+      "originalDaemonState": "stopped",
+      "originalDaemonStopReason": "blocked",
+      "factoryBeforeCleanup": [
+        {
+          "status": "waiting",
+          "stage": "execute",
+          "attemptStatus": "waiting",
+          "supersededOwnerRequest": false,
+          "sourceMatches": []
+        }
+      ],
+      "githubReceipt": {
+        "pr": 1801,
+        "harness": "claude_code",
+        "issue": "1424c8c7-5f68-4110-a4a9-ae2f7a7c6750",
+        "head": "c6c9ed380aaef08325afa098519c2900d490b8e1",
+        "ref": "mikka/alex-1",
+        "path": "docs/acceptance/self-hosted-batch/42561752062-claude.md",
+        "blob": "6dff1c57a31feef22f93cff9091285a49e2844ab",
+        "createdAt": "2026-11-09T04:28:51Z",
+        "closedAt": "2026-11-09T04:44:57Z",
+        "closed": true,
+        "merged": false,
+        "externalDeliveryReceiptVerified": true
+      },
+      "cleanup": {
+        "runStopped": true,
+        "factoryCancelled": true,
+        "deviceRemoved": true,
+        "vmStopped": true
+      }
+    },
+    {
+      "harness": "codex",
+      "model": "gpt-6-luna",
+      "subscription": true,
+      "officialCli": {
+        "version": "0.166.0",
+        "binarySha256": "e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af"
+      },
+      "runId": "ab5903c1-d592-4ae3-8586-25a03b3e3523",
+      "issueId": "47befc6c-88e5-446d-9487-2bd1cdf68450",
+      "startupObservation": {
+        "clock": "driver_monotonic_observation_upper_bound",
+        "calledAt": "2026-11-09T04:30:09.253Z",
+        "underFiveSecondTargetAsserted": false,
+        "dispatchAcknowledgedAfterMs": 1053,
+        "agentStartObservedAfterMs": 25126,
+        "firstProviderChunkObservedAfterMs": 29735
+      },
+      "nativeObservedExecution": {
+        "agentStarted": true,
+        "providerChunk": true,
+        "replyAfterTool": true
+      },
+      "originalDriverCaseStatus": "failed",
+      "originalDriverCode": "COMMUNITY_DELIVERY_PR_COUNT",
+      "originalDaemonState": "succeeded",
+      "originalDaemonStopReason": "submitted",
+      "factoryBeforeCleanup": [
+        {
+          "status": "blocked",
+          "stage": "execute",
+          "attemptStatus": "blocked",
+          "supersededOwnerRequest": false,
+          "sourceMatches": []
+        }
+      ],
+      "githubReceipt": {
+        "pr": 1802,
+        "harness": "codex",
+        "issue": "47befc6c-88e5-446d-9487-2bd1cdf68450",
+        "head": "03fae63550356f49ff1e68b64fc5b1b60598ad67",
+        "ref": "acceptance/selfhost-42561752062-codex",
+        "path": "docs/acceptance/self-hosted-batch/42561752062-codex.md",
+        "blob": "d2394065a7284e680824e1b6dfa455dd71d73fcb",
+        "createdAt": "2026-11-09T04:31:39Z",
+        "closedAt": "2026-11-09T04:31:53Z",
+        "closed": true,
+        "merged": false,
+        "externalDeliveryReceiptVerified": true
+      },
+      "cleanup": {
+        "runStopped": true,
+        "factoryCancelled": true,
+        "deviceRemoved": true,
+        "vmStopped": true
+      }
+    }
+  ],
+  "accountCleanup": {
+    "cloudServerRevoked": true,
+    "cloudWorkspaceRestored": true,
+    "sessionsClosed": true,
+    "ownFolderRemoved": true
+  },
+  "githubCleanup": {
+    "schemaVersion": 1,
+    "originalRun": 42561752062,
+    "cleanupRun": "42563632033",
+    "driverRevision": "b54e4a09eb54ad5452f4dbde6936158124fdeb50",
+    "originalWorkflowStatus": "failure",
+    "scope": "independent_clone_push_pull_request_receipts_and_owned_cleanup",
+    "receipts": [
+      {
+        "pr": 1801,
+        "harness": "claude_code",
+        "issue": "1424c8c7-5f68-4110-a4a9-ae2f7a7c6750",
+        "head": "c6c9ed380aaef08325afa098519c2900d490b8e1",
+        "ref": "mikka/alex-1",
+        "path": "docs/acceptance/self-hosted-batch/42561752062-claude.md",
+        "blob": "6dff1c57a31feef22f93cff9091285a49e2844ab",
+        "createdAt": "2026-11-09T04:28:51Z",
+        "closedAt": "2026-11-09T04:44:57Z",
+        "closed": true,
+        "merged": false,
+        "externalDeliveryReceiptVerified": true
+      },
+      {
+        "pr": 1802,
+        "harness": "codex",
+        "issue": "47befc6c-88e5-446d-9487-2bd1cdf68450",
+        "head": "03fae63550356f49ff1e68b64fc5b1b60598ad67",
+        "ref": "acceptance/selfhost-42561752062-codex",
+        "path": "docs/acceptance/self-hosted-batch/42561752062-codex.md",
+        "blob": "d2394065a7284e680824e1b6dfa455dd71d73fcb",
+        "createdAt": "2026-11-09T04:31:39Z",
+        "closedAt": "2026-11-09T04:31:53Z",
+        "closed": true,
+        "merged": false,
+        "externalDeliveryReceiptVerified": true
+      }
+    ],
+    "branches": [
+      {
+        "branch": "acceptance/selfhost-42561752062-claude",
+        "sha": "c6c9ed380aaef08325afa098519c2900d490b8e1",
+        "absentConfirmed": true
+      },
+      {
+        "branch": "acceptance/selfhost-42561752062-codex",
+        "sha": "03fae63550356f49ff1e68b64fc5b1b60598ad67",
+        "absentConfirmed": true
+      },
+      {
+        "branch": "mikka/alex-1",
+        "sha": "c6c9ed380aaef08325afa098519c2900d490b8e1",
+        "absentConfirmed": true
+      }
+    ],
+    "status": "passed",
+    "fullFactoryAcceptanceClaimed": false,
+    "modelsDispatchedByCleanup": 0,
+    "observedAt": "2026-11-09T04:46:40.189Z"
+  },
+  "limits": [
+    "original_driver_failure_is_preserved",
+    "claude_original_run_stopped_blocked_factory_waiting",
+    "codex_original_run_succeeded_factory_blocked",
+    "no_later_factory_review_verify_merge_acceptance",
+    "no_direct_network_trace_or_latency_regression_claim",
+    "webhook_suggestions_and_merge_writeback_not_proven_here",
+    "new_custom_github_app_not_created",
+    "real_empty_wallet_notice_not_tested_here"
+  ],
+  "artifacts": [
+    {
+      "id": 13649773011,
+      "zipBytes": 6413,
+      "zipSha256": "b52eba51ecf07155edad665708b9c7658a2761f8deb716cffd62138f954ad4b1",
+      "downloads": 1
+    },
+    {
+      "id": 13650278533,
+      "zipBytes": 891,
+      "zipSha256": "e74355ef0631069be692fc2d7429634734f76bee0e3fc88d36b1234931621c25",
+      "downloads": 1
+    }
+  ]
+}
