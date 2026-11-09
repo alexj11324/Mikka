@@ -9,6 +9,7 @@
 - Replaces: in the `decisions.md` row of 2026-10-31 on idle avatar animations,
   play, orbit, comet and notify (struck there); the bot list's green/orange
   status dot
+- Superseded in part by: [2026-11-09-0050](2026-11-09-0050-paid-blocks-as-shipped.md): "the bloub body and nothing else, everywhere" does not reach inside a paid block: the hosted layer's BoardUI `agent-avatar` and other block avatars stay as shipped.
 
 A bot's avatar is the bloub body and nothing else, everywhere (profile, bot
 list, chat header, search, the Coordinator, the first-run guide). No switch

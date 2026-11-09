@@ -1,10 +1,11 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import { pollIssueThreads } from '@/app/actions/agents'
-import { acceptedProducerOutcome, threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
+import { acceptedProducerOutcome, agentStretches, threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { BotAvatar, COORDINATOR_AVATAR, colorFor } from '@/components/nav/bot-avatar'
@@ -12,7 +13,6 @@ import { Button } from '@/components/ui/button'
 import { ThreadStatus, ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
 import { InlineLoadError } from '@/components/load-error'
-import { useRunErrorText } from './run-error-text'
 import { useAcceptanceTasks } from './factory-acceptance'
 
 /** The SWR key of an issue's thread list; it holds `{ threads, live }`. */
@@ -21,10 +21,10 @@ export type IssueThreadsRead = Awaited<ReturnType<typeof pollIssueThreads>>
 
 /** No timer reads the list (#1212): a run change on this issue, a teammate's included, pushes
  * `issue_threads` to every member who can see it. While the channel is down it is read once a minute. */
-export function useIssueThreads(issueId: string) {
+export function useIssueThreads(issueId: string, enabled = true) {
   const key = issueThreadsKey(issueId)
-  const result = useSWR(key, () => pollIssueThreads(issueId), { revalidateOnReconnect: true })
-  const scope = result.data?.live.workspaceId ?? null
+  const result = useSWR(enabled ? key : null, () => pollIssueThreads(issueId), { revalidateOnReconnect: true })
+  const scope = enabled ? result.data?.live.workspaceId ?? null : null
   useLiveKey('issue_threads', scope ? issueId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
   return { ...result, data: result.data?.threads }
 }
@@ -33,43 +33,41 @@ export function harnessLabel(harness: string) {
   return harness === 'claude_code' ? 'Claude Code' : harness === 'codex' ? 'Codex' : harness
 }
 
-/** 线程: the agent runs working on this issue (R-62). A readable one opens on the right. */
-export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; openId: string | null; onOpen: (id: string) => void }) {
+/** One 活动 row (R-62). `at` places it among the task's own events. */
+export type AgentActivityRow = { id: string; at: string; node: ReactNode }
+
+/**
+ * 活动's Agent rows (R-62, decision 2026-11-09-0045): one row per Agent stretch, oldest first, never one per
+ * run. The first names its Agent; a later one reads 「换 Codex」. A row shows the stretch's latest state and
+ * opens the task's one conversation at the stretch's first thread.
+ */
+export function useAgentActivity(issueId: string, openId: string | null, onOpen: (id: string) => void, enabled = true): { rows: AgentActivityRow[]; error: ReactNode } {
   const t = useTranslations('IssueThreads')
+  const tTask = useTranslations('Shell.panel.task')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
-  const runErrorText = useRunErrorText()
-  const { data, error, mutate } = useIssueThreads(issueId)
-  const { allTasks } = useAcceptanceTasks(issueId)
-  if (error) return <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
-  if (!data?.length) return null
-  return <section aria-labelledby={`threads-${issueId}`} className="flex flex-col gap-2">
-    <h2 id={`threads-${issueId}`} className="flex items-baseline gap-1.5 text-sm font-medium">{t('title')}<span className="text-xs font-normal text-muted-foreground tabular-nums">{data.length}</span></h2>
-    <ul className="flex flex-col rounded-xl bg-muted/50 p-1">
-      {data.map(thread => {
-        const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
-        // The bot runs the thread; the coding agent it hands work to is a step inside it, not the runner (R-05).
-        // A known failure code shows its words; the code itself stays in the thread's 详情.
-        const meta = runErrorText(thread.detail?.summary ?? null).message
-        const view = threadQuestionView(thread)
-        const outcome = acceptedProducerOutcome(thread, issueId, allTasks)
-        const body = <>
-          <ThreadStatusIcon status={view.status} outcome={outcome} waiting={view.waiting} />
-          <span className="flex min-w-0 flex-1 flex-col text-left">
-            <span className="truncate text-sm font-medium">{name}</span>
-            {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}
-          </span>
-          <ThreadStatus status={view.status} outcome={outcome} stopping={view.stopping} waiting={view.waiting} icon={false} />
-          <time className="min-w-14 shrink-0 whitespace-nowrap text-right text-xs font-normal text-muted-foreground tabular-nums" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(threadTime(thread, now), now)}</time>
-        </>
-        return <li key={thread.id}>
-          {thread.detail
-            ? <Button variant="ghost" aria-pressed={openId === thread.id} aria-label={t('open', { name })} className={cn('h-auto w-full justify-start gap-3 rounded-lg px-3 py-2.5', openId === thread.id && 'bg-background shadow-xs hover:bg-background')} onClick={() => onOpen(thread.id)}>{body}<ChevronRight data-icon="inline-end" className="text-muted-foreground" /></Button>
-            : <div className="flex items-center gap-3 px-3 py-2.5">{body}<span className="size-4" /></div>}
-        </li>
-      })}
-    </ul>
-  </section>
+  const { data, error, mutate } = useIssueThreads(issueId, enabled)
+  const { allTasks } = useAcceptanceTasks(enabled ? issueId : null)
+  if (!enabled) return { rows: [], error: null }
+  if (error) return { rows: [], error: <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /> }
+  const rows = agentStretches(data ?? []).map(({ agent, first, last, ids }, index): AgentActivityRow => {
+    const own = last.detail ? harnessLabel(last.detail.harness) : (last.ownerName ? t('ownerThread', { name: last.ownerName }) : t('hidden'))
+    const name = index > 0 && agent ? tTask('switchRow', { agent: harnessLabel(agent) }) : own
+    const view = threadQuestionView(last)
+    const outcome = acceptedProducerOutcome(last, issueId, allTasks)
+    const open = openId !== null && ids.includes(openId)
+    const body = <>
+      <ThreadStatusIcon status={view.status} outcome={outcome} waiting={view.waiting} />
+      <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">{name}</span>
+      <ThreadStatus status={view.status} outcome={outcome} stopping={view.stopping} waiting={view.waiting} icon={false} />
+      <time className="min-w-14 shrink-0 whitespace-nowrap text-right text-xs font-normal text-muted-foreground tabular-nums" dateTime={new Date(last.finishedAt ?? last.createdAt).toISOString()}>{format.relativeTime(threadTime(last, now), now)}</time>
+    </>
+    const node = first.detail
+      ? <Button variant="ghost" data-agent-stretch={index + 1} aria-pressed={open} aria-label={t('open', { name })} className={cn('-mx-3 h-auto w-[calc(100%+1.5rem)] justify-start gap-3 rounded-lg px-3 py-2', open && 'bg-muted hover:bg-muted')} onClick={() => onOpen(first.id)}>{body}<ChevronRight data-icon="inline-end" className="text-muted-foreground rtl:rotate-180" /></Button>
+      : <div className="flex min-w-0 items-center gap-3 py-2">{body}<span className="size-4" /></div>
+    return { id: `agent:${first.id}`, at: new Date(first.createdAt).toISOString(), node }
+  })
+  return { rows, error: null }
 }
 
 /** The dispatching Bot in its own look (R-36): the same bloub as its bot-list row; the Coordinator's own runs use its mark. */

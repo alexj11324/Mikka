@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import test from 'node:test'
-import { assertFixtureEnvironment, assertOfficialWebCors, chatObservation, fixtureHttp, handoffCode, officialWebFixture } from './self-hosted-services.mjs'
+import { assertFixtureEnvironment, assertOfficialWebCors, chatObservation, fixtureHttp, handoffCode, mailpitObservation, officialWebFixture, socketEvents } from './self-hosted-services.mjs'
 import { createModelFixture } from './self-hosted-model.mjs'
 
 const fixture = {
@@ -14,6 +14,62 @@ const fixture = {
   S3_ACCESS_KEY_ID: 'selfhost-ci', S3_SECRET_ACCESS_KEY: Buffer.alloc(32, 1).toString('base64'), S3_REGION: 'us-east-1',
   MIKKA_DEFAULT_MODEL_BASE_URL: 'http://model:8080/v1', MIKKA_DEFAULT_MODEL_API_KEY: 'synthetic-selfhost-only', MIKKA_DEFAULT_MODEL_ID: 'selfhost-ci',
 }
+
+test('Mailpit notifications coalesced as newline-delimited JSON in one WebSocket frame remain queued', async t => {
+  const original = globalThis.WebSocket
+  let peer
+  class FixtureSocket extends EventTarget {
+    static OPEN = 1
+    readyState = 1
+    constructor() { super(); peer = this; queueMicrotask(() => this.dispatchEvent(new Event('open'))) }
+    close() { this.readyState = 3; this.dispatchEvent(new Event('close')) }
+  }
+  globalThis.WebSocket = FixtureSocket
+  const mailbox = socketEvents('ws://fixture.invalid/api/events', undefined, { jsonLines: true })
+  t.after(() => { mailbox.close(); globalThis.WebSocket = original })
+  await mailbox.ready
+  // Mailpit v1.27.4 writePump explicitly packs its queued JSON notifications
+  // into a single frame with newline separators.
+  const update = { Type: 'update', Data: { Total: 1 } }
+  const arrival = { Type: 'new', Data: { Subject: 'verification', To: [{ Address: 'fixture@example.invalid' }] } }
+  peer.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(update) + '\n' + JSON.stringify(arrival) }))
+  assert.deepEqual(await mailbox.next(value => value.Type === 'new', 50), arrival)
+  assert.deepEqual(await mailbox.next(value => value.Type === 'update', 50), update)
+  assert.equal(mailbox.receivedCount, 2)
+  const live = socketEvents('ws://fixture.invalid/live')
+  t.after(() => live.close())
+  await live.ready
+  const notification = { kind: 'chat', text: 'a\nb' }
+  peer.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(notification, null, 2) }))
+  assert.deepEqual(await live.next(value => value.kind === 'chat', 50), notification)
+  assert.equal(live.receivedCount, 1)
+})
+
+test('SMTP timeout evidence separates absent mail, recipient/subject mismatch and delivered mail without retaining private values', () => {
+  const email = 'private-recipient@example.invalid', from = 'private-sender@example.invalid', subject = 'private-subject'
+  const secret = 'private-authentication-link-token'
+  const row = { ID: secret, Subject: subject, To: [{ Address: email }], From: { Address: from }, Snippet: secret, Text: secret }
+  const expected = { read: 'ok', messages: 0, recipientMatches: 0, subjectMatches: 0, senderMatches: 0 }
+  assert.deepEqual(mailpitObservation({ messages: [] }, { email, subject, from }), expected)
+  const delivered = mailpitObservation({ messages: [row] }, { email, subject, from })
+  assert.deepEqual(delivered, { read: 'ok', messages: 1, recipientMatches: 1, subjectMatches: 1, senderMatches: 1 })
+  assert.deepEqual(mailpitObservation({ messages: [{ ...row, Subject: 'other' }] }, { email, subject, from }),
+    { read: 'ok', messages: 1, recipientMatches: 1, subjectMatches: 0, senderMatches: 0 })
+  assert.deepEqual(mailpitObservation({ messages: [{ ...row, To: [{ Address: 'other' }] }] }, { email, subject, from }),
+    { read: 'ok', messages: 1, recipientMatches: 0, subjectMatches: 0, senderMatches: 0 })
+  assert.deepEqual(mailpitObservation({ messages: [{ ...row, From: { Address: 'other' } }] }, { email, subject, from }),
+    { read: 'ok', messages: 1, recipientMatches: 1, subjectMatches: 1, senderMatches: 0 })
+  for (const value of [email, from, subject, secret]) assert.equal(JSON.stringify(delivered).includes(value), false)
+})
+
+test('unexpected or oversized Mailpit metadata stays unknown and cannot become delivery evidence', () => {
+  const scope = { email: 'private', subject: 'private', from: 'private' }
+  for (const inbox of [null, {}, { messages: 'private' }, { messages: Array(51).fill(null) }]) {
+    assert.deepEqual(mailpitObservation(inbox, scope), { read: 'invalid' })
+  }
+  assert.deepEqual(mailpitObservation({ messages: [null, {}] }, scope),
+    { read: 'ok', messages: 2, recipientMatches: 0, subjectMatches: 0, senderMatches: 0 })
+})
 
 test('the mutating driver refuses public origins, remote databases, cloud credentials and real model targets', () => {
   assert.doesNotThrow(() => assertFixtureEnvironment(fixture))
