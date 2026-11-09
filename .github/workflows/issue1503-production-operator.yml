@@ -14,7 +14,7 @@ concurrency:
   queue: max
 jobs:
   setup:
-    if: false
+    if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -161,6 +161,58 @@ jobs:
           secret-name: BETTER_AUTH_SECRET
           recursive: false
           include-imports: false
+      - name: Import the pinned production workspace database
+        id: setup_workspace_database
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /neon
+          secret-name: DATABASE_URL
+          recursive: false
+          include-imports: false
+      - name: Import the normal GitHub application client identifier
+        id: setup_github_client_id
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_ID
+          recursive: false
+          include-imports: false
+      - name: Import the normal GitHub application client secret
+        id: setup_github_client_secret
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_SECRET
+          recursive: false
+          include-imports: false
+      - name: Validate setup configuration before application modules load
+        id: setup_configuration
+        run: |
+          node --input-type=module - <<'JS'
+          const keys = ['MIKKA_DATABASE_URL', 'DATABASE_URL', 'BETTER_AUTH_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']
+          const missing = keys.filter(key => !process.env[key]?.trim())
+          if (missing.length) {
+            console.error(JSON.stringify({ phase: 'setup_configuration', status: 'failed', code: 'setup_configuration_missing', keys: missing }))
+            process.exitCode = 1
+          } else {
+            console.log(JSON.stringify({ phase: 'setup_configuration', status: 'passed', keys }))
+          }
+          JS
       - name: Prepare the existing smoke workspace and a new scoped GitHub child
         id: preflight_reentry
         run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/preflight-reentry.ts
