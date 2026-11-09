@@ -1,0 +1,155 @@
+✔ fresh child requests exactly two read permissions; role push=true is not token authority (100.331942ms)
+✔ provider rejects write permission (7.80598ms)
+✔ provider rejects extra permission (6.121566ms)
+✔ provider rejects all repositories (1.654049ms)
+✔ provider rejects wrong App (6.627154ms)
+✔ provider rejects wrong principal (0.586776ms)
+✔ provider rejects wrong repository (5.67369ms)
+✔ provider rejects expired child (2.171887ms)
+✔ provider rejects same source child (4.651974ms)
+✔ provider rejects unexpected OAuth scope (8.581426ms)
+✖ successful repair uses normal readback, retains new child and emits no secrets (7.308849ms)
+✔ existing connection fails before obtaining Owner source or minting (0.687672ms)
+✔ a failed post-resolution Owner source stops minting (0.418451ms)
+✔ precommit refusal revokes only the newly minted token (0.78696ms)
+✔ ambiguous COMMIT preserves safe recovery state and never blindly revokes (0.528662ms)
+✔ readback failure cleans only the known installed child (4.99061ms)
+✔ foreign connection blocks cleanup without revoking or deleting it (0.497002ms)
+✔ changed App rejects cleanup before reading a token (0.308132ms)
+✔ wrong state principal rejects cleanup before storage/provider IO (3.082894ms)
+✔ normal repository readback must match exact GitHub subject and installation (0.432544ms)
+✔ store holds Owner lock, rechecks vacancy and uses normal scoped-client save before COMMIT (1.832357ms)
+✔ store concurrent existing Smoke row refuses before save and rolls back (0.546898ms)
+✔ store changed Owner refuses before saving child (0.359318ms)
+✔ store failed COMMIT retains checkpoint, closes broken client, does not delete row (4.886631ms)
+✔ runner default disabled fails before loading any credential or application dependency (0.682269ms)
+✖ runner exact execution guard rejects rerun, foreign repo, branch and missing GO (0.24925ms)
+✔ lost mint response records unknown outcome and performs no retry or speculative revocation (0.515548ms)
+✔ normal repository readback binds only provider-verified public App ID and restores its environment (0.291249ms)
+✔ normal repository readback rejects conflicting App configuration and restores after failure (0.337124ms)
+✔ closed diagnostics reject identifier-shaped foreign messages and preserve only listed codes (0.308908ms)
+✖ an expired original Owner source resolves under its lock and only the committed reread reaches the child provider (1.702158ms)
+✔ refusal at identity never resolves Owner credentials or mints (0.572284ms)
+✔ refusal at idle never resolves Owner credentials or mints (0.571581ms)
+✔ refusal at assertVacant never resolves Owner credentials or mints (0.213075ms)
+✖ the locked Owner identity and finite dates are checked before any normal getter (0.592124ms)
+✖ an unpersisted refresh intent stops before the getter (0.249905ms)
+✖ getterError preserves possible refresh evidence without mint, retry or Owner revocation (0.609972ms)
+✖ commitError preserves possible refresh evidence without mint, retry or Owner revocation (0.56257ms)
+✔ cleanup never resolves or refreshes an Owner connection (0.331437ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 32
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 349.553988
+
+✖ failing tests:
+
+test at github-readonly.test.mjs:79:1
+✖ successful repair uses normal readback, retains new child and emits no secrets (7.308849ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-readonly-refresh/github-readonly.test.mjs:81:44)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at github-readonly.test.mjs:211:1
+✖ runner exact execution guard rejects rerun, foreign repo, branch and missing GO (0.24925ms)
+  Error: issue1505_github_execution_not_enabled
+      at fail (file:///vercel/sandbox/issue1505-readonly-refresh/github-readonly-helper.mjs:5:37)
+      at check (file:///vercel/sandbox/issue1505-readonly-refresh/github-readonly-helper.mjs:6:61)
+      at configuration (file:///vercel/sandbox/issue1505-readonly-refresh/github-readonly-runner.mjs:9:3)
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-readonly-refresh/github-readonly.test.mjs:215:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at github-readonly.test.mjs:294:1
+✖ an expired original Owner source resolves under its lock and only the committed reread reaches the child provider (1.702158ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'passed'
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-readonly-refresh/github-readonly.test.mjs:308:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at github-readonly.test.mjs:326:1
+✖ the locked Owner identity and finite dates are checked before any normal getter (0.592124ms)
+  TypeError [Error]: f.store.prepareOwnerSource is not a function
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-readonly-refresh/github-readonly.test.mjs:333:34)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at github-readonly.test.mjs:339:1
+✖ an unpersisted refresh intent stops before the getter (0.249905ms)
+  TypeError [Error]: f.store.prepareOwnerSource is not a function
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-readonly-refresh/github-readonly.test.mjs:341:32)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at github-readonly.test.mjs:346:52
+✖ getterError preserves possible refresh evidence without mint, retry or Owner revocation (0.609972ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-readonly-refresh/github-readonly.test.mjs:351:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at github-readonly.test.mjs:346:52
+✖ commitError preserves possible refresh evidence without mint, retry or Owner revocation (0.56257ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-readonly-refresh/github-readonly.test.mjs:351:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

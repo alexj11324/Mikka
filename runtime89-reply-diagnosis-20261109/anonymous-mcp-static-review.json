@@ -1,0 +1,27 @@
+{
+  "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "comparedTo": "a2198c8c2f608f7b8169329b9da853067618dba6",
+  "reviewer": "template_prebuild",
+  "reviewKind": "source-only",
+  "relevantPathsChanged": 0,
+  "reviewedPaths": 9,
+  "comparePaths": 39,
+  "conclusions": [
+    "Fresh MCP args/env are synchronously fsynced and atomically linked by writeCodexMcpContext; adoption returns threadConfig.mcp_servers; Codex adapter sends it in thread/start.config and awaits response before turn/start.",
+    "The MCP wrapper reads context and updates its own env/argv before dynamic backend import. Normal account/login/start binds fresh subscription token. Apps/Computer and mismatched process config reject anonymous adoption.",
+    "Source anonymous initialize userAgent guard requires0.166.0; this is not actual R89 binary/checksum evidence."
+  ],
+  "limits": [
+    "Actual native first-turn model request and its tool catalogue remain unobserved.",
+    "No supported product fix, delay, readonly capability change or new model run inferred from this source review.",
+    "No new production original, OAuth, SQL, VM or test run."
+  ],
+  "blobs": {
+    "packages/daemon/src/anonymous-codex-spare.ts": "00f476c51799a68c4af5edc38d9a62c91aeea545",
+    "packages/daemon/src/adapters/codex.ts": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7",
+    "packages/daemon/src/codex-mcp-context.ts": "beb35030e17a70a219ec9878701df7726bd4fddf",
+    "packages/daemon/src/agents/mikka-mcp-context.mjs": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+    "packages/daemon/src/agents/run-context.ts": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f",
+    "packages/daemon/src/codex-startup-config.ts": "c7724a698dc12e2e301461941eead3a5bec16177"
+  }
+}

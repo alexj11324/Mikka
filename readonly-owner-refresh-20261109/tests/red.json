@@ -1,0 +1,35 @@
+{
+  "label": "red",
+  "node": "v24.22.1",
+  "exit": 1,
+  "signal": null,
+  "bytes": 8394,
+  "sha256": "8520ad94a696bdab77547ae8b9d67ca5ff2f7a439a431f7ed44ec780cc952e2c",
+  "counts": [
+    "ℹ tests 39",
+    "ℹ suites 0",
+    "ℹ pass 32",
+    "ℹ fail 7",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 349.553988"
+  ],
+  "failures": [
+    "✖ successful repair uses normal readback, retains new child and emits no secrets (7.308849ms)",
+    "✖ runner exact execution guard rejects rerun, foreign repo, branch and missing GO (0.24925ms)",
+    "✖ an expired original Owner source resolves under its lock and only the committed reread reaches the child provider (1.702158ms)",
+    "✖ the locked Owner identity and finite dates are checked before any normal getter (0.592124ms)",
+    "✖ an unpersisted refresh intent stops before the getter (0.249905ms)",
+    "✖ getterError preserves possible refresh evidence without mint, retry or Owner revocation (0.609972ms)",
+    "✖ commitError preserves possible refresh evidence without mint, retry or Owner revocation (0.56257ms)",
+    "✖ failing tests:",
+    "✖ successful repair uses normal readback, retains new child and emits no secrets (7.308849ms)",
+    "✖ runner exact execution guard rejects rerun, foreign repo, branch and missing GO (0.24925ms)",
+    "✖ an expired original Owner source resolves under its lock and only the committed reread reaches the child provider (1.702158ms)",
+    "✖ the locked Owner identity and finite dates are checked before any normal getter (0.592124ms)",
+    "✖ an unpersisted refresh intent stops before the getter (0.249905ms)",
+    "✖ getterError preserves possible refresh evidence without mint, retry or Owner revocation (0.609972ms)",
+    "✖ commitError preserves possible refresh evidence without mint, retry or Owner revocation (0.56257ms)"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "result": {
+    "sandbox": {
+      "name": "issue1505-readonly-refresh-regression-20261109",
+      "currentSessionId": "sbx_fLlxHFh0qmYXtxOG3b5ttZ9A63B4",
+      "status": "stopped",
+      "statusUpdatedAt": 1794219408468,
+      "persistent": false,
+      "workloadType": "sandbox",
+      "region": "iad1",
+      "failoverRegions": [],
+      "vcpus": 1,
+      "memory": 2048,
+      "runtime": "node24",
+      "architecture": "amd64",
+      "timeout": 600000,
+      "totalEgressBytes": 34952,
+      "totalIngressBytes": 195583,
+      "totalActiveCpuDurationMs": 4827,
+      "totalDurationMs": 382479,
+      "cwd": "/vercel/sandbox",
+      "createdAt": 1794219025791,
+      "updatedAt": 1794219025791
+    },
+    "session": {
+      "id": "sbx_fLlxHFh0qmYXtxOG3b5ttZ9A63B4",
+      "runtime": "node24",
+      "architecture": "amd64",
+      "requestedAt": 1794219025732,
+      "startedAt": 1794219025758,
+      "requestedStopAt": 1794219407960,
+      "stoppedAt": 1794219408237,
+      "status": "stopped",
+      "duration": 382479,
+      "vcpus": 1,
+      "memory": 2048,
+      "timeout": 600000,
+      "region": "iad1",
+      "cwd": "/vercel/sandbox",
+      "workloadType": "sandbox",
+      "createdAt": 1794219025732,
+      "updatedAt": 1794219025766,
+      "interactivePort": 26661,
+      "activeCpuDurationMs": 4827,
+      "networkTransfer": {
+        "ingress": 195583,
+        "egress": 34952
+      },
+      "sourceSandboxName": "issue1505-readonly-refresh-regression-20261109",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+    }
+  }
+}

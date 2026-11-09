@@ -1,0 +1,38 @@
+✔ fresh child requests exactly two read permissions; role push=true is not token authority (88.267788ms)
+✔ provider rejects write permission (4.472967ms)
+✔ provider rejects extra permission (1.058212ms)
+✔ provider rejects all repositories (5.481444ms)
+✔ provider rejects wrong App (4.03389ms)
+✔ provider rejects wrong principal (0.423979ms)
+✔ provider rejects wrong repository (0.590335ms)
+✔ provider rejects expired child (1.258037ms)
+✔ provider rejects same source child (0.879895ms)
+✔ provider rejects unexpected OAuth scope (5.542876ms)
+✔ successful repair uses normal readback, retains new child and emits no secrets (5.410778ms)
+✔ existing connection fails before obtaining Owner source or minting (0.378113ms)
+✔ Owner source failure never refreshes or mints (0.23938ms)
+✔ precommit refusal revokes only the newly minted token (1.982924ms)
+✔ ambiguous COMMIT preserves safe recovery state and never blindly revokes (0.342862ms)
+✔ readback failure cleans only the known installed child (1.40611ms)
+✔ foreign connection blocks cleanup without revoking or deleting it (0.282372ms)
+✔ changed App rejects cleanup before reading a token (0.222503ms)
+✔ wrong state principal rejects cleanup before storage/provider IO (0.333438ms)
+✔ normal repository readback must match exact GitHub subject and installation (0.234719ms)
+✔ store holds Owner lock, rechecks vacancy and uses normal scoped-client save before COMMIT (1.099102ms)
+✔ store concurrent existing Smoke row refuses before save and rolls back (0.402955ms)
+✔ store changed Owner refuses before saving child (0.218555ms)
+✔ store failed COMMIT retains checkpoint, closes broken client, does not delete row (0.31981ms)
+✔ runner default disabled fails before loading any credential or application dependency (0.489638ms)
+✔ runner exact execution guard rejects rerun, foreign repo, branch and missing GO (0.213133ms)
+✔ lost mint response records unknown outcome and performs no retry or speculative revocation (0.300019ms)
+✔ normal repository readback binds only provider-verified public App ID and restores its environment (0.174128ms)
+✔ normal repository readback rejects conflicting App configuration and restores after failure (0.193431ms)
+✔ closed diagnostics reject identifier-shaped foreign messages and preserve only listed codes (0.192412ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 231.402056

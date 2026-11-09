@@ -1,0 +1,94 @@
+{
+  "files": [
+    {
+      "path": "readonly-owner-refresh-20261109/tests/baseline.log",
+      "bytes": 2478,
+      "sha256": "b920d22742ed6cdd8ee20f5446dfb172586e8d804ed561e578f7dfd94436afa9"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/tests/red.log",
+      "bytes": 8394,
+      "sha256": "8520ad94a696bdab77547ae8b9d67ca5ff2f7a439a431f7ed44ec780cc952e2c"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/tests/green.log",
+      "bytes": 3301,
+      "sha256": "a358013922ca8bd5b611083945591727566a39ade3cbb91575181a1c4517e19d"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/tests/red.json",
+      "bytes": 1906,
+      "sha256": "d3b0e792ad8bc4c82dd1a8ad1efe7efd1206ef5df6176b246c4a5e3723e2a711"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/tests/green.json",
+      "bytes": 382,
+      "sha256": "93f8c4946fba157ba0669262c98ec297a8634cc7ca44fe7042bccb3e1359cc38"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/source/github-readonly-provider.mjs",
+      "bytes": 14515,
+      "sha256": "11b100e92c24d91b98200c18eea9a50a9c6a09ac3e3d5ece1166bbcc559f8937"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/source/github-readonly-helper.mjs",
+      "bytes": 9828,
+      "sha256": "9655772777836a8b1a806b1021409ff9b1f7163db51490f25eeda166f6599be7"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/source/github-readonly-store.mjs",
+      "bytes": 8858,
+      "sha256": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/source/github-readonly-runner.mjs",
+      "bytes": 6211,
+      "sha256": "27c134bbc3fac43f8e64d245e23f2ea6c7188d6fee131cefc63195ebea900570"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/source/github-readonly.test.mjs",
+      "bytes": 24726,
+      "sha256": "91f42d23d47de871afce03788314fe505fad9083787434d1d380e771c26d4987"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/workflow-1ddc-unexecuted.yml.txt",
+      "bytes": 8672,
+      "sha256": "d569720a717acaec8152f12dabba96375a4a2547a3cddb9b751e79d348cd9fff"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/workflow-1678-unexecuted.yml.txt",
+      "bytes": 10085,
+      "sha256": "55f55ef0bf67658832516213d7b97c6aab497260f6260c23f6c1db8a838d2daa"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/vm-stop-response.json",
+      "bytes": 1548,
+      "sha256": "7a0b44b5eda59f3b8a6cae50457ec196243ab08a085935c90cde4bf24301c652"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/vm-stopped-readback.json",
+      "bytes": 873,
+      "sha256": "50f10859983a7b644130ad84a2b31b68787d3356d6c25c9a633da20d171bd2a0"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/review-and-boundary.json",
+      "bytes": 4256,
+      "sha256": "6f01a04d64dedc3da3d82e070f6c49a524cfd42a9c28759302303c283a14017a"
+    },
+    {
+      "path": "tool-proof-regression-20261109/remote-ci-37ff-closed.json",
+      "bytes": 14407,
+      "sha256": "ac3f341ddd0b6e957bf8b7fd59a1a54b4a3f22ff70ab66f188be990c8905bc21"
+    },
+    {
+      "path": "runtime89-reply-diagnosis-20261109/anonymous-mcp-static-review.json",
+      "bytes": 1721,
+      "sha256": "c8315756d16cce7473069c42d8ff187b4aa7fc616c36d846d15c78303a9c38ff"
+    },
+    {
+      "path": "readonly-owner-refresh-20261109/README.md",
+      "bytes": 1960,
+      "sha256": "c6e33029996e91beea5af6d7bfac01f4b94cb8011fe3a58780ea0da6419382cb"
+    }
+  ]
+}

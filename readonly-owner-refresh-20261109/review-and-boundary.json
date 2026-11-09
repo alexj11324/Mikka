@@ -1,0 +1,86 @@
+{
+  "issue": 1505,
+  "observedAt": "2026-11-09T10:37:00Z",
+  "originalReviewCommit": "1ddcbed37661f417a048b9842fb2cdc52ccd4f51",
+  "finalReviewCommit": "1678d0966ed961ac6bc91f82140c712b74550540",
+  "finalTree": "eca30bbea5d26099e8d6683705f7de852519acb6",
+  "soleParent": "a2198c8c2f608f7b8169329b9da853067618dba6",
+  "workflowBlob": "af0bb9ad6dced078574f84713858d933b716d87f",
+  "workflowBytes": 10085,
+  "workflowSha256": "55f55ef0bf67658832516213d7b97c6aab497260f6260c23f6c1db8a838d2daa",
+  "sourceSha256": {
+    "scripts/ops/issue1505/github-readonly-provider.mjs": "11b100e92c24d91b98200c18eea9a50a9c6a09ac3e3d5ece1166bbcc559f8937",
+    "scripts/ops/issue1505/github-readonly-helper.mjs": "9655772777836a8b1a806b1021409ff9b1f7163db51490f25eeda166f6599be7",
+    "scripts/ops/issue1505/github-readonly-store.mjs": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+    "scripts/ops/issue1505/github-readonly-runner.mjs": "27c134bbc3fac43f8e64d245e23f2ea6c7188d6fee131cefc63195ebea900570",
+    "scripts/ops/issue1505/github-readonly.test.mjs": "91f42d23d47de871afce03788314fe505fad9083787434d1d380e771c26d4987"
+  },
+  "status": {
+    "refCreated": false,
+    "actionsRunStarted": false,
+    "productionCredentialsRead": false,
+    "ownerRefreshed": false,
+    "childMinted": false,
+    "taskCreated": false,
+    "newFormalSamples": 0
+  },
+  "draftDeadline": "2026-11-09T10:45:00Z",
+  "expirationPolicy": "Never activated; discard this draft after deadline. Do not extend or rerun it. Rebind future work to actual handed-off source and a new concrete deadline.",
+  "activeFactoryWindow": {
+    "start": "2026-11-09T10:26:04Z",
+    "hardEnd": "2026-11-09T12:56:04Z",
+    "receipt": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6737702351",
+    "noIndependentChildInstall": true
+  },
+  "factoryReply": {
+    "receipt": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6737879072",
+    "alreadyHasNormalOwnerGetterRefresh": true,
+    "usesOwnWriteFixture": true,
+    "noReadonlyChildRequested": true
+  },
+  "reviewers": [
+    {
+      "agent": "template_prebuild",
+      "scope": "Exact original review commit: five JS source hashes, provider, original install/cleanup preservation, owner normal getter and transaction boundary; workflow deadline gap identified.",
+      "result": "No code blocker; identified install-to-OIDC deadline gap."
+    },
+    {
+      "agent": "production_traces",
+      "scope": "Final1678 immutable commit/tree/parent/blob; difference from1dd workflow",
+      "result": "No new static blocker; three exact main GET guards each have before-and-after deadline check; five source hashes, OIDC scope, install scripts, prepare-only, shared concurrency and artifact configuration retained."
+    }
+  ],
+  "validation": {
+    "runtime": "Node v24.22.1",
+    "baseline": {
+      "tests": 30,
+      "pass": 30,
+      "fail": 0
+    },
+    "red": {
+      "tests": 39,
+      "pass": 32,
+      "fail": 7,
+      "meaning": "Seven failing test cases include changed receipt expectations and an execution branch/GO guard mismatch; not seven business defects."
+    },
+    "green": {
+      "tests": 39,
+      "pass": 39,
+      "fail": 0
+    },
+    "syntax": "All five JS files passed node --check",
+    "limitations": [
+      "Stub provider/lock/getter callbacks; no real PostgreSQL transaction or OAuth tested",
+      "No actual production Owner refresh, provider child or execution",
+      "Pre-helper workflow failures can have logs and no JSON artifact",
+      "Root tool captured complete logs and byte/hash verified before explicit VM stop"
+    ]
+  },
+  "behavior": {
+    "refresh": "Within original Owner row lock and ambient database transaction, normal githubConnectionToken is called once with minValidityMs660000; token return discarded; no post-getter I/O before commit",
+    "freshBaseline": "Strict source reread/provider/child checks occur after commit; ownerUnchanged is against this post-resolution baseline",
+    "unknownCommit": "Retain incomplete receipt; no child mint, retry, or Owner revocation",
+    "cleanup": "Original child receipt CAS cleanup preserved; never calls normal refresh",
+    "scope": "metadata/read and contents/read only; does not replace Factory write fixture"
+  }
+}
