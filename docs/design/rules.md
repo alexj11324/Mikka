@@ -201,9 +201,12 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   A group heading that names the
   workspace its settings apply to (设置's workspace group) is not a crumb and
   stays.
-- **R-62** A task's 活动 lists its creation, attempts and replacements oldest
-  first. An attempt opens the task's single conversation at that attempt's
-  section (R-81), ending in the shared composer (R-10). The task properties
+- **R-62** A task's 活动 lists its creation, its events and one row per Agent
+  stretch, oldest first: consecutive runs by the same Agent are one row, and
+  where the Agent changes the row reads 「换 Codex」 ([2026-11-09-0045](decisions/2026-11-09-0045-no-attempt-word.md)).
+  There is no per-run thread list. A row shows the stretch's latest state and
+  opens the task's single conversation at the stretch's first run (R-81),
+  ending in the shared composer (R-10). The task properties
   show its dispatching bot, Agent/model and execution location. A reader who
   cannot access the work sees no private transcript. Workspace visibility
   follows [2026-11-01-2300](decisions/2026-11-01-2300-thread-visibility-follows-warp.md)
@@ -248,8 +251,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   thread's root identity does not change across its continuation runs. Only the person's explicit request for a new
   session or thread, or another agent, starts a new one; the old thread is
   stopped and marked replaced. The task still has one conversation joining
-  every attempt oldest first; opening an attempt scrolls to its section, and
-  replies go to the newest attempt
+  every run oldest first; a 活动 row opens it at that Agent stretch, and
+  replies go to the newest run
   ([2300](decisions/2026-11-07-2300-one-conversation-per-task.md)).
   The server enforces this at every dispatch
   entry, not the prompt ([decision](decisions/2026-11-01-1330-one-thread-per-task.md)).
@@ -364,11 +367,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     crumb and close action return to the source, defaulting to 看板; ↑↓
     appear when it was opened from a list.
   - A chat task card or right-panel task row opens task detail in the right
-    column (`?task=`), preserving the chat. An attempt in 活动 opens that
-    task's one conversation, with ← back to the task. The conversation joins
-    attempts oldest first, opens a selected attempt at its section and
-    otherwise starts at the newest message. Its header is the task title
-    and current Agent; its composer addresses the newest attempt.
+    column (`?task=`), preserving the chat. A row in 活动 (one per Agent
+    stretch, R-62) opens that task's one conversation, with ← back to the
+    task. The conversation joins runs oldest first, opens a selected stretch
+    at its first run and otherwise starts at the newest message. Its header
+    is the task title and current Agent; its composer addresses the newest run.
   - 全部任务 opens from the window bar on every page, with the hand and the
     count of 等你处理 tasks. A bot's 任务 tab lists its dispatched tasks.
     Search hits in a task conversation resolve to the task. Legacy run IDs

@@ -181,3 +181,19 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
       question: null, continuation: null,
     }))
 }
+
+/**
+ * One conversation per task (decision 2026-11-09-0045): consecutive threads by the same Agent are one
+ * stretch. Oldest first; a stretch opens at its first thread and reads as its last. A thread whose
+ * detail the reader cannot see has no Agent and stands alone unless the one before is hidden too.
+ */
+export function agentStretches<T extends { id: string; createdAt: Date | string; detail: { harness: string } | null }>(threads: readonly T[]): { agent: string | null; first: T; last: T; ids: string[] }[] {
+  const out: { agent: string | null; first: T; last: T; ids: string[] }[] = []
+  for (const thread of [...threads].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
+    const agent = thread.detail?.harness ?? null
+    const previous = out.at(-1)
+    if (previous && previous.agent === agent) { previous.last = thread; previous.ids.push(thread.id) }
+    else out.push({ agent, first: thread, last: thread, ids: [thread.id] })
+  }
+  return out
+}
