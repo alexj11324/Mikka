@@ -17,7 +17,7 @@ concurrency:
   queue: max
 jobs:
   prepare:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/issues-1504-1506' && github.run_attempt == 1
+    if: false && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/issues-1504-1506' && github.run_attempt == 1
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
