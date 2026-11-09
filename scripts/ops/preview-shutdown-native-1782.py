@@ -31,15 +31,23 @@ BASE_GATEWAY = 'b911ccb7bb7a7db2c23114694a91145bd7359db4a99791296f9c579d109991a8
 BASE_CASES = '540c6ced3d64edc792481192ef283367d1c5bfdcbb605f5c90e582563dbffdc7'
 SELF_WAIT = 'test_shutdown_replies_after_revoking_lease_without_waiting_on_its_own_client'
 RACE = 'test_shutdown_refuses_accepted_and_discovering_controls_before_they_can_reopen'
-# The only follow-up scope is the separately reviewed native drain proof.
+# Each additional proof uses separately reviewed, exact-pinned fixtures.
 APPLE = {
     'apps/desktop/test/native-cleanup.mjs': 'cf115bb73361f049d2560f2950785d7465dcfa80cd267d124b477304248b42d8',
     'apps/desktop/test/native-cleanup.test.mjs': '3750fa89a42002c953f4822268f74bb8fdcec53fb5b05635e10ee495bae79f93',
     'apps/desktop/test/fixtures/native-daemon.mjs': '3708c5edf3399bb686c22de51d27bff93cc6baa9fa46fbe6b9c7a36e08c1dd1d',
 }
 PIN.update(APPLE)
+LATE = {
+    'scripts/ops/fixtures/preview-late-shutdown-1782/preview-gateway.py':
+        '38f3be0ebc824522ad04dd69493b2520c575a7d20589c32ec5894d586482c954',
+    'scripts/ops/fixtures/preview-late-shutdown-1782/preview-gateway.test.py':
+        '6cc1ca8deecede58f56af6c423eb56d253b5f3b58ce19583f8ab1bf816c40adb',
+}
+PIN.update(LATE)
 ALLOWED = {GATEWAY, CASES, HELPER, HELPER_TEST, WORKFLOW, *APPLE,
-           'scripts/ops/native-drain-proof-1782.py', 'scripts/ops/native-drain-proof-1782.test.py'}
+           'scripts/ops/native-drain-proof-1782.py', 'scripts/ops/native-drain-proof-1782.test.py', *LATE,
+           'scripts/ops/preview-late-shutdown-native-1782.py', 'scripts/ops/preview-late-shutdown-native-1782.test.py'}
 
 
 def require(value, code):

@@ -1,8 +1,11 @@
 """Offline proof-classifier tests. No sockets or production credentials."""
 import copy
 import importlib.util
+import json
 from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('native_proof', Path(__file__).with_name('preview-shutdown-native-1782.py'))
 proof = importlib.util.module_from_spec(spec)
@@ -79,6 +82,31 @@ class NativeProof(unittest.TestCase):
             proof.test_preservation(prefix + methods, (prefix + methods + added).replace('self.assertEqual(1, 1)', 'self.assertEqual(1, 0)', 1))
         with self.assertRaisesRegex(RuntimeError, 'fixture_cases_changed'):
             proof.test_preservation(prefix + methods, prefix + methods)
+
+    def test_followup_fixture_directory_does_not_authorize_any_additional_path(self):
+        with tempfile.TemporaryDirectory(prefix='native-source-classifier-') as directory:
+            repo = Path(directory); event = repo / 'event.json'; head = 'a' * 40
+            env = {'GITHUB_ACTIONS': 'true', 'GITHUB_REPOSITORY': 'alexj11324/Mikka',
+                   'GITHUB_ACTOR': 'alexj11324', 'GITHUB_TRIGGERING_ACTOR': 'alexj11324',
+                   'GITHUB_EVENT_NAME': 'push', 'GITHUB_RUN_ATTEMPT': '1',
+                   'GITHUB_REF': 'refs/heads/' + proof.BRANCH, 'GITHUB_JOB': 'native_shutdown',
+                   'GITHUB_WORKFLOW_REF': 'alexj11324/Mikka/' + proof.WORKFLOW + '@refs/heads/' + proof.BRANCH,
+                   'GITHUB_SHA': head, 'GITHUB_EVENT_PATH': str(event)}
+            event.write_text(json.dumps({'after': head, 'ref': env['GITHUB_REF'], 'forced': False, 'deleted': False,
+                                         'repository': {'id': 1427517699, 'owner': {'id': 183887963}}}))
+            for added in ['scripts/ops/fixtures/preview-late-shutdown-1782/extra.py',
+                          'scripts/ops/fixtures/preview-late-shutdown-1782/preview-gateway-copy.py']:
+                def git(args, **_kwargs):
+                    command = args[3:]
+                    if command == ['rev-parse', 'HEAD']: return (head + '\n').encode()
+                    if command == ['status', '--porcelain', '--untracked-files=all']: return b''
+                    if command == ['merge-base', '--is-ancestor', proof.BASE, head]: return b''
+                    if command == ['diff', '--name-only', proof.BASE, head]:
+                        return ('\n'.join(sorted(proof.ALLOWED | {added})) + '\n').encode()
+                    self.fail('Unexpected read after out-of-scope path: ' + repr(command))
+                with self.subTest(added=added), patch.object(proof.subprocess, 'check_output', side_effect=git), \
+                        self.assertRaisesRegex(RuntimeError, 'source_scope_changed'):
+                    proof.source(repo, env)
 
 
 if __name__ == '__main__':
