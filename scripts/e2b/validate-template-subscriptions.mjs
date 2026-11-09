@@ -8,6 +8,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { runCloudStartup, createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace, acceptanceBot,
   STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES, bootstrapAdoptionEvidence, bootstrapAdoptionDiagnostics } from '../acceptance/cloud-startup.mjs'
 import { readRuntimeTiming, runtimeEvidence } from '../acceptance/cloud-startup-evidence.mjs'
+import { ACTION_ERROR_CODES } from '../../lib/action-result.ts'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 const KINDS = [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]
@@ -35,6 +36,34 @@ const CLEANUP_STEPS = new Map([['factoryCancelled', 'factory_cancel'], ['taskDel
 const CLEANUP_CODES = new Set(['startup_cleanup_scope_mismatch', 'startup_factory_list_invalid',
   'startup_api_refused', 'startup_rpc_refused', 'startup_action_refused', 'startup_workspace_restore_failed'])
 const cliVersion = value => typeof value === 'string' && value.length <= 32 && /^[0-9]+\.[0-9]+\.[0-9]+$/.test(value)
+const REQUEST_TRACE_SCOPE = 'submission_http_only_workflow_may_use_another_trace'
+// Existing public action codes plus the dispatch, repository, Profile and
+// Factory return sites. A new/unrecognized code stays unknown, never raw text.
+const DISPATCH_REFUSAL_CODES = new Set([...ACTION_ERROR_CODES,
+  'machineUnavailable', 'threadProfileMismatch', 'repositoryRequired', 'repositoryAmbiguous', 'repositoryNotFound',
+  'githubNotConnected', 'githubNotConfigured', 'githubReconnectRequired', 'githubUnavailable', 'githubRepositoryForbidden',
+  'agentProfileScopeNotFound', 'agentProfileNotFound', 'agentProfileModelUnavailable', 'agentProfileUnavailable',
+  'agentProfilePinConflict', 'agentProfileSelectionInvalid', 'agentProfileArchived', 'agentProfileDisabled',
+  'agentProfileVersionConflict', 'agentProfileDecisionUnavailable',
+  'factoryLifecycleUnavailable', 'factoryTransition', 'factoryReplayMismatch', 'factoryStopped',
+  'factoryStale', 'factoryRunStillActive', 'factorySourceMismatch',
+])
+
+/** Correlate a failed submission even before a run exists. Never promote its
+ * HTTP trace to a workflow/run trace or copy tool inputs, outputs or messages. */
+function startupCorrelation(sample, sourceCommit, harness) {
+  if (sample?.sourceCommit !== sourceCommit || sample.harness !== harness) return undefined
+  const trace = sample.requestTraceId, workflow = sample.workflowRunId, refusal = sample.dispatchRefusal
+  if (trace === undefined && workflow === undefined && refusal === undefined) return undefined
+  const requestTraceId = sample.requestTraceScope === REQUEST_TRACE_SCOPE && typeof trace === 'string'
+    && /^[a-f0-9]{32}$/.test(trace) && trace !== '0'.repeat(32) ? trace : null
+  // Keep the startup reader's alphanumeric grammar, bounded for publication;
+  // do not assume every World or future SDK uses today's 26-character ULID.
+  const workflowRunId = typeof workflow === 'string' && /^wrun_[A-Za-z0-9]{1,128}$/.test(workflow) ? workflow : null
+  const code = refusal?.code
+  return { requestTraceId, requestTraceScope: requestTraceId ? REQUEST_TRACE_SCOPE : null, workflowRunId,
+    dispatchRefusal: refusal == null ? null : { code: typeof code === 'string' && DISPATCH_REFUSAL_CODES.has(code) ? code : 'unknown' } }
+}
 
 function registrationDiagnostic(report, kind, proof) {
   const harness = kind === 'claude' ? 'claude_code' : 'codex', row = report.templates?.[kind]
@@ -95,6 +124,7 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
   const sampleFailure = startupFailure(sample)
   const failure = sampleFailure ?? startupFailure(acceptance)
   const harness = kind === 'claude' ? 'claude_code' : 'codex'
+  const correlation = error ? startupCorrelation(sample, sourceCommit, harness) : undefined
   const runIdHash = UUID.test(sample?.runId ?? '') ? createHash('sha256').update(sample.runId).digest('hex').slice(0, 16) : null
   const timing = runIdHash ? readRuntimeTiming(sample?.runtimeTiming, { runIdHash, harness }) : null
   const evidence = runtimeEvidence(timing, { requireOfficial: true })
@@ -140,6 +170,7 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
     sampleStatus: SAMPLE_STATUSES.has(sample?.status) ? sample.status : 'unavailable',
     sampleError: sampleFailure?.code ?? null,
     ...(error && failure ? { failure } : {}),
+    ...(correlation ? { startupCorrelation: correlation } : {}),
     cleanupErrors: [...cleanup], ...(observation ? { observation } : {}), ...(fixture ? { fixture } : {}),
     ...(cleanupFailures.length ? { cleanupFailures: cleanupFailures.slice(0, 8), cleanupFailuresTruncated: cleanupFailures.length > 8 } : {}),
     // Only the existing strict candidateReceipt can populate this proof. A

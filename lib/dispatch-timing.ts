@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { SpanStatusCode, trace } from '@opentelemetry/api'
 import { stepIdentity } from '@/lib/model-call-timing'
 import { withRunSpan } from './tracing/context'
 
@@ -24,9 +25,26 @@ export interface DispatchTiming {
   failed: boolean
 }
 
-type Recording = { phases: DispatchTiming['phases']; github: DispatchTiming['github'] }
+type Recording = { phases: DispatchTiming['phases']; github: DispatchTiming['github']; refusal?: string }
 
 const current = new AsyncLocalStorage<Recording>()
+const repositoryRefusals = new Set(['githubNotConnected', 'githubNotConfigured', 'githubReconnectRequired', 'githubUnavailable', 'githubRepositoryForbidden', 'repositoryNotFound', 'repositoryAmbiguous'])
+
+function markRefusal(code: string) {
+  try {
+    const span = trace.getActiveSpan()
+    span?.setAttributes({ 'error.type': 'DispatchRefusal', 'mikka.error.code': code })
+    span?.setStatus({ code: SpanStatusCode.ERROR })
+  } catch { /* telemetry never changes a returned refusal */ }
+}
+
+/** A closed repository Resolution refusal, recorded before its phase ends. */
+export function recordRepositoryRefusal(code: string) {
+  if (!repositoryRefusals.has(code)) return
+  const recording = current.getStore()
+  if (recording) recording.refusal ??= code
+  markRefusal(code)
+}
 
 /** Times one part of a dispatch; outside a timed dispatch it only runs it. */
 export async function timedPhase<T>(phase: string, run: () => Promise<T>, now: () => number = Date.now): Promise<T> {
@@ -52,8 +70,12 @@ export async function withDispatchTiming<T>(run: () => Promise<T>, now: () => nu
   const started = now()
   let failed = true
   try {
-    const result = await withRunSpan('dispatch_run', {}, () => current.run(recording, run))
-    failed = false
+    const result = await withRunSpan('dispatch_run', {}, () => current.run(recording, async () => {
+      const result = await run()
+      if (recording.refusal) markRefusal(recording.refusal)
+      return result
+    }))
+    failed = recording.refusal !== undefined
     return result
   } finally {
     const endedAt = now()

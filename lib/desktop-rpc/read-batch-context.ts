@@ -1,4 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { COMMIT_EXECUTOR } from '../db/commit-effects'
+import { currentRoute } from '../tracing/labels'
 import { isLiveRevisionKind, LIVE_ID } from '../live/events'
 import type { LiveScope } from '../live/scope'
 import { liveRevisionKey, readLiveRevisions, type LiveRef, type LiveRevisions } from '../live/revisions'
@@ -11,6 +13,7 @@ type BatchContext = {
   active: boolean
   owners: Map<object, Map<string, Promise<LiveScope | null>>>
   revisions: Map<Database, RevisionQueue>
+  subscriptionPolicies: Map<object, Map<string, Promise<boolean>>>
   ownerRevisionKinds: ReturnType<typeof readBatchOwnerRevisionKinds>
 }
 const batches = new AsyncLocalStorage<BatchContext>()
@@ -18,9 +21,24 @@ const batches = new AsyncLocalStorage<BatchContext>()
 /** Installed only by the bounded read action. Detached after-work cannot keep
  * using the batch's authority/revision observations once its items settle. */
 export async function withReadBatchContext<T>(work: () => Promise<T>, actions: readonly BatchReadAction[] = []): Promise<T> {
-  const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map(), ownerRevisionKinds: readBatchOwnerRevisionKinds(actions) }
+  const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map(), subscriptionPolicies: new Map(), ownerRevisionKinds: readBatchOwnerRevisionKinds(actions) }
   try { return await batches.run(scope, work) }
-  finally { scope.active = false; scope.owners.clear(); scope.revisions.clear() }
+  finally { scope.active = false; scope.owners.clear(); scope.revisions.clear(); scope.subscriptionPolicies.clear() }
+}
+
+/** Chat model readers consult the same workspace policy for keys and subscriptions.
+ * Share only its observation in this read batch; each consumer keeps its own
+ * data and authority checks. A request proxy must name its actual executor.
+ * Deferred jobs have their own observation even while the parent is active. */
+export function readBatchSubscriptionPolicy(database: object, workspaceId: string, read: () => Promise<boolean>): Promise<boolean> {
+  const scope = batches.getStore()
+  if (!scope?.active || /^(?:after|cron|workflow):/.test(currentRoute() ?? '')) return read()
+  const executor = (database as { [COMMIT_EXECUTOR]?: object })[COMMIT_EXECUTOR] ?? database
+  let policies = scope.subscriptionPolicies.get(executor)
+  if (!policies) { policies = new Map(); scope.subscriptionPolicies.set(executor, policies) }
+  let pending = policies.get(workspaceId)
+  if (!pending) { pending = Promise.resolve().then(read); policies.set(workspaceId, pending) }
+  return pending
 }
 
 export function readBatchOwnerScope(database: object, ownerId: string, read: () => Promise<LiveScope | null>): Promise<LiveScope | null> {

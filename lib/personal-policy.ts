@@ -4,6 +4,7 @@ import { runChanged } from './live/panels'
 import { runListChanged } from './live/lists'
 import { runControlChanged } from './device-gateway-notify'
 import { armDueTimerAfterCommit } from './due-timer'
+import { readBatchSubscriptionPolicy } from './desktop-rpc/read-batch-context'
 
 /**
  * Decision 2026-11-01-2240: a person's own subscriptions and API keys always run
@@ -16,8 +17,10 @@ type Query = Pick<Pool | PoolClient, 'query'>
 
 /** The admin switch over other members' use; an absent row means on. It never limits the owner's own use. */
 export async function memberSubscriptionsAllowed(query: Query, workspaceId: string): Promise<boolean> {
-  const { rows: [row] } = await query.query<{ subscriptions: boolean }>('SELECT subscriptions FROM workspace_personal_policies WHERE "workspaceId"=$1', [workspaceId])
-  return row?.subscriptions ?? true
+  return readBatchSubscriptionPolicy(query, workspaceId, async () => {
+    const { rows: [row] } = await query.query<{ subscriptions: boolean }>('SELECT subscriptions FROM workspace_personal_policies WHERE "workspaceId"=$1', [workspaceId])
+    return row?.subscriptions ?? true
+  })
 }
 
 /** 分享给团队成员: the owner also lets other members' bots here use it (Alex, 「B」). */
