@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "startedAt": "2026-11-09T05:21:06.088Z",
+  "status": "settings_observed",
+  "modelCalls": 0,
+  "virtualMachines": 0,
+  "billingMutationsRequested": 0,
+  "quotaAcceptanceClaimed": false,
+  "http": [
+    {
+      "operation": "/api/version",
+      "status": 200
+    },
+    {
+      "operation": "/api/auth/sign-in/email",
+      "status": 200
+    },
+    {
+      "operation": "/api/auth/get-session",
+      "status": 200
+    },
+    {
+      "operation": "/api/workspace/switcher",
+      "status": 200
+    },
+    {
+      "operation": "/api/settings/credit-billing",
+      "status": 403
+    },
+    {
+      "operation": "/api/settings/card-verification",
+      "status": 200
+    },
+    {
+      "operation": "/api/settings/credit-billing",
+      "status": 200
+    },
+    {
+      "operation": "/api/settings/card-verification",
+      "status": 200
+    },
+    {
+      "operation": "/api/settings/credit-billing",
+      "status": 403
+    },
+    {
+      "operation": "/api/settings/card-verification",
+      "status": 200
+    },
+    {
+      "operation": "/api/settings/credit-billing",
+      "status": 200
+    },
+    {
+      "operation": "/api/settings/card-verification",
+      "status": 200
+    },
+    {
+      "operation": "/api/version",
+      "status": 200
+    },
+    {
+      "operation": "/api/auth/sign-out",
+      "status": 200
+    }
+  ],
+  "workspaces": [
+    {
+      "workspaceHash": "a38307f75620de4b",
+      "balanceKnown": false,
+      "ownBalanceZero": null,
+      "ownBalancePositive": null,
+      "billingReadDenied": true,
+      "cardStatus": "verified",
+      "effectivePayerExhaustionProven": false
+    },
+    {
+      "workspaceHash": "683a9e11b0c2d41f",
+      "balanceKnown": true,
+      "ownBalanceZero": false,
+      "ownBalancePositive": true,
+      "billingReadDenied": false,
+      "cardStatus": "verified",
+      "effectivePayerExhaustionProven": false
+    },
+    {
+      "workspaceHash": "43b16784a00841b1",
+      "balanceKnown": false,
+      "ownBalanceZero": null,
+      "ownBalancePositive": null,
+      "billingReadDenied": true,
+      "cardStatus": "verified",
+      "effectivePayerExhaustionProven": false
+    },
+    {
+      "workspaceHash": "551b3a791cd6eb2c",
+      "balanceKnown": true,
+      "ownBalanceZero": true,
+      "ownBalancePositive": false,
+      "billingReadDenied": false,
+      "cardStatus": "verified",
+      "effectivePayerExhaustionProven": false
+    }
+  ],
+  "cleanup": {
+    "ownSessionSignedOut": true
+  },
+  "driver": {
+    "head": "e15e36bbda4aca1b8c7baaa651f67e7bfc6f4fea",
+    "parent": "74cf21e78eb3bfca373744519995f6dc78586e60",
+    "run": "42566780106",
+    "attempt": 1
+  },
+  "publicBefore": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+  "publicAfter": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+  "publicSourceUnchanged": true,
+  "finishedAt": "2026-11-09T05:21:08.166Z"
+}

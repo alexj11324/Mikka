@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "kind": "real-self-hosted-cloud-services",
+  "startedAt": "2026-11-09T05:36:52.542Z",
+  "imageSource": "9bcdefc5fe0c047393d581eea867ffa801f53dbe",
+  "image": "ghcr.io/alexj11324/mikka@sha256:477a4178fcc5989ff030ed350075ff9cc4f7937f9ee998a006a2e6aa2675227c",
+  "model": "deepseek/deepseek-v4.1-flash",
+  "codingThreadsRequested": 0,
+  "driverVirtualMachines": 0,
+  "sharedBillingMutations": 0,
+  "uiOpened": false,
+  "cases": {
+    "selfHostedReply": {
+      "status": "failed",
+      "code": "SERVICES_OPERATION_FAILED"
+    },
+    "directReply": {
+      "status": "failed",
+      "code": "SERVICES_OPERATION_FAILED"
+    }
+  },
+  "cleanup": {
+    "turnsStopped": true,
+    "publicTestBotRetention": [
+      {
+        "id": "2718182a-813d-4c0d-96d1-35c826830633",
+        "reason": "named_test_bot_no_delete_api"
+      }
+    ],
+    "serverRevoked": true,
+    "emptyWorkspaceDeleted": false,
+    "workspaceRestored": true,
+    "sessionsSignedOut": true
+  },
+  "status": "failed",
+  "driver": {
+    "sha": "bfcae16e2650757994948a9a26ea8efa878d687b",
+    "parent": "80f2f7e095a4671efa87f245742ccb8b157c7228",
+    "run": "42568213173",
+    "attempt": 1
+  },
+  "privateBefore": {
+    "id": "dpl_H844syuBfzTwdsPxkdb8F7hRZVyi",
+    "source": "4b6b116a2ecffc00dd44a0c096c65a3f2329df16",
+    "state": "READY"
+  },
+  "publicBefore": "93e9d5e260cf899b9a40a188cfa34f069903489d",
+  "sharedWorkspaceHash": "a38307f75620de4b",
+  "origin": "https://genius-backed-development-descriptions.trycloudflare.com",
+  "imageId": "sha256:24126f5e7cabe44d33ff422cf8ad0fa1dbdbb090609747a166f1c8a5f2dde7b1",
+  "serverId": "15b0c712-dbe1-4dda-b535-f4c65315349e",
+  "code": "SERVICES_OPERATION_FAILED",
+  "finishedAt": "2026-11-09T05:39:56.064Z"
+}
