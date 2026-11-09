@@ -1044,7 +1044,7 @@ jobs:
           secret-name: VERCEL_TEAM_TOKEN
           recursive: false
           include-imports: false
-      - name: Run real self-hosted GitHub webhook, suggestions, merge writeback and revocation
+      - name: Run real self-hosted GitHub acceptance with corrected isolated publication schema
         timeout-minutes: 14
         run: |
           cd "$RUNNER_TEMP/mikka-github-source"

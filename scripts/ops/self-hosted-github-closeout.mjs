@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { mailpitNotifications } from './self-hosting-subscription-acceptance.mjs'
 
-const base = '7a0ad4b7890b1c67c5a35eaa64f9560ab46b4343'
+const base = '6419186f6e46fbf2f7b24d51a57e4970587d80c3'
 const revision = '88b144d52d091d7ff566c63fce6e902e33edc59e'
 const image = 'ghcr.io/alexj11324/mikka@sha256:96de4972ea7820dca9d7f03d116f8a4589c662ee6a6db9cb33cf8ad0f89ec98e'
 const publicOrigin = 'https://app.aspectlylabs.com'
@@ -127,7 +127,6 @@ try {
   await community.json('/api/auth/sign-in/email', post({ email: e.SMOKE_OWNER_EMAIL, password: e.SMOKE_OWNER_PASSWORD }))
   const localIdentity = await community.json('/api/auth/get-session?disableCookieCache=true')
   need(typeof localIdentity.user?.id === 'string' && localIdentity.user.email === e.SMOKE_OWNER_EMAIL, 'LOCAL_IDENTITY')
-  const localWorkspace = (await community.json('/api/workspace')).workspace.id
   appEnv.MIKKA_SERVER_ADMIN_USER_IDS = localIdentity.user.id
   await docker(['rm', '-f', name + '-app']); await startApp(); await waitForApp()
   report.stage = 'cloud_binding'
@@ -197,7 +196,7 @@ try {
   const agent = randomUUID(), run = randomUUID(), issue = randomUUID()
   const content = { type: 'doc', attrs: { mikka: { pullRequests: [{ url: pr.html_url, state: 'open', title: pr.title }] } }, content: [] }
   await localPool.query('INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,$3,$4)', [agent, localIdentity.user.id, '测试1565 publication fixture', 'codex'])
-  await localPool.query('INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId") VALUES ($1,$2,$3,$4,$5,$6,$7)', [issue, localIdentity.user.id, '测试1565 webhook writeback fixture', content, 'review', 'normal', localWorkspace])
+  await localPool.query('INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,$3,$4,$5,$6)', [issue, localIdentity.user.id, '测试1565 webhook writeback fixture', content, 'review', 'normal'])
   await localPool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt) VALUES ($1,$2,$3,$4,$5,$6)', [run, localIdentity.user.id, issue, agent, 'succeeded', 'Explicit isolated publication fixture; no model execution'])
   await localPool.query('INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest",branch,"baseBranch") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [run, localIdentity.user.id, issue, 'https://github.com/alexj11324/Mikka', 'v2/github.com/alexj11324/mikka', 'published', { url: pr.html_url, state: 'open' }, fixtureHead, fixtureBase])
   report.publicationFixture = { isolatedDatabaseOnly: true, realGitHubPr: fixturePr, factoryReviewClaimed: false, taskDispatchClaimed: false }
