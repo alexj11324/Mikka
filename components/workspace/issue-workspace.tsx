@@ -251,10 +251,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const [threadsView, setThreadsView] = useState<string | null>(() => readLocation(params).threads)
   // 全部线程's button counts the threads waiting on you (Figma 802:56).
   const threadsWaiting = useMemo(() => waitingCount(threads, tasks), [threads, tasks])
-  // FRAME_OWNS_HEADER: no 全部线程 list beside the page (the frame shows the waiting count on 收件箱); its old addresses
-  // land on 收件箱 (waiting) or 任务 (all), keeping an open thread.
+  // FRAME_OWNS_HEADER: no 全部线程 list beside the page (the frame shows the waiting count on 收件箱); an old address
+  // keeps its open thread beside the page it was on, and without one lands on 任务.
   useEffect(() => {
-    if (FRAME_OWNS_HEADER && threadsView) goTo({ threads: null, section: threadsView === 'waiting' ? 'suggestions' : 'tasks', thread: threadId }, 'replace')
+    if (FRAME_OWNS_HEADER && threadsView) goTo(threadId ? { threads: null } : { threads: null, section: 'tasks' }, 'replace')
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only the old address moves; the thread goes with it
   }, [threadsView])
   const tasksPending = useMemo(() => pendingTaskCount(threads, tasks), [threads, tasks])
