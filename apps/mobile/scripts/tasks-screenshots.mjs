@@ -189,8 +189,9 @@ async function run() {
       await page.getByText('活动').waitFor({ timeout: 20_000 })
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-3-task.png`) })
-      await page.getByText('换 Claude Code', { exact: true }).first().click()
-      await page.getByText('Codex 没跑通 · 换 Claude Code 继续').waitFor({ timeout: 20_000 })
+      // 活动's second row is the next Agent, named without a verb; it opens the conversation at its first run.
+      await page.getByText('Claude Code', { exact: true }).last().click()
+      await page.getByPlaceholder('给这个任务发消息').waitFor({ timeout: 20_000 })
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-4-conversation.png`) })
       // 审阅 is one result card; it opens to the reviewer's transcript.
