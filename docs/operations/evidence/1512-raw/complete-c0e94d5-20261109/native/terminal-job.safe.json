@@ -1,0 +1,226 @@
+{
+  "runId": 42590712093,
+  "job": {
+    "id": 129074068433,
+    "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-11-09T09:12:01Z",
+    "completed_at": "2026-11-09T09:31:15Z",
+    "labels": [
+      "macos-26"
+    ],
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-11-09T09:12:02Z",
+        "completed_at": "2026-11-09T09:12:04Z"
+      },
+      {
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-11-09T09:12:04Z",
+        "completed_at": "2026-11-09T09:12:11Z"
+      },
+      {
+        "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-11-09T09:12:11Z",
+        "completed_at": "2026-11-09T09:12:13Z"
+      },
+      {
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-11-09T09:12:13Z",
+        "completed_at": "2026-11-09T09:13:33Z"
+      },
+      {
+        "name": "Run test \"$(uname -m)\" = arm64",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-11-09T09:13:33Z",
+        "completed_at": "2026-11-09T09:13:33Z"
+      },
+      {
+        "name": "Run pnpm install --frozen-lockfile",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-11-09T09:13:33Z",
+        "completed_at": "2026-11-09T09:15:27Z"
+      },
+      {
+        "name": "Keep setup-node 24 in the native installer login shell",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-11-09T09:15:27Z",
+        "completed_at": "2026-11-09T09:15:29Z"
+      },
+      {
+        "name": "Prepare the pinned native Electron and builder checksum cache",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-11-09T09:15:29Z",
+        "completed_at": "2026-11-09T09:15:33Z"
+      },
+      {
+        "name": "Run pnpm exec playwright install chromium",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-11-09T09:15:33Z",
+        "completed_at": "2026-11-09T09:15:49Z"
+      },
+      {
+        "name": "Start an independent local PostgreSQL",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-11-09T09:15:49Z",
+        "completed_at": "2026-11-09T09:16:15Z"
+      },
+      {
+        "name": "Generate ephemeral test-only auth secret",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-11-09T09:16:15Z",
+        "completed_at": "2026-11-09T09:16:16Z"
+      },
+      {
+        "name": "Run pnpm migrate && pnpm test:e2e:setup",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-11-09T09:16:16Z",
+        "completed_at": "2026-11-09T09:16:22Z"
+      },
+      {
+        "name": "Build the production API for the native ARM64 runtime",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-11-09T09:16:22Z",
+        "completed_at": "2026-11-09T09:20:08Z"
+      },
+      {
+        "name": "Select Xcode 26",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-11-09T09:20:08Z",
+        "completed_at": "2026-11-09T09:20:08Z"
+      },
+      {
+        "name": "Package an inspector-enabled harness input",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-11-09T09:20:08Z",
+        "completed_at": "2026-11-09T09:21:31Z"
+      },
+      {
+        "name": "Real Keychain encryption across three independent packaged processes",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-11-09T09:21:31Z",
+        "completed_at": "2026-11-09T09:21:43Z"
+      },
+      {
+        "name": "Real packaged Apple Silicon native acceptance",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-11-09T09:21:43Z",
+        "completed_at": "2026-11-09T09:31:00Z"
+      },
+      {
+        "name": "Keep final package integrity evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 18,
+        "started_at": "2026-11-09T09:31:00Z",
+        "completed_at": "2026-11-09T09:31:01Z"
+      },
+      {
+        "name": "Audit closed package and crypto reports",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19,
+        "started_at": "2026-11-09T09:31:01Z",
+        "completed_at": "2026-11-09T09:31:01Z"
+      },
+      {
+        "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-11-09T09:31:01Z",
+        "completed_at": "2026-11-09T09:31:03Z"
+      },
+      {
+        "name": "Audit native evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21,
+        "started_at": "2026-11-09T09:31:03Z",
+        "completed_at": "2026-11-09T09:31:05Z"
+      },
+      {
+        "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22,
+        "started_at": "2026-11-09T09:31:05Z",
+        "completed_at": "2026-11-09T09:31:08Z"
+      },
+      {
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 42,
+        "started_at": "2026-11-09T09:31:08Z",
+        "completed_at": "2026-11-09T09:31:08Z"
+      },
+      {
+        "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 43,
+        "started_at": "2026-11-09T09:31:08Z",
+        "completed_at": "2026-11-09T09:31:08Z"
+      },
+      {
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 44,
+        "started_at": "2026-11-09T09:31:08Z",
+        "completed_at": "2026-11-09T09:31:09Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 45,
+        "started_at": "2026-11-09T09:31:09Z",
+        "completed_at": "2026-11-09T09:31:13Z"
+      }
+    ]
+  },
+  "logReadAfterTerminal": true,
+  "otherJobLogsNotRead": true
+}

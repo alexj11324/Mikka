@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "runId": 42590712093,
+  "metadataReads": [
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09T09:11:55Z",
+      "rawStoreKey": "nativec0e94-jobs-first-raw"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:13:36 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-1"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:14:33 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-2"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:15:29 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-3"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:19:35 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-4"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:20:31 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-5"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:21:27 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-6"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:22:23 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-7"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:23:19 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-8"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:24:15 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-9"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:25:12 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-10"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:26:08 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-11"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:27:04 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-12"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:28:00 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-13"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:28:57 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-14"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:29:53 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-15"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:30:49 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-16"
+    },
+    {
+      "operation": "workflow-jobs",
+      "runId": 42590712093,
+      "at": "2026-11-09 09:31:45 UTC",
+      "rawStoreKey": "nativec0e94-jobs-raw-17"
+    }
+  ],
+  "originalReads": [
+    {
+      "operation": "native-log",
+      "at": "2026-11-09T09:31:53.065Z",
+      "attempt": 1,
+      "status": "fulfilled"
+    },
+    {
+      "operation": "artifacts-metadata",
+      "at": "2026-11-09T09:31:53.462Z",
+      "attempt": 1,
+      "status": "fulfilled"
+    },
+    {
+      "operation": "download-workflow-artifact",
+      "artifactId": 13661983991,
+      "kind": "native",
+      "attempt": 1,
+      "at": "2026-11-09T09:32:23.153Z",
+      "status": "fulfilled"
+    },
+    {
+      "operation": "download-workflow-artifact",
+      "artifactId": 13661654841,
+      "kind": "package",
+      "attempt": 1,
+      "at": "2026-11-09T09:32:23.153Z",
+      "status": "fulfilled"
+    }
+  ],
+  "nativeLog": {
+    "path": "job-129074068433.original.log",
+    "jobId": 129074068433,
+    "kind": "Apple Silicon Native",
+    "bytes": 251108,
+    "sha256": "2dbd6b5474333466e34800ba2fe51c0bf9bbe8179a221303285f91ad92e67832",
+    "gitBlobSha1": "ef9afeb0e14072ec65d3dd1473875912c63a14e0",
+    "bomPreserved": true,
+    "ansiPresent": true,
+    "logTimestampRange": {
+      "first": "2026-11-09T09:12:02.1371280Z",
+      "last": "2026-11-09T09:31:13.2016140Z"
+    },
+    "checkoutCandidates": [
+      {
+        "line": 156,
+        "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+        "timestamp": "2026-11-09T09:12:11.8295130Z"
+      }
+    ],
+    "privacyFindings": [],
+    "unresolvedFindings": 0
+  },
+  "artifacts": [
+    {
+      "kind": "native",
+      "id": 13661983991,
+      "filename": "native-c0e94-original.zip",
+      "bytes": 14613678,
+      "sha256": "4ed58db955b96a6008fb841ac0d8b5f831285744714c4337dd244f46a8b9f43a",
+      "apiDigest": "sha256:4ed58db955b96a6008fb841ac0d8b5f831285744714c4337dd244f46a8b9f43a",
+      "apiCreatedAt": "2026-11-09T09:31:08Z",
+      "apiName": "desktop-native-evidence-9d8aab6986e474ea2df8f62091d97dc5aa992420"
+    },
+    {
+      "kind": "package",
+      "id": 13661654841,
+      "filename": "package-c0e94-original.zip",
+      "bytes": 1599,
+      "sha256": "504be051626e9379911892549d076aad7fc734b0f41194a9fd989eb46092c447",
+      "apiDigest": "sha256:504be051626e9379911892549d076aad7fc734b0f41194a9fd989eb46092c447",
+      "apiCreatedAt": "2026-11-09T09:31:03Z",
+      "apiName": "desktop-package-evidence-9d8aab6986e474ea2df8f62091d97dc5aa992420"
+    }
+  ],
+  "commitApiReads": 1,
+  "downloadReferenceRefreshes": 0,
+  "artifactMaterializations": {
+    "native": 1,
+    "package": 1
+  },
+  "zipIntegrity": "Both API byte counts/digests and ZipFile.testzip passed.",
+  "gzipTransfer": {
+    "chunks": 116,
+    "chunkErrors": [],
+    "allByteAndShaChecksPassed": true
+  },
+  "ciReruns": 0,
+  "ciCancellations": 0,
+  "refsChanged": 0,
+  "productionModelsInvoked": 0
+}

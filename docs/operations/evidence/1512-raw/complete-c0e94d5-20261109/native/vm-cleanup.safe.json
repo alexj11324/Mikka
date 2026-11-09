@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "purpose": "Read-only artifact extraction and verification; not a Native execution or production acceptance.",
+  "sessionId": "sbx_lhZCAcFuzZUlDK1mOdQLhJabLawx",
+  "name": "issue1512-native-c0e94-20261109-0932",
+  "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+  "architecture": "amd64",
+  "region": "iad1",
+  "resources": {
+    "vcpus": 1,
+    "memoryMiB": 2048
+  },
+  "persistent": false,
+  "ports": [],
+  "timeoutMs": 900000,
+  "networkPolicy": {
+    "mode": "custom",
+    "allowedDomains": [
+      "*.blob.core.windows.net",
+      "*.amazonaws.com",
+      "*.oaiusercontent.com",
+      "chatgpt.com"
+    ]
+  },
+  "requestedAt": "2026-11-09T09:32:12.372Z",
+  "startedAt": "2026-11-09T09:32:12.398Z",
+  "requestedStopAt": "2026-11-09T09:35:00.316Z",
+  "stoppedAt": "2026-11-09T09:35:00.590Z",
+  "status": "stopped",
+  "durationMs": 168192,
+  "activeCpuDurationMs": 5200,
+  "networkTransfer": {
+    "ingress": 14924015,
+    "egress": 394975
+  },
+  "extensionCount": 0,
+  "deleteCompleted": true,
+  "exactPostDeleteGet": {
+    "resume": false,
+    "status": 404,
+    "code": "not_found"
+  },
+  "allSelectedArtifactFilesRecoveredAndHashVerifiedBeforeStop": true,
+  "noActiveOwnedResources": true,
+  "costClaim": "No zero-cost claim; provider duration, CPU and transfer measurements are retained.",
+  "publicPayloadFilesRecovered": 13,
+  "originalArchiveMemberPathsIndexed": 310,
+  "fullArchiveBytesNotRehosted": true
+}

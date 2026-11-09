@@ -1,0 +1,77 @@
+{
+  "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+  "result": "passed",
+  "windows": {
+    "webLogin": {
+      "status": "complete",
+      "total": 412,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 393
+        }
+      ],
+      "pair": null
+    },
+    "nativeLogin": {
+      "status": "complete",
+      "total": 398,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 15
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 364
+        }
+      ],
+      "pair": null
+    },
+    "startup-bundled": {
+      "status": "complete",
+      "total": 181,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 181
+        }
+      ],
+      "pair": 1
+    },
+    "startup-hosted": {
+      "status": "complete",
+      "total": 206,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 206
+        }
+      ],
+      "pair": 1
+    }
+  },
+  "zipIntegrity": "both exact API bytes/SHA and testzip passed",
+  "files": [
+    {
+      "kind": "native",
+      "count": 308
+    },
+    {
+      "kind": "package",
+      "count": 2
+    }
+  ]
+}

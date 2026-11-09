@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "source": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+  "job": 129072322179,
+  "canonicalCommand": "pnpm --filter @mikka/desktop test -> node --test scripts/*.test.mjs (plus existing explicit files)",
+  "testSource": {
+    "sha": "c86aa78a70a1b9e219e69ee0fcfad71ac6d5059d",
+    "bytes": 14352,
+    "sha256": "766eacc9b1f5e145ec04efb52cdf682221b2b510c9fc79f7dcc404fa3d6f0567"
+  },
+  "testPath": "apps/desktop/scripts/read-batch.test.mjs",
+  "topLevelTests": 13,
+  "allTopLevelTitlesObservedPassed": true,
+  "tests": [
+    {
+      "name": "Native coalesces allowed reads in one turn with one codec pass and ordered results",
+      "passed": true
+    },
+    {
+      "name": "one startup read wave stays together across the real hydration gates used by SWR and list fetchers",
+      "passed": true
+    },
+    {
+      "name": "single reads, excluded actions and Web keep their ordinary single-request path without a read cache",
+      "passed": true
+    },
+    {
+      "name": "Native splits at sixteen items and captures each locale before the posted flush",
+      "passed": true
+    },
+    {
+      "name": "only an exact unknown batch action on 404 falls back and disables batching for this page",
+      "passed": true
+    },
+    {
+      "name": "batch HTTP and network failures do not retry or fall back",
+      "passed": true
+    },
+    {
+      "name": "batch item failures retain their own error and status without failing successful siblings",
+      "passed": true
+    },
+    {
+      "name": "malformed batch item count or shape rejects every item without retrying",
+      "passed": true
+    },
+    {
+      "name": "scope reset after a microtask rejects unsent old-identity reads before the posted flush",
+      "passed": true
+    },
+    {
+      "name": "workspace selector changes cannot pair queued arguments with the new workspace before React effects run",
+      "passed": true
+    },
+    {
+      "name": "explicit isCurrent guards drop stale queued reads and remain independent from other guards",
+      "passed": true
+    },
+    {
+      "name": "retired in-flight batches cannot change current transport state or trigger old-server fallback",
+      "passed": true
+    },
+    {
+      "name": "an isCurrent change while a batch body is pending prevents stale results and state updates",
+      "passed": true
+    }
+  ],
+  "wholeJob": {
+    "nodeSummaries": [
+      156,
+      280,
+      46,
+      10
+    ],
+    "protocolVitest": 4,
+    "typecheck": true,
+    "lint": true,
+    "build": true,
+    "uiLint": true
+  },
+  "minimalVmGapNowCoveredByFormalCI": true,
+  "original": {
+    "path": "desktopChecks.original.log",
+    "sha": "470e66731882bea6e88906db055781dee94121f6",
+    "bytes": 102945,
+    "sha256": "fa77c50aee2888e3e908e01123c153133eca9ace45ff223d265d75096428923b",
+    "job": 129072322179,
+    "run": 42590712093
+  }
+}

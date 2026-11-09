@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "publicFilesScanned": 22,
+  "categories": [
+    "private-key",
+    "github-token",
+    "provider-key",
+    "jwt",
+    "email",
+    "credential-url",
+    "authorization",
+    "signed-download-query"
+  ],
+  "files": [
+    {
+      "path": "arithmetic.safe.json",
+      "bytes": 23629,
+      "sha256": "0dce4f5fb1ca1bd2480b00cc6213ab6fa392690024fffa86b9c70ec7897027c6",
+      "findings": []
+    },
+    {
+      "path": "cleanup-package.safe.json",
+      "bytes": 10755,
+      "sha256": "3dfb03645833d3290297bf31b6eb50bbf3ebf2a3ca530ef3d60245e077980bfb",
+      "findings": []
+    },
+    {
+      "path": "first-read.safe.json",
+      "bytes": 1588,
+      "sha256": "7446924a448e7aab256ee83fcb37478e85fdb363944c9e68f7509e0452629184",
+      "findings": []
+    },
+    {
+      "path": "original/lifecycle.json",
+      "bytes": 694400,
+      "sha256": "d8540559abc57f78de51355c167c5f46ec0a7fa701e6310db1e6469c4a866be1",
+      "findings": []
+    },
+    {
+      "path": "original/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "0d8ce8dd64c18642c84f6d7982802459c2b5cd07f0cb98ff7689ccfd2a204c67",
+      "findings": []
+    },
+    {
+      "path": "original/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "f6937320659c622e2d9869737bdc0241a7894b4daae6d0c5886ff3068b2fa8d8",
+      "findings": []
+    },
+    {
+      "path": "original/parity.json",
+      "bytes": 116417,
+      "sha256": "2a4e8740e44181f597cc4ea97db55b2af558139f57440f0a687e89bbb3c62f3e",
+      "findings": []
+    },
+    {
+      "path": "original/smoke.json",
+      "bytes": 3105,
+      "sha256": "134c9258e3acc8b3b61b7c6e48b1594844d07820d93b7c99d05dca1bd5d7736d",
+      "findings": []
+    },
+    {
+      "path": "original-files-manifest.safe.json",
+      "bytes": 85173,
+      "sha256": "d067e749d0c1e078d02f8ffdf17743c68f3eb9023d03312da3b7327708bea725",
+      "findings": []
+    },
+    {
+      "path": "rpc-diagnostics.safe.json",
+      "bytes": 44424,
+      "sha256": "ffbe2f8f77e4a35eb59b296728e2ba0ead8ffb3996d99488b730f6a87beaef61",
+      "findings": []
+    },
+    {
+      "path": "verification-run.safe.json",
+      "bytes": 1045,
+      "sha256": "7a6ef5da0ab55c1670524fb7737f4ec38c9548248dbb7971c365a096c5455fc2",
+      "findings": []
+    },
+    {
+      "path": "verify-artifact-download.py",
+      "bytes": 2783,
+      "sha256": "11ba5d842724942c5e4241f6c7899efada4db04dda7544de52970a731f9a6ff6",
+      "findings": []
+    },
+    {
+      "path": "verify-native-originals.py",
+      "bytes": 16010,
+      "sha256": "b4452037b2f8a8f2e6016c288581c221f93e075845206334e41c2d5117288348",
+      "findings": []
+    },
+    {
+      "path": "source-contract.safe.json",
+      "bytes": 1920,
+      "sha256": "40922fb6efdda94306706fb2d807986c486cf1e68463b63bca377e1e72a747b3",
+      "findings": []
+    },
+    {
+      "path": "source-and-worker.safe.json",
+      "bytes": 4322,
+      "sha256": "e413f914c026320facdfb8e2cb39338b73a42a872549ada2c1ea0951f5fb008a",
+      "findings": []
+    },
+    {
+      "path": "terminal-job.safe.json",
+      "bytes": 7229,
+      "sha256": "b4aa984c2287372f2ccc9b72114f5b1a9891119616f828a9ccc58fe51ba6be9c",
+      "findings": []
+    },
+    {
+      "path": "read-ledger.safe.json",
+      "bytes": 5734,
+      "sha256": "51e338e310968bf243c1ae84ad73b9199761dd8238d80aa6427fe7c10bf92517",
+      "findings": []
+    },
+    {
+      "path": "budget-and-first-pair.safe.json",
+      "bytes": 21282,
+      "sha256": "a2f502e1227f3b695f891711145fd1abb67d2a01c5767bcde46b11dd244fae51",
+      "findings": []
+    },
+    {
+      "path": "bundle-transfer.safe.json",
+      "bytes": 564,
+      "sha256": "c2f47b3aeee0fcc1c8db47256164565723a54f2c98009d61bf254d3ab44dd2a0",
+      "findings": []
+    },
+    {
+      "path": "vm-cleanup.safe.json",
+      "bytes": 1500,
+      "sha256": "0e54e1dd7fedd8586a64d4d785d25923457f7d3dc23d5f05e4fda9eaeee9df3a",
+      "findings": []
+    },
+    {
+      "path": "job-129074068433.original.log",
+      "bytes": 251108,
+      "sha256": "2dbd6b5474333466e34800ba2fe51c0bf9bbe8179a221303285f91ad92e67832",
+      "findings": []
+    },
+    {
+      "path": "README.md",
+      "bytes": 5960,
+      "sha256": "3a1a7eee9f1423ce1a2b0b60e646e9effc0c579169d51ceb89b377c6b6698b1a",
+      "findings": []
+    }
+  ],
+  "totalFindings": 0,
+  "originalFilesModified": false,
+  "fullZipAndScreenshotContentsNotPublished": true,
+  "platformRawResponsesAndSignedDownloadUrlsNotPublished": true,
+  "scope": "Shape scan of exact public text bytes; originals and closed metadata projection retained."
+}

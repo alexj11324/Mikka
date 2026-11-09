@@ -1,0 +1,357 @@
+{
+  "schemaVersion": 1,
+  "kind": "companion-ci-originals-and-safe-review-index",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "source": {
+    "prHead": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+    "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+    "parents": [
+      "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "c0e94d594f1ecf4f5edc25904912702e61fce86b"
+    ],
+    "gitCommitApiVerifiedBy": "root",
+    "bindingReceipt": "https://github.com/alexj11324/Mikka/blob/43eac42001f96598c0aa5758290150e5b8bf354d/docs/operations/evidence/1512-raw/pending-dispatch-c0e94d5-20261109/ci/source-binding.safe.json",
+    "noDuplicateCommitApiFetch": true
+  },
+  "frozenAt": "2026-11-09 09:23:28 UTC",
+  "prefix": "ci-c0e94d5/companion",
+  "files": [
+    {
+      "workflow": "browser-gate",
+      "runId": 42590712026,
+      "jobId": 129071360135,
+      "jobName": "Browser tests (before merge)",
+      "path": "ci-c0e94d5/companion/browser-gate-129071360135.original.log",
+      "bytes": 2196,
+      "sha256": "0e00054104c2f3409665b0a948146a6a4494f69dfd4723c8784dc4a15eb0413b",
+      "gitBlob": "af7aea876fb1a188c48af60e7ca057ba50817655",
+      "lineCount": 37,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "e2b-additive",
+      "runId": 42590712049,
+      "jobId": 129071352005,
+      "jobName": "test",
+      "path": "ci-c0e94d5/companion/e2b-additive-129071352005.original.log",
+      "bytes": 50825,
+      "sha256": "ae02f071a7761cc7acb43cd435d198e64403e912e31d62ad44955c53d5e31a9f",
+      "gitBlob": "f6094fb44bad33b521c8c6c53e567ef32e292abc",
+      "lineCount": 449,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "unattended",
+      "runId": 42590712169,
+      "jobId": 129071352708,
+      "jobName": "runtime",
+      "path": "ci-c0e94d5/companion/unattended-129071352708.original.log",
+      "bytes": 73155,
+      "sha256": "62f571b6f44a1dd81c3b029cfe518d246973113a632ef02302d4c2bf97e462d7",
+      "gitBlob": "2fe263992e49f01c10e8c2c48a5d9a335562f1e8",
+      "lineCount": 830,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "node22",
+      "runId": 42590712054,
+      "jobId": 129071352213,
+      "jobName": "node22-unit",
+      "path": "ci-c0e94d5/companion/node22-129071352213.original.log",
+      "bytes": 134544,
+      "sha256": "b548355db895123bc5d21156d3d2066d364ce3b1d027e40950625819db7c7d32",
+      "gitBlob": "9fcbf0cdc8e83f0777009521f5149dcb7e4c2e83",
+      "lineCount": 1467,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "node22",
+      "runId": 42590712054,
+      "jobId": 129071352501,
+      "jobName": "package",
+      "path": "ci-c0e94d5/companion/node22-129071352501.original.log",
+      "bytes": 37430,
+      "sha256": "246d46e94c8f6b50b849425490f6cd004bad3a72b696f6cd4ad12935ae471e4f",
+      "gitBlob": "e462565eaa262fe18c736169458d9619b83a71ff",
+      "lineCount": 517,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "cloud-backend",
+      "runId": 42590711871,
+      "jobId": 129071351310,
+      "jobName": "Local driver (Linux Xvfb)",
+      "path": "ci-c0e94d5/companion/cloud-backend-129071351310.original.log",
+      "bytes": 27004,
+      "sha256": "5026cda24d1bd7fa9e08e72aae4acee6af6deab1bab163e769963517e1027172",
+      "gitBlob": "7d53a11d31d55aa3bc40f31264c70f7601163066",
+      "lineCount": 337,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "cloud-backend",
+      "runId": 42590711871,
+      "jobId": 129071351509,
+      "jobName": "Local driver (macOS permissions, nonblocking)",
+      "path": "ci-c0e94d5/companion/cloud-backend-129071351509.original.log",
+      "bytes": 19541,
+      "sha256": "4b2d3d83635efdf35b05136d9edd6e6a42ef9140c701d8006303ed896c6b7faf",
+      "gitBlob": "3457bdcf80de1480965d9c304b14260e876fcbee",
+      "lineCount": 237,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "cloud-backend",
+      "runId": 42590711871,
+      "jobId": 129071351623,
+      "jobName": "backend",
+      "path": "ci-c0e94d5/companion/cloud-backend-129071351623.original.log",
+      "bytes": 73408,
+      "sha256": "676c75fcbd3b180b73beba950cf14af675accf430673098d313104f518ad1938",
+      "gitBlob": "c5804771adc42975b27d606eb00362834a12c189",
+      "lineCount": 935,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "read-cache",
+      "runId": 42590712039,
+      "jobId": 129071361884,
+      "jobName": "Read cache API and CLI",
+      "path": "ci-c0e94d5/companion/read-cache-129071361884.original.log",
+      "bytes": 232566,
+      "sha256": "73af33c0ff3e2ab51b1e3b3e3643dbfc4fdd72f32b9aa00dfb6789bcd424d226",
+      "gitBlob": "254f132d7658a53903e2f2f2f420af2c8eaa1653",
+      "lineCount": 2565,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "ssh",
+      "runId": 42590712251,
+      "jobId": 129071352911,
+      "jobName": "ssh",
+      "path": "ci-c0e94d5/companion/ssh-129071352911.original.log",
+      "bytes": 160132,
+      "sha256": "4c6a6aa7d864be1f511464bdb6ccc3d5eb3a6021ddce2a1057ca44f3a9a5b456",
+      "gitBlob": "b33b29c82cfbe8121ec5d3ff94c92ae49641852d",
+      "lineCount": 1691,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "custody",
+      "runId": 42590712056,
+      "jobId": 129071351576,
+      "jobName": "custody",
+      "path": "ci-c0e94d5/companion/custody-129071351576.original.log",
+      "bytes": 217730,
+      "sha256": "8550d99387a041eb37bf1e1753d745c2f8152fde9891cab0ee76c6c3eba27ac1",
+      "gitBlob": "5fed4f38357c007daa0832800c1baf04b7104e50",
+      "lineCount": 1862,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "node22",
+      "runId": 42590712054,
+      "jobId": 129071892810,
+      "jobName": "macos-arm (22.22.1)",
+      "path": "ci-c0e94d5/companion/node22-129071892810.original.log",
+      "bytes": 48799,
+      "sha256": "faaa795fb98da6d12b2141cae5337319da01201d8316f2dac68dde33023a4419",
+      "gitBlob": "98463cdc932cdd0506a86c546830a12dbe4b6667",
+      "lineCount": 629,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "site-search",
+      "runId": 42590711896,
+      "jobId": 129071351595,
+      "jobName": "site-search",
+      "path": "ci-c0e94d5/companion/site-search-129071351595.original.log",
+      "bytes": 301067,
+      "sha256": "29bcb128c4d85e58e78a8db3849f75b976d2353e70ccb315af4b662f1e6d53b1",
+      "gitBlob": "f2f72bde8b5881849e1a6819fc9581c55e136dec",
+      "lineCount": 3222,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "workflow": "node22",
+      "runId": 42590712054,
+      "jobId": 129071892688,
+      "jobName": "macos-arm (18.20.8)",
+      "path": "ci-c0e94d5/companion/node22-129071892688.original.log",
+      "bytes": 51203,
+      "sha256": "554e26bfb03100deef46b71c6e583ced0c7efd1b043e01e6370c598383dafc1f",
+      "gitBlob": "0903b9b3a55e1d929a4e73da9ad6b75f336c13d3",
+      "lineCount": 658,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-public-github-job-log",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "ci-c0e94d5/companion/execution-and-cleanup.safe.json",
+      "bytes": 119320,
+      "sha256": "3f0a2b5c6e9162a39d9989298e59f8c404f699695713f32d2af41eef70c32e36",
+      "gitBlob": "82150ff74ae834f41a018f0c4cbd5f73df995ba8",
+      "kind": "safe-review",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "ci-c0e94d5/companion/privacy-review.safe.json",
+      "bytes": 10338,
+      "sha256": "c85295d10c022dbe5c2fa124811dcdf02f75332dce24001452b67a3ad13594a0",
+      "gitBlob": "35ee7d29e52e766670a1912780b6d243fd96f79d",
+      "kind": "safe-review",
+      "remoteConfirmed": true
+    }
+  ],
+  "filesExcludingIndex": 16,
+  "bytesExcludingIndex": 1559258,
+  "workflows": [
+    {
+      "id": 42590712039,
+      "name": "Read cache API acceptance",
+      "conclusion": "success",
+      "actualJobs": 1,
+      "conditionalSkippedJobs": 0
+    },
+    {
+      "id": 42590712251,
+      "name": "SSH device backend",
+      "conclusion": "success",
+      "actualJobs": 1,
+      "conditionalSkippedJobs": 0
+    },
+    {
+      "id": 42590712056,
+      "name": "E2B subscription custody",
+      "conclusion": "success",
+      "actualJobs": 1,
+      "conditionalSkippedJobs": 0
+    },
+    {
+      "id": 42590711896,
+      "name": "Site search read contract",
+      "conclusion": "success",
+      "actualJobs": 1,
+      "conditionalSkippedJobs": 0
+    },
+    {
+      "id": 42590712026,
+      "name": "Browser gate",
+      "conclusion": "success",
+      "actualJobs": 1,
+      "conditionalSkippedJobs": 0
+    },
+    {
+      "id": 42590712049,
+      "name": "E2B additive runtime release",
+      "conclusion": "success",
+      "actualJobs": 1,
+      "conditionalSkippedJobs": 6
+    },
+    {
+      "id": 42590712169,
+      "name": "Unattended sandbox acceptance",
+      "conclusion": "success",
+      "actualJobs": 1,
+      "conditionalSkippedJobs": 0
+    },
+    {
+      "id": 42590712054,
+      "name": "Local device Node 22",
+      "conclusion": "success",
+      "actualJobs": 4,
+      "conditionalSkippedJobs": 0
+    },
+    {
+      "id": 42590711871,
+      "name": "Cloud computer backend",
+      "conclusion": "success",
+      "actualJobs": 3,
+      "conditionalSkippedJobs": 0
+    }
+  ],
+  "semanticLimits": [
+    "All counts describe this exact source and actual jobs; no old c3b or 025 green is reused.",
+    "The Browser gate is an echo only; Site-search uses the Playwright runner for declared HTTP API tests, not a claim of browser interaction.",
+    "No formal Apple Native query budget, production served version, E2B publication/runtime refresh, production model run or PostHog ingestion is established here.",
+    "Successful job/post-job metadata and direct GHA service removal do not prove unlogged internal fixture destruction; custody conditional retention text remains explicit unknown.",
+    "No raw test stdout is suppressed because it includes expected errors, skipped conditions, cache warnings or deprecated-action warnings.",
+    "Node and Vitest/Python/Go/Playwright counts are reported separately; they are not summed into unique tests across overlapping jobs."
+  ],
+  "rawIntegrity": {
+    "originalLogs": 14,
+    "bytes": 1429600,
+    "exactUtf8StringBytes": true,
+    "bomAnsiLineEndingsUnmodified": true,
+    "allComputedGitBlobIdsMatchRemote": true,
+    "logDownloadCount": 14,
+    "onePerActualJob": true,
+    "skippedJobLogsDownloaded": 0,
+    "artifactDownloads": 0,
+    "zipOrScreenshotOriginalsNotIncluded": true
+  },
+  "privacy": {
+    "receiptGitBlob": "35ee7d29e52e766670a1912780b6d243fd96f79d",
+    "unresolvedFindings": 0,
+    "resolvedCandidates": 1,
+    "boundary": "Bounded scan/manual review of already-public GitHub-masked logs. No private tool envelopes or signed download links included."
+  },
+  "publication": {
+    "immutableGitBlobsCreated": true,
+    "refUpdatedByThisReviewer": false,
+    "parentWillAppendEvidenceBranch": true,
+    "originalTextUnmodified": true
+  },
+  "resources": {
+    "reviewerCreatedVm": 0,
+    "reviewerCreatedDb": 0,
+    "reviewerStartedModels": 0,
+    "reviewerTriggeredWorkflows": 0,
+    "reviewerReranOrCancelledJobs": 0,
+    "reviewerChangedRefs": 0,
+    "allNineCompanionRunsTerminal": true
+  }
+}

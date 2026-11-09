@@ -1,0 +1,657 @@
+﻿2026-11-09T09:06:54.7270810Z Current runner version: '2.338.2'
+2026-11-09T09:06:54.7292940Z ##[group]Runner Image Provisioner
+2026-11-09T09:06:54.7293800Z Hosted Compute Agent
+2026-11-09T09:06:54.7294280Z Version: 20261028.624
+2026-11-09T09:06:54.7294780Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T09:06:54.7295380Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T09:06:54.7296040Z Worker ID: {95580359-447f-4925-86ab-f312e1ec23c2}
+2026-11-09T09:06:54.7296730Z Region: westus
+2026-11-09T09:06:54.7297220Z Cloud: MacCloud
+2026-11-09T09:06:54.7297620Z ##[endgroup]
+2026-11-09T09:06:54.7299490Z ##[group]Operating System
+2026-11-09T09:06:54.7299930Z macOS
+2026-11-09T09:06:54.7300370Z 26.7.2
+2026-11-09T09:06:54.7300830Z 25G332
+2026-11-09T09:06:54.7301260Z ##[endgroup]
+2026-11-09T09:06:54.7301710Z ##[group]Runner Image
+2026-11-09T09:06:54.7302380Z Image: macos-26-arm64
+2026-11-09T09:06:54.7302930Z Version: 20261102.0473.1
+2026-11-09T09:06:54.7304020Z Included Software: https://github.com/actions/runner-images/blob/macos-26-arm64/20261102.0473/images/macos/macos-26-arm64-Readme.md
+2026-11-09T09:06:54.7305590Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20261102.0473
+2026-11-09T09:06:54.7306440Z ##[endgroup]
+2026-11-09T09:06:54.7307380Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T09:06:54.7309640Z Contents: read
+2026-11-09T09:06:54.7310110Z Metadata: read
+2026-11-09T09:06:54.7310470Z ##[endgroup]
+2026-11-09T09:06:54.7312260Z Secret source: Actions
+2026-11-09T09:06:54.7312880Z Cache mode: write
+2026-11-09T09:06:54.7313610Z Prepare workflow directory
+2026-11-09T09:06:54.7629050Z Prepare all required actions
+2026-11-09T09:06:54.7672730Z Getting action download info
+2026-11-09T09:06:55.5638480Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T09:06:55.8020080Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-11-09T09:06:56.2316500Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T09:06:56.3504790Z Download action repository 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)
+2026-11-09T09:06:56.8176720Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-09T09:06:57.1309240Z Complete job name: macos-arm (18.20.8)
+2026-11-09T09:06:57.2296870Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T09:06:57.2298540Z with:
+2026-11-09T09:06:57.2300780Z   repository: alexj11324/Mikka
+2026-11-09T09:06:57.2312100Z   token: ***
+2026-11-09T09:06:57.2314190Z   ssh-strict: true
+2026-11-09T09:06:57.2316680Z   ssh-user: git
+2026-11-09T09:06:57.2320810Z   persist-credentials: true
+2026-11-09T09:06:57.2324270Z   clean: true
+2026-11-09T09:06:57.2328390Z   sparse-checkout-cone-mode: true
+2026-11-09T09:06:57.2329710Z   fetch-depth: 1
+2026-11-09T09:06:57.2330410Z   fetch-tags: false
+2026-11-09T09:06:57.2331090Z   show-progress: true
+2026-11-09T09:06:57.2331690Z   lfs: false
+2026-11-09T09:06:57.2332270Z   submodules: false
+2026-11-09T09:06:57.2332880Z   set-safe-directory: true
+2026-11-09T09:06:57.2333550Z   allow-unsafe-pr-checkout: false
+2026-11-09T09:06:57.2334660Z ##[endgroup]
+2026-11-09T09:06:57.6984420Z Syncing repository: alexj11324/Mikka
+2026-11-09T09:06:57.6986570Z ##[group]Getting Git version info
+2026-11-09T09:06:57.6988790Z Working directory is '/Users/runner/work/Mikka/Mikka'
+2026-11-09T09:06:57.6993080Z [command]/opt/homebrew/bin/git version
+2026-11-09T09:06:57.7554750Z git version 2.56.0
+2026-11-09T09:06:57.7572160Z ##[endgroup]
+2026-11-09T09:06:57.7579400Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/15cc5198-be0b-4d44-bea7-185b805bc585/.gitconfig'
+2026-11-09T09:06:57.7589430Z Temporarily overriding HOME='/Users/runner/work/_temp/15cc5198-be0b-4d44-bea7-185b805bc585' before making global git config changes
+2026-11-09T09:06:57.7593210Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T09:06:57.7594950Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Mikka/Mikka
+2026-11-09T09:06:57.7736730Z Deleting the contents of '/Users/runner/work/Mikka/Mikka'
+2026-11-09T09:06:57.7739940Z ##[group]Initializing the repository
+2026-11-09T09:06:57.7743590Z [command]/opt/homebrew/bin/git init /Users/runner/work/Mikka/Mikka
+2026-11-09T09:06:57.8058460Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T09:06:57.8066310Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T09:06:57.8069060Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T09:06:57.8070340Z hint: call:
+2026-11-09T09:06:57.8070910Z hint:
+2026-11-09T09:06:57.8071610Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T09:06:57.8072540Z hint:
+2026-11-09T09:06:57.8073290Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T09:06:57.8074760Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T09:06:57.8075820Z hint:
+2026-11-09T09:06:57.8076360Z hint: 	git branch -m <name>
+2026-11-09T09:06:57.8076970Z hint:
+2026-11-09T09:06:57.8077800Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T09:06:57.8079380Z Initialized empty Git repository in /Users/runner/work/Mikka/Mikka/.git/
+2026-11-09T09:06:57.8085150Z [command]/opt/homebrew/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T09:06:57.8180850Z ##[endgroup]
+2026-11-09T09:06:57.8182740Z ##[group]Disabling automatic garbage collection
+2026-11-09T09:06:57.8183790Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-11-09T09:06:57.8268520Z ##[endgroup]
+2026-11-09T09:06:57.8270340Z ##[group]Setting up auth
+2026-11-09T09:06:57.8272520Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T09:06:57.8368070Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T09:06:57.9771540Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T09:06:57.9887180Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T09:06:58.1043580Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T09:06:58.1150380Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T09:06:58.2445640Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T09:06:58.2574020Z ##[endgroup]
+2026-11-09T09:06:58.2575520Z ##[group]Fetching the repository
+2026-11-09T09:06:58.2590100Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9d8aab6986e474ea2df8f62091d97dc5aa992420:refs/remotes/pull/1799/merge
+2026-11-09T09:07:00.3556560Z From https://github.com/alexj11324/Mikka
+2026-11-09T09:07:00.3567840Z  * [new ref]         9d8aab6986e474ea2df8f62091d97dc5aa992420 -> pull/1799/merge
+2026-11-09T09:07:00.3612300Z ##[endgroup]
+2026-11-09T09:07:00.3612840Z ##[group]Determining the checkout info
+2026-11-09T09:07:00.3613420Z ##[endgroup]
+2026-11-09T09:07:00.3614030Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-11-09T09:07:00.3716010Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T09:07:00.3808930Z ##[group]Checking out the ref
+2026-11-09T09:07:00.3810810Z [command]/opt/homebrew/bin/git checkout --progress --force refs/remotes/pull/1799/merge
+2026-11-09T09:07:01.4800930Z Updating files:  49% (3340/6762)
+2026-11-09T09:07:01.4943500Z Updating files:  50% (3381/6762)
+2026-11-09T09:07:01.5048480Z Updating files:  51% (3449/6762)
+2026-11-09T09:07:01.5141590Z Updating files:  52% (3517/6762)
+2026-11-09T09:07:01.5327170Z Updating files:  53% (3584/6762)
+2026-11-09T09:07:01.5434190Z Updating files:  54% (3652/6762)
+2026-11-09T09:07:01.5526270Z Updating files:  55% (3720/6762)
+2026-11-09T09:07:01.5665870Z Updating files:  56% (3787/6762)
+2026-11-09T09:07:01.5839400Z Updating files:  57% (3855/6762)
+2026-11-09T09:07:01.5935750Z Updating files:  58% (3922/6762)
+2026-11-09T09:07:01.6011870Z Updating files:  59% (3990/6762)
+2026-11-09T09:07:01.6164040Z Updating files:  60% (4058/6762)
+2026-11-09T09:07:01.6259460Z Updating files:  61% (4125/6762)
+2026-11-09T09:07:01.6427610Z Updating files:  62% (4193/6762)
+2026-11-09T09:07:01.6669860Z Updating files:  63% (4261/6762)
+2026-11-09T09:07:01.6833750Z Updating files:  64% (4328/6762)
+2026-11-09T09:07:01.7340540Z Updating files:  65% (4396/6762)
+2026-11-09T09:07:01.7434570Z Updating files:  66% (4463/6762)
+2026-11-09T09:07:01.7576190Z Updating files:  67% (4531/6762)
+2026-11-09T09:07:01.7696170Z Updating files:  68% (4599/6762)
+2026-11-09T09:07:01.7864580Z Updating files:  69% (4666/6762)
+2026-11-09T09:07:01.8097610Z Updating files:  70% (4734/6762)
+2026-11-09T09:07:01.8227420Z Updating files:  71% (4802/6762)
+2026-11-09T09:07:01.8331960Z Updating files:  72% (4869/6762)
+2026-11-09T09:07:01.8480460Z Updating files:  73% (4937/6762)
+2026-11-09T09:07:01.8586980Z Updating files:  74% (5004/6762)
+2026-11-09T09:07:01.8672000Z Updating files:  75% (5072/6762)
+2026-11-09T09:07:01.8756890Z Updating files:  76% (5140/6762)
+2026-11-09T09:07:01.8886450Z Updating files:  77% (5207/6762)
+2026-11-09T09:07:01.8985950Z Updating files:  78% (5275/6762)
+2026-11-09T09:07:01.9075290Z Updating files:  79% (5342/6762)
+2026-11-09T09:07:01.9169930Z Updating files:  80% (5410/6762)
+2026-11-09T09:07:01.9287420Z Updating files:  81% (5478/6762)
+2026-11-09T09:07:01.9430640Z Updating files:  82% (5545/6762)
+2026-11-09T09:07:01.9615350Z Updating files:  83% (5613/6762)
+2026-11-09T09:07:01.9729210Z Updating files:  84% (5681/6762)
+2026-11-09T09:07:01.9840000Z Updating files:  85% (5748/6762)
+2026-11-09T09:07:01.9987740Z Updating files:  86% (5816/6762)
+2026-11-09T09:07:02.0149750Z Updating files:  87% (5883/6762)
+2026-11-09T09:07:02.0318910Z Updating files:  88% (5951/6762)
+2026-11-09T09:07:02.0430970Z Updating files:  89% (6019/6762)
+2026-11-09T09:07:02.0583470Z Updating files:  90% (6086/6762)
+2026-11-09T09:07:02.0712690Z Updating files:  91% (6154/6762)
+2026-11-09T09:07:02.0797150Z Updating files:  92% (6222/6762)
+2026-11-09T09:07:02.0935950Z Updating files:  93% (6289/6762)
+2026-11-09T09:07:02.1017330Z Updating files:  94% (6357/6762)
+2026-11-09T09:07:02.1115270Z Updating files:  95% (6424/6762)
+2026-11-09T09:07:02.1243340Z Updating files:  96% (6492/6762)
+2026-11-09T09:07:02.1348060Z Updating files:  97% (6560/6762)
+2026-11-09T09:07:02.1487310Z Updating files:  98% (6627/6762)
+2026-11-09T09:07:02.1569260Z Updating files:  99% (6695/6762)
+2026-11-09T09:07:02.1571730Z Updating files: 100% (6762/6762)
+2026-11-09T09:07:02.1572020Z Updating files: 100% (6762/6762), done.
+2026-11-09T09:07:02.1690900Z HEAD is now at 9d8aab6 Merge c0e94d594f1ecf4f5edc25904912702e61fce86b into 0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6
+2026-11-09T09:07:02.1718220Z ##[endgroup]
+2026-11-09T09:07:02.1894700Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-11-09T09:07:02.1991800Z 9d8aab6986e474ea2df8f62091d97dc5aa992420
+2026-11-09T09:07:02.2277590Z ##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+2026-11-09T09:07:02.2277980Z with:
+2026-11-09T09:07:02.2278220Z   version: 10.34.3
+2026-11-09T09:07:02.2278530Z   dest: ~/setup-pnpm
+2026-11-09T09:07:02.2278720Z   run_install: null
+2026-11-09T09:07:02.2278930Z   cache: false
+2026-11-09T09:07:02.2279330Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-09T09:07:02.2279590Z   package_json_file: package.json
+2026-11-09T09:07:02.2279780Z   standalone: false
+2026-11-09T09:07:02.2279930Z ##[endgroup]
+2026-11-09T09:07:02.4743690Z ##[group]Running self-installer...
+2026-11-09T09:07:02.9738400Z (node:1189) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T09:07:02.9739500Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:07:03.1715880Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T09:07:03.1829530Z Packages: +1
+2026-11-09T09:07:03.1887560Z +
+2026-11-09T09:07:04.1749710Z Progress: resolved 1, reused 0, downloaded 1, added 0
+2026-11-09T09:07:04.3425860Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-09T09:07:04.3988710Z 
+2026-11-09T09:07:04.3990420Z dependencies:
+2026-11-09T09:07:04.4008950Z + pnpm 10.34.3 (12.18.0 is available)
+2026-11-09T09:07:04.4009270Z 
+2026-11-09T09:07:04.4054210Z Done in 1.7s
+2026-11-09T09:07:04.4235920Z ##[endgroup]
+2026-11-09T09:07:04.4236510Z Installation Completed!
+2026-11-09T09:07:04.4424290Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T09:07:04.4424670Z with:
+2026-11-09T09:07:04.4424850Z   node-version: 24.22.1
+2026-11-09T09:07:04.4425160Z   cache: pnpm
+2026-11-09T09:07:04.4425450Z   always-auth: false
+2026-11-09T09:07:04.4425720Z   check-latest: false
+2026-11-09T09:07:04.4428470Z   token: ***
+2026-11-09T09:07:04.4428630Z env:
+2026-11-09T09:07:04.4428830Z   PNPM_HOME: /Users/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:07:04.4429080Z ##[endgroup]
+2026-11-09T09:07:04.6504240Z Attempting to download 24.22.1...
+2026-11-09T09:07:04.6674400Z (node:1192) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T09:07:04.6694390Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:07:05.4134840Z Acquiring 24.22.1 - arm64 from https://github.com/actions/node-versions/releases/download/24.22.1-39619001896/node-24.22.1-darwin-arm64.tar.gz
+2026-11-09T09:07:06.1750110Z Extracting ...
+2026-11-09T09:07:06.1966210Z [command]/usr/bin/tar xz --strip 1 -C /Users/runner/work/_temp/caee811a-b4b2-4775-9f8c-603e7b95769b -f /Users/runner/work/_temp/1160fe18-8cf6-48aa-ae9e-412c4ae98800
+2026-11-09T09:07:07.8986510Z Adding to the cache ...
+2026-11-09T09:07:14.4245850Z ##[group]Environment details
+2026-11-09T09:07:15.2597440Z node: v24.22.1
+2026-11-09T09:07:15.2598730Z npm: 11.19.1
+2026-11-09T09:07:15.2599760Z yarn: 1.22.22
+2026-11-09T09:07:15.2601790Z ##[endgroup]
+2026-11-09T09:07:15.2636150Z [command]/Users/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-11-09T09:07:15.9780070Z /Users/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-09T09:07:16.2977120Z pnpm cache is not found
+2026-11-09T09:07:16.3368710Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-09T09:07:16.3369130Z [36;1mpnpm install --frozen-lockfile[0m
+2026-11-09T09:07:16.3433390Z shell: /bin/bash -e {0}
+2026-11-09T09:07:16.3433870Z env:
+2026-11-09T09:07:16.3434120Z   PNPM_HOME: /Users/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:07:16.3434390Z ##[endgroup]
+2026-11-09T09:07:17.0791940Z Scope: all 7 workspace projects
+2026-11-09T09:07:17.2742070Z Lockfile is up to date, resolution step is skipped
+2026-11-09T09:07:17.4055150Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T09:07:17.5492640Z Packages: +2184
+2026-11-09T09:07:17.5594400Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-09T09:07:18.4184990Z Progress: resolved 2184, reused 0, downloaded 5, added 0
+2026-11-09T09:07:19.4192840Z Progress: resolved 2184, reused 0, downloaded 26, added 4
+2026-11-09T09:07:20.4148650Z Progress: resolved 2184, reused 0, downloaded 40, added 8
+2026-11-09T09:07:21.4179290Z Progress: resolved 2184, reused 0, downloaded 67, added 16
+2026-11-09T09:07:22.4215390Z Progress: resolved 2184, reused 0, downloaded 125, added 31
+2026-11-09T09:07:23.4366340Z Progress: resolved 2184, reused 0, downloaded 182, added 47
+2026-11-09T09:07:24.4437900Z Progress: resolved 2184, reused 0, downloaded 214, added 55
+2026-11-09T09:07:25.4357270Z Progress: resolved 2184, reused 0, downloaded 226, added 59
+2026-11-09T09:07:26.4345650Z Progress: resolved 2184, reused 0, downloaded 229, added 59
+2026-11-09T09:07:27.4455490Z Progress: resolved 2184, reused 0, downloaded 284, added 74
+2026-11-09T09:07:28.4523290Z Progress: resolved 2184, reused 0, downloaded 318, added 84
+2026-11-09T09:07:29.4455840Z Progress: resolved 2184, reused 0, downloaded 341, added 90
+2026-11-09T09:07:30.4482030Z Progress: resolved 2184, reused 0, downloaded 364, added 98
+2026-11-09T09:07:31.4568830Z Progress: resolved 2184, reused 0, downloaded 378, added 102
+2026-11-09T09:07:32.4585030Z Progress: resolved 2184, reused 0, downloaded 397, added 106
+2026-11-09T09:07:33.4613530Z Progress: resolved 2184, reused 0, downloaded 414, added 114
+2026-11-09T09:07:35.4583340Z Progress: resolved 2184, reused 0, downloaded 415, added 114
+2026-11-09T09:07:36.4599000Z Progress: resolved 2184, reused 0, downloaded 430, added 118
+2026-11-09T09:07:37.4892630Z Progress: resolved 2184, reused 0, downloaded 461, added 126
+2026-11-09T09:07:38.4945480Z Progress: resolved 2184, reused 0, downloaded 497, added 139
+2026-11-09T09:07:39.4957610Z Progress: resolved 2184, reused 0, downloaded 501, added 139
+2026-11-09T09:07:40.5025920Z Progress: resolved 2184, reused 0, downloaded 516, added 143
+2026-11-09T09:07:41.5032090Z Progress: resolved 2184, reused 0, downloaded 616, added 177
+2026-11-09T09:07:42.5258150Z Progress: resolved 2184, reused 0, downloaded 717, added 211
+2026-11-09T09:07:43.5185720Z Progress: resolved 2184, reused 0, downloaded 772, added 228
+2026-11-09T09:07:44.5269540Z Progress: resolved 2184, reused 0, downloaded 793, added 234
+2026-11-09T09:07:45.5773310Z Progress: resolved 2184, reused 0, downloaded 793, added 235
+2026-11-09T09:07:46.5764370Z Progress: resolved 2184, reused 0, downloaded 805, added 238
+2026-11-09T09:07:47.5796170Z Progress: resolved 2184, reused 0, downloaded 815, added 241
+2026-11-09T09:07:48.5808570Z Progress: resolved 2184, reused 0, downloaded 822, added 244
+2026-11-09T09:07:49.5937830Z Progress: resolved 2184, reused 0, downloaded 870, added 260
+2026-11-09T09:07:50.5852670Z Progress: resolved 2184, reused 0, downloaded 904, added 273
+2026-11-09T09:07:51.5870580Z Progress: resolved 2184, reused 0, downloaded 972, added 292
+2026-11-09T09:07:52.5897170Z Progress: resolved 2184, reused 0, downloaded 1008, added 305
+2026-11-09T09:07:53.5922350Z Progress: resolved 2184, reused 0, downloaded 1019, added 307
+2026-11-09T09:07:54.5982350Z Progress: resolved 2184, reused 0, downloaded 1030, added 311
+2026-11-09T09:07:55.5991000Z Progress: resolved 2184, reused 0, downloaded 1036, added 313
+2026-11-09T09:07:56.6097300Z Progress: resolved 2184, reused 0, downloaded 1042, added 315
+2026-11-09T09:07:58.3089200Z Progress: resolved 2184, reused 0, downloaded 1043, added 315
+2026-11-09T09:07:59.3144910Z Progress: resolved 2184, reused 0, downloaded 1045, added 315
+2026-11-09T09:08:00.8693950Z Progress: resolved 2184, reused 0, downloaded 1046, added 315
+2026-11-09T09:08:01.8659510Z Progress: resolved 2184, reused 0, downloaded 1055, added 319
+2026-11-09T09:08:02.8681290Z Progress: resolved 2184, reused 0, downloaded 1082, added 327
+2026-11-09T09:08:03.8681510Z Progress: resolved 2184, reused 0, downloaded 1129, added 340
+2026-11-09T09:08:04.8715950Z Progress: resolved 2184, reused 0, downloaded 1172, added 354
+2026-11-09T09:08:05.8748020Z Progress: resolved 2184, reused 0, downloaded 1176, added 355
+2026-11-09T09:08:06.8756980Z Progress: resolved 2184, reused 0, downloaded 1177, added 355
+2026-11-09T09:08:07.8770990Z Progress: resolved 2184, reused 0, downloaded 1205, added 364
+2026-11-09T09:08:08.8789420Z Progress: resolved 2184, reused 0, downloaded 1213, added 366
+2026-11-09T09:08:09.8824160Z Progress: resolved 2184, reused 0, downloaded 1251, added 377
+2026-11-09T09:08:10.8839420Z Progress: resolved 2184, reused 0, downloaded 1255, added 377
+2026-11-09T09:08:11.8839040Z Progress: resolved 2184, reused 0, downloaded 1275, added 382
+2026-11-09T09:08:12.8864330Z Progress: resolved 2184, reused 0, downloaded 1339, added 404
+2026-11-09T09:08:13.8892960Z Progress: resolved 2184, reused 0, downloaded 1374, added 414
+2026-11-09T09:08:14.8897910Z Progress: resolved 2184, reused 0, downloaded 1385, added 416
+2026-11-09T09:08:16.0907870Z Progress: resolved 2184, reused 0, downloaded 1385, added 417
+2026-11-09T09:08:17.4975000Z Progress: resolved 2184, reused 0, downloaded 1386, added 417
+2026-11-09T09:08:18.4961690Z Progress: resolved 2184, reused 0, downloaded 1394, added 420
+2026-11-09T09:08:19.4964310Z Progress: resolved 2184, reused 0, downloaded 1421, added 427
+2026-11-09T09:08:20.4997200Z Progress: resolved 2184, reused 0, downloaded 1453, added 434
+2026-11-09T09:08:21.5019470Z Progress: resolved 2184, reused 0, downloaded 1468, added 439
+2026-11-09T09:08:22.5029250Z Progress: resolved 2184, reused 0, downloaded 1494, added 446
+2026-11-09T09:08:23.5037130Z Progress: resolved 2184, reused 0, downloaded 1511, added 452
+2026-11-09T09:08:24.5056140Z Progress: resolved 2184, reused 0, downloaded 1515, added 452
+2026-11-09T09:08:25.5114960Z Progress: resolved 2184, reused 0, downloaded 1522, added 456
+2026-11-09T09:08:26.5122360Z Progress: resolved 2184, reused 0, downloaded 1577, added 470
+2026-11-09T09:08:29.0550300Z Progress: resolved 2184, reused 0, downloaded 1577, added 471
+2026-11-09T09:08:30.0519540Z Progress: resolved 2184, reused 0, downloaded 1617, added 483
+2026-11-09T09:08:31.0532140Z Progress: resolved 2184, reused 0, downloaded 1659, added 496
+2026-11-09T09:08:32.0545820Z Progress: resolved 2184, reused 0, downloaded 1675, added 500
+2026-11-09T09:08:33.0557530Z Progress: resolved 2184, reused 0, downloaded 1694, added 505
+2026-11-09T09:08:34.0572430Z Progress: resolved 2184, reused 0, downloaded 1721, added 511
+2026-11-09T09:08:35.0589890Z Progress: resolved 2184, reused 0, downloaded 1757, added 523
+2026-11-09T09:08:36.0595790Z Progress: resolved 2184, reused 0, downloaded 1784, added 529
+2026-11-09T09:08:37.0599090Z Progress: resolved 2184, reused 0, downloaded 1825, added 542
+2026-11-09T09:08:38.0907140Z Progress: resolved 2184, reused 0, downloaded 1833, added 545
+2026-11-09T09:08:39.0795290Z Progress: resolved 2184, reused 0, downloaded 1840, added 548
+2026-11-09T09:08:40.0817010Z Progress: resolved 2184, reused 0, downloaded 1844, added 549
+2026-11-09T09:08:41.0861220Z Progress: resolved 2184, reused 0, downloaded 1850, added 550
+2026-11-09T09:08:42.1254880Z Progress: resolved 2184, reused 0, downloaded 1851, added 550
+2026-11-09T09:08:43.2380670Z Progress: resolved 2184, reused 0, downloaded 1852, added 550
+2026-11-09T09:08:44.2375020Z Progress: resolved 2184, reused 0, downloaded 1855, added 552
+2026-11-09T09:08:45.7355580Z Progress: resolved 2184, reused 0, downloaded 1856, added 552
+2026-11-09T09:08:46.7354740Z Progress: resolved 2184, reused 0, downloaded 1867, added 556
+2026-11-09T09:08:47.7385010Z Progress: resolved 2184, reused 0, downloaded 1872, added 557
+2026-11-09T09:08:48.7408970Z Progress: resolved 2184, reused 0, downloaded 1881, added 558
+2026-11-09T09:08:50.2178490Z Progress: resolved 2184, reused 0, downloaded 1881, added 559
+2026-11-09T09:08:51.2336610Z Progress: resolved 2184, reused 0, downloaded 1931, added 574
+2026-11-09T09:08:52.2233480Z Progress: resolved 2184, reused 0, downloaded 1940, added 577
+2026-11-09T09:08:53.2259520Z Progress: resolved 2184, reused 0, downloaded 1944, added 578
+2026-11-09T09:08:55.0302170Z Progress: resolved 2184, reused 0, downloaded 1945, added 578
+2026-11-09T09:08:56.0316640Z Progress: resolved 2184, reused 0, downloaded 1968, added 586
+2026-11-09T09:08:57.0337890Z Progress: resolved 2184, reused 0, downloaded 2003, added 595
+2026-11-09T09:08:58.0352820Z Progress: resolved 2184, reused 0, downloaded 2012, added 599
+2026-11-09T09:08:59.1484760Z Progress: resolved 2184, reused 0, downloaded 2013, added 599
+2026-11-09T09:09:00.1506810Z Progress: resolved 2184, reused 0, downloaded 2030, added 603
+2026-11-09T09:09:01.1528950Z Progress: resolved 2184, reused 0, downloaded 2052, added 611
+2026-11-09T09:09:02.1554290Z Progress: resolved 2184, reused 0, downloaded 2072, added 616
+2026-11-09T09:09:03.6813770Z Progress: resolved 2184, reused 0, downloaded 2073, added 616
+2026-11-09T09:09:04.6704970Z Progress: resolved 2184, reused 0, downloaded 2085, added 619
+2026-11-09T09:09:05.6733810Z Progress: resolved 2184, reused 0, downloaded 2105, added 625
+2026-11-09T09:09:06.6778200Z Progress: resolved 2184, reused 0, downloaded 2108, added 764
+2026-11-09T09:09:07.6804500Z Progress: resolved 2184, reused 0, downloaded 2108, added 848
+2026-11-09T09:09:08.6804580Z Progress: resolved 2184, reused 0, downloaded 2108, added 863
+2026-11-09T09:09:09.6825480Z Progress: resolved 2184, reused 0, downloaded 2108, added 864
+2026-11-09T09:09:10.6846310Z Progress: resolved 2184, reused 0, downloaded 2108, added 873
+2026-11-09T09:09:11.6863560Z Progress: resolved 2184, reused 0, downloaded 2108, added 923
+2026-11-09T09:09:12.6900780Z Progress: resolved 2184, reused 0, downloaded 2108, added 940
+2026-11-09T09:09:13.6904100Z Progress: resolved 2184, reused 0, downloaded 2108, added 994
+2026-11-09T09:09:14.6920450Z Progress: resolved 2184, reused 0, downloaded 2108, added 1062
+2026-11-09T09:09:15.6958100Z Progress: resolved 2184, reused 0, downloaded 2108, added 1083
+2026-11-09T09:09:16.6971410Z Progress: resolved 2184, reused 0, downloaded 2108, added 1097
+2026-11-09T09:09:17.6964300Z Progress: resolved 2184, reused 0, downloaded 2108, added 1103
+2026-11-09T09:09:18.6983710Z Progress: resolved 2184, reused 0, downloaded 2108, added 1106
+2026-11-09T09:09:21.9676490Z Progress: resolved 2184, reused 0, downloaded 2108, added 1107
+2026-11-09T09:09:24.2111440Z Progress: resolved 2184, reused 0, downloaded 2108, added 1108
+2026-11-09T09:09:25.2098490Z Progress: resolved 2184, reused 0, downloaded 2108, added 1124
+2026-11-09T09:09:26.2109920Z Progress: resolved 2184, reused 0, downloaded 2108, added 1135
+2026-11-09T09:09:27.2129850Z Progress: resolved 2184, reused 0, downloaded 2108, added 1156
+2026-11-09T09:09:28.2142510Z Progress: resolved 2184, reused 0, downloaded 2108, added 1244
+2026-11-09T09:09:29.2185220Z Progress: resolved 2184, reused 0, downloaded 2108, added 1246
+2026-11-09T09:09:31.0149640Z Progress: resolved 2184, reused 0, downloaded 2108, added 1247
+2026-11-09T09:09:32.0148800Z Progress: resolved 2184, reused 0, downloaded 2108, added 1282
+2026-11-09T09:09:33.0207500Z Progress: resolved 2184, reused 0, downloaded 2108, added 1315
+2026-11-09T09:09:34.0207650Z Progress: resolved 2184, reused 0, downloaded 2108, added 1357
+2026-11-09T09:09:35.0266290Z Progress: resolved 2184, reused 0, downloaded 2108, added 1422
+2026-11-09T09:09:36.0285700Z Progress: resolved 2184, reused 0, downloaded 2108, added 1495
+2026-11-09T09:09:37.0412650Z Progress: resolved 2184, reused 0, downloaded 2108, added 1531
+2026-11-09T09:09:38.0354430Z Progress: resolved 2184, reused 0, downloaded 2108, added 1578
+2026-11-09T09:09:39.0343580Z Progress: resolved 2184, reused 0, downloaded 2108, added 1610
+2026-11-09T09:09:40.0387320Z Progress: resolved 2184, reused 0, downloaded 2108, added 1681
+2026-11-09T09:09:41.0391020Z Progress: resolved 2184, reused 0, downloaded 2108, added 1729
+2026-11-09T09:09:42.0422550Z Progress: resolved 2184, reused 0, downloaded 2108, added 1774
+2026-11-09T09:09:43.0437550Z Progress: resolved 2184, reused 0, downloaded 2108, added 1881
+2026-11-09T09:09:44.0462120Z Progress: resolved 2184, reused 0, downloaded 2108, added 1916
+2026-11-09T09:09:45.0475250Z Progress: resolved 2184, reused 0, downloaded 2108, added 1924
+2026-11-09T09:09:46.0507010Z Progress: resolved 2184, reused 0, downloaded 2108, added 1933
+2026-11-09T09:09:47.0537060Z Progress: resolved 2184, reused 0, downloaded 2108, added 1937
+2026-11-09T09:09:48.0561600Z Progress: resolved 2184, reused 0, downloaded 2108, added 2012
+2026-11-09T09:09:49.0611350Z Progress: resolved 2184, reused 0, downloaded 2108, added 2014
+2026-11-09T09:09:50.0655280Z Progress: resolved 2184, reused 0, downloaded 2108, added 2024
+2026-11-09T09:09:51.0671670Z Progress: resolved 2184, reused 0, downloaded 2108, added 2077
+2026-11-09T09:09:52.0686670Z Progress: resolved 2184, reused 0, downloaded 2108, added 2082
+2026-11-09T09:09:53.0715460Z Progress: resolved 2184, reused 0, downloaded 2108, added 2127
+2026-11-09T09:09:55.0827840Z Progress: resolved 2184, reused 0, downloaded 2108, added 2128
+2026-11-09T09:09:56.0841080Z Progress: resolved 2184, reused 0, downloaded 2108, added 2174
+2026-11-09T09:09:57.4198780Z Progress: resolved 2184, reused 0, downloaded 2108, added 2175
+2026-11-09T09:09:57.9181620Z Progress: resolved 2184, reused 0, downloaded 2108, added 2184, done
+2026-11-09T09:09:58.7365460Z .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T09:09:58.7838490Z .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-11-09T09:09:58.7885860Z .../node_modules/ffmpeg-static install$ node install.js
+2026-11-09T09:09:58.8021020Z .../node_modules/@parcel/watcher install$ node scripts/build-from-source.js
+2026-11-09T09:09:58.8792890Z .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T09:09:58.9331300Z .../node_modules/@parcel/watcher install: Done
+2026-11-09T09:09:58.9501490Z .../node_modules/@swc/core postinstall: Done
+2026-11-09T09:09:58.9971600Z .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-11-09T09:09:59.1141580Z .../node_modules/@swc/core postinstall: Done
+2026-11-09T09:09:59.9479440Z .../node_modules/ffmpeg-static install: ffmpeg binary, README and LICENSE verified.
+2026-11-09T09:09:59.9503830Z .../node_modules/ffmpeg-static install: Done
+2026-11-09T09:10:00.1821970Z  WARN  Failed to create bin at /Users/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/Users/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-09T09:10:00.5612520Z 
+2026-11-09T09:10:00.5613780Z dependencies:
+2026-11-09T09:10:00.5634800Z + @ai-sdk/gateway 4.0.121
+2026-11-09T09:10:00.5635830Z + @ai-sdk/mcp 2.0.81
+2026-11-09T09:10:00.5637000Z + @ai-sdk/openai 4.0.99
+2026-11-09T09:10:00.5638810Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-09T09:10:00.5641630Z + @ai-sdk/react 4.0.152
+2026-11-09T09:10:00.5642260Z + @ai-sdk/workflow 2.0.80
+2026-11-09T09:10:00.5642750Z + @base-ui/react 1.9.0
+2026-11-09T09:10:00.5643100Z + @better-auth/core 1.7.12
+2026-11-09T09:10:00.5643520Z + @better-auth/expo 1.7.12
+2026-11-09T09:10:00.5643910Z + @better-auth/oauth-provider 1.7.12
+2026-11-09T09:10:00.5644350Z + @chat-adapter/slack 4.43.0
+2026-11-09T09:10:00.5645180Z + @chat-adapter/state-pg 4.43.0
+2026-11-09T09:10:00.5645600Z + @chat-adapter/telegram 4.43.0
+2026-11-09T09:10:00.5646100Z + @composio/core 0.26.0
+2026-11-09T09:10:00.5646520Z + @dnd-kit/core 6.3.1
+2026-11-09T09:10:00.5646930Z + @dnd-kit/sortable 10.0.0
+2026-11-09T09:10:00.5651670Z + @dnd-kit/utilities 3.2.2
+2026-11-09T09:10:00.5652150Z + @e965/xlsx 0.20.3
+2026-11-09T09:10:00.5652440Z + @floating-ui/dom 1.8.0
+2026-11-09T09:10:00.5652720Z + @formatjs/intl-localematcher 0.8.14
+2026-11-09T09:10:00.5653060Z + @heroui/react 3.2.6
+2026-11-09T09:10:00.5653300Z + @heroui/styles 3.2.6
+2026-11-09T09:10:00.5653650Z + @internationalized/date 3.12.4
+2026-11-09T09:10:00.5654010Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-09T09:10:00.5654480Z + @modelcontextprotocol/server 2.3.1
+2026-11-09T09:10:00.5654930Z + @norbert_bodziony/bloub 0.4.1
+2026-11-09T09:10:00.5655240Z + @novnc/novnc 1.6.0
+2026-11-09T09:10:00.5655480Z + @opentelemetry/api 1.10.0
+2026-11-09T09:10:00.5655840Z + @opentelemetry/api-logs 0.223.0
+2026-11-09T09:10:00.5656300Z + @opentelemetry/core 2.12.0
+2026-11-09T09:10:00.5657340Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-09T09:10:00.5659320Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-09T09:10:00.5659840Z + @opentelemetry/instrumentation 0.223.0
+2026-11-09T09:10:00.5660740Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-09T09:10:00.5661900Z + @opentelemetry/resources 2.12.0
+2026-11-09T09:10:00.5662850Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-09T09:10:00.5663220Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-09T09:10:00.5670250Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-09T09:10:00.5670800Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-09T09:10:00.5671160Z + @openuidev/lang-core 1.0.1
+2026-11-09T09:10:00.5671530Z + @openuidev/react-lang 1.0.1
+2026-11-09T09:10:00.5671800Z + @openuidev/react-ui 0.18.1
+2026-11-09T09:10:00.5672080Z + @pierre/diffs 1.6.4
+2026-11-09T09:10:00.5672340Z + @shadcn/react 0.3.1
+2026-11-09T09:10:00.5672570Z + @solidjs/web 2.0.0-rc.0
+2026-11-09T09:10:00.5672910Z + @stripe/stripe-js 10.1.0
+2026-11-09T09:10:00.5673210Z + @tanstack/react-virtual 3.14.18
+2026-11-09T09:10:00.5673560Z + @tiptap/core 3.32.0
+2026-11-09T09:10:00.5673890Z + @tiptap/extension-collaboration 3.32.0
+2026-11-09T09:10:00.5674300Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-09T09:10:00.5674730Z + @tiptap/extension-highlight 3.32.0
+2026-11-09T09:10:00.5675040Z + @tiptap/extension-list 3.32.0
+2026-11-09T09:10:00.5675400Z + @tiptap/extension-mention 3.32.0
+2026-11-09T09:10:00.5675690Z + @tiptap/extension-table 3.32.0
+2026-11-09T09:10:00.5676130Z + @tiptap/extension-text-align 3.32.0
+2026-11-09T09:10:00.5676520Z + @tiptap/extensions 3.32.0
+2026-11-09T09:10:00.5676750Z + @tiptap/pm 3.32.0
+2026-11-09T09:10:00.5677050Z + @tiptap/react 3.32.0
+2026-11-09T09:10:00.5677300Z + @tiptap/starter-kit 3.32.0
+2026-11-09T09:10:00.5677680Z + @tiptap/suggestion 3.32.0
+2026-11-09T09:10:00.5677920Z + @tiptap/y-tiptap 3.0.10
+2026-11-09T09:10:00.5678200Z + @vercel/analytics 1.3.1
+2026-11-09T09:10:00.5678470Z + @vercel/functions 3.10.2
+2026-11-09T09:10:00.5678740Z + @vercel/oidc 4.0.2
+2026-11-09T09:10:00.5679290Z + @workflow/serde 5.0.0
+2026-11-09T09:10:00.5679800Z + @workflow/world-local 5.1.2
+2026-11-09T09:10:00.5680060Z + ai 7.0.148
+2026-11-09T09:10:00.5680840Z + aws4fetch 1.0.20
+2026-11-09T09:10:00.5681170Z + beautiful-mermaid 1.1.3
+2026-11-09T09:10:00.5681500Z + better-auth 1.7.12
+2026-11-09T09:10:00.5681720Z + chat 4.43.0
+2026-11-09T09:10:00.5682090Z + class-variance-authority 0.7.1
+2026-11-09T09:10:00.5682370Z + clsx 2.1.1
+2026-11-09T09:10:00.5682620Z + cmdk 1.1.1
+2026-11-09T09:10:00.5682870Z + cn 0.5.0
+2026-11-09T09:10:00.5683060Z + cookie 1.1.1
+2026-11-09T09:10:00.5683290Z + date-fns 4.1.0
+2026-11-09T09:10:00.5683470Z + diff 8.0.2
+2026-11-09T09:10:00.5683710Z + dompurify 3.4.17
+2026-11-09T09:10:00.5684060Z + drizzle-orm 0.45.4
+2026-11-09T09:10:00.5684360Z + e2b 2.61.0
+2026-11-09T09:10:00.5684610Z + embla-carousel-react 8.5.1
+2026-11-09T09:10:00.5684880Z + fflate 0.8.3
+2026-11-09T09:10:00.5685670Z + ffmpeg-static 5.3.0
+2026-11-09T09:10:00.5686390Z + file-type 22.3.0
+2026-11-09T09:10:00.5686900Z + h3 2.0.8
+2026-11-09T09:10:00.5687220Z + hono 4.13.13
+2026-11-09T09:10:00.5687510Z + input-otp 1.4.1
+2026-11-09T09:10:00.5687720Z + katex 0.16.47
+2026-11-09T09:10:00.5688440Z + lucide-react 1.60.0
+2026-11-09T09:10:00.5688680Z + mcp-handler 2.3.0
+2026-11-09T09:10:00.5688910Z + mermaid 12.2.0
+2026-11-09T09:10:00.5689130Z + motion 14.5.0
+2026-11-09T09:10:00.5689360Z + music-metadata 12.3.4
+2026-11-09T09:10:00.5689640Z + negotiator 1.1.0
+2026-11-09T09:10:00.5689860Z + next 16.4.1
+2026-11-09T09:10:00.5690190Z + next-intl 4.14.9
+2026-11-09T09:10:00.5690390Z + next-themes 0.4.6
+2026-11-09T09:10:00.5690680Z + nodemailer 10.3.1
+2026-11-09T09:10:00.5691490Z + officeparser 8.5.0
+2026-11-09T09:10:00.5692020Z + pg 8.23.1
+2026-11-09T09:10:00.5693350Z + posthog-js 1.438.13
+2026-11-09T09:10:00.5693720Z + posthog-node 5.55.2
+2026-11-09T09:10:00.5694630Z + react 19.3.1
+2026-11-09T09:10:00.5695170Z + react-day-picker 9.8.0
+2026-11-09T09:10:00.5726990Z + react-dom 19.3.1
+2026-11-09T09:10:00.5727240Z + react-markdown 10.1.0
+2026-11-09T09:10:00.5727570Z + react-resizable-panels 4.14.7
+2026-11-09T09:10:00.5727880Z + react-syntax-highlighter 16.1.1
+2026-11-09T09:10:00.5728190Z + recharts 3.10.1
+2026-11-09T09:10:00.5728940Z + rehype-katex 7.0.1
+2026-11-09T09:10:00.5729230Z + remark-gfm 4.0.1
+2026-11-09T09:10:00.5729490Z + remark-math 6.0.0
+2026-11-09T09:10:00.5729720Z + shadcn 4.22.1
+2026-11-09T09:10:00.5730100Z + sharp 0.35.5
+2026-11-09T09:10:00.5730620Z + shiki 4.5.0
+2026-11-09T09:10:00.5730990Z + solid-js 2.0.0-rc.0
+2026-11-09T09:10:00.5731250Z + sonner 1.7.4
+2026-11-09T09:10:00.5731520Z + srvx 1.0.8
+2026-11-09T09:10:00.5731830Z + swr 2.5.1
+2026-11-09T09:10:00.5732080Z + tailwind-merge 3.7.0
+2026-11-09T09:10:00.5732500Z + tw-animate-css 1.4.0
+2026-11-09T09:10:00.5732810Z + undici 7.24.5
+2026-11-09T09:10:00.5733090Z + unstorage 2.0.0-beta.0
+2026-11-09T09:10:00.5733380Z + use-intl 4.14.9
+2026-11-09T09:10:00.5733650Z + vaul 1.1.2
+2026-11-09T09:10:00.5733900Z + workflow 5.2.3
+2026-11-09T09:10:00.5734090Z + y-protocols 1.0.7
+2026-11-09T09:10:00.5734330Z + yjs 13.6.33
+2026-11-09T09:10:00.5734500Z + zod 4.6.7
+2026-11-09T09:10:00.5734670Z 
+2026-11-09T09:10:00.5734870Z devDependencies:
+2026-11-09T09:10:00.5735130Z + @playwright/test 1.64.1
+2026-11-09T09:10:00.5735440Z + @tailwindcss/postcss 4.3.3
+2026-11-09T09:10:00.5735770Z + @types/node 25.9.9
+2026-11-09T09:10:00.5735990Z + @types/pg 8.23.1
+2026-11-09T09:10:00.5736250Z + @types/react 19.3.0
+2026-11-09T09:10:00.5736490Z + @types/react-dom 19.3.0
+2026-11-09T09:10:00.5736830Z + @types/react-syntax-highlighter 15.5.13
+2026-11-09T09:10:00.5738440Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-09T09:10:00.5738770Z + esbuild 0.28.2
+2026-11-09T09:10:00.5739010Z + fake-indexeddb 6.2.4
+2026-11-09T09:10:00.5739270Z + happy-dom 15.11.7
+2026-11-09T09:10:00.5739620Z + js-yaml 4.3.2
+2026-11-09T09:10:00.5739950Z + nitro 3.0.261103-rc
+2026-11-09T09:10:00.5740200Z + nx 24.0.5
+2026-11-09T09:10:00.5740520Z + oxlint 1.89.0
+2026-11-09T09:10:00.5740730Z + postcss 8.5.31
+2026-11-09T09:10:00.5741000Z + prettier 3.9.10
+2026-11-09T09:10:00.5741450Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-09T09:10:00.5741700Z + rolldown 1.3.0
+2026-11-09T09:10:00.5741970Z + tailwindcss 4.3.3
+2026-11-09T09:10:00.5742230Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-09T09:10:00.5742610Z + tsx 4.23.15
+2026-11-09T09:10:00.5742850Z + typescript 5.9.3
+2026-11-09T09:10:00.5743160Z + wrangler 4.152.0
+2026-11-09T09:10:00.5743390Z 
+2026-11-09T09:10:00.8092610Z  WARN  Failed to create bin at /Users/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/Users/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-09T09:10:00.8892490Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T09:10:00.8893880Z │                                                                              │
+2026-11-09T09:10:00.8896500Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T09:10:00.8898330Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-09T09:10:00.8899840Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-09T09:10:00.8900850Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T09:10:00.8901640Z │   to run scripts.                                                            │
+2026-11-09T09:10:00.8902290Z │                                                                              │
+2026-11-09T09:10:00.8902930Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T09:10:00.9042600Z Done in 2m 44.3s using pnpm v10.34.3
+2026-11-09T09:10:00.9669730Z ##[group]Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+2026-11-09T09:10:00.9670060Z with:
+2026-11-09T09:10:00.9670190Z   name: daemon-node22
+2026-11-09T09:10:00.9670350Z   path: artifacts/daemon
+2026-11-09T09:10:00.9670520Z   merge-multiple: false
+2026-11-09T09:10:00.9670680Z   repository: alexj11324/Mikka
+2026-11-09T09:10:00.9670850Z   run-id: 42590712054
+2026-11-09T09:10:00.9670990Z env:
+2026-11-09T09:10:00.9671160Z   PNPM_HOME: /Users/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:10:00.9671720Z ##[endgroup]
+2026-11-09T09:10:01.4380890Z Downloading single artifact
+2026-11-09T09:10:01.4576160Z (node:2864) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T09:10:01.4584310Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:10:01.7875290Z Preparing to download the following artifacts:
+2026-11-09T09:10:01.7876290Z - daemon-node22 (ID: 13660967620, Size: 963882, Expected Digest: sha256:8658f6f0871a61852fec388458c66732ad5bacc69a6b263016027cdedf3b0f82)
+2026-11-09T09:10:02.0247190Z Redirecting to blob download url: https://productionresultssa31.blob.core.windows.net/actions-results/e7e4aacf-6e84-8351-8958-a0e1ecf4cb35/workflow-job-run-f96ed047-8537-5729-9b7d-d34c2eb34596/artifacts/10f2cefea24b35046de35e86432d2d715e012f0ace53fc9f54e5f251378608d2.zip
+2026-11-09T09:10:02.0249630Z Starting download of artifact to: /Users/runner/work/Mikka/Mikka/artifacts/daemon
+2026-11-09T09:10:02.3541960Z (node:2864) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-11-09T09:10:02.8964280Z SHA256 digest of downloaded artifact is 8658f6f0871a61852fec388458c66732ad5bacc69a6b263016027cdedf3b0f82
+2026-11-09T09:10:02.8965060Z Artifact download completed successfully.
+2026-11-09T09:10:02.8965490Z Total of 1 artifact(s) downloaded
+2026-11-09T09:10:02.8971040Z Download artifact has finished successfully
+2026-11-09T09:10:02.9109910Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T09:10:02.9110250Z with:
+2026-11-09T09:10:02.9110400Z   node-version: 18.20.8
+2026-11-09T09:10:02.9110570Z   always-auth: false
+2026-11-09T09:10:02.9110750Z   check-latest: false
+2026-11-09T09:10:02.9112500Z   token: ***
+2026-11-09T09:10:02.9112650Z env:
+2026-11-09T09:10:02.9112850Z   PNPM_HOME: /Users/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:10:02.9113120Z ##[endgroup]
+2026-11-09T09:10:03.0598260Z Attempting to download 18.20.8...
+2026-11-09T09:10:03.0691810Z (node:2867) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T09:10:03.0693630Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:10:03.7832390Z Acquiring 18.20.8 - arm64 from https://github.com/actions/node-versions/releases/download/18.20.8-14110393767/node-18.20.8-darwin-arm64.tar.gz
+2026-11-09T09:10:04.2774220Z Extracting ...
+2026-11-09T09:10:04.2947830Z [command]/usr/bin/tar xz --strip 1 -C /Users/runner/work/_temp/b4b98a95-9c38-4dde-ac0e-a823334a6e8e -f /Users/runner/work/_temp/0c735521-fb2a-4950-a9eb-86095e56c0ee
+2026-11-09T09:10:05.6804300Z Adding to the cache ...
+2026-11-09T09:10:08.7369400Z ##[group]Environment details
+2026-11-09T09:10:09.0686730Z node: v18.20.8
+2026-11-09T09:10:09.0687920Z npm: 10.8.2
+2026-11-09T09:10:09.0688570Z yarn: 1.22.22
+2026-11-09T09:10:09.0689750Z ##[endgroup]
+2026-11-09T09:10:09.0875790Z ##[group]Run set -euo pipefail
+2026-11-09T09:10:09.0876110Z [36;1mset -euo pipefail[0m
+2026-11-09T09:10:09.0876670Z [36;1mexport MIKKA_DAEMON_TARBALL="$(find artifacts/daemon -name '*.tgz' -print -quit)"[0m
+2026-11-09T09:10:09.0877190Z [36;1mnode --import tsx scripts/acceptance/local-installer-macos.ts[0m
+2026-11-09T09:10:09.3188110Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T09:10:09.3188960Z env:
+2026-11-09T09:10:09.3189520Z   PNPM_HOME: /Users/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:10:09.3190190Z ##[endgroup]
+2026-11-09T09:10:09.9617810Z {"platform":"darwin","arch":"arm64","node":"18.20.8","npmStarted":false,"registrations":0,"heartbeats":0,"enrollments":0,"socketPathBytes":73,"states":[{"step":"check","status":"running"},{"step":"check","status":"running"},{"step":"check","status":"failed","cause":"node_required"}],"result":"check/node_required"}
+2026-11-09T09:10:09.9796420Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+2026-11-09T09:10:09.9797160Z with:
+2026-11-09T09:10:09.9797360Z   name: macos-node-18.20.8
+2026-11-09T09:10:09.9797630Z   path: artifacts/local-installer/*.json
+2026-11-09T09:10:09.9797920Z   if-no-files-found: warn
+2026-11-09T09:10:09.9798140Z   compression-level: 6
+2026-11-09T09:10:09.9798320Z   overwrite: false
+2026-11-09T09:10:09.9798500Z   include-hidden-files: false
+2026-11-09T09:10:09.9798690Z env:
+2026-11-09T09:10:09.9798890Z   PNPM_HOME: /Users/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:10:09.9799160Z ##[endgroup]
+2026-11-09T09:10:10.2011930Z (node:2901) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T09:10:10.2118430Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:10:10.2506000Z With the provided path, there will be 1 file uploaded
+2026-11-09T09:10:10.2508670Z Artifact name is valid!
+2026-11-09T09:10:10.2509090Z Root directory input is valid!
+2026-11-09T09:10:10.6385810Z (node:2901) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T09:10:10.6522420Z Beginning upload of artifact content to blob storage
+2026-11-09T09:10:10.9210800Z Uploaded bytes 342
+2026-11-09T09:10:10.9949120Z Finished uploading artifact content to blob storage!
+2026-11-09T09:10:11.0050780Z SHA256 digest of uploaded artifact zip is 544dcc69700c8acc78411bf84164e898202549af075ebb4a5e5853c3e8d1d713
+2026-11-09T09:10:11.0152180Z Finalizing artifact upload
+2026-11-09T09:10:11.4498150Z Artifact macos-node-18.20.8.zip successfully finalized. Artifact ID 13661546466
+2026-11-09T09:10:11.4502570Z Artifact macos-node-18.20.8 has been successfully uploaded! Final size is 342 bytes. Artifact ID is 13661546466
+2026-11-09T09:10:11.4515490Z Artifact download URL: https://github.com/alexj11324/Mikka/actions/runs/42590712054/artifacts/13661546466
+2026-11-09T09:10:11.4710330Z Post job cleanup.
+2026-11-09T09:10:11.6605580Z (node:2975) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T09:10:11.6607740Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:10:11.6780920Z Post job cleanup.
+2026-11-09T09:10:11.8778550Z (node:2976) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T09:10:11.8880540Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:10:11.9612150Z [command]/opt/homebrew/bin/gtar --posix -cf cache.tzst --exclude cache.tzst -P -C /Users/runner/work/Mikka/Mikka --files-from manifest.txt --delay-directory-restore --use-compress-program zstdmt
+2026-11-09T09:13:12.0001400Z Failed to save: Unable to reserve cache with key node-cache-macOS-arm64-pnpm-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9, another job may be creating this cache.
+2026-11-09T09:13:12.0956220Z Post job cleanup.
+2026-11-09T09:13:12.4283700Z Pruning is unnecessary.
+2026-11-09T09:13:12.4471320Z Post job cleanup.
+2026-11-09T09:13:12.6648350Z [command]/opt/homebrew/bin/git version
+2026-11-09T09:13:12.7531700Z git version 2.56.0
+2026-11-09T09:13:12.7565930Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/ff6a6cd1-e7f6-4a80-9631-2d1c101940b7/.gitconfig'
+2026-11-09T09:13:12.7581450Z Temporarily overriding HOME='/Users/runner/work/_temp/ff6a6cd1-e7f6-4a80-9631-2d1c101940b7' before making global git config changes
+2026-11-09T09:13:12.7583600Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T09:13:12.7585470Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Mikka/Mikka
+2026-11-09T09:13:12.7777670Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T09:13:12.7873510Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T09:13:12.9583120Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T09:13:12.9775500Z http.https://github.com/.extraheader
+2026-11-09T09:13:12.9828300Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T09:13:12.9931010Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T09:13:13.1590530Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T09:13:13.1957670Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T09:13:13.3699520Z Cleaning up orphan processes
+2026-11-09T09:13:17.6313920Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

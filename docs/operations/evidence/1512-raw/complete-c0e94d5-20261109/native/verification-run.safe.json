@@ -1,0 +1,12 @@
+{
+  "command": [
+    "python3",
+    "/vercel/sandbox/native-c0e94/verify-native-originals.py"
+  ],
+  "scriptSha256": "b4452037b2f8a8f2e6016c288581c221f93e075845206334e41c2d5117288348",
+  "exitCode": 0,
+  "durationMs": 52,
+  "stdout": "{\"verified\": true, \"totals\": {\"webLogin\": 412, \"nativeLogin\": 398, \"startup-bundled\": 181, \"startup-hosted\": 206}, \"records\": 24, \"checkpoints\": 12, \"buckets\": [17, 78], \"diagnosticsStatus\": \"incomplete\", \"projectedQueries\": 1197, \"overflow\": false, \"unknowns\": {\"nativeLogin\": {\"context\": 94, \"statement\": 135}, \"webLogin\": {\"context\": 87, \"statement\": 139}, \"startup-bundled\": {\"context\": 48, \"statement\": 73}, \"startup-hosted\": {\"context\": 48, \"statement\": 82}}, \"cleanupAfter\": {\"lifecycle\": {\"owner\": true, \"peer\": true}, \"smoke\": {\"owner\": true, \"peer\": true}}, \"nativeFiles\": 308}\n",
+  "stderr": "",
+  "purpose": "Read-only verification of GitHub macOS artifact originals; this Linux VM did not run Native or produce measurements."
+}

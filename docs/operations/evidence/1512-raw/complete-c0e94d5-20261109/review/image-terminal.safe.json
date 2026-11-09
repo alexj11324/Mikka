@@ -1,0 +1,491 @@
+{
+  "version": 1,
+  "job": 129072134209,
+  "source": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+  "original": {
+    "path": "image.original.log",
+    "sha": "ca544eb71097abdd16b6e41c847cb0f9b5d1f3c9",
+    "bytes": 357652,
+    "sha256": "324d737d9c023a66fedb04a74f3be1a187d4c0d91cf37181051595865a0fd1b0",
+    "job": 129072134209,
+    "run": 42590712093
+  },
+  "jobMetadata": {
+    "id": 129072134209,
+    "run_id": 42590712093,
+    "workflow_name": "CI",
+    "head_branch": "fix/1512-daemon-fixture-executable-20261109",
+    "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42590712093",
+    "run_attempt": 1,
+    "node_id": "CR_kwDOVRYxA88AAAAeDUx4QQ",
+    "head_sha": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129072134209",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42590712093/job/129072134209",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-11-09T09:07:26Z",
+    "started_at": "2026-11-09T09:07:28Z",
+    "completed_at": "2026-11-09T09:25:03Z",
+    "name": "image-checks / image",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-11-09T09:07:29Z",
+        "completed_at": "2026-11-09T09:07:30Z"
+      },
+      {
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-11-09T09:07:30Z",
+        "completed_at": "2026-11-09T09:07:34Z"
+      },
+      {
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-11-09T09:07:34Z",
+        "completed_at": "2026-11-09T09:07:35Z"
+      },
+      {
+        "name": "Verify disposable acceptance target guards and model fixture",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-11-09T09:07:35Z",
+        "completed_at": "2026-11-09T09:07:35Z"
+      },
+      {
+        "name": "Build the public standalone application",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-11-09T09:07:35Z",
+        "completed_at": "2026-11-09T09:12:29Z"
+      },
+      {
+        "name": "Verify packaged subscription binaries without network or credentials",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-11-09T09:12:29Z",
+        "completed_at": "2026-11-09T09:12:30Z"
+      },
+      {
+        "name": "Start with an empty database and no Mikka credentials",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-11-09T09:12:30Z",
+        "completed_at": "2026-11-09T09:12:30Z"
+      },
+      {
+        "name": "Build the pinned upstream MinIO fixture",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-11-09T09:12:30Z",
+        "completed_at": "2026-11-09T09:15:17Z"
+      },
+      {
+        "name": "Apply migrations and wait for health",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-11-09T09:15:17Z",
+        "completed_at": "2026-11-09T09:15:39Z"
+      },
+      {
+        "name": "Verify runtime edition, sign-in document, API and compiled assets",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-11-09T09:15:39Z",
+        "completed_at": "2026-11-09T09:15:40Z"
+      },
+      {
+        "name": "Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-11-09T09:15:40Z",
+        "completed_at": "2026-11-09T09:19:55Z"
+      },
+      {
+        "name": "Reclaim intermediate build cache before installing source dependencies",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-11-09T09:19:55Z",
+        "completed_at": "2026-11-09T09:21:20Z"
+      },
+      {
+        "name": "Install the same-revision source daemon dependencies",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-11-09T09:21:20Z",
+        "completed_at": "2026-11-09T09:22:04Z"
+      },
+      {
+        "name": "Exercise the real daemon against the registered community user",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-11-09T09:22:04Z",
+        "completed_at": "2026-11-09T09:22:08Z"
+      },
+      {
+        "name": "Install the native desktop runtime dependencies",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-11-09T09:22:08Z",
+        "completed_at": "2026-11-09T09:22:46Z"
+      },
+      {
+        "name": "Build one packaged acceptance desktop with an independent default server",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-11-09T09:22:46Z",
+        "completed_at": "2026-11-09T09:23:10Z"
+      },
+      {
+        "name": "Verify packaged desktop email login, chat and built-in live against the actual image",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-11-09T09:23:10Z",
+        "completed_at": "2026-11-09T09:23:21Z"
+      },
+      {
+        "name": "Remove private desktop fixture material",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 18,
+        "started_at": "2026-11-09T09:23:21Z",
+        "completed_at": "2026-11-09T09:23:21Z"
+      },
+      {
+        "name": "Remove private daemon fixture material",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19,
+        "started_at": "2026-11-09T09:23:21Z",
+        "completed_at": "2026-11-09T09:23:22Z"
+      },
+      {
+        "name": "Retain secret-free application acceptance evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-11-09T09:23:22Z",
+        "completed_at": "2026-11-09T09:23:22Z"
+      },
+      {
+        "name": "Upload isolated acceptance receipt",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21,
+        "started_at": "2026-11-09T09:23:22Z",
+        "completed_at": "2026-11-09T09:23:23Z"
+      },
+      {
+        "name": "Verify the same persistent installation restarts",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22,
+        "started_at": "2026-11-09T09:23:23Z",
+        "completed_at": "2026-11-09T09:23:46Z"
+      },
+      {
+        "name": "Verify the older built-in UI remains opt-in with the same data",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23,
+        "started_at": "2026-11-09T09:23:46Z",
+        "completed_at": "2026-11-09T09:24:38Z"
+      },
+      {
+        "name": "Publish the tested revision",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 24,
+        "started_at": "2026-11-09T09:24:38Z",
+        "completed_at": "2026-11-09T09:24:38Z"
+      },
+      {
+        "name": "Retain startup diagnostics on failure",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 25,
+        "started_at": "2026-11-09T09:24:38Z",
+        "completed_at": "2026-11-09T09:24:38Z"
+      },
+      {
+        "name": "Stop disposable services",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 26,
+        "started_at": "2026-11-09T09:24:38Z",
+        "completed_at": "2026-11-09T09:24:59Z"
+      },
+      {
+        "name": "Post Install the same-revision source daemon dependencies",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 50,
+        "started_at": "2026-11-09T09:24:59Z",
+        "completed_at": "2026-11-09T09:25:00Z"
+      },
+      {
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 51,
+        "started_at": "2026-11-09T09:25:00Z",
+        "completed_at": "2026-11-09T09:25:00Z"
+      },
+      {
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 52,
+        "started_at": "2026-11-09T09:25:00Z",
+        "completed_at": "2026-11-09T09:25:00Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 53,
+        "started_at": "2026-11-09T09:25:00Z",
+        "completed_at": "2026-11-09T09:25:00Z"
+      }
+    ],
+    "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129072134209",
+    "labels": [
+      "ubuntu-latest"
+    ],
+    "runner_id": 1000236529,
+    "runner_name": "GitHub Actions 1000236529",
+    "runner_group_id": 0,
+    "runner_group_name": "GitHub Actions"
+  },
+  "normalVerifiedInstallMessages": [
+    "#20 54.26 .../node_modules/ffmpeg-static install: ffmpeg binary, README and LICENSE verified.",
+    ".../node_modules/ffmpeg-static install: ffmpeg binary, README and LICENSE verified."
+  ],
+  "receipts": [
+    {
+      "phase": "subscription_binary_startup",
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "cpaCommit": "8289ec4c71ad914d0612c2776352b76ba3d355a6",
+      "systemCaCertificates": 148,
+      "binaries": [
+        {
+          "name": "mikka-subscription-worker",
+          "sha256": "01ea58fc27750826c1a1b3d6dd20deedb1dd1b5c47265df1ccf0b8267145e52c",
+          "executable": true,
+          "missingConfigurationRefused": true
+        },
+        {
+          "name": "mikka-subscription-enrollment",
+          "sha256": "896c1aafe288e0971c4cbfce4328582585e89902743eb890d6d60dc6c0fc9855",
+          "executable": true,
+          "missingConfigurationRefused": true
+        }
+      ],
+      "providerRequests": 0,
+      "subscriptionAcceptance": false
+    },
+    {
+      "status": "passed",
+      "edition": "community",
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "origin": "http://localhost:3000",
+      "desktopDiscovery": true,
+      "serverInfo": true,
+      "communityUI": false
+    },
+    {
+      "kind": "isolated-self-hosted-services",
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "origin": "http://localhost:3000",
+      "provider": "synthetic-openai-compatible",
+      "synthetic": true,
+      "productionAcceptance": false,
+      "checks": {
+        "mailpit": {
+          "verificationReceived": true,
+          "passwordResetReceived": true,
+          "configuredSender": true,
+          "verifiedSignIn": true
+        },
+        "officialWeb": {
+          "transport": "actual-http",
+          "protocol": "v1",
+          "discovery": true,
+          "corsPreflight": true,
+          "bearerOnly": true,
+          "explicitSameOriginReturn": true,
+          "independentSession": true,
+          "fragmentCodeOnly": true,
+          "replayRejected": true,
+          "sessionRpc": true,
+          "maliciousOriginRejected": true,
+          "visualAcceptance": false,
+          "workspaceRead": true,
+          "attachmentUploadAndDownload": true,
+          "messageSubmitted": true,
+          "messageReplyRead": true,
+          "replyProvider": "synthetic-openai-compatible",
+          "revokeImmediate": true,
+          "sourceCookieSurvives": true,
+          "bearerBoundLive": true,
+          "liveClosedOnRevoke": true
+        },
+        "live": {
+          "applications": 2,
+          "sharedPostgres": true,
+          "cloudflare": false,
+          "businessMutationReceivedAcrossReplicas": true
+        },
+        "minio": {
+          "applicationUpload": true,
+          "privateObject": true,
+          "presignedDownload": true,
+          "bytesVerified": true
+        },
+        "chat": {
+          "messages": 31,
+          "replies": 31,
+          "provider": "synthetic-openai-compatible",
+          "synthetic": true,
+          "hostedUsageRows": 0,
+          "subscriptionAcceptance": false
+        }
+      },
+      "status": "passed",
+      "stage": "complete",
+      "chatProgress": {
+        "confirmedReplies": 31
+      }
+    },
+    {
+      "kind": "isolated-source-daemon",
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "origin": "http://localhost:3000",
+      "status": "passed",
+      "checks": {
+        "target": true,
+        "enrollment": true,
+        "realProcess": true,
+        "heartbeat": true,
+        "builtinGatewayPong": true,
+        "ownerDeviceOnline": true,
+        "builtinPresenceReady": true,
+        "builtinPresenceAck": true
+      },
+      "cleanup": {
+        "credentialRevoked": true,
+        "revokedCredentialRefused": true,
+        "daemonUnregistered": true,
+        "revocationCheckedOnNextSync": true,
+        "deviceRemoved": true,
+        "sessionClosed": true,
+        "privateFilesRemoved": true
+      },
+      "taskCompletion": false,
+      "subscriptionAcceptance": false,
+      "modelRequests": false,
+      "process": {
+        "pid": 27196,
+        "daemonVersion": "0.0.1",
+        "protocolVersion": 3
+      }
+    },
+    {
+      "event": "electron_pinned_install",
+      "version": "45.1.0",
+      "platform": "linux",
+      "arch": "x64",
+      "sha256": "9dafab2c57ce209f8f716f8f3e4fddd8ffe0820e2455bfbbfc00b0fc13e03a3b",
+      "downloadedViaApi": true,
+      "builderChecksumSeeded": true
+    },
+    {
+      "status": "passed",
+      "checks": [
+        "real_community_discovery_and_explicit_server_selection",
+        "normal_email_login_and_authenticated_remote_rpc",
+        "actual_builtin_live_ticket_and_socket",
+        "real_chat_submission_and_fixture_reply_over_live_invalidations",
+        "normal_first_run_dismissed_and_reply_visible",
+        "sign_out_and_return_to_bundled_default_server"
+      ],
+      "cleanup": {
+        "session": true,
+        "electron": true,
+        "daemon": true,
+        "privateFile": true
+      }
+    },
+    {
+      "status": "passed",
+      "edition": "community",
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "origin": "http://localhost:3000",
+      "desktopDiscovery": true,
+      "serverInfo": true,
+      "communityUI": false
+    },
+    {
+      "status": "passed",
+      "edition": "community",
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "origin": "http://localhost:3000",
+      "desktopDiscovery": true,
+      "serverInfo": true,
+      "communityUI": true
+    },
+    {
+      "status": "passed",
+      "edition": "community",
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "origin": "http://localhost:3000",
+      "desktopDiscovery": true,
+      "serverInfo": true,
+      "communityUI": false
+    }
+  ],
+  "resourcesRemoved": [
+    "Container mikka-selfhost-ci-app-replica-1  Removed",
+    "Container mikka-selfhost-ci-app-1  Removed",
+    "Container mikka-selfhost-ci-model-1  Removed",
+    "Container mikka-selfhost-ci-postgres-1  Removed",
+    "Container mikka-selfhost-ci-minio-1  Removed",
+    "Container mikka-selfhost-ci-mailpit-1  Removed",
+    "Network mikka-selfhost-ci_default  Removed",
+    "Volume mikka-selfhost-ci_app-data  Removed",
+    "Volume mikka-selfhost-ci_replica-data  Removed",
+    "Volume mikka-selfhost-ci_postgres-data  Removed"
+  ],
+  "privacyShapes": {
+    "github": 0,
+    "aws": 0,
+    "privateKey": 0,
+    "openai": 0
+  },
+  "limits": [
+    "Only PR isolated/community acceptance; synthetic models and subscription-binary startup are not production subscription/model acceptance.",
+    "No production publish was performed; Publish step is original skipped condition.",
+    "Existing broad job-token environment process exposure remains a pre-merge source issue despite successful installation."
+  ]
+}

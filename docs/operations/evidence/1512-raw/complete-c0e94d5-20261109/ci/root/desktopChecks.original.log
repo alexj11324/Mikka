@@ -1,0 +1,1087 @@
+﻿2026-11-09T09:07:56.8238692Z Current runner version: '2.338.2'
+2026-11-09T09:07:56.8264651Z ##[group]Runner Image Provisioner
+2026-11-09T09:07:56.8265693Z Hosted Compute Agent
+2026-11-09T09:07:56.8266282Z Version: 20261028.624
+2026-11-09T09:07:56.8267009Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T09:07:56.8268293Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T09:07:56.8269106Z Worker ID: {efe60155-573f-405c-911c-afe14228ff80}
+2026-11-09T09:07:56.8269922Z Region: westus
+2026-11-09T09:07:56.8270474Z Cloud: Azure
+2026-11-09T09:07:56.8271050Z ##[endgroup]
+2026-11-09T09:07:56.8272622Z ##[group]Operating System
+2026-11-09T09:07:56.8273434Z Ubuntu
+2026-11-09T09:07:56.8274085Z 24.04.5
+2026-11-09T09:07:56.8274602Z LTS
+2026-11-09T09:07:56.8275164Z ##[endgroup]
+2026-11-09T09:07:56.8275742Z ##[group]Runner Image
+2026-11-09T09:07:56.8276731Z Image: ubuntu-24.04
+2026-11-09T09:07:56.8277474Z Version: 20261101.360.1
+2026-11-09T09:07:56.8279216Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T09:07:56.8280923Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T09:07:56.8281930Z ##[endgroup]
+2026-11-09T09:07:56.8283110Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T09:07:56.8285340Z Contents: read
+2026-11-09T09:07:56.8286050Z Metadata: read
+2026-11-09T09:07:56.8286663Z ##[endgroup]
+2026-11-09T09:07:56.8289023Z Secret source: Actions
+2026-11-09T09:07:56.8290135Z Cache mode: write
+2026-11-09T09:07:56.8291232Z Prepare workflow directory
+2026-11-09T09:07:56.8699132Z Prepare all required actions
+2026-11-09T09:07:56.8747409Z Getting action download info
+2026-11-09T09:07:57.2394438Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T09:07:57.3783135Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-11-09T09:07:57.7653431Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T09:07:57.9452752Z Uses: alexj11324/Mikka/.github/workflows/desktop.yml@refs/pull/1799/merge (9d8aab6986e474ea2df8f62091d97dc5aa992420)
+2026-11-09T09:07:57.9457435Z Complete job name: desktop-checks / checks
+2026-11-09T09:07:58.0368835Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T09:07:58.0370173Z with:
+2026-11-09T09:07:58.0370748Z   repository: alexj11324/Mikka
+2026-11-09T09:07:58.0374642Z   token: ***
+2026-11-09T09:07:58.0375326Z   ssh-strict: true
+2026-11-09T09:07:58.0375881Z   ssh-user: git
+2026-11-09T09:07:58.0376473Z   persist-credentials: true
+2026-11-09T09:07:58.0377103Z   clean: true
+2026-11-09T09:07:58.0377937Z   sparse-checkout-cone-mode: true
+2026-11-09T09:07:58.0378687Z   fetch-depth: 1
+2026-11-09T09:07:58.0379230Z   fetch-tags: false
+2026-11-09T09:07:58.0379813Z   show-progress: true
+2026-11-09T09:07:58.0380440Z   lfs: false
+2026-11-09T09:07:58.0380985Z   submodules: false
+2026-11-09T09:07:58.0381664Z   set-safe-directory: true
+2026-11-09T09:07:58.0382284Z   allow-unsafe-pr-checkout: false
+2026-11-09T09:07:58.0383215Z env:
+2026-11-09T09:07:58.0383840Z   MIKKA_EDITION: cloud
+2026-11-09T09:07:58.0384432Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:07:58.0385247Z ##[endgroup]
+2026-11-09T09:07:58.3698123Z Syncing repository: alexj11324/Mikka
+2026-11-09T09:07:58.3701358Z ##[group]Getting Git version info
+2026-11-09T09:07:58.3702453Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T09:07:58.3703856Z [command]/usr/bin/git version
+2026-11-09T09:07:58.3793212Z git version 2.56.0
+2026-11-09T09:07:58.3820070Z ##[endgroup]
+2026-11-09T09:07:58.3833123Z Temporarily overriding HOME='/home/runner/work/_temp/b37afa92-ec18-42d8-ac59-33d9b338139d' before making global git config changes
+2026-11-09T09:07:58.3836097Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T09:07:58.3839401Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T09:07:58.3896968Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T09:07:58.3902490Z ##[group]Initializing the repository
+2026-11-09T09:07:58.3906030Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T09:07:58.4049168Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T09:07:58.4051705Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T09:07:58.4053771Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T09:07:58.4055933Z hint: call:
+2026-11-09T09:07:58.4057011Z hint:
+2026-11-09T09:07:58.4058945Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T09:07:58.4060590Z hint:
+2026-11-09T09:07:58.4062162Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T09:07:58.4064524Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T09:07:58.4066259Z hint:
+2026-11-09T09:07:58.4067451Z hint: 	git branch -m <name>
+2026-11-09T09:07:58.4069326Z hint:
+2026-11-09T09:07:58.4070946Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T09:07:58.4073631Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T09:07:58.4085500Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T09:07:58.4131389Z ##[endgroup]
+2026-11-09T09:07:58.4133632Z ##[group]Disabling automatic garbage collection
+2026-11-09T09:07:58.4135632Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T09:07:58.4178601Z ##[endgroup]
+2026-11-09T09:07:58.4180303Z ##[group]Setting up auth
+2026-11-09T09:07:58.4182463Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T09:07:58.4223938Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T09:07:58.4697535Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T09:07:58.4750347Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T09:07:58.4991373Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T09:07:58.5037221Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T09:07:58.5274222Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T09:07:58.5323104Z ##[endgroup]
+2026-11-09T09:07:58.5342475Z ##[group]Fetching the repository
+2026-11-09T09:07:58.5344184Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9d8aab6986e474ea2df8f62091d97dc5aa992420:refs/remotes/pull/1799/merge
+2026-11-09T09:08:05.0652251Z From https://github.com/alexj11324/Mikka
+2026-11-09T09:08:05.0653979Z  * [new ref]         9d8aab6986e474ea2df8f62091d97dc5aa992420 -> pull/1799/merge
+2026-11-09T09:08:05.0658571Z ##[endgroup]
+2026-11-09T09:08:05.0659229Z ##[group]Determining the checkout info
+2026-11-09T09:08:05.0660285Z ##[endgroup]
+2026-11-09T09:08:05.0664843Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T09:08:05.0729083Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T09:08:05.0766791Z ##[group]Checking out the ref
+2026-11-09T09:08:05.0771023Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge
+2026-11-09T09:08:05.7701473Z Note: switching to 'refs/remotes/pull/1799/merge'.
+2026-11-09T09:08:05.7701939Z 
+2026-11-09T09:08:05.7702174Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T09:08:05.7703614Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T09:08:05.7704466Z state without impacting any branches by switching back to a branch.
+2026-11-09T09:08:05.7704988Z 
+2026-11-09T09:08:05.7705489Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T09:08:05.7706285Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T09:08:05.7706739Z 
+2026-11-09T09:08:05.7706917Z   git switch -c <new-branch-name>
+2026-11-09T09:08:05.7707222Z 
+2026-11-09T09:08:05.7707449Z Or undo this operation with:
+2026-11-09T09:08:05.7708122Z 
+2026-11-09T09:08:05.7708283Z   git switch -
+2026-11-09T09:08:05.7708529Z 
+2026-11-09T09:08:05.7708962Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T09:08:05.7709531Z 
+2026-11-09T09:08:05.7710192Z HEAD is now at 9d8aab6 Merge c0e94d594f1ecf4f5edc25904912702e61fce86b into 0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6
+2026-11-09T09:08:05.7730721Z ##[endgroup]
+2026-11-09T09:08:05.7785833Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T09:08:05.7821616Z 9d8aab6986e474ea2df8f62091d97dc5aa992420
+2026-11-09T09:08:05.8137769Z ##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+2026-11-09T09:08:05.8138234Z with:
+2026-11-09T09:08:05.8138455Z   version: 10.34.3
+2026-11-09T09:08:05.8138681Z   dest: ~/setup-pnpm
+2026-11-09T09:08:05.8138902Z   run_install: null
+2026-11-09T09:08:05.8139112Z   cache: false
+2026-11-09T09:08:05.8139331Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-09T09:08:05.8139659Z   package_json_file: package.json
+2026-11-09T09:08:05.8139909Z   standalone: false
+2026-11-09T09:08:05.8140142Z env:
+2026-11-09T09:08:05.8140334Z   MIKKA_EDITION: cloud
+2026-11-09T09:08:05.8140561Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:08:05.8140809Z ##[endgroup]
+2026-11-09T09:08:05.9662128Z ##[group]Running self-installer...
+2026-11-09T09:08:06.4233202Z (node:2347) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T09:08:06.4235237Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:08:06.5430927Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T09:08:06.5533023Z Packages: +1
+2026-11-09T09:08:06.5533436Z +
+2026-11-09T09:08:06.9834159Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-09T09:08:07.0136910Z 
+2026-11-09T09:08:07.0137332Z dependencies:
+2026-11-09T09:08:07.0138021Z + pnpm 10.34.3 (12.18.0 is available)
+2026-11-09T09:08:07.0138408Z 
+2026-11-09T09:08:07.0161447Z Done in 840ms
+2026-11-09T09:08:07.0371819Z ##[endgroup]
+2026-11-09T09:08:07.0372442Z Installation Completed!
+2026-11-09T09:08:07.0570972Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T09:08:07.0571406Z with:
+2026-11-09T09:08:07.0571615Z   node-version: 24
+2026-11-09T09:08:07.0571824Z   cache: pnpm
+2026-11-09T09:08:07.0572034Z   always-auth: false
+2026-11-09T09:08:07.0572256Z   check-latest: false
+2026-11-09T09:08:07.0574569Z   token: ***
+2026-11-09T09:08:07.0574765Z env:
+2026-11-09T09:08:07.0574954Z   MIKKA_EDITION: cloud
+2026-11-09T09:08:07.0575182Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:08:07.0575487Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:08:07.0575790Z ##[endgroup]
+2026-11-09T09:08:07.2114058Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T09:08:07.2119496Z (node:2361) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T09:08:07.2120465Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:08:07.2122665Z ##[group]Environment details
+2026-11-09T09:08:07.6795897Z node: v24.22.2
+2026-11-09T09:08:07.6796210Z npm: 11.19.1
+2026-11-09T09:08:07.6796442Z yarn: 1.22.22
+2026-11-09T09:08:07.6797831Z ##[endgroup]
+2026-11-09T09:08:07.6823514Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-11-09T09:08:08.1379151Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-09T09:08:08.4147320Z Cache hit for: node-cache-Linux-x64-pnpm-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9
+2026-11-09T09:08:08.4255098Z (node:2361) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T09:08:09.6785464Z Received 33554432 of 1127814902 (3.0%), 32.0 MBs/sec
+2026-11-09T09:08:10.6784011Z Received 130023424 of 1127814902 (11.5%), 62.0 MBs/sec
+2026-11-09T09:08:11.6792631Z Received 230686720 of 1127814902 (20.5%), 73.3 MBs/sec
+2026-11-09T09:08:12.6809280Z Received 352321536 of 1127814902 (31.2%), 84.0 MBs/sec
+2026-11-09T09:08:13.6806998Z Received 448790528 of 1127814902 (39.8%), 85.6 MBs/sec
+2026-11-09T09:08:14.6813761Z Received 574619648 of 1127814902 (50.9%), 91.3 MBs/sec
+2026-11-09T09:08:15.6825278Z Received 671088640 of 1127814902 (59.5%), 91.4 MBs/sec
+2026-11-09T09:08:16.6828505Z Received 801112064 of 1127814902 (71.0%), 95.5 MBs/sec
+2026-11-09T09:08:17.6825529Z Received 918552576 of 1127814902 (81.4%), 97.3 MBs/sec
+2026-11-09T09:08:18.6879049Z Received 1031798784 of 1127814902 (91.5%), 98.4 MBs/sec
+2026-11-09T09:08:19.5217330Z Received 1127814902 of 1127814902 (100.0%), 99.2 MBs/sec
+2026-11-09T09:08:19.5218796Z Cache Size: ~1076 MB (1127814902 B)
+2026-11-09T09:08:19.5344005Z [command]/usr/bin/tar -xf /home/runner/work/_temp/a88685db-50f4-4c28-89ce-cc9cd9d10403/cache.tzst -P -C /home/runner/work/Mikka/Mikka --use-compress-program unzstd
+2026-11-09T09:08:32.0153380Z Cache restored successfully
+2026-11-09T09:08:32.1939127Z Cache restored from key: node-cache-Linux-x64-pnpm-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9
+2026-11-09T09:08:32.2185429Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-09T09:08:32.2185864Z [36;1mpnpm install --frozen-lockfile[0m
+2026-11-09T09:08:32.2216397Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:08:32.2216666Z env:
+2026-11-09T09:08:32.2216867Z   MIKKA_EDITION: cloud
+2026-11-09T09:08:32.2217132Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:08:32.2217469Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:08:32.2218194Z   ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+2026-11-09T09:08:32.2218455Z ##[endgroup]
+2026-11-09T09:08:32.5885197Z Scope: all 7 workspace projects
+2026-11-09T09:08:32.6911612Z Lockfile is up to date, resolution step is skipped
+2026-11-09T09:08:32.8129833Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T09:08:33.0184840Z Packages: +2184
+2026-11-09T09:08:33.0185938Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-09T09:08:33.8145623Z Progress: resolved 2184, reused 959, downloaded 0, added 0
+2026-11-09T09:08:34.8150420Z Progress: resolved 2184, reused 2108, downloaded 0, added 10
+2026-11-09T09:08:35.8152155Z Progress: resolved 2184, reused 2108, downloaded 0, added 464
+2026-11-09T09:08:36.8162052Z Progress: resolved 2184, reused 2108, downloaded 0, added 707
+2026-11-09T09:08:37.8172222Z Progress: resolved 2184, reused 2108, downloaded 0, added 927
+2026-11-09T09:08:38.8185309Z Progress: resolved 2184, reused 2108, downloaded 0, added 1203
+2026-11-09T09:08:39.8190609Z Progress: resolved 2184, reused 2108, downloaded 0, added 1425
+2026-11-09T09:08:40.8192928Z Progress: resolved 2184, reused 2108, downloaded 0, added 1875
+2026-11-09T09:08:41.8196676Z Progress: resolved 2184, reused 2108, downloaded 0, added 2111
+2026-11-09T09:08:42.4819226Z Progress: resolved 2184, reused 2108, downloaded 0, added 2184, done
+2026-11-09T09:08:43.9907887Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-09T09:08:44.5007190Z 
+2026-11-09T09:08:44.5008745Z dependencies:
+2026-11-09T09:08:44.5009220Z + @ai-sdk/gateway 4.0.121
+2026-11-09T09:08:44.5010088Z + @ai-sdk/mcp 2.0.81
+2026-11-09T09:08:44.5010691Z + @ai-sdk/openai 4.0.99
+2026-11-09T09:08:44.5011265Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-09T09:08:44.5011820Z + @ai-sdk/react 4.0.152
+2026-11-09T09:08:44.5012315Z + @ai-sdk/workflow 2.0.80
+2026-11-09T09:08:44.5012803Z + @base-ui/react 1.9.0
+2026-11-09T09:08:44.5013275Z + @better-auth/core 1.7.12
+2026-11-09T09:08:44.5013781Z + @better-auth/expo 1.7.12
+2026-11-09T09:08:44.5014394Z + @better-auth/oauth-provider 1.7.12
+2026-11-09T09:08:44.5014963Z + @chat-adapter/slack 4.43.0
+2026-11-09T09:08:44.5015546Z + @chat-adapter/state-pg 4.43.0
+2026-11-09T09:08:44.5016113Z + @chat-adapter/telegram 4.43.0
+2026-11-09T09:08:44.5016661Z + @composio/core 0.26.0
+2026-11-09T09:08:44.5017523Z + @dnd-kit/core 6.3.1
+2026-11-09T09:08:44.5019042Z + @dnd-kit/sortable 10.0.0
+2026-11-09T09:08:44.5019621Z + @dnd-kit/utilities 3.2.2
+2026-11-09T09:08:44.5020144Z + @e965/xlsx 0.20.3
+2026-11-09T09:08:44.5020606Z + @floating-ui/dom 1.8.0
+2026-11-09T09:08:44.5021188Z + @formatjs/intl-localematcher 0.8.14
+2026-11-09T09:08:44.5021771Z + @heroui/react 3.2.6
+2026-11-09T09:08:44.5022065Z + @heroui/styles 3.2.6
+2026-11-09T09:08:44.5022540Z + @internationalized/date 3.12.4
+2026-11-09T09:08:44.5023247Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-09T09:08:44.5023734Z + @modelcontextprotocol/server 2.3.1
+2026-11-09T09:08:44.5024196Z + @norbert_bodziony/bloub 0.4.1
+2026-11-09T09:08:44.5024701Z + @novnc/novnc 1.6.0
+2026-11-09T09:08:44.5025158Z + @opentelemetry/api 1.10.0
+2026-11-09T09:08:44.5025674Z + @opentelemetry/api-logs 0.223.0
+2026-11-09T09:08:44.5026168Z + @opentelemetry/core 2.12.0
+2026-11-09T09:08:44.5026774Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-09T09:08:44.5027491Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-09T09:08:44.5028650Z + @opentelemetry/instrumentation 0.223.0
+2026-11-09T09:08:44.5029940Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-09T09:08:44.5030662Z + @opentelemetry/resources 2.12.0
+2026-11-09T09:08:44.5031264Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-09T09:08:44.5031900Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-09T09:08:44.5032532Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-09T09:08:44.5033182Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-09T09:08:44.5033759Z + @openuidev/lang-core 1.0.1
+2026-11-09T09:08:44.5034241Z + @openuidev/react-lang 1.0.1
+2026-11-09T09:08:44.5034747Z + @openuidev/react-ui 0.18.1
+2026-11-09T09:08:44.5035223Z + @pierre/diffs 1.6.4
+2026-11-09T09:08:44.5035658Z + @shadcn/react 0.3.1
+2026-11-09T09:08:44.5036093Z + @solidjs/web 2.0.0-rc.0
+2026-11-09T09:08:44.5036560Z + @stripe/stripe-js 10.1.0
+2026-11-09T09:08:44.5037098Z + @tanstack/react-virtual 3.14.18
+2026-11-09T09:08:44.5037875Z + @tiptap/core 3.32.0
+2026-11-09T09:08:44.5038442Z + @tiptap/extension-collaboration 3.32.0
+2026-11-09T09:08:44.5039205Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-09T09:08:44.5039888Z + @tiptap/extension-highlight 3.32.0
+2026-11-09T09:08:44.5040494Z + @tiptap/extension-list 3.32.0
+2026-11-09T09:08:44.5041084Z + @tiptap/extension-mention 3.32.0
+2026-11-09T09:08:44.5041643Z + @tiptap/extension-table 3.32.0
+2026-11-09T09:08:44.5042421Z + @tiptap/extension-text-align 3.32.0
+2026-11-09T09:08:44.5042995Z + @tiptap/extensions 3.32.0
+2026-11-09T09:08:44.5043463Z + @tiptap/pm 3.32.0
+2026-11-09T09:08:44.5043879Z + @tiptap/react 3.32.0
+2026-11-09T09:08:44.5044320Z + @tiptap/starter-kit 3.32.0
+2026-11-09T09:08:44.5044808Z + @tiptap/suggestion 3.32.0
+2026-11-09T09:08:44.5045264Z + @tiptap/y-tiptap 3.0.10
+2026-11-09T09:08:44.5045711Z + @vercel/analytics 1.3.1
+2026-11-09T09:08:44.5046162Z + @vercel/functions 3.10.2
+2026-11-09T09:08:44.5046615Z + @vercel/oidc 4.0.2
+2026-11-09T09:08:44.5047035Z + @workflow/serde 5.0.0
+2026-11-09T09:08:44.5047492Z + @workflow/world-local 5.1.2
+2026-11-09T09:08:44.5048151Z + ai 7.0.148
+2026-11-09T09:08:44.5048536Z + aws4fetch 1.0.20
+2026-11-09T09:08:44.5048944Z + beautiful-mermaid 1.1.3
+2026-11-09T09:08:44.5049388Z + better-auth 1.7.12
+2026-11-09T09:08:44.5050051Z + chat 4.43.0
+2026-11-09T09:08:44.5050503Z + class-variance-authority 0.7.1
+2026-11-09T09:08:44.5050973Z + clsx 2.1.1
+2026-11-09T09:08:44.5051324Z + cmdk 1.1.1
+2026-11-09T09:08:44.5051651Z + cn 0.5.0
+2026-11-09T09:08:44.5051981Z + cookie 1.1.1
+2026-11-09T09:08:44.5052354Z + date-fns 4.1.0
+2026-11-09T09:08:44.5052723Z + diff 8.0.2
+2026-11-09T09:08:44.5053074Z + dompurify 3.4.17
+2026-11-09T09:08:44.5053425Z + drizzle-orm 0.45.4
+2026-11-09T09:08:44.5053777Z + e2b 2.61.0
+2026-11-09T09:08:44.5054294Z + embla-carousel-react 8.5.1
+2026-11-09T09:08:44.5087279Z + fflate 0.8.3
+2026-11-09T09:08:44.5088006Z + ffmpeg-static 5.3.0
+2026-11-09T09:08:44.5088481Z + file-type 22.3.0
+2026-11-09T09:08:44.5088898Z + h3 2.0.8
+2026-11-09T09:08:44.5089261Z + hono 4.13.13
+2026-11-09T09:08:44.5089668Z + input-otp 1.4.1
+2026-11-09T09:08:44.5090077Z + katex 0.16.47
+2026-11-09T09:08:44.5090496Z + lucide-react 1.60.0
+2026-11-09T09:08:44.5090907Z + mcp-handler 2.3.0
+2026-11-09T09:08:44.5091246Z + mermaid 12.2.0
+2026-11-09T09:08:44.5091614Z + motion 14.5.0
+2026-11-09T09:08:44.5091999Z + music-metadata 12.3.4
+2026-11-09T09:08:44.5092436Z + negotiator 1.1.0
+2026-11-09T09:08:44.5092812Z + next 16.4.1
+2026-11-09T09:08:44.5093205Z + next-intl 4.14.9
+2026-11-09T09:08:44.5093602Z + next-themes 0.4.6
+2026-11-09T09:08:44.5094016Z + nodemailer 10.3.1
+2026-11-09T09:08:44.5094431Z + officeparser 8.5.0
+2026-11-09T09:08:44.5094842Z + pg 8.23.1
+2026-11-09T09:08:44.5095243Z + posthog-js 1.438.13
+2026-11-09T09:08:44.5095680Z + posthog-node 5.55.2
+2026-11-09T09:08:44.5096077Z + react 19.3.1
+2026-11-09T09:08:44.5096496Z + react-day-picker 9.8.0
+2026-11-09T09:08:44.5096948Z + react-dom 19.3.1
+2026-11-09T09:08:44.5097357Z + react-markdown 10.1.0
+2026-11-09T09:08:44.5098573Z + react-resizable-panels 4.14.7
+2026-11-09T09:08:44.5099168Z + react-syntax-highlighter 16.1.1
+2026-11-09T09:08:44.5099674Z + recharts 3.10.1
+2026-11-09T09:08:44.5100350Z + rehype-katex 7.0.1
+2026-11-09T09:08:44.5100834Z + remark-gfm 4.0.1
+2026-11-09T09:08:44.5101262Z + remark-math 6.0.0
+2026-11-09T09:08:44.5101670Z + shadcn 4.22.1
+2026-11-09T09:08:44.5102041Z + sharp 0.35.5
+2026-11-09T09:08:44.5102394Z + shiki 4.5.0
+2026-11-09T09:08:44.5102790Z + solid-js 2.0.0-rc.0
+2026-11-09T09:08:44.5103198Z + sonner 1.7.4
+2026-11-09T09:08:44.5103569Z + srvx 1.0.8
+2026-11-09T09:08:44.5103903Z + swr 2.5.1
+2026-11-09T09:08:44.5104269Z + tailwind-merge 3.7.0
+2026-11-09T09:08:44.5104713Z + tw-animate-css 1.4.0
+2026-11-09T09:08:44.5105111Z + undici 7.24.5
+2026-11-09T09:08:44.5105518Z + unstorage 2.0.0-beta.0
+2026-11-09T09:08:44.5105958Z + use-intl 4.14.9
+2026-11-09T09:08:44.5106385Z + vaul 1.1.2
+2026-11-09T09:08:44.5106758Z + workflow 5.2.3
+2026-11-09T09:08:44.5107123Z + y-protocols 1.0.7
+2026-11-09T09:08:44.5107494Z + yjs 13.6.33
+2026-11-09T09:08:44.5108115Z + zod 4.6.7
+2026-11-09T09:08:44.5108321Z 
+2026-11-09T09:08:44.5108496Z devDependencies:
+2026-11-09T09:08:44.5108947Z + @playwright/test 1.64.1
+2026-11-09T09:08:44.5109426Z + @tailwindcss/postcss 4.3.3
+2026-11-09T09:08:44.5109873Z + @types/node 25.9.9
+2026-11-09T09:08:44.5110286Z + @types/pg 8.23.1
+2026-11-09T09:08:44.5110693Z + @types/react 19.3.0
+2026-11-09T09:08:44.5111130Z + @types/react-dom 19.3.0
+2026-11-09T09:08:44.5111717Z + @types/react-syntax-highlighter 15.5.13
+2026-11-09T09:08:44.5112476Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-09T09:08:44.5113055Z + esbuild 0.28.2
+2026-11-09T09:08:44.5113458Z + fake-indexeddb 6.2.4
+2026-11-09T09:08:44.5113896Z + happy-dom 15.11.7
+2026-11-09T09:08:44.5114275Z + js-yaml 4.3.2
+2026-11-09T09:08:44.5114653Z + nitro 3.0.261103-rc
+2026-11-09T09:08:44.5115042Z + nx 24.0.5
+2026-11-09T09:08:44.5115397Z + oxlint 1.89.0
+2026-11-09T09:08:44.5115813Z + postcss 8.5.31
+2026-11-09T09:08:44.5116223Z + prettier 3.9.10
+2026-11-09T09:08:44.5116724Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-09T09:08:44.5117219Z + rolldown 1.3.0
+2026-11-09T09:08:44.5117865Z + tailwindcss 4.3.3
+2026-11-09T09:08:44.5118338Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-09T09:08:44.5118767Z + tsx 4.23.15
+2026-11-09T09:08:44.5119422Z + typescript 5.9.3
+2026-11-09T09:08:44.5119818Z + wrangler 4.152.0
+2026-11-09T09:08:44.5120045Z 
+2026-11-09T09:08:44.7681628Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-09T09:08:44.8622398Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T09:08:44.8623830Z │                                                                              │
+2026-11-09T09:08:44.8625126Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T09:08:44.8626657Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-09T09:08:44.8628449Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-09T09:08:44.8629855Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T09:08:44.8631273Z │   to run scripts.                                                            │
+2026-11-09T09:08:44.8633512Z │                                                                              │
+2026-11-09T09:08:44.8634818Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T09:08:44.8852032Z Done in 12.6s using pnpm v10.34.3
+2026-11-09T09:08:44.9882197Z ##[group]Run pnpm --filter @mikka/desktop typecheck
+2026-11-09T09:08:44.9882666Z [36;1mpnpm --filter @mikka/desktop typecheck[0m
+2026-11-09T09:08:44.9904115Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:08:44.9904394Z env:
+2026-11-09T09:08:44.9904597Z   MIKKA_EDITION: cloud
+2026-11-09T09:08:44.9904847Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:08:44.9905162Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:08:44.9905480Z ##[endgroup]
+2026-11-09T09:08:45.3781025Z 
+2026-11-09T09:08:45.3782187Z > @mikka/desktop@0.1.2 typecheck /home/runner/work/Mikka/Mikka/apps/desktop
+2026-11-09T09:08:45.3783229Z > tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.renderer.json
+2026-11-09T09:08:45.3783681Z 
+2026-11-09T09:09:26.2637445Z ##[group]Run pnpm --filter @mikka/desktop lint
+2026-11-09T09:09:26.2638143Z [36;1mpnpm --filter @mikka/desktop lint[0m
+2026-11-09T09:09:26.2658797Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:09:26.2659056Z env:
+2026-11-09T09:09:26.2659250Z   MIKKA_EDITION: cloud
+2026-11-09T09:09:26.2659491Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:09:26.2659818Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:09:26.2660134Z ##[endgroup]
+2026-11-09T09:09:26.6308700Z 
+2026-11-09T09:09:26.6309770Z > @mikka/desktop@0.1.2 lint /home/runner/work/Mikka/Mikka/apps/desktop
+2026-11-09T09:09:26.6310435Z > oxlint --deny-warnings -c oxlint.json src scripts
+2026-11-09T09:09:26.6310716Z 
+2026-11-09T09:09:26.6899040Z Found 0 warnings and 0 errors.
+2026-11-09T09:09:26.6900269Z Finished in 20ms on 114 files with 96 rules using 4 threads.
+2026-11-09T09:09:26.7248728Z ##[group]Run pnpm --filter @mikka/desktop test
+2026-11-09T09:09:26.7249405Z [36;1mpnpm --filter @mikka/desktop test[0m
+2026-11-09T09:09:26.7279782Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:09:26.7280221Z env:
+2026-11-09T09:09:26.7280567Z   MIKKA_EDITION: cloud
+2026-11-09T09:09:26.7280990Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:09:26.7281549Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:09:26.7282100Z ##[endgroup]
+2026-11-09T09:09:27.1033075Z 
+2026-11-09T09:09:27.1033975Z > @mikka/desktop@0.1.2 test /home/runner/work/Mikka/Mikka/apps/desktop
+2026-11-09T09:09:27.1039396Z > node --import tsx --test src/main/*.test.ts && node --test scripts/*.test.mjs test/native-cleanup.test.mjs test/account-release-observer.test.mjs test/generated-workspace-name.test.mjs test/native-cleanup-close.test.mjs test/bundled-session.test.mjs test/parity-reads.test.mjs test/parity-fixtures.test.mjs test/parity-clock.test.mjs test/native-auth-diagnostics.test.mjs test/native-device-ready.test.mjs test/native-node.test.mjs test/parity-reader-defaults.test.mjs test/native-crypto.test.mjs test/production-application.test.mjs test/live-worker.test.mjs test/self-hosted.test.mjs test/db-metrics.test.mjs test/native-document.test.mjs test/native-code-cache.test.mjs
+2026-11-09T09:09:27.1044477Z 
+2026-11-09T09:09:27.4810637Z ✔ each flavor has its own scheme, never the internal renderer scheme (1.616159ms)
+2026-11-09T09:09:27.4839231Z ✔ only the exact done path with one well-formed id parses (0.81901ms)
+2026-11-09T09:09:27.4847913Z ✔ a second instance passes the link as an argument; other arguments are not links (0.227705ms)
+2026-11-09T09:09:27.4849773Z ✔ only a link this process handed out, and only until it expires, is accepted (0.991411ms)
+2026-11-09T09:09:27.4851327Z ✔ older links are dropped once too many sign-ins are pending (0.480037ms)
+2026-11-09T09:09:27.5230039Z ✔ the callback page opens the app link, then offers it as a button under a nonce-only CSP (61.162167ms)
+2026-11-09T09:09:27.5379914Z ✔ the hosted callback page carries the same link in English (20.464155ms)
+2026-11-09T09:09:30.5540125Z ✔ the shared approval reader accepts its verified owner and server clock through the native proxy (55.623033ms)
+2026-11-09T09:09:30.5544051Z ✔ the native proxy does not manufacture approval ownership for missing viewer proof (2.448312ms)
+2026-11-09T09:09:30.5546166Z ✔ the native proxy does not manufacture approval ownership for different-owner viewer proof (1.197496ms)
+2026-11-09T09:09:30.5549462Z ✔ startup diagnostics distinguish HTTP headers from awaited private persistence without releasing the response early (12.960006ms)
+2026-11-09T09:09:30.5551490Z ✔ signed-out bootstrap creates no authenticated startup timing record (1.027009ms)
+2026-11-09T09:09:30.5553346Z ✔ accepts the actual community ticket base path and the existing Worker ticket path (30.870108ms)
+2026-11-09T09:09:30.5555105Z ✔ retains exact channel paths, TLS and ticket URL boundaries (2.539595ms)
+2026-11-09T09:09:30.5557012Z ✔ custom origin is explicit; opaque, lookalike, embedded and resource frames are unprivileged (3.044981ms)
+2026-11-09T09:09:30.5559273Z ✔ path policy rejects traversal, encoded delimiters, absolute targets and unknown API routes (3.512042ms)
+2026-11-09T09:09:30.5561172Z ✔ renderer CSP has no remote code, eval, inline scripts, external fetch, workers or object (0.432518ms)
+2026-11-09T09:09:30.5562969Z ✔ Factory flow accepts only a strict UUID and its two declared methods (0.412191ms)
+2026-11-09T09:09:30.5564812Z ✔ local entry/assets load without backend; missing assets and symlink escape fail closed (40.913464ms)
+2026-11-09T09:09:30.5566877Z ✔ proxy strips credentials, cookies, redirects and remote policy; preserves streaming resume headers (8.570244ms)
+2026-11-09T09:09:30.5569363Z ✔ OS-encrypted vault round trips, rejects wrong server/corruption and never writes plaintext (13.392894ms)
+2026-11-09T09:09:30.5571461Z ✔ unavailable OS keychain fails closed instead of persisting a plaintext session (2.972804ms)
+2026-11-09T09:09:30.5574145Z ✔ main bearer never appears in public session and only validated workspace selector persists (12.42305ms)
+2026-11-09T09:09:30.5576322Z ✔ loopback validates nonce/code exactly, ignores wrong attempts and accepts once on localhost (40.64672ms)
+2026-11-09T09:09:30.5579377Z ✔ browser handoff creates/exchanges PKCE only in main and publishes only public identity (28.899358ms)
+2026-11-09T09:09:30.5581266Z ✔ pending PKCE skips only the navigating main window and ordinary changes still notify it (0.571698ms)
+2026-11-09T09:09:30.5583235Z ▶ PKCE navigation failure restores notification only for its current authentication generation
+2026-11-09T09:09:30.5584596Z   ✔ current sign-in (10.76407ms)
+2026-11-09T09:09:30.5585561Z   ✔ signed out during navigation (11.511492ms)
+2026-11-09T09:09:30.5587164Z ✔ PKCE navigation failure restores notification only for its current authentication generation (23.467268ms)
+2026-11-09T09:09:30.5589882Z ✔ password session rotation is accepted only for its RPC and refreshes public session id privately (14.261848ms)
+2026-11-09T09:09:30.5592361Z ✔ saved-account switching uses that account bearer, safely projects choices and fences stale responses (11.502392ms)
+2026-11-09T09:09:30.5594433Z ✔ live hands renderer only owner-bound handles and refuses cross-window use or arbitrary messages (2.103039ms)
+2026-11-09T09:09:30.5596281Z ✔ viewer grants permit only the backend E2B viewer gateways and bounded expiries (0.775529ms)
+2026-11-09T09:09:30.5598407Z ✔ main binary viewer hides credentials, scopes ownership/workspace, and bounds send/receive data (2.635665ms)
+2026-11-09T09:09:30.5600396Z ✔ the vault keeps each account's exact server and refuses a widened or plain-HTTP one (2.098702ms)
+2026-11-09T09:09:30.5602305Z ✔ each account's bearer goes only to its own server; the switcher names servers once they differ (44.738003ms)
+2026-11-09T09:09:30.5604266Z ✔ switching to an account on another server moves the window and the sign-in target with it (32.076566ms)
+2026-11-09T09:09:30.5606122Z ✔ only a probed server can be chosen; signed out, requests and sign-in then go there (7.333563ms)
+2026-11-09T09:09:30.5608246Z ✔ an email sign-in on a self-hosted server stores that server with the account (7.361976ms)
+2026-11-09T09:09:30.5609871Z ✔ the same user id from a different server is refused, not merged (8.528555ms)
+2026-11-09T09:09:30.5611551Z ✔ disconnecting a server signs out only its accounts and moves to an account elsewhere (11.207271ms)
+2026-11-09T09:09:30.5612963Z ✔ a broken servers file falls back to the cloud (4.498566ms)
+2026-11-09T09:09:30.5614433Z ✔ REST cache fallback extracts only exact SDK cache cookies, including contiguous chunks (2.957938ms)
+2026-11-09T09:09:30.5616128Z ✔ REST cache fallback rejects ambiguous versions, malformed chunks and oversized proof (5.503749ms)
+2026-11-09T09:09:30.5618228Z ✔ REST cache fallback accepts SDK direct/chunk transitions and explicit private clears win (0.885204ms)
+2026-11-09T09:09:30.5620440Z ✔ a REST-only Set-Cookie renewal is retained encrypted and never forwarded to renderer (41.333454ms)
+2026-11-09T09:09:30.5622546Z ✔ signed cache survives encrypted cold restore but cannot cross the renderer header boundary (24.454163ms)
+2026-11-09T09:09:30.5624517Z ✔ native email handoff carries existing auth cache privately before its first bootstrap (5.65205ms)
+2026-11-09T09:09:30.5626641Z ✔ password rotation cannot replay the previous bearer cache, and revocation clears the encrypted record (15.864322ms)
+2026-11-09T09:09:30.5628973Z ✔ an old account cache response cannot overwrite the active account during encrypted commit (12.041459ms)
+2026-11-09T09:09:30.5630848Z ✔ signout during encrypted sign-in commit cannot resurrect that account after restart (6.547085ms)
+2026-11-09T09:09:30.5632602Z ✔ five maximum-size signed proofs fit only inside the bounded encrypted vault (7.78798ms)
+2026-11-09T09:09:30.5634487Z ✔ an existing bootstrap quietly refreshes only the current safe profile without another auth read (8.022329ms)
+2026-11-09T09:09:30.5636810Z ✔ a bootstrap body arriving after signout cannot restore the safe profile or escape its scope (7.587778ms)
+2026-11-09T09:09:30.5639466Z ✔ local assets load during vault restoration; authenticated transport waits and uses the restored identity (38.414485ms)
+2026-11-09T09:09:30.5641645Z ✔ a sign-out during restore revokes and clears the retained account rather than resurrecting it (2.523425ms)
+2026-11-09T09:09:30.5643429Z ✔ email sign-in and account reads cannot overtake initial restore (3.78369ms)
+2026-11-09T09:09:30.5645218Z ✔ all waiters join one restore and an empty vault preserves ordinary signed-out behavior (0.832566ms)
+2026-11-09T09:09:30.5647220Z ✔ OAuth continuation mints in main and opens only existing account-confirmed handoff (27.621886ms)
+2026-11-09T09:09:30.5649385Z ✔ no token is minted for an external origin, auth endpoint or unrecognized page (0.776481ms)
+2026-11-09T09:09:30.5651308Z ✔ missing, expired or changed native session cannot open a browser with another account (2.19479ms)
+2026-11-09T09:09:30.5652972Z ✔ malformed token response never reaches the browser or a caller (4.705793ms)
+2026-11-09T09:09:30.5654699Z ✔ maps a running daemon to the local device the UI shows (1.492739ms)
+2026-11-09T09:09:30.5656101Z ✔ keeps an unregistered daemon online but without an identity (0.161181ms)
+2026-11-09T09:09:30.5657394Z ✔ the offline device carries no identity at all (0.13419ms)
+2026-11-09T09:09:30.5659421Z ✔ main reads the current authenticated device account without caching or following a redirect (33.535501ms)
+2026-11-09T09:09:30.5661372Z ✔ setup admission reads only the fresh owner while daemon verification still reads devices (4.111853ms)
+2026-11-09T09:09:30.5663359Z ✔ the bridge setup follows A→B→A in one process, preserves a workspace switch, and only reports owned devices online (5.065855ms)
+2026-11-09T09:09:30.5665003Z ✔ asks the daemon on this computer to update and passes on its answer (2.207675ms)
+2026-11-09T09:09:30.5666493Z ✔ the dev app reaches only the dev daemon; the production app only the production one (0.534719ms)
+2026-11-09T09:09:30.5668170Z ✔ no daemon on this computer: nothing is asked (0.509291ms)
+2026-11-09T09:09:30.5669615Z ✔ an older daemon without daemon.update keeps its own hourly check (0.421488ms)
+2026-11-09T09:09:30.5671120Z ✔ a failed request never throws into the app launch (0.441575ms)
+2026-11-09T09:09:30.5672544Z ✔ no update: the app opens and the gate stops listening (10.326293ms)
+2026-11-09T09:09:30.5674346Z ✔ offline or a failed check: the app opens; a failed check never locks anyone out (4.805709ms)
+2026-11-09T09:09:30.5676047Z ✔ no answer within five seconds: the app opens, and a late answer is ignored (0.663369ms)
+2026-11-09T09:09:30.5677996Z ✔ a new version: progress, then install and restart; no way in on the old version (4.396664ms)
+2026-11-09T09:09:30.5679788Z ✔ a failed download shows why and offers 重试; 重试 downloads again (1.313153ms)
+2026-11-09T09:09:30.5681272Z ✔ an update downloaded on an earlier run installs at once (0.745723ms)
+2026-11-09T09:09:30.5682879Z ✔ the window shows a heading, progress and 重试 only when it can help (0.714115ms)
+2026-11-09T09:09:30.5684627Z ✔ installation failure keeps complete output beyond the old 4 KB stderr tail (55.053968ms)
+2026-11-09T09:09:30.5686630Z ✔ local install uses its own npm prefix and cache and preserves the selected Node for service/login/status (2.751952ms)
+2026-11-09T09:09:30.5688790Z ✔ check failure is structured, writes a private full log, and never starts npm (6.610121ms)
+2026-11-09T09:09:30.5690640Z ✔ stdin registration credentials are redacted even when a failed child echoes them (36.996518ms)
+2026-11-09T09:09:30.5692692Z ✔ discovery includes nvm, fnm, Volta and Homebrew instead of relying on interactive shell setup (0.374831ms)
+2026-11-09T09:09:33.1497929Z ✔ the loopback listener hands back the in-app finish URL (52.748128ms)
+2026-11-09T09:09:33.1499314Z ✔ a callback with the wrong nonce never reaches the finish page (12.277451ms)
+2026-11-09T09:09:33.1500629Z ✔ the return page follows the browser language and defaults to Chinese (5.275397ms)
+2026-11-09T09:09:33.1619451Z ✔ shows each notification id once (3.550855ms)
+2026-11-09T09:09:33.1620510Z ✔ caps notifications at five per minute (0.372787ms)
+2026-11-09T09:09:33.1621662Z ✔ allows a new notification after the window passes (0.372967ms)
+2026-11-09T09:09:33.1623029Z ✔ does nothing where notifications are unsupported (0.248254ms)
+2026-11-09T09:09:33.1624408Z ✔ refuses an invalid payload instead of showing it (0.979009ms)
+2026-11-09T09:09:33.1625522Z ✔ badge counts are bounded (0.510825ms)
+2026-11-09T09:09:33.1626748Z ✔ a finished thread (线程完成) is a desktop notification kind (0.240339ms)
+2026-11-09T09:09:33.1628363Z ✔ offline reconnects back off and keep going (2.129261ms)
+2026-11-09T09:09:33.1629551Z ✔ the failed URL's error page does not count as an app load (0.322042ms)
+2026-11-09T09:09:33.1630818Z ✔ a retry that fails again keeps the offline page retrying; one that succeeds stops it (0.231533ms)
+2026-11-09T09:09:33.1632182Z ✔ the offline page says whether this computer or Mikka is unreachable (review C9) (0.276517ms)
+2026-11-09T09:09:33.8567502Z ✔ the return listener tells the app the result once and shows the browser one line (48.331142ms)
+2026-11-09T09:09:33.8570809Z ✔ a return with another state or result never reaches the app, and the listener keeps waiting (15.558661ms)
+2026-11-09T09:09:33.8573966Z ✔ a state that is not the renderer's 43-character nonce is refused before listening (0.542103ms)
+2026-11-09T09:09:33.8769724Z ✔ only the exact app origin is trusted (1.982056ms)
+2026-11-09T09:09:33.8771169Z ✔ credentials and non-URLs have no origin (0.297136ms)
+2026-11-09T09:09:33.8772723Z ✔ navigation keeps only the app, opens every other HTTPS URL externally (0.460771ms)
+2026-11-09T09:09:33.8774531Z ✔ external opens accept only HTTP(S) and mailto without credentials (2.186663ms)
+2026-11-09T09:09:33.8776265Z ✔ external app-origin opens stay on the app origin (0.326361ms)
+2026-11-09T09:09:33.8778113Z ✔ loopback auth callback becomes the in-app token exchange page (0.619318ms)
+2026-11-09T09:09:33.8779720Z ✔ loopback auth callbacks reject invalid tokens and paths (0.246291ms)
+2026-11-09T09:09:33.8781071Z ✔ the loopback nonce is bounded (0.199282ms)
+2026-11-09T09:09:33.8782637Z ✔ plain-HTTP links open in the system browser like HTTPS; other schemes stay denied (0.229339ms)
+2026-11-09T09:09:33.8784547Z ✔ typed addresses become one canonical HTTPS base; plain HTTP only on this computer (1.351957ms)
+2026-11-09T09:09:33.8786516Z ✔ discovery needs a name, version, edition, base path, protocol range and sign-in methods (1.052678ms)
+2026-11-09T09:09:33.8788677Z ✔ a bare host finds the server under /mikka and keeps exactly the origin that answered (23.995953ms)
+2026-11-09T09:09:33.8790569Z ✔ unreachable, not Mikka and a redirect stay distinct; a redirect is never followed (2.34767ms)
+2026-11-09T09:09:33.8792480Z ✔ version answers: server too old, app too old, and an older Mikka without discovery (4.419103ms)
+2026-11-09T09:09:33.8794382Z ✔ five accounts and their workspace selections round-trip only as encrypted data (24.206525ms)
+2026-11-09T09:09:33.8796206Z ✔ v1 ciphertext migrates atomically to one active v2 account and retains its selector (4.192228ms)
+2026-11-09T09:09:33.8798360Z ✔ duplicate owners, an unknown active owner, excess accounts and malformed secrets fail closed (6.364709ms)
+2026-11-09T09:09:33.8800291Z ✔ queued writes snapshot their accounts and preserve the last explicit active selection (4.820442ms)
+2026-11-09T09:09:33.8802191Z ✔ wrong origins, a locked keychain, malformed ciphertext and logout expose no retained account (4.689899ms)
+2026-11-09T09:09:33.8803885Z ✔ SSH host parsing rejects options, commands and invalid ports (2.382104ms)
+2026-11-09T09:09:33.8805528Z ✔ first key requires explicit confirmation, then follows all steps without exposing the token (23.862264ms)
+2026-11-09T09:09:33.8807330Z ✔ host check failure names the step, keeps the reason and allows retry (2.049362ms)
+2026-11-09T09:09:33.8809763Z ✔ failures identify the exact installation step and never advance past it (3.572569ms)
+2026-11-09T09:09:33.8811447Z ✔ process runner returns output and maps failures and timeouts (125.803237ms)
+2026-11-09T09:09:33.8813095Z ✔ cancelled and timed out commands stop their own installer descendants (1841.875522ms)
+2026-11-09T09:09:33.8814784Z ✔ host details use OpenSSH resolution, with explicit aliases only (2.879473ms)
+2026-11-09T09:09:33.8816389Z ✔ cancel kills the in-flight process, preserves the step, and retry completes (5.067785ms)
+2026-11-09T09:09:33.8818992Z ✔ cancel during host discovery and fingerprint confirmation never installs (3.772683ms)
+2026-11-09T09:09:33.8820759Z ✔ 添加这台电脑 installs, starts and signs in the daemon here as a laptop, with no SSH (1.239697ms)
+2026-11-09T09:09:33.8822035Z ✔ a dev desktop adds its own dev daemon (0.39022ms)
+2026-11-09T09:09:33.8823683Z ✔ 重新连接 for this computer restarts its daemon and waits; it neither installs nor signs in again (0.356016ms)
+2026-11-09T09:09:33.8825469Z ✔ the login shell is $SHELL when it is a plain path, else the platform default (0.142897ms)
+2026-11-09T09:09:33.8827979Z ✔ automatic repair restarts a daemon that is already set up, without installing or signing in again (0.373789ms)
+2026-11-09T09:09:33.8829963Z ✔ automatic repair never reports another account's recovered daemon as this person's device (0.498121ms)
+2026-11-09T09:09:33.8831648Z ✔ an unconfirmed account fails repair without registering again or reporting online (3.716799ms)
+2026-11-09T09:09:33.8833215Z ✔ automatic repair installs and signs in when the restart fails (first launch) (0.78663ms)
+2026-11-09T09:09:33.8834676Z ✔ a failed automatic install keeps the reason and 重试 installs again (1.73804ms)
+2026-11-09T09:09:33.8836300Z ✔ repair registers an already running unregistered daemon without reinstalling it (3.036838ms)
+2026-11-09T09:09:33.8838507Z ✔ recovered daemon registration denial fails without another install or credential attempt (12.065486ms)
+2026-11-09T09:09:33.8840515Z ✔ recovered daemon registration still rejects a device owned by another account (6.51435ms)
+2026-11-09T09:09:33.8842488Z ✔ repair does not replace a starting or unconfirmed credential based on the initial server state (2.307454ms)
+2026-11-09T09:09:33.8844462Z ✔ only a Claude page returning to the registered callback is accepted (1.167693ms)
+2026-11-09T09:09:33.8846029Z ✔ catches the return, opens the browser once, and frees the port (43.312007ms)
+2026-11-09T09:09:33.8847813Z ✔ a declined sign-in, a newer attempt and a timeout resolve null (79.697636ms)
+2026-11-09T09:09:33.8849256Z ✔ a taken port rejects so the page can offer the paste (1.598659ms)
+2026-11-09T09:09:33.9478296Z ✔ downloads in the background and installs on quit (1.047929ms)
+2026-11-09T09:09:33.9489648Z ✔ a background check opens no dialog; only a downloaded update reaches the rail (1.110416ms)
+2026-11-09T09:09:33.9493437Z ✔ a menu check that finds a new version says nothing until it has downloaded, then offers the restart (0.290213ms)
+2026-11-09T09:09:33.9496613Z ✔ a menu check reports up to date and errors, including a failed download it started (0.379149ms)
+2026-11-09T09:09:33.9505117Z ✔ install restarts only once an update is downloaded (0.182991ms)
+2026-11-09T09:09:33.9506761Z ✔ the menu check speaks Chinese unless the system language is not (0.306703ms)
+2026-11-09T09:09:34.0305937Z ✔ macOS uses the sidebar material behind a transparent page in both themes (0.944416ms)
+2026-11-09T09:09:34.0315241Z ✔ Reduce transparency keeps the opaque macOS window (0.223588ms)
+2026-11-09T09:09:34.0316581Z ✔ Windows and Linux keep the opaque window and native title bar (0.764689ms)
+2026-11-09T09:09:34.0518036Z ℹ tests 156
+2026-11-09T09:09:34.0518475Z ℹ suites 0
+2026-11-09T09:09:34.0518831Z ℹ pass 156
+2026-11-09T09:09:34.0519167Z ℹ fail 0
+2026-11-09T09:09:34.0519514Z ℹ cancelled 0
+2026-11-09T09:09:34.0519884Z ℹ skipped 0
+2026-11-09T09:09:34.0520224Z ℹ todo 0
+2026-11-09T09:09:34.0520636Z ℹ duration_ms 6913.197003
+2026-11-09T09:09:34.2186696Z ✔ bundled IPC does not return a false signed-out projection while the vault is restoring (37.471366ms)
+2026-11-09T09:09:34.2306140Z ▶ a destroyed or newly untrusted sender cannot run queued IPC after restoration
+2026-11-09T09:09:34.2314440Z   ✔ destroyed (13.075306ms)
+2026-11-09T09:09:34.2419212Z   ✔ navigation (12.287994ms)
+2026-11-09T09:09:34.2447126Z ✔ a destroyed or newly untrusted sender cannot run queued IPC after restoration (26.346819ms)
+2026-11-09T09:09:34.5085786Z ✔ official asset download keeps authentication on the API and writes the exact CDN body (46.156427ms)
+2026-11-09T09:09:34.5109373Z ✔ a release digest differing from the locked package fails before fetching any asset (1.173154ms)
+2026-11-09T09:09:34.5111190Z ✔ an off-domain asset redirect is rejected without sending the token or fetching it (2.064409ms)
+2026-11-09T09:09:34.5113035Z ✔ a mismatched filename cannot select another platform or version from release metadata (0.332131ms)
+2026-11-09T09:09:34.5114875Z ✔ the native ARM64 asset can be streamed directly from the authenticated official API (10.361532ms)
+2026-11-09T09:09:34.5116191Z   • using cached artifact  label=electron
+2026-11-09T09:09:34.5129408Z ✔ the locked SDK cache and checksum seed are consumed by the actual builder without network or disabled checksums (288.382317ms)
+2026-11-09T09:09:34.5231852Z ✔ the real desktop runtime starts one retained-session code hint before the application graph finishes (42.676511ms)
+2026-11-09T09:09:34.5240097Z ▶ the early desktop entry keeps signed-out and public/auth documents lazy and excludes foreign/web origins
+2026-11-09T09:09:34.5241473Z   ✔ mikka://app/mikka (24.070754ms)
+2026-11-09T09:09:34.5242454Z   ✔ mikka://app/mikka/en/sign-in (15.319431ms)
+2026-11-09T09:09:34.5243447Z   ✔ mikka://app/mikka/en/a/shared-fixture (13.250546ms)
+2026-11-09T09:09:34.5244341Z   ✔ mikka://app/mikka/en/device (14.907692ms)
+2026-11-09T09:09:34.5245119Z   ✔ mikka://other/mikka/en (14.443284ms)
+2026-11-09T09:09:34.5245930Z   ✔ https://app.example/mikka/en (17.191239ms)
+2026-11-09T09:09:34.5247453Z ✔ the early desktop entry keeps signed-out and public/auth documents lazy and excludes foreign/web origins (101.402264ms)
+2026-11-09T09:09:34.5249956Z ✔ the web runtime remains its existing production/development instrumentation entry without the desktop warm-up (0.290333ms)
+2026-11-09T09:09:34.5252369Z ✔ a failed early identity hint cannot prevent the normal application or authenticated lazy path (15.242017ms)
+2026-11-09T09:09:34.7964525Z ✔ a completed preload waits for authentication, then renders synchronously without a fallback (23.678162ms)
+2026-11-09T09:09:35.1245309Z ✔ an unfinished preload keeps normal Suspense and never changes component type after resolving (327.402117ms)
+2026-11-09T09:09:35.4350264Z ✔ a rejected preload is never promoted to a resolved component and reaches the normal error boundary (311.464888ms)
+2026-11-09T09:09:35.4624372Z ✔ actual early Mac failure audits without an account descriptor, scanner or database (208.723757ms)
+2026-11-09T09:09:35.4631226Z ✔ strict report schemas reject extra credential or arbitrary diagnostic fields at every nesting level (18.924283ms)
+2026-11-09T09:09:35.4633234Z ✔ a passing report requires the actual package gates and all three prior-canary checks (3.212276ms)
+2026-11-09T09:09:35.4635677Z ✔ close failure reasons are optional closed enums, never arbitrary diagnostics or a passing result (1.336219ms)
+2026-11-09T09:09:35.4637395Z ✔ the shared writer refuses invalid evidence before creating an output file (3.711838ms)
+2026-11-09T09:09:35.4639985Z ✔ duplicate JSON keys cannot hide bytes from the audited projection (4.098493ms)
+2026-11-09T09:09:35.4641567Z ✔ account JSON, logs and symlinks cannot enter the independent native report upload (3.09678ms)
+2026-11-09T09:09:35.4643234Z ✔ audit failure emits only a fixed error code, never untrusted fields or paths (118.505745ms)
+2026-11-09T09:09:35.4644475Z ✔ staple retries back off for about five minutes (1.819221ms)
+2026-11-09T09:09:35.4645571Z ✔ a staple that fails twice then succeeds waits the first two delays (1.79698ms)
+2026-11-09T09:09:35.4647271Z ✔ a staple that never succeeds throws the last error after every retry (0.905904ms)
+2026-11-09T09:09:35.4649141Z ✔ credentials come from the same variables electron-builder reads (0.390009ms)
+2026-11-09T09:09:35.4650868Z ✔ on CI missing credentials fail the build; only a local build may skip notarization (0.285404ms)
+2026-11-09T09:09:35.4652902Z ✔ a failed notarytool or stapler call reports its exit code and last stderr line, never a credential (1.605331ms)
+2026-11-09T09:09:35.4654737Z ✔ the staple retry log carries only the quiet error message (0.403956ms)
+2026-11-09T09:09:35.4656774Z ✔ the bundled offline card restores standalone font rendering instead of inheriting application typography (33.596696ms)
+2026-11-09T09:09:35.4659504Z ✔ standalone and bundled offline surfaces use the same factual state copy without a display timer (37.41492ms)
+2026-11-09T09:09:35.4661591Z ✔ Dev ad-hoc signing cannot inherit release credentials and does not mutate the parent environment (1.783565ms)
+2026-11-09T09:09:35.4663482Z ✔ Dev build still requires an explicit isolated credential-free backend (0.373839ms)
+2026-11-09T09:09:35.4665808Z ✔ ad-hoc library validation exception is confined to Dev and inherited acceptance packaging (12.832071ms)
+2026-11-09T09:09:35.4667786Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T09:09:35.4669787Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.dev.yml
+2026-11-09T09:09:35.4671691Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T09:09:35.4673673Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.acceptance.yml
+2026-11-09T09:09:35.4675641Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.dev.yml
+2026-11-09T09:09:35.4678079Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T09:09:35.4680234Z ✔ each flavor declares only its own sign-in link scheme after electron-builder merges extends (124.568164ms)
+2026-11-09T09:09:35.4682024Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T09:09:35.4700787Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.dev.yml
+2026-11-09T09:09:35.4710311Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T09:09:35.4712039Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.acceptance.yml
+2026-11-09T09:09:35.4713731Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.dev.yml
+2026-11-09T09:09:35.4715364Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T09:09:35.4717152Z ✔ every packaged flavor excludes workspace dependencies through the actual node-module matcher (16.393412ms)
+2026-11-09T09:09:35.7848913Z ✔ Native coalesces allowed reads in one turn with one codec pass and ordered results (89.23149ms)
+2026-11-09T09:09:35.8137032Z ✔ one startup read wave stays together across the real hydration gates used by SWR and list fetchers (31.449201ms)
+2026-11-09T09:09:35.8413410Z ✔ single reads, excluded actions and Web keep their ordinary single-request path without a read cache (26.827606ms)
+2026-11-09T09:09:35.8668818Z ✔ Native splits at sixteen items and captures each locale before the posted flush (25.831124ms)
+2026-11-09T09:09:35.8920215Z ✔ only an exact unknown batch action on 404 falls back and disables batching for this page (23.610924ms)
+2026-11-09T09:09:35.9085488Z ▶ batch HTTP and network failures do not retry or fall back
+2026-11-09T09:09:35.9086633Z   ✔ 404:not_found (17.215499ms)
+2026-11-09T09:09:35.9355817Z   ✔ 500:desktop_rpc_action_unknown (26.090419ms)
+2026-11-09T09:09:35.9692532Z   ✔ 401:authRequired (26.104336ms)
+2026-11-09T09:09:36.0080682Z   ✔ 426:desktop_client_update_required (43.594172ms)
+2026-11-09T09:09:36.0329245Z   ✔ 503:desktop_rpc_failed (24.932568ms)
+2026-11-09T09:09:36.0658371Z   ✔ network (32.625432ms)
+2026-11-09T09:09:36.0659815Z ✔ batch HTTP and network failures do not retry or fall back (172.723896ms)
+2026-11-09T09:09:36.0902700Z ✔ batch item failures retain their own error and status without failing successful siblings (25.211926ms)
+2026-11-09T09:09:36.1168792Z ▶ malformed batch item count or shape rejects every item without retrying
+2026-11-09T09:09:36.1190758Z   ✔ [{"ok":true,"result":null}] (27.56687ms)
+2026-11-09T09:09:36.1554138Z   ✔ [{"ok":true,"result":null},{"ok":false,"status":"403","error":{"code":"workspaceAccessDenied"}}] (35.067438ms)
+2026-11-09T09:09:36.1556088Z ✔ malformed batch item count or shape rejects every item without retrying (63.649194ms)
+2026-11-09T09:09:36.1729480Z ✔ scope reset after a microtask rejects unsent old-identity reads before the posted flush (19.702468ms)
+2026-11-09T09:09:36.1910661Z ✔ workspace selector changes cannot pair queued arguments with the new workspace before React effects run (18.479388ms)
+2026-11-09T09:09:36.2220753Z ✔ explicit isCurrent guards drop stale queued reads and remain independent from other guards (29.510484ms)
+2026-11-09T09:09:36.2441748Z ▶ retired in-flight batches cannot change current transport state or trigger old-server fallback
+2026-11-09T09:09:36.2444141Z   ✔ 401 (23.150904ms)
+2026-11-09T09:09:36.2715432Z   ✔ 503 (25.690085ms)
+2026-11-09T09:09:36.3036412Z   ✔ 404 (33.435544ms)
+2026-11-09T09:09:36.3059480Z ✔ retired in-flight batches cannot change current transport state or trigger old-server fallback (83.289005ms)
+2026-11-09T09:09:36.3274232Z ✔ an isCurrent change while a batch body is pending prevents stale results and state updates (23.854975ms)
+2026-11-09T09:09:36.3583414Z ✔ retained-account local module loading overlaps the real bootstrap promise without mounting or an extra backend read (95.043676ms)
+2026-11-09T09:09:36.3598934Z ▶ signed-out root and public/auth routes do not preload the workspace graph
+2026-11-09T09:09:36.3600019Z   ✔ /mikka (31.596117ms)
+2026-11-09T09:09:36.3600855Z   ✔ /mikka/en/sign-in (32.689835ms)
+2026-11-09T09:09:36.3601753Z   ✔ /mikka/en/a/public-share (30.452071ms)
+2026-11-09T09:09:36.3603102Z ✔ signed-out root and public/auth routes do not preload the workspace graph (96.332663ms)
+2026-11-09T09:09:36.3604819Z ✔ failure of the optional main identity hint leaves the normal bootstrap and lazy path available (27.794545ms)
+2026-11-09T09:09:36.4558149Z ✔ local routing preserves workspace history state, locale, query and fragment without treating opaque origins as equal (50.946889ms)
+2026-11-09T09:09:36.5503747Z ✔ generated action stubs preserve declaration arity, including SWR zero-argument fetchers (108.437051ms)
+2026-11-09T09:09:36.5619934Z ✔ action inventory includes the actual billing re-export chain and excludes type-only aliases (6.579684ms)
+2026-11-09T09:09:36.6169982Z ✔ real billing client re-exports reach the native RPC with only their declared parameters (59.251066ms)
+2026-11-09T09:09:36.6270955Z ✔ public configuration keeps only existing flags and discards the previous owner snapshot on reset (7.463231ms)
+2026-11-09T09:09:36.6552469Z ✔ RPC sends only the versioned local envelope and preserves shared cache access-denial semantics (27.372983ms)
+2026-11-09T09:09:36.6847326Z ✔ bootstrap only transports a workspace selector and uses server-proved cache authority (30.710644ms)
+2026-11-09T09:09:36.7054795Z ✔ an old safe-session IPC completion cannot restore the previous account after an owner change (20.585855ms)
+2026-11-09T09:09:36.7233815Z ✔ native logout waits for queued shared-cache writes and clears them before returning (18.42066ms)
+2026-11-09T09:09:36.7600672Z ✔ unsupported renderer state cannot be cleared by an older in-flight success (34.325349ms)
+2026-11-09T09:09:36.7719931Z ✔ live transport uses a local handle, subscribes before connecting, and closes an aborted preparation (11.559996ms)
+2026-11-09T09:09:36.7817995Z ✔ noVNC raw channel forwards exact binary slices and rejects malformed local handles (11.180281ms)
+2026-11-09T09:09:36.7951283Z ✔ viewer HTTP seam retains shared response errors and routes ordinary requests through the unchanged web transport (15.903449ms)
+2026-11-09T09:09:36.8299876Z ✔ native startup evidence keeps exact numeric phases and drops URLs, arbitrary marks and resource metadata (3.39815ms)
+2026-11-09T09:09:36.8319567Z ✔ absent marks in the unchanged hosted renderer are explicit null, never a fabricated zero duration (1.489092ms)
+2026-11-09T09:09:38.7799609Z ✔ the native shared palette retains the web build color space for neutral color mixing (2017.71457ms)
+2026-11-09T09:09:38.9422679Z ✔ final package verification checks deep strict signatures, nested identities and actual fuses (4.56498ms)
+2026-11-09T09:09:38.9426910Z ✔ failed signature verification cannot be replaced with plausible identity metadata (0.378878ms)
+2026-11-09T09:09:38.9439303Z ✔ signed but wrong identity, architecture, hardened runtime or entitlements fails closed (1.839828ms)
+2026-11-09T09:09:38.9440997Z ✔ downloadable Dev inspector fuse must be off, and removed or missing security fuses reject (1.537172ms)
+2026-11-09T09:09:38.9442891Z ✔ identity parsing rejects duplicate fields instead of guessing which signature to trust (0.419394ms)
+2026-11-09T09:09:38.9444340Z ✔ empty entitlement is permitted only for a real DYLIB, never a renamed executable (0.911072ms)
+2026-11-09T09:09:38.9445294Z ✔ Mach-O classification reads actual ARM64 filetype and rejects unknown or truncated headers (0.916192ms)
+2026-11-09T09:09:38.9446124Z ✔ actual file reads follow only sealed in-app binaries and bound FAT offsets (39.820656ms)
+2026-11-09T09:09:38.9446958Z ✔ signed production release reads its own package and requires the production fuse policy (0.689511ms)
+2026-11-09T09:09:38.9448451Z ✔ release fuse verification rejects the inspector or incomplete wire and preserves read failures (0.783544ms)
+2026-11-09T09:09:38.9450202Z ✔ release verification uses the installed fuse SDK to read an actual fixture file (8.504551ms)
+2026-11-09T09:09:38.9451818Z ✔ observer preserves actual release identity while reporting only changed field names and counts (5.189957ms)
+2026-11-09T09:09:38.9453016Z ✔ clean release stays clean; a different lease is never observed (1.323884ms)
+2026-11-09T09:09:38.9454267Z ✔ original rejection and observation read failure never alter release behavior (4.259579ms)
+2026-11-09T09:09:38.9455669Z ✔ per-step checkpoints expose only the actual transition and preserve final release (2.555655ms)
+2026-11-09T09:09:38.9457212Z ✔ native session wait retries resolved null/false and another account, returning the matching value (10.282701ms)
+2026-11-09T09:09:38.9459176Z ✔ native session wait tolerates the actual callback navigation but preserves IPC failures (3.089703ms)
+2026-11-09T09:09:38.9460692Z ✔ native session wait fails with a bounded safe diagnostic instead of accepting a Promise (20.742679ms)
+2026-11-09T09:09:39.1121581Z ✔ SQL structures hash only a bounded parameterized subset and never read parameter/config getters (3.947165ms)
+2026-11-09T09:09:39.1149700Z ✔ request diagnostics reject foreign registries, concurrent module scopes and arbitrary metadata (1.232584ms)
+2026-11-09T09:09:39.1189284Z ✔ diagnostic safety: context identifiers accept primitive strings and read fields once (0.317774ms)
+2026-11-09T09:09:39.1196852Z ✔ diagnostic safety: structure identifiers cannot preserve objects through implicit coercion (0.820133ms)
+2026-11-09T09:09:39.1209636Z ✔ diagnostic safety: receipt timestamps accept primitive strings only (1.159336ms)
+2026-11-09T09:09:39.1211672Z ✔ diagnostic safety: Proxy query configs are rejected before any descriptor or value trap runs (0.240209ms)
+2026-11-09T09:09:39.1213660Z ✔ diagnostic safety: statement prefixes cannot admit opaque SET payloads or a second statement (0.536031ms)
+2026-11-09T09:09:39.1215732Z ✔ query capture starts at the existing checkpoint, freezes once and reset creates a new diagnostic history (0.771532ms)
+2026-11-09T09:09:39.1218338Z ✔ ordinal windows retain carried requests, unknown shapes and all overflow as nonzero unknown costs (1.11292ms)
+2026-11-09T09:09:39.1220549Z ✔ query receipts retain exact HTTP method and batch siblings, ignore external IDs and detect mismatches (5.515225ms)
+2026-11-09T09:09:39.1222644Z ✔ malformed diagnostic payloads, reset identities and absent checkpoints are never manufactured zeroes (0.463887ms)
+2026-11-09T09:09:39.1224537Z ✔ maximum query/context/structure cardinality stays under the final export bound (171.140801ms)
+2026-11-09T09:09:39.1226665Z ✔ the final projection reads one bounded export after all twelve unchanged snapshots and preserves the original windows (102.816757ms)
+2026-11-09T09:09:39.1229342Z ✔ actual request ALS and manageDatabasePool bind concurrent and reused queued clients without a global current request (653.83693ms)
+2026-11-09T09:09:39.1231456Z ✔ next cjs: bind the actual PG after tracing, with distinct copies and no double count (292.764497ms)
+2026-11-09T09:09:39.1233205Z ✔ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (364.372111ms)
+2026-11-09T09:09:39.1235220Z ✔ nitro esm: bind the actual PG after tracing, with distinct copies and no double count (357.343029ms)
+2026-11-09T09:09:39.1237157Z ✔ Nitro cannot fall back to source PG when its traced dependency is absent or points outside the output (213.695228ms)
+2026-11-09T09:09:39.1239356Z ✔ lifecycle query windows retain exact counter deltas and omit unrelated content (0.535842ms)
+2026-11-09T09:09:39.1241335Z ✔ operation SQL counts partition the original full window without removing unknown or background work (0.422921ms)
+2026-11-09T09:09:39.1243481Z ✔ operation SQL attribution refuses unknown labels, missing buckets, inconsistent totals and partial histories (0.777954ms)
+2026-11-09T09:09:39.1245499Z ✔ unattributed source refinement conserves the original partition and full-window deltas (0.755011ms)
+2026-11-09T09:09:39.1247415Z ✔ unattributed source refinement rejects incomplete evidence without upgrading legacy reports (1.343781ms)
+2026-11-09T09:09:39.1249790Z ✔ unattributed source refinement fits the unchanged control-response limit at the largest safe count (0.38541ms)
+2026-11-09T09:09:39.1251888Z ✔ the 78-source refinement rejects a historical 75-key partition without backfilling it (1.290652ms)
+2026-11-09T09:09:39.1253889Z ✔ lifecycle query windows refuse a changed process, reset, missing driver and unknown readings (0.506025ms)
+2026-11-09T09:09:39.1255870Z ✔ lifecycle reads only the attested primary metric socket, with bounded closed errors (1.642019ms)
+2026-11-09T09:09:39.1284367Z ✔ RPC diagnostics count four windows by request start, deduplicate unordered receipts and discard private fields (17.85299ms)
+2026-11-09T09:09:39.1389236Z ✔ RPC diagnostics retain unknown attribution and missing boundaries without double counting conflicting receipts (10.569775ms)
+2026-11-09T09:09:39.1450686Z ✔ RPC diagnostic missing, partial and oversized logs remain unavailable rather than reporting zero calls (6.178015ms)
+2026-11-09T09:09:39.1562115Z ✔ RPC diagnostics accept only the descriptor-bound primary log and complete measured windows (10.954614ms)
+2026-11-09T09:09:39.1652942Z ✔ RPC phase attribution separates handoff from workspace reads and preserves a completed login when startup is unavailable (7.215276ms)
+2026-11-09T09:09:39.1782853Z ✔ RPC phase attribution refuses private labels and non-partition boundaries without fabricating phases (14.440785ms)
+2026-11-09T09:09:39.1822849Z ✔ RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries (4.008753ms)
+2026-11-09T09:09:39.1922871Z ✔ RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence (10.350371ms)
+2026-11-09T09:09:39.2085470Z ✔ restores only a proven localized generated name through normal authenticated RPC, then exact cleanup (162.046362ms)
+2026-11-09T09:09:39.2087835Z ✔ unchanged name needs no reauthentication or RPC and drain is mandatory (24.75694ms)
+2026-11-09T09:09:39.2092719Z ✔ custom names, unrelated owner fields and peer changes all fail before reauthentication (86.109681ms)
+2026-11-09T09:09:39.2094794Z ✔ a rejected normal RPC or a new unrelated change cannot report successful cleanup (58.525197ms)
+2026-11-09T09:09:39.2096589Z ✔ the Worker has its own process, private initialization and an actual disposal-and-exit barrier (8.103532ms)
+2026-11-09T09:09:39.2098653Z ✔ an invalid or foreign ready URL is refused and the newly owned Worker is still disposed (4.937767ms)
+2026-11-09T09:09:39.2100510Z ✔ startup timeout and owner cancellation both dispose the owned child before returning failure (6.388637ms)
+2026-11-09T09:09:39.2102162Z ✔ an exit without successful disposal and a later failed exit cannot become clean evidence (4.551114ms)
+2026-11-09T09:09:39.2103565Z ✔ authentication diagnostics use a closed route vocabulary (3.039579ms)
+2026-11-09T09:09:39.2108018Z ✔ malformed and encoded credential paths cannot escape as output (0.382524ms)
+2026-11-09T09:09:39.2109499Z ✔ failure diagnostics keep only closed error categories and bounded causes (1.475877ms)
+2026-11-09T09:09:39.2111176Z ✔ exchange observation consumes only the product JSON call and preserves original promises and values (5.435366ms)
+2026-11-09T09:09:39.2112998Z ✔ a real Response stays unread until the product consumes it and its inherited method is restored (45.406855ms)
+2026-11-09T09:09:39.2115105Z ✔ JSON parse and invalid identity failures stay distinguishable without exporting response data (4.483906ms)
+2026-11-09T09:09:39.2117116Z ✔ parsed response shape and observed superseding attempts are closed booleans, not an invented generation (7.064973ms)
+2026-11-09T09:09:39.2120464Z ✔ real availability and encrypt calls are observed without additional calls or substituted output (3.934361ms)
+2026-11-09T09:09:39.2122320Z ✔ encryption rejection and synchronous native exceptions keep the same error objects (2.545235ms)
+2026-11-09T09:09:39.2124116Z ✔ file observation is restricted to the exact owned vault and its PID temporary file (3.313101ms)
+2026-11-09T09:09:39.2125814Z ▶ each vault I/O rejection is attributed to its exact stage with the original rejection preserved
+2026-11-09T09:09:39.2126869Z   ✔ mkdir (1.885753ms)
+2026-11-09T09:09:39.2127562Z   ✔ open-temporary (1.623383ms)
+2026-11-09T09:09:39.2128552Z   ✔ write (2.190193ms)
+2026-11-09T09:09:39.2129122Z   ✔ sync (1.449268ms)
+2026-11-09T09:09:39.2129679Z   ✔ close (1.047487ms)
+2026-11-09T09:09:39.2130254Z   ✔ rename (4.229554ms)
+2026-11-09T09:09:39.2130883Z   ✔ remove-final (1.247972ms)
+2026-11-09T09:09:39.2132235Z ✔ each vault I/O rejection is attributed to its exact stage with the original rejection preserved (15.349601ms)
+2026-11-09T09:09:39.2134111Z ✔ non-writable observation targets do not alter the original call and report only observer availability (1.730604ms)
+2026-11-09T09:09:39.2135875Z ✔ stop restores descriptors and pending calls cannot install later observation wrappers (1.638031ms)
+2026-11-09T09:09:39.2137405Z ✔ observation refuses another profile and keeps a bounded closed event stream (13.126049ms)
+2026-11-09T09:09:39.2139312Z ✔ cleanup stages preserve asynchronous completion and the exact original release error (3.064243ms)
+2026-11-09T09:09:39.2141134Z ✔ cleanup projection retains closed browser and aggregate causes without message or identifiers (0.840791ms)
+2026-11-09T09:09:39.2142888Z ✔ cleanup diagnostics refuse unknown stages and never replace the original rejection (0.677005ms)
+2026-11-09T09:09:39.2144621Z ✔ fixture cleanup retains its exact rejection and exposes only existing ownership guard codes (0.662287ms)
+2026-11-09T09:09:39.2146620Z ✔ navigation during the installer read repeats the real cancellation contract before a clean original-child exit (78.608727ms)
+2026-11-09T09:09:39.2149001Z ✔ concurrent and later close calls share one operation, including after actual process exit (64.038397ms)
+2026-11-09T09:09:39.2150797Z ✔ unknown renderer failures remain failures and cannot be erased by an idempotent cleanup call (49.395899ms)
+2026-11-09T09:09:39.2152995Z ✔ an active installer cancellation failure still fails even when Electron subsequently exits cleanly (82.624934ms)
+2026-11-09T09:09:41.5629175Z ✔ drain authenticates exact profiles and waits past socket closure to process exit (2890.214983ms)
+2026-11-09T09:09:43.6690596Z ✔ a recorded starting daemon is drained when its socket appears within the same cleanup deadline (2106.919535ms)
+2026-11-09T09:09:44.6388249Z ✔ an authenticated socket with a different PID cannot drain or authorize cleanup (969.695109ms)
+2026-11-09T09:09:45.7404602Z ✔ a wrong profile secret cannot drain or authorize cleanup (1101.443367ms)
+2026-11-09T09:09:47.0033834Z ✔ metadata reads only the actual authenticated hello and never leaks secrets or stops the daemon (1263.000921ms)
+2026-11-09T09:09:47.6674636Z ✔ an already closed socket still waits for the recorded daemon process to finish (663.992382ms)
+2026-11-09T09:09:48.2343238Z ✔ a refused socket without its daemon PID cannot authorize database cleanup (566.674193ms)
+2026-11-09T09:09:48.5705751Z ✔ absent own profiles are stopped and relative paths are refused (336.25522ms)
+2026-11-09T09:09:48.6248342Z ✔ the shipped local scheme enables ordinary V8 caching without adding execution privileges (118.63869ms)
+2026-11-09T09:09:48.6250151Z ✔ the real-runtime probe cannot silently extract another registration or execute source expressions (12.826463ms)
+2026-11-09T09:09:48.6251798Z ✔ three fresh main instances verify both prior canaries across profile and mode changes (33.799362ms)
+2026-11-09T09:09:48.6253388Z ✔ availability alone cannot pass an actual encryption failure or write a canary (7.662361ms)
+2026-11-09T09:09:48.6254771Z ✔ unavailable OS encryption and wrong profile fail before encryption (3.451862ms)
+2026-11-09T09:09:48.6255921Z ✔ second instance must genuinely decrypt the prior process canary, not only create a new one (10.306954ms)
+2026-11-09T09:09:48.6256930Z ✔ canary reads cannot follow a substituted symlink outside the owned artifact (3.456129ms)
+2026-11-09T09:09:48.6258385Z ✔ native Keychain diagnostics retain only closed status codes across split chunks (3.279359ms)
+2026-11-09T09:09:48.6260097Z ✔ close diagnostics classify only known lifecycle errors and never return original renderer text (0.539279ms)
+2026-11-09T09:09:48.6261782Z ✔ native readiness requires the real bridge, daemon identity, authentication and server connection (14.512093ms)
+2026-11-09T09:09:48.6263582Z ✔ installer failures are a closed projection, never raw npm output, identifiers, arguments or exception strings (5.368163ms)
+2026-11-09T09:09:48.6264952Z ✔ rejected or unavailable IPC reads fail readiness without exporting the cause (1.494273ms)
+2026-11-09T09:09:48.6265819Z ✔ bounded waiter retries real false states, records transitions and preserves a failed gate (7.016884ms)
+2026-11-09T09:09:48.6266618Z ✔ metadata failures cannot replace a lease failure or turn it into readiness (0.803161ms)
+2026-11-09T09:09:48.6267481Z ✔ main profile inspection rejects other profiles and reports only fixed service argument comparisons (4.072421ms)
+2026-11-09T09:09:48.6268692Z ✔ launchd bootstrap diagnostics retain only a bounded numeric code (9.615001ms)
+2026-11-09T09:09:48.6269639Z ✔ one destroyed navigation context requires new leased snapshots and the unchanged ready predicate (5.652084ms)
+2026-11-09T09:09:48.6271162Z ✔ repeated destroyed navigation contexts exhaust the original deadline without passing readiness (2.298837ms)
+2026-11-09T09:09:48.6272409Z ▶ navigation handling preserves permanent, closed-page and authentication failures verbatim
+2026-11-09T09:09:48.6272973Z   ✔ permanent read failure (1.08121ms)
+2026-11-09T09:09:48.6273318Z   ✔ closed page error (0.270205ms)
+2026-11-09T09:09:48.6273654Z   ✔ page already closed (0.352178ms)
+2026-11-09T09:09:48.6273998Z   ✔ page openness unavailable (0.359883ms)
+2026-11-09T09:09:48.6274348Z   ✔ authentication failure (0.361235ms)
+2026-11-09T09:09:48.6274756Z   ✔ authentication code retains authority (0.383838ms)
+2026-11-09T09:09:48.6275204Z   ✔ authentication cause retains authority (0.264324ms)
+2026-11-09T09:09:48.6276089Z   ✔ different exception kind (0.222466ms)
+2026-11-09T09:09:48.6277015Z ✔ navigation handling preserves permanent, closed-page and authentication failures verbatim (4.806294ms)
+2026-11-09T09:09:48.6278304Z ✔ a navigation interruption never bypasses the next fresh lease check (0.497369ms)
+2026-11-09T09:09:48.6279210Z ✔ an already loaded bundled SPA auth route needs no new document navigation (10.198171ms)
+2026-11-09T09:09:48.6280099Z ✔ a completed blank document and available preload cannot bypass the bundled DOMContentLoaded (8.048523ms)
+2026-11-09T09:09:48.6280999Z ✔ a matching bundled document still waits for both DOMContentLoaded and the real IPC predicate (3.416726ms)
+2026-11-09T09:09:48.6281916Z ✔ blank, foreign, credential-bearing and non-application namespace URLs never satisfy readiness (2.537924ms)
+2026-11-09T09:09:48.6282817Z ✔ navigation evidence records bounded main-document transitions without URLs or query values (2.34326ms)
+2026-11-09T09:09:48.6284279Z ✔ same-document History routes have a closed bundled classification without revealing their paths (0.453708ms)
+2026-11-09T09:09:48.6285902Z ✔ failure evidence retains a closed error class and owned source locations only (0.736566ms)
+2026-11-09T09:09:48.6287548Z ✔ real shell startup reselects the actual Node24 binary after startup shadows inherited PATH (169.327048ms)
+2026-11-09T09:09:48.6289500Z ✔ profile export preserves a selected binary directory containing shell metacharacters (43.904488ms)
+2026-11-09T09:09:48.6290891Z ✔ a symlink login profile is refused without modifying its target (10.317577ms)
+2026-11-09T09:09:48.6292157Z ✔ probe diagnostics never return startup output or malformed values (7.735605ms)
+2026-11-09T09:09:48.6293513Z ✔ capture time is explicit, canonical, shared across the pair and never future (5.969457ms)
+2026-11-09T09:09:48.6294572Z ✔ the real useNow first render no longer crosses the observed 5.5-hour boundary (82.74488ms)
+2026-11-09T09:09:48.6295371Z ✔ setFixedTime keeps actual timeout, interval and monotonic clock advancing (98.016004ms)
+2026-11-09T09:09:48.6296294Z ✔ ordinary parity retains its owner-only fixture and never adopts or deletes peer rows (171.295008ms)
+2026-11-09T09:09:48.6297216Z ✔ both leased members have separately owned, pre-reserved coordinators before UI reads (203.305131ms)
+2026-11-09T09:09:48.6298664Z ✔ cleanup removes only reserved coordinator IDs and leaves personal or untracked peer rows dirty (199.54837ms)
+2026-11-09T09:09:48.6299656Z ✔ a refused peer reservation prevents every fixture insertion and cleanup write (152.665801ms)
+2026-11-09T09:09:48.6300520Z ✔ pre-existing reader defaults are refused without adopting or deleting them (3.020685ms)
+2026-11-09T09:09:48.6301327Z ✔ only exact default rows created during this UI session are removed (2.666264ms)
+2026-11-09T09:09:48.6302150Z ✔ foreign, old, modified and meaningful rows fail before any deletion (8.240482ms)
+2026-11-09T09:09:48.6302972Z ✔ workspace capture completes the cold two-message history through its real button (11.667196ms)
+2026-11-09T09:09:48.6303877Z ✔ workspace capture completes the restored two-message history through its real button (1.149027ms)
+2026-11-09T09:09:48.6304901Z ✔ receipt reservation uses actual fresh bot keys, never raw IDs or the shared coordinator label (0.337711ms)
+2026-11-09T09:09:48.6305736Z ✔ a pre-existing coordinator receipt is refused without any deletion (1.049511ms)
+2026-11-09T09:09:48.6306520Z ✔ only new receipts for the seeded owner messages and exact positions are removed (0.671445ms)
+2026-11-09T09:09:48.6307438Z ✔ foreign messages, changed positions and unproven message owners fail before any row deletion (0.756794ms)
+2026-11-09T09:09:48.6308650Z ✔ a completed Next action does not wait for its ongoing page Flight stream (1.668559ms)
+2026-11-09T09:09:48.6309351Z ✔ ordinary RPC waits for both the body and parsed JSON (4.4354ms)
+2026-11-09T09:09:48.6310168Z ✔ browser RPC refuses missing protocol results and business failures after real JSON completion (2.73983ms)
+2026-11-09T09:09:48.6311274Z ✔ HTTP success does not hide API/RPC error data or a non-JSON redirect page (1.48206ms)
+2026-11-09T09:09:48.6312360Z ✔ an action auth redirect or wrong response type is not successful completion (0.876608ms)
+2026-11-09T09:09:48.6313261Z ✔ only the exact successful Linear unavailable payload enables its existing status message (1.167722ms)
+2026-11-09T09:09:48.6314232Z ✔ workspace selection waits for the new document even when its URL and old DOM already match (6.15808ms)
+2026-11-09T09:09:48.6315141Z ✔ the already-selected workspace closes its menu once without awaiting a nonexistent navigation (0.427208ms)
+2026-11-09T09:09:48.6316030Z ✔ workspace selection preserves a failed document wait and never retries the switch (1.139289ms)
+2026-11-09T09:09:48.6317547Z ✔ workspace selection preserves click failures while its pending document observer is safely settled (0.945648ms)
+2026-11-09T09:09:48.6319834Z ✔ lifecycle workspace selection waits for the switched document before its viewport readiness read (3.031025ms)
+2026-11-09T09:09:48.6321141Z ✔ lifecycle workspace selection keeps the current default-locale document without waiting for navigation (1.373237ms)
+2026-11-09T09:09:48.6322076Z ✔ lifecycle workspace selection preserves navigation failure before any viewport read (2.543845ms)
+2026-11-09T09:09:48.6322964Z ✔ lifecycle workspace selection preserves a single click failure and drains its pending observer (1.795225ms)
+2026-11-09T09:09:48.6323852Z ✔ artifact-markdown waits for both visible thread cards, not background or partial matches (58.306155ms)
+2026-11-09T09:09:48.6324607Z ✔ artifact-markdown requires the final reply in the dialog thread (11.357347ms)
+2026-11-09T09:09:48.6325282Z ✔ artifact-markdown fails when a required thread card never arrives (9.351088ms)
+2026-11-09T09:09:48.6326039Z ✔ artifact-html waits for both visible thread cards, not background or partial matches (12.523306ms)
+2026-11-09T09:09:48.6326753Z ✔ artifact-html requires the final reply in the dialog thread (10.934228ms)
+2026-11-09T09:09:48.6327389Z ✔ artifact-html fails when a required thread card never arrives (11.6695ms)
+2026-11-09T09:09:48.6328279Z ✔ artifact HTML still requires the rendered iframe document (12.792219ms)
+2026-11-09T09:09:48.6328986Z ✔ task-thread capture waits for verified even when all its other reads are ready (13.71849ms)
+2026-11-09T09:09:48.6329790Z ✔ task-thread capture waits for editable-title even when all its other reads are ready (1.062025ms)
+2026-11-09T09:09:48.6330594Z ✔ task-thread capture waits for description even when all its other reads are ready (1.160629ms)
+2026-11-09T09:09:48.6331357Z ✔ task-thread capture waits for activity even when all its other reads are ready (0.91004ms)
+2026-11-09T09:09:48.6332129Z ✔ task-thread capture waits for thread-row even when all its other reads are ready (1.139921ms)
+2026-11-09T09:09:48.6332911Z ✔ task-thread capture waits for thread-reply even when all its other reads are ready (0.958672ms)
+2026-11-09T09:09:48.6333724Z ✔ identical pixels with different mask geometry still fail and retain both geometries (6.380636ms)
+2026-11-09T09:09:48.6334545Z ✔ matching masks preserve the unchanged strict pixel comparison (6.761958ms)
+2026-11-09T09:09:48.6335327Z ✔ the old baseline launches its actual compiled Next revision with the metrics preload first (26.155775ms)
+2026-11-09T09:09:48.6336191Z ✔ the new product uses start-app only after validating its compiled revision and entry (10.96823ms)
+2026-11-09T09:09:48.6337030Z ✔ missing compiled proof, symlinked manifests and malformed launch arguments fail closed (6.492545ms)
+2026-11-09T09:09:48.6338041Z ✔ shutdown waits for the actual owned child exit after its graceful signal (1.738349ms)
+2026-11-09T09:09:48.6338903Z ✔ a forced owned exit is proven but remains a failed shutdown, and an unproven exit fails separately (16.275981ms)
+2026-11-09T09:09:48.6339759Z ✔ each idle listener authenticates browser RPC only at its own configured origin (418.796045ms)
+2026-11-09T09:09:48.6340567Z ✔ packaged desktop only accepts the exact disposable image and generated identity (9.164088ms)
+2026-11-09T09:09:48.6341238Z ℹ tests 280
+2026-11-09T09:09:48.6341588Z ℹ suites 0
+2026-11-09T09:09:48.6341798Z ℹ pass 280
+2026-11-09T09:09:48.6341999Z ℹ fail 0
+2026-11-09T09:09:48.6342211Z ℹ cancelled 0
+2026-11-09T09:09:48.6342427Z ℹ skipped 0
+2026-11-09T09:09:48.6342634Z ℹ todo 0
+2026-11-09T09:09:48.6342876Z ℹ duration_ms 14532.424067
+2026-11-09T09:09:48.6543157Z ##[group]Run pnpm --filter @mikka/desktop build
+2026-11-09T09:09:48.6543560Z [36;1mpnpm --filter @mikka/desktop build[0m
+2026-11-09T09:09:48.6563572Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:09:48.6563833Z env:
+2026-11-09T09:09:48.6564030Z   MIKKA_EDITION: cloud
+2026-11-09T09:09:48.6564287Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:09:48.6564606Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:09:48.6564920Z ##[endgroup]
+2026-11-09T09:09:49.0276933Z 
+2026-11-09T09:09:49.0278133Z > @mikka/desktop@0.1.2 build /home/runner/work/Mikka/Mikka/apps/desktop
+2026-11-09T09:09:49.0278931Z > node scripts/build.mjs
+2026-11-09T09:09:49.0279199Z 
+2026-11-09T09:09:58.4128636Z [33m[plugin builtin:vite-reporter] 
+2026-11-09T09:09:58.4129359Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-11-09T09:09:58.4130017Z - Using dynamic import() to code-split the application
+2026-11-09T09:09:58.4131056Z - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+2026-11-09T09:09:58.4132170Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+2026-11-09T09:09:59.0218403Z 
+2026-11-09T09:09:59.0238942Z   dist/main.cjs  1.8mb ⚠️
+2026-11-09T09:09:59.0239298Z 
+2026-11-09T09:09:59.0239537Z ⚡ Done in 171ms
+2026-11-09T09:09:59.0320852Z 
+2026-11-09T09:09:59.0321214Z   dist/preload.cjs  10.1kb
+2026-11-09T09:09:59.0321441Z 
+2026-11-09T09:09:59.0321654Z ⚡ Done in 5ms
+2026-11-09T09:09:59.0341543Z built @mikka/desktop 0.1.2 (prod) -> https://app.aspectlylabs.com/mikka
+2026-11-09T09:09:59.2209360Z ##[group]Run pnpm --filter @mikka/protocol typecheck
+2026-11-09T09:09:59.2209833Z [36;1mpnpm --filter @mikka/protocol typecheck[0m
+2026-11-09T09:09:59.2230416Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:09:59.2230676Z env:
+2026-11-09T09:09:59.2230882Z   MIKKA_EDITION: cloud
+2026-11-09T09:09:59.2231124Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:09:59.2231438Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:09:59.2231753Z ##[endgroup]
+2026-11-09T09:09:59.5947291Z 
+2026-11-09T09:09:59.5948302Z > @mikka/protocol@0.0.1 typecheck /home/runner/work/Mikka/Mikka/packages/protocol
+2026-11-09T09:09:59.5949018Z > tsgo --noEmit -p tsconfig.json
+2026-11-09T09:09:59.5949265Z 
+2026-11-09T09:10:00.2684842Z ##[group]Run pnpm test:platform
+2026-11-09T09:10:00.2685279Z [36;1mpnpm test:platform[0m
+2026-11-09T09:10:00.2705728Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:10:00.2705991Z env:
+2026-11-09T09:10:00.2706197Z   MIKKA_EDITION: cloud
+2026-11-09T09:10:00.2706439Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:10:00.2706768Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:10:00.2707100Z ##[endgroup]
+2026-11-09T09:10:00.6152231Z 
+2026-11-09T09:10:00.6152997Z > next-app@0.0.1 test:platform /home/runner/work/Mikka/Mikka
+2026-11-09T09:10:00.6155480Z > node --import tsx --test lib/app-build.test.ts lib/required-refresh-network.test.ts lib/daemon-release.test.ts tests/daemon-contract.test.ts lib/local-device-setup.test.ts lib/platform/detect.test.ts lib/platform/desktop-notifications.test.ts lib/platform/open-settings.test.ts && pnpm --filter @mikka/protocol exec vitest run src/platform.test.ts
+2026-11-09T09:10:00.6157208Z 
+2026-11-09T09:10:01.2281182Z ✔ navigation and action probes share one public read, then reuse it until stale (52.730849ms)
+2026-11-09T09:10:01.2327074Z ✔ failed version reads stay unknown and do not turn into a known stale build (0.453608ms)
+2026-11-09T09:10:01.2329061Z ✔ a known stale action asks for refresh before any action runs (11.057108ms)
+2026-11-09T09:10:01.2330751Z ✔ a page is stale only when both builds are known and differ (0.143067ms)
+2026-11-09T09:10:01.2332874Z ✔ a missing action asks for refresh without reloading, and retires obsolete traffic (6.263179ms)
+2026-11-09T09:10:01.2335802Z ✔ third-party response headers do not retire or reload the app (3.451542ms)
+2026-11-09T09:10:01.2337192Z ✔ ordinary errors do not require an app refresh (2.834368ms)
+2026-11-09T09:10:01.2338971Z ✔ missing-action handling does not depend on access to sessionStorage (2.993346ms)
+2026-11-09T09:10:01.2340627Z ✔ a late refresh subscriber catches the marker before waiting for another event (3.158895ms)
+2026-11-09T09:10:01.2342329Z ✔ an early refresh subscriber waits for an event and unsubscribes cleanly (2.873933ms)
+2026-11-09T09:10:01.2343920Z ✔ the server minimum desktop version is a valid version or nothing (0.917676ms)
+2026-11-09T09:10:01.2369331Z ✔ a desktop build below the minimum must update; at or above it, or without one, it need not (0.306593ms)
+2026-11-09T09:10:01.2395043Z ✔ a required refresh stops same-origin application traffic while the public version probe remains available (1.087162ms)
+2026-11-09T09:10:01.2879811Z ✔ only a plain release at or above the minimum is passed on from npm (61.57563ms)
+2026-11-09T09:10:01.2890416Z ✔ the registry is read once per five minutes; no answer still sends the minimum (1.726097ms)
+2026-11-09T09:10:01.2909222Z ✔ only released local daemons below the minimum are too old (0.383426ms)
+2026-11-09T09:10:01.2910721Z ✔ the source version is the daemon package's own (0.184896ms)
+2026-11-09T09:10:01.2912364Z ✔ a long-poll reads the cached release without waiting; a stale cache refreshes in the background (14.077297ms)
+2026-11-09T09:10:01.2914053Z ✔ a release is news only when newer than what the daemon already knows (0.375292ms)
+2026-11-09T09:10:01.2915621Z ✔ device admission requires a fixed binary independently of the login credential (3.218958ms)
+2026-11-09T09:10:01.2917318Z ✔ only update control traffic remains available to an authenticated idle old daemon (3.115825ms)
+2026-11-09T09:10:01.2919036Z ✔ first launch: no daemon answers, so restart it or install it (1.285272ms)
+2026-11-09T09:10:01.2920591Z ✔ already my device: nothing to do, online or with its server link down for a moment (0.298428ms)
+2026-11-09T09:10:01.2922050Z ✔ a daemon with no device, or someone else's, is set up for me (0.225121ms)
+2026-11-09T09:10:01.2923448Z ✔ the launch snapshot seeds the badge without replaying notifications (2.825953ms)
+2026-11-09T09:10:01.2924799Z ✔ entering 等你 and failing raise one notification each (0.836274ms)
+2026-11-09T09:10:01.2925865Z ✔ an unchanged poll stays silent (0.25105ms)
+2026-11-09T09:10:01.2927377Z ✔ a run that appears after launch can notify (1.25154ms)
+2026-11-09T09:10:01.2928842Z ✔ runs that disappear only update the map (0.254836ms)
+2026-11-09T09:10:01.2930080Z ✔ a finished thread notifies the desktop when 线程完成 is on (0.396892ms)
+2026-11-09T09:10:01.2931415Z ✔ a finished thread stays silent on the desktop when 线程完成 is off (0.258102ms)
+2026-11-09T09:10:01.2932699Z ✔ the launch snapshot never replays finished threads (0.207678ms)
+2026-11-09T09:10:01.2934287Z ✔ whether a transition raises a notification is the Decisions API's answer, per candidate (1.392203ms)
+2026-11-09T09:10:01.4679827Z ✔ no bridge means the web platform and no capabilities (1.465549ms)
+2026-11-09T09:10:01.4750450Z ✔ a browser-runtime bridge is still web (1.53242ms)
+2026-11-09T09:10:01.4752249Z ✔ an electron bridge reports every subsystem it exposes (1.250207ms)
+2026-11-09T09:10:01.4786363Z ✔ a missing subsystem turns only its capability off (0.320951ms)
+2026-11-09T09:10:01.4829005Z ✔ detection never reads the user agent (0.396511ms)
+2026-11-09T09:10:01.5243214Z ✔ web settings stay in the current window (1.693085ms)
+2026-11-09T09:10:01.5254574Z ✔ an older desktop shell cannot link from the app window (0.300582ms)
+2026-11-09T09:10:01.5256228Z ✔ the desktop shell reopens the current page for OAuth callbacks (1.381622ms)
+2026-11-09T09:10:01.5261148Z ✔ the desktop shell opens the matching settings section in the system browser (1.618548ms)
+2026-11-09T09:10:01.5263636Z ✔ the desktop shell starts an app path such as GitHub connect in the system browser (0.416599ms)
+2026-11-09T09:10:01.8443215Z ✔ requiring refresh aborts an already-open business stream and preserves the version probe (274.773561ms)
+2026-11-09T09:10:02.0391423Z ✔ the fixture is the npm release of MIN_DAEMON_VERSION (13.188164ms)
+2026-11-09T09:10:02.0708927Z ✔ the oldest daemon's git credential helper accepts today's run GitHub token answer (34.724806ms)
+2026-11-09T09:10:02.0922149Z ℹ tests 46
+2026-11-09T09:10:02.0932937Z ℹ suites 0
+2026-11-09T09:10:02.0933748Z ℹ pass 46
+2026-11-09T09:10:02.0934454Z ℹ fail 0
+2026-11-09T09:10:02.0935116Z ℹ cancelled 0
+2026-11-09T09:10:02.0935792Z ℹ skipped 0
+2026-11-09T09:10:02.0936461Z ℹ todo 0
+2026-11-09T09:10:02.0937053Z ℹ duration_ms 1442.443505
+2026-11-09T09:10:02.7558769Z 
+2026-11-09T09:10:02.7560239Z [1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/home/runner/work/Mikka/Mikka/packages/protocol[39m
+2026-11-09T09:10:02.7560944Z 
+2026-11-09T09:10:02.9344827Z  [32m✓[39m src/platform.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-11-09T09:10:02.9385829Z 
+2026-11-09T09:10:02.9391140Z [2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+2026-11-09T09:10:02.9392657Z [2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+2026-11-09T09:10:02.9393913Z [2m   Start at [22m 09:10:02
+2026-11-09T09:10:02.9398241Z [2m   Duration [22m 172ms[2m (transform 60%, import 22%, tests 10%, worker 8%)[22m
+2026-11-09T09:10:02.9412201Z 
+2026-11-09T09:10:03.0132221Z ##[group]Run pnpm test:idle-budget
+2026-11-09T09:10:03.0132571Z [36;1mpnpm test:idle-budget[0m
+2026-11-09T09:10:03.0152838Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:10:03.0153100Z env:
+2026-11-09T09:10:03.0153302Z   MIKKA_EDITION: cloud
+2026-11-09T09:10:03.0153545Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:10:03.0153874Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:10:03.0154197Z ##[endgroup]
+2026-11-09T09:10:03.3514474Z 
+2026-11-09T09:10:03.3515458Z > next-app@0.0.1 test:idle-budget /home/runner/work/Mikka/Mikka
+2026-11-09T09:10:03.3516999Z > node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/idle-request-budget.test.tsx
+2026-11-09T09:10:03.3518125Z 
+2026-11-09T09:10:09.5377255Z Warning: KaTeX doesn't work in quirks mode. Make sure your website has a suitable doctype.
+2026-11-09T09:10:10.3673547Z (node:4253) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-09T09:10:10.3674675Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-09T09:10:10.3678758Z (node:4253) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-09T09:10:10.3680423Z (node:4253) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+2026-11-09T09:10:10.3707253Z ✔ the budget file lists exactly the measured pages, and every allowance names its issue (2.359719ms)
+2026-11-09T09:10:11.4695511Z ✔ board: an idle, visible minute stays within its request budget (6868.188067ms)
+2026-11-09T09:10:12.3293506Z ✔ task-detail: an idle, visible minute stays within its request budget (1387.113561ms)
+2026-11-09T09:10:12.4606133Z ✔ bot-chat: an idle, visible minute stays within its request budget (112.805619ms)
+2026-11-09T09:10:12.5694602Z ✔ devices: an idle, visible minute stays within its request budget (88.338103ms)
+2026-11-09T09:10:12.7261699Z ✔ artifact-viewer: an idle, visible minute stays within its request budget (135.936279ms)
+2026-11-09T09:10:12.8005101Z ✔ nav-bot-list: an idle, visible minute stays within its request budget (134.92716ms)
+2026-11-09T09:10:12.8889753Z ✔ group-chat: an idle, visible minute stays within its request budget (99.67717ms)
+2026-11-09T09:10:13.0329701Z ✔ subscription-settings: an idle, visible minute stays within its request budget (151.406813ms)
+2026-11-09T09:10:13.0551708Z ✔ pull-request-badge: an idle, visible minute stays within its request budget (26.214107ms)
+2026-11-09T09:10:13.1623651Z ℹ tests 10
+2026-11-09T09:10:13.1623975Z ℹ suites 0
+2026-11-09T09:10:13.1624225Z ℹ pass 10
+2026-11-09T09:10:13.1624460Z ℹ fail 0
+2026-11-09T09:10:13.1624710Z ℹ cancelled 0
+2026-11-09T09:10:13.1624969Z ℹ skipped 0
+2026-11-09T09:10:13.1625203Z ℹ todo 0
+2026-11-09T09:10:13.1625479Z ℹ duration_ms 9777.104891
+2026-11-09T09:10:13.1839780Z ##[group]Run pnpm lint:ui
+2026-11-09T09:10:13.1840098Z [36;1mpnpm lint:ui[0m
+2026-11-09T09:10:13.1860304Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:10:13.1860573Z env:
+2026-11-09T09:10:13.1860783Z   MIKKA_EDITION: cloud
+2026-11-09T09:10:13.1861033Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:10:13.1861371Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:10:13.1861704Z ##[endgroup]
+2026-11-09T09:10:13.5259669Z 
+2026-11-09T09:10:13.5260437Z > next-app@0.0.1 lint:ui /home/runner/work/Mikka/Mikka
+2026-11-09T09:10:13.5261181Z > node scripts/lint-ui.mjs
+2026-11-09T09:10:13.5261495Z 
+2026-11-09T09:10:24.1640441Z 
+2026-11-09T09:10:24.1642091Z UI policy: 3205 business files, 0 errors; 287 component-library files excluded (no source verification).
+2026-11-09T09:10:24.1643979Z Interaction policy: 532 files, including downloaded business blocks; only UI/ReUI primitives excluded.
+2026-11-09T09:10:24.1645222Z {}
+2026-11-09T09:10:24.2325616Z Post job cleanup.
+2026-11-09T09:10:24.3634945Z (node:4306) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T09:10:24.3636207Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:10:24.3639977Z Cache hit occurred on the primary key node-cache-Linux-x64-pnpm-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9, not saving cache.
+2026-11-09T09:10:24.3757313Z Post job cleanup.
+2026-11-09T09:10:24.5289848Z Pruning is unnecessary.
+2026-11-09T09:10:24.5464961Z Post job cleanup.
+2026-11-09T09:10:24.6474362Z [command]/usr/bin/git version
+2026-11-09T09:10:24.6524322Z git version 2.56.0
+2026-11-09T09:10:24.6597852Z Temporarily overriding HOME='/home/runner/work/_temp/c9958e74-4a7f-4bec-beac-76243ae4fb52' before making global git config changes
+2026-11-09T09:10:24.6599369Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T09:10:24.6620812Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T09:10:24.6680389Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T09:10:24.6732851Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T09:10:24.7020287Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T09:10:24.7059243Z http.https://github.com/.extraheader
+2026-11-09T09:10:24.7092810Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T09:10:24.7151266Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T09:10:24.7579038Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T09:10:24.7607111Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T09:10:24.8037465Z Cleaning up orphan processes
+2026-11-09T09:10:24.8397506Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

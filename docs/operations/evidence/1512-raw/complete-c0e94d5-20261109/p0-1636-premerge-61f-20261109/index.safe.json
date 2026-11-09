@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "kind": "p0-1636-source-review-index",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequests": [
+    1799,
+    1636
+  ],
+  "prefix": "p0-1636-premerge-61f-20261109",
+  "baseCommit": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "p0Commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+  "oursCommit": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+  "files": [
+    {
+      "path": "p0-1636-premerge-61f-20261109/p0-1636-observability-source-review.safe.json",
+      "bytes": 65056,
+      "sha256": "9679125ea1d032d05c8665567a804d5c10f32866b1bf96cedc78e98412081e77",
+      "gitBlob": "dbd01504940f0ef306da9a3e222ec0d2bf59c88b",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "p0-1636-premerge-61f-20261109/p0-1636-complete-path-index.safe.json",
+      "bytes": 122002,
+      "sha256": "2bf37e2c11caf3ed41a45ee211799336f8db17be3d3c44f5ccb8123df703358d",
+      "gitBlob": "d7106f37b4bd5e18a0aa272b43976178d6cf4e9b",
+      "remoteConfirmed": true
+    }
+  ],
+  "originalPathCount": 428,
+  "overlapPaths": 8,
+  "limits": [
+    "Source-only review, no new candidate, ref, test, workflow, resource or production request.",
+    "P0 recorded open/unmerged at metadata read. Re-read actual main before any later adaptation.",
+    "No ACME failure observed; NULL fixture insertion not claimed universally invalid.",
+    "P0 Factory/default no-cookie mismatch and ownerIdle scope change need explicit handling; no changed trust rules or weakened1512 acceptance."
+  ]
+}

@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "kind": "postgres-public-log-privacy-review",
+  "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+  "method": "Pattern-assisted scan of the five original decoded GitHub logs; every match classified by exact value and, for the synthetic email collision, same-checkout source and SQL normalization. Raw matched values are omitted from this receipt.",
+  "rawLogOrigin": "Official GitHub decoded-log API strings, with original BOM/ANSI retained; platform masking unchanged.",
+  "patterns": [
+    "private-key-header",
+    "provider-token-shaped",
+    "aws-key-shaped",
+    "email-shaped",
+    "authorization-bearer-shaped",
+    "credential-url-shaped",
+    "signed-url-shaped",
+    "credential-label-assignment"
+  ],
+  "findings": [
+    {
+      "jobId": 129071734768,
+      "line": 4187,
+      "category": "email-shaped",
+      "matchSha256": "fdb0d7655db963926cc4efe3326475516ec97dcbd6959766918e03ff45edb225",
+      "length": 19,
+      "resolution": "Same-checkout deliberately colliding synthetic signup fixture. Normalized two literal values with the exact SQL function rule; both equal the sole logged value.",
+      "source": {
+        "testPath": "lib/abuse/store.db.test.ts",
+        "testLines": [
+          386,
+          390
+        ],
+        "testBlob": "04792f1c02a965cabff134f30f938d14c97d62aa",
+        "normalizerPath": "drizzle/20261030230000_hosted_usage.sql",
+        "normalizerLines": [
+          38,
+          39,
+          40
+        ],
+        "normalizerBlob": "41c55d332822f397f51a75eb95bdeafc2abc685a",
+        "exactValueMatched": true,
+        "rawValueOmitted": true
+      }
+    },
+    {
+      "jobId": 129071734800,
+      "line": 5882,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "resolution": "Natural-language test-title phrase: bearer authenticates. Not a credential/header; original title and streamed/grouped copies inspected."
+    },
+    {
+      "jobId": 129071734800,
+      "line": 5942,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "resolution": "Natural-language test-title phrase: bearer authenticates. Not a credential/header; original title and streamed/grouped copies inspected."
+    },
+    {
+      "jobId": 129071734800,
+      "line": 6064,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "resolution": "Natural-language test-title phrase: bearer authenticates. Not a credential/header; original title and streamed/grouped copies inspected."
+    },
+    {
+      "jobId": 129071734800,
+      "line": 6124,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "resolution": "Natural-language test-title phrase: bearer authenticates. Not a credential/header; original title and streamed/grouped copies inspected."
+    },
+    {
+      "jobId": 129071734749,
+      "line": 2143,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "resolution": "Natural-language test-title phrase: bearer authenticates. Not a credential/header; original title and streamed/grouped copies inspected."
+    },
+    {
+      "jobId": 129071734749,
+      "line": 2718,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "resolution": "Natural-language test-title phrase: bearer authenticates. Not a credential/header; original title and streamed/grouped copies inspected."
+    }
+  ],
+  "credentialLabelReview": {
+    "total": 27,
+    "allMasked": true,
+    "keys": [
+      {
+        "key": "FFMPEG_GITHUB_TOKEN",
+        "occurrences": 4
+      },
+      {
+        "key": "BETTER_AUTH_SECRET",
+        "occurrences": 22
+      },
+      {
+        "key": "GITHUB_TOKEN",
+        "occurrences": 1
+      }
+    ],
+    "unmaskedValuesExported": false,
+    "processScopeBoundary": "Masking of FFMPEG_GITHUB_TOKEN in logs is not a claim that dependency lifecycle processes cannot access the environment variable. That source risk is reviewed separately."
+  },
+  "unresolvedCandidates": 0,
+  "publicDisposition": "Preserve all five original decoded log strings without edits. Exclude tool/API envelopes, platform account metadata and temporary download URLs.",
+  "limitations": "Pattern and source checks do not prove universal absence of personal data. These jobs use isolated synthetic CI fixtures, not production account/business-data reads.",
+  "downloadAccounting": [
+    {
+      "jobId": 129071734768,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129071734800,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129071734749,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129071734733,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129074353558,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    }
+  ],
+  "resources": {
+    "created": 0,
+    "running": 0,
+    "testsRerun": 0,
+    "productionOrModelCalls": 0,
+    "refsChanged": false
+  }
+}

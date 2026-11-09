@@ -1,0 +1,16 @@
+{
+  "path": "/vercel/sandbox/native-c0e94/public.bundle.json.gz",
+  "fileCount": 13,
+  "payloadBytes": 1003154,
+  "gzipBytes": 167924,
+  "gzipSha256": "06bc99e4e051956ecda0d3afac5acdd0c22fc72391620e83369cba0bde62abce",
+  "decodedBytes": 1340108,
+  "decodedSha256": "eba0cbb525a3640b2204bca64d32a561a4c83b4813864cad0c40e800d392e104",
+  "chunkBytes": 1455,
+  "chunks": 116,
+  "allChunksRecovered": true,
+  "gzipCrcAndSizeVerified": true,
+  "gzipSha256Verified": true,
+  "decodedBytesAndSha256Verified": true,
+  "everyMemberBytesSha256AndGitBlobSha1Verified": true
+}

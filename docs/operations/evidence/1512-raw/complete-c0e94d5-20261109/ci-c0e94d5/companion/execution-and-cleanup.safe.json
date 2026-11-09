@@ -1,0 +1,3691 @@
+{
+  "schemaVersion": 1,
+  "kind": "companion-ci-execution-and-cleanup-review",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "source": {
+    "prHead": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+    "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+    "parents": [
+      "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "c0e94d594f1ecf4f5edc25904912702e61fce86b"
+    ],
+    "gitCommitApiVerifiedBy": "root",
+    "bindingReceipt": "https://github.com/alexj11324/Mikka/blob/43eac42001f96598c0aa5758290150e5b8bf354d/docs/operations/evidence/1512-raw/pending-dispatch-c0e94d5-20261109/ci/source-binding.safe.json",
+    "noDuplicateCommitApiFetch": true
+  },
+  "reviewer": "current_source_review",
+  "reviewScope": {
+    "workflowCount": 9,
+    "executedJobs": 14,
+    "conditionalSkippedJobs": 6,
+    "originalLogReads": 14,
+    "eachExecutedJobReadOnce": true,
+    "mainCiPgNativeOrPeerLogsRead": false,
+    "artifactsDownloaded": false,
+    "productionProof": false
+  },
+  "workflows": [
+    {
+      "runId": 42590712039,
+      "name": "Read cache API acceptance",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42590712039",
+      "event": "pull_request",
+      "headSha": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-09T09:05:33Z",
+      "updatedAt": "2026-11-09T09:09:55Z",
+      "workflowSource": {
+        "path": ".github/workflows/read-cache.yml",
+        "gitBlob": "54464667276af18611ba083e968ce9f1672fb301",
+        "sha256": "fb011ef1b3c47f8be147ddc6e57b324d1959ce5a1df6ca850908aef338af1ca0",
+        "bytes": 4145
+      },
+      "jobs": [
+        {
+          "id": 129071361884,
+          "name": "Read cache API and CLI",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:09:54Z"
+        }
+      ]
+    },
+    {
+      "runId": 42590712251,
+      "name": "SSH device backend",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42590712251",
+      "event": "pull_request",
+      "headSha": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-09T09:05:33Z",
+      "updatedAt": "2026-11-09T09:11:11Z",
+      "workflowSource": {
+        "path": ".github/workflows/ssh-device-backend.yml",
+        "gitBlob": "e980cb3cdf2bc1206972ca66c87f9bc990e2ac48",
+        "sha256": "d99df4d780a3cb699710e1b02c0f09a6b806a0d11f9c4470cea6e7346dd9d597",
+        "bytes": 1839
+      },
+      "jobs": [
+        {
+          "id": 129071352911,
+          "name": "ssh",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:35Z",
+          "completedAt": "2026-11-09T09:11:10Z"
+        }
+      ]
+    },
+    {
+      "runId": 42590712056,
+      "name": "E2B subscription custody",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42590712056",
+      "event": "pull_request",
+      "headSha": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-09T09:05:33Z",
+      "updatedAt": "2026-11-09T09:10:28Z",
+      "workflowSource": {
+        "path": ".github/workflows/e2b-byos.yml",
+        "gitBlob": "333e0674355baa72ce7bd00e7e57964fff8c7d6a",
+        "sha256": "d837c7bcad12763ba903a04e05fecbe0f4dbbd8a8b10f13149a3c4a770ecc6d5",
+        "bytes": 1660
+      },
+      "jobs": [
+        {
+          "id": 129071351576,
+          "name": "custody",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:10:28Z"
+        }
+      ]
+    },
+    {
+      "runId": 42590711896,
+      "name": "Site search read contract",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42590711896",
+      "event": "pull_request",
+      "headSha": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-09T09:05:33Z",
+      "updatedAt": "2026-11-09T09:12:46Z",
+      "workflowSource": {
+        "path": ".github/workflows/site-search.yml",
+        "gitBlob": "299e09591558bced0eafcc05c7d5a6d295078438",
+        "sha256": "f0f4d26487b769faf85440c95f40f169219460e2a82240e8517f291053247f1e",
+        "bytes": 4072
+      },
+      "jobs": [
+        {
+          "id": 129071351595,
+          "name": "site-search",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:12:45Z"
+        }
+      ]
+    },
+    {
+      "runId": 42590712026,
+      "name": "Browser gate",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42590712026",
+      "event": "pull_request",
+      "headSha": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-09T09:05:33Z",
+      "updatedAt": "2026-11-09T09:05:40Z",
+      "workflowSource": {
+        "path": ".github/workflows/browser-gate.yml",
+        "gitBlob": "0717180c70f54f9af06ebe39d0f5b5ec207235c4",
+        "sha256": "0e833e68d8bb03e448de93cfe9a7bf1564f78195c678d5db4be542a39e772737",
+        "bytes": 579
+      },
+      "jobs": [
+        {
+          "id": 129071360135,
+          "name": "Browser tests (before merge)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:40Z"
+        }
+      ]
+    },
+    {
+      "runId": 42590712049,
+      "name": "E2B additive runtime release",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42590712049",
+      "event": "pull_request",
+      "headSha": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-09T09:05:33Z",
+      "updatedAt": "2026-11-09T09:06:00Z",
+      "workflowSource": {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "gitBlob": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+        "sha256": "9c13b3e21a58abac5240495beaa08a0fc26e1fffabeb1506d94f030689833ab3",
+        "bytes": 18463
+      },
+      "jobs": [
+        {
+          "id": 129071352005,
+          "name": "test",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:35Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        },
+        {
+          "id": 129071533096,
+          "name": "subscriptions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T09:05:59Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        },
+        {
+          "id": 129071533233,
+          "name": "check",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T09:05:59Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        },
+        {
+          "id": 129071533285,
+          "name": "validate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T09:05:59Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        },
+        {
+          "id": 129071534124,
+          "name": "await-web",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T09:05:59Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        },
+        {
+          "id": 129071534836,
+          "name": "cleanup",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T09:06:00Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        },
+        {
+          "id": 129071534856,
+          "name": "publish",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T09:06:00Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        }
+      ]
+    },
+    {
+      "runId": 42590712169,
+      "name": "Unattended sandbox acceptance",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42590712169",
+      "event": "pull_request",
+      "headSha": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-09T09:05:33Z",
+      "updatedAt": "2026-11-09T09:08:06Z",
+      "workflowSource": {
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "gitBlob": "91ebe7a22509c3e900eedf2d6f160c454da91b4e",
+        "sha256": "180bf340425c2e5332ee767b1121f792a021feed396931ab15021c723a0a16e7",
+        "bytes": 2327
+      },
+      "jobs": [
+        {
+          "id": 129071352708,
+          "name": "runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:08:05Z"
+        }
+      ]
+    },
+    {
+      "runId": 42590712054,
+      "name": "Local device Node 22",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42590712054",
+      "event": "pull_request",
+      "headSha": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-09T09:05:33Z",
+      "updatedAt": "2026-11-09T09:13:23Z",
+      "workflowSource": {
+        "path": ".github/workflows/local-device-node22.yml",
+        "gitBlob": "d195f389292e1a84967fd9864063ac536b91bbaf",
+        "sha256": "c90f7c1a31cdfc33a8e397b234945b5580859bdb7d70270119ff62f155d4ba69",
+        "bytes": 3548
+      },
+      "jobs": [
+        {
+          "id": 129071352213,
+          "name": "node22-unit",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:09:17Z"
+        },
+        {
+          "id": 129071352501,
+          "name": "package",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:06:50Z"
+        },
+        {
+          "id": 129071892688,
+          "name": "macos-arm (18.20.8)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:54Z",
+          "completedAt": "2026-11-09T09:13:22Z"
+        },
+        {
+          "id": 129071892810,
+          "name": "macos-arm (22.22.1)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:55Z",
+          "completedAt": "2026-11-09T09:11:50Z"
+        }
+      ]
+    },
+    {
+      "runId": 42590711871,
+      "name": "Cloud computer backend",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42590711871",
+      "event": "pull_request",
+      "headSha": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "createdAt": "2026-11-09T09:05:33Z",
+      "updatedAt": "2026-11-09T09:08:48Z",
+      "workflowSource": {
+        "path": ".github/workflows/cloud-computer.yml",
+        "gitBlob": "ea4a582550a5b61c222444dd0b67d87a1426dab9",
+        "sha256": "5568ae37b01a9a14b6cadad167ab0dbc0c1a1c4057bf24afec41bdf32940ce23",
+        "bytes": 7593
+      },
+      "jobs": [
+        {
+          "id": 129071351310,
+          "name": "Local driver (Linux Xvfb)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:35Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        },
+        {
+          "id": 129071351509,
+          "name": "Local driver (macOS permissions, nonblocking)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:06:10Z"
+        },
+        {
+          "id": 129071351623,
+          "name": "backend",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:35Z",
+          "completedAt": "2026-11-09T09:08:48Z"
+        }
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "workflow": "browser-gate",
+      "runId": 42590712026,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712026",
+      "jobId": 129071360135,
+      "jobName": "Browser tests (before merge)",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712026/job/129071360135",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:37Z",
+      "completedAt": "2026-11-09T09:05:40Z",
+      "original": {
+        "workflow": "browser-gate",
+        "runId": 42590712026,
+        "jobId": 129071360135,
+        "jobName": "Browser tests (before merge)",
+        "path": "ci-c0e94d5/companion/browser-gate-129071360135.original.log",
+        "bytes": 2196,
+        "sha256": "0e00054104c2f3409665b0a948146a6a4494f69dfd4723c8784dc4a15eb0413b",
+        "gitBlob": "af7aea876fb1a188c48af60e7ca057ba50817655",
+        "lineCount": 37,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": null,
+      "checkoutEvidence": [],
+      "versions": [],
+      "nodeTestGroups": [],
+      "nodeTestTotals": null,
+      "otherTestSummary": [],
+      "executionConclusions": [
+        "Only the existing disabled-browser echo executed. No checkout, browser, installation or production acceptance ran."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:37Z"
+        },
+        {
+          "number": 2,
+          "name": "Run echo \"Browser tests are not run in CI (decision 2026-11-01-1520).\"",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:38Z"
+        },
+        {
+          "number": 3,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:38Z",
+          "completedAt": "2026-11-09T09:05:38Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "e2b-additive",
+      "runId": 42590712049,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712049",
+      "jobId": 129071352005,
+      "jobName": "test",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712049/job/129071352005",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:35Z",
+      "completedAt": "2026-11-09T09:05:59Z",
+      "original": {
+        "workflow": "e2b-additive",
+        "runId": 42590712049,
+        "jobId": 129071352005,
+        "jobName": "test",
+        "path": "ci-c0e94d5/companion/e2b-additive-129071352005.original.log",
+        "bytes": 50825,
+        "sha256": "ae02f071a7761cc7acb43cd435d198e64403e912e31d62ad44955c53d5e31a9f",
+        "gitBlob": "f6094fb44bad33b521c8c6c53e567ef32e292abc",
+        "lineCount": 449,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 121,
+          "value": "[command]/usr/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 144,
+          "value": "node: v24.22.2"
+        }
+      ],
+      "nodeTestGroups": [
+        {
+          "line": 361,
+          "tests": 195,
+          "suites": 0,
+          "pass": 195,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      ],
+      "nodeTestTotals": {
+        "tests": 195,
+        "pass": 195,
+        "fail": 0,
+        "skipped": 0
+      },
+      "otherTestSummary": [
+        {
+          "line": 403,
+          "text": "Ran 32 tests in 0.766s"
+        },
+        {
+          "line": 412,
+          "text": "Ran 22 tests in 0.188s"
+        },
+        {
+          "line": 421,
+          "text": "Ran 16 tests in 0.007s"
+        }
+      ],
+      "executionConclusions": [
+        "Offline release-gate Node and Python tests executed. Six PR-conditional release jobs skipped; no E2B writer, publish, subscription validation or release cleanup executed."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:05:37Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:45Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:45Z",
+          "completedAt": "2026-11-09T09:05:48Z"
+        },
+        {
+          "number": 4,
+          "name": "Install only the offline gate test dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:48Z",
+          "completedAt": "2026-11-09T09:05:51Z"
+        },
+        {
+          "number": 5,
+          "name": "Run node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:51Z",
+          "completedAt": "2026-11-09T09:05:53Z"
+        },
+        {
+          "number": 6,
+          "name": "Run python3 scripts/e2b/build-template.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:53Z",
+          "completedAt": "2026-11-09T09:05:54Z"
+        },
+        {
+          "number": 7,
+          "name": "Run python3 scripts/e2b/official-files.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:54Z",
+          "completedAt": "2026-11-09T09:05:54Z"
+        },
+        {
+          "number": 8,
+          "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:54Z",
+          "completedAt": "2026-11-09T09:05:54Z"
+        },
+        {
+          "number": 9,
+          "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:54Z",
+          "completedAt": "2026-11-09T09:05:54Z"
+        },
+        {
+          "number": 10,
+          "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:54Z",
+          "completedAt": "2026-11-09T09:05:54Z"
+        },
+        {
+          "number": 19,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:54Z",
+          "completedAt": "2026-11-09T09:05:55Z"
+        },
+        {
+          "number": 20,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:55Z",
+          "completedAt": "2026-11-09T09:05:55Z"
+        },
+        {
+          "number": 21,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:55Z",
+          "completedAt": "2026-11-09T09:05:55Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "unattended",
+      "runId": 42590712169,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712169",
+      "jobId": 129071352708,
+      "jobName": "runtime",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712169/job/129071352708",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:36Z",
+      "completedAt": "2026-11-09T09:08:05Z",
+      "original": {
+        "workflow": "unattended",
+        "runId": 42590712169,
+        "jobId": 129071352708,
+        "jobName": "runtime",
+        "path": "ci-c0e94d5/companion/unattended-129071352708.original.log",
+        "bytes": 73155,
+        "sha256": "62f571b6f44a1dd81c3b029cfe518d246973113a632ef02302d4c2bf97e462d7",
+        "gitBlob": "2fe263992e49f01c10e8c2c48a5d9a335562f1e8",
+        "lineCount": 830,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 121,
+          "value": "[command]/usr/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 172,
+          "value": "node: v24.22.2"
+        }
+      ],
+      "nodeTestGroups": [
+        {
+          "line": 470,
+          "tests": 41,
+          "suites": 0,
+          "pass": 41,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      ],
+      "nodeTestTotals": {
+        "tests": 41,
+        "pass": 41,
+        "fail": 0,
+        "skipped": 0
+      },
+      "otherTestSummary": [
+        {
+          "line": 483,
+          "text": " Test Files  1 passed (1)"
+        },
+        {
+          "line": 484,
+          "text": "      Tests  23 passed (23)"
+        },
+        {
+          "line": 494,
+          "text": " Test Files  2 passed (2)"
+        },
+        {
+          "line": 495,
+          "text": "      Tests  27 passed (27)"
+        },
+        {
+          "line": 800,
+          "text": "Ran 7 tests in 9.454s"
+        },
+        {
+          "line": 805,
+          "text": "Ran 3 tests in 3.389s"
+        }
+      ],
+      "executionConclusions": [
+        "Scoped-policy/network tests and real Chromium Python fixtures ran after installing pinned isolated browser dependencies. This is local fixture acceptance, not production Replay."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:38Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:38Z",
+          "completedAt": "2026-11-09T09:05:44Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:44Z",
+          "completedAt": "2026-11-09T09:05:45Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:45Z",
+          "completedAt": "2026-11-09T09:05:48Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:48Z",
+          "completedAt": "2026-11-09T09:06:24Z"
+        },
+        {
+          "number": 6,
+          "name": "Visual model, scoped policy and network contracts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:24Z",
+          "completedAt": "2026-11-09T09:06:43Z"
+        },
+        {
+          "number": 7,
+          "name": "Install isolated browser acceptance dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:43Z",
+          "completedAt": "2026-11-09T09:07:33Z"
+        },
+        {
+          "number": 8,
+          "name": "Real Chromium observation, action, replay and credential guards",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:33Z",
+          "completedAt": "2026-11-09T09:07:46Z"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:46Z",
+          "completedAt": "2026-11-09T09:08:03Z"
+        },
+        {
+          "number": 15,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:03Z",
+          "completedAt": "2026-11-09T09:08:03Z"
+        },
+        {
+          "number": 16,
+          "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:03Z",
+          "completedAt": "2026-11-09T09:08:03Z"
+        },
+        {
+          "number": 17,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:03Z",
+          "completedAt": "2026-11-09T09:08:03Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "node22",
+      "runId": 42590712054,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712054",
+      "jobId": 129071352213,
+      "jobName": "node22-unit",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712054/job/129071352213",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:36Z",
+      "completedAt": "2026-11-09T09:09:17Z",
+      "original": {
+        "workflow": "node22",
+        "runId": 42590712054,
+        "jobId": 129071352213,
+        "jobName": "node22-unit",
+        "path": "ci-c0e94d5/companion/node22-129071352213.original.log",
+        "bytes": 134544,
+        "sha256": "b548355db895123bc5d21156d3d2066d364ce3b1d027e40950625819db7c7d32",
+        "gitBlob": "9fcbf0cdc8e83f0777009521f5149dcb7e4c2e83",
+        "lineCount": 1467,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 122,
+          "value": "[command]/usr/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 166,
+          "value": "node: v24.22.1"
+        },
+        {
+          "line": 414,
+          "value": "node: v22.22.1"
+        },
+        {
+          "line": 426,
+          "value": "v22.22.1"
+        }
+      ],
+      "nodeTestGroups": [
+        {
+          "line": 1150,
+          "tests": 45,
+          "suites": 0,
+          "pass": 45,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 1189,
+          "tests": 4,
+          "suites": 0,
+          "pass": 4,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 1246,
+          "tests": 7,
+          "suites": 0,
+          "pass": 7,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 1285,
+          "tests": 4,
+          "suites": 0,
+          "pass": 4,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 1433,
+          "tests": 23,
+          "suites": 0,
+          "pass": 23,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      ],
+      "nodeTestTotals": {
+        "tests": 83,
+        "pass": 83,
+        "fail": 0,
+        "skipped": 0
+      },
+      "otherTestSummary": [
+        {
+          "line": 865,
+          "text": " Test Files  139 passed | 1 skipped (140)"
+        },
+        {
+          "line": 866,
+          "text": "      Tests  1577 passed | 2 skipped (1579)"
+        }
+      ],
+      "executionConclusions": [
+        "Dependencies installed using Node 24.22.1, then daemon and installer tests executed under real Node 22.22.1.",
+        "Vitest retained 139 passed files plus one skipped real-agent file and 1577 passed tests plus two Cursor-specific skips; Node test groups separately passed."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:38Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:38Z",
+          "completedAt": "2026-11-09T09:05:43Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:43Z",
+          "completedAt": "2026-11-09T09:05:44Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:44Z",
+          "completedAt": "2026-11-09T09:05:50Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:50Z",
+          "completedAt": "2026-11-09T09:06:25Z"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:25Z",
+          "completedAt": "2026-11-09T09:06:30Z"
+        },
+        {
+          "number": 7,
+          "name": "Daemon and installer on real Node 22",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:30Z",
+          "completedAt": "2026-11-09T09:08:57Z"
+        },
+        {
+          "number": 11,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:57Z",
+          "completedAt": "2026-11-09T09:08:57Z"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:57Z",
+          "completedAt": "2026-11-09T09:09:14Z"
+        },
+        {
+          "number": 13,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:14Z",
+          "completedAt": "2026-11-09T09:09:14Z"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:14Z",
+          "completedAt": "2026-11-09T09:09:14Z"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:14Z",
+          "completedAt": "2026-11-09T09:09:14Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "node22",
+      "runId": 42590712054,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712054",
+      "jobId": 129071352501,
+      "jobName": "package",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712054/job/129071352501",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:36Z",
+      "completedAt": "2026-11-09T09:06:50Z",
+      "original": {
+        "workflow": "node22",
+        "runId": 42590712054,
+        "jobId": 129071352501,
+        "jobName": "package",
+        "path": "ci-c0e94d5/companion/node22-129071352501.original.log",
+        "bytes": 37430,
+        "sha256": "246d46e94c8f6b50b849425490f6cd004bad3a72b696f6cd4ad12935ae471e4f",
+        "gitBlob": "e462565eaa262fe18c736169458d9619b83a71ff",
+        "lineCount": 517,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 123,
+          "value": "[command]/usr/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 167,
+          "value": "node: v24.22.1"
+        }
+      ],
+      "nodeTestGroups": [],
+      "nodeTestTotals": null,
+      "otherTestSummary": [],
+      "executionConclusions": [
+        "Built @aspectlylabs/mikka 0.0.1 CI tarball, 43 files. Uploaded package artifact; no production release or served-version claim."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:38Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:38Z",
+          "completedAt": "2026-11-09T09:05:43Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:43Z",
+          "completedAt": "2026-11-09T09:05:45Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:45Z",
+          "completedAt": "2026-11-09T09:05:50Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:50Z",
+          "completedAt": "2026-11-09T09:06:25Z"
+        },
+        {
+          "number": 6,
+          "name": "Build the tested daemon package",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:25Z",
+          "completedAt": "2026-11-09T09:06:25Z"
+        },
+        {
+          "number": 7,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:25Z",
+          "completedAt": "2026-11-09T09:06:27Z"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:27Z",
+          "completedAt": "2026-11-09T09:06:48Z"
+        },
+        {
+          "number": 13,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:48Z",
+          "completedAt": "2026-11-09T09:06:48Z"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:48Z",
+          "completedAt": "2026-11-09T09:06:48Z"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:48Z",
+          "completedAt": "2026-11-09T09:06:48Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "cloud-backend",
+      "runId": 42590711871,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590711871",
+      "jobId": 129071351310,
+      "jobName": "Local driver (Linux Xvfb)",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590711871/job/129071351310",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:35Z",
+      "completedAt": "2026-11-09T09:05:59Z",
+      "original": {
+        "workflow": "cloud-backend",
+        "runId": 42590711871,
+        "jobId": 129071351310,
+        "jobName": "Local driver (Linux Xvfb)",
+        "path": "ci-c0e94d5/companion/cloud-backend-129071351310.original.log",
+        "bytes": 27004,
+        "sha256": "5026cda24d1bd7fa9e08e72aae4acee6af6deab1bab163e769963517e1027172",
+        "gitBlob": "7d53a11d31d55aa3bc40f31264c70f7601163066",
+        "lineCount": 337,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 124,
+          "value": "[command]/usr/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 139,
+          "value": "node: v24.22.2"
+        }
+      ],
+      "nodeTestGroups": [
+        {
+          "line": 285,
+          "tests": 1,
+          "suites": 0,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      ],
+      "nodeTestTotals": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0
+      },
+      "otherTestSummary": [],
+      "executionConclusions": [
+        "Actual isolated X11 screenshot, input and click through the run broker passed. This is not the formal Apple Native login/query-budget acceptance."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:35Z",
+          "completedAt": "2026-11-09T09:05:36Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:05:41Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:41Z",
+          "completedAt": "2026-11-09T09:05:42Z"
+        },
+        {
+          "number": 4,
+          "name": "Install isolated X11 and pinned MIT driver",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:42Z",
+          "completedAt": "2026-11-09T09:05:53Z"
+        },
+        {
+          "number": 5,
+          "name": "Real default-allow driver through the run broker",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:53Z",
+          "completedAt": "2026-11-09T09:05:56Z"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:56Z",
+          "completedAt": "2026-11-09T09:05:57Z"
+        },
+        {
+          "number": 11,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:57Z",
+          "completedAt": "2026-11-09T09:05:57Z"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:57Z",
+          "completedAt": "2026-11-09T09:05:57Z"
+        },
+        {
+          "number": 13,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:57Z",
+          "completedAt": "2026-11-09T09:05:57Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "cloud-backend",
+      "runId": 42590711871,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590711871",
+      "jobId": 129071351509,
+      "jobName": "Local driver (macOS permissions, nonblocking)",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590711871/job/129071351509",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:36Z",
+      "completedAt": "2026-11-09T09:06:10Z",
+      "original": {
+        "workflow": "cloud-backend",
+        "runId": 42590711871,
+        "jobId": 129071351509,
+        "jobName": "Local driver (macOS permissions, nonblocking)",
+        "path": "ci-c0e94d5/companion/cloud-backend-129071351509.original.log",
+        "bytes": 19541,
+        "sha256": "4b2d3d83635efdf35b05136d9edd6e6a42ef9140c701d8006303ed896c6b7faf",
+        "gitBlob": "3457bdcf80de1480965d9c304b14260e876fcbee",
+        "lineCount": 237,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 130,
+          "value": "[command]/opt/homebrew/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 145,
+          "value": "node: v24.22.2"
+        }
+      ],
+      "nodeTestGroups": [
+        {
+          "line": 184,
+          "tests": 1,
+          "suites": 0,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      ],
+      "nodeTestTotals": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0
+      },
+      "otherTestSummary": [],
+      "executionConclusions": [
+        "Actual macOS screenshot, input and click through the run broker passed. Workflow continue-on-error=true remains nonblocking; no formal Native-budget claim."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:05:37Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:44Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:44Z",
+          "completedAt": "2026-11-09T09:05:45Z"
+        },
+        {
+          "number": 4,
+          "name": "Install the pinned MIT standalone driver",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:45Z",
+          "completedAt": "2026-11-09T09:05:47Z"
+        },
+        {
+          "number": 5,
+          "name": "Observe native screenshot, input and click through the run broker",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:47Z",
+          "completedAt": "2026-11-09T09:06:06Z"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:06Z",
+          "completedAt": "2026-11-09T09:06:07Z"
+        },
+        {
+          "number": 11,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:07Z",
+          "completedAt": "2026-11-09T09:06:07Z"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:07Z",
+          "completedAt": "2026-11-09T09:06:08Z"
+        },
+        {
+          "number": 13,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:08Z",
+          "completedAt": "2026-11-09T09:06:08Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "cloud-backend",
+      "runId": 42590711871,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590711871",
+      "jobId": 129071351623,
+      "jobName": "backend",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590711871/job/129071351623",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:35Z",
+      "completedAt": "2026-11-09T09:08:48Z",
+      "original": {
+        "workflow": "cloud-backend",
+        "runId": 42590711871,
+        "jobId": 129071351623,
+        "jobName": "backend",
+        "path": "ci-c0e94d5/companion/cloud-backend-129071351623.original.log",
+        "bytes": 73408,
+        "sha256": "676c75fcbd3b180b73beba950cf14af675accf430673098d313104f518ad1938",
+        "gitBlob": "c5804771adc42975b27d606eb00362834a12c189",
+        "lineCount": 935,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 232,
+          "value": "[command]/usr/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 274,
+          "value": "node: v24.22.2"
+        }
+      ],
+      "nodeTestGroups": [
+        {
+          "line": 576,
+          "tests": 15,
+          "suites": 0,
+          "pass": 15,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 593,
+          "tests": 2,
+          "suites": 0,
+          "pass": 2,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 640,
+          "tests": 32,
+          "suites": 0,
+          "pass": 32,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 670,
+          "tests": 3,
+          "suites": 0,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 697,
+          "tests": 1,
+          "suites": 0,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 715,
+          "tests": 1,
+          "suites": 0,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 732,
+          "tests": 1,
+          "suites": 0,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 749,
+          "tests": 1,
+          "suites": 0,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 765,
+          "tests": 1,
+          "suites": 0,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 792,
+          "tests": 4,
+          "suites": 0,
+          "pass": 4,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      ],
+      "nodeTestTotals": {
+        "tests": 61,
+        "pass": 61,
+        "fail": 0,
+        "skipped": 0
+      },
+      "otherTestSummary": [
+        {
+          "line": 547,
+          "text": " Test Files  1 passed (1)"
+        },
+        {
+          "line": 548,
+          "text": "      Tests  3 passed (3)"
+        },
+        {
+          "line": 657,
+          "text": "Ran 1 test in 0.007s"
+        }
+      ],
+      "executionConclusions": [
+        "Typecheck, lint, computer-protocol tests, Node suites, Python lease driver and isolated PostgreSQL tests actually ran.",
+        "Database constraint errors appearing in service output are retained intentional negative-test output; all relevant test summaries and job conclusion passed."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:05:37Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:52Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:52Z",
+          "completedAt": "2026-11-09T09:05:57Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:57Z",
+          "completedAt": "2026-11-09T09:05:58Z"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:58Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:59Z",
+          "completedAt": "2026-11-09T09:06:40Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:40Z",
+          "completedAt": "2026-11-09T09:07:18Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm exec oxlint --deny-warnings lib/computer app/api/bots",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:18Z",
+          "completedAt": "2026-11-09T09:07:19Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @mikka/protocol exec vitest run src/computer.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:19Z",
+          "completedAt": "2026-11-09T09:07:19Z"
+        },
+        {
+          "number": 10,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/handler.test.ts lib/computer/policy-route.test.ts lib/computer/permission.test.ts lib/computer/local-authority.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:19Z",
+          "completedAt": "2026-11-09T09:07:21Z"
+        },
+        {
+          "number": 11,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/cua/local-review.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:21Z",
+          "completedAt": "2026-11-09T09:07:21Z"
+        },
+        {
+          "number": 12,
+          "name": "Run node --test packages/daemon/src/computer/broker.test.mjs packages/daemon/src/computer/driver.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:21Z",
+          "completedAt": "2026-11-09T09:07:24Z"
+        },
+        {
+          "number": 13,
+          "name": "Run python3 scripts/e2b/lease-driver.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:24Z",
+          "completedAt": "2026-11-09T09:07:24Z"
+        },
+        {
+          "number": 14,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test packages/daemon/src/computer/web-review.node.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:24Z",
+          "completedAt": "2026-11-09T09:07:24Z"
+        },
+        {
+          "number": 15,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:24Z",
+          "completedAt": "2026-11-09T09:08:27Z"
+        },
+        {
+          "number": 16,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/local-reviews.db.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:27Z",
+          "completedAt": "2026-11-09T09:08:27Z"
+        },
+        {
+          "number": 17,
+          "name": "Run node --test tests/device-computer-migration.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:27Z",
+          "completedAt": "2026-11-09T09:08:27Z"
+        },
+        {
+          "number": 18,
+          "name": "Run node --test tests/computer-policy-default-allow-migration.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:27Z",
+          "completedAt": "2026-11-09T09:08:28Z"
+        },
+        {
+          "number": 19,
+          "name": "Run node --test packages/daemon/src/computer/local-grant.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:28Z",
+          "completedAt": "2026-11-09T09:08:28Z"
+        },
+        {
+          "number": 20,
+          "name": "Run cd packages/daemon && node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:28Z",
+          "completedAt": "2026-11-09T09:08:30Z"
+        },
+        {
+          "number": 37,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:30Z",
+          "completedAt": "2026-11-09T09:08:45Z"
+        },
+        {
+          "number": 38,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:45Z",
+          "completedAt": "2026-11-09T09:08:45Z"
+        },
+        {
+          "number": 39,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:45Z",
+          "completedAt": "2026-11-09T09:08:45Z"
+        },
+        {
+          "number": 40,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:45Z",
+          "completedAt": "2026-11-09T09:08:46Z"
+        },
+        {
+          "number": 41,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:46Z",
+          "completedAt": "2026-11-09T09:08:46Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Stop containers",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [
+          {
+            "kind": "container",
+            "identifier": "8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41",
+            "commandLine": 928,
+            "echoLine": 929,
+            "echoMatches": true
+          },
+          {
+            "kind": "network",
+            "identifier": "github_network_2467c8018465494192ffe9542212b62e",
+            "commandLine": 931,
+            "echoLine": 932,
+            "echoMatches": true
+          }
+        ],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "read-cache",
+      "runId": 42590712039,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712039",
+      "jobId": 129071361884,
+      "jobName": "Read cache API and CLI",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712039/job/129071361884",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:37Z",
+      "completedAt": "2026-11-09T09:09:54Z",
+      "original": {
+        "workflow": "read-cache",
+        "runId": 42590712039,
+        "jobId": 129071361884,
+        "jobName": "Read cache API and CLI",
+        "path": "ci-c0e94d5/companion/read-cache-129071361884.original.log",
+        "bytes": 232566,
+        "sha256": "73af33c0ff3e2ab51b1e3b3e3643dbfc4fdd72f32b9aa00dfb6789bcd424d226",
+        "gitBlob": "254f132d7658a53903e2f2f2f420af2c8eaa1653",
+        "lineCount": 2565,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 247,
+          "value": "[command]/usr/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 349,
+          "value": "node: v24.22.2"
+        }
+      ],
+      "nodeTestGroups": [
+        {
+          "line": 703,
+          "tests": 31,
+          "suites": 0,
+          "pass": 31,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      ],
+      "nodeTestTotals": {
+        "tests": 31,
+        "pass": 31,
+        "fail": 0,
+        "skipped": 0
+      },
+      "otherTestSummary": [],
+      "executionConclusions": [
+        "31 driver tests passed, followed by an actual production-mode local application HTTP acceptance with 35 read records; businessRequestWrites=false, modelExecution=false, browserExecution=false.",
+        "Driver reports fixtures succeeded, lease released-clean, retainedDirectChildren=0 and no owned-runtime errors. This is isolated local acceptance, not production."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:38Z",
+          "completedAt": "2026-11-09T09:05:39Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:39Z",
+          "completedAt": "2026-11-09T09:05:54Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:54Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:59Z",
+          "completedAt": "2026-11-09T09:06:54Z"
+        },
+        {
+          "number": 5,
+          "name": "Verify the bounded read-only driver",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:54Z",
+          "completedAt": "2026-11-09T09:06:55Z"
+        },
+        {
+          "number": 6,
+          "name": "Generate ephemeral test-only authentication secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:55Z",
+          "completedAt": "2026-11-09T09:06:55Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:55Z",
+          "completedAt": "2026-11-09T09:06:57Z"
+        },
+        {
+          "number": 8,
+          "name": "Bind the isolated database and application to this checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:57Z",
+          "completedAt": "2026-11-09T09:06:57Z"
+        },
+        {
+          "number": 9,
+          "name": "Build this isolated application for production-mode acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:57Z",
+          "completedAt": "2026-11-09T09:09:43Z"
+        },
+        {
+          "number": 10,
+          "name": "Accept real incremental Server Actions and Settings GET",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:43Z",
+          "completedAt": "2026-11-09T09:09:49Z"
+        },
+        {
+          "number": 11,
+          "name": "Check the public evidence for authentication material",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:49Z",
+          "completedAt": "2026-11-09T09:09:50Z"
+        },
+        {
+          "number": 12,
+          "name": "Retain only the aggregate acceptance summary",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:50Z",
+          "completedAt": "2026-11-09T09:09:51Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:51Z",
+          "completedAt": "2026-11-09T09:09:51Z"
+        },
+        {
+          "number": 23,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:51Z",
+          "completedAt": "2026-11-09T09:09:51Z"
+        },
+        {
+          "number": 24,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:51Z",
+          "completedAt": "2026-11-09T09:09:52Z"
+        },
+        {
+          "number": 25,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:52Z",
+          "completedAt": "2026-11-09T09:09:52Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run ./.github/actions/pnpm-install",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Stop containers",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [
+          {
+            "kind": "container",
+            "identifier": "bf0359ce4ca903a9d2ecdcb9c3ed17369b20ed59a7914ced36824331e41d0c17",
+            "commandLine": 2558,
+            "echoLine": 2559,
+            "echoMatches": true
+          },
+          {
+            "kind": "network",
+            "identifier": "github_network_67044b5a4d864058b6f452c91fcca350",
+            "commandLine": 2561,
+            "echoLine": 2562,
+            "echoMatches": true
+          }
+        ],
+        "internalFixtureRemovalIndependentlyEstablished": true
+      }
+    },
+    {
+      "workflow": "ssh",
+      "runId": 42590712251,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712251",
+      "jobId": 129071352911,
+      "jobName": "ssh",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712251/job/129071352911",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:35Z",
+      "completedAt": "2026-11-09T09:11:10Z",
+      "original": {
+        "workflow": "ssh",
+        "runId": 42590712251,
+        "jobId": 129071352911,
+        "jobName": "ssh",
+        "path": "ci-c0e94d5/companion/ssh-129071352911.original.log",
+        "bytes": 160132,
+        "sha256": "4c6a6aa7d864be1f511464bdb6ccc3d5eb3a6021ddce2a1057ca44f3a9a5b456",
+        "gitBlob": "b33b29c82cfbe8121ec5d3ff94c92ae49641852d",
+        "lineCount": 1691,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 230,
+          "value": "[command]/usr/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 274,
+          "value": "node: v24.22.1"
+        }
+      ],
+      "nodeTestGroups": [
+        {
+          "line": 673,
+          "tests": 156,
+          "suites": 0,
+          "pass": 156,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 982,
+          "tests": 280,
+          "suites": 0,
+          "pass": 280,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 1045,
+          "tests": 13,
+          "suites": 0,
+          "pass": 13,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 1511,
+          "tests": 1,
+          "suites": 0,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      ],
+      "nodeTestTotals": {
+        "tests": 450,
+        "pass": 450,
+        "fail": 0,
+        "skipped": 0
+      },
+      "otherTestSummary": [
+        {
+          "line": 1006,
+          "text": " Test Files  5 passed (5)"
+        },
+        {
+          "line": 1007,
+          "text": "      Tests  50 passed (50)"
+        }
+      ],
+      "executionConclusions": [
+        "Desktop state-machine, real PostgreSQL enrollment/isolation and packaged daemon through real SSH/systemd preload fixture executed.",
+        "GHA service PostgreSQL and its network removal are directly logged. This does not independently prove every internal SSH fixture resource finalizer."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:36Z",
+          "completedAt": "2026-11-09T09:05:37Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:51Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:51Z",
+          "completedAt": "2026-11-09T09:05:56Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:56Z",
+          "completedAt": "2026-11-09T09:05:57Z"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:57Z",
+          "completedAt": "2026-11-09T09:06:02Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:02Z",
+          "completedAt": "2026-11-09T09:06:32Z"
+        },
+        {
+          "number": 7,
+          "name": "Desktop state-machine and service tests",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:32Z",
+          "completedAt": "2026-11-09T09:06:55Z"
+        },
+        {
+          "number": 8,
+          "name": "Enrollment and command isolation against PostgreSQL",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:55Z",
+          "completedAt": "2026-11-09T09:07:29Z"
+        },
+        {
+          "number": 9,
+          "name": "Packaged daemon over real SSH and systemd through the preload IPC",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:29Z",
+          "completedAt": "2026-11-09T09:10:56Z"
+        },
+        {
+          "number": 15,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:56Z",
+          "completedAt": "2026-11-09T09:11:07Z"
+        },
+        {
+          "number": 16,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:11:07Z",
+          "completedAt": "2026-11-09T09:11:07Z"
+        },
+        {
+          "number": 17,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:11:07Z",
+          "completedAt": "2026-11-09T09:11:07Z"
+        },
+        {
+          "number": 18,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:11:07Z",
+          "completedAt": "2026-11-09T09:11:08Z"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:11:08Z",
+          "completedAt": "2026-11-09T09:11:08Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Stop containers",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [
+          {
+            "kind": "container",
+            "identifier": "e7ca9a6c72827b688f81be59b6c2315ef9451445ad9166fb32296b9e853a1105",
+            "commandLine": 1684,
+            "echoLine": 1685,
+            "echoMatches": true
+          },
+          {
+            "kind": "network",
+            "identifier": "github_network_9b8d3aa0a7ed4273acd4e586a524863b",
+            "commandLine": 1687,
+            "echoLine": 1688,
+            "echoMatches": true
+          }
+        ],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "custody",
+      "runId": 42590712056,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712056",
+      "jobId": 129071351576,
+      "jobName": "custody",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712056/job/129071351576",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:36Z",
+      "completedAt": "2026-11-09T09:10:28Z",
+      "original": {
+        "workflow": "custody",
+        "runId": 42590712056,
+        "jobId": 129071351576,
+        "jobName": "custody",
+        "path": "ci-c0e94d5/companion/custody-129071351576.original.log",
+        "bytes": 217730,
+        "sha256": "8550d99387a041eb37bf1e1753d745c2f8152fde9891cab0ee76c6c3eba27ac1",
+        "gitBlob": "5fed4f38357c007daa0832800c1baf04b7104e50",
+        "lineCount": 1862,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 124,
+          "value": "[command]/usr/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 166,
+          "value": "node: v24.22.2"
+        }
+      ],
+      "nodeTestGroups": [
+        {
+          "line": 583,
+          "tests": 126,
+          "suites": 0,
+          "pass": 126,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 1828,
+          "tests": 4,
+          "suites": 0,
+          "pass": 4,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      ],
+      "nodeTestTotals": {
+        "tests": 130,
+        "pass": 130,
+        "fail": 0,
+        "skipped": 0
+      },
+      "otherTestSummary": [
+        {
+          "line": 603,
+          "text": " Test Files  1 passed (1)"
+        },
+        {
+          "line": 604,
+          "text": "      Tests  42 passed (42)"
+        },
+        {
+          "line": 624,
+          "text": " Test Files  1 passed (1)"
+        },
+        {
+          "line": 625,
+          "text": "      Tests  45 passed (45)"
+        },
+        {
+          "line": 1728,
+          "text": "ok  \tgithub.com/alexj11324/Mikka/subscription-worker\t15.995s"
+        }
+      ],
+      "executionConclusions": [
+        "Node custody, protocol/hosted-runner Vitest, Go worker and backend-only isolated acceptance executed. 257 migrations and a repeat migration passed.",
+        "The log says 'Retained BYOS Postgres container if created'. Container creation/deletion is not inferred from that conditional sentence; exact deletion remains unknown. No browser acceptance ran."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:38Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:38Z",
+          "completedAt": "2026-11-09T09:05:43Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:43Z",
+          "completedAt": "2026-11-09T09:05:45Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:45Z",
+          "completedAt": "2026-11-09T09:05:46Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:46Z",
+          "completedAt": "2026-11-09T09:06:20Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm test:byos",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:20Z",
+          "completedAt": "2026-11-09T09:06:27Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm --filter @mikka/protocol exec vitest run src/subscription.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:27Z",
+          "completedAt": "2026-11-09T09:06:28Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm --filter @mikka/daemon exec vitest run test/subscription-hosted-runner.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:28Z",
+          "completedAt": "2026-11-09T09:06:34Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm test:byos-worker",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:34Z",
+          "completedAt": "2026-11-09T09:10:08Z"
+        },
+        {
+          "number": 16,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:08Z",
+          "completedAt": "2026-11-09T09:10:25Z"
+        },
+        {
+          "number": 17,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:25Z",
+          "completedAt": "2026-11-09T09:10:25Z"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:25Z",
+          "completedAt": "2026-11-09T09:10:25Z"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:25Z",
+          "completedAt": "2026-11-09T09:10:25Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "node22",
+      "runId": 42590712054,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712054",
+      "jobId": 129071892810,
+      "jobName": "macos-arm (22.22.1)",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712054/job/129071892810",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:06:55Z",
+      "completedAt": "2026-11-09T09:11:50Z",
+      "original": {
+        "workflow": "node22",
+        "runId": 42590712054,
+        "jobId": 129071892810,
+        "jobName": "macos-arm (22.22.1)",
+        "path": "ci-c0e94d5/companion/node22-129071892810.original.log",
+        "bytes": 48799,
+        "sha256": "faaa795fb98da6d12b2141cae5337319da01201d8316f2dac68dde33023a4419",
+        "gitBlob": "98463cdc932cdd0506a86c546830a12dbe4b6667",
+        "lineCount": 629,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 160,
+          "value": "[command]/opt/homebrew/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 205,
+          "value": "node: v24.22.1"
+        },
+        {
+          "line": 554,
+          "value": "node: v22.22.1"
+        }
+      ],
+      "nodeTestGroups": [],
+      "nodeTestTotals": null,
+      "otherTestSummary": [],
+      "executionConclusions": [
+        "Real macOS arm64 Node 22.22.1 npm/LaunchAgent path reports installed/launchagent/online/reconnect; registrations=2, heartbeats=2, enrollments=1.",
+        "Downloaded the same package artifact and matching logged ZIP digest as the package job. No independent artifact download or production version verification by reviewer."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:56Z",
+          "completedAt": "2026-11-09T09:06:59Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:59Z",
+          "completedAt": "2026-11-09T09:07:08Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:08Z",
+          "completedAt": "2026-11-09T09:07:10Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:10Z",
+          "completedAt": "2026-11-09T09:07:18Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:18Z",
+          "completedAt": "2026-11-09T09:09:14Z"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:14Z",
+          "completedAt": "2026-11-09T09:09:16Z"
+        },
+        {
+          "number": 7,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:16Z",
+          "completedAt": "2026-11-09T09:09:22Z"
+        },
+        {
+          "number": 8,
+          "name": "Real npm, LaunchAgent, enrollment and reconnect",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:22Z",
+          "completedAt": "2026-11-09T09:09:40Z"
+        },
+        {
+          "number": 9,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:40Z",
+          "completedAt": "2026-11-09T09:09:41Z"
+        },
+        {
+          "number": 15,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:41Z",
+          "completedAt": "2026-11-09T09:09:41Z"
+        },
+        {
+          "number": 16,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:09:41Z",
+          "completedAt": "2026-11-09T09:11:45Z"
+        },
+        {
+          "number": 17,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:11:45Z",
+          "completedAt": "2026-11-09T09:11:45Z"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:11:45Z",
+          "completedAt": "2026-11-09T09:11:46Z"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:11:46Z",
+          "completedAt": "2026-11-09T09:11:47Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "site-search",
+      "runId": 42590711896,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590711896",
+      "jobId": 129071351595,
+      "jobName": "site-search",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590711896/job/129071351595",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:05:36Z",
+      "completedAt": "2026-11-09T09:12:45Z",
+      "original": {
+        "workflow": "site-search",
+        "runId": 42590711896,
+        "jobId": 129071351595,
+        "jobName": "site-search",
+        "path": "ci-c0e94d5/companion/site-search-129071351595.original.log",
+        "bytes": 301067,
+        "sha256": "29bcb128c4d85e58e78a8db3849f75b976d2353e70ccb315af4b662f1e6d53b1",
+        "gitBlob": "f2f72bde8b5881849e1a6819fc9581c55e136dec",
+        "lineCount": 3222,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 260,
+          "value": "[command]/usr/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 325,
+          "value": "node: v24.22.2"
+        }
+      ],
+      "nodeTestGroups": [
+        {
+          "line": 709,
+          "tests": 97,
+          "suites": 0,
+          "pass": 97,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 730,
+          "tests": 9,
+          "suites": 0,
+          "pass": 9,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 828,
+          "tests": 71,
+          "suites": 0,
+          "pass": 71,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 864,
+          "tests": 14,
+          "suites": 0,
+          "pass": 14,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 903,
+          "tests": 21,
+          "suites": 0,
+          "pass": 21,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 920,
+          "tests": 6,
+          "suites": 0,
+          "pass": 6,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 936,
+          "tests": 4,
+          "suites": 0,
+          "pass": 4,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 958,
+          "tests": 7,
+          "suites": 0,
+          "pass": 7,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        {
+          "line": 1071,
+          "tests": 55,
+          "suites": 0,
+          "pass": 55,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      ],
+      "nodeTestTotals": {
+        "tests": 284,
+        "pass": 284,
+        "fail": 0,
+        "skipped": 0
+      },
+      "otherTestSummary": [
+        {
+          "line": 3008,
+          "text": "Running 7 tests using 1 worker"
+        },
+        {
+          "line": 3027,
+          "text": "  7 passed (22.1s)"
+        }
+      ],
+      "executionConclusions": [
+        "Generator check, typecheck, lint, production build, two separately provisioned local PostgreSQL services and seven Playwright test-runner cases passed.",
+        "Workflow labels the latter HTTP API only, no browser, no providers. Chromium project names in output are not evidence that a browser was launched; no production browser claim is made."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:37Z",
+          "completedAt": "2026-11-09T09:05:38Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:38Z",
+          "completedAt": "2026-11-09T09:05:53Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:53Z",
+          "completedAt": "2026-11-09T09:05:58Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:58Z",
+          "completedAt": "2026-11-09T09:05:59Z"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:05:59Z",
+          "completedAt": "2026-11-09T09:06:01Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:01Z",
+          "completedAt": "2026-11-09T09:06:36Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:integrations",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:36Z",
+          "completedAt": "2026-11-09T09:07:27Z"
+        },
+        {
+          "number": 8,
+          "name": "Run node apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:27Z",
+          "completedAt": "2026-11-09T09:08:31Z"
+        },
+        {
+          "number": 9,
+          "name": "Provision only the isolated application test database from existing schema",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:31Z",
+          "completedAt": "2026-11-09T09:08:34Z"
+        },
+        {
+          "number": 10,
+          "name": "Provision only the separate workspace test database from existing schema",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:34Z",
+          "completedAt": "2026-11-09T09:08:36Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm build",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:08:36Z",
+          "completedAt": "2026-11-09T09:12:01Z"
+        },
+        {
+          "number": 12,
+          "name": "Real compiled HTTP, Better Auth and PG title read regression (HTTP API only, no browser, no providers)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:12:01Z",
+          "completedAt": "2026-11-09T09:12:24Z"
+        },
+        {
+          "number": 13,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:12:24Z",
+          "completedAt": "2026-11-09T09:12:26Z"
+        },
+        {
+          "number": 23,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:12:26Z",
+          "completedAt": "2026-11-09T09:12:42Z"
+        },
+        {
+          "number": 24,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:12:42Z",
+          "completedAt": "2026-11-09T09:12:42Z"
+        },
+        {
+          "number": 25,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:12:42Z",
+          "completedAt": "2026-11-09T09:12:42Z"
+        },
+        {
+          "number": 26,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:12:42Z",
+          "completedAt": "2026-11-09T09:12:43Z"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:12:43Z",
+          "completedAt": "2026-11-09T09:12:43Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Stop containers",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [
+          {
+            "kind": "container",
+            "identifier": "a4bf3dc37f14d73e9ffdf42f84137e15969cd5cd720264c0c6e7d1e26719f988",
+            "commandLine": 3152,
+            "echoLine": 3153,
+            "echoMatches": true
+          },
+          {
+            "kind": "container",
+            "identifier": "a1cce1fd9072de681c05b2f21893d15733826b0b08e8e48a33f1d02c2f2ce0ce",
+            "commandLine": 3215,
+            "echoLine": 3216,
+            "echoMatches": true
+          },
+          {
+            "kind": "network",
+            "identifier": "github_network_f61d602b89b741e09cb7c8cc1db0e8e7",
+            "commandLine": 3218,
+            "echoLine": 3219,
+            "echoMatches": true
+          }
+        ],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    },
+    {
+      "workflow": "node22",
+      "runId": 42590712054,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712054",
+      "jobId": 129071892688,
+      "jobName": "macos-arm (18.20.8)",
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42590712054/job/129071892688",
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T09:06:54Z",
+      "completedAt": "2026-11-09T09:13:22Z",
+      "original": {
+        "workflow": "node22",
+        "runId": 42590712054,
+        "jobId": 129071892688,
+        "jobName": "macos-arm (18.20.8)",
+        "path": "ci-c0e94d5/companion/node22-129071892688.original.log",
+        "bytes": 51203,
+        "sha256": "554e26bfb03100deef46b71c6e583ced0c7efd1b043e01e6370c598383dafc1f",
+        "gitBlob": "0903b9b3a55e1d929a4e73da9ad6b75f336c13d3",
+        "lineCount": 658,
+        "reviewerDownloads": 1,
+        "teamDownloads": 1
+      },
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "checkoutEvidence": [
+        {
+          "line": 161,
+          "value": "[command]/opt/homebrew/bin/git log -1 --format=%H",
+          "next": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+        }
+      ],
+      "versions": [
+        {
+          "line": 206,
+          "value": "node: v24.22.1"
+        },
+        {
+          "line": 593,
+          "value": "node: v18.20.8"
+        }
+      ],
+      "nodeTestGroups": [],
+      "nodeTestTotals": null,
+      "otherTestSummary": [],
+      "executionConclusions": [
+        "Real macOS arm64 Node 18.20.8 returned the expected node_required rejection before npm start or enrollment; zero registrations, heartbeats and enrollments.",
+        "Expected rejection is test success, not installation success. Cache-upload collision warnings remain in the original log."
+      ],
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:54Z",
+          "completedAt": "2026-11-09T09:06:57Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:06:57Z",
+          "completedAt": "2026-11-09T09:07:02Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:02Z",
+          "completedAt": "2026-11-09T09:07:04Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:04Z",
+          "completedAt": "2026-11-09T09:07:16Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:07:16Z",
+          "completedAt": "2026-11-09T09:10:00Z"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:00Z",
+          "completedAt": "2026-11-09T09:10:02Z"
+        },
+        {
+          "number": 7,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:02Z",
+          "completedAt": "2026-11-09T09:10:09Z"
+        },
+        {
+          "number": 8,
+          "name": "Real npm, LaunchAgent, enrollment and reconnect",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:09Z",
+          "completedAt": "2026-11-09T09:10:09Z"
+        },
+        {
+          "number": 9,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:09Z",
+          "completedAt": "2026-11-09T09:10:11Z"
+        },
+        {
+          "number": 15,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:11Z",
+          "completedAt": "2026-11-09T09:10:11Z"
+        },
+        {
+          "number": 16,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:10:11Z",
+          "completedAt": "2026-11-09T09:13:12Z"
+        },
+        {
+          "number": 17,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:13:12Z",
+          "completedAt": "2026-11-09T09:13:12Z"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:13:12Z",
+          "completedAt": "2026-11-09T09:13:13Z"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T09:13:13Z",
+          "completedAt": "2026-11-09T09:13:17Z"
+        }
+      ],
+      "cleanup": {
+        "githubPostJobSteps": [
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "directServiceRemoval": [],
+        "internalFixtureRemovalIndependentlyEstablished": null
+      }
+    }
+  ],
+  "skips": {
+    "e2bReleaseJobs": [
+      {
+        "jobId": 129071533096,
+        "name": "subscriptions",
+        "status": "completed",
+        "conclusion": "skipped",
+        "logReads": 0
+      },
+      {
+        "jobId": 129071533233,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "skipped",
+        "logReads": 0
+      },
+      {
+        "jobId": 129071533285,
+        "name": "validate",
+        "status": "completed",
+        "conclusion": "skipped",
+        "logReads": 0
+      },
+      {
+        "jobId": 129071534124,
+        "name": "await-web",
+        "status": "completed",
+        "conclusion": "skipped",
+        "logReads": 0
+      },
+      {
+        "jobId": 129071534836,
+        "name": "cleanup",
+        "status": "completed",
+        "conclusion": "skipped",
+        "logReads": 0
+      },
+      {
+        "jobId": 129071534856,
+        "name": "publish",
+        "status": "completed",
+        "conclusion": "skipped",
+        "logReads": 0
+      }
+    ],
+    "node22Vitest": {
+      "passedFiles": 139,
+      "skippedFiles": 1,
+      "passedTests": 1577,
+      "skippedTests": 2,
+      "sources": [
+        {
+          "path": "packages/daemon/test/adapters.test.ts",
+          "gitBlob": "c594202c9db5a0fa8a1c19fb731125d309abc61d",
+          "contract": "Two it.skipIf(harness === cursor) continuation cases."
+        },
+        {
+          "path": "packages/daemon/test/real-agents.test.ts",
+          "gitBlob": "6153fb4ead3ffc55d8c31451d27608da05300f1f",
+          "contract": "Real-agent suite disabled when MIKKA_REAL_AGENTS yields no harnesses."
+        }
+      ]
+    },
+    "macCloudDriver": {
+      "continueOnError": true,
+      "actualConclusion": "success"
+    }
+  },
+  "closedResults": {
+    "readCache": {
+      "line": 2398,
+      "status": "pass",
+      "environment": {
+        "id": "github-42590712039-1",
+        "origin": "http://localhost:3137",
+        "deploymentSha": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+      },
+      "readRecordCount": 35,
+      "discovery": {
+        "pagesRead": 3,
+        "chunksRead": 0,
+        "found": [
+          "syncCoordinatorChat",
+          "syncIssueList",
+          "syncThreadList",
+          "pollIssue",
+          "pollIssueVersionSummaries"
+        ],
+        "transport": "rpc",
+        "manifestsRead": 1
+      },
+      "fixtures": {
+        "issues": 3,
+        "threads": 3,
+        "chatMessages": 12,
+        "activityVersions": 3
+      },
+      "boundaries": {
+        "businessRequestWrites": false,
+        "modelExecution": false,
+        "browserExecution": false
+      },
+      "cleanup": {
+        "fixtures": "succeeded",
+        "lease": "released-clean"
+      },
+      "ownedRuntime": {
+        "cpuCount": 4,
+        "availableCpuCount": 4,
+        "systemMemoryBytes": 16764346368,
+        "output": {
+          "ready": 1,
+          "compiling": 0,
+          "compiled": 0,
+          "httpCompleted": 0,
+          "nextError": 0,
+          "fatalError": 0,
+          "heapOutOfMemory": 0,
+          "esbuildDeadlock": 0
+        },
+        "errors": [],
+        "start": {
+          "systemAvailableBytes": 15022305280,
+          "cgroupVersion": 2,
+          "cgroupCurrentBytes": 7340613632,
+          "cgroupMaxBytes": null,
+          "cgroupMaxUnlimited": true,
+          "cgroupPeakBytes": 10921639936,
+          "cgroupOom": 0,
+          "cgroupOomKill": 0,
+          "ownedDirectChildCount": 0,
+          "workers": []
+        },
+        "end": {
+          "systemAvailableBytes": 15011770368,
+          "cgroupVersion": 2,
+          "cgroupCurrentBytes": 7345950720,
+          "cgroupMaxBytes": null,
+          "cgroupMaxUnlimited": true,
+          "cgroupPeakBytes": 10921639936,
+          "cgroupOom": 0,
+          "cgroupOomKill": 0,
+          "ownedDirectChildCount": 0,
+          "workers": []
+        },
+        "retainedDirectChildren": 0,
+        "cgroupCurrentBytesDelta": 5337088,
+        "cgroupOomDelta": 0,
+        "cgroupOomKillDelta": 0
+      }
+    },
+    "macNode22": {
+      "line": 566,
+      "value": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "node": "22.22.1",
+        "npmStarted": true,
+        "registrations": 2,
+        "heartbeats": 2,
+        "enrollments": 1,
+        "socketPathBytes": 73,
+        "states": [
+          {
+            "step": "check",
+            "status": "running"
+          },
+          {
+            "step": "check",
+            "status": "running"
+          },
+          {
+            "step": "install",
+            "status": "running"
+          },
+          {
+            "step": "service",
+            "status": "running"
+          },
+          {
+            "step": "connect",
+            "status": "running"
+          },
+          {
+            "step": "connect",
+            "status": "online"
+          },
+          {
+            "step": "service",
+            "status": "running"
+          },
+          {
+            "step": "connect",
+            "status": "running"
+          },
+          {
+            "step": "connect",
+            "status": "online"
+          }
+        ],
+        "result": "installed/launchagent/online/reconnect"
+      }
+    },
+    "macNode18": {
+      "line": 605,
+      "value": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "node": "18.20.8",
+        "npmStarted": false,
+        "registrations": 0,
+        "heartbeats": 0,
+        "enrollments": 0,
+        "socketPathBytes": 73,
+        "states": [
+          {
+            "step": "check",
+            "status": "running"
+          },
+          {
+            "step": "check",
+            "status": "running"
+          },
+          {
+            "step": "check",
+            "status": "failed",
+            "cause": "node_required"
+          }
+        ],
+        "result": "check/node_required"
+      }
+    },
+    "package": {
+      "jobId": 129071352501,
+      "npmName": "@aspectlylabs/mikka",
+      "version": "0.0.1",
+      "files": 43,
+      "artifactId": 13660967620,
+      "loggedZipBytes": 963882,
+      "loggedZipSha256": "8658f6f0871a61852fec388458c66732ad5bacc69a6b263016027cdedf3b0f82",
+      "digestAlsoLoggedByConsumers": [
+        129071892688,
+        129071892810
+      ],
+      "independentlyDownloadedAndHashed": false
+    },
+    "custodyCleanup": {
+      "line": 1838,
+      "message": "Retained BYOS Postgres container if created: mikka-cpa-test-d2fd4c52-f732-42b8-8eca-4404a663beb0",
+      "creationFromThisMessage": null,
+      "deletionFromThisLog": null
+    }
+  },
+  "limits": [
+    "All counts describe this exact source and actual jobs; no old c3b or 025 green is reused.",
+    "The Browser gate is an echo only; Site-search uses the Playwright runner for declared HTTP API tests, not a claim of browser interaction.",
+    "No formal Apple Native query budget, production served version, E2B publication/runtime refresh, production model run or PostHog ingestion is established here.",
+    "Successful job/post-job metadata and direct GHA service removal do not prove unlogged internal fixture destruction; custody conditional retention text remains explicit unknown.",
+    "No raw test stdout is suppressed because it includes expected errors, skipped conditions, cache warnings or deprecated-action warnings.",
+    "Node and Vitest/Python/Go/Playwright counts are reported separately; they are not summed into unique tests across overlapping jobs."
+  ],
+  "resources": {
+    "reviewerCreatedVm": 0,
+    "reviewerCreatedDb": 0,
+    "reviewerStartedModels": 0,
+    "reviewerTriggeredWorkflows": 0,
+    "reviewerReranOrCancelledJobs": 0,
+    "reviewerChangedRefs": 0,
+    "allNineCompanionRunsTerminal": true
+  }
+}

@@ -1,0 +1,934 @@
+﻿2026-11-09T09:05:36.6156633Z Current runner version: '2.338.2'
+2026-11-09T09:05:36.6180110Z ##[group]Runner Image Provisioner
+2026-11-09T09:05:36.6180867Z Hosted Compute Agent
+2026-11-09T09:05:36.6181421Z Version: 20261028.624
+2026-11-09T09:05:36.6181961Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T09:05:36.6182655Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T09:05:36.6183241Z Worker ID: {0a7e1454-7b4c-4d21-a19a-98f613b0dfae}
+2026-11-09T09:05:36.6183851Z Region: centralus
+2026-11-09T09:05:36.6184379Z Cloud: Azure
+2026-11-09T09:05:36.6184895Z ##[endgroup]
+2026-11-09T09:05:36.6186055Z ##[group]Operating System
+2026-11-09T09:05:36.6186587Z Ubuntu
+2026-11-09T09:05:36.6187019Z 24.04.5
+2026-11-09T09:05:36.6187608Z LTS
+2026-11-09T09:05:36.6188055Z ##[endgroup]
+2026-11-09T09:05:36.6188824Z ##[group]Runner Image
+2026-11-09T09:05:36.6189411Z Image: ubuntu-24.04
+2026-11-09T09:05:36.6189896Z Version: 20261101.360.1
+2026-11-09T09:05:36.6191075Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T09:05:36.6192383Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T09:05:36.6193240Z ##[endgroup]
+2026-11-09T09:05:36.6194169Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T09:05:36.6195831Z Contents: read
+2026-11-09T09:05:36.6196325Z Metadata: read
+2026-11-09T09:05:36.6196900Z ##[endgroup]
+2026-11-09T09:05:36.6198822Z Secret source: Actions
+2026-11-09T09:05:36.6199786Z Cache mode: write
+2026-11-09T09:05:36.6200379Z Prepare workflow directory
+2026-11-09T09:05:36.6604642Z Prepare all required actions
+2026-11-09T09:05:36.6659673Z Getting action download info
+2026-11-09T09:05:36.9217208Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T09:05:37.0450292Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-11-09T09:05:37.5023828Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T09:05:37.7373990Z Complete job name: backend
+2026-11-09T09:05:37.7967263Z ##[group]Checking docker version
+2026-11-09T09:05:37.7978257Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2026-11-09T09:05:37.8954350Z '1.48'
+2026-11-09T09:05:37.8970607Z Docker daemon API version: '1.48'
+2026-11-09T09:05:37.8971318Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2026-11-09T09:05:37.9158836Z '1.48'
+2026-11-09T09:05:37.9172141Z Docker client API version: '1.48'
+2026-11-09T09:05:37.9177103Z ##[endgroup]
+2026-11-09T09:05:37.9179708Z ##[group]Clean up resources from previous jobs
+2026-11-09T09:05:37.9184614Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=77b17a"
+2026-11-09T09:05:37.9342403Z ##[command]/usr/bin/docker network prune --force --filter "label=77b17a"
+2026-11-09T09:05:37.9490606Z ##[endgroup]
+2026-11-09T09:05:37.9491229Z ##[group]Create local container network
+2026-11-09T09:05:37.9501299Z ##[command]/usr/bin/docker network create --label 77b17a github_network_2467c8018465494192ffe9542212b62e
+2026-11-09T09:05:38.0074660Z c45ba35d68a12a04cb3a82f6a157b49a175a1e0df473b0db2ba1a22fe181cc96
+2026-11-09T09:05:38.0096789Z ##[endgroup]
+2026-11-09T09:05:38.0121538Z ##[group]Starting postgres service container
+2026-11-09T09:05:38.0140575Z ##[command]/usr/bin/docker pull postgres:17
+2026-11-09T09:05:38.5579970Z 17: Pulling from library/postgres
+2026-11-09T09:05:38.7182792Z 37fb86c2a767: Pulling fs layer
+2026-11-09T09:05:38.7183752Z 56c5b61c6d2b: Pulling fs layer
+2026-11-09T09:05:38.7184559Z c2f4b34f5119: Pulling fs layer
+2026-11-09T09:05:38.7185382Z d717e9509665: Pulling fs layer
+2026-11-09T09:05:38.7186162Z 046371a447cc: Pulling fs layer
+2026-11-09T09:05:38.7187074Z c97a680633a2: Pulling fs layer
+2026-11-09T09:05:38.7188108Z f0f18338e0da: Pulling fs layer
+2026-11-09T09:05:38.7189356Z 0eab0a63b06d: Pulling fs layer
+2026-11-09T09:05:38.7190910Z 9de238338a9a: Pulling fs layer
+2026-11-09T09:05:38.7192017Z 275aa943d416: Pulling fs layer
+2026-11-09T09:05:38.7193063Z 5760334e16b5: Pulling fs layer
+2026-11-09T09:05:38.7194145Z d35c08e535dc: Pulling fs layer
+2026-11-09T09:05:38.7195195Z 4f0fb6572de8: Pulling fs layer
+2026-11-09T09:05:38.7196250Z ceeafc939069: Pulling fs layer
+2026-11-09T09:05:38.7197286Z d717e9509665: Waiting
+2026-11-09T09:05:38.7198198Z 046371a447cc: Waiting
+2026-11-09T09:05:38.7199348Z 5760334e16b5: Waiting
+2026-11-09T09:05:38.7200265Z f0f18338e0da: Waiting
+2026-11-09T09:05:38.7201177Z d35c08e535dc: Waiting
+2026-11-09T09:05:38.7202101Z 4f0fb6572de8: Waiting
+2026-11-09T09:05:38.7203013Z ceeafc939069: Waiting
+2026-11-09T09:05:38.7203951Z 0eab0a63b06d: Waiting
+2026-11-09T09:05:38.7204872Z 275aa943d416: Waiting
+2026-11-09T09:05:38.7205831Z 9de238338a9a: Waiting
+2026-11-09T09:05:38.8723763Z 56c5b61c6d2b: Verifying Checksum
+2026-11-09T09:05:38.8725608Z 56c5b61c6d2b: Download complete
+2026-11-09T09:05:38.9360016Z c2f4b34f5119: Verifying Checksum
+2026-11-09T09:05:38.9361572Z c2f4b34f5119: Download complete
+2026-11-09T09:05:39.0292099Z 37fb86c2a767: Download complete
+2026-11-09T09:05:39.1100208Z d717e9509665: Verifying Checksum
+2026-11-09T09:05:39.1101978Z d717e9509665: Download complete
+2026-11-09T09:05:39.1630603Z 046371a447cc: Verifying Checksum
+2026-11-09T09:05:39.1634223Z 046371a447cc: Download complete
+2026-11-09T09:05:39.2243720Z c97a680633a2: Verifying Checksum
+2026-11-09T09:05:39.2245312Z c97a680633a2: Download complete
+2026-11-09T09:05:39.2262118Z f0f18338e0da: Verifying Checksum
+2026-11-09T09:05:39.2263704Z f0f18338e0da: Download complete
+2026-11-09T09:05:39.3001270Z 0eab0a63b06d: Verifying Checksum
+2026-11-09T09:05:39.3003189Z 0eab0a63b06d: Download complete
+2026-11-09T09:05:39.3553641Z 275aa943d416: Verifying Checksum
+2026-11-09T09:05:39.3555358Z 275aa943d416: Download complete
+2026-11-09T09:05:39.4191720Z 5760334e16b5: Verifying Checksum
+2026-11-09T09:05:39.4194473Z 5760334e16b5: Download complete
+2026-11-09T09:05:39.5066549Z d35c08e535dc: Verifying Checksum
+2026-11-09T09:05:39.5071696Z d35c08e535dc: Download complete
+2026-11-09T09:05:39.5664220Z 4f0fb6572de8: Verifying Checksum
+2026-11-09T09:05:39.5667753Z 4f0fb6572de8: Download complete
+2026-11-09T09:05:39.6299313Z ceeafc939069: Verifying Checksum
+2026-11-09T09:05:39.6307526Z ceeafc939069: Download complete
+2026-11-09T09:05:39.7563446Z 9de238338a9a: Verifying Checksum
+2026-11-09T09:05:39.7564577Z 9de238338a9a: Download complete
+2026-11-09T09:05:39.9094744Z 37fb86c2a767: Pull complete
+2026-11-09T09:05:41.1572860Z 56c5b61c6d2b: Pull complete
+2026-11-09T09:05:41.3710370Z c2f4b34f5119: Pull complete
+2026-11-09T09:05:41.4231401Z d717e9509665: Pull complete
+2026-11-09T09:05:41.8117784Z 046371a447cc: Pull complete
+2026-11-09T09:05:41.8772337Z c97a680633a2: Pull complete
+2026-11-09T09:05:41.8860173Z f0f18338e0da: Pull complete
+2026-11-09T09:05:41.8938907Z 0eab0a63b06d: Pull complete
+2026-11-09T09:05:45.5958461Z 9de238338a9a: Pull complete
+2026-11-09T09:05:45.6088159Z 275aa943d416: Pull complete
+2026-11-09T09:05:45.6188227Z 5760334e16b5: Pull complete
+2026-11-09T09:05:45.6313518Z d35c08e535dc: Pull complete
+2026-11-09T09:05:45.6427343Z 4f0fb6572de8: Pull complete
+2026-11-09T09:05:45.6497645Z ceeafc939069: Pull complete
+2026-11-09T09:05:45.6532291Z Digest: sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
+2026-11-09T09:05:45.6546123Z Status: Downloaded newer image for postgres:17
+2026-11-09T09:05:45.6555167Z docker.io/library/postgres:17
+2026-11-09T09:05:45.6614249Z ##[command]/usr/bin/docker create --name da11c3ff5b6b45e79ffba3041b3abd1c_postgres17_bb8410 --label 77b17a --network github_network_2467c8018465494192ffe9542212b62e --network-alias postgres -p 5432:5432 --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10 -e "POSTGRES_PASSWORD=isolated-ci" -e "POSTGRES_DB=computer_test" -e GITHUB_ACTIONS=true -e CI=true postgres:17
+2026-11-09T09:05:45.6984141Z 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41
+2026-11-09T09:05:45.7009873Z ##[command]/usr/bin/docker start 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41
+2026-11-09T09:05:45.9020174Z 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41
+2026-11-09T09:05:45.9041306Z ##[command]/usr/bin/docker ps --all --filter id=8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41 --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-11-09T09:05:45.9190485Z 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41 Up Less than a second (health: starting)
+2026-11-09T09:05:45.9210532Z ##[command]/usr/bin/docker port 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41
+2026-11-09T09:05:45.9351575Z 5432/tcp -> 0.0.0.0:5432
+2026-11-09T09:05:45.9352380Z 5432/tcp -> [::]:5432
+2026-11-09T09:05:45.9419326Z ##[endgroup]
+2026-11-09T09:05:45.9427278Z ##[group]Waiting for all services to be ready
+2026-11-09T09:05:45.9438920Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41
+2026-11-09T09:05:45.9579242Z starting
+2026-11-09T09:05:45.9603386Z postgres service is starting, waiting 2 seconds before checking again.
+2026-11-09T09:05:47.9602670Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41
+2026-11-09T09:05:47.9730349Z starting
+2026-11-09T09:05:47.9744365Z postgres service is starting, waiting 4 seconds before checking again.
+2026-11-09T09:05:52.2389859Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41
+2026-11-09T09:05:52.2522826Z healthy
+2026-11-09T09:05:52.2541239Z postgres service is healthy.
+2026-11-09T09:05:52.2542021Z ##[endgroup]
+2026-11-09T09:05:52.2779563Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T09:05:52.2780165Z with:
+2026-11-09T09:05:52.2780358Z   repository: alexj11324/Mikka
+2026-11-09T09:05:52.2782334Z   token: ***
+2026-11-09T09:05:52.2782520Z   ssh-strict: true
+2026-11-09T09:05:52.2782694Z   ssh-user: git
+2026-11-09T09:05:52.2782868Z   persist-credentials: true
+2026-11-09T09:05:52.2783062Z   clean: true
+2026-11-09T09:05:52.2783239Z   sparse-checkout-cone-mode: true
+2026-11-09T09:05:52.2783452Z   fetch-depth: 1
+2026-11-09T09:05:52.2783624Z   fetch-tags: false
+2026-11-09T09:05:52.2783808Z   show-progress: true
+2026-11-09T09:05:52.2783979Z   lfs: false
+2026-11-09T09:05:52.2784135Z   submodules: false
+2026-11-09T09:05:52.2784312Z   set-safe-directory: true
+2026-11-09T09:05:52.2784519Z   allow-unsafe-pr-checkout: false
+2026-11-09T09:05:52.2784862Z env:
+2026-11-09T09:05:52.2785029Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:05:52.2785236Z ##[endgroup]
+2026-11-09T09:05:52.5435994Z Syncing repository: alexj11324/Mikka
+2026-11-09T09:05:52.5437445Z ##[group]Getting Git version info
+2026-11-09T09:05:52.5437770Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T09:05:52.5438226Z [command]/usr/bin/git version
+2026-11-09T09:05:52.5472573Z git version 2.56.0
+2026-11-09T09:05:52.5490015Z ##[endgroup]
+2026-11-09T09:05:52.5503939Z Temporarily overriding HOME='/home/runner/work/_temp/45e20e1c-67f9-4844-ba40-6459e4586fc6' before making global git config changes
+2026-11-09T09:05:52.5505199Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T09:05:52.5509366Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T09:05:52.5559779Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T09:05:52.5563752Z ##[group]Initializing the repository
+2026-11-09T09:05:52.5567481Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T09:05:52.5651322Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T09:05:52.5652093Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T09:05:52.5653208Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T09:05:52.5653753Z hint: call:
+2026-11-09T09:05:52.5654032Z hint:
+2026-11-09T09:05:52.5654485Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T09:05:52.5654952Z hint:
+2026-11-09T09:05:52.5655396Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T09:05:52.5656104Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T09:05:52.5656635Z hint:
+2026-11-09T09:05:52.5656932Z hint: 	git branch -m <name>
+2026-11-09T09:05:52.5657275Z hint:
+2026-11-09T09:05:52.5657678Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T09:05:52.5659754Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T09:05:52.5670669Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T09:05:52.5720183Z ##[endgroup]
+2026-11-09T09:05:52.5720792Z ##[group]Disabling automatic garbage collection
+2026-11-09T09:05:52.5724166Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T09:05:52.5761909Z ##[endgroup]
+2026-11-09T09:05:52.5762448Z ##[group]Setting up auth
+2026-11-09T09:05:52.5769326Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T09:05:52.5810491Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T09:05:52.6129314Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T09:05:52.6170879Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T09:05:52.6419927Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T09:05:52.6462507Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T09:05:52.6682256Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T09:05:52.6730405Z ##[endgroup]
+2026-11-09T09:05:52.6730899Z ##[group]Fetching the repository
+2026-11-09T09:05:52.6747248Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9d8aab6986e474ea2df8f62091d97dc5aa992420:refs/remotes/pull/1799/merge
+2026-11-09T09:05:56.7278472Z From https://github.com/alexj11324/Mikka
+2026-11-09T09:05:56.7279251Z  * [new ref]         9d8aab6986e474ea2df8f62091d97dc5aa992420 -> pull/1799/merge
+2026-11-09T09:05:56.7282512Z ##[endgroup]
+2026-11-09T09:05:56.7282994Z ##[group]Determining the checkout info
+2026-11-09T09:05:56.7285103Z ##[endgroup]
+2026-11-09T09:05:56.7289550Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T09:05:56.7343628Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T09:05:56.7379445Z ##[group]Checking out the ref
+2026-11-09T09:05:56.7382924Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge
+2026-11-09T09:05:57.3003375Z Note: switching to 'refs/remotes/pull/1799/merge'.
+2026-11-09T09:05:57.3003621Z 
+2026-11-09T09:05:57.3003798Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T09:05:57.3004176Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T09:05:57.3004551Z state without impacting any branches by switching back to a branch.
+2026-11-09T09:05:57.3004889Z 
+2026-11-09T09:05:57.3005095Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T09:05:57.3005590Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T09:05:57.3005855Z 
+2026-11-09T09:05:57.3005969Z   git switch -c <new-branch-name>
+2026-11-09T09:05:57.3006479Z 
+2026-11-09T09:05:57.3006590Z Or undo this operation with:
+2026-11-09T09:05:57.3006753Z 
+2026-11-09T09:05:57.3006856Z   git switch -
+2026-11-09T09:05:57.3007005Z 
+2026-11-09T09:05:57.3007406Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T09:05:57.3007815Z 
+2026-11-09T09:05:57.3008412Z HEAD is now at 9d8aab6 Merge c0e94d594f1ecf4f5edc25904912702e61fce86b into 0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6
+2026-11-09T09:05:57.3024844Z ##[endgroup]
+2026-11-09T09:05:57.3074878Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T09:05:57.3107480Z 9d8aab6986e474ea2df8f62091d97dc5aa992420
+2026-11-09T09:05:57.3311547Z ##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+2026-11-09T09:05:57.3311875Z with:
+2026-11-09T09:05:57.3312053Z   dest: ~/setup-pnpm
+2026-11-09T09:05:57.3312249Z   run_install: null
+2026-11-09T09:05:57.3312424Z   cache: false
+2026-11-09T09:05:57.3312616Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-09T09:05:57.3312888Z   package_json_file: package.json
+2026-11-09T09:05:57.3313094Z   standalone: false
+2026-11-09T09:05:57.3313261Z env:
+2026-11-09T09:05:57.3313425Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:05:57.3313631Z ##[endgroup]
+2026-11-09T09:05:57.4517908Z ##[group]Running self-installer...
+2026-11-09T09:05:57.8424245Z (node:2567) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T09:05:57.8425099Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:05:57.9636520Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T09:05:57.9705965Z Packages: +1
+2026-11-09T09:05:57.9706625Z +
+2026-11-09T09:05:58.3191426Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-09T09:05:58.3806839Z 
+2026-11-09T09:05:58.3807180Z dependencies:
+2026-11-09T09:05:58.3807413Z + pnpm 10.34.3 (12.18.0 is available)
+2026-11-09T09:05:58.3807603Z 
+2026-11-09T09:05:58.3831443Z Done in 787ms
+2026-11-09T09:05:58.4035195Z ##[endgroup]
+2026-11-09T09:05:58.4035670Z Installation Completed!
+2026-11-09T09:05:58.4221868Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T09:05:58.4222203Z with:
+2026-11-09T09:05:58.4222378Z   node-version: 24
+2026-11-09T09:05:58.4222557Z   cache: pnpm
+2026-11-09T09:05:58.4222726Z   always-auth: false
+2026-11-09T09:05:58.4222908Z   check-latest: false
+2026-11-09T09:05:58.4224786Z   token: ***
+2026-11-09T09:05:58.4224964Z env:
+2026-11-09T09:05:58.4225138Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:05:58.4225398Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:05:58.4225649Z ##[endgroup]
+2026-11-09T09:05:58.5464406Z (node:2581) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T09:05:58.5464969Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:05:58.5469434Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T09:05:58.5469889Z ##[group]Environment details
+2026-11-09T09:05:58.8456066Z node: v24.22.2
+2026-11-09T09:05:58.8456423Z npm: 11.19.1
+2026-11-09T09:05:58.8456678Z yarn: 1.22.22
+2026-11-09T09:05:58.8457903Z ##[endgroup]
+2026-11-09T09:05:58.8473709Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-11-09T09:05:59.1995339Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-09T09:05:59.3671561Z pnpm cache is not found
+2026-11-09T09:05:59.3813052Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-09T09:05:59.3813397Z [36;1mpnpm install --frozen-lockfile[0m
+2026-11-09T09:05:59.3839405Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:05:59.3839640Z env:
+2026-11-09T09:05:59.3839819Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:05:59.3840091Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:05:59.3840347Z ##[endgroup]
+2026-11-09T09:05:59.6659635Z Scope: all 7 workspace projects
+2026-11-09T09:05:59.7672146Z Lockfile is up to date, resolution step is skipped
+2026-11-09T09:05:59.8673002Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T09:05:59.9988144Z Packages: +2184
+2026-11-09T09:05:59.9989030Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-09T09:06:00.8684886Z Progress: resolved 2184, reused 0, downloaded 40, added 8
+2026-11-09T09:06:01.8687356Z Progress: resolved 2184, reused 0, downloaded 267, added 179
+2026-11-09T09:06:02.8713507Z Progress: resolved 2184, reused 0, downloaded 377, added 299
+2026-11-09T09:06:03.8700594Z Progress: resolved 2184, reused 0, downloaded 439, added 332
+2026-11-09T09:06:04.8707505Z Progress: resolved 2184, reused 0, downloaded 500, added 363
+2026-11-09T09:06:05.8719356Z Progress: resolved 2184, reused 0, downloaded 639, added 458
+2026-11-09T09:06:06.8760642Z Progress: resolved 2184, reused 0, downloaded 772, added 533
+2026-11-09T09:06:07.8738449Z Progress: resolved 2184, reused 0, downloaded 815, added 553
+2026-11-09T09:06:08.9220271Z Progress: resolved 2184, reused 0, downloaded 885, added 621
+2026-11-09T09:06:09.9198036Z Progress: resolved 2184, reused 0, downloaded 999, added 726
+2026-11-09T09:06:10.9195481Z Progress: resolved 2184, reused 0, downloaded 1022, added 735
+2026-11-09T09:06:11.9194975Z Progress: resolved 2184, reused 0, downloaded 1040, added 742
+2026-11-09T09:06:12.9202969Z Progress: resolved 2184, reused 0, downloaded 1044, added 743
+2026-11-09T09:06:13.9206432Z Progress: resolved 2184, reused 0, downloaded 1045, added 743
+2026-11-09T09:06:14.9206051Z Progress: resolved 2184, reused 0, downloaded 1165, added 844
+2026-11-09T09:06:15.9203537Z Progress: resolved 2184, reused 0, downloaded 1195, added 858
+2026-11-09T09:06:16.9210417Z Progress: resolved 2184, reused 0, downloaded 1269, added 882
+2026-11-09T09:06:17.9360110Z Progress: resolved 2184, reused 0, downloaded 1416, added 1011
+2026-11-09T09:06:18.9311068Z Progress: resolved 2184, reused 0, downloaded 1453, added 1027
+2026-11-09T09:06:19.9321711Z Progress: resolved 2184, reused 0, downloaded 1508, added 1055
+2026-11-09T09:06:20.9331157Z Progress: resolved 2184, reused 0, downloaded 1594, added 1087
+2026-11-09T09:06:21.9481312Z Progress: resolved 2184, reused 0, downloaded 1655, added 1114
+2026-11-09T09:06:22.9486143Z Progress: resolved 2184, reused 0, downloaded 1754, added 1150
+2026-11-09T09:06:23.9500830Z Progress: resolved 2184, reused 0, downloaded 1836, added 1215
+2026-11-09T09:06:24.9504495Z Progress: resolved 2184, reused 0, downloaded 1849, added 1219
+2026-11-09T09:06:25.9526868Z Progress: resolved 2184, reused 0, downloaded 1865, added 1226
+2026-11-09T09:06:26.9524470Z Progress: resolved 2184, reused 0, downloaded 1933, added 1255
+2026-11-09T09:06:27.9527838Z Progress: resolved 2184, reused 0, downloaded 1961, added 1265
+2026-11-09T09:06:28.9525581Z Progress: resolved 2184, reused 0, downloaded 2059, added 1303
+2026-11-09T09:06:29.9526097Z Progress: resolved 2184, reused 0, downloaded 2105, added 1335
+2026-11-09T09:06:30.9532575Z Progress: resolved 2184, reused 0, downloaded 2106, added 1597
+2026-11-09T09:06:31.9543361Z Progress: resolved 2184, reused 0, downloaded 2108, added 1893
+2026-11-09T09:06:32.9552385Z Progress: resolved 2184, reused 0, downloaded 2108, added 2035
+2026-11-09T09:06:33.9563700Z Progress: resolved 2184, reused 0, downloaded 2108, added 2183
+2026-11-09T09:06:36.4304102Z Progress: resolved 2184, reused 0, downloaded 2108, added 2184
+2026-11-09T09:06:36.4308446Z Progress: resolved 2184, reused 0, downloaded 2108, added 2184, done
+2026-11-09T09:06:37.1367402Z .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T09:06:37.2000131Z .../node_modules/ffmpeg-static install$ node install.js
+2026-11-09T09:06:37.2496954Z .../node_modules/@swc/core postinstall: Done
+2026-11-09T09:06:37.2579972Z .../node_modules/@parcel/watcher install$ node scripts/build-from-source.js
+2026-11-09T09:06:37.3047659Z .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-11-09T09:06:37.3058521Z .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T09:06:37.3960371Z .../node_modules/@parcel/watcher install: Done
+2026-11-09T09:06:37.3990392Z .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-11-09T09:06:37.4931173Z .../node_modules/@swc/core postinstall: Done
+2026-11-09T09:06:38.5690741Z .../node_modules/ffmpeg-static install: ffmpeg binary, README and LICENSE verified.
+2026-11-09T09:06:38.5755188Z .../node_modules/ffmpeg-static install: Done
+2026-11-09T09:06:39.1195288Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-09T09:06:39.5462237Z 
+2026-11-09T09:06:39.5462567Z dependencies:
+2026-11-09T09:06:39.5462894Z + @ai-sdk/gateway 4.0.121
+2026-11-09T09:06:39.5463124Z + @ai-sdk/mcp 2.0.81
+2026-11-09T09:06:39.5463321Z + @ai-sdk/openai 4.0.99
+2026-11-09T09:06:39.5463561Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-09T09:06:39.5463829Z + @ai-sdk/react 4.0.152
+2026-11-09T09:06:39.5464024Z + @ai-sdk/workflow 2.0.80
+2026-11-09T09:06:39.5464326Z + @base-ui/react 1.9.0
+2026-11-09T09:06:39.5464645Z + @better-auth/core 1.7.12
+2026-11-09T09:06:39.5464950Z + @better-auth/expo 1.7.12
+2026-11-09T09:06:39.5465293Z + @better-auth/oauth-provider 1.7.12
+2026-11-09T09:06:39.5465646Z + @chat-adapter/slack 4.43.0
+2026-11-09T09:06:39.5465990Z + @chat-adapter/state-pg 4.43.0
+2026-11-09T09:06:39.5466337Z + @chat-adapter/telegram 4.43.0
+2026-11-09T09:06:39.5466659Z + @composio/core 0.26.0
+2026-11-09T09:06:39.5466938Z + @dnd-kit/core 6.3.1
+2026-11-09T09:06:39.5467217Z + @dnd-kit/sortable 10.0.0
+2026-11-09T09:06:39.5467506Z + @dnd-kit/utilities 3.2.2
+2026-11-09T09:06:39.5467785Z + @e965/xlsx 0.20.3
+2026-11-09T09:06:39.5468050Z + @floating-ui/dom 1.8.0
+2026-11-09T09:06:39.5468387Z + @formatjs/intl-localematcher 0.8.14
+2026-11-09T09:06:39.5468847Z + @heroui/react 3.2.6
+2026-11-09T09:06:39.5469122Z + @heroui/styles 3.2.6
+2026-11-09T09:06:39.5469455Z + @internationalized/date 3.12.4
+2026-11-09T09:06:39.5469879Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-09T09:06:39.5470289Z + @modelcontextprotocol/server 2.3.1
+2026-11-09T09:06:39.5470660Z + @norbert_bodziony/bloub 0.4.1
+2026-11-09T09:06:39.5470967Z + @novnc/novnc 1.6.0
+2026-11-09T09:06:39.5471251Z + @opentelemetry/api 1.10.0
+2026-11-09T09:06:39.5471598Z + @opentelemetry/api-logs 0.223.0
+2026-11-09T09:06:39.5471942Z + @opentelemetry/core 2.12.0
+2026-11-09T09:06:39.5472366Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-09T09:06:39.5472871Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-09T09:06:39.5473329Z + @opentelemetry/instrumentation 0.223.0
+2026-11-09T09:06:39.5473737Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-09T09:06:39.5474155Z + @opentelemetry/resources 2.12.0
+2026-11-09T09:06:39.5474516Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-09T09:06:39.5474896Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-09T09:06:39.5475298Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-09T09:06:39.5475728Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-09T09:06:39.5476049Z + @openuidev/lang-core 1.0.1
+2026-11-09T09:06:39.5476272Z + @openuidev/react-lang 1.0.1
+2026-11-09T09:06:39.5476485Z + @openuidev/react-ui 0.18.1
+2026-11-09T09:06:39.5476684Z + @pierre/diffs 1.6.4
+2026-11-09T09:06:39.5476871Z + @shadcn/react 0.3.1
+2026-11-09T09:06:39.5477067Z + @solidjs/web 2.0.0-rc.0
+2026-11-09T09:06:39.5477282Z + @stripe/stripe-js 10.1.0
+2026-11-09T09:06:39.5477517Z + @tanstack/react-virtual 3.14.18
+2026-11-09T09:06:39.5477958Z + @tiptap/core 3.32.0
+2026-11-09T09:06:39.5478207Z + @tiptap/extension-collaboration 3.32.0
+2026-11-09T09:06:39.5478503Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-09T09:06:39.5479105Z + @tiptap/extension-highlight 3.32.0
+2026-11-09T09:06:39.5479501Z + @tiptap/extension-list 3.32.0
+2026-11-09T09:06:39.5479888Z + @tiptap/extension-mention 3.32.0
+2026-11-09T09:06:39.5480284Z + @tiptap/extension-table 3.32.0
+2026-11-09T09:06:39.5480665Z + @tiptap/extension-text-align 3.32.0
+2026-11-09T09:06:39.5481249Z + @tiptap/extensions 3.32.0
+2026-11-09T09:06:39.5481575Z + @tiptap/pm 3.32.0
+2026-11-09T09:06:39.5481852Z + @tiptap/react 3.32.0
+2026-11-09T09:06:39.5482152Z + @tiptap/starter-kit 3.32.0
+2026-11-09T09:06:39.5482464Z + @tiptap/suggestion 3.32.0
+2026-11-09T09:06:39.5482761Z + @tiptap/y-tiptap 3.0.10
+2026-11-09T09:06:39.5483068Z + @vercel/analytics 1.3.1
+2026-11-09T09:06:39.5483383Z + @vercel/functions 3.10.2
+2026-11-09T09:06:39.5483689Z + @vercel/oidc 4.0.2
+2026-11-09T09:06:39.5484017Z + @workflow/serde 5.0.0
+2026-11-09T09:06:39.5484346Z + @workflow/world-local 5.1.2
+2026-11-09T09:06:39.5484648Z + ai 7.0.148
+2026-11-09T09:06:39.5484914Z + aws4fetch 1.0.20
+2026-11-09T09:06:39.5485207Z + beautiful-mermaid 1.1.3
+2026-11-09T09:06:39.5485520Z + better-auth 1.7.12
+2026-11-09T09:06:39.5485796Z + chat 4.43.0
+2026-11-09T09:06:39.5486121Z + class-variance-authority 0.7.1
+2026-11-09T09:06:39.5486444Z + clsx 2.1.1
+2026-11-09T09:06:39.5486677Z + cmdk 1.1.1
+2026-11-09T09:06:39.5486955Z + cn 0.5.0
+2026-11-09T09:06:39.5487193Z + cookie 1.1.1
+2026-11-09T09:06:39.5487448Z + date-fns 4.1.0
+2026-11-09T09:06:39.5487726Z + diff 8.0.2
+2026-11-09T09:06:39.5488020Z + dompurify 3.4.17
+2026-11-09T09:06:39.5488308Z + drizzle-orm 0.45.4
+2026-11-09T09:06:39.5488708Z + e2b 2.61.0
+2026-11-09T09:06:39.5488993Z + embla-carousel-react 8.5.1
+2026-11-09T09:06:39.5489325Z + fflate 0.8.3
+2026-11-09T09:06:39.5489592Z + ffmpeg-static 5.3.0
+2026-11-09T09:06:39.5489895Z + file-type 22.3.0
+2026-11-09T09:06:39.5490153Z + h3 2.0.8
+2026-11-09T09:06:39.5490401Z + hono 4.13.13
+2026-11-09T09:06:39.5490671Z + input-otp 1.4.1
+2026-11-09T09:06:39.5490932Z + katex 0.16.47
+2026-11-09T09:06:39.5491206Z + lucide-react 1.60.0
+2026-11-09T09:06:39.5491504Z + mcp-handler 2.3.0
+2026-11-09T09:06:39.5491764Z + mermaid 12.2.0
+2026-11-09T09:06:39.5492025Z + motion 14.5.0
+2026-11-09T09:06:39.5492300Z + music-metadata 12.3.4
+2026-11-09T09:06:39.5492596Z + negotiator 1.1.0
+2026-11-09T09:06:39.5492864Z + next 16.4.1
+2026-11-09T09:06:39.5493137Z + next-intl 4.14.9
+2026-11-09T09:06:39.5493425Z + next-themes 0.4.6
+2026-11-09T09:06:39.5493706Z + nodemailer 10.3.1
+2026-11-09T09:06:39.5493989Z + officeparser 8.5.0
+2026-11-09T09:06:39.5494264Z + pg 8.23.1
+2026-11-09T09:06:39.5494527Z + posthog-js 1.438.13
+2026-11-09T09:06:39.5494790Z + posthog-node 5.55.2
+2026-11-09T09:06:39.5495060Z + react 19.3.1
+2026-11-09T09:06:39.5495376Z + react-day-picker 9.8.0
+2026-11-09T09:06:39.5495679Z + react-dom 19.3.1
+2026-11-09T09:06:39.5495963Z + react-markdown 10.1.0
+2026-11-09T09:06:39.5496316Z + react-resizable-panels 4.14.7
+2026-11-09T09:06:39.5496702Z + react-syntax-highlighter 16.1.1
+2026-11-09T09:06:39.5497018Z + recharts 3.10.1
+2026-11-09T09:06:39.5497300Z + rehype-katex 7.0.1
+2026-11-09T09:06:39.5497587Z + remark-gfm 4.0.1
+2026-11-09T09:06:39.5497857Z + remark-math 6.0.0
+2026-11-09T09:06:39.5498139Z + shadcn 4.22.1
+2026-11-09T09:06:39.5498389Z + sharp 0.35.5
+2026-11-09T09:06:39.5498750Z + shiki 4.5.0
+2026-11-09T09:06:39.5499005Z + solid-js 2.0.0-rc.0
+2026-11-09T09:06:39.5499285Z + sonner 1.7.4
+2026-11-09T09:06:39.5499530Z + srvx 1.0.8
+2026-11-09T09:06:39.5499767Z + swr 2.5.1
+2026-11-09T09:06:39.5500060Z + tailwind-merge 3.7.0
+2026-11-09T09:06:39.5500390Z + tw-animate-css 1.4.0
+2026-11-09T09:06:39.5500673Z + undici 7.24.5
+2026-11-09T09:06:39.5500954Z + unstorage 2.0.0-beta.0
+2026-11-09T09:06:39.5501275Z + use-intl 4.14.9
+2026-11-09T09:06:39.5501545Z + vaul 1.1.2
+2026-11-09T09:06:39.5501797Z + workflow 5.2.3
+2026-11-09T09:06:39.5502044Z + y-protocols 1.0.7
+2026-11-09T09:06:39.5502464Z + yjs 13.6.33
+2026-11-09T09:06:39.5502679Z + zod 4.6.7
+2026-11-09T09:06:39.5502807Z 
+2026-11-09T09:06:39.5502920Z devDependencies:
+2026-11-09T09:06:39.5503200Z + @playwright/test 1.64.1
+2026-11-09T09:06:39.5503503Z + @tailwindcss/postcss 4.3.3
+2026-11-09T09:06:39.5503805Z + @types/node 25.9.9
+2026-11-09T09:06:39.5504086Z + @types/pg 8.23.1
+2026-11-09T09:06:39.5504351Z + @types/react 19.3.0
+2026-11-09T09:06:39.5504634Z + @types/react-dom 19.3.0
+2026-11-09T09:06:39.5504989Z + @types/react-syntax-highlighter 15.5.13
+2026-11-09T09:06:39.5505604Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-09T09:06:39.5505971Z + esbuild 0.28.2
+2026-11-09T09:06:39.5506251Z + fake-indexeddb 6.2.4
+2026-11-09T09:06:39.5506536Z + happy-dom 15.11.7
+2026-11-09T09:06:39.5506796Z + js-yaml 4.3.2
+2026-11-09T09:06:39.5507057Z + nitro 3.0.261103-rc
+2026-11-09T09:06:39.5507327Z + nx 24.0.5
+2026-11-09T09:06:39.5507556Z + oxlint 1.89.0
+2026-11-09T09:06:39.5507782Z + postcss 8.5.31
+2026-11-09T09:06:39.5508013Z + prettier 3.9.10
+2026-11-09T09:06:39.5508326Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-09T09:06:39.5508815Z + rolldown 1.3.0
+2026-11-09T09:06:39.5509108Z + tailwindcss 4.3.3
+2026-11-09T09:06:39.5509396Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-09T09:06:39.5509670Z + tsx 4.23.15
+2026-11-09T09:06:39.5509930Z + typescript 5.9.3
+2026-11-09T09:06:39.5510202Z + wrangler 4.152.0
+2026-11-09T09:06:39.5510345Z 
+2026-11-09T09:06:39.7646745Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-09T09:06:39.8453466Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T09:06:39.8454005Z │                                                                              │
+2026-11-09T09:06:39.8454499Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T09:06:39.8455052Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-09T09:06:39.8455569Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-09T09:06:39.8456084Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T09:06:39.8456564Z │   to run scripts.                                                            │
+2026-11-09T09:06:39.8456963Z │                                                                              │
+2026-11-09T09:06:39.8457405Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T09:06:39.8732738Z Done in 40.4s using pnpm v10.34.3
+2026-11-09T09:06:40.0276268Z ##[group]Run pnpm typecheck
+2026-11-09T09:06:40.0276540Z [36;1mpnpm typecheck[0m
+2026-11-09T09:06:40.0297785Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:06:40.0298001Z env:
+2026-11-09T09:06:40.0298179Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:06:40.0298440Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:06:40.0298903Z ##[endgroup]
+2026-11-09T09:06:40.3021936Z 
+2026-11-09T09:06:40.3022349Z > next-app@0.0.1 typecheck /home/runner/work/Mikka/Mikka
+2026-11-09T09:06:40.3023263Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck
+2026-11-09T09:06:40.3023758Z 
+2026-11-09T09:06:46.0904641Z 
+2026-11-09T09:06:46.0905665Z > @mikka/frontend@0.0.1 typecheck /home/runner/work/Mikka/Mikka/apps/frontend
+2026-11-09T09:06:46.0906300Z > tsc --noEmit -p tsconfig.json
+2026-11-09T09:06:46.0906568Z 
+2026-11-09T09:07:18.7717172Z ##[group]Run pnpm exec oxlint --deny-warnings lib/computer app/api/bots
+2026-11-09T09:07:18.7717609Z [36;1mpnpm exec oxlint --deny-warnings lib/computer app/api/bots[0m
+2026-11-09T09:07:18.7736481Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:07:18.7736691Z env:
+2026-11-09T09:07:18.7736879Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:07:18.7737140Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:07:18.7737400Z ##[endgroup]
+2026-11-09T09:07:19.0777410Z Found 0 warnings and 0 errors.
+2026-11-09T09:07:19.0789726Z Finished in 13ms on 96 files with 97 rules using 4 threads.
+2026-11-09T09:07:19.1021210Z ##[group]Run pnpm --filter @mikka/protocol exec vitest run src/computer.test.ts
+2026-11-09T09:07:19.1021693Z [36;1mpnpm --filter @mikka/protocol exec vitest run src/computer.test.ts[0m
+2026-11-09T09:07:19.1040262Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:07:19.1040480Z env:
+2026-11-09T09:07:19.1040852Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:07:19.1041113Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:07:19.1041379Z ##[endgroup]
+2026-11-09T09:07:19.6313467Z 
+2026-11-09T09:07:19.6316458Z [1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/home/runner/work/Mikka/Mikka/packages/protocol[39m
+2026-11-09T09:07:19.6317142Z 
+2026-11-09T09:07:19.8347715Z  [32m✓[39m src/computer.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-11-09T09:07:19.8383955Z 
+2026-11-09T09:07:19.8386996Z [2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+2026-11-09T09:07:19.8387843Z [2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+2026-11-09T09:07:19.8388519Z [2m   Start at [22m 09:07:19
+2026-11-09T09:07:19.8391625Z [2m   Duration [22m 201ms[2m (import 57%, transform 33%, tests 7%, worker 3%)[22m
+2026-11-09T09:07:19.8408127Z 
+2026-11-09T09:07:19.8723890Z ##[group]Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/handler.test.ts lib/computer/policy-route.test.ts lib/computer/permission.test.ts lib/computer/local-authority.test.mjs
+2026-11-09T09:07:19.8725117Z [36;1mnode --import ./scripts/server-test.mjs --import tsx --test lib/computer/handler.test.ts lib/computer/policy-route.test.ts lib/computer/permission.test.ts lib/computer/local-authority.test.mjs[0m
+2026-11-09T09:07:19.8743731Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:07:19.8743942Z env:
+2026-11-09T09:07:19.8744111Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:07:19.8744377Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:07:19.8744632Z ##[endgroup]
+2026-11-09T09:07:20.9947884Z {"event":"cloud_computer_failed","action":"wake","botId":"b9b30c54-8354-4e86-9dfd-bfcf2d437fca","code":"Error"}
+2026-11-09T09:07:20.9951709Z {"event":"cloud_computer_failed","action":"wake","botId":"b9b30c54-8354-4e86-9dfd-bfcf2d437fca","code":"Error"}
+2026-11-09T09:07:21.0025529Z ✔ unauthenticated requests never reach the store and responses cannot be cached (3.624274ms)
+2026-11-09T09:07:21.0027761Z ✔ cross-origin and missing-origin mutations never provision compute (1.122395ms)
+2026-11-09T09:07:21.0028849Z ✔ rejects malformed identities, modes and client-supplied ownership (4.402059ms)
+2026-11-09T09:07:21.0038112Z ✔ uses server-derived ownership and the shared request contract (1.62243ms)
+2026-11-09T09:07:21.0039214Z ✔ accepts a duplicate wake while provisioning without starting another worker (0.550502ms)
+2026-11-09T09:07:21.0040179Z ✔ keeps provisioning conflicts for other actions and all other wake conflicts (1.846209ms)
+2026-11-09T09:07:21.0041061Z ✔ keeps ownership errors but never serializes provider credentials (1.172211ms)
+2026-11-09T09:07:21.0043309Z ✔ waking starts the trusted worker after desktop provisioning and fails closed on worker errors (0.974932ms)
+2026-11-09T09:07:21.0045254Z ✔ a failed worker start logs its code and sandbox, and the response stays generic (3.778036ms)
+2026-11-09T09:07:21.0981972Z ✔ local authority returns only the persisted Bot scope and supported current permission (2.860121ms)
+2026-11-09T09:07:21.0983145Z ✔ absent ownership, deny, corrupt policy and version never grant local authority (0.351942ms)
+2026-11-09T09:07:21.0984132Z ✔ authority lookup failure propagates without substituting cached allow (0.750534ms)
+2026-11-09T09:07:21.0985130Z ✔ computer policy defaults to allow, preserves deny and refuses unknown stored values (0.90038ms)
+2026-11-09T09:07:21.0986119Z ✔ only workspace admins may change policy, using an exact same-origin request (28.719184ms)
+2026-11-09T09:07:21.0987063Z ✔ disabled and failed backends cannot expose details or change settings (0.942804ms)
+2026-11-09T09:07:21.0987638Z ℹ tests 15
+2026-11-09T09:07:21.0987928Z ℹ suites 0
+2026-11-09T09:07:21.0988190Z ℹ pass 15
+2026-11-09T09:07:21.0988445Z ℹ fail 0
+2026-11-09T09:07:21.0988897Z ℹ cancelled 0
+2026-11-09T09:07:21.0989171Z ℹ skipped 0
+2026-11-09T09:07:21.0989460Z ℹ todo 0
+2026-11-09T09:07:21.0989769Z ℹ duration_ms 1191.658038
+2026-11-09T09:07:21.1139679Z ##[group]Run node --import ./scripts/server-test.mjs --import tsx --test lib/cua/local-review.test.ts
+2026-11-09T09:07:21.1140851Z [36;1mnode --import ./scripts/server-test.mjs --import tsx --test lib/cua/local-review.test.ts[0m
+2026-11-09T09:07:21.1166548Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:07:21.1166867Z env:
+2026-11-09T09:07:21.1167120Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:07:21.1167518Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:07:21.1167910Z ##[endgroup]
+2026-11-09T09:07:21.3773382Z ✔ web snapshot is exact, bounded, normalized and hash-bound to the daemon review (6.393376ms)
+2026-11-09T09:07:21.3774424Z ✔ cloud approval binds the exact display and rejects substitution (0.515589ms)
+2026-11-09T09:07:21.4160401Z ℹ tests 2
+2026-11-09T09:07:21.4169975Z ℹ suites 0
+2026-11-09T09:07:21.4199460Z ℹ pass 2
+2026-11-09T09:07:21.4199927Z ℹ fail 0
+2026-11-09T09:07:21.4200394Z ℹ cancelled 0
+2026-11-09T09:07:21.4200808Z ℹ skipped 0
+2026-11-09T09:07:21.4201329Z ℹ todo 0
+2026-11-09T09:07:21.4201902Z ℹ duration_ms 257.402835
+2026-11-09T09:07:21.4269613Z ##[group]Run node --test packages/daemon/src/computer/broker.test.mjs packages/daemon/src/computer/driver.test.mjs
+2026-11-09T09:07:21.4270628Z [36;1mnode --test packages/daemon/src/computer/broker.test.mjs packages/daemon/src/computer/driver.test.mjs[0m
+2026-11-09T09:07:21.4292301Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:07:21.4292515Z env:
+2026-11-09T09:07:21.4292686Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:07:21.4292965Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:07:21.4293221Z ##[endgroup]
+2026-11-09T09:07:21.5229343Z ✔ TCP grants require the actual listening endpoint (12.01021ms)
+2026-11-09T09:07:21.5247377Z ✔ revoking a run grant promptly rejects pending work without revoking another run (2.505715ms)
+2026-11-09T09:07:21.5265849Z ✔ suspending revokes grants and pending reviews without closing resources (1.723694ms)
+2026-11-09T09:07:21.5300667Z ✔ listen rejects a pre-existing path without deleting or replacing it (3.339783ms)
+2026-11-09T09:07:21.5325016Z ✔ suspension during allow asynchronous admission blocks the later action (2.506025ms)
+2026-11-09T09:07:21.5336616Z ✔ suspension during ask asynchronous admission blocks the later action (1.201054ms)
+2026-11-09T09:07:21.5347118Z ✔ each broker action has its own trusted id and ask reuses the review id (0.971738ms)
+2026-11-09T09:07:21.5523708Z ✔ only pinned driver detected; missing/unexpected version absent (17.245546ms)
+2026-11-09T09:07:21.5544905Z ✔ missing/deny/unknown permissions do not produce an MCP grant (1.378672ms)
+2026-11-09T09:07:21.5545952Z ✔ strict allowlist rejects arbitrary tools, output paths and argument smuggling (0.597863ms)
+2026-11-09T09:07:21.5558295Z ✔ keys and scrolling require the exact approval and use the selected desktop (1.547277ms)
+2026-11-09T09:07:21.5577598Z ✔ ask suspends; one exact review delivers result, replay denied (1.894421ms)
+2026-11-09T09:07:21.5586385Z ✔ allow executes once without an approval; deny and missing policy revoke earlier grants (0.935122ms)
+2026-11-09T09:07:21.5594153Z ✔ allow rechecks live authority, cancellation, grant replacement and driver identity before executing (0.782943ms)
+2026-11-09T09:07:21.5601249Z ✔ allow returns an uncertain driver error without retrying the operation (0.633136ms)
+2026-11-09T09:07:21.5617261Z ✔ denied, expired and newly forbidden requests never execute (1.498163ms)
+2026-11-09T09:07:21.5624611Z ✔ failed/uncertain driver execution consumes approval permanently (0.733588ms)
+2026-11-09T09:07:21.5635351Z ✔ closed broker discards pending approvals and old session grant is revoked (0.780699ms)
+2026-11-09T09:07:21.6170443Z ✔ real stdio MCP proxy holds call until trusted broker approval; cannot decide through request socket (53.125938ms)
+2026-11-09T09:07:21.6558172Z ✔ allow returns actual PNG bytes through the request-only MCP proxy to the scripted client (38.219755ms)
+2026-11-09T09:07:21.6569161Z ✔ replaced run session and disconnected model discard pending execution (1.710823ms)
+2026-11-09T09:07:21.6583207Z ✔ pinned platform click schemas preserve desktop coordinates without unsupported macOS fields (0.262306ms)
+2026-11-09T09:07:21.6594846Z ✔ concurrent approved runs execute on their own trusted display (2.468859ms)
+2026-11-09T09:07:21.6618136Z ✔ capture calls skip review but still need the run's grant (2.203348ms)
+2026-11-09T09:07:21.6623944Z ✔ capture calls cannot choose the desktop, a path or a longer recording (0.808642ms)
+2026-11-09T09:07:21.6633503Z ✔ a refused capture tells the model only the server's own reason (0.923554ms)
+2026-11-09T09:07:21.7511556Z ✔ the proxy lists capture tools only with --captures and relays them over the socket (86.956564ms)
+2026-11-09T09:07:21.7526549Z ✔ a done action's step goes on the recording timeline only while recording; the driver never sees it (2.039971ms)
+2026-11-09T09:07:21.7542386Z ✔ under ask the Decisions API says which actions need the person; no answer executes, logged (1.571183ms)
+2026-11-09T09:07:21.7548895Z ✔ allow never asks the Decisions API and deny grants nothing (0.717865ms)
+2026-11-09T09:07:21.7560831Z ✔ judged reviews keep the pending cap (1.209346ms)
+2026-11-09T09:07:24.0244886Z ✔ a driver that closes its input before answering rejects the action without an unhandled error (2515.502606ms)
+2026-11-09T09:07:24.0314063Z ℹ tests 32
+2026-11-09T09:07:24.0314360Z ℹ suites 0
+2026-11-09T09:07:24.0314616Z ℹ pass 32
+2026-11-09T09:07:24.0314854Z ℹ fail 0
+2026-11-09T09:07:24.0315064Z ℹ cancelled 0
+2026-11-09T09:07:24.0315261Z ℹ skipped 0
+2026-11-09T09:07:24.0315523Z ℹ todo 0
+2026-11-09T09:07:24.0315821Z ℹ duration_ms 2572.276926
+2026-11-09T09:07:24.0421187Z ##[group]Run python3 scripts/e2b/lease-driver.test.py
+2026-11-09T09:07:24.0421708Z [36;1mpython3 scripts/e2b/lease-driver.test.py[0m
+2026-11-09T09:07:24.0446311Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:07:24.0446624Z env:
+2026-11-09T09:07:24.0446878Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:07:24.0447275Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:07:24.0447691Z ##[endgroup]
+2026-11-09T09:07:24.2045132Z .
+2026-11-09T09:07:24.2045793Z ----------------------------------------------------------------------
+2026-11-09T09:07:24.2046308Z Ran 1 test in 0.007s
+2026-11-09T09:07:24.2046538Z 
+2026-11-09T09:07:24.2047035Z OK
+2026-11-09T09:07:24.2224954Z ##[group]Run node --import ./scripts/server-test.mjs --import tsx --test packages/daemon/src/computer/web-review.node.ts
+2026-11-09T09:07:24.2226074Z [36;1mnode --import ./scripts/server-test.mjs --import tsx --test packages/daemon/src/computer/web-review.node.ts[0m
+2026-11-09T09:07:24.2251523Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:07:24.2251812Z env:
+2026-11-09T09:07:24.2252054Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:07:24.2252460Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:07:24.2252840Z ##[endgroup]
+2026-11-09T09:07:24.5488035Z ✔ web decision releases original MCP call and scripted model continues screenshot -> click; no raw driver or repeated execution (80.497288ms)
+2026-11-09T09:07:24.5547954Z ✔ review polling retries transport failures without granting and stops on abort (6.739138ms)
+2026-11-09T09:07:24.6524857Z ✔ idle review sync sends one cleanup, resumes for a pending call and retries the final cleanup (97.690686ms)
+2026-11-09T09:07:24.6664867Z ℹ tests 3
+2026-11-09T09:07:24.6665235Z ℹ suites 0
+2026-11-09T09:07:24.6665512Z ℹ pass 3
+2026-11-09T09:07:24.6665769Z ℹ fail 0
+2026-11-09T09:07:24.6666032Z ℹ cancelled 0
+2026-11-09T09:07:24.6666330Z ℹ skipped 0
+2026-11-09T09:07:24.6666602Z ℹ todo 0
+2026-11-09T09:07:24.6666941Z ℹ duration_ms 409.756841
+2026-11-09T09:07:24.6754143Z ##[group]Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts
+2026-11-09T09:07:24.6754757Z [36;1mnode --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts[0m
+2026-11-09T09:07:24.6773458Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:07:24.6773665Z env:
+2026-11-09T09:07:24.6773836Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:07:24.6774288Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:07:24.6775130Z   COMPUTER_TEST_DATABASE_URL: ***localhost:5432/computer_test
+2026-11-09T09:07:24.6775407Z ##[endgroup]
+2026-11-09T09:07:26.5535112Z Desktop GitHub credential helper not installed { sandboxId: 'sandbox-test' }
+2026-11-09T09:07:26.5571813Z Desktop GitHub credential helper not installed { sandboxId: 'sandbox-test' }
+2026-11-09T09:07:26.8921267Z {"msg":"cloud_run_model_missing","runId":"1947d493-3b5a-44eb-ad11-adb7308e8a50","threadRunId":"thread-fixture","issueId":"725eda9c-7194-4ca1-a360-2a93b6a0e3f4","agentId":"fe2463d0-043f-4143-88c0-678ec33429bd"}
+2026-11-09T09:07:26.8922796Z {"msg":"cloud_run_model_missing","runId":"426dd773-26b8-47de-90ae-7a6ec114f58e","threadRunId":"thread-fixture","issueId":"725eda9c-7194-4ca1-a360-2a93b6a0e3f4","agentId":"fe2463d0-043f-4143-88c0-678ec33429bd"}
+2026-11-09T09:07:26.8924110Z {"msg":"cloud_run_model_missing","runId":"23ec0410-65cc-4bb5-b84d-949f88043071","threadRunId":"thread-fixture","issueId":"725eda9c-7194-4ca1-a360-2a93b6a0e3f4","agentId":"fe2463d0-043f-4143-88c0-678ec33429bd"}
+2026-11-09T09:07:26.8925321Z {"msg":"cloud_run_model_missing","runId":"da334a12-1f42-422d-b40c-b1078f7781dd","threadRunId":"thread-fixture","issueId":"725eda9c-7194-4ca1-a360-2a93b6a0e3f4","agentId":"fe2463d0-043f-4143-88c0-678ec33429bd"}
+2026-11-09T09:07:27.1973236Z [device-gateway] long poll notification failed { deviceId: '5f236602-aa45-4d51-bee3-6f57229ea7d9' }
+2026-11-09T09:07:27.4528950Z Retained computer test schema: computer_5a3fa0eeec344197817b1aca63058dfb
+2026-11-09T09:07:27.4552025Z ✔ real PostgreSQL: allocation, owner boundary, control generations and recovery (1383.381903ms)
+2026-11-09T09:07:27.4559443Z {"level":"info","msg":"db_transport_sample","timestamp":"2026-11-09T09:07:27.455Z","runtime":"c94b9250-ffe7-4eca-8a59-5b1555c147bb","windowStart":"2026-11-09T09:07:26.633Z","windowEnd":"2026-11-09T09:07:27.455Z","elapsedMs":822,"measurement":"postgres_protocol_plaintext_received","pgProtocolReceiveBytes":778,"knownPgProtocolReceiveBytes":778,"connections":1,"scopes":["workspace"],"unknownReadings":0,"coverage":"observed_connections","startupExcluded":true,"excludes":["TLS","TCP","startup_before_registration","other_runtimes","Go_workers","supplier_metering"]}
+2026-11-09T09:07:27.9475884Z [live] gateway invalidation unavailable
+2026-11-09T09:08:27.2282405Z ℹ tests 1
+2026-11-09T09:08:27.2282640Z ℹ suites 0
+2026-11-09T09:08:27.2282829Z ℹ pass 1
+2026-11-09T09:08:27.2283009Z ℹ fail 0
+2026-11-09T09:08:27.2283187Z ℹ cancelled 0
+2026-11-09T09:08:27.2283397Z ℹ skipped 0
+2026-11-09T09:08:27.2283623Z ℹ todo 0
+2026-11-09T09:08:27.2283828Z ℹ duration_ms 62520.485121
+2026-11-09T09:08:27.2382865Z ##[group]Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/local-reviews.db.test.ts
+2026-11-09T09:08:27.2383866Z [36;1mnode --import ./scripts/server-test.mjs --import tsx --test lib/computer/local-reviews.db.test.ts[0m
+2026-11-09T09:08:27.2409352Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:08:27.2409700Z env:
+2026-11-09T09:08:27.2409952Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:08:27.2410367Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:08:27.2411203Z   COMPUTER_TEST_DATABASE_URL: ***localhost:5432/computer_test
+2026-11-09T09:08:27.2411648Z ##[endgroup]
+2026-11-09T09:08:27.7266444Z Retained local review test schema: local_review_3c641d015a684b6da182ee5c415b7df6
+2026-11-09T09:08:27.7292141Z ✔ local decisions bind owner, device, live run and exact digest, and cannot be replayed (218.287089ms)
+2026-11-09T09:08:27.7454652Z ℹ tests 1
+2026-11-09T09:08:27.7455040Z ℹ suites 0
+2026-11-09T09:08:27.7455326Z ℹ pass 1
+2026-11-09T09:08:27.7455701Z ℹ fail 0
+2026-11-09T09:08:27.7455978Z ℹ cancelled 0
+2026-11-09T09:08:27.7456274Z ℹ skipped 0
+2026-11-09T09:08:27.7456541Z ℹ todo 0
+2026-11-09T09:08:27.7456848Z ℹ duration_ms 473.215422
+2026-11-09T09:08:27.7547151Z ##[group]Run node --test tests/device-computer-migration.test.mjs
+2026-11-09T09:08:27.7547582Z [36;1mnode --test tests/device-computer-migration.test.mjs[0m
+2026-11-09T09:08:27.7566102Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:08:27.7566316Z env:
+2026-11-09T09:08:27.7566502Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:08:27.7566777Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:08:27.7567362Z   COMPUTER_TEST_DATABASE_URL: ***localhost:5432/computer_test
+2026-11-09T09:08:27.7567637Z ##[endgroup]
+2026-11-09T09:08:27.8688873Z ✔ local computer metadata migration preserves devices and reruns safely (24.074966ms)
+2026-11-09T09:08:27.8781657Z ℹ tests 1
+2026-11-09T09:08:27.8781955Z ℹ suites 0
+2026-11-09T09:08:27.8782223Z ℹ pass 1
+2026-11-09T09:08:27.8782466Z ℹ fail 0
+2026-11-09T09:08:27.8782714Z ℹ cancelled 0
+2026-11-09T09:08:27.8782984Z ℹ skipped 0
+2026-11-09T09:08:27.8783239Z ℹ todo 0
+2026-11-09T09:08:27.8783544Z ℹ duration_ms 90.020872
+2026-11-09T09:08:27.8879199Z ##[group]Run node --test tests/computer-policy-default-allow-migration.test.mjs
+2026-11-09T09:08:27.8879982Z [36;1mnode --test tests/computer-policy-default-allow-migration.test.mjs[0m
+2026-11-09T09:08:27.8905236Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:08:27.8905567Z env:
+2026-11-09T09:08:27.8905821Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:08:27.8906229Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:08:27.8907036Z   COMPUTER_TEST_DATABASE_URL: ***localhost:5432/computer_test
+2026-11-09T09:08:27.8907469Z ##[endgroup]
+2026-11-09T09:08:28.0125084Z ✔ computer policy migration retires ask: rows become allow, deny stays, new rows default to allow (28.902276ms)
+2026-11-09T09:08:28.0216216Z ℹ tests 1
+2026-11-09T09:08:28.0216582Z ℹ suites 0
+2026-11-09T09:08:28.0216867Z ℹ pass 1
+2026-11-09T09:08:28.0217135Z ℹ fail 0
+2026-11-09T09:08:28.0217410Z ℹ cancelled 0
+2026-11-09T09:08:28.0217700Z ℹ skipped 0
+2026-11-09T09:08:28.0217965Z ℹ todo 0
+2026-11-09T09:08:28.0218391Z ℹ duration_ms 98.778787
+2026-11-09T09:08:28.0300047Z ##[group]Run node --test packages/daemon/src/computer/local-grant.test.mjs
+2026-11-09T09:08:28.0300694Z [36;1mnode --test packages/daemon/src/computer/local-grant.test.mjs[0m
+2026-11-09T09:08:28.0319028Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:08:28.0319230Z env:
+2026-11-09T09:08:28.0319400Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:08:28.0319679Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:08:28.0319931Z ##[endgroup]
+2026-11-09T09:08:28.1135928Z ✔ local computer injection requires a driver, explicit permission and a writable run (2.056846ms)
+2026-11-09T09:08:28.1207442Z ℹ tests 1
+2026-11-09T09:08:28.1207757Z ℹ suites 0
+2026-11-09T09:08:28.1208029Z ℹ pass 1
+2026-11-09T09:08:28.1208229Z ℹ fail 0
+2026-11-09T09:08:28.1208398Z ℹ cancelled 0
+2026-11-09T09:08:28.1208761Z ℹ skipped 0
+2026-11-09T09:08:28.1208974Z ℹ todo 0
+2026-11-09T09:08:28.1209292Z ℹ duration_ms 59.282073
+2026-11-09T09:08:28.1289553Z ##[group]Run cd packages/daemon && node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts
+2026-11-09T09:08:28.1290358Z [36;1mcd packages/daemon && node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts[0m
+2026-11-09T09:08:28.1308200Z shell: /usr/bin/bash -e {0}
+2026-11-09T09:08:28.1308403Z env:
+2026-11-09T09:08:28.1308746Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T09:08:28.1309362Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T09:08:28.1309723Z   NODE_ENV: test
+2026-11-09T09:08:28.1309986Z   MIKKA_TEST_MODE: 1
+2026-11-09T09:08:28.1310332Z ##[endgroup]
+2026-11-09T09:08:29.5054056Z Retained local adapter test directory: /tmp/mikka-local-adapter-Hqgdrl
+2026-11-09T09:08:29.5070017Z ✔ claude_code receives only the per-run proxy supplied by the trusted host (202.135278ms)
+2026-11-09T09:08:29.6276111Z Retained local adapter test directory: /tmp/mikka-local-adapter-UK3yEe
+2026-11-09T09:08:29.6310511Z ✔ codex receives only the per-run proxy supplied by the trusted host (120.663957ms)
+2026-11-09T09:08:29.9376657Z Retained local adapter test directory: /tmp/mikka-local-adapter-DAfvc3
+2026-11-09T09:08:29.9390052Z ✔ cursor receives only the per-run proxy supplied by the trusted host (311.153569ms)
+2026-11-09T09:08:30.6869615Z Retained local computer daemon repository: /tmp/orvr-lw7clX
+2026-11-09T09:08:30.6870609Z {"actualDaemon":true,"actualCodexAdapter":true,"syntheticHarness":true,"localGrantInjected":true,"driverNotExposed":true,"runId":"52786d4e-51a0-4d46-9ac9-bff1d8ffb0db"}
+2026-11-09T09:08:30.6871320Z Retained local computer daemon fixture: /tmp/pr161-host-7LATFE
+2026-11-09T09:08:30.6872127Z ✔ actual daemon injects local authority and closes its own socket on stop (380.954216ms)
+2026-11-09T09:08:30.7155366Z ℹ tests 4
+2026-11-09T09:08:30.7155627Z ℹ suites 0
+2026-11-09T09:08:30.7155811Z ℹ pass 4
+2026-11-09T09:08:30.7155991Z ℹ fail 0
+2026-11-09T09:08:30.7156221Z ℹ cancelled 0
+2026-11-09T09:08:30.7156461Z ℹ skipped 0
+2026-11-09T09:08:30.7156716Z ℹ todo 0
+2026-11-09T09:08:30.7157025Z ℹ duration_ms 2553.043639
+2026-11-09T09:08:30.7300519Z Post job cleanup.
+2026-11-09T09:08:30.8337929Z (node:4004) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T09:08:30.8338833Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T09:08:30.8531665Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/Mikka/Mikka --files-from manifest.txt --use-compress-program zstdmt
+2026-11-09T09:08:45.3667990Z Failed to save: Unable to reserve cache with key node-cache-Linux-x64-pnpm-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9, another job may be creating this cache.
+2026-11-09T09:08:45.4588339Z Post job cleanup.
+2026-11-09T09:08:45.5784696Z Pruning is unnecessary.
+2026-11-09T09:08:45.5920861Z Post job cleanup.
+2026-11-09T09:08:45.6682224Z [command]/usr/bin/git version
+2026-11-09T09:08:45.6722115Z git version 2.56.0
+2026-11-09T09:08:45.6756806Z Temporarily overriding HOME='/home/runner/work/_temp/8a242f38-be7f-40a9-9e1b-eb126c6d4533' before making global git config changes
+2026-11-09T09:08:45.6757627Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T09:08:45.6761773Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T09:08:45.6802291Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T09:08:45.6837264Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T09:08:45.7087003Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T09:08:45.7116547Z http.https://github.com/.extraheader
+2026-11-09T09:08:45.7128421Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T09:08:45.7176928Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T09:08:45.7422965Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T09:08:45.7474918Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T09:08:45.7834992Z Print service container logs: da11c3ff5b6b45e79ffba3041b3abd1c_postgres17_bb8410
+2026-11-09T09:08:45.7839057Z ##[command]/usr/bin/docker logs --details 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41
+2026-11-09T09:08:45.7968655Z  The files belonging to this database system will be owned by user "postgres".
+2026-11-09T09:08:45.7969456Z  This user must also own the server process.
+2026-11-09T09:08:45.7971610Z  initdb: warning: enabling "trust" authentication for local connections
+2026-11-09T09:08:45.7972882Z  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-11-09T09:08:45.7973931Z  
+2026-11-09T09:08:45.7974725Z  2026-11-09 09:05:47.075 UTC [1] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-09T09:08:45.7975714Z  2026-11-09 09:05:47.075 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-09T09:08:45.7976335Z  2026-11-09 09:05:47.075 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-09T09:08:45.7977021Z  2026-11-09 09:05:47.089 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-09T09:08:45.7977763Z  2026-11-09 09:05:47.092 UTC [64] LOG:  database system was shut down at 2026-11-09 09:05:47 UTC
+2026-11-09T09:08:45.7978457Z  2026-11-09 09:05:47.095 UTC [1] LOG:  database system is ready to accept connections
+2026-11-09T09:08:45.7979230Z  2026-11-09 09:05:50.952 UTC [75] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7979766Z  2026-11-09 09:05:56.012 UTC [83] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7980295Z  2026-11-09 09:06:01.099 UTC [91] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7980807Z  2026-11-09 09:06:06.219 UTC [99] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7981340Z  2026-11-09 09:06:11.569 UTC [107] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7981869Z  2026-11-09 09:06:16.638 UTC [115] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7982394Z  2026-11-09 09:06:21.730 UTC [124] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7982913Z  2026-11-09 09:06:26.904 UTC [131] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7983438Z  2026-11-09 09:06:31.957 UTC [139] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7983953Z  2026-11-09 09:06:37.017 UTC [147] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7984475Z  2026-11-09 09:06:42.159 UTC [155] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7984944Z  2026-11-09 09:06:47.238 UTC [164] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7985521Z  2026-11-09 09:06:52.299 UTC [171] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7986052Z  2026-11-09 09:06:57.364 UTC [179] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7986592Z  2026-11-09 09:07:02.420 UTC [187] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7987124Z  2026-11-09 09:07:07.480 UTC [195] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7987657Z  2026-11-09 09:07:12.546 UTC [203] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7988203Z  2026-11-09 09:07:17.605 UTC [212] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7988836Z  2026-11-09 09:07:22.657 UTC [220] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7989634Z  2026-11-09 09:07:27.114 UTC [222] ERROR:  insert or update on table "byos_native_runs" violates foreign key constraint "byos_native_runs_bindingId_fkey"
+2026-11-09T09:08:45.7990533Z  2026-11-09 09:07:27.114 UTC [222] DETAIL:  Key (bindingId)=(d2fb2ccb-3b73-4949-ae4e-3ce1a297e406) is not present in table "byos_bindings".
+2026-11-09T09:08:45.7991152Z  2026-11-09 09:07:27.114 UTC [222] STATEMENT:  INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)
+2026-11-09T09:08:45.7991843Z  2026-11-09 09:07:27.236 UTC [222] ERROR:  new row for relation "workspace_computer_policies" violates check constraint "workspace_computer_policies_permission_check"
+2026-11-09T09:08:45.7992833Z  2026-11-09 09:07:27.236 UTC [222] DETAIL:  Failing row contains (47880c98-3890-4997-8aad-fc189b145039, ask, 1, 2026-11-09 09:07:27.232276+00).
+2026-11-09T09:08:45.7993507Z  2026-11-09 09:07:27.236 UTC [222] STATEMENT:  UPDATE workspace_computer_policies SET permission=$2 WHERE "workspaceId"=$1
+2026-11-09T09:08:45.7994282Z  2026-11-09 09:07:27.303 UTC [223] ERROR:  insert or update on table "computer_run_bindings" violates foreign key constraint "computer_run_bindings_botId_workspaceId_ownerId_fkey"
+2026-11-09T09:08:45.7995198Z  2026-11-09 09:07:27.303 UTC [223] DETAIL:  Key (botId, workspaceId, ownerId)=(d042d43d-526f-4e9c-b163-d9424d3f9238, 2757730f-e1f8-417a-bf6e-76e5f07c3a82, alice) is not present in table "bots".
+2026-11-09T09:08:45.7996113Z  2026-11-09 09:07:27.303 UTC [223] STATEMENT:  INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)
+2026-11-09T09:08:45.7996640Z  2026-11-09 09:07:27.710 UTC [235] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7996991Z  2026-11-09 09:07:32.764 UTC [243] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7997321Z  2026-11-09 09:07:37.819 UTC [251] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7997653Z  2026-11-09 09:07:42.872 UTC [259] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7997988Z  2026-11-09 09:07:47.924 UTC [268] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7998326Z  2026-11-09 09:07:52.976 UTC [276] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.7999534Z  2026-11-09 09:07:58.028 UTC [284] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.8000015Z  2026-11-09 09:08:03.082 UTC [292] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.8000506Z  2026-11-09 09:08:08.135 UTC [301] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.8000870Z  2026-11-09 09:08:13.187 UTC [309] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.8001162Z  2026-11-09 09:08:18.240 UTC [317] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.8001457Z  2026-11-09 09:08:23.293 UTC [325] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.8001788Z  2026-11-09 09:08:27.181 UTC [226] FATAL:  canceling authentication due to timeout
+2026-11-09T09:08:45.8002368Z  2026-11-09 09:08:28.007 UTC [331] ERROR:  new row for relation "workspace_computer_policies" violates check constraint "workspace_computer_policies_permission_check"
+2026-11-09T09:08:45.8003066Z  2026-11-09 09:08:28.007 UTC [331] DETAIL:  Failing row contains (f66b8ed6-5660-4ea7-bf98-6b12a126b171, ask, 0, 2026-11-09 09:08:27.99781+00).
+2026-11-09T09:08:45.8003669Z  2026-11-09 09:08:28.007 UTC [331] STATEMENT:  update workspace_computer_policies set permission='ask' where "workspaceId"=$1
+2026-11-09T09:08:45.8004125Z  2026-11-09 09:08:28.358 UTC [339] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.8004427Z  2026-11-09 09:08:33.562 UTC [346] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.8004728Z  2026-11-09 09:08:38.665 UTC [353] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.8005017Z  2026-11-09 09:08:43.742 UTC [361] FATAL:  role "root" does not exist
+2026-11-09T09:08:45.8005337Z  The database cluster will be initialized with locale "en_US.utf8".
+2026-11-09T09:08:45.8005675Z  The default database encoding has accordingly been set to "UTF8".
+2026-11-09T09:08:45.8006168Z  The default text search configuration will be set to "english".
+2026-11-09T09:08:45.8006436Z  
+2026-11-09T09:08:45.8006604Z  Data page checksums are disabled.
+2026-11-09T09:08:45.8006801Z  
+2026-11-09T09:08:45.8007040Z  fixing permissions on existing directory /var/lib/postgresql/data ... ok
+2026-11-09T09:08:45.8007343Z  creating subdirectories ... ok
+2026-11-09T09:08:45.8007600Z  selecting dynamic shared memory implementation ... posix
+2026-11-09T09:08:45.8007884Z  selecting default "max_connections" ... 100
+2026-11-09T09:08:45.8008123Z  selecting default "shared_buffers" ... 128MB
+2026-11-09T09:08:45.8008357Z  selecting default time zone ... Etc/UTC
+2026-11-09T09:08:45.8008761Z  creating configuration files ... ok
+2026-11-09T09:08:45.8009144Z  running bootstrap script ... ok
+2026-11-09T09:08:45.8009387Z  performing post-bootstrap initialization ... ok
+2026-11-09T09:08:45.8009640Z  syncing data to disk ... ok
+2026-11-09T09:08:45.8009823Z  
+2026-11-09T09:08:45.8009966Z  
+2026-11-09T09:08:45.8010154Z  Success. You can now start the database server using:
+2026-11-09T09:08:45.8010387Z  
+2026-11-09T09:08:45.8010575Z      pg_ctl -D /var/lib/postgresql/data -l logfile start
+2026-11-09T09:08:45.8010807Z  
+2026-11-09T09:08:45.8011297Z  waiting for server to start....2026-11-09 09:05:46.772 UTC [48] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-09T09:08:45.8012052Z  2026-11-09 09:05:46.773 UTC [48] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-09T09:08:45.8012476Z  2026-11-09 09:05:46.775 UTC [51] LOG:  database system was shut down at 2026-11-09 09:05:46 UTC
+2026-11-09T09:08:45.8012867Z  2026-11-09 09:05:46.778 UTC [48] LOG:  database system is ready to accept connections
+2026-11-09T09:08:45.8013157Z   done
+2026-11-09T09:08:45.8013322Z  server started
+2026-11-09T09:08:45.8013491Z  CREATE DATABASE
+2026-11-09T09:08:45.8013652Z  
+2026-11-09T09:08:45.8013795Z  
+2026-11-09T09:08:45.8014048Z  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+2026-11-09T09:08:45.8014348Z  
+2026-11-09T09:08:45.8014624Z  waiting for server to shut down...2026-11-09 09:05:46.953 UTC [48] LOG:  received fast shutdown request
+2026-11-09T09:08:45.8015022Z  .2026-11-09 09:05:46.953 UTC [48] LOG:  aborting any active transactions
+2026-11-09T09:08:45.8015461Z  2026-11-09 09:05:46.955 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
+2026-11-09T09:08:45.8015862Z  2026-11-09 09:05:46.956 UTC [49] LOG:  shutting down
+2026-11-09T09:08:45.8016155Z  2026-11-09 09:05:46.956 UTC [49] LOG:  checkpoint starting: shutdown immediate
+2026-11-09T09:08:45.8016942Z  2026-11-09 09:05:47.038 UTC [49] LOG:  checkpoint complete: wrote 925 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.066 s, sync=0.016 s, total=0.083 s; sync files=301, longest=0.013 s, average=0.001 s; distance=4256 kB, estimate=4256 kB; lsn=0/19179B0, redo lsn=0/19179B0
+2026-11-09T09:08:45.8017753Z  2026-11-09 09:05:47.045 UTC [48] LOG:  database system is shut down
+2026-11-09T09:08:45.8018009Z   done
+2026-11-09T09:08:45.8018163Z  server stopped
+2026-11-09T09:08:45.8018328Z  
+2026-11-09T09:08:45.8018520Z  PostgreSQL init process complete; ready for start up.
+2026-11-09T09:08:45.8019006Z  
+2026-11-09T09:08:45.8024232Z Stop and remove container: da11c3ff5b6b45e79ffba3041b3abd1c_postgres17_bb8410
+2026-11-09T09:08:45.8028405Z ##[command]/usr/bin/docker rm --force 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41
+2026-11-09T09:08:46.2065821Z 8f9bd902981d40d7fdb86d220d35827e9f5db6e046908b6a7e91d28593b47c41
+2026-11-09T09:08:46.2095762Z Remove container network: github_network_2467c8018465494192ffe9542212b62e
+2026-11-09T09:08:46.2099316Z ##[command]/usr/bin/docker network rm github_network_2467c8018465494192ffe9542212b62e
+2026-11-09T09:08:46.3081492Z github_network_2467c8018465494192ffe9542212b62e
+2026-11-09T09:08:46.3146227Z Cleaning up orphan processes
+2026-11-09T09:08:46.3443554Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -1,0 +1,89 @@
+{
+  "method": "Root independently sums every frozen per-suite ledger against original full selection; does not redownload original PG job logs.",
+  "selected": 72,
+  "rows": 72,
+  "totalSummaries": 91,
+  "missing": [],
+  "extra": [],
+  "duplicates": [],
+  "sum": {
+    "tests": 3789,
+    "pass": 3789,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "valid": true,
+  "source": {
+    "prHead": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+    "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+    "treeEqualsCandidate": true,
+    "treeAndParentsEvidence": "Root independently read exact Git commit API; parents [main0415, c0e94d], tree3e09885 equals candidate. This reviewer binds each job independently by its original git log -1 result.",
+    "selection": {
+      "blob": "db30d852aee662f01f591884fb8d2c222ebadff9",
+      "bytes": 387694,
+      "sha256": "046925f40a816cde262479ec27884b9c0887ea393b742eb02ed58b9afd7f7e09",
+      "full": true,
+      "suiteCount": 72,
+      "rawSelectionJobReadByThisReviewer": false,
+      "providedBy": "root frozen JSON; this reviewer fetched and independently checked bytes/SHA256/Git blob"
+    },
+    "directlyReadSourceContracts": [
+      {
+        "path": "scripts/run-db-tests.mjs",
+        "checkout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+        "bytes": 37271,
+        "sha256": "7f54e6d9c241f6c60056f2c1c1d2f9b82c398638c4e31713894ce7c8168286f3",
+        "gitBlob": "2d797fb4603f4e668b56439e7dea11d6065dbd46"
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "checkout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+        "bytes": 11425,
+        "sha256": "e4f1ee4f90de93ce22f74e5dc97a3475816a5d2a932b0d327ee2441953224d51",
+        "gitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "checkout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+        "bytes": 21505,
+        "sha256": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d",
+        "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530"
+      },
+      {
+        "path": "lib/abuse/store.db.test.ts",
+        "checkout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+        "bytes": 22283,
+        "sha256": "0076394e5cf1118e8c2c8c18969567f9da8c5cacb017f500d5ae43992e16ec9d",
+        "gitBlob": "04792f1c02a965cabff134f30f938d14c97d62aa"
+      },
+      {
+        "path": "drizzle/20261030230000_hosted_usage.sql",
+        "checkout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+        "bytes": 3583,
+        "sha256": "aaee2b4ce0f8e540262b002ffe404afb4ca9b96fe574b4f0f4c1bd016fb925a0",
+        "gitBlob": "41c55d332822f397f51a75eb95bdeafc2abc685a"
+      }
+    ]
+  },
+  "ledger": {
+    "sha": "51e5a2448154b0e8b20f1275a30ee580df3a65d6",
+    "bytes": 305834,
+    "sha256": "1a3a03931c6bb7d2453285f85371c00daf6ac57af89b483a49282c9dbc6375f2"
+  },
+  "independentCountsArrayReconciliation": {
+    "checkedMetricCells": 546,
+    "summaryCount": 91,
+    "totals": {
+      "tests": 3789,
+      "pass": 3789,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "everyIndividualSummaryPass": true
+  }
+}

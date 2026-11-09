@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "runId": 42590712093,
+  "jobId": 129074068433,
+  "jobConclusion": "success",
+  "headRevision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+  "headTree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+  "actualCheckout": {
+    "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+    "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+    "parents": [
+      "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "c0e94d594f1ecf4f5edc25904912702e61fce86b"
+    ],
+    "ownLog": {
+      "path": "job-129074068433.original.log",
+      "jobId": 129074068433,
+      "kind": "Apple Silicon Native",
+      "bytes": 251108,
+      "sha256": "2dbd6b5474333466e34800ba2fe51c0bf9bbe8179a221303285f91ad92e67832",
+      "gitBlobSha1": "ef9afeb0e14072ec65d3dd1473875912c63a14e0",
+      "bomPreserved": true,
+      "ansiPresent": true,
+      "logTimestampRange": {
+        "first": "2026-11-09T09:12:02.1371280Z",
+        "last": "2026-11-09T09:31:13.2016140Z"
+      },
+      "checkoutCandidates": [
+        {
+          "line": 156,
+          "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+          "timestamp": "2026-11-09T09:12:11.8295130Z"
+        }
+      ],
+      "privacyFindings": [],
+      "unresolvedFindings": 0
+    },
+    "sameTreeAsPublishedHead": true
+  },
+  "artifactIdentity": {
+    "lifecycle": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+    "querySource": {
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "platform": "darwin",
+      "arch": "arm64",
+      "runtime": "nitro",
+      "pid": 34161,
+      "process": "primary API shared by lifecycle bundled, hosted and Chromium"
+    },
+    "parityApp": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+    "parityHarness": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+    "renderers": {
+      "bundled": {
+        "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+        "mode": "bundled",
+        "url": "mikka://app/mikka",
+        "backend": "http://localhost:3000"
+      },
+      "hosted": {
+        "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+        "mode": "hosted",
+        "url": "http://localhost:3000/mikka",
+        "backend": "http://localhost:3000"
+      }
+    }
+  },
+  "installedDaemon": {
+    "lifecycle": [
+      {
+        "mode": "bundled",
+        "ready": true,
+        "navigationInterruptions": 0,
+        "daemon": {
+          "source": "local_daemon_hello",
+          "status": "connected",
+          "daemonVersion": "0.0.551",
+          "protocolVersion": 3
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.551",
+          "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9"
+        },
+        "profileMatches": true,
+        "overrideMatches": true
+      },
+      {
+        "mode": "hosted",
+        "ready": true,
+        "navigationInterruptions": 0,
+        "daemon": {
+          "source": "local_daemon_hello",
+          "status": "connected",
+          "daemonVersion": "0.0.551",
+          "protocolVersion": 3
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.551",
+          "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9"
+        },
+        "profileMatches": true,
+        "overrideMatches": true
+      }
+    ],
+    "parity": [
+      {
+        "mode": "bundled",
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.551",
+          "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9"
+        }
+      },
+      {
+        "mode": "hosted",
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.551",
+          "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9"
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "Installed daemon version/revision are observations in this artifact, not inferred from the application revision.",
+    "This receipt establishes CI Native evidence, not production acceptance."
+  ]
+}

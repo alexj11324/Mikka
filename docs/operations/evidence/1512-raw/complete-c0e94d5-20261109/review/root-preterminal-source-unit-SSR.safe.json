@@ -1,0 +1,619 @@
+{
+  "version": 1,
+  "phase": "terminal-source-unit-and-SSR-gates_while-image-and-Native-pending",
+  "head": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+  "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+  "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+  "run": 42590712093,
+  "rootLogFiles": [
+    {
+      "role": "source",
+      "path": "source.original.log",
+      "sha": "9c96f80bfc4fd8003eccbedc6f7a8848ef13b46a",
+      "bytes": 134845,
+      "sha256": "5da66e3c6e81c3285a4a634cbc8978233eff1eecde7cd9204c6806b5b409345b",
+      "job": 129071734751,
+      "run": 42590712093
+    },
+    {
+      "role": "core",
+      "path": "core.original.log",
+      "sha": "9346d233acddb2e3833f1405d7faa461544c0610",
+      "bytes": 1004245,
+      "sha256": "b8ae94a0136e9f00cb5e2a94710e26c7a314e6cbbb1d53d511a1169dc31c54ca",
+      "job": 129071734650,
+      "run": 42590712093
+    },
+    {
+      "role": "integration",
+      "path": "integration.original.log",
+      "sha": "8a335347e0dca1f36440bbc91e79469f48b0a7e4",
+      "bytes": 661481,
+      "sha256": "16c57308bcfa2492c265e320cb8c5c47294cc8d871c1343dadfb9113cc7fdff3",
+      "job": 129071734880,
+      "run": 42590712093
+    },
+    {
+      "role": "daemon",
+      "path": "daemon.original.log",
+      "sha": "6ebc18f2a5bbd8c50ce75bae1d9df98b76a713b8",
+      "bytes": 125938,
+      "sha256": "b71239bd47e5c385667ca60901b1d00d0f48e81eaab24e931446be91692a070b",
+      "job": 129071734836,
+      "run": 42590712093
+    },
+    {
+      "role": "desktopChecks",
+      "path": "desktopChecks.original.log",
+      "sha": "470e66731882bea6e88906db055781dee94121f6",
+      "bytes": 102945,
+      "sha256": "fa77c50aee2888e3e908e01123c153133eca9ace45ff223d265d75096428923b",
+      "job": 129072322179,
+      "run": 42590712093
+    },
+    {
+      "role": "desktopSmoke",
+      "path": "desktopSmoke.original.log",
+      "sha": "3a224100ad6f12b46a23868d01a8c4d5a5452cfa",
+      "bytes": 309628,
+      "sha256": "3d2c2cfa848312ce8437ba94415bb4bb3b8dd6ecf2d23ff9d414f8dfaf151b97",
+      "job": 129072322174,
+      "run": 42590712093
+    },
+    {
+      "role": "analyticsSSR",
+      "path": "analyticsSSR.original.log",
+      "sha": "500c3f46d978e5dc9914fb08a761eb4c33683864",
+      "bytes": 226240,
+      "sha256": "b343952b70fba31194c49e55fb0085aa2f62d063b7286c4d5a68153fe177d24c",
+      "job": 129072205951,
+      "run": 42590712093
+    }
+  ],
+  "source": {
+    "metrics": [
+      "ℹ tests 46",
+      "ℹ pass 46",
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 0",
+      "ℹ todo 0",
+      "ℹ tests 7",
+      "ℹ pass 7",
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 0",
+      "ℹ todo 0",
+      "ℹ tests 29",
+      "ℹ pass 29",
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 0",
+      "ℹ todo 0",
+      "ℹ tests 55",
+      "ℹ pass 55",
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 0",
+      "ℹ todo 0",
+      "ℹ tests 87",
+      "ℹ pass 87",
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 0",
+      "ℹ todo 0",
+      "# tests 69",
+      "# pass 69",
+      "# fail 0",
+      "# cancelled 0",
+      "# skipped 0",
+      "# todo 0",
+      "ℹ tests 45",
+      "ℹ pass 45",
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 0",
+      "ℹ todo 0"
+    ],
+    "canonicalGeneratorChecked": true,
+    "lintCode": true,
+    "typecheck": true,
+    "uiAudit": "3205 business files style-scanned; 532 files interaction-scanned (including business blocks); 0 errors. 287 component-library files excluded from style checks only. No upstream source verification."
+  },
+  "units": {
+    "core": {
+      "selected": 57,
+      "actualCount": 57,
+      "uniqueActual": 57,
+      "missing": [],
+      "extra": [],
+      "errors": [],
+      "nodeSummaryTests": 92,
+      "nodeTotals": {
+        "tests": 4647,
+        "pass": 4647,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "successfulNxSummary": [
+        " NX   Successfully ran targets core-2, core-3, core-4, core-5, core-6, core-7, core-8, core-9, core-10, core-11, core-12, core-13, core-14, core-15, core-16, core-17, core-18, core-19, core-20, core-21, core-22, core-23, core-24, core-25, core-26, core-27, core-28, core-29, core-30, core-31, core-32, core-33, core-34, core-35, core-36, core-37, core-38, core-39, core-40, core-41, core-42, core-43, core-44, core-45, core-46, core-47, core-48, core-49, core-50, core-51, core-52, core-53, core-54, core-55, core-56, core-57, core-triage for project ci-tasks"
+      ],
+      "skipNxCache": true,
+      "actualTargets": [
+        "ci-tasks:core-2",
+        "ci-tasks:core-3",
+        "ci-tasks:core-4",
+        "ci-tasks:core-5",
+        "ci-tasks:core-6",
+        "ci-tasks:core-7",
+        "ci-tasks:core-8",
+        "ci-tasks:core-9",
+        "ci-tasks:core-10",
+        "ci-tasks:core-11",
+        "ci-tasks:core-12",
+        "ci-tasks:core-13",
+        "ci-tasks:core-14",
+        "ci-tasks:core-15",
+        "ci-tasks:core-16",
+        "ci-tasks:core-17",
+        "ci-tasks:core-18",
+        "ci-tasks:core-19",
+        "ci-tasks:core-20",
+        "ci-tasks:core-21",
+        "ci-tasks:core-22",
+        "ci-tasks:core-23",
+        "ci-tasks:core-24",
+        "ci-tasks:core-25",
+        "ci-tasks:core-26",
+        "ci-tasks:core-27",
+        "ci-tasks:core-28",
+        "ci-tasks:core-29",
+        "ci-tasks:core-30",
+        "ci-tasks:core-31",
+        "ci-tasks:core-32",
+        "ci-tasks:core-33",
+        "ci-tasks:core-34",
+        "ci-tasks:core-35",
+        "ci-tasks:core-36",
+        "ci-tasks:core-37",
+        "ci-tasks:core-38",
+        "ci-tasks:core-39",
+        "ci-tasks:core-40",
+        "ci-tasks:core-41",
+        "ci-tasks:core-42",
+        "ci-tasks:core-43",
+        "ci-tasks:core-44",
+        "ci-tasks:core-45",
+        "ci-tasks:core-46",
+        "ci-tasks:core-47",
+        "ci-tasks:core-48",
+        "ci-tasks:core-49",
+        "ci-tasks:core-50",
+        "ci-tasks:core-51",
+        "ci-tasks:core-52",
+        "ci-tasks:core-53",
+        "ci-tasks:core-54",
+        "ci-tasks:core-55",
+        "ci-tasks:core-56",
+        "ci-tasks:core-57",
+        "ci-tasks:core-triage"
+      ]
+    },
+    "integration": {
+      "selected": 29,
+      "actualCount": 29,
+      "uniqueActual": 29,
+      "missing": [],
+      "extra": [],
+      "errors": [],
+      "nodeSummaryTests": 59,
+      "nodeTotals": {
+        "tests": 2196,
+        "pass": 2184,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 12,
+        "todo": 0
+      },
+      "successfulNxSummary": [
+        " NX   Successfully ran targets integration-2, integration-3, integration-4, integration-5, integration-6, integration-7, integration-8, integration-9, integration-10, integration-11, integration-12, integration-13, integration-14, integration-15, integration-16, integration-17, integration-18, integration-19, integration-20, integration-21, integration-22, integration-23, integration-24, integration-25, integration-26, integration-27, integration-28, integration-29, integration-factory-activity for project ci-tasks"
+      ],
+      "skipNxCache": true,
+      "actualTargets": [
+        "ci-tasks:integration-2",
+        "ci-tasks:integration-3",
+        "ci-tasks:integration-4",
+        "ci-tasks:integration-5",
+        "ci-tasks:integration-6",
+        "ci-tasks:integration-7",
+        "ci-tasks:integration-8",
+        "ci-tasks:integration-9",
+        "ci-tasks:integration-10",
+        "ci-tasks:integration-11",
+        "ci-tasks:integration-12",
+        "ci-tasks:integration-13",
+        "ci-tasks:integration-14",
+        "ci-tasks:integration-15",
+        "ci-tasks:integration-16",
+        "ci-tasks:integration-17",
+        "ci-tasks:integration-18",
+        "ci-tasks:integration-19",
+        "ci-tasks:integration-20",
+        "ci-tasks:integration-21",
+        "ci-tasks:integration-22",
+        "ci-tasks:integration-23",
+        "ci-tasks:integration-24",
+        "ci-tasks:integration-25",
+        "ci-tasks:integration-26",
+        "ci-tasks:integration-27",
+        "ci-tasks:integration-28",
+        "ci-tasks:integration-29",
+        "ci-tasks:integration-factory-activity"
+      ],
+      "nonzeroSummaryCounters": [
+        "ci-tasks: ℹ skipped 1",
+        "ci-tasks: ℹ skipped 1",
+        "ci-tasks: ℹ skipped 9",
+        "ci-tasks: ℹ skipped 1"
+      ],
+      "skippedTitles": [
+        "ci-tasks: ﹣ active agents on the database (0.453808ms) # SKIP",
+        "ci-tasks: ﹣ Postgres17 migration, atomic history, pagination, unread counts, membership and privacy (0.048218ms) # SKIP",
+        "ci-tasks: ﹣ PG: scoped decision traces, exact event counting, human feedback, revoked memberships and privacy (0.667202ms) # SKIP",
+        "ci-tasks: ﹣ PG: group delegation has one Task/Thread, requester scope, replay receipt, latest epoch, status/stop and one reporter (0.652474ms) # SKIP",
+        "ci-tasks: ﹣ PG: real Factory flow 2 deliverable acceptance publishes one final report with current-epoch artifact and producer thread (0.188143ms) # SKIP",
+        "ci-tasks: ﹣ PG: real Factory flow 2 repository acceptance publishes one final report with current-epoch artifact and producer thread (0.066289ms) # SKIP",
+        "ci-tasks: ﹣ PG: real Factory flow 1 deliverable acceptance publishes one final report with current-epoch artifact and producer thread (0.067337ms) # SKIP",
+        "ci-tasks: ﹣ PG: real Factory flow 1 repository acceptance publishes one final report with current-epoch artifact and producer thread (0.051567ms) # SKIP",
+        "ci-tasks: ﹣ PG: production group Factory authorization uses typed Bot membership and rechecks both current workspace owners (0.054946ms) # SKIP",
+        "ci-tasks: ﹣ PG17: group sessions own different backends and close releases reentrant locks even after a socket loss (0.044999ms) # SKIP",
+        "ci-tasks: ﹣ PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy (0.031909ms) # SKIP",
+        "ci-tasks: ﹣ the demo replies use every component the bot can use (0.097133ms) # SKIP"
+      ],
+      "nonzeroCounterDisposition": "12 explicit skips in mixed non-DB integration execution; kept distinct from selected PG72/3789 which executed without skips. Not treated as CI errors or hidden."
+    }
+  },
+  "isolatedRegressionGapsClosed": {
+    "version": 1,
+    "source": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+    "job": 129072322179,
+    "canonicalCommand": "pnpm --filter @mikka/desktop test -> node --test scripts/*.test.mjs (plus existing explicit files)",
+    "testSource": {
+      "sha": "c86aa78a70a1b9e219e69ee0fcfad71ac6d5059d",
+      "bytes": 14352,
+      "sha256": "766eacc9b1f5e145ec04efb52cdf682221b2b510c9fc79f7dcc404fa3d6f0567"
+    },
+    "testPath": "apps/desktop/scripts/read-batch.test.mjs",
+    "topLevelTests": 13,
+    "allTopLevelTitlesObservedPassed": true,
+    "tests": [
+      {
+        "name": "Native coalesces allowed reads in one turn with one codec pass and ordered results",
+        "passed": true
+      },
+      {
+        "name": "one startup read wave stays together across the real hydration gates used by SWR and list fetchers",
+        "passed": true
+      },
+      {
+        "name": "single reads, excluded actions and Web keep their ordinary single-request path without a read cache",
+        "passed": true
+      },
+      {
+        "name": "Native splits at sixteen items and captures each locale before the posted flush",
+        "passed": true
+      },
+      {
+        "name": "only an exact unknown batch action on 404 falls back and disables batching for this page",
+        "passed": true
+      },
+      {
+        "name": "batch HTTP and network failures do not retry or fall back",
+        "passed": true
+      },
+      {
+        "name": "batch item failures retain their own error and status without failing successful siblings",
+        "passed": true
+      },
+      {
+        "name": "malformed batch item count or shape rejects every item without retrying",
+        "passed": true
+      },
+      {
+        "name": "scope reset after a microtask rejects unsent old-identity reads before the posted flush",
+        "passed": true
+      },
+      {
+        "name": "workspace selector changes cannot pair queued arguments with the new workspace before React effects run",
+        "passed": true
+      },
+      {
+        "name": "explicit isCurrent guards drop stale queued reads and remain independent from other guards",
+        "passed": true
+      },
+      {
+        "name": "retired in-flight batches cannot change current transport state or trigger old-server fallback",
+        "passed": true
+      },
+      {
+        "name": "an isCurrent change while a batch body is pending prevents stale results and state updates",
+        "passed": true
+      }
+    ],
+    "wholeJob": {
+      "nodeSummaries": [
+        156,
+        280,
+        46,
+        10
+      ],
+      "protocolVitest": 4,
+      "typecheck": true,
+      "lint": true,
+      "build": true,
+      "uiLint": true
+    },
+    "minimalVmGapNowCoveredByFormalCI": true,
+    "original": {
+      "path": "desktopChecks.original.log",
+      "sha": "470e66731882bea6e88906db055781dee94121f6",
+      "bytes": 102945,
+      "sha256": "fa77c50aee2888e3e908e01123c153133eca9ace45ff223d265d75096428923b",
+      "job": 129072322179,
+      "run": 42590712093
+    }
+  },
+  "analytics": [
+    {
+      "target": "web",
+      "rendererBuild": "10ec794018d1c516a9b96ccfe3ed60275dbce393f5563fb0722b8b699f291b21",
+      "actions": 165,
+      "exports": 215,
+      "serverModules": []
+    },
+    {
+      "routes": 243,
+      "methods": 315
+    },
+    {
+      "status": "built",
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "preset": "node-server",
+      "functions": 0,
+      "resources": 51
+    },
+    {
+      "status": "pass",
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "assets": 852,
+      "runtimeResources": {
+        "count": 51,
+        "required": [
+          "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "packages/daemon/scripts/refresh-cloud-worker.py",
+          "scripts/e2b/inspect-retained-deliverable.mjs"
+        ]
+      }
+    },
+    {
+      "revision": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "runtime": "vite-nitro",
+      "analytics": "synthetic-enabled-network-blocked",
+      "assetManifestSha256": "e859a1123f93497f52734695148d0f3e5429cc23fffc3e833d584685b7ea6333",
+      "runtimeResources": {
+        "count": 51,
+        "required": [
+          "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "packages/daemon/scripts/refresh-cloud-worker.py",
+          "scripts/e2b/inspect-retained-deliverable.mjs"
+        ]
+      },
+      "paths": [
+        {
+          "path": "/mikka",
+          "locale": "zh-CN",
+          "status": "pass",
+          "loadedAssets": 61,
+          "blockedExternalRequests": 7,
+          "pageErrors": 0
+        },
+        {
+          "path": "/mikka/sign-in",
+          "locale": "zh-CN",
+          "status": "pass",
+          "loadedAssets": 61,
+          "blockedExternalRequests": 6,
+          "pageErrors": 0
+        },
+        {
+          "path": "/mikka/en/sign-in",
+          "locale": "en",
+          "status": "pass",
+          "loadedAssets": 61,
+          "blockedExternalRequests": 6,
+          "pageErrors": 0
+        }
+      ]
+    }
+  ],
+  "databaseRootReconciliation": {
+    "method": "Root independently sums every frozen per-suite ledger against original full selection; does not redownload original PG job logs.",
+    "selected": 72,
+    "rows": 72,
+    "totalSummaries": 91,
+    "missing": [],
+    "extra": [],
+    "duplicates": [],
+    "sum": {
+      "tests": 3789,
+      "pass": 3789,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "valid": true,
+    "source": {
+      "prHead": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+      "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+      "treeEqualsCandidate": true,
+      "treeAndParentsEvidence": "Root independently read exact Git commit API; parents [main0415, c0e94d], tree3e09885 equals candidate. This reviewer binds each job independently by its original git log -1 result.",
+      "selection": {
+        "blob": "db30d852aee662f01f591884fb8d2c222ebadff9",
+        "bytes": 387694,
+        "sha256": "046925f40a816cde262479ec27884b9c0887ea393b742eb02ed58b9afd7f7e09",
+        "full": true,
+        "suiteCount": 72,
+        "rawSelectionJobReadByThisReviewer": false,
+        "providedBy": "root frozen JSON; this reviewer fetched and independently checked bytes/SHA256/Git blob"
+      },
+      "directlyReadSourceContracts": [
+        {
+          "path": "scripts/run-db-tests.mjs",
+          "checkout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+          "bytes": 37271,
+          "sha256": "7f54e6d9c241f6c60056f2c1c1d2f9b82c398638c4e31713894ce7c8168286f3",
+          "gitBlob": "2d797fb4603f4e668b56439e7dea11d6065dbd46"
+        },
+        {
+          "path": "lib/device-unit-fence.db.test.ts",
+          "checkout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+          "bytes": 11425,
+          "sha256": "e4f1ee4f90de93ce22f74e5dc97a3475816a5d2a932b0d327ee2441953224d51",
+          "gitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+        },
+        {
+          "path": "lib/device-heartbeat.db.test.ts",
+          "checkout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+          "bytes": 21505,
+          "sha256": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d",
+          "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530"
+        },
+        {
+          "path": "lib/abuse/store.db.test.ts",
+          "checkout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+          "bytes": 22283,
+          "sha256": "0076394e5cf1118e8c2c8c18969567f9da8c5cacb017f500d5ae43992e16ec9d",
+          "gitBlob": "04792f1c02a965cabff134f30f938d14c97d62aa"
+        },
+        {
+          "path": "drizzle/20261030230000_hosted_usage.sql",
+          "checkout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+          "bytes": 3583,
+          "sha256": "aaee2b4ce0f8e540262b002ffe404afb4ca9b96fe574b4f0f4c1bd016fb925a0",
+          "gitBlob": "41c55d332822f397f51a75eb95bdeafc2abc685a"
+        }
+      ]
+    },
+    "ledger": {
+      "sha": "51e5a2448154b0e8b20f1275a30ee580df3a65d6",
+      "bytes": 305834,
+      "sha256": "1a3a03931c6bb7d2453285f85371c00daf6ac57af89b483a49282c9dbc6375f2"
+    },
+    "independentCountsArrayReconciliation": {
+      "checkedMetricCells": 546,
+      "summaryCount": 91,
+      "totals": {
+        "tests": 3789,
+        "pass": 3789,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "everyIndividualSummaryPass": true
+    }
+  },
+  "companion": {
+    "index": {
+      "sha": "cd10793e99736bd70c0381f056067384e4748d12",
+      "bytes": 12557,
+      "sha256": "04dbed84c043160cab67717c828de80698cd4f0520ea357bc68cfe46c87aa232"
+    },
+    "execution": {
+      "sha": "82150ff74ae834f41a018f0c4cbd5f73df995ba8",
+      "bytes": 119320,
+      "sha256": "3f0a2b5c6e9162a39d9989298e59f8c404f699695713f32d2af41eef70c32e36"
+    },
+    "workflows": 9,
+    "executedJobs": 14,
+    "checkoutCount": 13,
+    "browserGate": "echo only; no checkout",
+    "custodyCleanup": "conditional retained container statement, deletion not established",
+    "originalReleaseSkips": 6
+  },
+  "privacyShapeScan": [
+    {
+      "key": "source",
+      "hits": {
+        "github": 0,
+        "aws": 0,
+        "privateKey": 0,
+        "openai": 0
+      }
+    },
+    {
+      "key": "core",
+      "hits": {
+        "github": 0,
+        "aws": 0,
+        "privateKey": 0,
+        "openai": 0
+      }
+    },
+    {
+      "key": "integration",
+      "hits": {
+        "github": 0,
+        "aws": 0,
+        "privateKey": 0,
+        "openai": 0
+      }
+    },
+    {
+      "key": "daemon",
+      "hits": {
+        "github": 0,
+        "aws": 0,
+        "privateKey": 0,
+        "openai": 0
+      }
+    },
+    {
+      "key": "desktopChecks",
+      "hits": {
+        "github": 0,
+        "aws": 0,
+        "privateKey": 0,
+        "openai": 0
+      }
+    },
+    {
+      "key": "desktopSmoke",
+      "hits": {
+        "github": 0,
+        "aws": 0,
+        "privateKey": 0,
+        "openai": 0
+      }
+    },
+    {
+      "key": "analyticsSSR",
+      "hits": {
+        "github": 0,
+        "aws": 0,
+        "privateKey": 0,
+        "openai": 0
+      }
+    }
+  ],
+  "limitations": [
+    "Image/Native/final UI gate not yet included in this snapshot.",
+    "No production account or model execution, publication, PostHog ingestion or Native budget pass is claimed.",
+    "Shared installer whole-job token process exposure is a confirmed pre-merge task; owner accepted a unified pure-source correction.",
+    "Conditional mixed Integration12 skips retained; independently executed required PG72 has zero skips."
+  ]
+}

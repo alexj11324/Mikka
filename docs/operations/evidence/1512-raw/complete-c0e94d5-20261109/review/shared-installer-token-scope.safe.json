@@ -1,0 +1,345 @@
+{
+  "schemaVersion": 1,
+  "kind": "read-only-installer-credential-process-scope-review",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequests": [
+    1799,
+    1810
+  ],
+  "observedAtUTC": "2026-11-09T09:24:22.031Z",
+  "assessedSource": {
+    "head": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+    "priorCandidate": "1ffa581f16319381054e0636ae41e6292719a1fe",
+    "peerReadHead": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+    "peerMergedAtRead": false,
+    "scope": "Credential entrypoints inherited into #1799, not a review of all #1810 performance changes or a new release gate for unrelated sources.",
+    "entryComparison": {
+      "bytes": 1021,
+      "sha256": "c665eb82995d252d1abf32ff0fcd35e647d736b6976d6c0825623285a36c0101",
+      "entries": [
+        {
+          "path": ".github/actions/pnpm-install/action.yml",
+          "baseBlob": "6563e46bec7c1a02cdbdcd90be0742fb9ecb47d9",
+          "headBlob": "20a5db53847172db9f52ee12c6c0feeec6c48dce",
+          "unchanged": false
+        },
+        {
+          "path": ".github/workflows/self-hosting-ui.yml",
+          "baseBlob": "5aa39770c0a4d6166e0088d5e1d84af746b57d58",
+          "headBlob": "5aa39770c0a4d6166e0088d5e1d84af746b57d58",
+          "unchanged": true
+        },
+        {
+          "path": ".github/workflows/self-hosted-image.yml",
+          "baseBlob": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077",
+          "headBlob": "46f05f36960559221030e89e1add41ecdfced3b4",
+          "unchanged": false
+        },
+        {
+          "path": "Dockerfile",
+          "baseBlob": "0de463a5b008837322a28a0edf665fa3c0ba6d53",
+          "headBlob": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+          "unchanged": false
+        }
+      ]
+    }
+  },
+  "requestEvidence": [
+    {
+      "kind": "review",
+      "id": 5823372853,
+      "url": "https://github.com/alexj11324/Mikka/pull/1810#pullrequestreview-5823372853",
+      "createdAt": "2026-11-09T08:34:19Z",
+      "directlyRead": true
+    },
+    {
+      "kind": "comment",
+      "id": 6736135550,
+      "url": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6736135550",
+      "createdAt": "2026-11-09T09:00:22Z",
+      "directlyRead": true
+    }
+  ],
+  "recommendation": "revise",
+  "workflowLabel": "revise",
+  "conclusion": "The automatic credential recipient expansion is source-proven at exact c0e. Remove unconditional job-token injection before merging this credential entry change. No credential exfiltration is observed or claimed.",
+  "riskDimensions": {
+    "impactIfWrong": "high",
+    "impactEvidence": "A same-repository screenshot job has contents:write; the image job has packages:write. The patch supplies that full job token to a broader dependency-install process tree.",
+    "regressionLikelihood": "high",
+    "likelihoodMeaning": "The missing process-isolation property is established by source, not a numerical estimate of malicious-dependency occurrence. Actual abuse occurrence is unknown.",
+    "regressionProtection": "partial",
+    "protectionEvidence": "22 top-level installer tests exercise installer/file/HTTP/redirect/error behavior; none references the affected shared action or caller workflow files. This review ran no tests.",
+    "recoverability": "easy",
+    "recoveryEvidence": "Candidate not merged by this task; no migrations or persisted data change required. Change credential inputs/callers while retaining installer implementation and release responsibilities.",
+    "confidence": "high",
+    "confidenceScope": "Exact immutable candidate/base source and three concrete entry paths verified; no claim of exhaustive audit of every workflow or actual stolen token."
+  },
+  "findings": [
+    {
+      "id": "shared-install-implicit-token",
+      "status": "confirmed-source",
+      "root": ".github/actions/pnpm-install/action.yml",
+      "lines": [
+        26,
+        29
+      ],
+      "evidence": "The pnpm install --frozen-lockfile step unconditionally assigns FFMPEG_GITHUB_TOKEN from github.token, with no optional input.",
+      "recipientBoundary": "The pnpm process and allowed dependency lifecycle descendants receive this environment. The fixed-host rules of one FFmpeg HTTP function do not constrain other lifecycle processes.",
+      "allowedBuildPackages": [
+        "@parcel/watcher",
+        "@swc/core",
+        "electron",
+        "esbuild",
+        "ffmpeg-static",
+        "sharp"
+      ],
+      "allowBuildSource": "pnpm-workspace.yaml:20-26",
+      "strongestCounterexample": "An otherwise allowed ordinary lifecycle reads the new FFMPEG_GITHUB_TOKEN environment value in a caller whose token has write permissions. This is a source data-flow example, not executed exfiltration.",
+      "legitimateControl": "Default absent/empty optional credential; explicit input supplied only by confirmed read-token callers. Keep the existing allowBuilds and frozen lockfile."
+    },
+    {
+      "id": "screenshots-new-write-token-recipient",
+      "status": "confirmed-source",
+      "root": ".github/workflows/self-hosting-ui.yml",
+      "lines": [
+        19,
+        35,
+        48,
+        51
+      ],
+      "jobPermissions": {
+        "contents": "write"
+      },
+      "before": "Exact same screenshots source existed at prior1ffa; checkout uses persist-credentials:false and explicit GITHUB_TOKEN appears only in the later evidence-publication step.",
+      "after": "The unchanged shared-action call now injects the full contents-write job token into pnpm installation due to the changed action.",
+      "scope": "Same-repository PR condition and existing path filters remain; this review does not claim the screenshots job ran in CI42590712093.",
+      "minimalRepair": "Do not opt this caller into the new credential input; retain its existing later publishing step and contents:write permission."
+    },
+    {
+      "id": "docker-build-new-package-write-token-recipient",
+      "status": "confirmed-source",
+      "root": ".github/workflows/self-hosted-image.yml + Dockerfile",
+      "lines": {
+        "workflow": [
+          24,
+          39
+        ],
+        "Dockerfile": [
+          16,
+          18
+        ]
+      },
+      "jobPermissions": {
+        "contents": "read",
+        "packages": "write"
+      },
+      "before": "Prior Dockerfile runs pnpm without a token secret. Current .dockerignore excludes .git, so host checkout credentials are not copied into this build context.",
+      "after": "Workflow injects github.token into FFMPEG_GITHUB_TOKEN and passes a BuildKit secret; Docker RUN maps the secret to environment for the complete pnpm install.",
+      "secretMountBoundary": "Optional BuildKit secret avoids an ARG or durable ENV entry, but does not downgrade token permissions or restrict it to only one child process in that RUN.",
+      "minimalRepair": "Remove the image workflow's automatic write-token env/--secret handoff. Keep anonymous install and the optional Docker secret declaration for explicit supported callers. Preserve package publishing later in the job."
+    },
+    {
+      "id": "image-host-install-qualified-increment",
+      "status": "confirmed-with-qualification",
+      "root": ".github/workflows/self-hosted-image.yml:28,69-72",
+      "evidence": "The host also calls the now-injecting shared action. However, image checkout does not set persist-credentials:false, so this review does not claim no Git credential was reachable by host dependencies before the patch.",
+      "increment": "The new automatic environment recipient path is real. The stronger newly crossed boundary is the Docker install process described separately.",
+      "minimalRepair": "The shared action default-none also removes this new environment injection, without claiming to solve every pre-existing CI credential channel."
+    }
+  ],
+  "compatibleExistingEntry": {
+    "root": ".github/workflows/web-deploy.yml:48-50,192-197",
+    "repositoryTokenPermission": "contents:read",
+    "explicitTokenEnvironment": true,
+    "existingOIDCPermission": "id-token:write; preserve separately, do not change existing OIDC release setup in this fix",
+    "scope": "Verify actual job-level permissions; workflow-level contents:read does not override a caller job's explicit write grants."
+  },
+  "installerControlsRetained": {
+    "source": "patches/ffmpeg-static@5.3.0.patch",
+    "facts": [
+      "Only the dedicated FFMPEG_GITHUB_TOKEN is read at the pinned API fallback; no implicit generic GITHUB_TOKEN fallback.",
+      "Authorization is added only for the fixed API source's exact first HTTPS request; every redirect rebuilds headers and receives no credential.",
+      "Fixed sources, three redirects, 30-second per-attempt budget, bundle checksums and closed diagnostics remain part of the existing implementation.",
+      "These controls protect the installer HTTP sink and its logging; they do not remove credentials from siblings in the installation process tree."
+    ]
+  },
+  "minimalChangeBoundary": {
+    "sharedAction": "Add explicit optional credential input with default empty; environment references only that input, never github.token fallback.",
+    "readCallers": "Explicitly opt in only at reviewed callers whose actual repository token grants are read-only.",
+    "writeCallers": "Screenshots and image remain anonymous for dependency installation; preserve screenshot publishing and GHCR publishing permissions/steps.",
+    "Docker": "Remove automatic image writer-token submission; optional secret support may remain. No ARG, persisted ENV, new PAT, new identity or permission expansion.",
+    "notNeeded": [
+      "No installer HTTP redesign",
+      "No change to Native budget/window/first-pair measurement",
+      "No account/session/model action",
+      "No changes to server delta/home/SQL candidates",
+      "No parallel implementation by this reviewer"
+    ]
+  },
+  "testBoundary": {
+    "executionByThisReview": 0,
+    "existingTestFile": "scripts/ffmpeg-install.test.mjs",
+    "existingTopLevelTests": 22,
+    "existingCallerConfigReferences": 0,
+    "minimumProposed": [
+      {
+        "case": "ordinary lifecycle default-none",
+        "boundary": "Use the actual normal install lifecycle entry with a harmless allowed synthetic package/fixture. No optional input means the child sees no nonempty FFMPEG token. Emit only presence/equality booleans, never credential value.",
+        "network": "offline fixture; no real credential"
+      },
+      {
+        "case": "explicit input positive",
+        "boundary": "An explicit synthetic read token reaches the intended normal installation path; it is not sourced from a separate generic GITHUB_TOKEN value."
+      },
+      {
+        "case": "real write callers negative",
+        "boundary": "Inspect actual screenshots and image job configs, including job-level permission overrides. They must not opt into shared action credential input or automatically send github.token as Docker secret. A small intentionally invalid configuration fixture must make this guard fail."
+      },
+      {
+        "case": "read caller positive",
+        "boundary": "An explicitly reviewed read-token caller can opt in; keep existing release/OIDC responsibilities unchanged."
+      },
+      {
+        "case": "installer contract retained",
+        "boundary": "Retain anonymous download, exact API first-hop auth, redirect stripping, 30s/3redirect limits, complete bundle hashes and closed error diagnostics; successful install by itself is not the process-scope test."
+      }
+    ],
+    "validationLimit": "No tests were run in this source review; existing green installation evidence does not cover the new default-none property until the owner fixes and validates it."
+  },
+  "ownerCoordination": {
+    "status": "owner accepted unified implementation, reported by root",
+    "commentId": 6736515248,
+    "url": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6736515248",
+    "reportedAtUTC": "2026-11-09T09:20:39Z",
+    "directlyReadByThisReviewer": false,
+    "agreement": "optional/default none; confirmed read callers opt in; image/screenshots anonymous; remove automatic image BuildKit write-token handoff; retain optional secret and fixed download contract",
+    "nextAction": "Wait for owner's immutable independent pure fix; review exact source and provided results before reuse. This reviewer makes no competing implementation."
+  },
+  "method": {
+    "skill": "assess-patch-risk",
+    "read": "main SKILL and risk-rubric read",
+    "unavailable": "Cross-package artifact-storage/schema resources returned read errors; local validator/runtime unavailable and prohibited in this task.",
+    "formalSkillSchemaValidationClaimed": false,
+    "artifactType": "Focused safe source-evidence receipt, not a claim that the complete PR passes the skill's full-patch merge gate."
+  },
+  "sources": [
+    {
+      "path": ".github/actions/pnpm-install/action.yml",
+      "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "role": "candidate",
+      "bytes": 1514,
+      "sha256": "8b95a775175947954d8f049d1f5737e8961a6f512debfa343fb4981340679eb2",
+      "gitBlob": "20a5db53847172db9f52ee12c6c0feeec6c48dce"
+    },
+    {
+      "path": ".github/workflows/self-hosting-ui.yml",
+      "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "role": "candidate",
+      "bytes": 2118,
+      "sha256": "af9b345b4ec19b97a461e14fc63e8ab52287d91d419c1e1aa30cce0b1a1940f5",
+      "gitBlob": "5aa39770c0a4d6166e0088d5e1d84af746b57d58"
+    },
+    {
+      "path": ".github/workflows/self-hosted-image.yml",
+      "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "role": "candidate",
+      "bytes": 9043,
+      "sha256": "5c5bd3c7a46f09cf463df367869fdaef058d85272d2fcc752404cb0b0ea13b21",
+      "gitBlob": "46f05f36960559221030e89e1add41ecdfced3b4"
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "role": "candidate",
+      "bytes": 11670,
+      "sha256": "790c964833cd3352a5238a7e58162ab5783ddfa8886c68a25afc521ab8b04a22",
+      "gitBlob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba"
+    },
+    {
+      "path": "Dockerfile",
+      "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "role": "candidate",
+      "bytes": 2403,
+      "sha256": "a1f0f64ffa44df45b38b669eea0b1b9e59f17c19b9b7382b1b7ded521883f0ee",
+      "gitBlob": "19054afe4768b3391515c7a3e0f97a0021f123ee"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "role": "candidate",
+      "bytes": 718,
+      "sha256": "5a24e67ade7fae19b2d160b4ca61b58170eb3c04a18f8b06efb9a5a0fae36b9f",
+      "gitBlob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d"
+    },
+    {
+      "path": "scripts/ffmpeg-install.test.mjs",
+      "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "role": "candidate",
+      "bytes": 22092,
+      "sha256": "156d860d61cea15a2658f1f26f41256e93cb99549a676ddbf862feefd7cd1e85",
+      "gitBlob": "9ce1e3333fd3ddb10ea206f5144cc466611842a1"
+    },
+    {
+      "path": "patches/ffmpeg-static@5.3.0.patch",
+      "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "role": "candidate",
+      "bytes": 23338,
+      "sha256": "7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b",
+      "gitBlob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa"
+    },
+    {
+      "path": ".dockerignore",
+      "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "role": "candidate",
+      "bytes": 282,
+      "sha256": "271183197009f2c74e60c919295bffdc2d18ba896d96195554248d6f23fa3d96",
+      "gitBlob": "7fb8c6a19335532b08762b6566d184bde8312d33"
+    },
+    {
+      "path": ".github/actions/pnpm-install/action.yml",
+      "revision": "1ffa581f16319381054e0636ae41e6292719a1fe",
+      "role": "prior-candidate",
+      "bytes": 1454,
+      "sha256": "bad2902a9db6057a9411e30b7f61e819ed104fb10241a7d3982d1c0e46b57889",
+      "gitBlob": "6563e46bec7c1a02cdbdcd90be0742fb9ecb47d9"
+    },
+    {
+      "path": ".github/workflows/self-hosting-ui.yml",
+      "revision": "1ffa581f16319381054e0636ae41e6292719a1fe",
+      "role": "prior-candidate",
+      "bytes": 2118,
+      "sha256": "af9b345b4ec19b97a461e14fc63e8ab52287d91d419c1e1aa30cce0b1a1940f5",
+      "gitBlob": "5aa39770c0a4d6166e0088d5e1d84af746b57d58"
+    },
+    {
+      "path": "Dockerfile",
+      "revision": "1ffa581f16319381054e0636ae41e6292719a1fe",
+      "role": "prior-candidate",
+      "bytes": 2309,
+      "sha256": "f9c1fccf6d26b872b87dca3b344ac9bafcfb4979b4455391da15de8e661edbbb",
+      "gitBlob": "0de463a5b008837322a28a0edf665fa3c0ba6d53"
+    },
+    {
+      "path": ".github/workflows/self-hosted-image.yml",
+      "revision": "1ffa581f16319381054e0636ae41e6292719a1fe",
+      "role": "prior-candidate",
+      "bytes": 8923,
+      "sha256": "7618e82b4fb3d571a394fe82fc562acd2af422cc772db86c0a2c94ba041af310",
+      "gitBlob": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077"
+    }
+  ],
+  "operations": {
+    "sourceChanges": 0,
+    "refChanges": 0,
+    "testsRun": 0,
+    "logsDownloadedForThisReview": 0,
+    "resourcesCreated": 0,
+    "productionCalls": 0,
+    "models": 0,
+    "credentialsRead": 0,
+    "settingsChanges": 0
+  }
+}

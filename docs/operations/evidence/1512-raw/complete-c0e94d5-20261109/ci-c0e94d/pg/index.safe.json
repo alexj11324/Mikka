@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "kind": "postgres-terminal-evidence-index",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "workflowRunId": 42590712093,
+  "runAttempt": 1,
+  "prHead": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+  "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+  "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+  "suggestedPrefix": "ci-c0e94d/pg",
+  "files": [
+    {
+      "path": "ci-c0e94d/pg/pg-1.original.log",
+      "kind": "original-decoded-job-log",
+      "jobId": 129071734768,
+      "bytes": 616469,
+      "sha256": "e6b717c66ac04e857a30342682ce1327ea57a9aa85b3cd93e0264dfb48f3c0b4",
+      "gitBlob": "c2e5519d9c36e18d622b6c286894ed681a362383",
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "path": "ci-c0e94d/pg/pg-2.original.log",
+      "kind": "original-decoded-job-log",
+      "jobId": 129071734800,
+      "bytes": 1160990,
+      "sha256": "28b3232a1e2692fb9da76baf1598f7d1c935488b984309981e6f6c815ff37ad0",
+      "gitBlob": "ff732f05c34cbbf69b8568068e2e12bf970e25e3",
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "path": "ci-c0e94d/pg/pg-3.original.log",
+      "kind": "original-decoded-job-log",
+      "jobId": 129071734749,
+      "bytes": 2285572,
+      "sha256": "3626d599ab8d32b5a5bd3bc09d7e2ae0096028792f0438e88d635ea4f9d39ebc",
+      "gitBlob": "a6f4ff0d399385ddb9377c59e54639215a5352f6",
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "path": "ci-c0e94d/pg/pg-4.original.log",
+      "kind": "original-decoded-job-log",
+      "jobId": 129071734733,
+      "bytes": 625712,
+      "sha256": "4523af0d2af1a38f848a5c42cd7db87f71e8619c0a52aa89bfcc05d72230738a",
+      "gitBlob": "e208f05b45196c50043ba7cd7a39ac19513c78e6",
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "path": "ci-c0e94d/pg/pg-aggregate.original.log",
+      "kind": "original-decoded-job-log",
+      "jobId": 129074353558,
+      "bytes": 13305,
+      "sha256": "ec46f4dd78aa8a754b1d14802498c6f010198a67f9aedb839a9a17effe23720f",
+      "gitBlob": "75839826e566e0327d2f6017a5d785a828af4eac",
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "path": "ci-c0e94d/pg/postgres-terminal-review.safe.json",
+      "kind": "safe-review-receipt",
+      "bytes": 305834,
+      "sha256": "1a3a03931c6bb7d2453285f85371c00daf6ac57af89b483a49282c9dbc6375f2",
+      "gitBlob": "51e5a2448154b0e8b20f1275a30ee580df3a65d6"
+    },
+    {
+      "path": "ci-c0e94d/pg/privacy-review.safe.json",
+      "kind": "safe-review-receipt",
+      "bytes": 5528,
+      "sha256": "332e250ce6b72d884d0be037aa3b19aa7f9044ce4b0424eefc614aa96863680d",
+      "gitBlob": "a3ef16d47d92bc85bcdd0980c0f8da1aab5be790"
+    }
+  ],
+  "filesExcludingThisIndex": 7,
+  "bytesExcludingThisIndex": 5013410,
+  "sharedSelection": {
+    "blob": "db30d852aee662f01f591884fb8d2c222ebadff9",
+    "bytes": 387694,
+    "sha256": "046925f40a816cde262479ec27884b9c0887ea393b742eb02ed58b9afd7f7e09",
+    "full": true,
+    "suites": 72,
+    "providedBy": "root; frozen extracted JSON bytes independently fetched and hashed",
+    "selectionOriginalLogReadByThisReviewer": false
+  },
+  "verdict": {
+    "requiredPgSuites": 72,
+    "shards": 4,
+    "suitesEach": 18,
+    "nodeExecutionSummaries": 91,
+    "tests": 3789,
+    "pass": 3789,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "perShardTests": [
+      741,
+      796,
+      1635,
+      617
+    ],
+    "C32": [
+      16,
+      11,
+      5
+    ],
+    "AB13": 13,
+    "activity": 57,
+    "queryFence": {
+      "roundTrips": [
+        11,
+        6
+      ],
+      "explicitTransactions": [
+        2,
+        1
+      ],
+      "strictSourceAssertionsPreserved": true
+    },
+    "aggregateJobId": 129074353558,
+    "aggregate": "success; database-result gate and summary only",
+    "wholeCiConcluded": false,
+    "nativeBudgetAcceptance": false,
+    "productionAcceptance": false
+  },
+  "readAccounting": {
+    "shardOriginalReads": 4,
+    "aggregateOriginalReads": 1,
+    "selectionOriginalReads": 0,
+    "teamDuplicateOriginalReads": 0,
+    "eachAssignedOriginalOnce": true,
+    "terminalMetadataReads": 2,
+    "unsupportedIndividualJobMetadataRequests": 4,
+    "unsupportedRequestsReturned": "GitHub fetch rejects individual job endpoint as outside allowed fetch URL family; subsequently used documented workflow_run_jobs. No log retry or credentials.",
+    "backgroundPolling": false
+  },
+  "publicBoundary": "Five original decoded UTF-8 log strings (BOM/ANSI retained), safe source/count ledger, privacy receipt. No API envelopes, temporary URLs or platform account metadata. Synthetic normalized-email match verified against exact source; six natural-language bearer-title matches classified; 27 credential labels masked.",
+  "fidelity": "Each actual create_blob returned SHA equals independently computed Git blob. No normalization/redaction/compression; not a ZIP/raw-server-byte-fidelity claim.",
+  "limitations": [
+    "Database gate success does not establish Native query budget, whole CI, production models or Replay.",
+    "Conditional workflow skips and optional no-files artifact warnings preserved; Node required-test skips zero.",
+    "FFMPEG_GITHUB_TOKEN platform masking does not prove process isolation; source-level credential exposure reviewed separately."
+  ],
+  "resources": {
+    "created": 0,
+    "running": 0,
+    "testsRerun": 0,
+    "productionOrModelCalls": 0,
+    "refsChanged": false
+  }
+}
