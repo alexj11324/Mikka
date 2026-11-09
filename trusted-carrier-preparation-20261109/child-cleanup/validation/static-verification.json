@@ -1,0 +1,171 @@
+{
+  "status": "passed_offline_only",
+  "workflow": {
+    "bytes": 29118,
+    "sha256": "9cee04bbb3cd3dc45d6349d1ea9deef5321240f61854fcb9ccebd714246e2c27"
+  },
+  "pythonBlocksCompiledWithoutExecution": 7,
+  "yamlSyntaxParsed": true,
+  "jobDisabled": true,
+  "unfilledPins": 19,
+  "fiveSecretBlockByteIdentical": true,
+  "unchangedFunctions": [
+    "source_matches",
+    "download_archive",
+    "verified_receipt",
+    "stamp",
+    "check_window"
+  ],
+  "threeMainReadsAndSevenWindowChecksRetained": true,
+  "twoQueuesRetained": true,
+  "runtimeCleanupAndReceiptUploadTailByteIdentical": true,
+  "helpers": [
+    {
+      "path": "scripts/ops/issue1505/github-readonly-provider.mjs",
+      "bytes": 14619,
+      "sha256": "23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e",
+      "byteIdenticalToTrustedPrepare": true
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-helper.mjs",
+      "bytes": 11192,
+      "sha256": "cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742",
+      "byteIdenticalToTrustedPrepare": true
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-store.mjs",
+      "bytes": 8858,
+      "sha256": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+      "byteIdenticalToTrustedPrepare": true
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-runner.mjs",
+      "bytes": 6220,
+      "sha256": "7859cff4714d5367a29322357bd9945ab8c9c49376c3312d4b8643facaff0f57",
+      "byteIdenticalToTrustedPrepare": true
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly.test.mjs",
+      "bytes": 29368,
+      "sha256": "a29271758aaa0cc9ed3eac3a8e9ae05f96c91bf955ef48cb97f8490ff8f6a1c2",
+      "byteIdenticalToTrustedPrepare": true
+    }
+  ],
+  "sourceGuardCases": [
+    {
+      "name": "exact APP plus six additions; closed carrier independent of prepare head",
+      "expected": "accepted",
+      "passed": true,
+      "fakeGitReads": 6
+    },
+    {
+      "name": "wrong parent order",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 3
+    },
+    {
+      "name": "obsolete sole-parent shape",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 3
+    },
+    {
+      "name": "extra third parent",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 3
+    },
+    {
+      "name": "old prepare-close instead of actual closed carrier",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 3
+    },
+    {
+      "name": "wrong closed carrier tree",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 2
+    },
+    {
+      "name": "APP is not the pinned exact commit",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 1
+    },
+    {
+      "name": "extra inherited H workflow",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 4
+    },
+    {
+      "name": "missing operator file",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 4
+    },
+    {
+      "name": "modified product or preexisting operator path",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 5
+    },
+    {
+      "name": "symlink mode",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 5
+    },
+    {
+      "name": "executable mode",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 5
+    },
+    {
+      "name": "rename status",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 5
+    },
+    {
+      "name": "nonzero old blob on claimed addition",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 5
+    },
+    {
+      "name": "zero new blob",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 5
+    },
+    {
+      "name": "malformed new blob",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 5
+    },
+    {
+      "name": "duplicate raw path",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 5
+    },
+    {
+      "name": "extra raw entry despite correct name list",
+      "expected": "refused",
+      "passed": true,
+      "fakeGitReads": 5
+    }
+  ],
+  "sourceGuardCasesPassed": 18,
+  "sourceGuardCasesFailed": 0,
+  "newHelperSuiteRuns": 0,
+  "executedRuntimeOrNetworkStatements": false,
+  "realGitInvocations": 0,
+  "gitObjectsOrRefsCreated": 0,
+  "scope": "Only the exact extracted source-shape function ran with fixed fake Git replies; no workflow, scope function, provider, DB or cleanup operation ran."
+}

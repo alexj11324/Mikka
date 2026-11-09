@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "status": "reviewed_unbound_disabled",
+  "carrierBranch": "ops/1505-smoke-github-readonly-20261109",
+  "lastObservedClosedHead": "195c681d414e958ad43fbd7222872aa13ca0ef05",
+  "lastObservedClosureRun": 42677399617,
+  "closureConclusion": "skipped",
+  "oidcTrustEvidence": [42622019169, 42670291715],
+  "productionCallsInThisPreparation": 0,
+  "rootReadFullAdaptationDiffs": true,
+  "ordinaryProductCodeChangedByThisPreparation": false,
+  "currentWindow": null,
+  "phases": [
+    {
+      "phase": "read-only child prepare",
+      "package": "readonly-trusted-carrier-preparation-1505",
+      "parents": ["fresh actual main", "fresh exact closed carrier"],
+      "deltaAgainstMain": "six added ordinary 100644 files",
+      "workflowSha256": "6e49a194122e1769cb23e3bed7277677070202f4171a6879abf95cac8afb8be8",
+      "offlineHelperTests": {"passed": 47, "failed": 0},
+      "guardBinding": "Current main, tree, both ordered parents, entry and hard end remain unfilled."
+    },
+    {
+      "phase": "diagnostic prepare and independent cleanup",
+      "package": "diagnostic-trusted-carrier-preparation-1505",
+      "parents": ["fresh actual APP/main", "fresh exact closed carrier for this phase"],
+      "deltaAgainstMain": {"prepare": "three added ordinary 100644 files", "cleanup": "two added ordinary 100644 files"},
+      "staticChecks": 39,
+      "extractedGuardBoundaryChecks": 22,
+      "requires": "The exact main runtime release has seven actual successful jobs before diagnostic prepare. Original helper, scope, queues and business functions remain unchanged."
+    },
+    {
+      "phase": "formal six ordinary Tasks",
+      "package": "formal-renderer-r7-1505",
+      "executionBranchParameter": "ops/1505-smoke-github-readonly-20261109",
+      "historicalFormalRefReused": false,
+      "rationale": "The chosen carrier has never executed formal six-task acceptance. The renderer accepts this branch parameter. A unique new reviewed commit is published once, and its formal job is disabled before any subsequent carrier operation.",
+      "requires": "Actual APP/DPL/runtime/W/templates, original Bot, fresh H ID/hash/expiry and exact seven-job runtime proof remain unfilled. Driver and helper checkouts stay pinned."
+    },
+    {
+      "phase": "exact fresh child cleanup",
+      "package": "readonly-trusted-cleanup-preparation-1505",
+      "parents": ["fresh actual APP/main", "fresh exact closed carrier, possibly after H/formal operations"],
+      "deltaAgainstMain": "six added ordinary 100644 files",
+      "workflowSha256": "9cee04bbb3cd3dc45d6349d1ea9deef5321240f61854fcb9ccebd714246e2c27",
+      "sourceGuardBoundaryChecks": 18,
+      "requires": "All 19 bindings remain null. Original child run/attempt/artifact/receipt provenance must not be rewritten to current APP or diagnostic source."
+    }
+  ],
+  "rootFollowThrough": "Re-read current main, actual source/account window, exact closed carrier and all production receipts before binding. Only normal expected-head fast-forwards. Close each executed entry at terminal state. No identity or trust-policy changes. No future source/account reservation is created by this document.",
+  "newFormalSamples": 0,
+  "productionAcceptanceClaimed": false
+}

@@ -1,0 +1,121 @@
+{
+  "status": "passed",
+  "scope": "offline extracted synchronous branch/parent guards only",
+  "checks": 22,
+  "results": [
+    {
+      "name": "original prepare rejects ordered APP/carrier parents",
+      "status": "passed",
+      "expectedRefusal": "helper_parent_mismatch"
+    },
+    {
+      "name": "original cleanup rejects ordered APP/carrier parents",
+      "status": "passed",
+      "expectedRefusal": "source_identity_invalid"
+    },
+    {
+      "name": "trusted prepare accepts exact ordered parents",
+      "status": "passed",
+      "expectedRefusal": null
+    },
+    {
+      "name": "trusted cleanup accepts exact ordered parents",
+      "status": "passed",
+      "expectedRefusal": null
+    },
+    {
+      "name": "prepare rejects single parent",
+      "status": "passed",
+      "expectedRefusal": "helper_parent_mismatch"
+    },
+    {
+      "name": "cleanup rejects single parent",
+      "status": "passed",
+      "expectedRefusal": "source_identity_invalid"
+    },
+    {
+      "name": "prepare rejects reversed parents",
+      "status": "passed",
+      "expectedRefusal": "helper_parent_mismatch"
+    },
+    {
+      "name": "cleanup rejects reversed parents",
+      "status": "passed",
+      "expectedRefusal": "source_identity_invalid"
+    },
+    {
+      "name": "prepare rejects third parent",
+      "status": "passed",
+      "expectedRefusal": "helper_parent_mismatch"
+    },
+    {
+      "name": "cleanup rejects third parent",
+      "status": "passed",
+      "expectedRefusal": "source_identity_invalid"
+    },
+    {
+      "name": "prepare rejects wrong carrier",
+      "status": "passed",
+      "expectedRefusal": "helper_parent_mismatch"
+    },
+    {
+      "name": "cleanup rejects wrong carrier",
+      "status": "passed",
+      "expectedRefusal": "source_identity_invalid"
+    },
+    {
+      "name": "prepare rejects unfilled carrier",
+      "status": "passed",
+      "expectedRefusal": "carrier_parent_invalid"
+    },
+    {
+      "name": "cleanup rejects unfilled carrier",
+      "status": "passed",
+      "expectedRefusal": "bindings_invalid"
+    },
+    {
+      "name": "prepare rejects APP reused as carrier",
+      "status": "passed",
+      "expectedRefusal": "carrier_parent_invalid"
+    },
+    {
+      "name": "cleanup rejects APP reused as carrier",
+      "status": "passed",
+      "expectedRefusal": "bindings_invalid"
+    },
+    {
+      "name": "prepare rejects former unproven branch",
+      "status": "passed",
+      "expectedRefusal": "workflow_identity_invalid"
+    },
+    {
+      "name": "cleanup rejects former unproven branch",
+      "status": "passed",
+      "expectedRefusal": "execution_identity_invalid"
+    },
+    {
+      "name": "prepare still checks APP tree",
+      "status": "passed",
+      "expectedRefusal": "helper_parent_tree_mismatch"
+    },
+    {
+      "name": "cleanup still checks APP tree",
+      "status": "passed",
+      "expectedRefusal": "source_identity_invalid"
+    },
+    {
+      "name": "cleanup rejects carrier content outside the two APP additions",
+      "status": "passed",
+      "expectedRefusal": "source_delta_invalid"
+    },
+    {
+      "name": "cleanup rejects executable additions",
+      "status": "passed",
+      "expectedRefusal": "source_delta_invalid"
+    }
+  ],
+  "networkCalls": 0,
+  "gitSubprocesses": 0,
+  "helperBusinessCalls": 0,
+  "actualOidcOrSourceTreeValidated": false
+}

@@ -1,0 +1,45 @@
+--- frozen/.github/workflows/issue1505-diagnostic-window.yml.in
++++ trusted-carrier/.github/workflows/issue1505-diagnostic-window.yml.in
+@@ -3,7 +3,7 @@
+ name: Issue 1505 fresh diagnostic window after R7
+ on:
+   push:
+-    branches: [ops/1505-diagnostic-prepare-r7-20261109]
++    branches: [ops/1505-smoke-github-readonly-20261109]
+ permissions:
+   contents: read
+   actions: read
+@@ -26,6 +26,7 @@
+       EXPECTED_APP_TREE: '__TREE__'
+       HELPER_PARENT: '__HELPER_PARENT__'
+       HELPER_PARENT_TREE: '__HELPER_PARENT_TREE__'
++      CLOSED_CARRIER_PARENT: '__CLOSED_CARRIER_PARENT__'
+       HELPER_SHA256: '__HELPER_SHA256__'
+       DIAGNOSTIC_WINDOW_GO: '__GO__'
+       UPSTREAM_RUNTIME_SOURCE: '__UPSTREAM_RUNTIME_SOURCE__'
+@@ -82,7 +83,7 @@
+           const sha = bytes => createHash('sha256').update(bytes).digest('hex')
+           const git = (cwd,...args) => execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()
+           const originalSha='12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5'
+-          export const branch='ops/1505-diagnostic-prepare-r7-20261109'
++          export const branch='ops/1505-smoke-github-readonly-20261109'
+           export const go='root-reviewed-1505-diagnostic-prepare-r7-v1'
+           export const paths=[
+            '.github/workflows/issue1505-diagnostic-window.yml',
+@@ -99,6 +100,7 @@
+             check(/^[0-9a-f]{64}$/.test(e.HELPER_SHA256??''),'helper_hash_unfilled')
+             check(e.DIAGNOSTIC_WINDOW_GO===go,'go_unfilled')
+             check(e.HELPER_PARENT===e.EXPECTED_APP_SOURCE&&e.HELPER_PARENT_TREE===e.EXPECTED_APP_TREE,'parent_pin_mismatch')
++            check(/^[0-9a-f]{40}$/.test(e.CLOSED_CARRIER_PARENT??'')&&e.CLOSED_CARRIER_PARENT!==e.HELPER_PARENT,'carrier_parent_invalid')
+             for(const key of ['UPSTREAM_RUN_ID','UPSTREAM_ATTEMPT'])
+               check(/^[1-9][0-9]*$/.test(e[key]??'')&&Number.isSafeInteger(Number(e[key])),'runtime_pin_unfilled')
+             for(const key of ['NOT_BEFORE','ENTRY_DEADLINE','HARD_DEADLINE'])
+@@ -150,7 +152,7 @@
+             check(git(sourceDir,'rev-parse','HEAD^{tree}')===e.EXPECTED_APP_TREE,'source_tree_mismatch')
+             check(git(opsDir,'rev-parse','HEAD')===e.GITHUB_SHA,'helper_head_mismatch')
+             const parents=git(opsDir,'rev-list','--parents','-n','1','HEAD').split(' ').slice(1)
+-            check(parents.length===1&&parents[0]===e.HELPER_PARENT,'helper_parent_mismatch')
++            check(parents.length===2&&parents[0]===e.HELPER_PARENT&&parents[1]===e.CLOSED_CARRIER_PARENT,'helper_parent_mismatch')
+             check(git(opsDir,'rev-parse',e.HELPER_PARENT+'^{tree}')===e.HELPER_PARENT_TREE,'helper_parent_tree_mismatch')
+             const raw=git(opsDir,'diff','--raw','--no-renames','--abbrev=40',e.HELPER_PARENT,'HEAD').split('\n')
+             check(raw.length===paths.length,'helper_scope_mismatch')

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "status": "offline_unbound_disabled",
+  "branch": "ops/1505-smoke-github-readonly-20261109",
+  "go": "root-reviewed-1505-github-r7-20261109-v1",
+  "mainCommit": null,
+  "mainTree": null,
+  "orderedParents": null,
+  "entryDeadlineUtc": null,
+  "hardEndUtc": null,
+  "requiredFirstParent": "actual current main selected at the real authorized handoff",
+  "requiredSecondParent": "actual exact closed head of the already-owned trusted carrier at activation",
+  "jobMinutes": 15,
+  "workflowJobIf": false,
+  "reviewedJobIfAfterBinding": "github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1",
+  "markers": {
+    "__REQUIRED_ENTRY_DEADLINE_UTC__": 3,
+    "__REQUIRED_HARD_END_UTC__": 3,
+    "__REQUIRED_MAIN_SHA__": 8,
+    "__REQUIRED_MAIN_TREE__": 1,
+    "__REQUIRED_ORDERED_PARENTS_JSON__": 1,
+    "__REQUIRED_CLOSED_CARRIER_SHA__": 1
+  },
+  "activationAuthorizedByThisPackage": false,
+  "sharedCarrierPreparedBy1810MustSuppressDuplicatePreparation": true,
+  "createsHold": false,
+  "addsProductionGate": false,
+  "closedCarrierCommit": null
+}

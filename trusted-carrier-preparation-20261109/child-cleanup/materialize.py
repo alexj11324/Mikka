@@ -1,0 +1,150 @@
+"""Prepare an inactive exact-child cleanup package from reviewed local sources."""
+from pathlib import Path
+import difflib
+import hashlib
+import json
+import re
+
+TASK = Path(__file__).resolve().parent
+WORKSPACE = TASK.parent
+OLD = WORKSPACE / 'readonly-r7-preparation-1505' / 'cleanup'
+TRUSTED = WORKSPACE / 'readonly-trusted-carrier-preparation-1505'
+WORKFLOW = '.github/workflows/issue1505-smoke-github-readonly.yml.in'
+BRANCH = 'ops/1505-smoke-github-readonly-20261109'
+OLD_BRANCH = 'ops/1505-readonly-r7-20261109'
+GO = 'root-reviewed-1505-github-r7-20261109-v1'
+HELPERS = {
+    'github-readonly-provider.mjs': '23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e',
+    'github-readonly-helper.mjs': 'cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742',
+    'github-readonly-store.mjs': '1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5',
+    'github-readonly-runner.mjs': '7859cff4714d5367a29322357bd9945ab8c9c49376c3312d4b8643facaff0f57',
+    'github-readonly.test.mjs': 'a29271758aaa0cc9ed3eac3a8e9ae05f96c91bf955ef48cb97f8490ff8f6a1c2',
+}
+
+
+def metadata(body):
+    return {'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest(),
+            'gitBlobOid': hashlib.sha1(b'blob ' + str(len(body)).encode() + b'\0' + body).hexdigest()}
+
+
+def save(relative, body):
+    path = TASK / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('xb') as stream:
+        stream.write(body)
+
+
+old_bytes = (OLD / 'bundle' / WORKFLOW).read_bytes()
+assert metadata(old_bytes)['sha256'] == '46693c759b2dd89954eb6effe0468f419938203c6b73e94a7e54d617d259071e'
+trusted_workflow = (TRUSTED / 'bundle' / WORKFLOW).read_bytes()
+assert metadata(trusted_workflow)['sha256'] == '6e49a194122e1769cb23e3bed7277677070202f4171a6879abf95cac8afb8be8'
+old = old_bytes.decode()
+prepared = old.replace(OLD_BRANCH, BRANCH)
+assert old.count(OLD_BRANCH) == 2
+rebindings = {
+    '85a532d55bb0c9703b2e0e97693ce322b042c01e3768d85b41e7fde5a9e63029': HELPERS['github-readonly-runner.mjs'],
+    '1ef0f176c458efa2e67bad134cbbf4fe8c014abfb1ddc95c04d941c7e3d13259': HELPERS['github-readonly.test.mjs'],
+}
+for before, after in rebindings.items():
+    assert prepared.count(before) == 1
+    prepared = prepared.replace(before, after)
+
+unfilled = "          if any(not value or '__REQUIRED_' in value for value in required_bindings.values()):\n            raise SystemExit('issue1505_cleanup_binding_unfilled')\n"
+assert prepared.count(unfilled) == 1
+prepared = prepared.replace(unfilled, unfilled +
+    "          assert required_bindings['prepareBranch']=='ops/1505-smoke-github-readonly-20261109'\n"
+    "          assert required_bindings['prepareRunAttempt']=='1'\n")
+
+old_source = """          base='__REQUIRED_CLEANUP_CLOSED_COMMIT__'
+          assert git('rev-parse',base+'^{tree}')=='__REQUIRED_CLEANUP_CLOSED_TREE__'
+          assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==[base]
+"""
+new_source = """          app='__REQUIRED_CLEANUP_CURRENT_MAIN_SHA__'
+          base='__REQUIRED_CLEANUP_CLOSED_COMMIT__'
+          def verify_source_shape(git,app,closed,closed_tree,expected):
+            assert app!=closed,'cleanup_parents_not_distinct'
+            assert git('rev-parse',app+'^{commit}')==app,'cleanup_app_not_exact_commit'
+            assert git('rev-parse',closed+'^{tree}')==closed_tree,'cleanup_closed_tree_changed'
+            assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==[app,closed],'cleanup_ordered_parents_changed'
+            allowed=set(expected)|{'.github/workflows/issue1505-smoke-github-readonly.yml'}
+            assert set(git('diff','--name-only','--no-renames',app,'HEAD').splitlines())==allowed,'cleanup_paths_changed'
+            entries=[line.split('\\t',1) for line in git('diff','--raw','--no-renames','--abbrev=40',app,'HEAD').splitlines()]
+            assert len(entries)==len(allowed) and all(len(entry)==2 for entry in entries),'cleanup_raw_entries_changed'
+            assert {entry[1] for entry in entries}==allowed,'cleanup_raw_paths_changed'
+            for header,path in entries:
+              fields=header.split()
+              assert (len(fields)==5 and fields[0]==':000000' and fields[1]=='100644'
+                and fields[2]=='0'*40 and len(fields[3])==40 and all(char in '0123456789abcdef' for char in fields[3])
+                and fields[3]!='0'*40 and fields[4]=='A'),path
+            return git('rev-parse',app+'^{tree}')
+"""
+assert prepared.count(old_source) == 1
+prepared = prepared.replace(old_source, new_source)
+old_diff = "          assert git('diff','--name-status','--no-renames',base,'HEAD')=='M\\t.github/workflows/issue1505-smoke-github-readonly.yml'\n"
+assert prepared.count(old_diff) == 1
+prepared = prepared.replace(old_diff,
+    "          app_tree=verify_source_shape(git,app,base,'__REQUIRED_CLEANUP_CLOSED_TREE__',expected)\n")
+old_report = "          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'base':base,'unchangedExecutionFiles':len(expected),'workflowOnly':True,'currentMain':'__REQUIRED_CLEANUP_CURRENT_MAIN_SHA__'}))"
+assert prepared.count(old_report) == 1
+prepared = prepared.replace(old_report,
+    "          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'app':app,'appTree':app_tree,'closedCarrier':base,'orderedParents':[app,base],'unchangedExecutionFiles':len(expected),'operatorAdditionsOnly':True,'currentMain':'__REQUIRED_CLEANUP_CURRENT_MAIN_SHA__'}))")
+prepared = prepared.replace(
+    '# OFFLINE UNBOUND TEMPLATE. Cleanup of the next cycle\'s exact new receipt only.',
+    '# OFFLINE UNBOUND TEMPLATE. Exact new child cleanup on the owned trusted carrier.')
+assert 'if: false # OFFLINE_UNBOUND_DO_NOT_ACTIVATE' in prepared
+assert OLD_BRANCH not in prepared
+
+bindings = json.loads((OLD / 'bindings.unfilled.json').read_text())
+assert len(bindings['values']) == 19 and all(value is None for value in bindings['values'].values())
+bindings.update({
+    'branch': BRANCH,
+    'go': GO,
+    'requiredPrepareBranch': BRANCH,
+    'closedParentMeaning': 'actual currently closed owned carrier head at cleanup handoff, possibly after H prepare/cleanup; exact second parent, never implicitly the child prepare-close head',
+    'currentMainMeaning': 'actual APP/main commit at cleanup handoff; exact first parent and complete tree base; may differ from original child prepare source',
+    'reviewedJobIfAfterBinding': "github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1",
+    'sourceShape': {
+        'orderedParentsDerivedFromPins': ['currentMainSha', 'cleanupClosedCommit'],
+        'baseTreeDerivedFromExactCommitPin': 'currentMainSha^{tree}',
+        'carrierTreePinnedBy': 'cleanupClosedTree',
+        'relativeToApp': 'exact six additions, mode 100644, no modifications/deletions/renames or inherited carrier files',
+        'workflowPath': '.github/workflows/issue1505-smoke-github-readonly.yml',
+        'helperPaths': ['scripts/ops/issue1505/' + name for name in HELPERS],
+        'soleParentFallbackAllowed': False,
+    },
+    'provenanceMeaning': 'prepareRun/head/attempt/artifact/receipt pins refer only to this child original prepare; never rewrite them to cleanup APP or H source',
+})
+assert set(re.findall(r'__REQUIRED_[A-Z0-9_]+__', prepared)) == set(bindings['markers'].values())
+
+save('bundle/' + WORKFLOW, prepared.encode())
+save('bindings.unfilled.json', (json.dumps(bindings, indent=2) + '\n').encode())
+save('provenance/original-cleanup.yml.in', old_bytes)
+save('provenance/original-bindings.unfilled.json', (OLD / 'bindings.unfilled.json').read_bytes())
+save('provenance/trusted-prepare-hash-correction.json', (TRUSTED / 'hash-binding-correction.json').read_bytes())
+save('provenance/trusted-prepare-offline-tests.json', (TRUSTED / 'offline-tests-after-binding-correction.json').read_bytes())
+rows = []
+for name, expected in HELPERS.items():
+    relative = 'scripts/ops/issue1505/' + name
+    body = (TRUSTED / 'bundle' / relative).read_bytes()
+    assert hashlib.sha256(body).hexdigest() == expected
+    save('bundle/' + relative, body)
+    rows.append({'path': relative, **metadata(body), 'changeFromTrustedPrepare': 'byte-identical'})
+receipt = {
+    'status': 'offline_unbound_disabled',
+    'originalCleanup': {'path': str(OLD / 'bundle' / WORKFLOW), **metadata(old_bytes)},
+    'trustedPrepare': {'path': str(TRUSTED / 'bundle' / WORKFLOW), **metadata(trusted_workflow)},
+    'preparedCleanup': metadata(prepared.encode()),
+    'helpers': rows,
+    'bindingsUnfilled': 19,
+    'productionCalls': 0,
+    'cloudResources': 0,
+    'gitObjectsOrRefsCreated': 0,
+    'helperTestsRerunByThisTask': 0,
+    'inheritedHelperValidation': 'Root reported and saved 47/47 PASS for these exact trusted helper bytes; no new execution claimed here',
+}
+save('source-bindings.json', (json.dumps(receipt, indent=2) + '\n').encode())
+patch = ''.join(difflib.unified_diff(old.splitlines(keepends=True), prepared.splitlines(keepends=True),
+                                  fromfile='old-cleanup/.github/workflows/issue1505-smoke-github-readonly.yml.in',
+                                  tofile='trusted-cleanup/.github/workflows/issue1505-smoke-github-readonly.yml.in'))
+save('candidate.patch', patch.encode())
+print(json.dumps({'status': receipt['status'], 'workflow': receipt['preparedCleanup'], 'helpers': len(rows), 'unfilledPins': 19}))

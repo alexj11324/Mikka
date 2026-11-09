@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "branch": "ops/1505-smoke-github-readonly-20261109",
+  "closedCarrierCommit": null,
+  "orderedParents": [
+    null,
+    null
+  ],
+  "firstParentMeaning": "fresh exact APP",
+  "secondParentMeaning": "fresh independently verified closed carrier head; root performs expected-head normal FF",
+  "originalPreparePins": 13,
+  "extraStructuralBinding": "CLOSED_CARRIER_PARENT, from per-operation carrier.unfilled.json",
+  "prepareHelperBytesPreserved": true,
+  "cleanupHelperBytesPreserved": true,
+  "oldHelperCliExecuted": false,
+  "v2WorkflowLiteralMatchesFrozen": true,
+  "rootTrustBasis": "root supplied actual successful same-identity carrier branch; no new OIDC probe or rule change",
+  "actualOidcTrustForFutureRun": "not exercised",
+  "relativeToApp": {
+    "prepare": "exactly original 3 added paths, mode 100644",
+    "cleanup": "exactly original 2 added paths, mode 100644"
+  },
+  "activated": false,
+  "refCreated": false,
+  "cloudCalls": 0
+}

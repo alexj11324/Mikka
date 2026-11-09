@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+    "validate-offline.py"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/readonly-trusted-cleanup-preparation-1505",
+  "startedAt": "2026-11-09T19:16:07.109677+00:00",
+  "completedAt": "2026-11-09T19:16:07.252397+00:00",
+  "exitCode": 0,
+  "pythonVersion": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "stdoutSha256": "7adb6201934d47c374d6c61b3f5e4d90001eac147a69c86dde834ebced675246",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

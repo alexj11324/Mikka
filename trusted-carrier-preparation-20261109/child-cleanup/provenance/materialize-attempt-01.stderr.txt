@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/263e36984c81/readonly-trusted-cleanup-preparation-1505/materialize.py", line 117, in <module>
+    assert set(re.findall(r'__REQUIRED_[A-Z_]+__', prepared)) == set(bindings['markers'].values())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

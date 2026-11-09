@@ -1,0 +1,63 @@
+{
+  "status": "offline_unbound_disabled",
+  "originalCleanup": {
+    "path": "/workspace/scratch/263e36984c81/readonly-r7-preparation-1505/cleanup/bundle/.github/workflows/issue1505-smoke-github-readonly.yml.in",
+    "bytes": 27629,
+    "sha256": "46693c759b2dd89954eb6effe0468f419938203c6b73e94a7e54d617d259071e",
+    "gitBlobOid": "6ba48d4b31381066cbd9a6696b540b9d1278863c"
+  },
+  "trustedPrepare": {
+    "path": "/workspace/scratch/263e36984c81/readonly-trusted-carrier-preparation-1505/bundle/.github/workflows/issue1505-smoke-github-readonly.yml.in",
+    "bytes": 11668,
+    "sha256": "6e49a194122e1769cb23e3bed7277677070202f4171a6879abf95cac8afb8be8",
+    "gitBlobOid": "26b8a8e126b2935eefa4b2d168fce4ad03adcd17"
+  },
+  "preparedCleanup": {
+    "bytes": 29118,
+    "sha256": "9cee04bbb3cd3dc45d6349d1ea9deef5321240f61854fcb9ccebd714246e2c27",
+    "gitBlobOid": "adf024bd500ee53de2b5a971337d78c9c13a3cc0"
+  },
+  "helpers": [
+    {
+      "path": "scripts/ops/issue1505/github-readonly-provider.mjs",
+      "bytes": 14619,
+      "sha256": "23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e",
+      "gitBlobOid": "d097f62e62ca64a72220bb26cf7966db2acf4b43",
+      "changeFromTrustedPrepare": "byte-identical"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-helper.mjs",
+      "bytes": 11192,
+      "sha256": "cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742",
+      "gitBlobOid": "595eee67850779b2bde4597306e6a1c83beee245",
+      "changeFromTrustedPrepare": "byte-identical"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-store.mjs",
+      "bytes": 8858,
+      "sha256": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+      "gitBlobOid": "0455da9dcc58015184edd734987c2f0d711cdf8a",
+      "changeFromTrustedPrepare": "byte-identical"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-runner.mjs",
+      "bytes": 6220,
+      "sha256": "7859cff4714d5367a29322357bd9945ab8c9c49376c3312d4b8643facaff0f57",
+      "gitBlobOid": "1ff5d0fc6120069bdedac3dcc28d6dc1cf1fe409",
+      "changeFromTrustedPrepare": "byte-identical"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly.test.mjs",
+      "bytes": 29368,
+      "sha256": "a29271758aaa0cc9ed3eac3a8e9ae05f96c91bf955ef48cb97f8490ff8f6a1c2",
+      "gitBlobOid": "1faf094767d0a1802fe6c8ab0b5faae017b77fef",
+      "changeFromTrustedPrepare": "byte-identical"
+    }
+  ],
+  "bindingsUnfilled": 19,
+  "productionCalls": 0,
+  "cloudResources": 0,
+  "gitObjectsOrRefsCreated": 0,
+  "helperTestsRerunByThisTask": 0,
+  "inheritedHelperValidation": "Root reported and saved 47/47 PASS for these exact trusted helper bytes; no new execution claimed here"
+}

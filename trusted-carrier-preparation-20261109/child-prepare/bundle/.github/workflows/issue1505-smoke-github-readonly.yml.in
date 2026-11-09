@@ -1,0 +1,212 @@
+# OFFLINE UNBOUND TEMPLATE. Stored as .yml.in; no ref, activation or production authority.
+# Root-reviewed prepare-only operator. Unreferenced review commit does not execute.
+# A new, bounded entry may be published only after current shared-account/writer review.
+# Does not revoke or renew any historical child. Cleanup must use this run's new receipt.
+name: Issue 1505 fresh read-only Smoke GitHub preparation
+on:
+  push:
+    branches: [ops/1505-smoke-github-readonly-20261109]
+    paths:
+      - .github/workflows/issue1505-smoke-github-readonly.yml
+      - scripts/ops/issue1505/github-readonly-*.mjs
+      - scripts/ops/issue1505/github-readonly.test.mjs
+permissions:
+  contents: read
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+  queue: max
+jobs:
+  prepare:
+    if: false # OFFLINE_UNBOUND_DO_NOT_ACTIVATE
+    runs-on: ubuntu-latest
+    concurrency:
+      group: web-deploy-production
+      cancel-in-progress: false
+      queue: max
+    timeout-minutes: 15
+    env:
+      MIKKA_EDITION: cloud
+      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-r7-20261109-v1'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Verify exact source, file scope, current main and bounded entry before credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import datetime,hashlib,json,os,pathlib,subprocess
+          def check_window():
+              entry=datetime.datetime.fromisoformat('__REQUIRED_ENTRY_DEADLINE_UTC__')
+              hard=datetime.datetime.fromisoformat('__REQUIRED_HARD_END_UTC__')
+              assert entry.utcoffset()==datetime.timedelta(0) and hard.utcoffset()==datetime.timedelta(0),'window_must_be_utc'
+              assert entry+datetime.timedelta(minutes=15)<=hard,'cleanup_budget_unbound'
+              assert datetime.datetime.now(datetime.timezone.utc)<entry,'prepare_entry_closed'
+          root=pathlib.Path('.')
+          assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-r7-20261109-v1'
+          assert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'
+          assert os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
+          assert os.environ.get('GITHUB_REF')=='refs/heads/ops/1505-smoke-github-readonly-20261109'
+          check_window()
+          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+          assert git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
+          expected_parents=json.loads('__REQUIRED_ORDERED_PARENTS_JSON__')
+          assert expected_parents==['__REQUIRED_MAIN_SHA__','__REQUIRED_CLOSED_CARRIER_SHA__'],'ordered_parents_not_bound'
+          assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==expected_parents
+          assert git('rev-parse','__REQUIRED_MAIN_SHA__^{tree}')=='__REQUIRED_MAIN_TREE__'
+          expected={"scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly-runner.mjs":"7859cff4714d5367a29322357bd9945ab8c9c49376c3312d4b8643facaff0f57","scripts/ops/issue1505/github-readonly.test.mjs":"a29271758aaa0cc9ed3eac3a8e9ae05f96c91bf955ef48cb97f8490ff8f6a1c2"}
+          allowed=set(expected)|{'.github/workflows/issue1505-smoke-github-readonly.yml'}
+          assert set(git('diff','--name-only','__REQUIRED_MAIN_SHA__','HEAD').splitlines())==allowed
+          raw=git('diff','--raw','--no-renames','--abbrev=40','__REQUIRED_MAIN_SHA__','HEAD').splitlines()
+          entries=[line.split('\t',1) for line in raw]
+          assert len(entries)==len(allowed) and all(len(entry)==2 for entry in entries)
+          assert {entry[1] for entry in entries}==allowed
+          for header,path in entries:
+              fields=header.split()
+              assert len(fields)==5 and fields[0]==':000000' and fields[1]=='100644' and fields[4]=='A',path
+          assert not git('diff','--name-only','HEAD')
+          for path,want in expected.items():
+              assert hashlib.sha256((root/path).read_bytes()).hexdigest()==want,path
+          import json,os,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          request=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
+              assert response.status==200
+              actual=json.load(response)
+          assert actual['object']['sha']=='__REQUIRED_MAIN_SHA__','main_changed'
+          check_window()
+          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'base':'__REQUIRED_MAIN_SHA__','files':len(expected),'productDelta':False}))
+          PY
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify the exact bounded helper before loading production credentials
+        run: node --test scripts/ops/issue1505/github-readonly.test.mjs
+      - name: Install the existing application dependencies with frozen lock and normal scripts
+        run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+      - name: Recheck bounded entry and exact main after installation before production credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import datetime
+          def check_window():
+              entry=datetime.datetime.fromisoformat('__REQUIRED_ENTRY_DEADLINE_UTC__')
+              hard=datetime.datetime.fromisoformat('__REQUIRED_HARD_END_UTC__')
+              assert entry.utcoffset()==datetime.timedelta(0) and hard.utcoffset()==datetime.timedelta(0),'window_must_be_utc'
+              assert entry+datetime.timedelta(minutes=15)<=hard,'cleanup_budget_unbound'
+              assert datetime.datetime.now(datetime.timezone.utc)<entry,'prepare_entry_closed'
+          check_window()
+          import json,os,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          request=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
+              assert response.status==200
+              actual=json.load(response)
+          assert actual['object']['sha']=='__REQUIRED_MAIN_SHA__','main_changed'
+          check_window()
+          PY
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /neon
+          secret-name: DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: BETTER_AUTH_SECRET
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_ID
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_SECRET
+          recursive: false
+          include-imports: false
+
+      - name: Recheck current source and prepare one new read-only child using the normal Owner getter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NODE_ENV: production
+          VERCEL_ENV: production
+          BETTER_AUTH_URL: https://app.aspectlylabs.com
+          NEXT_PUBLIC_APP_URL: https://app.aspectlylabs.com
+        run: |
+          python3 - <<'PY'
+          import datetime
+          def check_window():
+              entry=datetime.datetime.fromisoformat('__REQUIRED_ENTRY_DEADLINE_UTC__')
+              hard=datetime.datetime.fromisoformat('__REQUIRED_HARD_END_UTC__')
+              assert entry.utcoffset()==datetime.timedelta(0) and hard.utcoffset()==datetime.timedelta(0),'window_must_be_utc'
+              assert entry+datetime.timedelta(minutes=15)<=hard,'cleanup_budget_unbound'
+              assert datetime.datetime.now(datetime.timezone.utc)<entry,'prepare_entry_closed'
+          check_window()
+          import json,os,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          request=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
+              assert response.status==200
+              actual=json.load(response)
+          assert actual['object']['sha']=='__REQUIRED_MAIN_SHA__','main_changed'
+          check_window()
+          PY
+          node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --prepare
+      - name: Preserve the exact fresh receipt and any uncertain outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1505-github-readonly-fresh-${{ github.run_id }}-${{ github.run_attempt }}
+          path: issue1505-github-readonly-report/*.json
+          if-no-files-found: warn
+          retention-days: 14

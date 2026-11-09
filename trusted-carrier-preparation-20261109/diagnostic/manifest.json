@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "kind": "diagnostic-trusted-carrier-unbound-preparation",
+  "root": "/workspace/scratch/263e36984c81/diagnostic-trusted-carrier-preparation-1505",
+  "activated": false,
+  "refCreatedOrUpdated": false,
+  "parentCommits": [
+    null,
+    null
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "bytes": 7633,
+      "sha256": "623639db05eb97571c64ae8cbeac7485faa69bbb8c4292f364648a3ac407ed65",
+      "gitBlob": "ee18b4031aceca50ab4f4e1f5e1e42c12761134f"
+    },
+    {
+      "path": "binding-table.md",
+      "mode": "100644",
+      "bytes": 2239,
+      "sha256": "37a5d39b908736596fc392b3d61a3cb8a69b3809070fb3070522234cb3f3e866",
+      "gitBlob": "4359722592379ce9e9aa73d2284a3aac7388b5e9"
+    },
+    {
+      "path": "carrier-guard-check.mjs",
+      "mode": "100644",
+      "bytes": 6454,
+      "sha256": "ad91c3727d363dace4123cca3fb3b2b5e8e5eb655ab65401da741cf104fedf42",
+      "gitBlob": "86b1f009651f7780447122f5373417313300f695"
+    },
+    {
+      "path": "cleanup/.github/workflows/issue1505-diagnostic-cleanup-r7.yml.in",
+      "mode": "100644",
+      "bytes": 20844,
+      "sha256": "b06be1c4c5135b3c21e8c7d970d9c13d7dd5d2fdee5cf7bf764cfb455fcee071",
+      "gitBlob": "f495af694781ae342e20ef89e9fc9b614620bbec"
+    },
+    {
+      "path": "cleanup/bindings.unfilled.json",
+      "mode": "100644",
+      "bytes": 332,
+      "sha256": "901b5e690cd70f4115022206d80f43f738b258f6f6f15568632deceaec99e05d",
+      "gitBlob": "f1304b86b4c9525e9ca59725d9ccc98a03d0b3d4"
+    },
+    {
+      "path": "cleanup/carrier.unfilled.json",
+      "mode": "100644",
+      "bytes": 34,
+      "sha256": "36777273619afee9f9e544119293f082f1698683e879c818e4484cf26f1fa29f",
+      "gitBlob": "c8818837bcd26e255606d2aa9187cf8e200515c4"
+    },
+    {
+      "path": "cleanup/scripts/ops/issue1505-diagnostic-cleanup-r7.mjs",
+      "mode": "100644",
+      "bytes": 27063,
+      "sha256": "46d8b905518cf480fecdf0a3bce1a3863f4e79c92609b1cd3ec9d4231820898c",
+      "gitBlob": "e9f07af8ec87eb83b3eb46c046731390ba97c1d9"
+    },
+    {
+      "path": "diffs/cleanup.diff",
+      "mode": "100644",
+      "bytes": 5168,
+      "sha256": "ace4f18aafc4cb31abb94c76694b6a0a9c25f9676ec07e3bfd1a4cabb899ab78",
+      "gitBlob": "6e29de0ba0b19c575008ca7d6f7079265d41d35f"
+    },
+    {
+      "path": "diffs/prepare.diff",
+      "mode": "100644",
+      "bytes": 2909,
+      "sha256": "a0224e96e29c8c160931aa56384490a98dd94aed0b3148e2e8614126ebea4b88",
+      "gitBlob": "16ae77040e1fae5ddec5aa87855d32c6976d0075"
+    },
+    {
+      "path": "materialize-trusted-carrier.py",
+      "mode": "100644",
+      "bytes": 9077,
+      "sha256": "ec91906afa2340171c0fc3279a7d12cb38468f569ffce032e688cc7426826872",
+      "gitBlob": "5684644c8e35060f9d1490db733c1506fe1dd628"
+    },
+    {
+      "path": "prepare/.github/workflows/issue1505-diagnostic-window.yml.in",
+      "mode": "100644",
+      "bytes": 18211,
+      "sha256": "f7669490a099fc079e3b180328f9525377a93df19a8cfd0dc3016afa4563c158",
+      "gitBlob": "3fbdab43f502463c141294f94811277ae328c450"
+    },
+    {
+      "path": "prepare/carrier.unfilled.json",
+      "mode": "100644",
+      "bytes": 34,
+      "sha256": "36777273619afee9f9e544119293f082f1698683e879c818e4484cf26f1fa29f",
+      "gitBlob": "c8818837bcd26e255606d2aa9187cf8e200515c4"
+    },
+    {
+      "path": "prepare/pins.unfilled.json",
+      "mode": "100644",
+      "bytes": 356,
+      "sha256": "b7b6080cb1db54e1c521014fcece66549876afa4e3e7cfdc28017397736ca5c3",
+      "gitBlob": "13d31f155705376319d8829a1d0b6316272da027"
+    },
+    {
+      "path": "prepare/scripts/ops/issue1505-diagnostic-window-original-42366750743.json",
+      "mode": "100644",
+      "bytes": 1787,
+      "sha256": "12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5",
+      "gitBlob": "009def408433e3890818009d3cd5c4753dc8293f"
+    },
+    {
+      "path": "prepare/scripts/ops/issue1505-diagnostic-window.mjs.in",
+      "mode": "100644",
+      "bytes": 26976,
+      "sha256": "53a39063ea55939b9f4f2caf916e429adc21e43a5990b8d62c2952f119032928",
+      "gitBlob": "55d388d3399d19b8c9fdfa582363cfb7fb0cf5fb"
+    },
+    {
+      "path": "provenance/adaptation.json",
+      "mode": "100644",
+      "bytes": 968,
+      "sha256": "f4915e531469427b4142523be024894f52bd080031c5a18be1c7d407561fba5c",
+      "gitBlob": "0a36585cb2f9c3ec6a783b9277e333f0549a8cab"
+    },
+    {
+      "path": "provenance/source-inventory.after.json",
+      "mode": "100644",
+      "bytes": 4930,
+      "sha256": "88aeda9bffef0321df9ec409c98197ef18eb9415d32cb5daf9d6c517746b1b36",
+      "gitBlob": "8bebf947c61e21568dbafacd5d8a8c0e3cbdc15b"
+    },
+    {
+      "path": "provenance/source-inventory.before.json",
+      "mode": "100644",
+      "bytes": 4930,
+      "sha256": "88aeda9bffef0321df9ec409c98197ef18eb9415d32cb5daf9d6c517746b1b36",
+      "gitBlob": "8bebf947c61e21568dbafacd5d8a8c0e3cbdc15b"
+    },
+    {
+      "path": "review.json",
+      "mode": "100644",
+      "bytes": 2533,
+      "sha256": "fa49d9223f421128d928d9e6323aef1d2045947279933452666bb71980716588",
+      "gitBlob": "99d52a89269fefe0f30884b33f384ab732140f5b"
+    },
+    {
+      "path": "validate.py",
+      "mode": "100644",
+      "bytes": 7469,
+      "sha256": "39e1606b856bbb566b71b8d2df5e63741548a8cfbc52046185567b1095e02d8b",
+      "gitBlob": "115b0753d8c05eea2ee134f31b5bfb692f19f711"
+    },
+    {
+      "path": "validation/cleanup-js.mjs",
+      "mode": "100644",
+      "bytes": 6464,
+      "sha256": "8df803dd78f4af9d51e439e4053198355c69a287b91db0ed6f1072240cc4d0f3",
+      "gitBlob": "bd5003050f4c0d43efeb58bb14a2e778569040ea"
+    },
+    {
+      "path": "validation/initial-validator-failure.json",
+      "mode": "100644",
+      "bytes": 605,
+      "sha256": "c65a1c298564b1baacf93b402a133f2ef70c025884b4fb605c925f982fcbfcbd",
+      "gitBlob": "7d47bc252d438f52b00690818e04e75621fa180c"
+    },
+    {
+      "path": "validation/prepare-diagnostic_guard_js.mjs",
+      "mode": "100644",
+      "bytes": 9368,
+      "sha256": "6a1856439ce87c0858d98a08d9d8a4a6e6271e81305f008d530ff961d9251efe",
+      "gitBlob": "20eb4381f1d7273a7949018bb7979bb8c86a81f0"
+    },
+    {
+      "path": "validation/prepare-diagnostic_preflight_js.mjs",
+      "mode": "100644",
+      "bytes": 209,
+      "sha256": "da50874b78b3fabcbdb953e733b8852a2b5c9336beceb9de934ca1255add1f97",
+      "gitBlob": "6c32bca8e3936dcd7a65b662a61fd6466a8cd5b6"
+    },
+    {
+      "path": "validation/prepare-diagnostic_prepare_js.mjs",
+      "mode": "100644",
+      "bytes": 1988,
+      "sha256": "593857d7c9bf158c872167a6edc6e245e08a106839b733ffcf470222913c07d4",
+      "gitBlob": "956da0f16d92433041b484d79307262264ffa609"
+    },
+    {
+      "path": "validation-final/cleanup-1-js.mjs",
+      "mode": "100644",
+      "bytes": 6464,
+      "sha256": "8df803dd78f4af9d51e439e4053198355c69a287b91db0ed6f1072240cc4d0f3",
+      "gitBlob": "bd5003050f4c0d43efeb58bb14a2e778569040ea"
+    },
+    {
+      "path": "validation-final/cleanup-2-js.mjs",
+      "mode": "100644",
+      "bytes": 9220,
+      "sha256": "6500be5cda753d344164092384a057b4dfc5c5e796d77e85b71b35e04317b182",
+      "gitBlob": "1e67b528604090bff36cd5aee728acbd3057d4bd"
+    },
+    {
+      "path": "validation-final/cleanup-3-js.mjs",
+      "mode": "100644",
+      "bytes": 427,
+      "sha256": "30d8be198422a7b5542a0e40dd61aa9f50d0c669b2416a9fac6867b85579bf10",
+      "gitBlob": "d4b721b26a03fa1399e34b7c0717fe5419529716"
+    },
+    {
+      "path": "validation-final/guard-check.stderr.txt",
+      "mode": "100644",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "validation-final/guard-check.stdout.json",
+      "mode": "100644",
+      "bytes": 3362,
+      "sha256": "10c85a8ce7aaade71b8956aaad1e84248a174f779d3cd469cb36a8113061fae5",
+      "gitBlob": "9b19ae015f30dbb7b8c94ed7ab40724b0667f638"
+    },
+    {
+      "path": "validation-final/guard-fragments.json",
+      "mode": "100644",
+      "bytes": 11606,
+      "sha256": "65ba8ea7cbbafb68162557ce4e5162df17fbf468bc456d16cfbe0f589aea772c",
+      "gitBlob": "20b380b6ab3b9074e1ca0974f0e60766765b2c23"
+    },
+    {
+      "path": "validation-final/prepare-1-diagnostic_guard_js.mjs",
+      "mode": "100644",
+      "bytes": 9368,
+      "sha256": "6a1856439ce87c0858d98a08d9d8a4a6e6271e81305f008d530ff961d9251efe",
+      "gitBlob": "20eb4381f1d7273a7949018bb7979bb8c86a81f0"
+    },
+    {
+      "path": "validation-final/prepare-2-diagnostic_preflight_js.mjs",
+      "mode": "100644",
+      "bytes": 209,
+      "sha256": "da50874b78b3fabcbdb953e733b8852a2b5c9336beceb9de934ca1255add1f97",
+      "gitBlob": "6c32bca8e3936dcd7a65b662a61fd6466a8cd5b6"
+    },
+    {
+      "path": "validation-final/prepare-3-diagnostic_prepare_js.mjs",
+      "mode": "100644",
+      "bytes": 1988,
+      "sha256": "593857d7c9bf158c872167a6edc6e245e08a106839b733ffcf470222913c07d4",
+      "gitBlob": "956da0f16d92433041b484d79307262264ffa609"
+    },
+    {
+      "path": "validation-final/result.json",
+      "mode": "100644",
+      "bytes": 9247,
+      "sha256": "fbac5c8cf6523a9b6f087f4f4266579822af606c033fd57d216ffd6af3784463",
+      "gitBlob": "ee05c854b8fe2131c6487383edc1f8de5f31fdc7"
+    }
+  ],
+  "fileCount": 35,
+  "totalBytes": 220472,
+  "frozenSourcesUnchanged": true,
+  "cloudCalls": 0,
+  "formalSamples": 0
+}

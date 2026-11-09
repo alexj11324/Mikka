@@ -1,0 +1,10 @@
+{
+  "command": "python3 diagnostic-trusted-carrier-preparation-1505/validate.py",
+  "exitCode": 1,
+  "error": "AssertionError at validate.py line 54: assert not target.exists()",
+  "cause": "The original cleanup workflow has multiple heredocs named JS; the first offline syntax extractor used the marker alone as the output filename and refused to overwrite the earlier extracted file.",
+  "productChangedForThisFailure": false,
+  "correction": "Index each extracted heredoc output and use a new validation output directory; retain these initial files.",
+  "networkCalls": 0,
+  "helperBusinessCalls": 0
+}

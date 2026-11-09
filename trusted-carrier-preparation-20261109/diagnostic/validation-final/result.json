@@ -1,0 +1,350 @@
+{
+  "version": 1,
+  "scope": "branch/ordered-parent adaptation, conservation and syntax only",
+  "checks": [
+    {
+      "name": "prepare exact allowed adaptation",
+      "passed": true
+    },
+    {
+      "name": "prepare only inert template extension",
+      "passed": true
+    },
+    {
+      "name": "prepare trusted carrier selected",
+      "passed": true
+    },
+    {
+      "name": "prepare workflow queue unchanged",
+      "passed": true
+    },
+    {
+      "name": "prepare job disabled",
+      "passed": true
+    },
+    {
+      "name": "prepare job queue and timeout unchanged",
+      "passed": true
+    },
+    {
+      "name": "prepare complete OIDC blocks unchanged",
+      "passed": true
+    },
+    {
+      "name": "prepare permissions unchanged",
+      "passed": true
+    },
+    {
+      "name": "prepare carrier binding remains unfilled",
+      "passed": true
+    },
+    {
+      "name": "syntax validation-final/prepare-1-diagnostic_guard_js.mjs",
+      "passed": true,
+      "command": [
+        "node",
+        "--input-type=module",
+        "--check"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": "",
+      "sourceSha256": "be7c40c0e21078ce99b400a5dade49382f2e77ea5636c0588bcc2fb42fbebedb"
+    },
+    {
+      "name": "syntax validation-final/prepare-2-diagnostic_preflight_js.mjs",
+      "passed": true,
+      "command": [
+        "node",
+        "--input-type=module",
+        "--check"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": "",
+      "sourceSha256": "4d07f1895d18e2faa3b488636269691736b9732ba4e0c33b52863b3b0c9beaf5"
+    },
+    {
+      "name": "syntax validation-final/prepare-3-diagnostic_prepare_js.mjs",
+      "passed": true,
+      "command": [
+        "node",
+        "--input-type=module",
+        "--check"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": "",
+      "sourceSha256": "ba4d0b390bc114bee32a7823a2ec8dbcd0fd777bc4bf6bd7c9410af34cfa0152"
+    },
+    {
+      "name": "cleanup exact allowed adaptation",
+      "passed": true
+    },
+    {
+      "name": "cleanup only inert template extension",
+      "passed": true
+    },
+    {
+      "name": "cleanup trusted carrier selected",
+      "passed": true
+    },
+    {
+      "name": "cleanup workflow queue unchanged",
+      "passed": true
+    },
+    {
+      "name": "cleanup job disabled",
+      "passed": true
+    },
+    {
+      "name": "cleanup job queue and timeout unchanged",
+      "passed": true
+    },
+    {
+      "name": "cleanup complete OIDC blocks unchanged",
+      "passed": true
+    },
+    {
+      "name": "cleanup permissions unchanged",
+      "passed": true
+    },
+    {
+      "name": "cleanup carrier binding remains unfilled",
+      "passed": true
+    },
+    {
+      "name": "syntax validation-final/cleanup-1-js.mjs",
+      "passed": true,
+      "command": [
+        "node",
+        "--input-type=module",
+        "--check"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": "",
+      "sourceSha256": "8176e867dec1eaa4db0137d98329fc36d636a58ff4f92885baa19f60bb9b9b14"
+    },
+    {
+      "name": "syntax validation-final/cleanup-2-js.mjs",
+      "passed": true,
+      "command": [
+        "node",
+        "--input-type=module",
+        "--check"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": "",
+      "sourceSha256": "5b366f4572aff02965dccc400b5448d575f2ffdf58c28ac19d2a36c3f407bdea"
+    },
+    {
+      "name": "syntax validation-final/cleanup-3-js.mjs",
+      "passed": true,
+      "command": [
+        "node",
+        "--input-type=module",
+        "--check"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": "",
+      "sourceSha256": "132cb18b3067b1e871646dee101916f7932dc0542adc0ef211ec8895c22d8366"
+    },
+    {
+      "name": "prepare unchanged pins.unfilled.json",
+      "passed": true
+    },
+    {
+      "name": "prepare unchanged scripts/ops/issue1505-diagnostic-window.mjs.in",
+      "passed": true
+    },
+    {
+      "name": "prepare helper syntax only",
+      "passed": true
+    },
+    {
+      "name": "prepare unchanged scripts/ops/issue1505-diagnostic-window-original-42366750743.json",
+      "passed": true
+    },
+    {
+      "name": "cleanup unchanged bindings.unfilled.json",
+      "passed": true
+    },
+    {
+      "name": "cleanup unchanged scripts/ops/issue1505-diagnostic-cleanup-r7.mjs",
+      "passed": true
+    },
+    {
+      "name": "cleanup helper syntax only",
+      "passed": true
+    },
+    {
+      "name": "original 13 pins remain exactly null",
+      "passed": true
+    },
+    {
+      "name": "cleanup original 12 dynamic pins remain null",
+      "passed": true
+    },
+    {
+      "name": "exactly one prepareWindow invocation",
+      "passed": true
+    },
+    {
+      "name": "exactly one imported removeOwnedWindow invocation",
+      "passed": true
+    },
+    {
+      "name": "no active workflow supplied",
+      "passed": true
+    },
+    {
+      "name": "all 20 frozen source files remain unchanged",
+      "passed": true
+    },
+    {
+      "name": "Python syntax materialize-trusted-carrier.py",
+      "passed": true
+    },
+    {
+      "name": "Python syntax validate.py",
+      "passed": true
+    }
+  ],
+  "guardCommand": [
+    "node",
+    "/workspace/scratch/263e36984c81/diagnostic-trusted-carrier-preparation-1505/carrier-guard-check.mjs",
+    "/workspace/scratch/263e36984c81/diagnostic-trusted-carrier-preparation-1505/validation-final/guard-fragments.json"
+  ],
+  "guardExitCode": 0,
+  "guardResults": {
+    "status": "passed",
+    "scope": "offline extracted synchronous branch/parent guards only",
+    "checks": 22,
+    "results": [
+      {
+        "name": "original prepare rejects ordered APP/carrier parents",
+        "status": "passed",
+        "expectedRefusal": "helper_parent_mismatch"
+      },
+      {
+        "name": "original cleanup rejects ordered APP/carrier parents",
+        "status": "passed",
+        "expectedRefusal": "source_identity_invalid"
+      },
+      {
+        "name": "trusted prepare accepts exact ordered parents",
+        "status": "passed",
+        "expectedRefusal": null
+      },
+      {
+        "name": "trusted cleanup accepts exact ordered parents",
+        "status": "passed",
+        "expectedRefusal": null
+      },
+      {
+        "name": "prepare rejects single parent",
+        "status": "passed",
+        "expectedRefusal": "helper_parent_mismatch"
+      },
+      {
+        "name": "cleanup rejects single parent",
+        "status": "passed",
+        "expectedRefusal": "source_identity_invalid"
+      },
+      {
+        "name": "prepare rejects reversed parents",
+        "status": "passed",
+        "expectedRefusal": "helper_parent_mismatch"
+      },
+      {
+        "name": "cleanup rejects reversed parents",
+        "status": "passed",
+        "expectedRefusal": "source_identity_invalid"
+      },
+      {
+        "name": "prepare rejects third parent",
+        "status": "passed",
+        "expectedRefusal": "helper_parent_mismatch"
+      },
+      {
+        "name": "cleanup rejects third parent",
+        "status": "passed",
+        "expectedRefusal": "source_identity_invalid"
+      },
+      {
+        "name": "prepare rejects wrong carrier",
+        "status": "passed",
+        "expectedRefusal": "helper_parent_mismatch"
+      },
+      {
+        "name": "cleanup rejects wrong carrier",
+        "status": "passed",
+        "expectedRefusal": "source_identity_invalid"
+      },
+      {
+        "name": "prepare rejects unfilled carrier",
+        "status": "passed",
+        "expectedRefusal": "carrier_parent_invalid"
+      },
+      {
+        "name": "cleanup rejects unfilled carrier",
+        "status": "passed",
+        "expectedRefusal": "bindings_invalid"
+      },
+      {
+        "name": "prepare rejects APP reused as carrier",
+        "status": "passed",
+        "expectedRefusal": "carrier_parent_invalid"
+      },
+      {
+        "name": "cleanup rejects APP reused as carrier",
+        "status": "passed",
+        "expectedRefusal": "bindings_invalid"
+      },
+      {
+        "name": "prepare rejects former unproven branch",
+        "status": "passed",
+        "expectedRefusal": "workflow_identity_invalid"
+      },
+      {
+        "name": "cleanup rejects former unproven branch",
+        "status": "passed",
+        "expectedRefusal": "execution_identity_invalid"
+      },
+      {
+        "name": "prepare still checks APP tree",
+        "status": "passed",
+        "expectedRefusal": "helper_parent_tree_mismatch"
+      },
+      {
+        "name": "cleanup still checks APP tree",
+        "status": "passed",
+        "expectedRefusal": "source_identity_invalid"
+      },
+      {
+        "name": "cleanup rejects carrier content outside the two APP additions",
+        "status": "passed",
+        "expectedRefusal": "source_delta_invalid"
+      },
+      {
+        "name": "cleanup rejects executable additions",
+        "status": "passed",
+        "expectedRefusal": "source_delta_invalid"
+      }
+    ],
+    "networkCalls": 0,
+    "gitSubprocesses": 0,
+    "helperBusinessCalls": 0,
+    "actualOidcOrSourceTreeValidated": false
+  },
+  "status": "passed",
+  "networkCalls": 0,
+  "gitMutations": 0,
+  "helperBusinessCalls": 0,
+  "frozenSourcesUnchanged": true,
+  "actualCloudTrustValidated": false,
+  "allBindingsUnfilled": true
+}

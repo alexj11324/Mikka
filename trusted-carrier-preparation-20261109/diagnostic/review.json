@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "status": "disabled_unbound_offline_candidate",
+  "branch": "ops/1505-smoke-github-readonly-20261109",
+  "appCommit": null,
+  "appTree": null,
+  "prepareClosedCarrier": null,
+  "cleanupClosedCarrier": null,
+  "orderedParents": [
+    null,
+    null
+  ],
+  "prepareOriginalPins": 13,
+  "allOriginalPreparePinsNull": true,
+  "cleanupOriginalDynamicPins": 12,
+  "allCleanupOriginalDynamicPinsNull": true,
+  "changed": [
+    "workflow branch in prepare and cleanup",
+    "separate per-operation CLOSED_CARRIER_PARENT structural binding",
+    "exact two ordered parents [APP, closed carrier] instead of one APP parent"
+  ],
+  "unchanged": [
+    "prepare helper input bytes",
+    "cleanup complete original helper bytes",
+    "original Bot receipt",
+    "original 13 prepare pins file",
+    "original cleanup bindings file",
+    "all OIDC steps and permissions",
+    "both concurrency queues",
+    "GO values",
+    "seven successful R7 jobs required",
+    "source/main/time/idle checks",
+    "exact three/two added 100644 path sets relative to APP",
+    "one prepare invocation",
+    "exact cleanup ID/hash/404/key absence and unknown DELETE report retention",
+    "old helper CLI guards"
+  ],
+  "treeRule": "Build from fresh APP plus only allowed additions, not from the carrier tree. Root must verify actual closed carrier and all matching workflows, then normal expected-head FF; no refs are created here.",
+  "pureCallBoundary": "Only imported prepareWindow/removeOwnedWindow in eventual workflow. No helper business function or CLI was invoked during preparation.",
+  "oldSchemaConstants": {
+    "SOURCE": "e33e3a91d4011efbe768b11b428a5d152ede744a",
+    "TREE": "b2e36d3351654fceec59fe138a55de31cb155df9",
+    "meaning": "cleanup schema target pins, not a fresh scope creation receipt"
+  },
+  "freshScopeReceiptSha256Meaning": "Root-reviewed provenance anchor only; workflow does not download or independently hash receipt artifact.",
+  "validation": {
+    "command": "python3 diagnostic-trusted-carrier-preparation-1505/validate.py --out /workspace/scratch/263e36984c81/diagnostic-trusted-carrier-preparation-1505/validation-final",
+    "exitCode": 0,
+    "staticAndSyntaxChecks": 39,
+    "guardChecks": 22,
+    "businessTestsRepeated": 0,
+    "initialValidatorFailure": "validation/initial-validator-failure.json"
+  },
+  "frozenInputFilesUnchanged": 20,
+  "cloudCalls": 0,
+  "refsCreatedOrUpdated": 0,
+  "commitsCreated": 0,
+  "activated": false,
+  "formalSamples": 0,
+  "actualFutureOidcTrustExercised": false
+}

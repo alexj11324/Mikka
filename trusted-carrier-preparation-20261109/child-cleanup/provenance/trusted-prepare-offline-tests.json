@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "status": "offline_unbound_disabled",
+  "command": "node --test scripts/ops/issue1505/github-readonly.test.mjs",
+  "workingDirectory": "readonly-trusted-carrier-preparation-1505/bundle",
+  "nodeVersion": "v24.22.1",
+  "executionResultChunk": "200559",
+  "exitCode": 0,
+  "tests": 47,
+  "pass": 47,
+  "fail": 0,
+  "cancelled": 0,
+  "skipped": 0,
+  "durationMs": 172.301348,
+  "coverage": "The five reviewed helper modules with the trusted owned branch literal. Absolute UTC and current-main/ordered-parent bindings remain unfilled, and were not exercised as production source guards.",
+  "workflowSha256": "6e49a194122e1769cb23e3bed7277677070202f4171a6879abf95cac8afb8be8",
+  "productionCalls": 0,
+  "credentialsLoaded": false,
+  "activated": false
+}

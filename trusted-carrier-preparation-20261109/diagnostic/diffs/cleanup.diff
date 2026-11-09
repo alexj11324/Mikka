@@ -1,0 +1,63 @@
+--- frozen/.github/workflows/issue1505-diagnostic-cleanup-r7.yml.in
++++ trusted-carrier/.github/workflows/issue1505-diagnostic-cleanup-r7.yml.in
+@@ -2,7 +2,7 @@
+ name: Issue 1505 exact diagnostic cleanup only
+ on:
+   push:
+-    branches: [ops/1505-diagnostic-cleanup-r7-20261109]
++    branches: [ops/1505-smoke-github-readonly-20261109]
+ permissions:
+   contents: read
+ concurrency:
+@@ -22,6 +22,7 @@
+       contents: read
+       id-token: write
+     env:
++      CLOSED_CARRIER_PARENT: '__CLOSED_CARRIER_PARENT__'
+       CLEANUP_BINDINGS_JSON: |
+         {
+           "version": 1,
+@@ -58,7 +59,7 @@
+           import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
+           import { createHash } from 'node:crypto';
+           import { execFileSync } from 'node:child_process';
+-          const EXPECTED_BRANCH='ops/1505-diagnostic-cleanup-r7-20261109';
++          const EXPECTED_BRANCH='ops/1505-smoke-github-readonly-20261109';
+           const EXPECTED_GO='root-reviewed-1505-diagnostic-cleanup-r7-20261109-v1';
+           const HELPER_PATH='scripts/ops/issue1505-diagnostic-cleanup-r7.mjs';
+           const WORKFLOW_PATH='.github/workflows/issue1505-diagnostic-cleanup-r7.yml';
+@@ -81,10 +82,11 @@
+            for(const key of ['diagnosticExpiresAt','startAt','latestEntryAt','hardEndAt'])must(typeof pins[key]==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(pins[key])&&Number.isFinite(Date.parse(pins[key])),'bindings_invalid');
+            must(pins.rootReviewGo===EXPECTED_GO,'bindings_invalid');
+            const e=process.env;
++           must(/^[a-f0-9]{40}$/.test(e.CLOSED_CARRIER_PARENT??'')&&e.CLOSED_CARRIER_PARENT!==pins.currentMainCommit,'bindings_invalid');
+            must(e.GITHUB_REPOSITORY==='alexj11324/Mikka'&&e.GITHUB_EVENT_NAME==='push'&&e.GITHUB_REF===`refs/heads/${EXPECTED_BRANCH}`&&e.GITHUB_RUN_ATTEMPT==='1'&&/^[a-f0-9]{40}$/.test(e.GITHUB_SHA??''),'execution_identity_invalid');
+            must(e.GITHUB_WORKFLOW_REF===`alexj11324/Mikka/${WORKFLOW_PATH}@refs/heads/${EXPECTED_BRANCH}`,'execution_identity_invalid');
+            must(typeof e.GITHUB_TOKEN==='string'&&e.GITHUB_TOKEN.length>0,'execution_identity_invalid');
+-           must(git('rev-parse','HEAD')===e.GITHUB_SHA&&git('show','-s','--format=%P','HEAD')===pins.currentMainCommit,'source_identity_invalid');
++           must(git('rev-parse','HEAD')===e.GITHUB_SHA&&git('show','-s','--format=%P','HEAD')===`${pins.currentMainCommit} ${e.CLOSED_CARRIER_PARENT}`,'source_identity_invalid');
+            must(git('rev-parse',`${pins.currentMainCommit}^{tree}`)===pins.currentMainTree,'source_identity_invalid');
+            const expected=[`A\t${WORKFLOW_PATH}`,`A\t${HELPER_PATH}`].sort();
+            const actual=git('diff-tree','--no-commit-id','--name-status','--no-renames','-r',pins.currentMainCommit,'HEAD').split('\n').sort();
+@@ -133,7 +135,7 @@
+           import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
+           import { createHash } from 'node:crypto';
+           import { execFileSync } from 'node:child_process';
+-          const EXPECTED_BRANCH='ops/1505-diagnostic-cleanup-r7-20261109';
++          const EXPECTED_BRANCH='ops/1505-smoke-github-readonly-20261109';
+           const EXPECTED_GO='root-reviewed-1505-diagnostic-cleanup-r7-20261109-v1';
+           const HELPER_PATH='scripts/ops/issue1505-diagnostic-cleanup-r7.mjs';
+           const WORKFLOW_PATH='.github/workflows/issue1505-diagnostic-cleanup-r7.yml';
+@@ -156,10 +158,11 @@
+            for(const key of ['diagnosticExpiresAt','startAt','latestEntryAt','hardEndAt'])must(typeof pins[key]==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(pins[key])&&Number.isFinite(Date.parse(pins[key])),'bindings_invalid');
+            must(pins.rootReviewGo===EXPECTED_GO,'bindings_invalid');
+            const e=process.env;
++           must(/^[a-f0-9]{40}$/.test(e.CLOSED_CARRIER_PARENT??'')&&e.CLOSED_CARRIER_PARENT!==pins.currentMainCommit,'bindings_invalid');
+            must(e.GITHUB_REPOSITORY==='alexj11324/Mikka'&&e.GITHUB_EVENT_NAME==='push'&&e.GITHUB_REF===`refs/heads/${EXPECTED_BRANCH}`&&e.GITHUB_RUN_ATTEMPT==='1'&&/^[a-f0-9]{40}$/.test(e.GITHUB_SHA??''),'execution_identity_invalid');
+            must(e.GITHUB_WORKFLOW_REF===`alexj11324/Mikka/${WORKFLOW_PATH}@refs/heads/${EXPECTED_BRANCH}`,'execution_identity_invalid');
+            must(typeof e.GITHUB_TOKEN==='string'&&e.GITHUB_TOKEN.length>0,'execution_identity_invalid');
+-           must(git('rev-parse','HEAD')===e.GITHUB_SHA&&git('show','-s','--format=%P','HEAD')===pins.currentMainCommit,'source_identity_invalid');
++           must(git('rev-parse','HEAD')===e.GITHUB_SHA&&git('show','-s','--format=%P','HEAD')===`${pins.currentMainCommit} ${e.CLOSED_CARRIER_PARENT}`,'source_identity_invalid');
+            must(git('rev-parse',`${pins.currentMainCommit}^{tree}`)===pins.currentMainTree,'source_identity_invalid');
+            const expected=[`A\t${WORKFLOW_PATH}`,`A\t${HELPER_PATH}`].sort();
+            const actual=git('diff-tree','--no-commit-id','--name-status','--no-renames','-r',pins.currentMainCommit,'HEAD').split('\n').sort();

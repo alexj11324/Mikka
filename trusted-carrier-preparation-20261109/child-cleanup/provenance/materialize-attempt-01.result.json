@@ -1,0 +1,9 @@
+{
+  "command": "python materialize.py",
+  "outcome": "AssertionError before the first save() call",
+  "recordedFrom": "actual exec tool displayed stderr",
+  "reason": "marker name regex omitted digits used by SHA256 markers",
+  "fix": "change only [A-Z_] to [A-Z0-9_] for the closed marker set equality check",
+  "generatedDeploymentFiles": 0,
+  "executedWorkflowBlocks": 0
+}
