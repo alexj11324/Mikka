@@ -1,0 +1,167 @@
+name: Issue 1782 official UI proof
+
+on:
+  push:
+    branches: [ops/1782-official-ui-proof-20261109]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue1782-official-ui-proof
+  cancel-in-progress: false
+
+jobs:
+  proof:
+    # Root activates this reviewed, fixed source pair immediately before its
+    # single publication. No workflow_dispatch or arbitrary target inputs.
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/1782-official-ui-proof-20261109'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      MIKKA_EDITION: cloud
+      MIKKA_TEST_APP_DIR: ${{ github.workspace }}/app
+      MIKKA_UI_PROOF_OUTPUT: ${{ github.workspace }}/ui-evidence
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3000
+      AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      NEXT_TELEMETRY_DISABLED: '1'
+      MIKKA_TEST_DEPLOYMENT_SHA: f48ede424f538f34f43b8a63dd674db2c988e944
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      MIKKA_UI_OVERLAY_SHA: b92b0e1d48f75c92d059ee071162b72455e6af90
+    defaults:
+      run:
+        working-directory: control
+        shell: bash
+    steps:
+      - name: Check out the owned proof controller
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Check out the exact product source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: f48ede424f538f34f43b8a63dd674db2c988e944
+          path: app
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Check fixed source, actor, push and isolated database before credentials
+        run: |
+          node --test scripts/ops/ui-proof-1782.test.mjs
+          node scripts/ops/ui-proof-1782.mjs preflight
+      - name: Install the product's pinned dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+        env:
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+      - name: Install Chromium
+        working-directory: app
+        timeout-minutes: 15
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Read only the existing official UI checkout key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: HOSTED_UI_READ_KEY
+          include-imports: false
+      - name: Check out the fixed licensed UI
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: alexj11324/mikka-hosted-ui
+          ref: b92b0e1d48f75c92d059ee071162b72455e6af90
+          ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
+          path: app/.hosted-ui
+          persist-credentials: false
+      - name: Record the official UI identity and clear its key
+        working-directory: app
+        run: node scripts/release/hosted-ui.mjs record .hosted-ui
+      - name: Install the pinned official UI production dependencies
+        working-directory: app
+        run: |
+          if ! pnpm --dir .hosted-ui install --ignore-workspace --prod --ignore-scripts --frozen-lockfile > "$RUNNER_TEMP/private-ui-install.log" 2>&1; then
+            echo '::error::UI_PROOF_PRIVATE_DEPENDENCIES_FAILED'
+            exit 1
+          fi
+      - name: Verify the source pair and selected private slots before building
+        run: |
+          mkdir -p "$MIKKA_UI_PROOF_OUTPUT"
+          node scripts/ops/ui-proof-1782.mjs source "$MIKKA_UI_PROOF_OUTPUT/source-pair.json"
+      - name: Create ephemeral local authentication secret
+        run: |
+          node --input-type=module - <<'NODE'
+          import { appendFileSync, writeSync } from 'node:fs'
+          import { randomBytes } from 'node:crypto'
+          const value = randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${value}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${value}\n`)
+          NODE
+      - name: Apply tracked migrations to PostgreSQL 17
+        working-directory: app
+        env:
+          MIGRATE: '1'
+        run: pnpm migrate
+      - name: Prepare the isolated test-account schema
+        working-directory: app
+        run: pnpm test:e2e:setup
+      - name: Build the actual production application with the fixed official UI
+        working-directory: app
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          if ! (pnpm generate:agent-ui && pnpm build:app) > "$RUNNER_TEMP/ui-proof-build.log" 2>&1; then
+            echo '::error::UI_PROOF_PRODUCTION_BUILD_FAILED'
+            exit 1
+          fi
+          node scripts/release/hosted-ui.mjs audit .output/public
+      - name: Capture real local production UI and close owned runtimes
+        id: capture
+        working-directory: app
+        run: node apps/desktop/test/environment.mjs -- node "$GITHUB_WORKSPACE/control/scripts/ops/ui-proof-1782-capture.mjs"
+      - name: Audit only the closed gallery and public manifest
+        id: evidence
+        if: always()
+        env:
+          CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+        run: node scripts/ops/ui-proof-1782-audit.mjs
+      - name: Upload the single audited gallery
+        if: always() && steps.evidence.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1782-official-ui-f48ede42-b92b0e1d
+          path: ui-evidence
+          if-no-files-found: error
+          retention-days: 14
