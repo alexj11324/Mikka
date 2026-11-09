@@ -85,13 +85,14 @@ function useChatRows({ bots, workspaceId, active, userId }: { bots: BotView[]; w
 export type ChatNavEntry = { id: string; kind: 'coordinator' | 'bot' | 'group'; name: string; unread: boolean; current: boolean; target: ChatTarget }
 
 /** The bot list's rows as data: what the hosted App Shell lists under Bots and 群聊, with the same unread dots. */
-export function useChatNav({ bots, workspaceId, active, userId }: { bots: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string }): ChatNavEntry[] {
+export function useChatNav({ bots, workspaceId, active, userId }: { bots: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string }): { entries: ChatNavEntry[]; reloadGroups: () => Promise<unknown> } {
   const i18nText = useTranslations()
-  const { rows, unread } = useChatRows({ bots, workspaceId, active, userId })
+  const { rows, unread, reloadGroups } = useChatRows({ bots, workspaceId, active, userId })
   const coordinator: ChatNavEntry = { id: 'coordinator', kind: 'coordinator', name: i18nText('Nav.coordinator'), unread: unread('coordinator'), current: active?.kind === 'coordinator', target: { kind: 'coordinator' } }
-  return [coordinator, ...rows.map((row): ChatNavEntry => row.kind === 'group'
+  const entries = [coordinator, ...rows.map((row): ChatNavEntry => row.kind === 'group'
     ? { id: row.group.id, kind: 'group', name: row.group.title || i18nText('Nav.untitledConversation'), unread: unread(row.group.id), current: active?.kind === 'group' && active.id === row.group.id, target: { kind: 'group', id: row.group.id, title: row.group.title, workspaceId: row.group.workspaceId } }
     : { id: row.bot.id, kind: 'bot', name: row.bot.name, unread: unread(row.bot.id), current: active?.kind === 'bot' && active.botId === row.bot.id, target: { kind: 'bot', botId: row.bot.id } })]
+  return { entries, reloadGroups }
 }
 
 const SEEN_KEY = 'mikka:conversations-seen'

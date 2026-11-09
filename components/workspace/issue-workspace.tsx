@@ -12,12 +12,13 @@ import { Columns3, List, Plus, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IconRail, type RailDestination } from '@/components/nav/icon-rail'
 import { BotList, useChatNav, type ChatTarget } from '@/components/nav/bot-list'
+import { NewGroupDialog } from '@/components/nav/new-group-dialog'
 import { threadName } from '@/components/nav/thread-list'
 import { NewBotDialog } from '@/components/nav/new-bot-dialog'
 import { Onboarding, type E2BKeyResult, type OnboardingComputer } from '@/components/onboarding/onboarding'
 import type { LegacyChatRequest } from './legacy-chat-archive'
 import { TeamHome } from '@/components/teams/team-home'
-import { AppFrame, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'
+import { AppFrame, AppShellContent, FRAME_LISTS_CHATS, SignOutBoundary, WindowBar } from '@/components/app-shell'
 import * as settingsFrameSlot from '@ui-slot/settings-frame'
 import * as reviewSummarySlot from '@ui-slot/review-summary'
 import { ReviewPage } from '@ui-slot/review-page'
@@ -222,6 +223,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     listsWerePaused.current = listsPaused
   }, [listsPaused, mutate, refreshThreads])
   const [creatingBot, setCreatingBot] = useState(false)
+  // 新建群聊 from a frame that lists the chats itself (FRAME_LISTS_CHATS); the bot list keeps its own otherwise.
+  const [creatingGroup, setCreatingGroup] = useState(false)
   const [createdBot, setCreatedBot] = useState<BotView>()
   // The Coordinator's last line and time come from the bot chat summaries, never its whole chat.
   const { data: botChatSummaries } = useLiveBotChatList(user.id)
@@ -493,7 +496,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const activeBot = section === 'coordinator' && activeBotId && activeBotId !== coordinatorBot?.id ? bots.find(bot => bot.id === activeBotId) ?? (createdBot?.id === activeBotId ? createdBot : undefined) : undefined
   const activeChat: ChatTarget | null = section === 'coordinator' ? activeBot ? { kind: 'bot', botId: activeBot.id } : { kind: 'coordinator' } : section === 'agent' ? { kind: 'agent', sessionId: activeAgentId } : section === 'group' && groupRequest ? { kind: 'group', ...groupRequest } : null
   // The same rows as the bot list, for a frame that draws its own navigation (RailProps.chats).
-  const chatNav = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id })
+  const { entries: chatNav, reloadGroups } = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id })
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
   const openSettings = (href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }
   const isProjects = section === 'projects' || section === 'team-projects'
@@ -561,6 +564,9 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const dialogs = <>
     <NewTaskDialog workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} open={creating} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
     {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot) }} />}
+    {FRAME_LISTS_CHATS && (workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null) && <NewGroupDialog key={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} workspaceId={(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null)!} bots={bots} open={creatingGroup} onOpenChange={setCreatingGroup}
+      onCreated={group => { setCreatingGroup(false); void reloadGroups().catch(() => {}); openChat({ kind: 'group', ...group }) }}
+      onNewBot={() => { setCreatingGroup(false); setCreatingBot(true) }} onReviewGroups={() => { setCreatingGroup(false); void reloadGroups().catch(() => {}) }} />}
     <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />
     {search.value && <GlobalSearch open={search.open} onOpenChange={setSearchOpen} onOpenChangeComplete={search.onOpenChangeComplete} bots={bots} sessions={conversationSessions} coordinatorLine={coordinatorSummary?.line ? chatPreview(coordinatorSummary.line) ?? i18nText('Nav.cardPreview') : undefined} issues={tasks} projects={projects} threads={threads} onThread={runId => openThread(runId)} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
       onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}
@@ -606,11 +612,11 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
     bar={<WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
-    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ entries: chatNav, onOpen: openChat }} onSearch={searchFromBar} />}>
+    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ entries: chatNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreatingGroup(true) }} onSearch={searchFromBar} />}>
     {settingsShown ? settingsContent
       : <>
     {/* The board keeps only the rail on its left (MIK-45); a phone, with no rail, keeps the list's sheet. */}
-    <BotList phoneOnly={fullPage} bots={bots} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} threads={threads} issues={tasks} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />
+    {!FRAME_LISTS_CHATS && <BotList phoneOnly={fullPage} bots={bots} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} threads={threads} issues={tasks} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it; every other page keeps the phone header and its list button. */}
     <AppShellContent scrollKey={`page:${section}:${teamId ?? ""}:${selected ?? projectId ?? activeBot?.id ?? groupId ?? ""}:${params.get("app") ?? ""}:${layout}`} listToggle={!fullPage && !selected} hideHeader={!!selected} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : undefined} title={section === 'coordinator' ? chatTitle : sectionTitles[section]} heading={chatHeading} actions={<>{section === 'suggestions' && <SuggestionsRefresh />}{section === 'plugins' || section === 'artifacts' ? null : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} aria-keyshortcuts="Control+k Meta+k" disabled={boardBusy} onClick={() => setSearchOpen(true)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText("Workspace.search.title")}<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>}{/* The phone's way to 全部线程; the window bar's is hidden there. */}<AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} /></>}>
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
