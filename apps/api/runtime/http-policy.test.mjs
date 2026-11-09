@@ -108,3 +108,14 @@ test('only official GitHub cloud installation state continues from the unchanged
   assert.equal(pageRedirect(request(path), { edition: 'community' }), undefined)
   assert.equal(pageRedirect(request(path, { method: 'POST' }), { edition: 'cloud' }), undefined)
 })
+
+test('legacy app hostname permanently redirects every URL to the marketing homepage without carrying paths or query', () => {
+  for (const path of ['/', '/settings?section=account', '/mikka/api/auth/callback?code=private', '/nested/']) {
+    const input = new Request(`https://mikka.aspectlylabs.com${path}`, { method: 'POST' })
+    const response = pageRedirect(input, { legacyHost: 'mikka.aspectlylabs.com' })
+    assert.equal(response.status, 301, path)
+    assert.equal(response.headers.get('location'), 'https://aspectlylabs.com/mikka', path)
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer', path)
+  }
+  assert.equal(pageRedirect(request('/settings'), { legacyHost: 'mikka.aspectlylabs.com' }), undefined)
+})
