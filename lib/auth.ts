@@ -8,7 +8,7 @@ import { oAuthProxy, oneTimeToken } from 'better-auth/plugins'
 import { pool } from '@/lib/db'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
-import { authOAuthProxyOptions, authEffectiveTrustedOrigins, authSignInMethods } from '@/lib/auth-config'
+import { authOAuthProxyOptions, authEffectiveTrustedOrigins, authSignInMethods, authAppleOptions, requireAppleSignInNonce } from '@/lib/auth-config'
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { afterJob } from '@/lib/background'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
@@ -26,6 +26,7 @@ export { MOBILE_APP_ORIGIN } from '@/lib/auth-config'
 
 export const { github: githubEnabled, google: googleEnabled } = authSignInMethods(process.env)
 export const authBaseURL = appOrigin
+const appleOptions = authAppleOptions(process.env)
 const proxyOptions = authOAuthProxyOptions(process.env)
 export const oauthCallbackBaseURL = proxyOptions?.productionURL ?? authBaseURL
 const email = createAuthEmail({
@@ -64,6 +65,7 @@ export const auth = betterAuth({
     },
   },
   socialProviders: {
+    ...(appleOptions ? { apple: appleOptions } : {}),
     github: async () => ({
       ...await githubSignInClient(),
       getUserInfo: githubVerifiedProfile(),
@@ -114,6 +116,7 @@ export const auth = betterAuth({
   ],
   hooks: {
     before: createAuthMiddleware(async ctx => {
+      requireAppleSignInNonce(ctx)
       await beforeSignup(pool,ctx)
       return email.before(ctx)
     }),

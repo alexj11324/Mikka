@@ -1,5 +1,6 @@
+import { mobileMessages } from '@/lib/messages'
 import { HOSTED_CHOICE, type BotModelCurrent, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '../../../lib/bot-model-menu-view'
-import messages from '../../../messages/zh-CN.json'
+const messages = mobileMessages
 
 export { HOSTED_CHOICE }
 export type ModelOption = BotModelMenuOption
@@ -44,7 +45,7 @@ export function modelDisplayName(id: string) {
   return parts.join(' ')
 }
 export function optionName(option: Pick<ModelOption, 'id' | 'modelId'>) {
-  return option.id === HOSTED_CHOICE ? 'Mikka 默认' : option.modelId ? modelDisplayName(option.modelId) : '未知模型'
+  return option.id === HOSTED_CHOICE ? messages.Coordinator.modelPicker.hosted : option.modelId ? modelDisplayName(option.modelId) : messages.Coordinator.modelPicker.unknownModel
 }
 export function modelMenuLabel(current: BotModelCurrent, _running = false) {
   return optionName(current)

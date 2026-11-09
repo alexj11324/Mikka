@@ -4,7 +4,9 @@ import { Check, ChevronDown, ChevronRight, Terminal, Wrench, X } from 'lucide-re
 import { Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { tap } from '@/lib/haptics'
+import { mobileMessages } from '@/lib/messages'
 import { colors } from '@/lib/theme'
+import { ATTEMPT_WORD } from '../model/task-groups'
 import { stepDuration, stepLine, stepsLabel, type ThreadStep } from '../model/thread-steps'
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' })
@@ -45,7 +47,7 @@ function Step({ step, running }: { step: ThreadStep; running: boolean }) {
   const duration = stepDuration(step.ms)
   const output = step.output?.trim() || null
   const Kind = line.code ? Terminal : Wrench
-  const state = running ? '运行中' : step.failed ? '失败' : '完成'
+  const state = ATTEMPT_WORD[running ? 'running' : step.failed ? 'failed' : 'done']
   const body = (
     <>
       <Kind size={14} color={colors.secondary} strokeWidth={2} style={styles.kind} />
@@ -59,17 +61,17 @@ function Step({ step, running }: { step: ThreadStep; running: boolean }) {
   return (
     <View>
       {output ? (
-        <Pressable accessibilityRole="button" accessibilityState={{ expanded: shown }} accessibilityLabel={`${line.title}，${state}`}
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: shown }} accessibilityLabel={`${line.title} · ${state}`}
           onPress={() => { tap(); setShown(value => !value) }} style={({ pressed }) => [styles.step, pressed && { opacity: 0.6 }]}>{body}</Pressable>
       ) : (
-        <View accessible accessibilityLabel={`${line.title}，${state}`} style={styles.step}>{body}</View>
+        <View accessible accessibilityLabel={`${line.title} · ${state}`} style={styles.step}>{body}</View>
       )}
       {shown && output ? (
         <View style={styles.output}>
           <Text style={styles.outputText} numberOfLines={full ? undefined : OUTPUT_LINES} selectable>{output}</Text>
           {output.split('\n').length > OUTPUT_LINES || output.length > 600 ? (
             <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setFull(value => !value)}>
-              <Text style={styles.more}>{full ? '收起' : '显示更多'}</Text>
+              <Text style={styles.more}>{full ? mobileMessages.MobileCore.threadSteps.showLess : mobileMessages.MobileCore.threadSteps.showMore}</Text>
             </Pressable>
           ) : null}
         </View>

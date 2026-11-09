@@ -1,3 +1,5 @@
+import { mobileMessages } from '@/lib/messages'
+
 /**
  * A thread's folded tool calls (「已运行 2 条命令 · 调用了 1 个工具」), as the server sends them in the mobile thread read
  * (lib/issue-run-conversation.ts `ThreadStep`): a name, the one input that says what it did, and whether it failed.
@@ -11,10 +13,13 @@ export const isCommand = (step: Pick<ThreadStep, 'name'>) => COMMANDS.has(step.n
 
 /** The row's words, as Codex says them: 「已运行 2 条命令 · 调用了 1 个工具」; without the steps, 「执行了 3 步」. No Agent name: the Agent shows only in the header and where it changes. */
 export function stepsLabel(steps: readonly Pick<ThreadStep, 'name'>[] | undefined, count: number) {
-  if (!steps?.length) return `执行了 ${count} 步`
+  const words = mobileMessages.MobileCore
+  if (!steps?.length) return words.steps.replace('{count}', String(count))
   const commands = steps.filter(isCommand).length
   const tools = steps.length - commands
-  return [commands ? `已运行 ${commands} 条命令` : null, tools ? `调用了 ${tools} 个工具` : null].filter(Boolean).join(' · ')
+  const counted = (n: number, one: string, many: string) => n === 1 ? one : many.replace('{count}', String(n))
+  return [commands ? counted(commands, words.threadSteps.command, words.threadSteps.commands) : null,
+    tools ? counted(tools, words.threadSteps.tool, words.threadSteps.tools) : null].filter(Boolean).join(' · ')
 }
 
 /** A command as it was typed: Codex wraps it in `/bin/bash -lc "…"`, which says nothing. */
@@ -42,7 +47,8 @@ export function stepLine(step: Pick<ThreadStep, 'name' | 'detail'>) {
 /** 「1.2 秒」, 「850 毫秒」, 「2 分 5 秒」. */
 export function stepDuration(ms: number | null | undefined) {
   if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 0) return null
-  if (ms < 1000) return `${Math.round(ms)} 毫秒`
-  if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} 秒`
-  return `${Math.floor(ms / 60_000)} 分 ${Math.round((ms % 60_000) / 1000)} 秒`
+  const words = mobileMessages.MobileCore.threadSteps
+  if (ms < 1000) return words.milliseconds.replace('{count}', String(Math.round(ms)))
+  if (ms < 60_000) return words.seconds.replace('{count}', (ms / 1000).toFixed(ms < 10_000 ? 1 : 0))
+  return words.minutes.replace('{minutes}', String(Math.floor(ms / 60_000))).replace('{seconds}', String(Math.round((ms % 60_000) / 1000)))
 }

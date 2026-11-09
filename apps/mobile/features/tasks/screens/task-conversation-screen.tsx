@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { useCallback, useRef, useState } from 'react'
 import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
@@ -107,8 +108,8 @@ export function TaskConversationScreen() {
       />
       <KeyboardChatScrollView ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={styles.center}><Spinner /></View> : null}
-        <ReadNotice error={error} hasData={Boolean(data)} label="对话" onRetry={reload} />
-        {data && !segments.length ? <Text style={styles.empty}>还没有尝试</Text> : null}
+        <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
+        {data && !segments.length ? <Text style={styles.empty}>{mobileMessages.MobileCore.noAttempts}</Text> : null}
         {segments.map((segment, index) => (
           <View key={segment.attempt.runId} style={styles.segment}
             onLayout={event => { offsets.current.set(segment.attempt.runId, event.nativeEvent.layout.y); place() }}>
@@ -124,7 +125,7 @@ export function TaskConversationScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: the conversation ends in the composer; a message to an ended attempt runs it again (R-81). */}
-      {live && newest ? <Composer placeholder="给这个任务发消息" onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id: newest }}
+      {live && newest ? <Composer placeholder={mobileMessages.MobileCore.messageTask} onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id: newest }}
         onStop={composerStops(live) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
@@ -148,7 +149,7 @@ function AttemptError({ raw }: { raw: string }) {
     <View style={styles.cause}>
       <Text style={styles.causeLine}>{line}</Text>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(value => !value)} hitSlop={8}>
-        <Text style={styles.detailsToggle}>详情</Text>
+        <Text style={styles.detailsToggle}>{mobileMessages.IssueThreads.errorDetails}</Text>
       </Pressable>
       {open ? <Text selectable style={styles.details}>{raw}</Text> : null}
     </View>

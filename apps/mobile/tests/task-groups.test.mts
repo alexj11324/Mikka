@@ -1,3 +1,4 @@
+import { mobileMessages } from '../lib/messages.ts'
 // Lists show tasks only, grouped 待处理 · 进行中 · 待办 · 已完成 (decisions/2026-11-07-2045-tasks-only-threads-inside.md).
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -29,7 +30,7 @@ test('groups come in order with counts; 已完成 starts folded and opens when t
   ]
   const rows = taskListRows(tasks, new Set())
   assert.deepEqual(rows.map(row => row.kind === 'section' ? `${row.title}${row.count}${row.folded ? '+' : ''}` : (row.task as { id: string }).id),
-    ['等待你1', 'd', '进行中1', 'c', '待办1', 'b', '已完成2+'])
+    [`${mobileMessages.MobileCore.groups.pending}1`, 'd', `${mobileMessages.MobileCore.groups.running}1`, 'c', `${mobileMessages.MobileCore.groups.todo}1`, 'b', `${mobileMessages.MobileCore.groups.done}2+`])
   const opened = taskListRows(tasks, new Set(['done', 'pending']))
   assert.deepEqual(opened.map(row => row.kind === 'section' ? row.id : (row.task as { id: string }).id),
     ['pending', 'running', 'c', 'todo', 'b', 'done', 'a', 'e'])
@@ -44,28 +45,28 @@ test('a filter shows its group alone; an empty group has no header', () => {
 
 // 2026-11-07-2230: each row shows its own state's icon; the hand is only 等你处理.
 test('a row shows the API\'s state; the app writes the reason\'s words', () => {
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'failed', reason: null }), { state: 'failed', reason: '失败' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'review', state: 'waiting', reason: 'pr_review' }), { state: 'waiting', reason: '待审阅' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'waiting', reason: 'approval' }), { state: 'waiting', reason: '等你确认' })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'failed', reason: null }), { state: 'failed', reason: mobileMessages.MobileCore.states.failed })
+  assert.deepEqual(rowState({ group: 'pending', status: 'review', state: 'waiting', reason: 'pr_review' }), { state: 'waiting', reason: mobileMessages.MobileCore.reasons.pr_review })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'waiting', reason: 'approval' }), { state: 'waiting', reason: mobileMessages.MobileCore.reasons.approval })
   assert.deepEqual(rowState({ group: 'running', status: 'doing', state: 'queued', reason: null }), { state: 'queued', reason: null })
   // todo, done, canceled and duplicate show the board's icon.
-  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: 'todo', reason: 'blocked_by', blockedBy: 'MIK-12' }), { state: null, reason: '等 MIK-12' })
+  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: 'todo', reason: 'blocked_by', blockedBy: 'MIK-12' }), { state: null, reason: mobileMessages.MobileCore.reasons.blocked_by.replace('{task}', 'MIK-12') })
   assert.deepEqual(rowState({ group: 'done', status: 'canceled', state: 'canceled', reason: null }), { state: null, reason: null })
-  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: 'todo', reason: 'flagged' }), { state: null, reason: '已标记受阻' })
+  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: 'todo', reason: 'flagged' }), { state: null, reason: mobileMessages.MobileCore.reasons.flagged })
 })
 
 test('until then, a failed attempt is a triangle, not a hand, and waiting rows say why', () => {
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'failed', blocker: null } }), { state: 'failed', reason: '失败' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'question', blocker: null } }), { state: 'waiting', reason: '等你回复' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'review' }), { state: 'waiting', reason: '待审阅' })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'failed', blocker: null } }), { state: 'failed', reason: mobileMessages.MobileCore.states.failed })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'question', blocker: null } }), { state: 'waiting', reason: mobileMessages.MobileCore.reasons.needs_input })
+  assert.deepEqual(rowState({ group: 'pending', status: 'review' }), { state: 'waiting', reason: mobileMessages.MobileCore.reasons.pr_review })
   assert.deepEqual(rowState({ group: 'running', status: 'doing' }), { state: 'running', reason: null })
   assert.deepEqual(rowState({ group: 'todo', status: 'backlog' }), { state: null, reason: null })
   assert.deepEqual(rowState({ group: 'done', status: 'canceled' }), { state: null, reason: null })
 })
 
 test('waiting on another task, or flagged, never gets the hand; it says why', () => {
-  assert.deepEqual(rowState({ group: 'pending', status: 'todo', blocked: { reason: 'dependency', blocker: 'MIK-12' } }), { state: null, reason: '等 MIK-12' })
-  assert.deepEqual(rowState({ group: 'todo', status: 'todo', blocked: { reason: 'flagged', blocker: null } }), { state: null, reason: '已标记受阻' })
+  assert.deepEqual(rowState({ group: 'pending', status: 'todo', blocked: { reason: 'dependency', blocker: 'MIK-12' } }), { state: null, reason: mobileMessages.MobileCore.reasons.blocked_by.replace('{task}', 'MIK-12') })
+  assert.deepEqual(rowState({ group: 'todo', status: 'todo', blocked: { reason: 'flagged', blocker: null } }), { state: null, reason: mobileMessages.MobileCore.reasons.flagged })
 })
 
 test('an attempt shows its own result, never the hand: running, paused, done, failed, blocked', () => {
@@ -83,9 +84,9 @@ test('an attempt shows its own result, never the hand: running, paused, done, fa
 
 // 受阻 (quota, login, key, a device offline) is its own state, the octagon: not the hand.
 test('受阻 is its own state, with the API\'s code or read from the board until then', () => {
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'blocked', reason: 'quota' }), { state: 'blocked', reason: '额度用完' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'quota', blocker: null } }), { state: 'blocked', reason: '额度用完' })
-  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'run', blocker: null } }), { state: 'blocked', reason: '受阻' })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'blocked', reason: 'quota' }), { state: 'blocked', reason: mobileMessages.MobileCore.reasons.quota })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'quota', blocker: null } }), { state: 'blocked', reason: mobileMessages.MobileCore.reasons.quota })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'run', blocker: null } }), { state: 'blocked', reason: mobileMessages.MobileCore.reasons.blocked })
 })
 
 // Alex 2026-11-07: 「第二次尝试明显应该在第一次之后」. A task has one conversation.
@@ -110,13 +111,14 @@ test('a steps row says what ran: commands and tools, or the plain count without 
     { name: 'Bash', detail: 'git status' },
     { name: 'mcp__mikka__record_decision', detail: 'Choose provider receipts' },
   ]
-  assert.equal(stepsLabel(steps, 3), '已运行 2 条命令 · 调用了 1 个工具')
-  assert.equal(stepsLabel([steps[2]!], 1), '调用了 1 个工具')
-  assert.equal(stepsLabel(undefined, 3), '执行了 3 步')
+  const words = mobileMessages.MobileCore
+  assert.equal(stepsLabel(steps, 3), `${words.threadSteps.commands.replace('{count}', '2')} · ${words.threadSteps.tool}`)
+  assert.equal(stepsLabel([steps[2]!], 1), words.threadSteps.tool)
+  assert.equal(stepsLabel(undefined, 3), words.steps.replace('{count}', '3'))
   assert.equal(commandText('/bin/bash -lc "pnpm test"'), 'pnpm test')
   assert.equal(commandText(`/bin/bash -lc "python3 - <<'PY' import json…`), `python3 - <<'PY' import json…`)
   assert.deepEqual(stepLine(steps[2]!), { title: 'record_decision', detail: 'Choose provider receipts', code: false })
   assert.deepEqual(stepLine({ name: 'apply_patch', detail: '/home/user/.mikka/worker/worktrees/abc/apps/mobile/lib/a.ts' }), { title: 'apply_patch', detail: 'lib/a.ts', code: false })
   assert.deepEqual(stepLine(steps[0]!), { title: 'pnpm test', detail: null, code: true })
-  assert.deepEqual([stepDuration(850), stepDuration(1240), stepDuration(125_000), stepDuration(undefined)], ['850 毫秒', '1.2 秒', '2 分 5 秒', null])
+  assert.deepEqual([stepDuration(850), stepDuration(1240), stepDuration(125_000), stepDuration(undefined)], [words.threadSteps.milliseconds.replace('{count}', '850'), words.threadSteps.seconds.replace('{count}', '1.2'), words.threadSteps.minutes.replace('{minutes}', '2').replace('{seconds}', '5'), null])
 })
