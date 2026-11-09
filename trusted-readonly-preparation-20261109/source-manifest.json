@@ -1,0 +1,42 @@
+[
+  {
+    "path": "test_github_prepare_guard.py",
+    "bytes": 12345,
+    "sha256": "dd311ec0a37249049f005394413e74f988ba5799e06f4b7391f4c2cc690eb3a8"
+  },
+  {
+    "path": "guard.template.py",
+    "bytes": 2920,
+    "sha256": "cd7e55d6523d5ef6e44fde02baa507723c8e9b6960a2ac0321da47e9f79352c1"
+  },
+  {
+    "path": "fixture-source/.github/workflows/issue1505-smoke-github-readonly.yml",
+    "bytes": 10754,
+    "sha256": "b58efa843dc9d21434728d7ee4581bda89e5a17ad28d1a570db2eefb8a69e4cc"
+  },
+  {
+    "path": "fixture-source/scripts/ops/issue1505/github-readonly-provider.mjs",
+    "bytes": 14515,
+    "sha256": "11b100e92c24d91b98200c18eea9a50a9c6a09ac3e3d5ece1166bbcc559f8937"
+  },
+  {
+    "path": "fixture-source/scripts/ops/issue1505/github-readonly-helper.mjs",
+    "bytes": 9828,
+    "sha256": "9655772777836a8b1a806b1021409ff9b1f7163db51490f25eeda166f6599be7"
+  },
+  {
+    "path": "fixture-source/scripts/ops/issue1505/github-readonly-store.mjs",
+    "bytes": 8858,
+    "sha256": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5"
+  },
+  {
+    "path": "fixture-source/scripts/ops/issue1505/github-readonly-runner.mjs",
+    "bytes": 6216,
+    "sha256": "e7178ba5338e27ceaa03700fcbf6fdb8adcbf137601ee6245c2980a5b3b1f25a"
+  },
+  {
+    "path": "fixture-source/scripts/ops/issue1505/github-readonly.test.mjs",
+    "bytes": 24731,
+    "sha256": "e16c13cf488a682cde1666ab002e4cac957912a1887ef1b087822887885f770d"
+  }
+]

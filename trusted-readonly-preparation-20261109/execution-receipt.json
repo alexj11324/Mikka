@@ -1,0 +1,46 @@
+{
+  "observedAt": "2026-11-09 12:37:14 UTC",
+  "offlineDraftEvidenceCommit": "c464a896632baccd360a9c402fa3d08eee6a8fd2",
+  "workflowSha256": "b58efa843dc9d21434728d7ee4581bda89e5a17ad28d1a570db2eefb8a69e4cc",
+  "runtime": {
+    "node": "v24.22.1",
+    "python": "3.9.25"
+  },
+  "gitGuard": {
+    "passed": 15,
+    "failed": 0,
+    "realTemporaryGitObjects": true,
+    "actualGeneratedGuard": true,
+    "onlyThreeGitPinsRebound": true,
+    "actualSixFilesAndFiveHashes": true,
+    "externalNetworkBlocked": true
+  },
+  "businessHelper": {
+    "passed": 39,
+    "failed": 0,
+    "actualPostgreSQL": false,
+    "actualOAuth": false
+  },
+  "vm": {
+    "id": "sbx_HtMfKPfNNTEIjDSEgkGOXojKiOdG",
+    "status": "stopped",
+    "stoppedAt": "2026-11-09T12:26:38.961Z",
+    "durationMs": 114128,
+    "vcpus": 1
+  },
+  "capture": {
+    "chars": 6503,
+    "bytes": 6597,
+    "sha256": "a157f2a39ceacf2b0b2710723cccca001b7b0fa302eb4d9488e88e44448d8d55",
+    "frames": 15
+  },
+  "limits": {
+    "operationalCommitCreated": false,
+    "trustedBranchRefUpdated": false,
+    "productionCredentialsRead": false,
+    "newChild": false,
+    "newTasks": 0,
+    "formalSamples": 0
+  },
+  "next": "Bind fresh current source, exact closed OPS head and actual finite entry after actual Factory release and a normal-API blocked_connection result. Do not activate prototype 14:00/source pins automatically."
+}

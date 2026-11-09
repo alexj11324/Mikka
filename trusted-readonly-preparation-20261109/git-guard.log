@@ -1,0 +1,20 @@
+test_changed_source_bytes_are_rejected (__main__.PrepareGuardTests) ... ok
+test_current_main_change_is_rejected (__main__.PrepareGuardTests) ... ok
+test_dirty_tracked_worktree_is_rejected (__main__.PrepareGuardTests) ... ok
+test_exact_two_parent_candidate_passes (__main__.PrepareGuardTests) ... ok
+test_executable_ops_file_is_rejected (__main__.PrepareGuardTests) ... ok
+test_expired_entry_rejects_before_get (__main__.PrepareGuardTests) ... ok
+test_expiry_during_response_rejects_after_get (__main__.PrepareGuardTests) ... ok
+test_extra_parent_is_rejected (__main__.PrepareGuardTests) ... ok
+test_missing_ops_parent_is_rejected (__main__.PrepareGuardTests) ... ok
+test_parent_order_is_significant (__main__.PrepareGuardTests) ... ok
+test_product_change_is_rejected (__main__.PrepareGuardTests) ... ok
+test_symlink_with_matching_target_bytes_is_rejected (__main__.PrepareGuardTests) ... ok
+test_wrong_main_parent_is_rejected (__main__.PrepareGuardTests) ... ok
+test_wrong_main_tree_pin_is_rejected (__main__.PrepareGuardTests) ... ok
+test_wrong_ops_parent_is_rejected (__main__.PrepareGuardTests) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.855s
+
+OK

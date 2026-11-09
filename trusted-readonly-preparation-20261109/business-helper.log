@@ -1,0 +1,47 @@
+✔ fresh child requests exactly two read permissions; role push=true is not token authority (82.78453ms)
+✔ provider rejects write permission (5.61264ms)
+✔ provider rejects extra permission (0.995806ms)
+✔ provider rejects all repositories (1.352855ms)
+✔ provider rejects wrong App (5.429898ms)
+✔ provider rejects wrong principal (0.315397ms)
+✔ provider rejects wrong repository (2.777533ms)
+✔ provider rejects expired child (1.586512ms)
+✔ provider rejects same source child (1.643212ms)
+✔ provider rejects unexpected OAuth scope (4.04924ms)
+✔ successful repair uses normal readback, retains new child and emits no secrets (1.302492ms)
+✔ existing connection fails before obtaining Owner source or minting (0.352978ms)
+✔ a failed post-resolution Owner source stops minting (0.266458ms)
+✔ precommit refusal revokes only the newly minted token (4.523449ms)
+✔ ambiguous COMMIT preserves safe recovery state and never blindly revokes (0.424529ms)
+✔ readback failure cleans only the known installed child (0.751963ms)
+✔ foreign connection blocks cleanup without revoking or deleting it (0.220988ms)
+✔ changed App rejects cleanup before reading a token (0.18583ms)
+✔ wrong state principal rejects cleanup before storage/provider IO (0.166523ms)
+✔ normal repository readback must match exact GitHub subject and installation (0.185854ms)
+✔ store holds Owner lock, rechecks vacancy and uses normal scoped-client save before COMMIT (1.066656ms)
+✔ store concurrent existing Smoke row refuses before save and rolls back (4.403277ms)
+✔ store changed Owner refuses before saving child (0.260725ms)
+✔ store failed COMMIT retains checkpoint, closes broken client, does not delete row (0.351121ms)
+✔ runner default disabled fails before loading any credential or application dependency (0.36906ms)
+✔ runner exact execution guard rejects rerun, foreign repo, branch and missing GO (0.203517ms)
+✔ lost mint response records unknown outcome and performs no retry or speculative revocation (0.330696ms)
+✔ normal repository readback binds only provider-verified public App ID and restores its environment (0.180239ms)
+✔ normal repository readback rejects conflicting App configuration and restores after failure (0.180677ms)
+✔ closed diagnostics reject identifier-shaped foreign messages and preserve only listed codes (0.226961ms)
+✔ an expired original Owner source resolves under its lock and only the committed reread reaches the child provider (0.904433ms)
+✔ refusal at identity never resolves Owner credentials or mints (2.812056ms)
+✔ refusal at idle never resolves Owner credentials or mints (0.161761ms)
+✔ refusal at assertVacant never resolves Owner credentials or mints (0.146933ms)
+✔ the locked Owner identity and finite dates are checked before any normal getter (0.493676ms)
+✔ an unpersisted refresh intent stops before the getter (0.251222ms)
+✔ getterError preserves possible refresh evidence without mint, retry or Owner revocation (0.379582ms)
+✔ commitError preserves possible refresh evidence without mint, retry or Owner revocation (0.201028ms)
+✔ cleanup never resolves or refreshes an Owner connection (0.200155ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 252.13975
