@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "kind": "ci-raw-log-publication-boundary",
+  "repository": "alexj11324/Mikka",
+  "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "origin": "GitHub Actions public job decoded log API; each of these four terminal job logs read once by the assigned sole reader.",
+  "rawFiles": [
+    {
+      "key": "changes",
+      "jobId": 129322657088,
+      "runId": 42663994959,
+      "bytes": 582508,
+      "sha256": "2aab7bb8b97ccf1f03a34dce557188090dca7b56a0da02b88460cb1b7ef2dece",
+      "gitBlob": "1933e131fba7c42c19f61c9baafb981cb78461a5",
+      "logReadsByThisAgent": 1,
+      "closedPatternScan": [
+        {
+          "category": "private_key",
+          "count": 0
+        },
+        {
+          "category": "github_token",
+          "count": 0
+        },
+        {
+          "category": "posthog_secret",
+          "count": 0
+        },
+        {
+          "category": "aws_access",
+          "count": 0
+        },
+        {
+          "category": "bearer_value",
+          "count": 0
+        },
+        {
+          "category": "signed_url",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "key": "source",
+      "jobId": 129324156926,
+      "runId": 42663994959,
+      "bytes": 136710,
+      "sha256": "bd2d2f782a8391c86eed413a15a1ab33af19e45533e2201f3c0332e691d11dcd",
+      "gitBlob": "134d59aa23a53b7cd0b259a37902bb2fe9a4c37d",
+      "logReadsByThisAgent": 1,
+      "closedPatternScan": [
+        {
+          "category": "private_key",
+          "count": 0
+        },
+        {
+          "category": "github_token",
+          "count": 0
+        },
+        {
+          "category": "posthog_secret",
+          "count": 0
+        },
+        {
+          "category": "aws_access",
+          "count": 0
+        },
+        {
+          "category": "bearer_value",
+          "count": 0
+        },
+        {
+          "category": "signed_url",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "key": "core",
+      "jobId": 129324156636,
+      "runId": 42663994959,
+      "bytes": 1019842,
+      "sha256": "4dbc96f75d5d473cfa2ecfee452e125c24ad350ad754c919117b0aeff515a66a",
+      "gitBlob": "5933d3f78c7c3516ee6511487d6b1c715d737acf",
+      "logReadsByThisAgent": 1,
+      "closedPatternScan": [
+        {
+          "category": "private_key",
+          "count": 0
+        },
+        {
+          "category": "github_token",
+          "count": 0
+        },
+        {
+          "category": "posthog_secret",
+          "count": 0
+        },
+        {
+          "category": "aws_access",
+          "count": 0
+        },
+        {
+          "category": "bearer_value",
+          "count": 0
+        },
+        {
+          "category": "signed_url",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "key": "e2bTest",
+      "jobId": 129322656507,
+      "runId": 42663994973,
+      "bytes": 53455,
+      "sha256": "58c42a4666cc010a84c182fecaea1bd28c391ff29a402f58e43d8bd2a3b0e959",
+      "gitBlob": "f2c86755c96c81fded1c7db0e79c245e4cf4a863",
+      "logReadsByThisAgent": 1,
+      "closedPatternScan": [
+        {
+          "category": "private_key",
+          "count": 0
+        },
+        {
+          "category": "github_token",
+          "count": 0
+        },
+        {
+          "category": "posthog_secret",
+          "count": 0
+        },
+        {
+          "category": "aws_access",
+          "count": 0
+        },
+        {
+          "category": "bearer_value",
+          "count": 0
+        },
+        {
+          "category": "signed_url",
+          "count": 0
+        }
+      ]
+    }
+  ],
+  "masking": "Platform masking is retained exactly. No signed download URL or raw API envelope is published.",
+  "method": "Closed searches for private-key headers, GitHub/PostHog/AWS token forms, long Bearer credentials and signed-URL values across all four exact log strings. All counts are zero.",
+  "limits": "This is a bounded automated scan plus review of relevant command/result/cleanup blocks; it is not exhaustive classification of all possible personal or secret strings.",
+  "expectedPublicFixtures": "CI commands use repository-defined test identities and local fixture inputs; warnings and test names are preserved. No business-data query or account access was performed by the reviewer.",
+  "storage": "Only original UTF8 text and closed source/execution metadata are put in content-addressed Git blobs. No refs, commits or trees are updated.",
+  "originalPreservation": true,
+  "resources": {
+    "reviewerTestsRun": 0,
+    "reviewerVMs": 0,
+    "reviewerProviderAllocations": 0,
+    "workflowDispatches": 0,
+    "reruns": 0
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "observedAt": "2026-11-09 17:53:14 UTC",
+  "runCount": 9,
+  "jobs": 38,
+  "checkCount": 39,
+  "externalChecks": [
+    {
+      "id": 129322722545,
+      "name": "GitGuardian Security Checks",
+      "app": "gitguardian",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "errors": [],
+  "jobConclusions": {
+    "success": 31,
+    "skipped": 7
+  },
+  "checkConclusions": {
+    "success": 32,
+    "skipped": 7
+  },
+  "workflowConclusions": {
+    "success": 9
+  },
+  "pagesFullyRead": true,
+  "firstPageLimit": 100,
+  "allCountsBelowLimit": true,
+  "allRunAndCheckIdsUnique": true,
+  "allChecksHeadMatches": true,
+  "missingCoverage": 0,
+  "sqlBudgetsFailed": true
+}

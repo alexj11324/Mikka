@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "kind": "actual-ci-checkout-and-selection-binding",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1799,
+  "event": "pull_request",
+  "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "actualCheckout": "576c903cd6ede14520a79111d2b71154968ad910",
+  "actualTree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "actualParents": [
+    "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+    "6414a08ddb4a92962bc82e9e427c391d645cacb2"
+  ],
+  "headTree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "sameTree": true,
+  "observedFrom": [
+    {
+      "runId": 42663994959,
+      "attempt": 1,
+      "jobId": 129322657088,
+      "name": "changes / Changed files",
+      "gitLogCommandLine": 2573,
+      "gitLogValueLine": 2574,
+      "nodeVersion": "24.22.2",
+      "raw": {
+        "name": "changes.original.log",
+        "gitBlob": "1933e131fba7c42c19f61c9baafb981cb78461a5",
+        "bytes": 582508,
+        "sha256": "2aab7bb8b97ccf1f03a34dce557188090dca7b56a0da02b88460cb1b7ef2dece"
+      }
+    },
+    {
+      "runId": 42663994973,
+      "attempt": 1,
+      "jobId": 129322656507,
+      "name": "test",
+      "gitLogCommandLine": 121,
+      "gitLogValueLine": 122,
+      "nodeVersion": "24.22.2",
+      "raw": {
+        "name": "e2b-test.original.log",
+        "gitBlob": "f2c86755c96c81fded1c7db0e79c245e4cf4a863",
+        "bytes": 53455,
+        "sha256": "58c42a4666cc010a84c182fecaea1bd28c391ff29a402f58e43d8bd2a3b0e959"
+      }
+    }
+  ],
+  "exactGitCommitApi": "https://api.github.com/repos/alexj11324/Mikka/git/commits/576c903cd6ede14520a79111d2b71154968ad910",
+  "selection": {
+    "raw": {
+      "name": "selection.original.json",
+      "gitBlob": "cbdb27fa0d5b429b94bd0da88160064ed7fd5f58",
+      "bytes": 131272,
+      "sha256": "f0d49e1389576b70342d54df5cc8ef0e61b4ecb54e6ffbbd1474ecde03565073"
+    },
+    "originalNormalizedLines": {
+      "from": 2671,
+      "through": 5732
+    },
+    "full": true,
+    "docsOnly": false,
+    "units": 86,
+    "core": 57,
+    "integration": 29,
+    "dbSuites": 72,
+    "dbMatrix": [
+      "1/4",
+      "2/4",
+      "3/4",
+      "4/4"
+    ],
+    "source": true,
+    "daemon": true,
+    "mobile": true,
+    "desktop": true,
+    "image": true,
+    "analytics": true,
+    "reasons": [
+      "global configuration, schema, policy or security input",
+      "unmapped file",
+      "changed source has unresolved/generated imports"
+    ]
+  },
+  "scope": "Selection proves what this run selected, not completion. Source/Core and Native require their own actual logs. These original reads are unique to this reviewer; no prior run is reused as a current execution.",
+  "privacy": "Original logs are public GitHub Actions decoded logs with platform masking. Closed PEM/GitHub/PostHog/AWS/Bearer/signed-URL scan had zero matches; not a claim of exhaustive privacy auditing.",
+  "actions": {
+    "jobLogDownloads": 2,
+    "newTests": 0,
+    "newResources": 0,
+    "refChanges": 0
+  }
+}

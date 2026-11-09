@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "scope": "all preceding 22 public payload files, exact frozen bytes; index and this receipt contain metadata only",
+  "categories": [
+    "private-key",
+    "github-token",
+    "provider-key",
+    "jwt",
+    "email",
+    "credential-url",
+    "authorization",
+    "signed-download-query"
+  ],
+  "files": [
+    {
+      "path": "native-6414a0/original/lifecycle.json",
+      "bytes": 686827,
+      "sha256": "756aa75ae6b482b1e1a7ab1006c8451ac0650af09391ffa480d937efc8b4b06f",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/original/parity.json",
+      "bytes": 116451,
+      "sha256": "8ca9f255e5af83c6e62f48d63c3c3d7ba26b059d5caf8ad5bc5bcd0fb4a0df6d",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/original/smoke.json",
+      "bytes": 3144,
+      "sha256": "d1c3b9df1978e929fd9b8a42223f89abb261bcbea88a526f6b81a0cc3e97f87f",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/original/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "b9341a254eccdc154e53c12ab5b97d0d9b5c39164ca0b19147dbfdb58a46d389",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/original/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "c459012f4989abd5a432680373f4da077305ec124a680d2cbabcc1d4dc1cf24b",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/original-files-manifest.safe.json",
+      "bytes": 101816,
+      "sha256": "1e5f19441b9538168c2cac1088c715a070215e0086442a20b9b01795c7fa0532",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/job-129327506300.original.log",
+      "bytes": 256735,
+      "sha256": "b04b98c60ff10c275207c1f50795f13528bbcff7ee4281afe5576a26e50c6873",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/all-workflows-checks.safe.json",
+      "bytes": 190260,
+      "sha256": "d9f769c9d73ab4b0aa88367044c97c7bd5e5998b885f425c4970eafe36f42d12",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/metadata-coverage.safe.json",
+      "bytes": 764,
+      "sha256": "55ce55905bc372119c8d3aeeef0d4306e48970307af10e7c3d843c010cf9b04e",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/arithmetic.safe.json",
+      "bytes": 26010,
+      "sha256": "6ce28b6eb0a0eed7e874582917d5d67a7e646693e05e08c0ebdde1d2c64ca9a1",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/rpc-diagnostics.safe.json",
+      "bytes": 118499,
+      "sha256": "032bb37fba6b9f9823f677c7b106cf67a9b78fa571da5666ca0656dcc6858a09",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/cleanup-package.safe.json",
+      "bytes": 13372,
+      "sha256": "4e222047ef12f70a85f833bca85705304aa82f3b38a6e8d812e914ec6622ee38",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/source-binding.safe.json",
+      "bytes": 4615,
+      "sha256": "157238230edbe59daa9e6dec86ba08a960d0b71388132f3ff564f992d230e812",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/job.safe.json",
+      "bytes": 7884,
+      "sha256": "cbcc929e91ad7504a6508309f94b807d0156e28b355f26c110147c3447e58fb7",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/first-read.safe.json",
+      "bytes": 2854,
+      "sha256": "484f4172c835d2c2bcd74b79a11480181fb6f52469039180b8682ff778de50ca",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/artifact-transfer.safe.json",
+      "bytes": 4994,
+      "sha256": "53348fa2fa6e70b02bcfafa8fba27c28b6b2530f9f81432b79c1856fd2b8dcbc",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/vm-cleanup.safe.json",
+      "bytes": 1535,
+      "sha256": "e9935115ec3ca9904e7932daf275c9e71b95c93714ece25bd3544e62974ce5a5",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/verification-run.safe.json",
+      "bytes": 2250,
+      "sha256": "2443760fcd58086cd43eb04d09b36659be33d2c5cadf4bff8487f2dbae729cef",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/verify-artifact-download.py",
+      "bytes": 5436,
+      "sha256": "38436e5af850009bec300c9132334b44da86129529ad858e2fa7b86200082451",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/verify-native-originals.mjs",
+      "bytes": 9396,
+      "sha256": "f6ddbb3dbc8a9572c3837fbb9ebacf8b6fafc8d4be4955354a46e89a538cdc59",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/read-ledger.safe.json",
+      "bytes": 8838,
+      "sha256": "448b2b730253a72ab314d5c8f91296685bb0e1ea886589e80336d0d779a9f859",
+      "findings": []
+    },
+    {
+      "path": "native-6414a0/README.md",
+      "bytes": 8101,
+      "sha256": "cf6d59f43b4867f60c3e8102ae24fbe12a6c231e4aea59e94b4294aa52d37529",
+      "findings": []
+    }
+  ],
+  "totalFiles": 22,
+  "totalBytes": 1573606,
+  "findingCount": 0,
+  "originalsNotRedactedOrRewritten": true,
+  "privatePlatformResponsesAndDownloadReferencesNotPublished": true,
+  "limitations": "Pattern screening is not a formal absence guarantee; original harness fields and closed metadata were also reviewed. Fixture/internal invocation identifiers are not credentials."
+}

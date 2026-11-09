@@ -1,0 +1,665 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-native6414-read-only-source-diagnosis",
+  "repository": "alexj11324/Mikka",
+  "date": "2026-11-09",
+  "scope": {
+    "reviewer": "/root/current_source_review",
+    "sourceOnly": true,
+    "newTestsRun": 0,
+    "newDatabaseOrVmResources": 0,
+    "modelCalls": 0,
+    "workflowActions": 0,
+    "workflowJobLogDownloads": 0,
+    "artifactDownloads": 0,
+    "sourceEdits": 0,
+    "refUpdates": 0,
+    "existingEvidenceRead": "Existing immutable Git lifecycle blobs; source files at exact refs. Ledger arithmetic owned independently by /root/native_budget_diff; this receipt joins that evidence to source without replacing its original counts.",
+    "exclusions": [
+      "No window or threshold change",
+      "No revised first-pair choice",
+      "No delayed work or forced Web wait",
+      "No dropped background/unknown queries",
+      "No cross-request membership cache",
+      "No production inference"
+    ]
+  },
+  "binding": {
+    "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+    "actualCheckout": "576c903cd6ede14520a79111d2b71154968ad910",
+    "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+    "sourceReceiptGitBlob": "2b1563d80127a47bf83d6c5f9d7831b76a465e29",
+    "oldLifecycle": {
+      "gitBlob": "62402049a440f8475c427102ec797bc3a6e265d8",
+      "bytes": 709144,
+      "sha256": "d00e4cb3d295f67791e8c7ab08bcdc1f97a06b46739654688e83e3413dcf5277"
+    },
+    "newLifecycle": {
+      "gitBlob": "633c0569408df7076b91df290bd9b4456d7992ef",
+      "bytes": 686827,
+      "sha256": "756aa75ae6b482b1e1a7ab1006c8451ac0650af09391ffa480d937efc8b4b06f"
+    },
+    "ledgerDifferenceProof": {
+      "gitBlob": "c5e8690b7774a2e2fba4332d3aad22f9d8872df7",
+      "bytes": 68162,
+      "sha256": "223452aa19303ef435da03715a849646ff6912f276e1ce5695e47b093a496116",
+      "reader": "/root/native_budget_diff"
+    },
+    "coordinatorBefore": {
+      "path": "app/actions/coordinator.ts",
+      "source": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+      "bytes": 24899,
+      "sha256": "f55a49eaca1ae614606e2e013d2a33226f15682918a52b98dc486bbf65e2d8c3",
+      "gitBlob": "15a1af5331c957b575bae1491864e08dfa88f893"
+    },
+    "coordinatorAfter": {
+      "path": "app/actions/coordinator.ts",
+      "source": "576c903cd6ede14520a79111d2b71154968ad910",
+      "gitBlob": "bd24ef4c103b670d92d381d396d5c3e1b6aba083",
+      "bytes": 25249,
+      "sha256": "f73da84cbff308cf16c80dea1017161ca8ad8b44e9281d235eb8a2e622f680bd"
+    }
+  },
+  "originalResults": {
+    "old": {
+      "fullNative": 425,
+      "fullWeb": 435,
+      "firstNative": 213,
+      "firstHosted": 220,
+      "nativeSegments": {
+        "navigation": 19,
+        "pkce": 15,
+        "workspace": 391
+      },
+      "daemonVersion": "0.0.562",
+      "daemonInstalledRevisionPrefix": "111a8df"
+    },
+    "current": {
+      "fullNative": 433,
+      "fullWeb": 431,
+      "firstNative": 209,
+      "firstHosted": 147,
+      "nativeSegments": {
+        "navigation": 19,
+        "pkce": 15,
+        "workspace": 399
+      },
+      "daemonVersion": "0.0.564",
+      "daemonInstalledRevision": "8db16095f46be955df22f42914e0f89b6e5f3d11"
+    },
+    "classification": "Both current SQL budget comparisons remain RED. Functional CI success does not alter them.",
+    "correction": "Old and current PKCE both equal 15 with identical source buckets. Earlier 13-to-15 speculation is not used.",
+    "scopeLimits": "Daemon source changed as well as the App source. No single-change causal attribution follows from this comparison."
+  },
+  "identifiedNativeDelta": {
+    "total": 8,
+    "stableShapesWithSourceMeaning": 5,
+    "unknownStatements": 3,
+    "rows": [
+      {
+        "action": "coordinator.pollBotChatSummaries",
+        "delta": 1,
+        "structure": "6eda258b3007",
+        "meaning": "Fresh active-membership/workspace choices",
+        "queryParameterCount": 4
+      },
+      {
+        "action": "coordinator.syncCoordinatorChat",
+        "delta": 1,
+        "structure": "6eda258b3007",
+        "meaning": "Fresh active-membership/workspace choices",
+        "queryParameterCount": 4
+      },
+      {
+        "action": "coordinator.syncCoordinatorChat",
+        "delta": 1,
+        "structure": "82919a1d33a6",
+        "meaning": "Workspace member-subscription policy observation",
+        "queryParameterCount": 1
+      },
+      {
+        "action": "task-runs.pollTaskRuns",
+        "delta": 1,
+        "structure": "9f0fe8477a06",
+        "meaning": "Live revision lookup",
+        "queryParameterCount": 2
+      },
+      {
+        "action": "issues.syncIssueList",
+        "delta": 1,
+        "structure": "9f0fe8477a06",
+        "meaning": "Live revision lookup",
+        "queryParameterCount": 2
+      },
+      {
+        "action": "issues.syncIssueList",
+        "delta": 3,
+        "structure": null,
+        "meaning": "Unknown; original conservative diagnostic parser did not identify a safe structure"
+      }
+    ],
+    "boundary": "Structure equality identifies a statement form, not query parameters, refs, result rows, elapsed time or redundant work. Unknown statements are not assigned a speculative SQL meaning."
+  },
+  "structureMapping": [
+    {
+      "normalizedStructureId": "6eda258b3007",
+      "sourcePath": "lib/workspace-access.ts",
+      "sourceLines": [
+        61,
+        64
+      ],
+      "schemaPath": "lib/db/workspace-schema.ts",
+      "meaning": "Workspace choices joined to active membership; current user, active status, team kind and owner form four bound parameters.",
+      "method": "Reconstructed the fixed public Drizzle selection from the exact field/table declarations, including normal generated quoting and ordering; the current diagnostics canonicalization and SHA-256/12 exactly match the recorded identifier. No Drizzle/SQL execution was performed.",
+      "parameterCount": 4
+    },
+    {
+      "normalizedStructureId": "9f0fe8477a06",
+      "sourcePath": "lib/live/revisions.ts",
+      "meaning": "readLiveRevisions, joining live_revisions to two parameter arrays using unnest.",
+      "method": "Exact static SQL structure from source, whitespace canonicalization, SHA-256/12 match. Parameters and runtime refs are absent from the receipt.",
+      "parameterCount": 2
+    },
+    {
+      "normalizedStructureId": "82919a1d33a6",
+      "sourcePath": "lib/personal-policy.ts",
+      "sourceLines": [
+        19,
+        23
+      ],
+      "meaning": "memberSubscriptionsAllowed reads the subscriptions policy for one workspace.",
+      "method": "Exact literal-free parameterized source statement and current SHA-256/12 canonicalization match.",
+      "parameterCount": 1
+    }
+  ],
+  "physicalGrouping": {
+    "before": {
+      "httpPrefix": "5b73cc3b",
+      "members": [
+        "issues.syncIssueList",
+        "task-runs.pollTaskRuns",
+        "task-runs.syncThreadList",
+        "coordinator.pollBotChatSummaries",
+        "coordinator.syncCoordinatorChat"
+      ],
+      "choices": [
+        {
+          "ordinal": 30440,
+          "action": "task-runs.pollTaskRuns"
+        }
+      ],
+      "revisionQueries": [
+        {
+          "ordinal": 30443,
+          "action": "task-runs.syncThreadList"
+        },
+        {
+          "ordinal": 30450,
+          "action": "coordinator.pollBotChatSummaries"
+        },
+        {
+          "ordinal": 30451,
+          "action": "task-runs.pollTaskRuns"
+        },
+        {
+          "ordinal": 30475,
+          "action": "coordinator.syncCoordinatorChat"
+        }
+      ]
+    },
+    "after": [
+      {
+        "httpPrefix": "13b3393c",
+        "members": [
+          "issues.syncIssueList",
+          "task-runs.pollTaskRuns",
+          "task-runs.syncThreadList",
+          "teams.listTeams",
+          "team-relations.listProjectTeams"
+        ],
+        "choices": [
+          {
+            "ordinal": 30307,
+            "action": "task-runs.pollTaskRuns"
+          }
+        ],
+        "revisionQueries": [
+          {
+            "ordinal": 30314,
+            "action": "task-runs.syncThreadList"
+          },
+          {
+            "ordinal": 30320,
+            "action": "issues.syncIssueList"
+          },
+          {
+            "ordinal": 30328,
+            "action": "task-runs.pollTaskRuns"
+          }
+        ]
+      },
+      {
+        "httpPrefix": "1785f937",
+        "members": [
+          "coordinator.pollBotChatSummaries"
+        ],
+        "choices": [
+          {
+            "ordinal": 30353,
+            "action": "coordinator.pollBotChatSummaries"
+          }
+        ],
+        "revisionQueryCount": 1
+      },
+      {
+        "httpPrefix": "d9237537",
+        "members": [
+          "coordinator.syncCoordinatorChat"
+        ],
+        "choices": [
+          {
+            "ordinal": 30361,
+            "action": "coordinator.syncCoordinatorChat"
+          }
+        ],
+        "policyOrdinals": [
+          30367,
+          30371
+        ],
+        "revisionQueryCount": 1
+      }
+    ],
+    "causalBoundary": "This is an observed regrouping, not identical five members merely split in two. The two additional choice queries are attributable to the two newly independent HTTP contexts. Why their readiness fell in different turns is not established by the SQL ledger.",
+    "requestMemoSource": [
+      "apps/api/compat-aliases.mjs maps server react to apps/api/compat/react.ts",
+      "apps/api/compat/react.ts re-exports requestCache as cache",
+      "apps/api/src/context.ts:27-29 creates a distinct memo per RequestScope; :37-54 shares only that request and primitive argument path",
+      "lib/workspace-access.ts:58 applies cache to readWorkspaceContext"
+    ]
+  },
+  "policyRead": {
+    "sourcePath": "lib/desktop-rpc/read-batch-context.ts",
+    "lines": [
+      29,
+      42
+    ],
+    "observed": "Current independent chat executes the same policy shape twice; old batched chat once.",
+    "path": [
+      "coordinatorEnabled -> botModelReady",
+      "resolveBotModelChoice -> usableApiKeys -> memberSubscriptionsAllowed",
+      "resolveBotModelChoice -> ExecutionSettings.pooledBindings/sharedOwners -> pooledOwners -> memberSubscriptionsAllowed"
+    ],
+    "sourceContract": "Both consumers use the same supplied ExecutionSettingsScope workspace. Existing policy memo is active only inside withReadBatchContext, keyed by actual executor and workspace. after:/cron:/workflow: bypass it.",
+    "narrowCandidate": "A foreground read-only standalone invocation could use one bounded policy observation with the same lifetime and exclusions as the existing batch. Do not globally memoize memberSubscriptionsAllowed, wrap execution/writes, or cache across HTTP requests. Actual reservation/credential authorization remains fresh.",
+    "notImplementedOrValidated": true,
+    "savingsBoundary": "One observed additional policy read can be explained. Applicability to other Native or Web calls, and total future-window saving, are unknown."
+  },
+  "revisionRead": {
+    "refsByReader": [
+      {
+        "reader": "issues.syncIssueList",
+        "sourcePath": "app/actions/issues.ts",
+        "lines": [
+          104,
+          109
+        ],
+        "refs": "Personal issue_list plus the current authorized selected workspace issue_list",
+        "scopeResolution": "loadWorkspaceContext precedes beginOwnerListRead"
+      },
+      {
+        "reader": "task-runs.pollTaskRuns",
+        "sourcePath": "app/actions/task-runs.ts",
+        "lines": [
+          57,
+          64
+        ],
+        "refs": "Selected workspace task_run_list",
+        "scopeResolution": "Session, loadWorkspaceContext and issueVisibility precede beginWorkspaceListRead"
+      },
+      {
+        "reader": "task-runs.syncThreadList",
+        "sourcePath": "app/actions/task-runs.ts",
+        "lines": [
+          130,
+          136
+        ],
+        "refs": "Selected workspace thread_list",
+        "scopeResolution": "Session and loadWorkspaceContext precede beginWorkspaceListRead"
+      },
+      {
+        "reader": "coordinator.pollBotChatSummaries",
+        "sourcePath": "app/actions/coordinator.ts",
+        "lines": [
+          234,
+          240
+        ],
+        "refs": "Owner Personal bot_chat_list",
+        "scopeResolution": "loadWorkspaceContext plus beginOwnerListRead"
+      },
+      {
+        "reader": "coordinator.syncCoordinatorChat",
+        "sourcePath": "app/actions/coordinator.ts",
+        "lines": [
+          84,
+          89,
+          129,
+          144
+        ],
+        "refs": "Authorized persisted bot bot_chat entity",
+        "scopeResolution": "ownBot obtains the current authorized workspace and validates bot ownership"
+      }
+    ],
+    "existingPlan": "readBatchOwnerRevisionKinds contains the four list kinds, but readBatchOwnerRevisions only starts prefetch once a matching resolved home is explicitly supplied. beginWorkspaceListRead passes no home, so Team task/thread keys only share the existing same-microtask queue.",
+    "exactSourcePoints": [
+      "lib/live/revision-read.ts:14-18,22-34",
+      "lib/desktop-rpc/read-batch-context.ts:54-102",
+      "lib/desktop-rpc/read-batch-contract.ts:23-35"
+    ],
+    "safetyInvariant": "Each caller awaits its revision before data. Reusing an earlier revision is conservative; a later read must never stamp a newer revision on data read before it. Missing/failed counters remain no proof. Executor, request, owner/workspace and lifetime separation remain required.",
+    "narrowCandidate": "A separate explicitly authorized-workspace list plan could co-read only the selected-workspace kinds known to the prepared batch (issue_list, thread_list, task_run_list) at an already-required revision read. Keep the current owner-home API and its negative tests; do not infer Team authority from raw args, use Personal as a Team alias, include arbitrary bot_chat IDs, extend lifetime to after-work, or defer queries outside the measured interval.",
+    "noProvenDuplicateRefs": true,
+    "noPredictedAcceptance": true,
+    "validationNeededIfImplemented": [
+      "Actual read functions after their normal workspace/membership barriers, with a late selected-Team issue reader",
+      "Personal and Team remain distinct; different workspace, owner, database executor and request cannot borrow proof",
+      "Old observation remains older than data and missing/failed counters produce no fabricated proof",
+      "Existing owner-only selected-Team-late unit and DB contracts still hold; new explicitly authorized-Team behavior is a separate contract",
+      "Original full Native windows, first pair, scope/unknown totals and response proof remain unchanged"
+    ],
+    "existingTestsReadOnly": [
+      {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "lines": [
+          177,
+          198
+        ],
+        "contract": "Owner-only plan must keep an unrelated selected Team key late; both paths still two statements"
+      },
+      {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "lines": [
+          183,
+          234
+        ],
+        "contract": "Historical owner-home plan: Personal two-to-one, selected Team remains two; actual current P0 task/thread selected-workspace paths are not exercised by that helper-only setup"
+      }
+    ],
+    "savingsBoundary": "The two extra revision statements are observed, but runtime parameter arrays are unavailable. The proposed co-read is a candidate for genuinely fewer statements, not proof that both extras are duplicates or that a future Native budget will pass."
+  },
+  "liveScopeChange": {
+    "fixture": {
+      "path": "apps/desktop/test/parity-fixtures.mjs",
+      "lines": [
+        110,
+        128
+      ],
+      "fact": "Creates a Team workspace and binds the fixture Coordinator bot and rows to it"
+    },
+    "before": "Coordinator read resolved owner Personal live scope through beginOwnerListRead",
+    "after": "beginBotChatRead uses ownBot's authorized persisted Team workspace and reads its bot_chat entity revision",
+    "client": {
+      "path": "components/coordinator/coordinator-chat.tsx",
+      "lines": [
+        173,
+        217
+      ],
+      "fact": "ownerListWorkspace(data, data.live.ownerId) supplies data.live.workspaceId to useLiveKey"
+    },
+    "conclusion": "This exact fixture changes chat transport home from Personal to Team. That is required tenant-correct live behavior; it must not be reverted for counts.",
+    "causalLimit": "Channel/readiness grouping can change, but the source map and current ledger alone do not prove it caused every regrouped call or the full FIRST result."
+  },
+  "responseBarrier": {
+    "server": {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "lines": [
+        25,
+        48
+      ],
+      "fact": "Parallel invocations use Promise.all; all item work/diagnostics settle before result and any authFailure are emitted"
+    },
+    "client": {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "lines": [
+        62,
+        84
+      ],
+      "fact": "Waits complete decoded batch envelope before resolving its individual items"
+    },
+    "independentModelMenu": {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "lines": [
+        5,
+        15
+      ],
+      "fact": "getBotModelMenu is absent from the batch allowlist; do not claim it is a batched sibling"
+    },
+    "limitation": "The response barrier exists, but no per-request latency or exact critical dependency is reconstructed from SQL ordinals. Dedicated transport reviewer owns the next source analysis; no streaming redesign or altered readiness proposed here."
+  },
+  "firstPairLimits": {
+    "currentHosted": {
+      "started": 15,
+      "completedWithinWindow": 11,
+      "crossesEnd": 4,
+      "crossingActions": {
+        "coordinator.syncCoordinatorChat": 2,
+        "issues.syncIssueList": 1,
+        "execution-settings.getBotModelMenu": 1
+      }
+    },
+    "currentNative": {
+      "physical": 6,
+      "logical": 19,
+      "crossesEnd": 0
+    },
+    "fact": "Hosted requests eventually completed; tail work is outside this original measured window. The observed 147 is not replaced with guessed completed work.",
+    "unsafeShortcut": "readCachedCoordinatorChat merges cached/current rows and may issue a second full read. It is not an audited single-snapshot fetcher; do not give it blanket pending/final dispatch proof.",
+    "sourcePath": "lib/coordinator/chat-read-client.ts",
+    "finalBoundary": "This receipt does not explain the entire 62-query FIRST comparison or establish a source fix. Do not use a rerun-to-green, delayed work, or widened Hosted wait as resolution."
+  },
+  "sourceManifest": [
+    {
+      "path": "app/actions/issues.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 28524,
+      "gitBlob": "01c1d4bad01d207c39a8d2993ab7ce11ff37771f",
+      "sha256": "717111070002eec4987ab273d6efb738513aed9283ec64be353a1028a4c8abc8"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 14442,
+      "gitBlob": "f2213c69a435b967feb8d9f335213394c2e08630",
+      "sha256": "685edce7f5f2e06da09ddf360167b97d223a80ea632adeb2d7d2edf1874ad021"
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 2120,
+      "gitBlob": "445ea81dccbed5f4b6ad16816757df0154a74b76",
+      "sha256": "7bd1af7dfafddb57c113fb4795a3f42d104516e71ad69034028741ccc7338634"
+    },
+    {
+      "path": "lib/live/revisions.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 4070,
+      "gitBlob": "dbef48a71d14c0f5a4f68b16c7a0aae32ecd184f",
+      "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328"
+    },
+    {
+      "path": "lib/live/owner-scope.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 1284,
+      "gitBlob": "962829a3e69f508f93621e897209e408f6ad1d2a",
+      "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673"
+    },
+    {
+      "path": "lib/live/list-read-server.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 1249,
+      "gitBlob": "d1fa48d21bb1b429a9afacf03fa350b8f02f5763",
+      "sha256": "b6fa906a7eee521f91160f39d77098b33c640c0ec8ee15fc86a3df7e4518aff7"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 6263,
+      "gitBlob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+      "sha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 1637,
+      "gitBlob": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b",
+      "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 18417,
+      "gitBlob": "076d59eea10b000cd08df46754d32454609ecdc6",
+      "sha256": "a548b3d73268bd35f81ce8648b673c66b5931c37ed405ed100479c34c10d5353"
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 16071,
+      "gitBlob": "960eb24ff24aba996a681bc47468290cf6200398",
+      "sha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 8743,
+      "gitBlob": "9194b24354d6082c51b661105949ba983d6bd108",
+      "sha256": "f7d43f80867ec36c34717006d052dff3d63dc46d5e1f69df188bd56a8ee75313"
+    },
+    {
+      "path": "lib/db/workspace-schema.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 2972,
+      "gitBlob": "4599664e6d893304cee3858c4097fc0e81a2ddba",
+      "sha256": "257a41d7a6723ea83afde3c622f5ab8876cc89184925213b1a9f0ca302300f5b"
+    },
+    {
+      "path": "apps/api/compat-aliases.mjs",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 898,
+      "gitBlob": "d96e8879be028d54d33d085515bf6bfea8898c00",
+      "sha256": "b32f50f4142886c8f9a5ccb790638dbd28a915f992ac5b1093f047646b75f104"
+    },
+    {
+      "path": "apps/api/compat/react.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 1016,
+      "gitBlob": "7b345fdbfae5024f06cb3783082184c9aead9c3b",
+      "sha256": "55ccdcc85fe2868dc311f4d60c16090c572349c3ccba1e2bbce1d7a09156f3b1"
+    },
+    {
+      "path": "apps/api/src/context.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 2405,
+      "gitBlob": "ee90c3133ebfe8e2ba957a56ed5fd05a30655fda",
+      "sha256": "73b5ecaa23a4848e3224c4c6dab58b732f10162994f497ea2e6803fd0d9e06a5"
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 8694,
+      "gitBlob": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6"
+    },
+    {
+      "path": "lib/model-api-keys.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 26494,
+      "gitBlob": "d46338c3d695ffd0fd1bc245f0db3f63d0c2ed4d",
+      "sha256": "1574f8712bfe1ea8428a86e91cf137e75d2f0849bfea1cec2b0de34db0b8dffb"
+    },
+    {
+      "path": "lib/coordinator/model-ready.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 1934,
+      "gitBlob": "cd6ecaaaf847ca8619e55d7d42133c9214b07392",
+      "sha256": "a3c11f5eea106bb2c5c4ec44f8e9ccfce5b2e4782171bd64aa794fb560b566e7"
+    },
+    {
+      "path": "lib/bot-model-choice.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 8023,
+      "gitBlob": "d2fd785e8e164ea86387bfd013d070da9ed3e3f0",
+      "sha256": "941903810b3ec2b39bb8a58539b3d52ab08cde98fa9e8332a9a9777311144521"
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 23629,
+      "gitBlob": "0c0b7accd10ea84957428a79d9e58a9924b9d841",
+      "sha256": "12fc04116782566b78b17a5f2068756a6230e45930eff36912b3d2fa0045abf6"
+    },
+    {
+      "path": "apps/desktop/test/parity-fixtures.mjs",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 15446,
+      "gitBlob": "b2700f11040452a42c8c2a8fac55d500fab8a617",
+      "sha256": "16d279afcb1185a1b469338e35bc361c64a1ba2666f1c999cd7a6a3e410f8ec7"
+    },
+    {
+      "path": "components/coordinator/coordinator-chat.tsx",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 48888,
+      "gitBlob": "8bd5309e8cbe71fbbc6603d91c7fad890a026c6e",
+      "sha256": "d30805df38c0d3a6f8413dae6d7b4f79f280ac60682a742de5bbaa67b6e499f9"
+    },
+    {
+      "path": "lib/coordinator/chat-read-client.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 4326,
+      "gitBlob": "c5588e067ff295cc81b5c3e35ea5307fbd94bf57",
+      "sha256": "428bd4e2529d89c0ba740efbb5e0121f1ae50d9efcedffecaca72dd0dbdd2dd4"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 8237,
+      "gitBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "sha256": "c520e2c86ca83fe382e6131eb48b36b813b6b9f8750dc9d3c09e6e0044412cc9"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 6237,
+      "gitBlob": "67503a9abe7131de3e9bf86629532e015085d4ee",
+      "sha256": "a25842776c07816eb8af6a24d62dc9d745ab13fb9cfff513de02673d48926f18"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 4726,
+      "gitBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "sha256": "6119f76aa46cf1fcd93dc9b389859221c206fecba7cedf265af061fd6862270e"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 3099,
+      "gitBlob": "528365a2f6735a12fa514f6088bf81446c813ec7",
+      "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb"
+    },
+    {
+      "path": "lib/desktop-rpc/handler.ts",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 5876,
+      "gitBlob": "3e568543ea258a992bdae0af0f98f46f58b8e727",
+      "sha256": "e2493821dc5179c112ead4fb80fdc4735b38fccfd59edd0c71255dffe128e4d4"
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.cjs",
+      "ref": "576c903cd6ede14520a79111d2b71154968ad910",
+      "bytes": 18406,
+      "gitBlob": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+      "sha256": "763d180bfc0d0a62e67a99624a4815eeca953bbcb7290193a5515bb67e24ccad"
+    }
+  ],
+  "conclusion": "The five safely identified new queries map to two fresh workspace-choice reads, two live-revision statements, and one subscription-policy read. Only bounded same-request read sharing is a plausible minimal source direction; three new unknown statements, changed readiness timing and daemon source remain explicit limits. No candidate has been implemented or tested."
+}

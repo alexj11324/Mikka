@@ -1,0 +1,1763 @@
+﻿2026-11-09T17:25:15.4185243Z Current runner version: '2.338.2'
+2026-11-09T17:25:15.4204520Z ##[group]Runner Image Provisioner
+2026-11-09T17:25:15.4205272Z Hosted Compute Agent
+2026-11-09T17:25:15.4205749Z Version: 20261028.624
+2026-11-09T17:25:15.4206517Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T17:25:15.4207183Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T17:25:15.4207766Z Worker ID: {ffe20a40-c8e2-40fe-8944-55c134388365}
+2026-11-09T17:25:15.4208359Z Region: centralus
+2026-11-09T17:25:15.4208815Z Cloud: Azure
+2026-11-09T17:25:15.4209279Z ##[endgroup]
+2026-11-09T17:25:15.4210604Z ##[group]Operating System
+2026-11-09T17:25:15.4211096Z Ubuntu
+2026-11-09T17:25:15.4211564Z 22.04.5
+2026-11-09T17:25:15.4211981Z LTS
+2026-11-09T17:25:15.4212401Z ##[endgroup]
+2026-11-09T17:25:15.4212899Z ##[group]Runner Image
+2026-11-09T17:25:15.4213374Z Image: ubuntu-22.04
+2026-11-09T17:25:15.4213877Z Version: 20261101.347.1
+2026-11-09T17:25:15.4214909Z Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261101.347/images/ubuntu/Ubuntu2204-Readme.md
+2026-11-09T17:25:15.4216435Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261101.347
+2026-11-09T17:25:15.4217294Z ##[endgroup]
+2026-11-09T17:25:15.4218233Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T17:25:15.4219935Z Contents: read
+2026-11-09T17:25:15.4220452Z Metadata: read
+2026-11-09T17:25:15.4220908Z ##[endgroup]
+2026-11-09T17:25:15.4222530Z Secret source: Actions
+2026-11-09T17:25:15.4223300Z Cache mode: write
+2026-11-09T17:25:15.4223873Z Prepare workflow directory
+2026-11-09T17:25:15.4564642Z Prepare all required actions
+2026-11-09T17:25:15.4604360Z Getting action download info
+2026-11-09T17:25:15.7312707Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T17:25:15.8277253Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-09T17:25:16.0280326Z Complete job name: Source checks
+2026-11-09T17:25:16.0980762Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T17:25:16.0981751Z with:
+2026-11-09T17:25:16.0982183Z   repository: alexj11324/Mikka
+2026-11-09T17:25:16.0985770Z   token: ***
+2026-11-09T17:25:16.0986209Z   ssh-strict: true
+2026-11-09T17:25:16.0986813Z   ssh-user: git
+2026-11-09T17:25:16.0987265Z   persist-credentials: true
+2026-11-09T17:25:16.0987736Z   clean: true
+2026-11-09T17:25:16.0988160Z   sparse-checkout-cone-mode: true
+2026-11-09T17:25:16.0988691Z   fetch-depth: 1
+2026-11-09T17:25:16.0989139Z   fetch-tags: false
+2026-11-09T17:25:16.0989603Z   show-progress: true
+2026-11-09T17:25:16.0990037Z   lfs: false
+2026-11-09T17:25:16.0990412Z   submodules: false
+2026-11-09T17:25:16.0991191Z   set-safe-directory: true
+2026-11-09T17:25:16.0991693Z   allow-unsafe-pr-checkout: false
+2026-11-09T17:25:16.0992369Z env:
+2026-11-09T17:25:16.0992783Z   MIKKA_EDITION: cloud
+2026-11-09T17:25:16.0993256Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:25:16.0993887Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:25:16.0994390Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:16.0994925Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:25:16.0995494Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:16.0996173Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:25:16.0996996Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:25:16.0997745Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:25:16.0998337Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:25:16.0998808Z ##[endgroup]
+2026-11-09T17:25:16.2660012Z Syncing repository: alexj11324/Mikka
+2026-11-09T17:25:16.2661761Z ##[group]Getting Git version info
+2026-11-09T17:25:16.2662424Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T17:25:16.2663517Z [command]/usr/bin/git version
+2026-11-09T17:25:16.2684619Z git version 2.56.0
+2026-11-09T17:25:16.2704385Z ##[endgroup]
+2026-11-09T17:25:16.2716760Z Temporarily overriding HOME='/home/runner/work/_temp/17583089-e84b-4694-a387-780aa6512db2' before making global git config changes
+2026-11-09T17:25:16.2718592Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T17:25:16.2721507Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T17:25:16.2750071Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T17:25:16.2753505Z ##[group]Initializing the repository
+2026-11-09T17:25:16.2757506Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T17:25:16.2851478Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T17:25:16.2852630Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T17:25:16.2853649Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T17:25:16.2854518Z hint: call:
+2026-11-09T17:25:16.2855050Z hint:
+2026-11-09T17:25:16.2855755Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T17:25:16.2856721Z hint:
+2026-11-09T17:25:16.2857469Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T17:25:16.2858461Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T17:25:16.2859413Z hint:
+2026-11-09T17:25:16.2859911Z hint: 	git branch -m <name>
+2026-11-09T17:25:16.2860515Z hint:
+2026-11-09T17:25:16.2861196Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T17:25:16.2862326Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T17:25:16.2864132Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T17:25:16.2891499Z ##[endgroup]
+2026-11-09T17:25:16.2892871Z ##[group]Disabling automatic garbage collection
+2026-11-09T17:25:16.2893950Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T17:25:16.2917884Z ##[endgroup]
+2026-11-09T17:25:16.2918842Z ##[group]Setting up auth
+2026-11-09T17:25:16.2924121Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T17:25:16.2949031Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T17:25:16.3186880Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T17:25:16.3211873Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T17:25:16.3395671Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T17:25:16.3422608Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T17:25:16.3584559Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T17:25:16.3616175Z ##[endgroup]
+2026-11-09T17:25:16.3617306Z ##[group]Fetching the repository
+2026-11-09T17:25:16.3629621Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +576c903cd6ede14520a79111d2b71154968ad910:refs/remotes/pull/1799/merge
+2026-11-09T17:25:19.8737221Z From https://github.com/alexj11324/Mikka
+2026-11-09T17:25:19.8738577Z  * [new ref]         576c903cd6ede14520a79111d2b71154968ad910 -> pull/1799/merge
+2026-11-09T17:25:19.8741841Z ##[endgroup]
+2026-11-09T17:25:19.8743297Z ##[group]Determining the checkout info
+2026-11-09T17:25:19.8744622Z ##[endgroup]
+2026-11-09T17:25:19.8750228Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T17:25:19.8789300Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T17:25:19.8816160Z ##[group]Checking out the ref
+2026-11-09T17:25:19.8820016Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge
+2026-11-09T17:25:20.4726533Z Note: switching to 'refs/remotes/pull/1799/merge'.
+2026-11-09T17:25:20.4727281Z 
+2026-11-09T17:25:20.4727709Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T17:25:20.4728820Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T17:25:20.4729833Z state without impacting any branches by switching back to a branch.
+2026-11-09T17:25:20.4730386Z 
+2026-11-09T17:25:20.4730898Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T17:25:20.4731878Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T17:25:20.4732375Z 
+2026-11-09T17:25:20.4732638Z   git switch -c <new-branch-name>
+2026-11-09T17:25:20.4733043Z 
+2026-11-09T17:25:20.4733273Z Or undo this operation with:
+2026-11-09T17:25:20.4733665Z 
+2026-11-09T17:25:20.4733916Z   git switch -
+2026-11-09T17:25:20.4734222Z 
+2026-11-09T17:25:20.4734830Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T17:25:20.4737612Z 
+2026-11-09T17:25:20.4738423Z HEAD is now at 576c903 Merge 6414a08ddb4a92962bc82e9e427c391d645cacb2 into 5ba1f9e2359ce714d83cd16fc040f2567c40a6d0
+2026-11-09T17:25:20.4740840Z ##[endgroup]
+2026-11-09T17:25:20.4772770Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T17:25:20.4795027Z 576c903cd6ede14520a79111d2b71154968ad910
+2026-11-09T17:25:20.5060249Z Prepare all required actions
+2026-11-09T17:25:20.5061019Z Getting action download info
+2026-11-09T17:25:20.6139785Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-11-09T17:25:21.0153703Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T17:25:21.1184671Z Download action repository 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-11-09T17:25:21.2680006Z ##[group]Run ./.github/actions/pnpm-install
+2026-11-09T17:25:21.2680319Z with:
+2026-11-09T17:25:21.2682694Z   ffmpeg-github-token: ***
+2026-11-09T17:25:21.2682944Z env:
+2026-11-09T17:25:21.2683162Z   MIKKA_EDITION: cloud
+2026-11-09T17:25:21.2683411Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:25:21.2683684Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:25:21.2683996Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:21.2684277Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:25:21.2684560Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:21.2684908Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:25:21.2685286Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:25:21.2685692Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:25:21.2685996Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:25:21.2686449Z ##[endgroup]
+2026-11-09T17:25:21.2739041Z ##[start-action display=Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1;id=__self.__pnpm_action-setup]
+2026-11-09T17:25:21.2791511Z ##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+2026-11-09T17:25:21.2791890Z with:
+2026-11-09T17:25:21.2792116Z   version: 10.34.3
+2026-11-09T17:25:21.2792346Z   dest: ~/setup-pnpm
+2026-11-09T17:25:21.2792578Z   run_install: null
+2026-11-09T17:25:21.2792805Z   cache: false
+2026-11-09T17:25:21.2793065Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-09T17:25:21.2793348Z   package_json_file: package.json
+2026-11-09T17:25:21.2793609Z   standalone: false
+2026-11-09T17:25:21.2793849Z env:
+2026-11-09T17:25:21.2794090Z   MIKKA_EDITION: cloud
+2026-11-09T17:25:21.2794356Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:25:21.2794647Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:25:21.2794964Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:21.2795275Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:25:21.2795589Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:21.2795977Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:25:21.2796707Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:25:21.2797189Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:25:21.2797472Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:25:21.2797723Z ##[endgroup]
+2026-11-09T17:25:21.4029211Z ##[group]Running self-installer...
+2026-11-09T17:25:21.7561706Z (node:1875) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T17:25:21.7563188Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T17:25:21.9261303Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T17:25:21.9328322Z Packages: +1
+2026-11-09T17:25:21.9328690Z +
+2026-11-09T17:25:22.2615157Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-09T17:25:22.3204574Z 
+2026-11-09T17:25:22.3205118Z dependencies:
+2026-11-09T17:25:22.3205579Z + pnpm 10.34.3 (12.18.0 is available)
+2026-11-09T17:25:22.3205839Z 
+2026-11-09T17:25:22.3226741Z Done in 754ms
+2026-11-09T17:25:22.3346688Z ##[endgroup]
+2026-11-09T17:25:22.3347127Z Installation Completed!
+2026-11-09T17:25:22.3423010Z ##[end-action id=__self.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=1068]
+2026-11-09T17:25:22.3427206Z ##[start-action display=Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020;id=__self.__actions_setup-node]
+2026-11-09T17:25:22.3558451Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T17:25:22.3558768Z with:
+2026-11-09T17:25:22.3558945Z   node-version: 24
+2026-11-09T17:25:22.3559137Z   always-auth: false
+2026-11-09T17:25:22.3559327Z   check-latest: false
+2026-11-09T17:25:22.3561472Z   token: ***
+2026-11-09T17:25:22.3561643Z env:
+2026-11-09T17:25:22.3561807Z   MIKKA_EDITION: cloud
+2026-11-09T17:25:22.3562011Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:25:22.3562245Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:25:22.3562484Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:22.3562713Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:25:22.3562953Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:22.3563258Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:25:22.3563592Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:25:22.3563960Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:25:22.3564210Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:25:22.3564457Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:25:22.3564707Z ##[endgroup]
+2026-11-09T17:25:22.4762209Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T17:25:22.4764720Z (node:1889) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T17:25:22.4765297Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T17:25:22.4766784Z ##[group]Environment details
+2026-11-09T17:25:22.7639374Z node: v24.22.2
+2026-11-09T17:25:22.7639876Z npm: 11.19.1
+2026-11-09T17:25:22.7640085Z yarn: 1.22.22
+2026-11-09T17:25:22.7641111Z ##[endgroup]
+2026-11-09T17:25:22.7711735Z ##[end-action id=__self.__actions_setup-node;outcome=success;conclusion=success;duration_ms=428]
+2026-11-09T17:25:22.7714257Z ##[start-action display=Run echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT";id=__self.store]
+2026-11-09T17:25:22.7745809Z ##[group]Run echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+2026-11-09T17:25:22.7746470Z [36;1mecho "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"[0m
+2026-11-09T17:25:22.7799509Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T17:25:22.7799805Z env:
+2026-11-09T17:25:22.7799990Z   MIKKA_EDITION: cloud
+2026-11-09T17:25:22.7800196Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:25:22.7800423Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:25:22.7800651Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:22.7801022Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:25:22.7801264Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:22.7801576Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:25:22.7801924Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:25:22.7802375Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:25:22.7802630Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:25:22.7802884Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:25:22.7803158Z ##[endgroup]
+2026-11-09T17:25:23.1358014Z ##[end-action id=__self.store;outcome=success;conclusion=success;duration_ms=364]
+2026-11-09T17:25:23.1362561Z ##[start-action display=Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830;id=__self.restore]
+2026-11-09T17:25:23.1892838Z ##[group]Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+2026-11-09T17:25:23.1893158Z with:
+2026-11-09T17:25:23.1893393Z   path: /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-09T17:25:23.1893866Z   key: pnpm-store-v1-Linux-X64-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9
+2026-11-09T17:25:23.1894294Z   restore-keys: pnpm-store-v1-Linux-X64-
+
+2026-11-09T17:25:23.1894556Z   enableCrossOsArchive: false
+2026-11-09T17:25:23.1894790Z   fail-on-cache-miss: false
+2026-11-09T17:25:23.1894997Z   lookup-only: false
+2026-11-09T17:25:23.1895179Z env:
+2026-11-09T17:25:23.1895554Z   MIKKA_EDITION: cloud
+2026-11-09T17:25:23.1895760Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:25:23.1895987Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:25:23.1896200Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:23.1896978Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:25:23.1897220Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:23.1897526Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:25:23.1897865Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:25:23.1898299Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:25:23.1898548Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:25:23.1898791Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:25:23.1899049Z ##[endgroup]
+2026-11-09T17:25:23.2778293Z (node:1951) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T17:25:23.2779704Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T17:25:23.4524317Z Cache hit for: pnpm-store-v1-Linux-X64-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9
+2026-11-09T17:25:23.4609011Z (node:1951) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T17:25:24.6552210Z Received 134217728 of 1283845973 (10.5%), 122.6 MBs/sec
+2026-11-09T17:25:25.6559498Z Received 360710144 of 1283845973 (28.1%), 168.3 MBs/sec
+2026-11-09T17:25:26.6591755Z Received 570425344 of 1283845973 (44.4%), 178.7 MBs/sec
+2026-11-09T17:25:27.6606787Z Received 796917760 of 1283845973 (62.1%), 187.8 MBs/sec
+2026-11-09T17:25:28.6584362Z Received 973078528 of 1283845973 (75.8%), 183.9 MBs/sec
+2026-11-09T17:25:29.6880163Z Received 1207959552 of 1283845973 (94.1%), 189.7 MBs/sec
+2026-11-09T17:25:30.0967269Z Received 1283845973 of 1283845973 (100.0%), 188.8 MBs/sec
+2026-11-09T17:25:30.0969540Z Cache Size: ~1224 MB (1283845973 B)
+2026-11-09T17:25:30.1075210Z [command]/usr/bin/tar -xf /home/runner/work/_temp/b1329742-c18e-497b-b2cf-60761ecccb54/cache.tzst -P -C /home/runner/work/Mikka/Mikka --use-compress-program unzstd
+2026-11-09T17:25:49.2954670Z Cache restored successfully
+2026-11-09T17:25:49.4399292Z Cache restored from key: pnpm-store-v1-Linux-X64-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9
+2026-11-09T17:25:49.4470885Z ##[end-action id=__self.restore;outcome=success;conclusion=success;duration_ms=26310]
+2026-11-09T17:25:49.4475599Z ##[start-action display=Run pnpm install --frozen-lockfile;id=__self.__run]
+2026-11-09T17:25:49.5274260Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-09T17:25:49.5274613Z [36;1mpnpm install --frozen-lockfile[0m
+2026-11-09T17:25:49.5306872Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T17:25:49.5307173Z env:
+2026-11-09T17:25:49.5307360Z   MIKKA_EDITION: cloud
+2026-11-09T17:25:49.5307582Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:25:49.5307820Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:25:49.5308044Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:49.5308273Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:25:49.5308525Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:25:49.5308842Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:25:49.5309184Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:25:49.5309661Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:25:49.5309913Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:25:49.5310187Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:25:49.5312560Z   FFMPEG_GITHUB_TOKEN: ***
+2026-11-09T17:25:49.5312775Z ##[endgroup]
+2026-11-09T17:25:49.8433765Z Scope: all 7 workspace projects
+2026-11-09T17:25:49.9380116Z Lockfile is up to date, resolution step is skipped
+2026-11-09T17:25:50.0109884Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T17:25:50.1373406Z Packages: +2184
+2026-11-09T17:25:50.1374037Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-09T17:25:51.0152213Z Progress: resolved 2184, reused 859, downloaded 0, added 0
+2026-11-09T17:25:52.0154987Z Progress: resolved 2184, reused 2108, downloaded 0, added 22
+2026-11-09T17:25:53.0154152Z Progress: resolved 2184, reused 2108, downloaded 0, added 203
+2026-11-09T17:25:54.0166380Z Progress: resolved 2184, reused 2108, downloaded 0, added 460
+2026-11-09T17:25:55.0173148Z Progress: resolved 2184, reused 2108, downloaded 0, added 531
+2026-11-09T17:25:56.0171490Z Progress: resolved 2184, reused 2108, downloaded 0, added 787
+2026-11-09T17:25:57.0179563Z Progress: resolved 2184, reused 2108, downloaded 0, added 925
+2026-11-09T17:25:58.0188930Z Progress: resolved 2184, reused 2108, downloaded 0, added 1137
+2026-11-09T17:25:59.0190976Z Progress: resolved 2184, reused 2108, downloaded 0, added 1192
+2026-11-09T17:26:00.0194955Z Progress: resolved 2184, reused 2108, downloaded 0, added 1356
+2026-11-09T17:26:01.0190572Z Progress: resolved 2184, reused 2108, downloaded 0, added 1624
+2026-11-09T17:26:02.0197031Z Progress: resolved 2184, reused 2108, downloaded 0, added 1851
+2026-11-09T17:26:03.0198578Z Progress: resolved 2184, reused 2108, downloaded 0, added 1981
+2026-11-09T17:26:04.0197228Z Progress: resolved 2184, reused 2108, downloaded 0, added 2052
+2026-11-09T17:26:05.0196800Z Progress: resolved 2184, reused 2108, downloaded 0, added 2183
+2026-11-09T17:26:05.0801254Z Progress: resolved 2184, reused 2108, downloaded 0, added 2184, done
+2026-11-09T17:26:06.4912104Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-09T17:26:06.8561092Z 
+2026-11-09T17:26:06.8561695Z dependencies:
+2026-11-09T17:26:06.8562112Z + @ai-sdk/gateway 4.0.121
+2026-11-09T17:26:06.8562470Z + @ai-sdk/mcp 2.0.81
+2026-11-09T17:26:06.8562865Z + @ai-sdk/openai 4.0.99
+2026-11-09T17:26:06.8563242Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-09T17:26:06.8563557Z + @ai-sdk/react 4.0.152
+2026-11-09T17:26:06.8563854Z + @ai-sdk/workflow 2.0.80
+2026-11-09T17:26:06.8564151Z + @base-ui/react 1.9.0
+2026-11-09T17:26:06.8564444Z + @better-auth/core 1.7.12
+2026-11-09T17:26:06.8564747Z + @better-auth/expo 1.7.12
+2026-11-09T17:26:06.8565089Z + @better-auth/oauth-provider 1.7.12
+2026-11-09T17:26:06.8565419Z + @chat-adapter/slack 4.43.0
+2026-11-09T17:26:06.8565748Z + @chat-adapter/state-pg 4.43.0
+2026-11-09T17:26:06.8566079Z + @chat-adapter/telegram 4.43.0
+2026-11-09T17:26:06.8566890Z + @composio/core 0.26.0
+2026-11-09T17:26:06.8567177Z + @dnd-kit/core 6.3.1
+2026-11-09T17:26:06.8567407Z + @dnd-kit/sortable 10.0.0
+2026-11-09T17:26:06.8567702Z + @dnd-kit/utilities 3.2.2
+2026-11-09T17:26:06.8567985Z + @e965/xlsx 0.20.3
+2026-11-09T17:26:06.8568263Z + @floating-ui/dom 1.8.0
+2026-11-09T17:26:06.8568692Z + @formatjs/intl-localematcher 0.8.14
+2026-11-09T17:26:06.8569069Z + @heroui/react 3.2.6
+2026-11-09T17:26:06.8569678Z + @heroui/styles 3.2.6
+2026-11-09T17:26:06.8572635Z + @internationalized/date 3.12.4
+2026-11-09T17:26:06.8573955Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-09T17:26:06.8574409Z + @modelcontextprotocol/server 2.3.1
+2026-11-09T17:26:06.8574730Z + @norbert_bodziony/bloub 0.4.1
+2026-11-09T17:26:06.8574967Z + @novnc/novnc 1.6.0
+2026-11-09T17:26:06.8575200Z + @opentelemetry/api 1.10.0
+2026-11-09T17:26:06.8575470Z + @opentelemetry/api-logs 0.223.0
+2026-11-09T17:26:06.8575770Z + @opentelemetry/core 2.12.0
+2026-11-09T17:26:06.8576090Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-09T17:26:06.8576700Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-09T17:26:06.8577120Z + @opentelemetry/instrumentation 0.223.0
+2026-11-09T17:26:06.8577435Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-09T17:26:06.8577716Z + @opentelemetry/resources 2.12.0
+2026-11-09T17:26:06.8577987Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-09T17:26:06.8578454Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-09T17:26:06.8578733Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-09T17:26:06.8579030Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-09T17:26:06.8579299Z + @openuidev/lang-core 1.0.1
+2026-11-09T17:26:06.8579539Z + @openuidev/react-lang 1.0.1
+2026-11-09T17:26:06.8579781Z + @openuidev/react-ui 0.18.1
+2026-11-09T17:26:06.8580004Z + @pierre/diffs 1.6.4
+2026-11-09T17:26:06.8580212Z + @shadcn/react 0.3.1
+2026-11-09T17:26:06.8580428Z + @solidjs/web 2.0.0-rc.0
+2026-11-09T17:26:06.8580651Z + @stripe/stripe-js 10.1.0
+2026-11-09T17:26:06.8580901Z + @tanstack/react-virtual 3.14.18
+2026-11-09T17:26:06.8581130Z + @tiptap/core 3.32.0
+2026-11-09T17:26:06.8581378Z + @tiptap/extension-collaboration 3.32.0
+2026-11-09T17:26:06.8581696Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-09T17:26:06.8581997Z + @tiptap/extension-highlight 3.32.0
+2026-11-09T17:26:06.8582260Z + @tiptap/extension-list 3.32.0
+2026-11-09T17:26:06.8582527Z + @tiptap/extension-mention 3.32.0
+2026-11-09T17:26:06.8582788Z + @tiptap/extension-table 3.32.0
+2026-11-09T17:26:06.8583058Z + @tiptap/extension-text-align 3.32.0
+2026-11-09T17:26:06.8583315Z + @tiptap/extensions 3.32.0
+2026-11-09T17:26:06.8583535Z + @tiptap/pm 3.32.0
+2026-11-09T17:26:06.8583758Z + @tiptap/react 3.32.0
+2026-11-09T17:26:06.8583975Z + @tiptap/starter-kit 3.32.0
+2026-11-09T17:26:06.8584252Z + @tiptap/suggestion 3.32.0
+2026-11-09T17:26:06.8584483Z + @tiptap/y-tiptap 3.0.10
+2026-11-09T17:26:06.8584707Z + @vercel/analytics 1.3.1
+2026-11-09T17:26:06.8584943Z + @vercel/functions 3.10.2
+2026-11-09T17:26:06.8585180Z + @vercel/oidc 4.0.2
+2026-11-09T17:26:06.8585422Z + @workflow/serde 5.0.0
+2026-11-09T17:26:06.8585986Z + @workflow/world-local 5.1.2
+2026-11-09T17:26:06.8586487Z + ai 7.0.148
+2026-11-09T17:26:06.8586779Z + aws4fetch 1.0.20
+2026-11-09T17:26:06.8587119Z + beautiful-mermaid 1.1.3
+2026-11-09T17:26:06.8587397Z + better-auth 1.7.12
+2026-11-09T17:26:06.8587703Z + chat 4.43.0
+2026-11-09T17:26:06.8588054Z + class-variance-authority 0.7.1
+2026-11-09T17:26:06.8588463Z + clsx 2.1.1
+2026-11-09T17:26:06.8588709Z + cmdk 1.1.1
+2026-11-09T17:26:06.8588944Z + cn 0.5.0
+2026-11-09T17:26:06.8589276Z + cookie 1.1.1
+2026-11-09T17:26:06.8589558Z + date-fns 4.1.0
+2026-11-09T17:26:06.8589916Z + diff 8.0.2
+2026-11-09T17:26:06.8590671Z + dompurify 3.4.17
+2026-11-09T17:26:06.8591185Z + drizzle-orm 0.45.4
+2026-11-09T17:26:06.8591539Z + e2b 2.61.0
+2026-11-09T17:26:06.8591884Z + embla-carousel-react 8.5.1
+2026-11-09T17:26:06.8592344Z + fflate 0.8.3
+2026-11-09T17:26:06.8592712Z + ffmpeg-static 5.3.0
+2026-11-09T17:26:06.8593123Z + file-type 22.3.0
+2026-11-09T17:26:06.8593532Z + h3 2.0.8
+2026-11-09T17:26:06.8594038Z + hono 4.13.13
+2026-11-09T17:26:06.8594422Z + input-otp 1.4.1
+2026-11-09T17:26:06.8594829Z + katex 0.16.47
+2026-11-09T17:26:06.8595200Z + lucide-react 1.60.0
+2026-11-09T17:26:06.8595604Z + mcp-handler 2.3.0
+2026-11-09T17:26:06.8595933Z + mermaid 12.2.0
+2026-11-09T17:26:06.8596473Z + motion 14.5.0
+2026-11-09T17:26:06.8596889Z + music-metadata 12.3.4
+2026-11-09T17:26:06.8597309Z + negotiator 1.1.0
+2026-11-09T17:26:06.8597716Z + next 16.4.1
+2026-11-09T17:26:06.8598089Z + next-intl 4.14.9
+2026-11-09T17:26:06.8598458Z + next-themes 0.4.6
+2026-11-09T17:26:06.8598837Z + nodemailer 10.3.1
+2026-11-09T17:26:06.8599221Z + officeparser 8.5.0
+2026-11-09T17:26:06.8599582Z + pg 8.23.1
+2026-11-09T17:26:06.8599918Z + posthog-js 1.438.13
+2026-11-09T17:26:06.8600390Z + posthog-node 5.55.2
+2026-11-09T17:26:06.8600733Z + react 19.3.1
+2026-11-09T17:26:06.8601177Z + react-day-picker 9.8.0
+2026-11-09T17:26:06.8601636Z + react-dom 19.3.1
+2026-11-09T17:26:06.8602058Z + react-markdown 10.1.0
+2026-11-09T17:26:06.8602554Z + react-resizable-panels 4.14.7
+2026-11-09T17:26:06.8603064Z + react-syntax-highlighter 16.1.1
+2026-11-09T17:26:06.8603530Z + recharts 3.10.1
+2026-11-09T17:26:06.8603916Z + rehype-katex 7.0.1
+2026-11-09T17:26:06.8604360Z + remark-gfm 4.0.1
+2026-11-09T17:26:06.8604730Z + remark-math 6.0.0
+2026-11-09T17:26:06.8605092Z + shadcn 4.22.1
+2026-11-09T17:26:06.8605433Z + sharp 0.35.5
+2026-11-09T17:26:06.8605965Z + shiki 4.5.0
+2026-11-09T17:26:06.8606584Z + solid-js 2.0.0-rc.0
+2026-11-09T17:26:06.8606962Z + sonner 1.7.4
+2026-11-09T17:26:06.8607344Z + srvx 1.0.8
+2026-11-09T17:26:06.8607654Z + swr 2.5.1
+2026-11-09T17:26:06.8607994Z + tailwind-merge 3.7.0
+2026-11-09T17:26:06.8608485Z + tw-animate-css 1.4.0
+2026-11-09T17:26:06.8608878Z + undici 7.24.5
+2026-11-09T17:26:06.8609277Z + unstorage 2.0.0-beta.0
+2026-11-09T17:26:06.8609660Z + use-intl 4.14.9
+2026-11-09T17:26:06.8610041Z + vaul 1.1.2
+2026-11-09T17:26:06.8610380Z + workflow 5.2.3
+2026-11-09T17:26:06.8610740Z + y-protocols 1.0.7
+2026-11-09T17:26:06.8611180Z + yjs 13.6.33
+2026-11-09T17:26:06.8611533Z + zod 4.6.7
+2026-11-09T17:26:06.8611728Z 
+2026-11-09T17:26:06.8611893Z devDependencies:
+2026-11-09T17:26:06.8612322Z + @playwright/test 1.64.1
+2026-11-09T17:26:06.8612707Z + @tailwindcss/postcss 4.3.3
+2026-11-09T17:26:06.8613149Z + @types/node 25.9.9
+2026-11-09T17:26:06.8613570Z + @types/pg 8.23.1
+2026-11-09T17:26:06.8613952Z + @types/react 19.3.0
+2026-11-09T17:26:06.8614311Z + @types/react-dom 19.3.0
+2026-11-09T17:26:06.8614844Z + @types/react-syntax-highlighter 15.5.13
+2026-11-09T17:26:06.8615428Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-09T17:26:06.8615874Z + esbuild 0.28.2
+2026-11-09T17:26:06.8616387Z + fake-indexeddb 6.2.4
+2026-11-09T17:26:06.8616801Z + happy-dom 15.11.7
+2026-11-09T17:26:06.8617180Z + js-yaml 4.3.2
+2026-11-09T17:26:06.8617563Z + nitro 3.0.261103-rc
+2026-11-09T17:26:06.8617931Z + nx 24.0.5
+2026-11-09T17:26:06.8618298Z + oxlint 1.89.0
+2026-11-09T17:26:06.8618644Z + postcss 8.5.31
+2026-11-09T17:26:06.8619086Z + prettier 3.9.10
+2026-11-09T17:26:06.8619495Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-09T17:26:06.8619902Z + rolldown 1.3.0
+2026-11-09T17:26:06.8620318Z + tailwindcss 4.3.3
+2026-11-09T17:26:06.8620758Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-09T17:26:06.8621156Z + tsx 4.23.15
+2026-11-09T17:26:06.8621512Z + typescript 5.9.3
+2026-11-09T17:26:06.8621947Z + wrangler 4.152.0
+2026-11-09T17:26:06.8622156Z 
+2026-11-09T17:26:07.1011450Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-09T17:26:07.1932755Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T17:26:07.1933326Z │                                                                              │
+2026-11-09T17:26:07.1933884Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T17:26:07.1934549Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-09T17:26:07.1935325Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-09T17:26:07.1935938Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T17:26:07.1936892Z │   to run scripts.                                                            │
+2026-11-09T17:26:07.1937429Z │                                                                              │
+2026-11-09T17:26:07.1937957Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T17:26:07.2052197Z Done in 17.6s using pnpm v10.34.3
+2026-11-09T17:26:07.2486046Z ##[end-action id=__self.__run;outcome=success;conclusion=success;duration_ms=17800]
+2026-11-09T17:26:07.2490280Z ##[start-action display=Save the pnpm store (main only);id=__self.__actions_cache]
+2026-11-09T17:26:07.2501300Z ##[end-action id=__self.__actions_cache;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-09T17:26:07.2542786Z ##[group]Run node scripts/ci/shadow.mjs
+2026-11-09T17:26:07.2543216Z [36;1mnode scripts/ci/shadow.mjs[0m
+2026-11-09T17:26:07.2575835Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:26:07.2576144Z env:
+2026-11-09T17:26:07.2576651Z   MIKKA_EDITION: cloud
+2026-11-09T17:26:07.2576943Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:26:07.2577242Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:26:07.2577587Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:07.2577931Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:26:07.2578270Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:07.2578663Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:26:07.2579063Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:26:07.2579656Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:26:07.2579977Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:26:07.2580357Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:26:07.2580784Z ##[endgroup]
+2026-11-09T17:26:13.4997334Z ## Shadow selection vs full coverage
+2026-11-09T17:26:13.4997743Z 
+2026-11-09T17:26:13.4998443Z Full baseline: 86 unit commands, 72 DB suites, daemon, Docker and desktop. These are selection counts, not measured timings.
+2026-11-09T17:26:13.4999010Z 
+2026-11-09T17:26:13.4999308Z ```json
+2026-11-09T17:26:13.4999631Z [
+2026-11-09T17:26:13.4999958Z   {
+2026-11-09T17:26:13.5000230Z     "scenario": "mobile",
+2026-11-09T17:26:13.5000567Z     "file": "apps/mobile/lib/theme.ts",
+2026-11-09T17:26:13.5000928Z     "units": 14,
+2026-11-09T17:26:13.5001196Z     "db": 0,
+2026-11-09T17:26:13.5001453Z     "daemon": false,
+2026-11-09T17:26:13.5001730Z     "desktop": false,
+2026-11-09T17:26:13.5002146Z     "image": false,
+2026-11-09T17:26:13.5002545Z     "reasons": []
+2026-11-09T17:26:13.5002910Z   },
+2026-11-09T17:26:13.5003263Z   {
+2026-11-09T17:26:13.5003572Z     "scenario": "web",
+2026-11-09T17:26:13.5004014Z     "file": "components/settings/settings-view.tsx",
+2026-11-09T17:26:13.5004633Z     "units": 16,
+2026-11-09T17:26:13.5004975Z     "db": 0,
+2026-11-09T17:26:13.5005310Z     "daemon": false,
+2026-11-09T17:26:13.5005705Z     "desktop": true,
+2026-11-09T17:26:13.5006051Z     "image": false,
+2026-11-09T17:26:13.5006577Z     "reasons": []
+2026-11-09T17:26:13.5006905Z   },
+2026-11-09T17:26:13.5007299Z   {
+2026-11-09T17:26:13.5007604Z     "scenario": "daemon",
+2026-11-09T17:26:13.5008093Z     "file": "packages/daemon/src/adapters/codex.ts",
+2026-11-09T17:26:13.5008656Z     "units": 18,
+2026-11-09T17:26:13.5008965Z     "db": 8,
+2026-11-09T17:26:13.5009372Z     "daemon": true,
+2026-11-09T17:26:13.5009833Z     "desktop": true,
+2026-11-09T17:26:13.5010254Z     "image": false,
+2026-11-09T17:26:13.5010612Z     "reasons": []
+2026-11-09T17:26:13.5011016Z   },
+2026-11-09T17:26:13.5011355Z   {
+2026-11-09T17:26:13.5011699Z     "scenario": "factory",
+2026-11-09T17:26:13.5012226Z     "file": "lib/factory/store.ts",
+2026-11-09T17:26:13.5012650Z     "units": 71,
+2026-11-09T17:26:13.5013044Z     "db": 65,
+2026-11-09T17:26:13.5013739Z     "daemon": true,
+2026-11-09T17:26:13.5014084Z     "desktop": true,
+2026-11-09T17:26:13.5014507Z     "image": true,
+2026-11-09T17:26:13.5014908Z     "reasons": []
+2026-11-09T17:26:13.5015269Z   },
+2026-11-09T17:26:13.5015583Z   {
+2026-11-09T17:26:13.5015878Z     "scenario": "shared",
+2026-11-09T17:26:13.5016586Z     "file": "packages/protocol/src/run.ts",
+2026-11-09T17:26:13.5017057Z     "units": 86,
+2026-11-09T17:26:13.5017442Z     "db": 72,
+2026-11-09T17:26:13.5017816Z     "daemon": true,
+2026-11-09T17:26:13.5018185Z     "desktop": true,
+2026-11-09T17:26:13.5018564Z     "image": true,
+2026-11-09T17:26:13.5018940Z     "reasons": [
+2026-11-09T17:26:13.5019470Z       "global configuration, schema, policy or security input"
+2026-11-09T17:26:13.5020045Z     ]
+2026-11-09T17:26:13.5020439Z   },
+2026-11-09T17:26:13.5020767Z   {
+2026-11-09T17:26:13.5021075Z     "scenario": "migration",
+2026-11-09T17:26:13.5021550Z     "file": "drizzle/new.sql",
+2026-11-09T17:26:13.5022152Z     "units": 86,
+2026-11-09T17:26:13.5022541Z     "db": 72,
+2026-11-09T17:26:13.5022878Z     "daemon": true,
+2026-11-09T17:26:13.5023292Z     "desktop": true,
+2026-11-09T17:26:13.5023668Z     "image": true,
+2026-11-09T17:26:13.5024021Z     "reasons": [
+2026-11-09T17:26:13.5024556Z       "global configuration, schema, policy or security input",
+2026-11-09T17:26:13.5025131Z       "file absent from graph"
+2026-11-09T17:26:13.5025557Z     ]
+2026-11-09T17:26:13.5025934Z   },
+2026-11-09T17:26:13.5026364Z   {
+2026-11-09T17:26:13.5026770Z     "scenario": "docs",
+2026-11-09T17:26:13.5027294Z     "file": "docs/dev-workflow.md",
+2026-11-09T17:26:13.5027755Z     "units": 0,
+2026-11-09T17:26:13.5028108Z     "db": 0,
+2026-11-09T17:26:13.5028428Z     "daemon": false,
+2026-11-09T17:26:13.5028865Z     "desktop": false,
+2026-11-09T17:26:13.5029251Z     "image": false,
+2026-11-09T17:26:13.5029620Z     "reasons": []
+2026-11-09T17:26:13.5030014Z   }
+2026-11-09T17:26:13.5030328Z ]
+2026-11-09T17:26:13.5030658Z ```
+2026-11-09T17:26:13.5030876Z 
+2026-11-09T17:26:13.5313017Z ##[group]Run pnpm check:cloud-boundary
+2026-11-09T17:26:13.5313547Z [36;1mpnpm check:cloud-boundary[0m
+2026-11-09T17:26:13.5350255Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:26:13.5350623Z env:
+2026-11-09T17:26:13.5350937Z   MIKKA_EDITION: cloud
+2026-11-09T17:26:13.5351389Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:26:13.5351850Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:26:13.5352217Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:13.5352547Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:26:13.5352894Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:13.5353442Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:26:13.5354061Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:26:13.5354918Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:26:13.5355249Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:26:13.5355586Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:26:13.5356379Z ##[endgroup]
+2026-11-09T17:26:13.8060859Z 
+2026-11-09T17:26:13.8061851Z > next-app@0.0.1 check:cloud-boundary /home/runner/work/Mikka/Mikka
+2026-11-09T17:26:13.8062553Z > node scripts/cloud-boundary-policy.mjs && node --test scripts/cloud-boundary-policy.test.mjs
+2026-11-09T17:26:13.8062894Z 
+2026-11-09T17:26:17.3491506Z cloud boundary: public core and clients pass; no private cloud service primitives added
+2026-11-09T17:26:21.7024306Z ✔ the existing public repository passes without moving core, billing, credentials or plugins (3342.089029ms)
+2026-11-09T17:26:21.7025683Z ✔ rejects cloud issuer environment (0.343852ms)
+2026-11-09T17:26:21.7026629Z ✔ rejects computed environment access (0.256469ms)
+2026-11-09T17:26:21.7027675Z ✔ rejects constant-folded environment access (0.273596ms)
+2026-11-09T17:26:21.7028628Z ✔ rejects cloud data-encryption credential (0.174653ms)
+2026-11-09T17:26:21.7029480Z ✔ rejects private JWK material (0.193058ms)
+2026-11-09T17:26:21.7038644Z ✔ rejects aliased cloud signing primitive (0.335871ms)
+2026-11-09T17:26:21.7040072Z ✔ rejects cloud JWT construction (0.218179ms)
+2026-11-09T17:26:21.7041125Z ✔ rejects private signing schema (0.218083ms)
+2026-11-09T17:26:21.7042275Z ✔ rejects private schema under a renamed source path (0.35679ms)
+2026-11-09T17:26:21.7043252Z ✔ rejects GitHub token exchange endpoint (0.31079ms)
+2026-11-09T17:26:21.7044247Z ✔ rejects GitHub SDK token mint (0.144445ms)
+2026-11-09T17:26:21.7045194Z ✔ rejects forwarded webhook signature header (0.101347ms)
+2026-11-09T17:26:21.7046135Z ✔ rejects Headers signature mutation (0.066465ms)
+2026-11-09T17:26:21.7046997Z ✔ rejects new Expo sender (0.084156ms)
+2026-11-09T17:26:21.7047805Z ✔ rejects new Expo base endpoint (0.10207ms)
+2026-11-09T17:26:21.7048636Z ✔ rejects new Expo receipt reader (0.087542ms)
+2026-11-09T17:26:21.7049513Z ✔ rejects new Expo SDK sender (0.06216ms)
+2026-11-09T17:26:21.7050241Z ✔ rejects server-keyed usage outside the private schema (0.110648ms)
+2026-11-09T17:26:21.7051003Z ✔ rejects private metering schema (0.10834ms)
+2026-11-09T17:26:21.7051681Z ✔ rejects registered cloud push endpoint (0.062353ms)
+2026-11-09T17:26:21.7052342Z ✔ rejects route-table model endpoint (0.119788ms)
+2026-11-09T17:26:21.7055308Z ✔ rejects request path dispatch (0.082273ms)
+2026-11-09T17:26:21.7065862Z ✔ rejects cloud OAuth issuer handler (0.081484ms)
+2026-11-09T17:26:21.7067226Z ✔ rejects private package import (0.090587ms)
+2026-11-09T17:26:21.7068033Z ✔ rejects dynamic private package import (0.071064ms)
+2026-11-09T17:26:21.7068990Z ✔ DDL and quoted cloud schemas are guarded without parsing SQL as JavaScript (0.093619ms)
+2026-11-09T17:26:21.7070332Z ✔ file routes and vendored private service source cannot bypass primitive detection (0.09514ms)
+2026-11-09T17:26:21.7071240Z ✔ private service dependencies cannot move into a public build through a package manifest (0.12513ms)
+2026-11-09T17:26:21.7071941Z ✔ allows public cloud client (0.093365ms)
+2026-11-09T17:26:21.7074475Z ✔ allows public receipts client (0.05221ms)
+2026-11-09T17:26:21.7098013Z ✔ allows protocol path type (0.071166ms)
+2026-11-09T17:26:21.7102075Z ✔ allows JWKS verification (0.091234ms)
+2026-11-09T17:26:21.7102904Z ✔ allows public JWK material (0.056801ms)
+2026-11-09T17:26:21.7103576Z ✔ allows stripping a private JWK field (0.090608ms)
+2026-11-09T17:26:21.7104310Z ✔ allows webhook verification (0.106331ms)
+2026-11-09T17:26:21.7104979Z ✔ allows own GitHub App signing (0.083921ms)
+2026-11-09T17:26:21.7105584Z ✔ allows own-installation billing (0.050567ms)
+2026-11-09T17:26:21.7106473Z ✔ allows public cloud connection state (0.040044ms)
+2026-11-09T17:26:21.7107123Z ✔ allows public protocol dependency (0.041295ms)
+2026-11-09T17:26:21.7108202Z ✔ allows explanatory comment (0.033669ms)
+2026-11-09T17:26:21.7109256Z ✔ an existing Expo exception permits exactly one retained primitive, with no whole-file exemption (0.309259ms)
+2026-11-09T17:26:21.7110401Z ✔ every exception has a reason, one exact fingerprint and a positive hit count (6.429383ms)
+2026-11-09T17:26:21.7111464Z ✔ removed or changed retained code requires removing its stale exception (8.221266ms)
+2026-11-09T17:26:21.7112613Z ✔ the CI command fails on an added untracked violation and passes again after removal (700.121223ms)
+2026-11-09T17:26:21.7113655Z ✔ the same policy command is a local check and a required source CI step (0.557405ms)
+2026-11-09T17:26:21.7384105Z ℹ tests 46
+2026-11-09T17:26:21.7384719Z ℹ suites 0
+2026-11-09T17:26:21.7385021Z ℹ pass 46
+2026-11-09T17:26:21.7385279Z ℹ fail 0
+2026-11-09T17:26:21.7385614Z ℹ cancelled 0
+2026-11-09T17:26:21.7385904Z ℹ skipped 0
+2026-11-09T17:26:21.7386171Z ℹ todo 0
+2026-11-09T17:26:21.7386821Z ℹ duration_ms 4337.910636
+2026-11-09T17:26:21.7535977Z ##[group]Run node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
+2026-11-09T17:26:21.7537433Z [36;1mnode --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs[0m
+2026-11-09T17:26:21.7569204Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:26:21.7569509Z env:
+2026-11-09T17:26:21.7570017Z   MIKKA_EDITION: cloud
+2026-11-09T17:26:21.7570317Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:26:21.7570652Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:26:21.7570951Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:21.7571314Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:26:21.7571645Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:21.7572070Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:26:21.7572536Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:26:21.7573090Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:26:21.7573554Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:26:21.7573906Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:26:21.7574290Z ##[endgroup]
+2026-11-09T17:26:21.8332680Z ✔ production OTA obtains only the existing named token through the immutable main workload identity (0.688364ms)
+2026-11-09T17:26:21.8335164Z ✔ a PR preview cannot acquire the production OIDC delivery (0.264263ms)
+2026-11-09T17:26:21.8340029Z ✔ desktop-release.yml reads the existing canonical platform names through OIDC, without static repository credentials (1.068876ms)
+2026-11-09T17:26:21.8345421Z ✔ mobile-native.yml reads the existing canonical platform names through OIDC, without static repository credentials (0.184048ms)
+2026-11-09T17:26:21.8451011Z ✔ existing raw or base64 ASC key names map to the identical signing key without changing custody (2.48594ms)
+2026-11-09T17:26:21.8453094Z ✔ invalid key types and newline-bearing identifiers fail before runner environment writes (0.72839ms)
+2026-11-09T17:26:21.8456453Z ✔ desktop aliases preserve the existing certificate and refuse multiline environment injection (0.46596ms)
+2026-11-09T17:26:21.8503698Z ℹ tests 7
+2026-11-09T17:26:21.8504206Z ℹ suites 0
+2026-11-09T17:26:21.8504598Z ℹ pass 7
+2026-11-09T17:26:21.8504943Z ℹ fail 0
+2026-11-09T17:26:21.8505235Z ℹ cancelled 0
+2026-11-09T17:26:21.8505546Z ℹ skipped 0
+2026-11-09T17:26:21.8505811Z ℹ todo 0
+2026-11-09T17:26:21.8506113Z ℹ duration_ms 62.392876
+2026-11-09T17:26:21.8575926Z ##[group]Run node --test scripts/acceptance/auth-audit-production.test.mjs scripts/acceptance/cloud-lease-audit.test.mjs scripts/acceptance/cloud-lease-recovery.test.mjs scripts/acceptance/shared-account-queue.test.mjs scripts/ops/production-smoke.test.mjs
+2026-11-09T17:26:21.8577836Z [36;1mnode --test scripts/acceptance/auth-audit-production.test.mjs scripts/acceptance/cloud-lease-audit.test.mjs scripts/acceptance/cloud-lease-recovery.test.mjs scripts/acceptance/shared-account-queue.test.mjs scripts/ops/production-smoke.test.mjs[0m
+2026-11-09T17:26:21.8609990Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:26:21.8610321Z env:
+2026-11-09T17:26:21.8610650Z   MIKKA_EDITION: cloud
+2026-11-09T17:26:21.8610951Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:26:21.8611251Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:26:21.8611595Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:21.8611935Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:26:21.8612391Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:21.8612791Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:26:21.8613228Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:26:21.8613775Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:26:21.8614097Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:26:21.8614447Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:26:21.8614793Z ##[endgroup]
+2026-11-09T17:26:22.1214935Z ✔ production auth acceptance requires an exact main driver and explicit dispatch (1.792962ms)
+2026-11-09T17:26:22.1246932Z ✔ PAT production probes cannot mutate a Factory task or a sharing grant (0.373515ms)
+2026-11-09T17:26:22.1439844Z ✔ a refused target makes no request and cannot leak supplied credentials (1.134754ms)
+2026-11-09T17:26:22.1457675Z ✔ safe production driver checks human and PAT paths and closes its own resources (43.295993ms)
+2026-11-09T17:26:22.1489866Z ✔ safe production driver detects isolation failure and closes its own resources (11.084545ms)
+2026-11-09T17:26:22.1515288Z ✔ a mixed legacy list cannot misidentify a personal issue as the team positive control (7.534117ms)
+2026-11-09T17:26:22.1528653Z ✔ human baselines use their authorized workspace context and return to the team before PAT creation (6.060845ms)
+2026-11-09T17:26:22.1564697Z ✔ an unavailable personal baseline creates no PAT and restores its own session workspace (7.040862ms)
+2026-11-09T17:26:22.1737609Z ✔ real CLI survives startup re-importing its lease helpers and writes the pending report (89.681773ms)
+2026-11-09T17:26:22.1757960Z ✔ ordinary cloud audit uses real daemon spans without claiming a trusted candidate host (7.994499ms)
+2026-11-09T17:26:22.1784121Z ✔ daemon evidence queries only the owned run hash and expiry interval and rejects missing or failed spans (30.804806ms)
+2026-11-09T17:26:22.1787857Z ✔ plugin collection keeps natural renewal unverified until matching external spans arrive (1.815581ms)
+2026-11-09T17:26:22.1788800Z ✔ lease receipt accepts only the exact owned run and closed tool output fields (0.612019ms)
+2026-11-09T17:26:22.1789568Z ✔ live issuance and model claims cannot stand in for natural daemon renewal (0.349126ms)
+2026-11-09T17:26:22.2890142Z ✔ task instruction rejects injected markers and binds the original small model harness (4.7401ms)
+2026-11-09T17:26:22.2931363Z ✔ VM probe scopes its journal and never prints credential or lease bodies (110.09253ms)
+2026-11-09T17:26:22.2967690Z ✔ recovery selects only the exact interrupted time, fixture prefix, small subscriptions and own old session (1.592293ms)
+2026-11-09T17:26:22.2974744Z ✔ changed, ambiguous, foreign, currently used and outside-window fixtures refuse before any recovery write (1.009149ms)
+2026-11-09T17:26:22.2976086Z ✔ normal recovery archives only its two profiles, revokes only its old session and retains the Bot (2.80062ms)
+2026-11-09T17:26:22.2977498Z ✔ recovery handles an already absent fixture without touching unrelated resources (0.496911ms)
+2026-11-09T17:26:22.2979070Z ✔ failed recovery stops, closes its new session, and returns only closed diagnostics (0.90474ms)
+2026-11-09T17:26:22.2980273Z ✔ recovery target and known run are checked before account credentials or an HTTP client (0.511254ms)
+2026-11-09T17:26:22.2981609Z ✔ all shared-account workflows retain pending requests, including expression-selected production groups (80.045767ms)
+2026-11-09T17:26:22.2982993Z ✔ normal login carries session only to same-origin read probes; reports contain no credentials (26.706362ms)
+2026-11-09T17:26:22.2984124Z ✔ a disabled required capability or failed Coordinator read fails the smoke (4.044484ms)
+2026-11-09T17:26:22.2985082Z ✔ missing cookies and mismatched account fail before application probes (1.103439ms)
+2026-11-09T17:26:22.2986353Z ✔ the computer read requires the unique Coordinator and exact authorized owner/workspace (7.097154ms)
+2026-11-09T17:26:22.2987908Z ✔ configuration cannot send credentials to insecure targets or silently ignore misspelled required features (0.425423ms)
+2026-11-09T17:26:22.2989560Z ✔ transport errors never expose cookies, URLs or provider error messages (0.33243ms)
+2026-11-09T17:26:22.2990402Z ℹ tests 29
+2026-11-09T17:26:22.2991380Z ℹ suites 0
+2026-11-09T17:26:22.2991730Z ℹ pass 29
+2026-11-09T17:26:22.2992008Z ℹ fail 0
+2026-11-09T17:26:22.2992308Z ℹ cancelled 0
+2026-11-09T17:26:22.2992608Z ℹ skipped 0
+2026-11-09T17:26:22.2992865Z ℹ todo 0
+2026-11-09T17:26:22.2993205Z ℹ duration_ms 407.569228
+2026-11-09T17:26:22.3074802Z ##[group]Run pnpm lint:code
+2026-11-09T17:26:22.3075060Z [36;1mpnpm lint:code[0m
+2026-11-09T17:26:22.3106832Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:26:22.3107069Z env:
+2026-11-09T17:26:22.3107259Z   MIKKA_EDITION: cloud
+2026-11-09T17:26:22.3107474Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:26:22.3107708Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:26:22.3107926Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:22.3108164Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:26:22.3108400Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:22.3108851Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:26:22.3109188Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:26:22.3109640Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:26:22.3109883Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:26:22.3110138Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:26:22.3110394Z ##[endgroup]
+2026-11-09T17:26:22.5698015Z 
+2026-11-09T17:26:22.5699080Z > next-app@0.0.1 lint:code /home/runner/work/Mikka/Mikka
+2026-11-09T17:26:22.5699975Z > oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory
+2026-11-09T17:26:22.5700462Z 
+2026-11-09T17:26:22.9282777Z Found 0 warnings and 0 errors.
+2026-11-09T17:26:22.9283141Z Finished in 323ms on 4023 files with 97 rules using 4 threads.
+2026-11-09T17:26:23.1973776Z 
+2026-11-09T17:26:23.1974605Z > next-app@0.0.1 check:migrations /home/runner/work/Mikka/Mikka
+2026-11-09T17:26:23.1975049Z > node scripts/check-migrations.mjs
+2026-11-09T17:26:23.1975211Z 
+2026-11-09T17:26:23.6826398Z migrations: 261 个迁移文件检查通过
+2026-11-09T17:26:23.9561840Z 
+2026-11-09T17:26:23.9562788Z > next-app@0.0.1 test:migrations /home/runner/work/Mikka/Mikka
+2026-11-09T17:26:23.9565445Z > node --test scripts/activity-actor-validation.test.mjs scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-guard.test.mjs scripts/migration-steps.test.mjs scripts/migration-targets.test.mjs scripts/scope-migration-history.test.mjs scripts/integration-migration-history.test.mjs scripts/task-workspace-evidence.test.mjs
+2026-11-09T17:26:23.9567460Z 
+2026-11-09T17:26:24.0415030Z ✔ actor checks are validated independently in replay-safe standalone files (2.059575ms)
+2026-11-09T17:26:24.0579732Z ✔ 历史重号在白名单内通过 (2.188636ms)
+2026-11-09T17:26:24.0584041Z ✔ 新的 NNNN_ 文件被拒绝 (0.340251ms)
+2026-11-09T17:26:24.0584608Z ✔ 修改旧迁移被拒绝 (0.387355ms)
+2026-11-09T17:26:24.0593381Z ✔ 删除旧迁移被拒绝 (1.097356ms)
+2026-11-09T17:26:24.0593942Z ✔ 非法时间戳被拒绝 (0.208526ms)
+2026-11-09T17:26:24.0594417Z ✔ 不晚于 main 最新迁移被拒绝 (0.193383ms)
+2026-11-09T17:26:24.0594896Z ✔ 晚于 main 最新迁移通过 (0.190767ms)
+2026-11-09T17:26:24.0595359Z ✔ 时间戳重复被拒绝 (0.189116ms)
+2026-11-09T17:26:24.0595915Z ✔ 拿不到 main 时只跳过顺序检查 (0.221699ms)
+2026-11-09T17:26:24.0658216Z ✔ consolidated migration aliases preserve immutable SQL and refuse ambiguous old receipts (5.842429ms)
+2026-11-09T17:26:24.2967800Z Retained test fixture: /tmp/migration-mode-ezYkCy
+2026-11-09T17:26:24.3354420Z Retained test fixture: /tmp/migration-preview-target-gDZlvA
+2026-11-09T17:26:24.3456043Z Retained test fixture: /tmp/code-only-build-KdMh3s
+2026-11-09T17:26:24.3873449Z Retained test fixture: /tmp/migration-preflight-2zBh1k
+2026-11-09T17:26:24.3900465Z ✔ explicit MIGRATE=0 exits before filesystem or database work in production (210.783924ms)
+2026-11-09T17:26:24.3901415Z ✔ explicit Preview migration never connects to the global application target (39.020514ms)
+2026-11-09T17:26:24.3912828Z ✔ the build runs migrations only after compilation and type checking succeed (10.087534ms)
+2026-11-09T17:26:24.3914167Z ✔ all files preflight before a database connection, even if an earlier file is valid (41.660546ms)
+2026-11-09T17:26:24.3964928Z ✔ Vercel production migrates only from main (2.166172ms)
+2026-11-09T17:26:24.3966025Z ✔ outside Vercel MIGRATE=1 reaches only loopback databases unless --allow-remote (0.707747ms)
+2026-11-09T17:26:24.3967789Z ✔ Vercel preview keeps its own preview database target (1.017494ms)
+2026-11-09T17:26:24.3968546Z ✔ loopback detection (0.613452ms)
+2026-11-09T17:26:24.3970030Z ✔ migrates unasked only in Vercel production or when every target is loopback off Vercel (0.327034ms)
+2026-11-09T17:26:24.3972306Z ✔ only the explicit baseline precedes legacy migrations, without changing their IDs (2.704889ms)
+2026-11-09T17:26:24.3973333Z ✔ missing baseline fails before connecting to any database (0.4569ms)
+2026-11-09T17:26:24.3974258Z ✔ known legacy artifact compatibility runs before mainline artifact creation (0.146409ms)
+2026-11-09T17:26:24.3975938Z ✔ BYOS migration aliases recognize both recorded branch histories without replay (4.64451ms)
+2026-11-09T17:26:24.3977054Z ✔ Agent Kit migration alias requires its original exact SQL (0.223973ms)
+2026-11-09T17:26:24.3977924Z ✔ local repository defaults only accepts the exact SQL under its historical name (0.225389ms)
+2026-11-09T17:26:24.3978809Z ✔ device authorization recognizes its historical name only for identical SQL (0.312046ms)
+2026-11-09T17:26:24.3979657Z ✔ publication migration keeps the exact historical SQL receipt (0.277784ms)
+2026-11-09T17:26:24.3980563Z ✔ credential vault migration recognizes the exact previously applied Preview SQL (0.27697ms)
+2026-11-09T17:26:24.3981347Z ✔ a normal file is sent whole, in one transaction (2.111473ms)
+2026-11-09T17:26:24.3982082Z ✔ directives count only in the header (leading comment / blank lines) (0.561348ms)
+2026-11-09T17:26:24.3982960Z ✔ no-transaction: exactly one statement, trailing semicolon optional, comments ignored (1.704498ms)
+2026-11-09T17:26:24.3983859Z ✔ no-transaction rejects a second statement (QA: files used to be split on ;) (0.553209ms)
+2026-11-09T17:26:24.3984531Z ✔ no-transaction rejects any $ quoting (0.183253ms)
+2026-11-09T17:26:24.3985214Z ✔ no-transaction rejects BEGIN / COMMIT / END / ROLLBACK (0.233586ms)
+2026-11-09T17:26:24.3986040Z ✔ empty files and misplaced CONCURRENTLY are rejected (0.26892ms)
+2026-11-09T17:26:24.3987387Z ✔ assertIndexValid passes a valid index and fails a missing or INVALID one (0.496216ms)
+2026-11-09T17:26:24.3988303Z ✔ index names are looked up the way Postgres stores them (0.255663ms)
+2026-11-09T17:26:24.3989255Z ✔ QA string forms: the raw file is executed, never the stripped text (0.375997ms)
+2026-11-09T17:26:24.3990202Z ✔ no-transaction: the ; count must survive comment stripping (0.262639ms)
+2026-11-09T17:26:24.3991214Z ✔ all tracked SQL preflights without altering historical migration bytes (7.865482ms)
+2026-11-09T17:26:24.3992125Z ✔ concurrent index plans carry their table and schema (0.255566ms)
+2026-11-09T17:26:24.3993306Z ✔ dropInvalidIndex drops only an INVALID index on the expected table, concurrently and schema-qualified (0.513089ms)
+2026-11-09T17:26:24.3994589Z ✔ Preview migration routes both targets to its configured branch, never the global application URL (2.267201ms)
+2026-11-09T17:26:24.3995720Z ✔ production and local migration targets retain their separate configured URLs (0.221714ms)
+2026-11-09T17:26:24.4068293Z ✔ scope aliases pin identical SQL and keep the two-body historical name ambiguous (5.060112ms)
+2026-11-09T17:26:24.4069570Z ✔ all partial and mixed ledger models either preserve ordered progress or fail closed (131.851642ms)
+2026-11-09T17:26:24.4070983Z ✔ a later recorded gate cannot prove which older verified-target body ran (0.602436ms)
+2026-11-09T17:26:24.4072374Z ✔ actual runner model skips old DDL, applies only missing suffixes, and replays nothing on retry (7.181284ms)
+2026-11-09T17:26:24.4073858Z ✔ renamed scope sources preserve the complete previous ledger without DDL or replacement entries (1.988865ms)
+2026-11-09T17:26:24.4075290Z ✔ mixed previous and oldest unambiguous prefixes execute only the missing suffix (5.087698ms)
+2026-11-09T17:26:24.4079133Z ✔ actual runner model refuses ambiguous, gapped or changed history before pending DDL (10.450938ms)
+2026-11-09T17:26:24.4080232Z ✔ actual runner model rolls back DDL when the ledger write fails (1.469144ms)
+2026-11-09T17:26:24.4081472Z ✔ an unrelated AgentKit ledger addition from 79 to 80 neither authorizes nor aliases scope DDL (4.056445ms)
+2026-11-09T17:26:24.4082849Z ✔ actual runner model retains both DDL and ledger after lost COMMIT response; retry does not repeat it (3.706867ms)
+2026-11-09T17:26:24.4139606Z ✔ legacy scope and creator never prove a tenant (1.184077ms)
+2026-11-09T17:26:24.4140558Z ✔ one independently proved live workspace binds a task (0.205311ms)
+2026-11-09T17:26:24.4141699Z ✔ contradictory evidence is quarantined even if one workspace was deleted (0.84616ms)
+2026-11-09T17:26:24.4142890Z ✔ a deleted workspace does not redirect its tasks to the creator (0.150773ms)
+2026-11-09T17:26:24.4143938Z ✔ a malformed authoritative relation quarantines the task even when its tenant exists (0.102781ms)
+2026-11-09T17:26:24.4144788Z ✔ UUID capitalization is not a second tenant (0.114242ms)
+2026-11-09T17:26:24.4145606Z ✔ invalid frozen provenance cannot disappear beside a valid source (0.122278ms)
+2026-11-09T17:26:24.4146573Z ✔ a removed referenced source quarantines rather than borrowing another source tenant (0.111824ms)
+2026-11-09T17:26:24.4147030Z ℹ tests 63
+2026-11-09T17:26:24.4147331Z ℹ suites 0
+2026-11-09T17:26:24.4147626Z ℹ pass 63
+2026-11-09T17:26:24.4147909Z ℹ fail 0
+2026-11-09T17:26:24.4148156Z ℹ cancelled 0
+2026-11-09T17:26:24.4148466Z ℹ skipped 0
+2026-11-09T17:26:24.4148730Z ℹ todo 0
+2026-11-09T17:26:24.4149009Z ℹ duration_ms 430.211456
+2026-11-09T17:26:24.6913133Z 
+2026-11-09T17:26:24.6914419Z > next-app@0.0.1 check:factory /home/runner/work/Mikka/Mikka
+2026-11-09T17:26:24.6915453Z > node scripts/check-factory.mjs
+2026-11-09T17:26:24.6915897Z 
+2026-11-09T17:26:24.7809092Z factory: mikka (1 repositories, 1 runners, digest 5d6471b07f847683d43313aa54bc48d3ee9ac02fdf9cc2a10142cac7f962743f)
+2026-11-09T17:26:24.8046990Z ##[group]Run node apps/api/scripts/generate-routes.mjs --check
+2026-11-09T17:26:24.8047637Z [36;1mnode apps/api/scripts/generate-routes.mjs --check[0m
+2026-11-09T17:26:24.8079715Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:26:24.8080033Z env:
+2026-11-09T17:26:24.8080355Z   MIKKA_EDITION: cloud
+2026-11-09T17:26:24.8080686Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:26:24.8081018Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:26:24.8081314Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:24.8081631Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:26:24.8081867Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:24.8082179Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:26:24.8082511Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:26:24.8082978Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:26:24.8083228Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:26:24.8083645Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:26:24.8083912Z ##[endgroup]
+2026-11-09T17:26:25.2757943Z {"routes":243,"methods":315}
+2026-11-09T17:26:25.2860577Z ##[group]Run pnpm lint:runtime
+2026-11-09T17:26:25.2860846Z [36;1mpnpm lint:runtime[0m
+2026-11-09T17:26:25.2892897Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:26:25.2893139Z env:
+2026-11-09T17:26:25.2893317Z   MIKKA_EDITION: cloud
+2026-11-09T17:26:25.2893536Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:26:25.2893765Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:26:25.2893990Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:25.2894222Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:26:25.2894467Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:25.2894784Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:26:25.2895140Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:26:25.2895596Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:26:25.2895842Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:26:25.2896095Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:26:25.2896472Z ##[endgroup]
+2026-11-09T17:26:25.5698098Z 
+2026-11-09T17:26:25.5698708Z > next-app@0.0.1 lint:runtime /home/runner/work/Mikka/Mikka
+2026-11-09T17:26:25.5699722Z > oxlint --no-ignore --deny-warnings apps/api/compat apps/api/plugins apps/api/routes apps/api/runtime apps/api/scripts apps/api/src apps/api/*.mjs apps/api/nitro.config.ts apps/frontend/scripts apps/frontend/src apps/frontend/vite.config.mjs
+2026-11-09T17:26:25.5700358Z 
+2026-11-09T17:26:25.6213615Z Found 0 warnings and 0 errors.
+2026-11-09T17:26:25.6214272Z Finished in 12ms on 89 files with 97 rules using 4 threads.
+2026-11-09T17:26:25.6396943Z ##[group]Run pnpm test:api
+2026-11-09T17:26:25.6397215Z [36;1mpnpm test:api[0m
+2026-11-09T17:26:25.6431740Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:26:25.6431988Z env:
+2026-11-09T17:26:25.6432171Z   MIKKA_EDITION: cloud
+2026-11-09T17:26:25.6432387Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:26:25.6432614Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:26:25.6432835Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:25.6433065Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:26:25.6433304Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:25.6433624Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:26:25.6433956Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:26:25.6434396Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:26:25.6434632Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:26:25.6434880Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:26:25.6435138Z ##[endgroup]
+2026-11-09T17:26:25.8980570Z 
+2026-11-09T17:26:25.8981232Z > next-app@0.0.1 test:api /home/runner/work/Mikka/Mikka
+2026-11-09T17:26:26.5405585Z > node --import ./tests/support/server-only.mjs --import tsx --test apps/api/src/*.test.ts apps/api/runtime/*.test.ts lib/browser-rpc/*.test.ts lib/agent-image-cache.test.ts lib/web-connection/*.test.ts && node --test --test-reporter=tap apps/api/build-contract.test.mjs apps/api/runtime/*.test.mjs apps/api/scripts/*.test.mjs scripts/start-app.test.mjs scripts/test-subscription-enrollment-app.test.mjs scripts/release/build-vercel.test.mjs apps/api/cloud-service-rewrite.test.mjs
+2026-11-09T17:26:26.5407834Z 
+2026-11-09T17:26:26.5415781Z ✔ real Nitro Node WebSocket adapter retains authenticated hooks through the HTTP security wrapper (77.741932ms)
+2026-11-09T17:26:27.9437872Z ➜ Listening on: http://127.0.0.1:39921/
+2026-11-09T17:26:29.1918889Z ✔ the real Vite and Nitro proxies preserve the mailbox handshake for persistent and closing clients (1424.733831ms)
+2026-11-09T17:26:29.2565920Z ✔ non-listening Node adapter preserves real req/res/body, fixed origin and waitUntil close barrier (21.286391ms)
+2026-11-09T17:26:29.2575784Z ✔ raw ingress guards reject foreign Host/proxy metadata before the application and retain failed close (6.707823ms)
+2026-11-09T17:26:29.2584408Z ▶ NextResponse JSON preserves HTTP refusals with the real srvx global Response
+2026-11-09T17:26:29.2585549Z   ✔ reading headers then body cannot turn a 404 JSON response into 200 (5.496688ms)
+2026-11-09T17:26:29.2586692Z   ✔ the actual API dispatch preserves JSON status 200, headers and cookies (16.056988ms)
+2026-11-09T17:26:29.2587713Z   ✔ the actual API dispatch preserves JSON status 401, headers and cookies (1.64854ms)
+2026-11-09T17:26:29.2588676Z   ✔ the actual API dispatch preserves JSON status 403, headers and cookies (2.106116ms)
+2026-11-09T17:26:29.2589639Z   ✔ the actual API dispatch preserves JSON status 404, headers and cookies (1.344262ms)
+2026-11-09T17:26:29.2590636Z   ✔ the actual API dispatch preserves JSON status 409, headers and cookies (2.332867ms)
+2026-11-09T17:26:29.2591580Z   ✔ the actual API dispatch preserves JSON status 429, headers and cookies (1.307588ms)
+2026-11-09T17:26:29.2592539Z   ✔ the actual API dispatch preserves JSON status 503, headers and cookies (1.390532ms)
+2026-11-09T17:26:29.2593603Z ✔ NextResponse JSON preserves HTTP refusals with the real srvx global Response (273.105533ms)
+2026-11-09T17:26:29.2594833Z ✔ the official Vercel adapter preserves configured HTTPS authority for the existing strict RPC guard (156.123462ms)
+2026-11-09T17:26:29.2596158Z ✔ the unadapted official Node adapter reproduces the HTTPS reverse-proxy RPC rejection (32.419277ms)
+2026-11-09T17:26:29.2597530Z ✔ raw Host and proxy conflicts cannot add an authority; Origin remains independently enforced (53.121929ms)
+2026-11-09T17:26:29.2598716Z ✔ deployment-local Workflow ingress retains its own HTTPS URL, raw body and real waitUntil lifetime (50.175186ms)
+2026-11-09T17:26:29.2600324Z ✔ legacy domain remains a fixed redirect without reaching application data (20.759568ms)
+2026-11-09T17:26:29.2601490Z ✔ self-hosted Node accepts only its configured HTTPS authority behind a proxy (21.551415ms)
+2026-11-09T17:26:29.2602886Z ✔ authority registration is Vercel-production-only and configuration cannot contain arbitrary URL parts (1.396993ms)
+2026-11-09T17:26:29.2604067Z ✔ Decision backend HTTP preserves its daemon parent at the API boundary (flags 01) (54.662698ms)
+2026-11-09T17:26:29.2605111Z ✔ Decision backend HTTP preserves its daemon parent at the API boundary (flags 00) (17.156323ms)
+2026-11-09T17:26:29.2606368Z ✔ community defaults to server data, explicit 1 restores the compiled UI, cloud keeps its app (48.016817ms)
+2026-11-09T17:26:29.2632848Z ✔ authentication documents keep their flows and server marker in both locales (5.61061ms)
+2026-11-09T17:26:29.2634433Z ✔ GitHub linking stays on its existing narrow surface before and after URL cleanup (1.83433ms)
+2026-11-09T17:26:29.2635635Z ✔ server pages preserve HEAD, refuse writes and never absorb machine endpoints (0.820283ms)
+2026-11-09T17:26:29.2643657Z ✔ response disposal starts independent callbacks concurrently and joins their lifetime once (2.077865ms)
+2026-11-09T17:26:29.2645153Z ✔ nested callbacks start while another task waits; early promise and callback failures do not abandon the lifetime (0.491285ms)
+2026-11-09T17:26:29.2646686Z ✔ official web bearer adaptation is installed before the API scope and strips handler cookies afterward (22.111127ms)
+2026-11-09T17:26:29.2648115Z ✔ request cookies match the installed SDK for duplicates and malformed encoding without rewriting auth headers (4.454859ms)
+2026-11-09T17:26:29.2649330Z ✔ exact routes, decoded parameters, HEAD and OPTIONS preserve method contracts (7.725718ms)
+2026-11-09T17:26:29.2650510Z ✔ API slash redirects preserve POST replay and never execute a handler or decode an encoded route (5.430087ms)
+2026-11-09T17:26:29.2651725Z ✔ parallel requests retain their own cookie, locale, React cache and all after ALS (2.771921ms)
+2026-11-09T17:26:29.2652829Z ✔ multiple raw Set-Cookie fields retain Expires, chunks and deletion attributes (1.937431ms)
+2026-11-09T17:26:29.2653869Z ✔ real Web stream complete schedules after once and retains waitUntil (1.437312ms)
+2026-11-09T17:26:29.2654762Z ✔ real Web stream cancel schedules after once and retains waitUntil (1.451807ms)
+2026-11-09T17:26:29.2655709Z ✔ real Web stream error schedules after once and retains waitUntil (1.818352ms)
+2026-11-09T17:26:29.2657032Z ✔ native Request facade retains URL, query, clone, body and cancellation without global patch (3.305596ms)
+2026-11-09T17:26:29.2658224Z ✔ actual srvx NodeRequest backing preserves POST and rejects stale canonical authority (3.920656ms)
+2026-11-09T17:26:29.2659337Z ✔ locale and translations use actual ICU formatter; localized URL keeps query/hash (1.448942ms)
+2026-11-09T17:26:29.2660360Z ✔ web transport accepted belongs to the original request trace before any business scope (13.642047ms)
+2026-11-09T17:26:29.2661495Z ✔ web transport expired belongs to the original request trace before any business scope (6.073774ms)
+2026-11-09T17:26:29.2662672Z ✔ web transport unavailable belongs to the original request trace before any business scope (7.285979ms)
+2026-11-09T17:26:29.2663857Z ✔ web transport disabled belongs to the original request trace before any business scope (6.664035ms)
+2026-11-09T17:26:29.2664966Z ✔ web transport preflight belongs to the original request trace before any business scope (3.55314ms)
+2026-11-09T17:26:29.2666200Z ✔ a rejected transport preparation keeps the original H3 error response and finishes its trace once (12.794952ms)
+2026-11-09T17:26:29.2667487Z ✔ adapted Web stream complete retains tracing and after disposal (1.425649ms)
+2026-11-09T17:26:29.2668361Z ✔ adapted Web stream cancel retains tracing and after disposal (4.099975ms)
+2026-11-09T17:26:29.2669205Z ✔ adapted Web stream error retains tracing and after disposal (1.151016ms)
+2026-11-09T17:26:29.2670557Z ✔ NextResponse JSON preserves HTTP status after FastResponse headers and body materialize (219.639524ms)
+2026-11-09T17:26:29.7386606Z ✔ actual MCP SDK request abort closes the healthy observer without a deadline read (51.126888ms)
+2026-11-09T17:26:29.7400287Z ✔ actual MCP SDK response cancel closes the healthy observer without a deadline read (6.588199ms)
+2026-11-09T17:26:29.7401587Z ✔ actual MCP quiet wait keeps the full 90 second deadline and exactly two reads (5.917678ms)
+2026-11-09T17:26:29.7488355Z ✔ an already-running MCP write remains in waitUntil until its existing callback settles (8.4472ms)
+2026-11-09T17:26:29.7551430Z ✔ actual MCP rejected input starts no retained callback (3.997336ms)
+2026-11-09T17:26:29.7587811Z ✔ actual MCP original callback error reaches the SDK (2.838015ms)
+2026-11-09T17:26:29.7590841Z ✔ cancellation during SDK validation starts no callback after the request lifetime ends (5.24725ms)
+2026-11-09T17:26:29.8968368Z ✔ official-Origin GET /api/desktop/discovery adapts the real Node facade without losing its body or after lifetime (60.964574ms)
+2026-11-09T17:26:29.9238286Z ✔ official-Origin POST /api/web/begin adapts the real Node facade without losing its body or after lifetime (25.726283ms)
+2026-11-09T17:26:29.9327912Z ✔ official-Origin POST /api/web/revoke adapts the real Node facade without losing its body or after lifetime (11.889183ms)
+2026-11-09T17:26:29.9475860Z ✔ authenticated Node POST stream complete retains body, scoped Origin and the original disposal lifetime (11.173446ms)
+2026-11-09T17:26:29.9580558Z ✔ authenticated Node POST stream cancel retains body, scoped Origin and the original disposal lifetime (16.391057ms)
+2026-11-09T17:26:30.0106695Z ✔ public lookup keeps one-day freshness and stale revalidation without credential input (11.783009ms)
+2026-11-09T17:26:30.0108410Z ✔ cold error and cancellation propagate; unsafe cache projections cannot bypass the fixed loader (1.91008ms)
+2026-11-09T17:26:30.5148026Z ✔ request reuse is exact-cookie bound and never changes the desktop scope (21.121685ms)
+2026-11-09T17:26:30.5177933Z ✔ SDK response modes and unknown semantics bypass reuse (0.667158ms)
+2026-11-09T17:26:30.5209780Z ✔ concurrent fresh checks upgrade once and null never falls back (1.255097ms)
+2026-11-09T17:26:30.5227461Z ✔ a failed fresh authorization cannot fall back to cached identity (0.845145ms)
+2026-11-09T17:26:30.5255834Z ✔ fresh wrapper delegates unfamiliar contexts to real SDK and retains the DB flag (0.638722ms)
+2026-11-09T17:26:30.5347166Z ✔ initial/fresh SDK cookie outputs survive; only a real issued proof marks initial read fresh (3.801809ms)
+2026-11-09T17:26:30.5351512Z ✔ browser RPC rejects origin, cookie/bearer confusion, unknown actions and invalid args before execution (11.35778ms)
+2026-11-09T17:26:30.5695397Z ✔ web handoff routing preserves confirmation and rejects ambiguous query values (2.407368ms)
+2026-11-09T17:26:30.5726481Z ✔ binding requires same-origin confirmation; bearer parsing never accepts cookies (22.637187ms)
+2026-11-09T17:26:30.5770990Z ✔ completion clears fragments before posting only code and state to its own origin and nonce channel (4.628579ms)
+2026-11-09T17:26:30.5800689Z ✔ a confirmed remote Workspace selection reaches every RPC/REST and survives reload only with its own session (70.606816ms)
+2026-11-09T17:26:30.5818221Z ✔ server/account/logout transitions clear Workspace selection instead of inheriting another session preference (11.655894ms)
+2026-11-09T17:26:30.5819549Z ✔ failed or malformed selection acknowledgements cannot replace the last confirmed Workspace (17.565358ms)
+2026-11-09T17:26:30.5850694Z ✔ the newest switch intent wins and older reads or selection responses cannot replace it (5.454696ms)
+2026-11-09T17:26:30.6436207Z ✔ RPC accepts its own switch acknowledgement and refuses a previous response whose body finishes later (56.085265ms)
+2026-11-09T17:26:30.6475539Z ✔ credentials live only in browser session storage, public metadata never contains a token (3.017645ms)
+2026-11-09T17:26:30.6528215Z ✔ RPC, live ticket, upload and download route to the active account; bearer never follows redirects or foreign origins (5.204565ms)
+2026-11-09T17:26:30.6601863Z ✔ an identical user id from another server or the cloud is rejected rather than merged (7.800969ms)
+2026-11-09T17:26:30.6635311Z ✔ switching aborts/fences old responses and disconnect clears only the selected server (3.072568ms)
+2026-11-09T17:26:30.6636787Z ✔ an unprobed stored address cannot start sign-in, and public input cannot provide a verifier or credential (0.634635ms)
+2026-11-09T17:26:30.6664190Z ✔ a cloud read already in flight is also aborted and cannot populate the selected self-hosted account (2.068063ms)
+2026-11-09T17:26:30.6707854Z ✔ a late successful exchange cannot undo a later disconnect and its new session is revoked (5.745474ms)
+2026-11-09T17:26:30.6717511Z ✔ account switching invalidates pending login proofs before any exchange request (1.780006ms)
+2026-11-09T17:26:30.6754755Z ✔ official renderer version checks stay anonymous and cloud-bound when a self-hosted backend is active (1.84556ms)
+2026-11-09T17:26:30.6783934Z ✔ official correlation stays cloud-bound when tracing is installed before the directory (3.465824ms)
+2026-11-09T17:26:30.6831018Z ✔ official correlation stays cloud-bound when tracing is installed after the directory (3.469998ms)
+2026-11-09T17:26:30.7010715Z ✔ discovery uses one origin, no credentials or redirects and the declared base path (27.064417ms)
+2026-11-09T17:26:30.7015641Z ✔ all documented discovery failures are distinct (4.652732ms)
+2026-11-09T17:26:30.7017572Z ✔ discovery cannot select another origin, dot path, non-JSON or unbounded body (6.458756ms)
+2026-11-09T17:26:30.8008686Z ✔ official web trust is an exact HTTPS app URL with a distinct admin kill switch (1.706076ms)
+2026-11-09T17:26:30.8017089Z ✔ server addresses reject wildcards, insecure loopback and URL-normalized traversal (0.283147ms)
+2026-11-09T17:26:31.0031961Z ✔ self-hosted live tickets cannot redirect capabilities to the cloud or a different origin (0.748732ms)
+2026-11-09T17:26:31.0035522Z ✔ persistent caches cannot share a namespace across servers even with identical account and workspace ids (0.199081ms)
+2026-11-09T17:26:31.0037039Z ✔ authenticated assets only accept application API paths, never foreign or executable URLs (0.538762ms)
+2026-11-09T17:26:31.1216795Z ✔ CORS preflight has exact origin/header allowlists and never enables cookie credentials (5.003815ms)
+2026-11-09T17:26:31.1234970Z ✔ fresh bearer validation precedes adaptation; cookie/cache authority and response cookies are removed (6.405036ms)
+2026-11-09T17:26:31.1237423Z ✔ public discovery never receives ambient authority, and disabling blocks an existing bearer (1.649384ms)
+2026-11-09T17:26:31.1241618Z ✔ Workspace preference has an explicit header contract without transporting any Cookie authority (3.490482ms)
+2026-11-09T17:26:31.1481748Z ℹ tests 102
+2026-11-09T17:26:31.1482558Z ℹ suites 0
+2026-11-09T17:26:31.1482992Z ℹ pass 102
+2026-11-09T17:26:31.1483392Z ℹ fail 0
+2026-11-09T17:26:31.1483801Z ℹ cancelled 0
+2026-11-09T17:26:31.1484217Z ℹ skipped 0
+2026-11-09T17:26:31.1484671Z ℹ todo 0
+2026-11-09T17:26:31.1485101Z ℹ duration_ms 5221.769202
+2026-11-09T17:26:31.2004661Z TAP version 13
+2026-11-09T17:26:31.7517671Z # Subtest: shared tracing loads in a native Node worker without a TypeScript resolver
+2026-11-09T17:26:31.7521317Z ok 1 - shared tracing loads in a native Node worker without a TypeScript resolver
+2026-11-09T17:26:31.7530020Z   ---
+2026-11-09T17:26:31.7530529Z   duration_ms: 106.010259
+2026-11-09T17:26:31.7530986Z   type: 'test'
+2026-11-09T17:26:31.7531311Z   ...
+2026-11-09T17:26:31.7777388Z # Subtest: declaration inventory includes named reexports/destructuring and preserves explicit duration
+2026-11-09T17:26:31.7815094Z ok 2 - declaration inventory includes named reexports/destructuring and preserves explicit duration
+2026-11-09T17:26:31.7847052Z   ---
+2026-11-09T17:26:31.7852389Z   duration_ms: 29.75124
+2026-11-09T17:26:31.7879153Z   type: 'test'
+2026-11-09T17:26:31.7887098Z   ...
+2026-11-09T17:26:31.7911732Z # Subtest: function rules remain per route, source-bound, and accept actual catch-all names without traversal
+2026-11-09T17:26:31.7913115Z ok 3 - function rules remain per route, source-bound, and accept actual catch-all names without traversal
+2026-11-09T17:26:31.7921293Z   ---
+2026-11-09T17:26:31.7921748Z   duration_ms: 9.27145
+2026-11-09T17:26:31.7922184Z   type: 'test'
+2026-11-09T17:26:31.7922559Z   ...
+2026-11-09T17:26:31.7973012Z # Subtest: actual Nitro router accepts multiple named parameters and preserves route duration boundaries
+2026-11-09T17:26:31.7999607Z ok 4 - actual Nitro router accepts multiple named parameters and preserves route duration boundaries
+2026-11-09T17:26:31.8017998Z   ---
+2026-11-09T17:26:31.8047031Z   duration_ms: 10.590792
+2026-11-09T17:26:31.8047395Z   type: 'test'
+2026-11-09T17:26:31.8070862Z   ...
+2026-11-09T17:26:31.8404335Z # Subtest: actual Nitro Vercel output opts MCP into cancellation without changing other functions
+2026-11-09T17:26:31.8410907Z ok 5 - actual Nitro Vercel output opts MCP into cancellation without changing other functions
+2026-11-09T17:26:31.8411572Z   ---
+2026-11-09T17:26:31.8412025Z   duration_ms: 43.222637
+2026-11-09T17:26:31.8412423Z   type: 'test'
+2026-11-09T17:26:31.8412747Z   ...
+2026-11-09T17:26:31.8574990Z # [success] [nitro] Generated public [36m../../../../../tmp/mikka-public-assets-3b7iSq/.output/public[39m
+2026-11-09T17:26:31.8599179Z # Subtest: actual Nitro copy excludes SPA index and internal metadata without exposing root/public
+2026-11-09T17:26:31.8605625Z ok 6 - actual Nitro copy excludes SPA index and internal metadata without exposing root/public
+2026-11-09T17:26:31.8606561Z   ---
+2026-11-09T17:26:31.8606971Z   duration_ms: 19.265001
+2026-11-09T17:26:31.8607399Z   type: 'test'
+2026-11-09T17:26:31.8607764Z   ...
+2026-11-09T17:26:32.3357881Z # Subtest: actual root Nitro configuration loads the API/Workflow graph; an empty default graph is rejected
+2026-11-09T17:26:32.3358924Z ok 7 - actual root Nitro configuration loads the API/Workflow graph; an empty default graph is rejected
+2026-11-09T17:26:32.3359418Z   ---
+2026-11-09T17:26:32.3359610Z   duration_ms: 474.825409
+2026-11-09T17:26:32.3359820Z   type: 'test'
+2026-11-09T17:26:32.3360013Z   ...
+2026-11-09T17:26:32.3662387Z # Subtest: community and unconfigured cloud builds add no service rewrite
+2026-11-09T17:26:32.3688721Z ok 8 - community and unconfigured cloud builds add no service rewrite
+2026-11-09T17:26:32.3703501Z   ---
+2026-11-09T17:26:32.3710439Z   duration_ms: 0.714882
+2026-11-09T17:26:32.3731158Z   type: 'test'
+2026-11-09T17:26:32.3731473Z   ...
+2026-11-09T17:26:32.3732118Z # Subtest: the official service preserves the exact cookie path without matching unrelated routes
+2026-11-09T17:26:32.3733131Z ok 9 - the official service preserves the exact cookie path without matching unrelated routes
+2026-11-09T17:26:32.3733718Z   ---
+2026-11-09T17:26:32.3733974Z   duration_ms: 0.267694
+2026-11-09T17:26:32.3734268Z   type: 'test'
+2026-11-09T17:26:32.3734526Z   ...
+2026-11-09T17:26:32.3735072Z # Subtest: invalid configured targets fail before a build can publish them
+2026-11-09T17:26:32.3735805Z ok 10 - invalid configured targets fail before a build can publish them
+2026-11-09T17:26:32.3736727Z   ---
+2026-11-09T17:26:32.3736987Z   duration_ms: 0.624783
+2026-11-09T17:26:32.3737280Z   type: 'test'
+2026-11-09T17:26:32.3737540Z   ...
+2026-11-09T17:26:32.4014954Z # ➜ Listening on: http://127.0.0.1:44081/
+2026-11-09T17:26:32.4016081Z # Subtest: real development workers instrument pg before application imports, including hot replacements
+2026-11-09T17:26:32.4022658Z ok 11 - real development workers instrument pg before application imports, including hot replacements
+2026-11-09T17:26:32.4023460Z   ---
+2026-11-09T17:26:32.4023824Z   duration_ms: 1007.213204
+2026-11-09T17:26:32.4025303Z   type: 'test'
+2026-11-09T17:26:32.4025630Z   ...
+2026-11-09T17:26:32.4170595Z # Subtest: literal trailing slashes match installed Next redirects before machine dispatch for GET and POST
+2026-11-09T17:26:32.4188085Z ok 12 - literal trailing slashes match installed Next redirects before machine dispatch for GET and POST
+2026-11-09T17:26:32.4204292Z   ---
+2026-11-09T17:26:32.4204815Z   duration_ms: 15.807966
+2026-11-09T17:26:32.4205285Z   type: 'test'
+2026-11-09T17:26:32.4205672Z   ...
+2026-11-09T17:26:32.4206439Z # Subtest: page locale uses the same last valid cookie as the installed SDK
+2026-11-09T17:26:32.4207263Z ok 13 - page locale uses the same last valid cookie as the installed SDK
+2026-11-09T17:26:32.4207805Z   ---
+2026-11-09T17:26:32.4208187Z   duration_ms: 8.46899
+2026-11-09T17:26:32.4208581Z   type: 'test'
+2026-11-09T17:26:32.4208977Z   ...
+2026-11-09T17:26:32.4209667Z # Subtest: page-only locale and legacy redirects retain query while machine paths never get SPA HTML
+2026-11-09T17:26:32.4210647Z ok 14 - page-only locale and legacy redirects retain query while machine paths never get SPA HTML
+2026-11-09T17:26:32.4211278Z   ---
+2026-11-09T17:26:32.4211659Z   duration_ms: 1.919251
+2026-11-09T17:26:32.4212064Z   type: 'test'
+2026-11-09T17:26:32.4212424Z   ...
+2026-11-09T17:26:32.4213168Z # Subtest: security projection preserves body stream, raw cookies, status and route-specific headers
+2026-11-09T17:26:32.4214175Z ok 15 - security projection preserves body stream, raw cookies, status and route-specific headers
+2026-11-09T17:26:32.4214827Z   ---
+2026-11-09T17:26:32.4215205Z   duration_ms: 1.549303
+2026-11-09T17:26:32.4215609Z   type: 'test'
+2026-11-09T17:26:32.4215966Z   ...
+2026-11-09T17:26:32.4217055Z # Subtest: token pages keep private headers in both locales; document requests alone update locale cookie
+2026-11-09T17:26:32.4218129Z ok 16 - token pages keep private headers in both locales; document requests alone update locale cookie
+2026-11-09T17:26:32.4218687Z   ---
+2026-11-09T17:26:32.4219086Z   duration_ms: 2.027104
+2026-11-09T17:26:32.4219481Z   type: 'test'
+2026-11-09T17:26:32.4219854Z   ...
+2026-11-09T17:26:32.4220568Z # Subtest: only official GitHub cloud installation state continues from the unchanged homepage Setup URL
+2026-11-09T17:26:32.4221582Z ok 17 - only official GitHub cloud installation state continues from the unchanged homepage Setup URL
+2026-11-09T17:26:32.4222164Z   ---
+2026-11-09T17:26:32.4222554Z   duration_ms: 0.823262
+2026-11-09T17:26:32.4222958Z   type: 'test'
+2026-11-09T17:26:32.4223320Z   ...
+2026-11-09T17:26:32.4223961Z # Subtest: the real Vite base middleware preserves the bare application mount and its guards
+2026-11-09T17:26:32.4224791Z     # Subtest: bare mount is an HTML document for the normal account helper and browser
+2026-11-09T17:26:32.4225490Z     ok 1 - bare mount is an HTML document for the normal account helper and browser
+2026-11-09T17:26:32.4226058Z       ---
+2026-11-09T17:26:32.4226646Z       duration_ms: 106.463094
+2026-11-09T17:26:32.4227090Z       type: 'test'
+2026-11-09T17:26:32.4227457Z       ...
+2026-11-09T17:26:32.4227953Z     # Subtest: query and locale remain attached to the original URL
+2026-11-09T17:26:32.4228609Z     ok 2 - query and locale remain attached to the original URL
+2026-11-09T17:26:32.4229103Z       ---
+2026-11-09T17:26:32.4229516Z       duration_ms: 10.204651
+2026-11-09T17:26:32.4229934Z       type: 'test'
+2026-11-09T17:26:32.4230578Z       ...
+2026-11-09T17:26:32.4231111Z     # Subtest: HEAD and disallowed methods keep the page response contract
+2026-11-09T17:26:32.4231814Z     ok 3 - HEAD and disallowed methods keep the page response contract
+2026-11-09T17:26:32.4232368Z       ---
+2026-11-09T17:26:32.4232759Z       duration_ms: 8.858985
+2026-11-09T17:26:32.4233170Z       type: 'test'
+2026-11-09T17:26:32.4233535Z       ...
+2026-11-09T17:26:32.4234038Z     # Subtest: trailing slash keeps the existing permanent redirect
+2026-11-09T17:26:32.4234683Z     ok 4 - trailing slash keeps the existing permanent redirect
+2026-11-09T17:26:32.4235159Z       ---
+2026-11-09T17:26:32.4235508Z       duration_ms: 3.570117
+2026-11-09T17:26:32.4235947Z       type: 'test'
+2026-11-09T17:26:32.4236451Z       ...
+2026-11-09T17:26:32.4237077Z     # Subtest: machine paths, encoded mounts and neighboring paths never become the SPA
+2026-11-09T17:26:32.4238039Z     ok 5 - machine paths, encoded mounts and neighboring paths never become the SPA
+2026-11-09T17:26:32.4238649Z       ---
+2026-11-09T17:26:32.4239020Z       duration_ms: 26.656655
+2026-11-09T17:26:32.4239449Z       type: 'test'
+2026-11-09T17:26:32.4239836Z       ...
+2026-11-09T17:26:32.4240484Z     # Subtest: Vite still rejects an untrusted Host before the document handler
+2026-11-09T17:26:32.4241268Z     ok 6 - Vite still rejects an untrusted Host before the document handler
+2026-11-09T17:26:32.4241839Z       ---
+2026-11-09T17:26:32.4242233Z       duration_ms: 5.583957
+2026-11-09T17:26:32.4242648Z       type: 'test'
+2026-11-09T17:26:32.4243019Z       ...
+2026-11-09T17:26:32.4243367Z     1..6
+2026-11-09T17:26:32.4244017Z ok 18 - the real Vite base middleware preserves the bare application mount and its guards
+2026-11-09T17:26:32.4244656Z   ---
+2026-11-09T17:26:32.4245053Z   duration_ms: 226.505454
+2026-11-09T17:26:32.4245473Z   type: 'test'
+2026-11-09T17:26:32.4245847Z   ...
+2026-11-09T17:26:32.4246679Z # Subtest: development shutdown waits for the real close and preserves failure as a nonzero status
+2026-11-09T17:26:32.4247691Z ok 19 - development shutdown waits for the real close and preserves failure as a nonzero status
+2026-11-09T17:26:32.4248378Z   ---
+2026-11-09T17:26:32.4248739Z   duration_ms: 2.08229
+2026-11-09T17:26:32.4249147Z   type: 'test'
+2026-11-09T17:26:32.4249514Z   ...
+2026-11-09T17:26:32.4250181Z # Subtest: development keeps one explicit browser origin and accepts existing port/host switches
+2026-11-09T17:26:32.4251181Z ok 20 - development keeps one explicit browser origin and accepts existing port/host switches
+2026-11-09T17:26:32.4251811Z   ---
+2026-11-09T17:26:32.4252163Z   duration_ms: 0.757287
+2026-11-09T17:26:32.4252550Z   type: 'test'
+2026-11-09T17:26:32.4252921Z   ...
+2026-11-09T17:26:32.4253538Z # Subtest: only machine paths proxy, retaining the browser Host and exact encoded path
+2026-11-09T17:26:32.4254420Z ok 21 - only machine paths proxy, retaining the browser Host and exact encoded path
+2026-11-09T17:26:32.4254999Z   ---
+2026-11-09T17:26:32.4255364Z   duration_ms: 1.784607
+2026-11-09T17:26:32.4255774Z   type: 'test'
+2026-11-09T17:26:32.4256124Z   ...
+2026-11-09T17:26:32.4257022Z # Subtest: development applies real locale, document cookie and private-link policies before HTML transformation
+2026-11-09T17:26:32.4258505Z ok 22 - development applies real locale, document cookie and private-link policies before HTML transformation
+2026-11-09T17:26:32.4263629Z   ---
+2026-11-09T17:26:32.4264061Z   duration_ms: 9.46126
+2026-11-09T17:26:32.4264467Z   type: 'test'
+2026-11-09T17:26:32.4264833Z   ...
+2026-11-09T17:26:32.4265532Z # Subtest: page redirects retain the allowed browser host and configured HTTPS preview origin
+2026-11-09T17:26:32.4266680Z ok 23 - page redirects retain the allowed browser host and configured HTTPS preview origin
+2026-11-09T17:26:32.4267395Z   ---
+2026-11-09T17:26:32.4267744Z   duration_ms: 1.179844
+2026-11-09T17:26:32.4268124Z   type: 'test'
+2026-11-09T17:26:32.4268492Z   ...
+2026-11-09T17:26:32.4269178Z # Subtest: HEAD does not transform a document; unknown APIs/assets and writes never get the SPA
+2026-11-09T17:26:32.4270316Z ok 24 - HEAD does not transform a document; unknown APIs/assets and writes never get the SPA
+2026-11-09T17:26:32.4270939Z   ---
+2026-11-09T17:26:32.4271286Z   duration_ms: 2.16388
+2026-11-09T17:26:32.4271656Z   type: 'test'
+2026-11-09T17:26:32.4272020Z   ...
+2026-11-09T17:26:32.4279029Z # Subtest: development waits for the real worker address before its single HTTP check
+2026-11-09T17:26:32.4280016Z ok 25 - development waits for the real worker address before its single HTTP check
+2026-11-09T17:26:32.4280619Z   ---
+2026-11-09T17:26:32.4280984Z   duration_ms: 1.168583
+2026-11-09T17:26:32.4281384Z   type: 'test'
+2026-11-09T17:26:32.4281747Z   ...
+2026-11-09T17:26:32.4282325Z # Subtest: a worker ready message arriving before the wait is retained
+2026-11-09T17:26:32.4283066Z ok 26 - a worker ready message arriving before the wait is retained
+2026-11-09T17:26:32.4283819Z   ---
+2026-11-09T17:26:32.4284199Z   duration_ms: 0.299659
+2026-11-09T17:26:32.4284615Z   type: 'test'
+2026-11-09T17:26:32.4284979Z   ...
+2026-11-09T17:26:32.4285683Z # Subtest: a real worker init error fails immediately without an HTTP retry or raw error disclosure
+2026-11-09T17:26:32.4286807Z ok 27 - a real worker init error fails immediately without an HTTP retry or raw error disclosure
+2026-11-09T17:26:32.4287431Z   ---
+2026-11-09T17:26:32.4287804Z   duration_ms: 1.486654
+2026-11-09T17:26:32.4288207Z   type: 'test'
+2026-11-09T17:26:32.4288570Z   ...
+2026-11-09T17:26:32.4289331Z # Subtest: worker initialization and HTTP share one deadline and always release listeners
+2026-11-09T17:26:32.4290251Z ok 28 - worker initialization and HTTP share one deadline and always release listeners
+2026-11-09T17:26:32.4290836Z   ---
+2026-11-09T17:26:32.4291186Z   duration_ms: 0.681684
+2026-11-09T17:26:32.4291601Z   type: 'test'
+2026-11-09T17:26:32.4291963Z   ...
+2026-11-09T17:26:32.4292570Z # Subtest: worker disposal rejects an outstanding wait and HTTP failure remains fatal
+2026-11-09T17:26:32.4293422Z ok 29 - worker disposal rejects an outstanding wait and HTTP failure remains fatal
+2026-11-09T17:26:32.4294006Z   ---
+2026-11-09T17:26:32.4294343Z   duration_ms: 0.692263
+2026-11-09T17:26:32.4294744Z   type: 'test'
+2026-11-09T17:26:32.4295102Z   ...
+2026-11-09T17:26:38.5474319Z # Subtest: actual packaged bootstrap patches pg before application import and preserves Vercel function contract
+2026-11-09T17:26:38.5478410Z ok 30 - actual packaged bootstrap patches pg before application import and preserves Vercel function contract
+2026-11-09T17:26:38.5479154Z   ---
+2026-11-09T17:26:38.5479518Z   duration_ms: 319.638595
+2026-11-09T17:26:38.5479910Z   type: 'test'
+2026-11-09T17:26:38.5480243Z   ...
+2026-11-09T17:26:38.5480937Z # Subtest: unexpected generated Vercel handler fails instead of silently changing runtime semantics
+2026-11-09T17:26:38.5481983Z ok 31 - unexpected generated Vercel handler fails instead of silently changing runtime semantics
+2026-11-09T17:26:38.5482637Z   ---
+2026-11-09T17:26:38.5482990Z   duration_ms: 6.033104
+2026-11-09T17:26:38.5483383Z   type: 'test'
+2026-11-09T17:26:38.5483702Z   ...
+2026-11-09T17:26:38.5485386Z # Subtest: Node and Vercel bundles extract the verified real ffmpeg once and preserve its licensing files
+2026-11-09T17:26:38.5486190Z     # Subtest: node-server
+2026-11-09T17:26:38.5486899Z     ok 1 - node-server
+2026-11-09T17:26:38.5487332Z       ---
+2026-11-09T17:26:38.5487710Z       duration_ms: 6100.314908
+2026-11-09T17:26:38.5488174Z       type: 'test'
+2026-11-09T17:26:38.5488521Z       ...
+2026-11-09T17:26:44.7884535Z     # Subtest: vercel
+2026-11-09T17:26:44.7885168Z     ok 2 - vercel
+2026-11-09T17:26:44.7886143Z       ---
+2026-11-09T17:26:44.7886614Z       duration_ms: 6240.943031
+2026-11-09T17:26:44.7886916Z       type: 'test'
+2026-11-09T17:26:44.7887114Z       ...
+2026-11-09T17:26:44.8636188Z     1..2
+2026-11-09T17:26:44.8637137Z ok 32 - Node and Vercel bundles extract the verified real ffmpeg once and preserve its licensing files
+2026-11-09T17:26:44.8637575Z   ---
+2026-11-09T17:26:44.8638019Z   duration_ms: 12484.397296
+2026-11-09T17:26:44.8638239Z   type: 'test'
+2026-11-09T17:26:44.8638421Z   ...
+2026-11-09T17:26:44.8638772Z # {"preset":"node-server","ffmpegBytes":79826272,"packagedBytes":29916568}
+2026-11-09T17:26:44.8639241Z # {"preset":"vercel","ffmpegBytes":79826272,"packagedBytes":29916568}
+2026-11-09T17:26:44.8829691Z # Subtest: native step imports compile workspace protocol and keep API adapters and package singletons across rebuilds
+2026-11-09T17:26:44.8831515Z ok 33 - native step imports compile workspace protocol and keep API adapters and package singletons across rebuilds
+2026-11-09T17:26:44.8832323Z   ---
+2026-11-09T17:26:44.8832702Z   duration_ms: 813.996051
+2026-11-09T17:26:44.8833099Z   type: 'test'
+2026-11-09T17:26:44.8833452Z   ...
+2026-11-09T17:26:44.8834278Z # ✓ Compiled workflows in 920ms (5 steps, 1 workflow)
+2026-11-09T17:26:44.8835622Z # Subtest: the actual Workflow LocalBuilder output loads natively and answers GET/HEAD health after the API alias pass
+2026-11-09T17:26:44.8837643Z ok 34 - the actual Workflow LocalBuilder output loads natively and answers GET/HEAD health after the API alias pass
+2026-11-09T17:26:44.8838406Z   ---
+2026-11-09T17:26:44.8838773Z   duration_ms: 1785.782257
+2026-11-09T17:26:44.8839189Z   type: 'test'
+2026-11-09T17:26:44.8839535Z   ...
+2026-11-09T17:26:44.8840217Z # Subtest: production builds register no extra pass; dev registers after both SDK build phases
+2026-11-09T17:26:44.8841205Z ok 35 - production builds register no extra pass; dev registers after both SDK build phases
+2026-11-09T17:26:44.8841840Z   ---
+2026-11-09T17:26:44.8842177Z   duration_ms: 0.643062
+2026-11-09T17:26:44.8842582Z   type: 'test'
+2026-11-09T17:26:44.8842933Z   ...
+2026-11-09T17:26:44.8843561Z # ✓ Compiled workflows in 847ms (4 steps, 0 workflows)
+2026-11-09T17:26:44.8844547Z # Subtest: actual Nitro development output preserves Local World metadata and data-version guard
+2026-11-09T17:26:44.8845627Z ok 36 - actual Nitro development output preserves Local World metadata and data-version guard
+2026-11-09T17:26:44.8846955Z   ---
+2026-11-09T17:26:44.8847265Z   duration_ms: 2278.14384
+2026-11-09T17:26:44.8847567Z   type: 'test'
+2026-11-09T17:26:44.8847800Z   ...
+2026-11-09T17:26:44.8848395Z # ✓ Compiled workflows in 126ms (4 steps, 0 workflows)
+2026-11-09T17:26:44.8848931Z # [info] Tracing dependencies:
+2026-11-09T17:26:44.8849246Z # - `@workflow/world-local` (5.1.2)
+2026-11-09T17:26:44.8849590Z # - `ulid` (3.0.2)
+2026-11-09T17:26:44.8849924Z # - `zod` (4.5.4)
+2026-11-09T17:26:44.8850130Z # - `@workflow/world` (5.0.5)
+2026-11-09T17:26:44.8850412Z # - `@workflow/errors` (5.0.5)
+2026-11-09T17:26:44.8850647Z # - `@workflow/utils` (5.0.2)
+2026-11-09T17:26:44.8850923Z # - `@opentelemetry/api` (1.10.0)
+2026-11-09T17:26:44.8851157Z # - `undici` (7.30.0)
+2026-11-09T17:26:44.8851366Z # - `proper-lockfile` (4.1.2)
+2026-11-09T17:26:44.8851584Z # - `async-sema` (3.1.1)
+2026-11-09T17:26:44.8851795Z # - `ms` (2.1.3)
+2026-11-09T17:26:44.8851996Z # - `graceful-fs` (4.2.11)
+2026-11-09T17:26:44.8852217Z # - `signal-exit` (3.0.7)
+2026-11-09T17:26:44.8852421Z # - `retry` (0.12.0)
+2026-11-09T17:26:44.8852705Z # [success] Traced 14 dependencies (350 files) in 3840ms.
+2026-11-09T17:26:44.8853278Z # [info] Ensure your production environment matches the builder OS and architecture (`linux-x64`) to avoid native module issues.
+2026-11-09T17:26:44.8853934Z # [info] Generated [36m../mikka-local-world-build-l4ZDkJ/output/nitro.json[39m
+2026-11-09T17:26:44.8854470Z # Subtest: actual Nitro production output preserves Local World metadata and data-version guard
+2026-11-09T17:26:44.8855011Z ok 37 - actual Nitro production output preserves Local World metadata and data-version guard
+2026-11-09T17:26:44.8855344Z   ---
+2026-11-09T17:26:44.8855531Z   duration_ms: 5009.893217
+2026-11-09T17:26:44.8855734Z   type: 'test'
+2026-11-09T17:26:44.8855907Z   ...
+2026-11-09T17:26:44.8856205Z # ✓ Compiled workflows in 698ms (4 steps, 0 workflows)
+2026-11-09T17:26:44.8856682Z # [info] Tracing dependencies:
+2026-11-09T17:26:44.8857171Z # - `cbor-extract` (2.2.2)
+2026-11-09T17:26:44.8857450Z # - `node-gyp-build-optional-packages` (5.1.1)
+2026-11-09T17:26:44.8857723Z # - `detect-libc` (2.1.2)
+2026-11-09T17:26:44.8857970Z # - `@workflow/world-local` (5.1.2)
+2026-11-09T17:26:44.8858202Z # - `zod` (4.5.4)
+2026-11-09T17:26:44.8858403Z # - `ulid` (3.0.2)
+2026-11-09T17:26:44.8858607Z # - `@workflow/world` (5.0.5)
+2026-11-09T17:26:44.8858836Z # - `@workflow/utils` (5.0.2)
+2026-11-09T17:26:44.8859076Z # - `@workflow/errors` (5.0.5)
+2026-11-09T17:26:44.8859318Z # - `@opentelemetry/api` (1.10.0)
+2026-11-09T17:26:44.8859592Z # - `undici` (7.30.0)
+2026-11-09T17:26:44.8859802Z # - `proper-lockfile` (4.1.2)
+2026-11-09T17:26:44.8860018Z # - `async-sema` (3.1.1)
+2026-11-09T17:26:44.8860219Z # - `ms` (2.1.3)
+2026-11-09T17:26:44.8860412Z # - `graceful-fs` (4.2.11)
+2026-11-09T17:26:44.8860626Z # - `signal-exit` (3.0.7)
+2026-11-09T17:26:44.8860924Z # - `retry` (0.12.0)
+2026-11-09T17:26:44.8861198Z # - `@cbor-extract/cbor-extract-linux-x64` (2.2.2)
+2026-11-09T17:26:44.8861543Z # [success] Traced 18 dependencies (359 files) in 3652ms.
+2026-11-09T17:26:44.8862105Z # [info] Ensure your production environment matches the builder OS and architecture (`linux-x64`) to avoid native module issues.
+2026-11-09T17:26:44.8862808Z # [info] Generated [36m../../../../../tmp/mikka-workflow-routing-BJr6p5/output/nitro.json[39m
+2026-11-09T17:26:44.8863394Z # Subtest: standalone startup targets the actual Nitro Workflow consumer outside the application base path
+2026-11-09T17:26:44.8863998Z ok 38 - standalone startup targets the actual Nitro Workflow consumer outside the application base path
+2026-11-09T17:26:44.8864362Z   ---
+2026-11-09T17:26:44.8864539Z   duration_ms: 6776.706672
+2026-11-09T17:26:44.8864734Z   type: 'test'
+2026-11-09T17:26:44.8864912Z   ...
+2026-11-09T17:26:44.8865302Z # Subtest: official failure evidence retains codes and digests without private source or credentials
+2026-11-09T17:26:44.8866078Z ok 39 - official failure evidence retains codes and digests without private source or credentials
+2026-11-09T17:26:44.8866594Z   ---
+2026-11-09T17:26:44.8866771Z   duration_ms: 1.77858
+2026-11-09T17:26:44.8866962Z   type: 'test'
+2026-11-09T17:26:44.8867141Z   ...
+2026-11-09T17:26:44.8867625Z # Subtest: child failure observes a closed system-code candidate without a spawn error or private details
+2026-11-09T17:26:44.8868225Z ok 40 - child failure observes a closed system-code candidate without a spawn error or private details
+2026-11-09T17:26:44.8868587Z   ---
+2026-11-09T17:26:44.8868759Z   duration_ms: 0.387212
+2026-11-09T17:26:44.8868952Z   type: 'test'
+2026-11-09T17:26:44.8869123Z   ...
+2026-11-09T17:26:44.8869488Z # Subtest: unrecognized or unstructured child text does not become an observed system code
+2026-11-09T17:26:44.8870003Z ok 41 - unrecognized or unstructured child text does not become an observed system code
+2026-11-09T17:26:44.8870327Z   ---
+2026-11-09T17:26:44.8870508Z   duration_ms: 0.332592
+2026-11-09T17:26:44.8870701Z   type: 'test'
+2026-11-09T17:26:44.8870872Z   ...
+2026-11-09T17:26:44.8871249Z # Subtest: compiler observations retain only bounded diagnostic codes and fixed public commands
+2026-11-09T17:26:44.8871797Z ok 42 - compiler observations retain only bounded diagnostic codes and fixed public commands
+2026-11-09T17:26:44.8872130Z   ---
+2026-11-09T17:26:44.8872301Z   duration_ms: 1.081193
+2026-11-09T17:26:44.8872487Z   type: 'test'
+2026-11-09T17:26:44.8872655Z   ...
+2026-11-09T17:26:44.8872974Z # Subtest: real TypeScript colored diagnostics retain codes and raw log digests
+2026-11-09T17:26:44.8873438Z ok 43 - real TypeScript colored diagnostics retain codes and raw log digests
+2026-11-09T17:26:44.8873733Z   ---
+2026-11-09T17:26:44.8873903Z   duration_ms: 243.811641
+2026-11-09T17:26:44.8874107Z   type: 'test'
+2026-11-09T17:26:44.8874274Z   ...
+2026-11-09T17:26:44.8874643Z # Subtest: migration entry is observed without requiring an error stack or claiming SQL execution
+2026-11-09T17:26:44.8875191Z ok 44 - migration entry is observed without requiring an error stack or claiming SQL execution
+2026-11-09T17:26:44.8875615Z   ---
+2026-11-09T17:26:44.8875782Z   duration_ms: 0.213328
+2026-11-09T17:26:44.8875978Z   type: 'test'
+2026-11-09T17:26:44.8876145Z   ...
+2026-11-09T17:26:44.8876945Z # Subtest: unknown failure details remain unknown and a kill signal is not labeled as OOM
+2026-11-09T17:26:44.8877656Z ok 45 - unknown failure details remain unknown and a kill signal is not labeled as OOM
+2026-11-09T17:26:44.8878106Z   ---
+2026-11-09T17:26:44.8878406Z   duration_ms: 0.215482
+2026-11-09T17:26:44.8878595Z   type: 'test'
+2026-11-09T17:26:44.8878772Z   ...
+2026-11-09T17:26:44.8879186Z # Subtest: production build binds the exact source and deployment without acceptance credentials
+2026-11-09T17:26:44.8879882Z ok 46 - production build binds the exact source and deployment without acceptance credentials
+2026-11-09T17:26:44.8880225Z   ---
+2026-11-09T17:26:44.8880487Z   duration_ms: 0.562336
+2026-11-09T17:26:44.8880679Z   type: 'test'
+2026-11-09T17:26:44.8880853Z   ...
+2026-11-09T17:26:44.8881235Z # Subtest: production preflight rejects stale source, missing values and an unbound deployment
+2026-11-09T17:26:44.8881782Z ok 47 - production preflight rejects stale source, missing values and an unbound deployment
+2026-11-09T17:26:44.8882116Z   ---
+2026-11-09T17:26:44.8882291Z   duration_ms: 0.663022
+2026-11-09T17:26:44.8882479Z   type: 'test'
+2026-11-09T17:26:44.8882649Z   ...
+2026-11-09T17:26:44.8883022Z # Subtest: the filled build file preserves JSON-escaped connection and auth values byte for byte
+2026-11-09T17:26:44.8883556Z ok 48 - the filled build file preserves JSON-escaped connection and auth values byte for byte
+2026-11-09T17:26:44.8883888Z   ---
+2026-11-09T17:26:44.8884078Z   duration_ms: 1.549545
+2026-11-09T17:26:44.8884264Z   type: 'test'
+2026-11-09T17:26:44.8884431Z   ...
+2026-11-09T17:26:44.8884769Z # Subtest: the codec does not repair or dequote an originally invalid database value
+2026-11-09T17:26:44.8885240Z ok 49 - the codec does not repair or dequote an originally invalid database value
+2026-11-09T17:26:44.8885544Z   ---
+2026-11-09T17:26:44.8885711Z   duration_ms: 0.44529
+2026-11-09T17:26:44.8885911Z   type: 'test'
+2026-11-09T17:26:44.8886080Z   ...
+2026-11-09T17:26:44.8886638Z # Subtest: non-empty job values retain the legacy Vercel precedence over the filled file
+2026-11-09T17:26:44.8887150Z ok 50 - non-empty job values retain the legacy Vercel precedence over the filled file
+2026-11-09T17:26:44.8887460Z   ---
+2026-11-09T17:26:44.8887631Z   duration_ms: 0.304766
+2026-11-09T17:26:44.8887828Z   type: 'test'
+2026-11-09T17:26:44.8888000Z   ...
+2026-11-09T17:26:44.8888350Z # Subtest: empty or absent job values fall back to the decoded file without URL normalization
+2026-11-09T17:26:44.8888867Z ok 51 - empty or absent job values fall back to the decoded file without URL normalization
+2026-11-09T17:26:44.8889181Z   ---
+2026-11-09T17:26:44.8889350Z   duration_ms: 0.480225
+2026-11-09T17:26:44.8889535Z   type: 'test'
+2026-11-09T17:26:44.8889708Z   ...
+2026-11-09T17:26:44.8890047Z # Subtest: both selected migration targets fail early with only a key and fixed code
+2026-11-09T17:26:44.8890519Z ok 52 - both selected migration targets fail early with only a key and fixed code
+2026-11-09T17:26:44.8890829Z   ---
+2026-11-09T17:26:44.8890995Z   duration_ms: 0.581387
+2026-11-09T17:26:44.8891182Z   type: 'test'
+2026-11-09T17:26:44.8891358Z   ...
+2026-11-09T17:26:44.8891739Z # Subtest: a real deletion-fence SQLSTATE is retained without exposing its account or database text
+2026-11-09T17:26:44.8892297Z ok 53 - a real deletion-fence SQLSTATE is retained without exposing its account or database text
+2026-11-09T17:26:44.8892643Z   ---
+2026-11-09T17:26:44.8892811Z   duration_ms: 0.199403
+2026-11-09T17:26:44.8892998Z   type: 'test'
+2026-11-09T17:26:44.8893170Z   ...
+2026-11-09T17:26:44.8893532Z # Subtest: compiled production identity is checked before server code can execute
+2026-11-09T17:26:44.8894058Z ok 54 - compiled production identity is checked before server code can execute
+2026-11-09T17:26:44.8894493Z   ---
+2026-11-09T17:26:44.8894675Z   duration_ms: 71.083759
+2026-11-09T17:26:44.8894872Z   type: 'test'
+2026-11-09T17:26:44.8895043Z   ...
+2026-11-09T17:26:44.8895422Z # Subtest: startup parameters preserve the requested authority and reject ambiguous overrides
+2026-11-09T17:26:44.8895965Z ok 55 - startup parameters preserve the requested authority and reject ambiguous overrides
+2026-11-09T17:26:44.8896430Z   ---
+2026-11-09T17:26:44.8896764Z   duration_ms: 5.651898
+2026-11-09T17:26:44.8896961Z   type: 'test'
+2026-11-09T17:26:44.8897139Z   ...
+2026-11-09T17:26:44.8897494Z # Subtest: Docker compiled entry, graph and tracing must match before any module can execute
+2026-11-09T17:26:44.8898013Z ok 56 - Docker compiled entry, graph and tracing must match before any module can execute
+2026-11-09T17:26:44.8898332Z   ---
+2026-11-09T17:26:44.8898499Z   duration_ms: 32.84038
+2026-11-09T17:26:44.8898764Z   type: 'test'
+2026-11-09T17:26:44.8898939Z   ...
+2026-11-09T17:26:44.8899296Z # Subtest: the snapshot index contains only copied tracked files and rejects unresolved merges
+2026-11-09T17:26:44.8899827Z ok 57 - the snapshot index contains only copied tracked files and rejects unresolved merges
+2026-11-09T17:26:44.8900150Z   ---
+2026-11-09T17:26:44.8900376Z   duration_ms: 2.249437
+2026-11-09T17:26:44.8900627Z   type: 'test'
+2026-11-09T17:26:44.8900840Z   ...
+2026-11-09T17:26:44.8901396Z # Subtest: real Git can list the isolated snapshot without a commit, source objects or source config
+2026-11-09T17:26:44.8902107Z ok 58 - real Git can list the isolated snapshot without a commit, source objects or source config
+2026-11-09T17:26:44.8902441Z   ---
+2026-11-09T17:26:44.8902610Z   duration_ms: 26.850387
+2026-11-09T17:26:44.8902804Z   type: 'test'
+2026-11-09T17:26:44.8902980Z   ...
+2026-11-09T17:26:44.8903343Z # Subtest: the runner preserves its container boundary and mounts only its Vite cache writable
+2026-11-09T17:26:44.8903944Z ok 59 - the runner preserves its container boundary and mounts only its Vite cache writable
+2026-11-09T17:26:44.8904457Z   ---
+2026-11-09T17:26:44.8904692Z   duration_ms: 1.432044
+2026-11-09T17:26:44.8904966Z   type: 'test'
+2026-11-09T17:26:44.8905144Z   ...
+2026-11-09T17:26:44.8905538Z # Subtest: cleanup stops only the newly owned container, waits for real exit, and preserves its evidence
+2026-11-09T17:26:44.8906116Z ok 60 - cleanup stops only the newly owned container, waits for real exit, and preserves its evidence
+2026-11-09T17:26:44.8906618Z   ---
+2026-11-09T17:26:44.8906795Z   duration_ms: 1.692298
+2026-11-09T17:26:44.8906986Z   type: 'test'
+2026-11-09T17:26:44.8907157Z   ...
+2026-11-09T17:26:44.8907528Z # Subtest: a still-running, forced or OOM-killed enrollment process cannot count as clean
+2026-11-09T17:26:44.8908023Z ok 61 - a still-running, forced or OOM-killed enrollment process cannot count as clean
+2026-11-09T17:26:44.8908337Z   ---
+2026-11-09T17:26:44.8908516Z   duration_ms: 0.83408
+2026-11-09T17:26:44.8908707Z   type: 'test'
+2026-11-09T17:26:44.8908875Z   ...
+2026-11-09T17:26:44.8909046Z 1..61
+2026-11-09T17:26:44.8909206Z # tests 69
+2026-11-09T17:26:44.8909374Z # suites 0
+2026-11-09T17:26:44.8909542Z # pass 69
+2026-11-09T17:26:44.8909713Z # fail 0
+2026-11-09T17:26:44.8909881Z # cancelled 0
+2026-11-09T17:26:44.8910057Z # skipped 0
+2026-11-09T17:26:44.8910229Z # todo 0
+2026-11-09T17:26:44.8910412Z # duration_ms 13699.119336
+2026-11-09T17:26:44.9003230Z ##[group]Run pnpm --filter @mikka/frontend test
+2026-11-09T17:26:44.9003562Z [36;1mpnpm --filter @mikka/frontend test[0m
+2026-11-09T17:26:44.9035306Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:26:44.9035551Z env:
+2026-11-09T17:26:44.9035732Z   MIKKA_EDITION: cloud
+2026-11-09T17:26:44.9035946Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:26:44.9036174Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:26:44.9036682Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:44.9036924Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:26:44.9037176Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:26:44.9037491Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:26:44.9037956Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:26:44.9038427Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:26:44.9038674Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:26:44.9038928Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:26:44.9039257Z ##[endgroup]
+2026-11-09T17:26:45.1887008Z 
+2026-11-09T17:26:45.1887665Z > @mikka/frontend@0.0.1 test /home/runner/work/Mikka/Mikka/apps/frontend
+2026-11-09T17:26:45.1888079Z > node --test scripts/*.test.mjs
+2026-11-09T17:26:45.1888234Z 
+2026-11-09T17:26:46.2983611Z ✔ the actual Vite graph preserves action arity and the web/native transport separation (545.908644ms)
+2026-11-09T17:26:46.7318386Z ✔ actual Vite resolution rejects server runtime and unregistered action consumers before output (407.28995ms)
+2026-11-09T17:26:46.9347126Z ✔ actual emitted CommonJS and ESM syntax themes retain their conditional export semantics (221.067543ms)
+2026-11-09T17:26:49.0168254Z ✔ Vite uses the same existing Lightning CSS color space and neutral mixing as hosted CSS (2086.111962ms)
+2026-11-09T17:26:49.0634406Z ✔ a valid system-browser PKCE page reads only the existing session and public login methods (93.884604ms)
+2026-11-09T17:26:49.0638460Z ✔ a server authentication document preserves the PKCE identity-only boundary (20.643178ms)
+2026-11-09T17:26:49.0639870Z ✔ a signed-in server GitHub document renders only its handoff before and after intent cleanup (27.455717ms)
+2026-11-09T17:26:49.0640973Z ✔ a server GitHub document cannot bypass a rejected session (17.466752ms)
+2026-11-09T17:26:49.0642048Z ✔ the official app without a server document marker keeps its normal workspace route (41.510286ms)
+2026-11-09T17:26:49.0642886Z ✔ leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts (43.956654ms)
+2026-11-09T17:26:49.0643640Z ▶ malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap
+2026-11-09T17:26:49.0644164Z   ✔ duplicate state (31.694676ms)
+2026-11-09T17:26:49.0644528Z   ✔ Electron host (14.707984ms)
+2026-11-09T17:26:49.0645113Z ✔ malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap (47.437535ms)
+2026-11-09T17:26:49.0645910Z ✔ pending identity and workspace reads never join across phases or mount from a late identity result (30.928958ms)
+2026-11-09T17:26:49.0647295Z ✔ a late full bootstrap cannot replace a newly opened PKCE identity page or its anonymous configuration (30.065119ms)
+2026-11-09T17:26:49.0648540Z ▶ a retired workspace request cannot expire or disconnect the current PKCE identity page
+2026-11-09T17:26:49.0649196Z   ✔ 401 (13.071177ms)
+2026-11-09T17:26:49.0649614Z   ✔ 503 (14.704722ms)
+2026-11-09T17:26:49.0650528Z ✔ a retired workspace request cannot expire or disconnect the current PKCE identity page (28.298565ms)
+2026-11-09T17:26:49.0651713Z ▶ account and same-account session changes invalidate a pending identity response and clear prior caches
+2026-11-09T17:26:49.0652545Z   ✔ different owner (14.122442ms)
+2026-11-09T17:26:49.0653091Z   ✔ same owner, new session (14.543881ms)
+2026-11-09T17:26:49.0654139Z ✔ account and same-account session changes invalidate a pending identity response and clear prior caches (29.20987ms)
+2026-11-09T17:26:49.0655824Z ▶ only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable
+2026-11-09T17:26:49.0659778Z   ✔ 401 (15.861199ms)
+2026-11-09T17:26:49.0660340Z   ✔ 503 (18.995927ms)
+2026-11-09T17:26:49.0661352Z ✔ only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable (35.476023ms)
+2026-11-09T17:26:49.0662542Z ✔ a new session for the same owner retires the actual in-memory SWR cache (25.991098ms)
+2026-11-09T17:26:59.4925182Z [33m[plugin builtin:vite-reporter] 
+2026-11-09T17:26:59.4925796Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-11-09T17:26:59.4926423Z - Using dynamic import() to code-split the application
+2026-11-09T17:26:59.4927777Z - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+2026-11-09T17:26:59.4928734Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+2026-11-09T17:27:10.5598696Z [33m[plugin builtin:vite-reporter] 
+2026-11-09T17:27:10.5599569Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-11-09T17:27:10.5600087Z - Using dynamic import() to code-split the application
+2026-11-09T17:27:10.5600935Z - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+2026-11-09T17:27:10.5601904Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+2026-11-09T17:27:10.8829568Z ✔ real frontend builds retain incremental files without fingerprinting them and clean builds remove them (25096.272138ms)
+2026-11-09T17:27:11.0889806Z ✔ only the existing explicit public configuration is defined for the web graph (39.616493ms)
+2026-11-09T17:27:11.0891046Z ✔ the production explicit computer rollout follows VERCEL_ENV without requiring PostHog (58.389924ms)
+2026-11-09T17:27:11.0891812Z ✔ desktop remains unpinned and does not initialize browser analytics or browser auth configuration (7.987302ms)
+2026-11-09T17:27:11.0892496Z ✔ Vite development keeps the actual development React runtime and Fast Refresh plugin (16.374062ms)
+2026-11-09T17:27:11.0893328Z ✔ deployment pinning preserves relative resource paths, existing queries and hashes without pinning external URLs (1.341024ms)
+2026-11-09T17:27:11.0894584Z ✔ actual emitted static imports, lazy chunks, preload entries and CSS fonts receive the same deployment pin (21.580715ms)
+2026-11-09T17:27:11.0895602Z ✔ the real Vite HTML, lazy module and font outputs keep one deployment identity (324.825917ms)
+2026-11-09T17:27:11.0896433Z ✔ only backend authentication documents force business navigation back to the HTTP server entry (174.715486ms)
+2026-11-09T17:27:11.0899924Z ✔ explicit en-to-zh web navigation retains the chosen language through server refresh and reentry (133.813151ms)
+2026-11-09T17:27:11.0900648Z ✔ explicit zh-to-en web navigation retains the language and query on a fresh unprefixed entry (120.768503ms)
+2026-11-09T17:27:11.0901302Z ✔ ordinary navigation and the native custom scheme do not write a web locale cookie (293.810869ms)
+2026-11-09T17:27:11.0901931Z ✔ web RPC keeps the shared codec but uses only normal same-origin cookie transport (197.20725ms)
+2026-11-09T17:27:11.0902514Z ✔ an old web owner delayed 401 cannot clear the newly authenticated owner (95.172645ms)
+2026-11-09T17:27:11.0903092Z ✔ an old web owner network rejection does not overwrite the new owner transport (75.179618ms)
+2026-11-09T17:27:11.0904003Z ✔ web owner changes fence both asynchronous response bodies and pre-request encoding (72.629296ms)
+2026-11-09T17:27:11.0904990Z ✔ web auth routing preserves real PKCE, refused handoff, account addition and signed OAuth return behavior (15.297832ms)
+2026-11-09T17:27:11.0905946Z ✔ identity-only bootstrap is limited to a validated PKCE sign-in without other OAuth continuations (18.593331ms)
+2026-11-09T17:27:11.0906915Z ✔ web session owner watches the actual SDK atom without mutating it or treating an error as logout (7.026887ms)
+2026-11-09T17:27:11.0907963Z ✔ deployment fetch pins actual API Requests while preserving method, body, headers and abort signal (13.207784ms)
+2026-11-09T17:27:11.0908378Z ℹ tests 45
+2026-11-09T17:27:11.0908568Z ℹ suites 0
+2026-11-09T17:27:11.0908766Z ℹ pass 45
+2026-11-09T17:27:11.0908949Z ℹ fail 0
+2026-11-09T17:27:11.0909140Z ℹ cancelled 0
+2026-11-09T17:27:11.0909337Z ℹ skipped 0
+2026-11-09T17:27:11.0909532Z ℹ todo 0
+2026-11-09T17:27:11.0909742Z ℹ duration_ms 25873.638484
+2026-11-09T17:27:11.1104416Z ##[group]Run pnpm typecheck
+2026-11-09T17:27:11.1104792Z [36;1mpnpm typecheck[0m
+2026-11-09T17:27:11.1137592Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:27:11.1137840Z env:
+2026-11-09T17:27:11.1138034Z   MIKKA_EDITION: cloud
+2026-11-09T17:27:11.1138384Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:27:11.1138623Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:27:11.1138847Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:27:11.1139091Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:27:11.1139330Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:27:11.1139650Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:27:11.1139991Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:27:11.1140440Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:27:11.1140679Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:27:11.1140937Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:27:11.1141253Z   NODE_OPTIONS: --max-old-space-size=4096
+2026-11-09T17:27:11.1141489Z ##[endgroup]
+2026-11-09T17:27:11.3647023Z 
+2026-11-09T17:27:11.3647816Z > next-app@0.0.1 typecheck /home/runner/work/Mikka/Mikka
+2026-11-09T17:27:11.3648733Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck
+2026-11-09T17:27:11.3649275Z 
+2026-11-09T17:27:16.9897500Z 
+2026-11-09T17:27:16.9898572Z > @mikka/frontend@0.0.1 typecheck /home/runner/work/Mikka/Mikka/apps/frontend
+2026-11-09T17:27:16.9899600Z > tsc --noEmit -p tsconfig.json
+2026-11-09T17:27:16.9899967Z 
+2026-11-09T17:27:48.5097564Z ##[group]Run pnpm --filter @mikka/protocol typecheck
+2026-11-09T17:27:48.5097916Z [36;1mpnpm --filter @mikka/protocol typecheck[0m
+2026-11-09T17:27:48.5129373Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:27:48.5129605Z env:
+2026-11-09T17:27:48.5129781Z   MIKKA_EDITION: cloud
+2026-11-09T17:27:48.5129996Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:27:48.5130222Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:27:48.5130440Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:27:48.5130668Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:27:48.5130904Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:27:48.5131215Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:27:48.5131569Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:27:48.5132148Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:27:48.5132484Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:27:48.5132823Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:27:48.5133283Z ##[endgroup]
+2026-11-09T17:27:48.7922239Z 
+2026-11-09T17:27:48.7922951Z > @mikka/protocol@0.0.1 typecheck /home/runner/work/Mikka/Mikka/packages/protocol
+2026-11-09T17:27:48.7923715Z > tsgo --noEmit -p tsconfig.json
+2026-11-09T17:27:48.7923916Z 
+2026-11-09T17:27:49.2694498Z ##[group]Run pnpm --filter @mikka/mobile typecheck
+2026-11-09T17:27:49.2694822Z [36;1mpnpm --filter @mikka/mobile typecheck[0m
+2026-11-09T17:27:49.2727159Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:27:49.2727412Z env:
+2026-11-09T17:27:49.2727593Z   MIKKA_EDITION: cloud
+2026-11-09T17:27:49.2727811Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:27:49.2728041Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:27:49.2728259Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:27:49.2728507Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:27:49.2728754Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:27:49.2729074Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:27:49.2729412Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:27:49.2729904Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:27:49.2730153Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:27:49.2730407Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:27:49.2730703Z ##[endgroup]
+2026-11-09T17:27:49.5519124Z 
+2026-11-09T17:27:49.5519709Z > @mikka/mobile@0.0.1 typecheck /home/runner/work/Mikka/Mikka/apps/mobile
+2026-11-09T17:27:49.5520278Z > tsc --noEmit -p tsconfig.json
+2026-11-09T17:27:49.5520500Z 
+2026-11-09T17:27:56.7705488Z ##[group]Run pnpm --silent lint:ui --json > ui-audit.json
+2026-11-09T17:27:56.7706018Z [36;1mpnpm --silent lint:ui --json > ui-audit.json[0m
+2026-11-09T17:27:56.7738289Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:27:56.7738688Z env:
+2026-11-09T17:27:56.7738881Z   MIKKA_EDITION: cloud
+2026-11-09T17:27:56.7739091Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:27:56.7739314Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:27:56.7739530Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:27:56.7739765Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:27:56.7739996Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:27:56.7740308Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:27:56.7740642Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:27:56.7741153Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:27:56.7741402Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:27:56.7741710Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:27:56.7741966Z ##[endgroup]
+2026-11-09T17:28:05.2317364Z ##[group]Run node --input-type=module -e '
+2026-11-09T17:28:05.2317735Z [36;1mnode --input-type=module -e '[0m
+2026-11-09T17:28:05.2318033Z [36;1m  import fs from "node:fs";[0m
+2026-11-09T17:28:05.2318321Z [36;1m  if (fs.existsSync("ui-audit.json")) {[0m
+2026-11-09T17:28:05.2318725Z [36;1m    const audit = JSON.parse(fs.readFileSync("ui-audit.json", "utf8"));[0m
+2026-11-09T17:28:05.2320114Z [36;1m    const summary = `## Strict UI policy\n\n${audit.files} business files style-scanned; ${audit.interactionFiles} files interaction-scanned (including business blocks); ${audit.errors} errors. ${audit.libraryFiles} component-library files excluded from style checks only. No upstream source verification.\n\n` + Object.entries(audit.counts).map(([rule, count]) => `- ${rule}: ${count}`).join("\n") + "\n";[0m
+2026-11-09T17:28:05.2321429Z [36;1m    console.log(summary);[0m
+2026-11-09T17:28:05.2321797Z [36;1m    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);[0m
+2026-11-09T17:28:05.2322186Z [36;1m  }[0m
+2026-11-09T17:28:05.2322390Z [36;1m'[0m
+2026-11-09T17:28:05.2355841Z shell: /usr/bin/bash -e {0}
+2026-11-09T17:28:05.2356101Z env:
+2026-11-09T17:28:05.2356452Z   MIKKA_EDITION: cloud
+2026-11-09T17:28:05.2356814Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:28:05.2357043Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:28:05.2357264Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:28:05.2357506Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:28:05.2357774Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:28:05.2358088Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:28:05.2358436Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:28:05.2358845Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:28:05.2359089Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:28:05.2359354Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:28:05.2359611Z ##[endgroup]
+2026-11-09T17:28:05.2624343Z ## Strict UI policy
+2026-11-09T17:28:05.2624585Z 
+2026-11-09T17:28:05.2625631Z 3225 business files style-scanned; 532 files interaction-scanned (including business blocks); 0 errors. 287 component-library files excluded from style checks only. No upstream source verification.
+2026-11-09T17:28:05.2626689Z 
+2026-11-09T17:28:05.2626699Z 
+2026-11-09T17:28:05.2626706Z 
+2026-11-09T17:28:05.2705515Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+2026-11-09T17:28:05.2705835Z with:
+2026-11-09T17:28:05.2706032Z   name: ui-policy-audit
+2026-11-09T17:28:05.2706464Z   path: ui-audit.json
+2026-11-09T17:28:05.2706679Z   if-no-files-found: ignore
+2026-11-09T17:28:05.2706891Z   compression-level: 6
+2026-11-09T17:28:05.2707089Z   overwrite: false
+2026-11-09T17:28:05.2707280Z   include-hidden-files: false
+2026-11-09T17:28:05.2707482Z env:
+2026-11-09T17:28:05.2707642Z   MIKKA_EDITION: cloud
+2026-11-09T17:28:05.2707837Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T17:28:05.2708070Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T17:28:05.2708287Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T17:28:05.2708514Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T17:28:05.2708745Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T17:28:05.2709175Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T17:28:05.2709559Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T17:28:05.2709933Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T17:28:05.2710174Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T17:28:05.2710416Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T17:28:05.2710666Z ##[endgroup]
+2026-11-09T17:28:05.4106451Z (node:3805) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T17:28:05.4107105Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T17:28:05.4127173Z With the provided path, there will be 1 file uploaded
+2026-11-09T17:28:05.4134768Z Artifact name is valid!
+2026-11-09T17:28:05.4147608Z Root directory input is valid!
+2026-11-09T17:28:05.6723008Z Beginning upload of artifact content to blob storage
+2026-11-09T17:28:05.6866447Z (node:3805) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T17:28:05.8398525Z Uploaded bytes 231
+2026-11-09T17:28:05.8830435Z Finished uploading artifact content to blob storage!
+2026-11-09T17:28:05.8831276Z SHA256 digest of uploaded artifact zip is 2f8be6e5055fbe96876553bfe911f118457630c6c88eb7bbe8a21d3a642439b8
+2026-11-09T17:28:05.8832205Z Finalizing artifact upload
+2026-11-09T17:28:06.3559379Z Artifact ui-policy-audit.zip successfully finalized. Artifact ID 13695688738
+2026-11-09T17:28:06.3560212Z Artifact ui-policy-audit has been successfully uploaded! Final size is 231 bytes. Artifact ID is 13695688738
+2026-11-09T17:28:06.3567606Z Artifact download URL: https://github.com/alexj11324/Mikka/actions/runs/42663994959/artifacts/13695688738
+2026-11-09T17:28:06.3707141Z Post job cleanup.
+2026-11-09T17:28:06.3710886Z ##[start-action display=Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020;id=__7b80cfb8-9eff-40c7-8bc9-144d73139e65.__actions_setup-node]
+2026-11-09T17:28:06.3752447Z Post job cleanup.
+2026-11-09T17:28:06.4811433Z (node:3818) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T17:28:06.4812234Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T17:28:06.4873070Z ##[end-action id=__7b80cfb8-9eff-40c7-8bc9-144d73139e65.__actions_setup-node;outcome=success;conclusion=success;duration_ms=116]
+2026-11-09T17:28:06.4877415Z ##[start-action display=Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1;id=__7b80cfb8-9eff-40c7-8bc9-144d73139e65.__pnpm_action-setup]
+2026-11-09T17:28:06.4927069Z Post job cleanup.
+2026-11-09T17:28:06.6169895Z Pruning is unnecessary.
+2026-11-09T17:28:06.6227787Z ##[end-action id=__7b80cfb8-9eff-40c7-8bc9-144d73139e65.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=134]
+2026-11-09T17:28:06.6328793Z Post job cleanup.
+2026-11-09T17:28:06.7057105Z [command]/usr/bin/git version
+2026-11-09T17:28:06.7087130Z git version 2.56.0
+2026-11-09T17:28:06.7117200Z Temporarily overriding HOME='/home/runner/work/_temp/401088a2-b32a-4898-8373-e6a57c414853' before making global git config changes
+2026-11-09T17:28:06.7118722Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T17:28:06.7121837Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T17:28:06.7151788Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T17:28:06.7178989Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T17:28:06.7379254Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T17:28:06.7397318Z http.https://github.com/.extraheader
+2026-11-09T17:28:06.7406670Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T17:28:06.7435352Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T17:28:06.7635053Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T17:28:06.7659687Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T17:28:06.7952997Z Cleaning up orphan processes
+2026-11-09T17:28:06.8204165Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512 strict functional CI gate",
+  "checkedAt": "2026-11-09 18:03:15 UTC",
+  "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "actualCheckout": "576c903cd6ede14520a79111d2b71154968ad910",
+  "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "runId": 42663994959,
+  "attempt": 1,
+  "jobId": 129338527147,
+  "startedAt": "2026-11-09T17:50:34Z",
+  "completedAt": "2026-11-09T17:50:42Z",
+  "conclusion": "success",
+  "actual": {
+    "CHANGES_RESULT": "success",
+    "EXPECT_CORE": "true",
+    "CORE": "success",
+    "EXPECT_INTEGRATION": "true",
+    "INTEGRATION": "success",
+    "EXPECT_SOURCE": "true",
+    "SOURCE": "success",
+    "EXPECT_DAEMON": "true",
+    "DAEMON": "success",
+    "EXPECT_IMAGE": "true",
+    "IMAGE": "success",
+    "EXPECT_DESKTOP": "true",
+    "DESKTOP": "success",
+    "EXPECT_ANALYTICS": "true",
+    "ANALYTICS": "success"
+  },
+  "original": {
+    "jobId": 129338527147,
+    "runId": 42663994959,
+    "attempt": 1,
+    "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+    "readAt": "2026-11-09 17:54:26 UTC",
+    "originalReader": "/root",
+    "readCount": 1,
+    "bytes": 14089,
+    "sha256": "8ae53b2862f96c696c20d37c162cd2e4152c5b3de04852123d218242c09704df",
+    "gitBlob": "3bcc5b3b2f455fe90c7fb509ace82468338ae096"
+  },
+  "limits": [
+    "This job validates workflow dependency conclusions; it does not enforce the issue1512 Native query budgets.",
+    "Actual Native artifact budgets for this source are RED: 433>431 and first-pair209>147, despite functional CI success.",
+    "No retry, source/threshold/window change or production acceptance is claimed."
+  ]
+}

@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "runId": 42663994959,
+  "attempt": 1,
+  "jobId": 129327506300,
+  "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "checkout": "576c903cd6ede14520a79111d2b71154968ad910",
+  "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "lifecycleOriginal": {
+    "path": "native-6414a0/original/lifecycle.json",
+    "kind": "exact-original-JSON",
+    "mode": "100644",
+    "bytes": 686827,
+    "sha256": "756aa75ae6b482b1e1a7ab1006c8451ac0650af09391ffa480d937efc8b4b06f",
+    "gitBlob": "633c0569408df7076b91df290bd9b4456d7992ef",
+    "remoteConfirmed": true
+  },
+  "issue1512SqlBudgetStatus": "FAILED",
+  "reads": [
+    {
+      "kind": "metadata",
+      "resource": "run",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959",
+      "phase": "initial_snapshot"
+    },
+    {
+      "kind": "metadata",
+      "resource": "head-runs",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?head_sha=6414a08ddb4a92962bc82e9e427c391d645cacb2&per_page=100",
+      "phase": "initial_snapshot"
+    },
+    {
+      "kind": "metadata",
+      "resource": "head-checks",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/commits/6414a08ddb4a92962bc82e9e427c391d645cacb2/check-runs?per_page=100",
+      "phase": "initial_snapshot"
+    },
+    {
+      "kind": "metadata",
+      "resource": "main-jobs",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959/jobs?filter=latest&per_page=100",
+      "phase": "initial_snapshot"
+    },
+    {
+      "kind": "metadata",
+      "resource": "runs-1726",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?head_sha=6414a08ddb4a92962bc82e9e427c391d645cacb2&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "jobs-1726",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "terminal-jobs-42663994928",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994928/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "terminal-jobs-42663994973",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994973/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "terminal-jobs-42663994976",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994976/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "runs-1729",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?head_sha=6414a08ddb4a92962bc82e9e427c391d645cacb2&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "jobs-1729",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "terminal-jobs-42663994948",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994948/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "terminal-jobs-42663994998",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994998/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "jobs-1731",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "runs-1731",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?head_sha=6414a08ddb4a92962bc82e9e427c391d645cacb2&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "terminal-jobs-42663995120",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663995120/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "terminal-jobs-42663995029",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663995029/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "terminal-jobs-42663995017",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663995017/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "jobs-1733",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "jobs-1736",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "jobs-1739",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "jobs-1741",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "jobs-1744",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "native_job_steps",
+      "jobId": 129327506300,
+      "observedAt": "2026-11-09 17:47:43 UTC"
+    },
+    {
+      "kind": "metadata",
+      "resource": "native_job_steps",
+      "jobId": 129327506300,
+      "observedAt": "2026-11-09 17:49:36 UTC"
+    },
+    {
+      "kind": "metadata",
+      "resource": "native_job_steps",
+      "jobId": 129327506300,
+      "observedAt": "2026-11-09 17:52:49 UTC"
+    },
+    {
+      "kind": "metadata",
+      "resource": "final-head-checks",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/commits/6414a08ddb4a92962bc82e9e427c391d645cacb2/check-runs?filter=all&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "final-head-runs",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?head_sha=6414a08ddb4a92962bc82e9e427c391d645cacb2&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "final-main-jobs",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42663994959/jobs?filter=latest&per_page=100",
+      "error": false
+    },
+    {
+      "kind": "original_log",
+      "jobId": 129327506300,
+      "fetchCount": 1,
+      "bytes": 256735,
+      "sha256": "b04b98c60ff10c275207c1f50795f13528bbcff7ee4281afe5576a26e50c6873",
+      "gitBlob": "c95176f83e21f3de1e240b7e5603e8bc0a16c8a3",
+      "preservesOriginalDecodedUtf8": true
+    },
+    {
+      "kind": "metadata",
+      "resource": "run_artifacts",
+      "runId": 42663994959
+    },
+    {
+      "kind": "metadata",
+      "resource": "legacy_combined_status",
+      "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2"
+    },
+    {
+      "kind": "artifact_download",
+      "artifactId": 13698061905,
+      "githubDownloadCount": 1,
+      "reason": "first_terminal_original_read"
+    },
+    {
+      "kind": "artifact_download",
+      "artifactId": 13697842275,
+      "githubDownloadCount": 1,
+      "reason": "first_terminal_original_read"
+    }
+  ],
+  "counts": {
+    "nativeJobOriginalLog": 1,
+    "nativeArtifactDownload": 1,
+    "packageArtifactDownload": 1,
+    "otherJobOriginalLogs": 0,
+    "oldArtifactsRedownloaded": 0,
+    "fileReferenceUrlOpenCalls": 2,
+    "originalsBundleChunks": 94,
+    "chunkRereads": 0,
+    "referenceRefreshes": 0,
+    "ownGitCommitMetadataReads": 0,
+    "gitCommitMetadataReusedFromPeer": 1,
+    "vmCreate": 1,
+    "vmStop": 1,
+    "vmDelete": 1,
+    "vmExactGetAfterDelete": 1,
+    "ciRerun": 0,
+    "modelCalls": 0,
+    "productionRequests": 0,
+    "gitRefChanges": 0
+  },
+  "metadataCoverage": {
+    "runCount": 9,
+    "jobs": 38,
+    "checkCount": 39,
+    "externalChecks": [
+      {
+        "id": 129322722545,
+        "name": "GitGuardian Security Checks",
+        "app": "gitguardian",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "errors": [],
+    "jobConclusions": {
+      "success": 31,
+      "skipped": 7
+    },
+    "checkConclusions": {
+      "success": 32,
+      "skipped": 7
+    },
+    "workflowConclusions": {
+      "success": 9
+    }
+  },
+  "allSignedUrlsExcluded": true
+}

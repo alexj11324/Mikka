@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+    "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+    "actualCheckout": "576c903cd6ede14520a79111d2b71154968ad910"
+  },
+  "rawOriginals": [
+    {
+      "name": "lifecycle.json",
+      "bytes": 686827,
+      "sha256": "756aa75ae6b482b1e1a7ab1006c8451ac0650af09391ffa480d937efc8b4b06f",
+      "gitBlob": "633c0569408df7076b91df290bd9b4456d7992ef",
+      "artifactId": 13698061905
+    },
+    {
+      "name": "parity.json",
+      "bytes": 116451,
+      "sha256": "8ca9f255e5af83c6e62f48d63c3c3d7ba26b059d5caf8ad5bc5bcd0fb4a0df6d",
+      "gitBlob": "b77ddcf8aa42281ef33efdd9cb7320c909fc1e0b",
+      "artifactId": 13698061905
+    },
+    {
+      "name": "smoke.json",
+      "bytes": 3144,
+      "sha256": "d1c3b9df1978e929fd9b8a42223f89abb261bcbea88a526f6b81a0cc3e97f87f",
+      "gitBlob": "847d49271f59aba3804a7113494ad465199d6ead",
+      "artifactId": 13698061905
+    },
+    {
+      "name": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "b9341a254eccdc154e53c12ab5b97d0d9b5c39164ca0b19147dbfdb58a46d389",
+      "gitBlob": "af10ad6478a0b28b1b0498837ba247fd1170ef45",
+      "artifactId": 13697842275
+    },
+    {
+      "name": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "c459012f4989abd5a432680373f4da077305ec124a680d2cbabcc1d4dc1cf24b",
+      "gitBlob": "f1052503446655fbe9ab222ee61e27722d8d4a36",
+      "artifactId": 13697842275
+    }
+  ],
+  "independentArithmetic": {
+    "records": 24,
+    "checkpoints": 12,
+    "segments": 8,
+    "bucketCells": 2280,
+    "ordinalRows": 1220,
+    "errors": [
+      {
+        "label": "native full-window exceeds web"
+      },
+      {
+        "label": "native first startup exceeds hosted"
+      }
+    ],
+    "conservationErrors": []
+  },
+  "peerComparison": {
+    "commonFields": [
+      "schemaVersion",
+      "head",
+      "tree",
+      "actualCheckout",
+      "arithmetic",
+      "windows",
+      "scope",
+      "exclusions",
+      "background",
+      "boundary",
+      "login",
+      "startup",
+      "cold",
+      "parity",
+      "crypto",
+      "smoke",
+      "cleanup",
+      "nativeSetup",
+      "limitations"
+    ],
+    "differences": []
+  },
+  "budget": {
+    "full": {
+      "native": 433,
+      "web": 431,
+      "pass": false
+    },
+    "first": {
+      "pair": 1,
+      "native": 209,
+      "hosted": 147,
+      "pass": false
+    }
+  },
+  "interpretation": {
+    "functionalCiSucceeded": true,
+    "issue1512SqlBudgetPassed": false,
+    "productionAcceptanceCompleted": 0,
+    "productionAcceptanceRequired": 2
+  },
+  "invariants": {
+    "originalWindows": true,
+    "originalFirstPair": true,
+    "unknownAndBackgroundRetained": true,
+    "repeatExecutionCount": 0
+  },
+  "evidenceBoundaries": {
+    "diagnosticsIncomplete": true,
+    "unknownFineAttributionPreserved": true,
+    "installedDaemonSeparateFromCandidate": true,
+    "rootViewedParityPngPixels": false,
+    "productionAcceptance": false,
+    "apiProcessProtocolBytesAreNotWholeNetworkBytes": true
+  },
+  "resources": {
+    "manualVmRemaining": 0,
+    "exactPostDeleteGetStatus": 404,
+    "cleanupBlob": "e62f1d420ef6253e3f826d9eeb6d8c2aeca77e3a"
+  },
+  "referenceProofs": {
+    "sourceDiagnosis": "886c194df4b3df8a724efd09bd5489dfcb74c590",
+    "budgetDiff": "c5e8690b7774a2e2fba4332d3aad22f9d8872df7"
+  }
+}

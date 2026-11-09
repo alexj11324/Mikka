@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "kind": "root-independent-workflow-job-check-coverage",
+  "metadataGitBlob": "02f54aa53883c54bb7fa0c308b31678f0d8fc2",
+  "metadataObservedAt": "2026-11-09 17:53:14 UTC",
+  "source": {
+    "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+    "tree": "05b40c13c233d7f3cef989011705cf624b27c507"
+  },
+  "workflows": 9,
+  "workflowConclusions": {
+    "success": 9
+  },
+  "jobs": 38,
+  "jobConclusions": {
+    "success": 31,
+    "skipped": 7
+  },
+  "checks": 39,
+  "checkConclusions": {
+    "success": 32,
+    "skipped": 7
+  },
+  "external": [
+    {
+      "id": 129322722545,
+      "name": "GitGuardian Security Checks",
+      "app": "gitguardian",
+      "conclusion": "success"
+    }
+  ],
+  "errors": [],
+  "boundary": "Functional CI metadata does not enforce or override original manual Native SQL budgets."
+}

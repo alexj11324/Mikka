@@ -1,0 +1,499 @@
+{
+  "schemaVersion": 1,
+  "runId": 42663994959,
+  "attempt": 1,
+  "jobId": 129327506300,
+  "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "checkout": "576c903cd6ede14520a79111d2b71154968ad910",
+  "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "lifecycleOriginal": {
+    "path": "native-6414a0/original/lifecycle.json",
+    "kind": "exact-original-JSON",
+    "mode": "100644",
+    "bytes": 686827,
+    "sha256": "756aa75ae6b482b1e1a7ab1006c8451ac0650af09391ffa480d937efc8b4b06f",
+    "gitBlob": "633c0569408df7076b91df290bd9b4456d7992ef",
+    "remoteConfirmed": true
+  },
+  "issue1512SqlBudgetStatus": "FAILED",
+  "lifecycle": {
+    "cleanupStages": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "fixtures",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 2,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      }
+    },
+    "workspaceNameCleanup": {
+      "captured": true,
+      "phase": "unchanged",
+      "restored": false,
+      "initialName": {
+        "en": false,
+        "zhCN": true
+      },
+      "initialOwnerMatchesSealedBaseline": false,
+      "beforeName": {
+        "en": false,
+        "zhCN": true
+      },
+      "peerMatchesSealedBaseline": true,
+      "afterName": {
+        "en": false,
+        "zhCN": true
+      },
+      "ownerMatchesSealedBaseline": true
+    },
+    "accountObservation": {
+      "observed": true,
+      "state": "released",
+      "blockedReason": null,
+      "owner": {
+        "matchesSealedBaselineBefore": false,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 1,
+        "changes": [
+          {
+            "table": "workspace_audit_outbox",
+            "beforeRows": 1,
+            "afterRows": 0,
+            "changedFieldValueSets": [
+              "createdAt",
+              "id",
+              "workspaceId"
+            ],
+            "otherChangedFieldCount": 3
+          }
+        ]
+      },
+      "peer": {
+        "matchesSealedBaselineBefore": false,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 1,
+        "changes": [
+          {
+            "table": "workspace_audit_outbox",
+            "beforeRows": 1,
+            "afterRows": 0,
+            "changedFieldValueSets": [
+              "createdAt",
+              "id",
+              "workspaceId"
+            ],
+            "otherChangedFieldCount": 3
+          }
+        ]
+      }
+    }
+  },
+  "smoke": {
+    "cleanupStages": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "electron-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 1,
+        "device_token_devices": 0,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 0,
+        "device_tokens": 0,
+        "device_enrollments": 0,
+        "devices": 0
+      }
+    },
+    "workspaceNameCleanup": {
+      "captured": true,
+      "phase": "restored",
+      "restored": true,
+      "initialName": {
+        "en": false,
+        "zhCN": true
+      },
+      "initialOwnerMatchesSealedBaseline": true,
+      "beforeName": {
+        "en": true,
+        "zhCN": false
+      },
+      "peerMatchesSealedBaseline": true,
+      "onlyGeneratedNameDifference": true,
+      "afterName": {
+        "en": false,
+        "zhCN": true
+      },
+      "ownerMatchesSealedBaseline": true
+    },
+    "accountObservation": {
+      "observed": true,
+      "state": "released",
+      "blockedReason": null,
+      "owner": {
+        "matchesSealedBaselineBefore": true,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 0,
+        "changes": []
+      },
+      "peer": {
+        "matchesSealedBaselineBefore": true,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 0,
+        "changes": []
+      }
+    }
+  },
+  "parity": {
+    "cleanup": "passed",
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 1,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      }
+    },
+    "workspaceNameCleanup": {
+      "captured": true,
+      "phase": "restored",
+      "restored": true,
+      "initialName": {
+        "en": false,
+        "zhCN": true
+      },
+      "initialOwnerMatchesSealedBaseline": false,
+      "beforeName": {
+        "en": true,
+        "zhCN": false
+      },
+      "peerMatchesSealedBaseline": true,
+      "onlyGeneratedNameDifference": true,
+      "afterName": {
+        "en": false,
+        "zhCN": true
+      },
+      "ownerMatchesSealedBaseline": true
+    }
+  },
+  "package": {
+    "version": 1,
+    "variant": "acceptance",
+    "passed": true,
+    "signatureVerifiedStrictDeep": true,
+    "bundleIdentifier": "com.aspectlylabs.mikka.dev",
+    "urlScheme": "mikka-dev-auth",
+    "architecture": "arm64",
+    "identity": {
+      "adHoc": true,
+      "teamIdentifier": "none",
+      "hardenedRuntime": true,
+      "cdHash": "15305a14149658f9956aef4660ae40442c7a86d2"
+    },
+    "signedBundleCount": 9,
+    "entitlements": {
+      "hardenedRuntime": true,
+      "devOnlyLibraryValidationException": true,
+      "unexpected": false,
+      "executables": 5,
+      "libraries": 4,
+      "librariesWithoutEntitlements": 4
+    },
+    "fuses": {
+      "RunAsNode": false,
+      "EnableCookieEncryption": false,
+      "EnableNodeOptionsEnvironmentVariable": false,
+      "EnableNodeCliInspectArguments": true,
+      "EnableEmbeddedAsarIntegrityValidation": false,
+      "OnlyLoadAppFromAsar": true,
+      "LoadBrowserProcessSpecificV8Snapshot": false,
+      "GrantFileProtocolExtraPrivileges": true
+    }
+  },
+  "crypto": {
+    "version": 1,
+    "passed": true,
+    "platform": "darwin",
+    "architecture": "arm64",
+    "revision": "576c903cd6ede14520a79111d2b71154968ad910",
+    "launches": [
+      {
+        "mode": "bundled",
+        "profile": "a",
+        "phase": "create",
+        "passed": true,
+        "crypto": {
+          "passed": true,
+          "phase": "create",
+          "available": true,
+          "verifiedCanaries": 0,
+          "encrypted": true,
+          "decrypted": true,
+          "identityMatches": true
+        },
+        "processExited": true,
+        "keychainLog": {
+          "observation": "after-launch-return",
+          "lookupFailureCount": 0,
+          "knownStatusCodes": [],
+          "truncated": false
+        }
+      },
+      {
+        "mode": "hosted",
+        "profile": "b",
+        "phase": "continue",
+        "passed": true,
+        "crypto": {
+          "passed": true,
+          "phase": "continue",
+          "available": true,
+          "verifiedCanaries": 1,
+          "encrypted": true,
+          "decrypted": true,
+          "identityMatches": true
+        },
+        "processExited": true,
+        "keychainLog": {
+          "observation": "after-launch-return",
+          "lookupFailureCount": 0,
+          "knownStatusCodes": [],
+          "truncated": false
+        }
+      },
+      {
+        "mode": "bundled",
+        "profile": "b",
+        "phase": "verify",
+        "passed": true,
+        "crypto": {
+          "passed": true,
+          "phase": "verify",
+          "available": true,
+          "verifiedCanaries": 2,
+          "encrypted": true,
+          "decrypted": true,
+          "identityMatches": true
+        },
+        "processExited": true,
+        "keychainLog": {
+          "observation": "after-launch-return",
+          "lookupFailureCount": 0,
+          "knownStatusCodes": [],
+          "truncated": false
+        }
+      }
+    ],
+    "package": {
+      "version": 1,
+      "variant": "acceptance",
+      "passed": true,
+      "signatureVerifiedStrictDeep": true,
+      "bundleIdentifier": "com.aspectlylabs.mikka.dev",
+      "urlScheme": "mikka-dev-auth",
+      "architecture": "arm64",
+      "identity": {
+        "adHoc": true,
+        "teamIdentifier": "none",
+        "hardenedRuntime": true,
+        "cdHash": "15305a14149658f9956aef4660ae40442c7a86d2"
+      },
+      "signedBundleCount": 9,
+      "entitlements": {
+        "hardenedRuntime": true,
+        "devOnlyLibraryValidationException": true,
+        "unexpected": false,
+        "executables": 5,
+        "libraries": 4,
+        "librariesWithoutEntitlements": 4
+      },
+      "fuses": {
+        "RunAsNode": false,
+        "EnableCookieEncryption": false,
+        "EnableNodeOptionsEnvironmentVariable": false,
+        "EnableNodeCliInspectArguments": true,
+        "EnableEmbeddedAsarIntegrityValidation": false,
+        "OnlyLoadAppFromAsar": true,
+        "LoadBrowserProcessSpecificV8Snapshot": false,
+        "GrantFileProtocolExtraPrivileges": true
+      }
+    },
+    "sameImmutablePackage": true,
+    "distinctProcesses": 3,
+    "cleanup": "passed"
+  },
+  "checks": [
+    {
+      "name": "one leased account, ordinary native PKCE and hosted cookie profiles select the same real workspace",
+      "result": "passed"
+    },
+    {
+      "name": "at least five paired fresh-process launches reach the same usable seeded chat",
+      "result": "passed"
+    },
+    {
+      "name": "two leased browser identities remain private in main and the real account/workspace menu switches back to the retained owner",
+      "result": "passed"
+    },
+    {
+      "name": "real sandboxed frame has no IPC/Node or parent access, and its API request never reaches the main bearer transport",
+      "result": "passed"
+    },
+    {
+      "name": "actual main HTTP transport outage preserves the loaded conversation and unsent draft; online notification recovers",
+      "result": "passed"
+    },
+    {
+      "name": "native notification click event follows the real preload bridge to the requested task/thread",
+      "result": "passed"
+    },
+    {
+      "name": "native dialog result traverses real IPC and main validates the selected Git repository and cancellation",
+      "result": "passed"
+    },
+    {
+      "name": "fresh-process offline launch serves installed assets and a meaningful local offline screen, then recovers without a reload",
+      "result": "passed"
+    }
+  ],
+  "smokeChecks": [
+    {
+      "name": "packaged local origin and isolated renderer",
+      "result": "passed"
+    },
+    {
+      "name": "local document CSP blocks external renderer fetches",
+      "result": "passed"
+    },
+    {
+      "name": "server choice: probe states, probed-only selection, the page follows the chosen server and returns",
+      "result": "passed"
+    },
+    {
+      "name": "system browser shows the signed-in account, then loopback and single-use PKCE session handoff",
+      "result": "passed"
+    },
+    {
+      "name": "the callback page opens the Dev build's own app link",
+      "result": "passed"
+    },
+    {
+      "name": "opening the app link brings the packaged app to the front",
+      "result": "passed"
+    },
+    {
+      "name": "no browser session credential in renderer-accessible state",
+      "result": "passed"
+    },
+    {
+      "name": "native badge, payload validation, device and quota bridge",
+      "result": "passed"
+    },
+    {
+      "name": "settings deep link and shared devices page",
+      "result": "passed"
+    },
+    {
+      "name": "sign-out clears the main-owned session",
+      "result": "passed"
+    }
+  ],
+  "coldStart": {
+    "pairs": 5,
+    "bundledMedianMs": 3167.33,
+    "hostedMedianMs": 3183.79,
+    "differenceMs": -16.460000000000036,
+    "bundledFaster": true,
+    "improvementPercent": 0.52
+  },
+  "paritySummary": {
+    "screens": 100,
+    "required": 50,
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "maximumChangedRatio": 0.001,
+    "colorThreshold": 0,
+    "totalComparedPixels": 129600000,
+    "changedPixels": 332,
+    "maxObserved": 0.00010262345679012345,
+    "maskedScreens": 56,
+    "masks": [
+      "avatars",
+      "timestamps"
+    ],
+    "excludedDesktopOnly": [
+      "data-desktop-only: server row, Settings › 服务器"
+    ],
+    "pageErrors": []
+  },
+  "explicitBoundaries": {
+    "lifecycleWorkspaceNameRestored": false,
+    "lifecycleNamePhase": "unchanged",
+    "smokeSealedBeforeOwner": true,
+    "smokeSealedBeforePeer": true,
+    "lifecycleSealedBeforeOwner": false,
+    "lifecycleSealedBeforePeer": false,
+    "allCleanupFieldsAreNotCollapsedIntoOneBoolean": true,
+    "productionAppStoreOrProductionAccountAcceptance": false
+  }
+}

@@ -1,0 +1,492 @@
+{
+  "schemaVersion": 1,
+  "kind": "native-6414-transport-head-of-line-review",
+  "repository": "alexj11324/Mikka",
+  "source": {
+    "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+    "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+    "ciCheckout": "576c903cd6ede14520a79111d2b71154968ad910"
+  },
+  "evidence": {
+    "newLifecycleBlob": "633c0569408df7076b91df290bd9b4456d7992ef",
+    "newLifecycleBytes": 686827,
+    "newLifecycleSha256": "756aa75ae6b482b1e1a7ab1006c8451ac0650af09391ffa480d937efc8b4b06f",
+    "budgetDiffProofBlob": "c5e8690b7774a2e2fba4332d3aad22f9d8872df7",
+    "budgetDiffProofSha256": "223452aa19303ef435da03715a849646ff6912f276e1ce5695e47b093a496116",
+    "timingProvenance": "Exact item spans and batch membership reported by /root/native_budget_diff from its already-read immutable original. This review did not reacquire original logs or ZIPs.",
+    "timestampPrecision": "milliseconds",
+    "physicalIdRepresentation": "Observed prefixes only; no full identifier reconstructed."
+  },
+  "invariants": {
+    "fullNativeQueries": 433,
+    "fullWebQueries": 431,
+    "firstNativeQueries": 209,
+    "firstHostedQueries": 147,
+    "firstPair": 1,
+    "fullBudgetPass": false,
+    "firstBudgetPass": false,
+    "windowModified": false,
+    "postBoundarySqlAdded": false,
+    "unknownExcluded": false,
+    "productionAcceptancePass": false
+  },
+  "transportFacts": [
+    {
+      "claim": "Native ordinary action RPC uses renderer fetch, a mikka custom scheme, BundledAuth.request and a separate backend session fetch; it is not an IPC action envelope.",
+      "anchors": [
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "blob": "dae8798653457afad334c2d909b10b63e9b3956f",
+          "lines": [
+            11,
+            47
+          ]
+        },
+        {
+          "path": "apps/desktop/src/main/bundled-protocol.ts",
+          "blob": "653f8534f4f278a7c0e331d28ea3dbbebc49e3a6",
+          "lines": [
+            71,
+            95
+          ]
+        },
+        {
+          "path": "apps/desktop/src/main/index.ts",
+          "blob": "61da70923e2109761919f8b4968c0cb701917ff3",
+          "lines": [
+            551,
+            603
+          ]
+        }
+      ]
+    },
+    {
+      "claim": "Renderer grouping is exact locale, URL workspace and isCurrent function-reference equality. Shared ordinary action proxies omit isCurrent, so this review does not attribute observed grouping changes to callback identity.",
+      "anchors": [
+        {
+          "path": "apps/desktop/src/renderer/read-batch.ts",
+          "blob": "67503a9abe7131de3e9bf86629532e015085d4ee",
+          "lines": [
+            87,
+            102
+          ]
+        },
+        {
+          "path": "apps/frontend/scripts/application-plugin.mjs",
+          "blob": "ce704d874e8150adf81ab92bcd061dd46e425559",
+          "lines": [
+            119,
+            123
+          ]
+        }
+      ]
+    },
+    {
+      "claim": "A MessageChannel posted task coalesces ready reads. It adds no timeout, polling or response cache. Batch execution and separate batch sends are concurrent, not a serial request queue.",
+      "anchors": [
+        {
+          "path": "apps/desktop/src/renderer/read-batch.ts",
+          "blob": "67503a9abe7131de3e9bf86629532e015085d4ee",
+          "lines": [
+            98,
+            127
+          ]
+        },
+        {
+          "path": "lib/desktop-rpc/read-batch.ts",
+          "blob": "528365a2f6735a12fa514f6088bf81446c813ec7",
+          "lines": [
+            25,
+            48
+          ]
+        }
+      ]
+    },
+    {
+      "claim": "Result release waits for all server actions, server Response.json, renderer response.json and complete envelope validation before any member promise resolves.",
+      "anchors": [
+        {
+          "path": "lib/desktop-rpc/read-batch.ts",
+          "blob": "528365a2f6735a12fa514f6088bf81446c813ec7",
+          "lines": [
+            27,
+            47
+          ]
+        },
+        {
+          "path": "lib/desktop-rpc/handler.ts",
+          "blob": "3e568543ea258a992bdae0af0f98f46f58b8e727",
+          "lines": [
+            83,
+            89
+          ]
+        },
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "blob": "dae8798653457afad334c2d909b10b63e9b3956f",
+          "lines": [
+            66,
+            73
+          ]
+        },
+        {
+          "path": "apps/desktop/src/renderer/read-batch.ts",
+          "blob": "67503a9abe7131de3e9bf86629532e015085d4ee",
+          "lines": [
+            62,
+            76
+          ]
+        }
+      ]
+    },
+    {
+      "claim": "Main already forwards streaming bodies. Scheme registration enables streams; only text/event-stream receives an additional per-pull scope fence. No per-item RPC stream protocol or renderer incremental JSON parser exists in this path.",
+      "anchors": [
+        {
+          "path": "apps/desktop/src/main/index.ts",
+          "blob": "61da70923e2109761919f8b4968c0cb701917ff3",
+          "lines": [
+            49,
+            51
+          ]
+        },
+        {
+          "path": "apps/desktop/src/main/bundled-protocol.ts",
+          "blob": "653f8534f4f278a7c0e331d28ea3dbbebc49e3a6",
+          "lines": [
+            80,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "claim": "execution-settings.getBotModelMenu is excluded from READ_BATCH_ACTIONS and cannot be blamed for same-batch result release delay.",
+      "anchors": [
+        {
+          "path": "lib/desktop-rpc/read-batch-contract.ts",
+          "blob": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b",
+          "lines": [
+            5,
+            21
+          ]
+        }
+      ]
+    }
+  ],
+  "firstNative": {
+    "pair": 1,
+    "windowStart": "17:49:13.740",
+    "windowEnd": "17:49:18.678",
+    "timeBasis": "Original lifecycle time-of-day; no date or offset inferred by this proof.",
+    "physicalCount": 6,
+    "logicalStarts": 19,
+    "logicalCompletions": 19,
+    "physical": [
+      {
+        "idPrefix": null,
+        "action": "desktop.bootstrap",
+        "startedAt": "17:49:16.676",
+        "completedAt": "17:49:16.718",
+        "durationMs": 42,
+        "members": []
+      },
+      {
+        "idPrefix": null,
+        "action": "execution-settings.getBotModelMenu",
+        "startedAt": "17:49:17.935",
+        "completedAt": "17:49:18.225",
+        "durationMs": 290,
+        "members": []
+      },
+      {
+        "idPrefix": "2d179db6",
+        "action": "desktop.readBatch",
+        "startedAt": "17:49:18.040",
+        "completedAt": "17:49:18.272",
+        "durationMs": 232,
+        "members": [
+          {
+            "action": "teams.listTeams",
+            "startedAt": "17:49:18.109",
+            "completedAt": "17:49:18.130",
+            "durationMs": 21,
+            "itemCompletionToPhysicalCompletionMs": 142
+          },
+          {
+            "action": "team-relations.listProjectTeams",
+            "startedAt": "17:49:18.109",
+            "completedAt": "17:49:18.127",
+            "durationMs": 18,
+            "itemCompletionToPhysicalCompletionMs": 145
+          },
+          {
+            "action": "task-runs.pollTaskRuns",
+            "startedAt": "17:49:18.109",
+            "completedAt": "17:49:18.179",
+            "durationMs": 70,
+            "itemCompletionToPhysicalCompletionMs": 93
+          },
+          {
+            "action": "coordinator.pollBotChatSummaries",
+            "startedAt": "17:49:18.109",
+            "completedAt": "17:49:18.183",
+            "durationMs": 74,
+            "itemCompletionToPhysicalCompletionMs": 89
+          },
+          {
+            "action": "projects.listProjects",
+            "startedAt": "17:49:18.109",
+            "completedAt": "17:49:18.134",
+            "durationMs": 25,
+            "itemCompletionToPhysicalCompletionMs": 138
+          },
+          {
+            "action": "bots.pollBots",
+            "startedAt": "17:49:18.109",
+            "completedAt": "17:49:18.135",
+            "durationMs": 26,
+            "itemCompletionToPhysicalCompletionMs": 137
+          },
+          {
+            "action": "coordinator.syncCoordinatorChat",
+            "startedAt": "17:49:18.110",
+            "completedAt": "17:49:18.272",
+            "durationMs": 162,
+            "itemCompletionToPhysicalCompletionMs": 0
+          },
+          {
+            "action": "issues.syncIssueList",
+            "startedAt": "17:49:18.110",
+            "completedAt": "17:49:18.216",
+            "durationMs": 106,
+            "itemCompletionToPhysicalCompletionMs": 56
+          },
+          {
+            "action": "task-runs.syncThreadList",
+            "startedAt": "17:49:18.110",
+            "completedAt": "17:49:18.161",
+            "durationMs": 51,
+            "itemCompletionToPhysicalCompletionMs": 111
+          }
+        ]
+      },
+      {
+        "idPrefix": "3bcc4cd3",
+        "action": "desktop.readBatch",
+        "startedAt": "17:49:18.282",
+        "completedAt": "17:49:18.352",
+        "durationMs": 70,
+        "members": [
+          {
+            "action": "task-runs.syncThreadList",
+            "startedAt": "17:49:18.327",
+            "completedAt": "17:49:18.352",
+            "durationMs": 25,
+            "itemCompletionToPhysicalCompletionMs": 0
+          },
+          {
+            "action": "teams.listTeams",
+            "startedAt": "17:49:18.327",
+            "completedAt": "17:49:18.334",
+            "durationMs": 7,
+            "itemCompletionToPhysicalCompletionMs": 18
+          },
+          {
+            "action": "team-relations.listProjectTeams",
+            "startedAt": "17:49:18.327",
+            "completedAt": "17:49:18.330",
+            "durationMs": 3,
+            "itemCompletionToPhysicalCompletionMs": 22
+          },
+          {
+            "action": "bots.pollBots",
+            "startedAt": "17:49:18.327",
+            "completedAt": "17:49:18.334",
+            "durationMs": 7,
+            "itemCompletionToPhysicalCompletionMs": 18
+          }
+        ]
+      },
+      {
+        "idPrefix": "e38a4261",
+        "action": "desktop.readBatch",
+        "startedAt": "17:49:18.299",
+        "completedAt": "17:49:18.385",
+        "durationMs": 86,
+        "members": [
+          {
+            "action": "coordinator.pollBotChatSummaries",
+            "startedAt": "17:49:18.336",
+            "completedAt": "17:49:18.359",
+            "durationMs": 23,
+            "itemCompletionToPhysicalCompletionMs": 26
+          },
+          {
+            "action": "issues.syncIssueList",
+            "startedAt": "17:49:18.336",
+            "completedAt": "17:49:18.362",
+            "durationMs": 26,
+            "itemCompletionToPhysicalCompletionMs": 23
+          },
+          {
+            "action": "coordinator.syncCoordinatorChat",
+            "startedAt": "17:49:18.336",
+            "completedAt": "17:49:18.385",
+            "durationMs": 49,
+            "itemCompletionToPhysicalCompletionMs": 0
+          }
+        ]
+      },
+      {
+        "idPrefix": null,
+        "action": "task-runs.pollTaskRuns",
+        "startedAt": "17:49:18.625",
+        "completedAt": "17:49:18.642",
+        "durationMs": 17,
+        "members": []
+      }
+    ],
+    "logicalActionCounts": {
+      "bots.pollBots": 2,
+      "coordinator.pollBotChatSummaries": 2,
+      "coordinator.syncCoordinatorChat": 2,
+      "desktop.bootstrap": 1,
+      "execution-settings.getBotModelMenu": 1,
+      "issues.syncIssueList": 2,
+      "projects.listProjects": 1,
+      "task-runs.pollTaskRuns": 2,
+      "task-runs.syncThreadList": 2,
+      "team-relations.listProjectTeams": 2,
+      "teams.listTeams": 2
+    }
+  },
+  "uiFacts": [
+    {
+      "claim": "IssueWorkspace and CoordinatorChat consume their own SWR results; there is no identified top-level Promise.all requiring the whole page to wait. The batch therefore adds cross-action release dependence.",
+      "anchors": [
+        {
+          "path": "components/workspace/issue-workspace.tsx",
+          "blob": "b043d5c09d02d5f675cd62d28e40bb8dc38b5060",
+          "lines": [
+            188,
+            227
+          ]
+        },
+        {
+          "path": "components/coordinator/coordinator-chat.tsx",
+          "blob": "8bd5309e8cbe71fbbc6603d91c7fad890a026c6e",
+          "lines": [
+            179,
+            187
+          ]
+        },
+        {
+          "path": "components/coordinator/coordinator-chat.tsx",
+          "blob": "8bd5309e8cbe71fbbc6603d91c7fad890a026c6e",
+          "lines": [
+            488,
+            492
+          ]
+        }
+      ]
+    },
+    {
+      "claim": "A selected non-Coordinator bot can be unresolved before roster completion while Overview mounts the default Coordinator; this is a conditional product candidate only, not an attributed cause of this run.",
+      "anchors": [
+        {
+          "path": "components/workspace/issue-workspace.tsx",
+          "blob": "b043d5c09d02d5f675cd62d28e40bb8dc38b5060",
+          "lines": [
+            491,
+            494
+          ]
+        },
+        {
+          "path": "components/workspace/workspace-overview.tsx",
+          "blob": "3b1619a26844fc18c8b782dccbbefcf9d2aa5d16",
+          "lines": [
+            32,
+            35
+          ]
+        }
+      ]
+    }
+  ],
+  "authorizationConstraints": [
+    {
+      "claim": "Both thrown and returned authRequired cause a global HTTP 401 only after all item work and diagnostics settle. Sending HTTP 200 or usable partial success earlier would change this contract.",
+      "anchors": [
+        {
+          "path": "lib/desktop-rpc/read-batch.ts",
+          "blob": "528365a2f6735a12fa514f6088bf81446c813ec7",
+          "lines": [
+            30,
+            46
+          ]
+        },
+        {
+          "path": "lib/desktop-rpc/read-batch.test.ts",
+          "blob": "6d896c2763a2ededca04d37d89b8e2d4fc293dd0",
+          "lines": [
+            104,
+            120
+          ]
+        }
+      ]
+    },
+    {
+      "claim": "Main rejects stale token/scope responses and uses an ordinary HTTP 401 to clear only the matching current identity.",
+      "anchors": [
+        {
+          "path": "apps/desktop/src/main/bundled-auth.ts",
+          "blob": "d860b674f24e3159d7f196270c71c3a6f6e76839",
+          "lines": [
+            178,
+            202
+          ]
+        }
+      ]
+    },
+    {
+      "claim": "Completed dispatch proof is bound to an actual response object. Pending hints are not completed coverage, and a proof must not be attached to merged data or another logical read.",
+      "anchors": [
+        {
+          "path": "lib/swr/read-observer.ts",
+          "blob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+          "lines": [
+            34,
+            87
+          ]
+        },
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "blob": "dae8798653457afad334c2d909b10b63e9b3956f",
+          "lines": [
+            66,
+            73
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Original lifecycle receipts contain no action arguments or botId.",
+    "Only declared renderer URLs and navigation route categories were available; actual page URL and runtime bot selection are unknown.",
+    "Item-to-envelope spans are server receipt facts, not measured browser paint or user-perceived delays.",
+    "syncCoordinatorChat was the last completing action in batches 2d179db6 and e38a4261; it was not delayed by another batch member. Calling it optional requires separate scenario evidence.",
+    "The source proves a release barrier, not that it explains the entire SQL budget difference.",
+    "More envelopes may repeat request-scoped authorization/work and increase SQL; moving work beyond FIRST is not query elimination.",
+    "No streaming redesign, harness/ready/window change, delay, polling, new query, or authorization/proof weakening is proposed."
+  ],
+  "execution": {
+    "sourceEdits": false,
+    "refChanges": false,
+    "testRuns": false,
+    "ciRuns": false,
+    "originalJobLogReads": false,
+    "originalZipReads": false,
+    "newResources": false,
+    "scope": "Immutable source reads and one safe proof blob only."
+  }
+}

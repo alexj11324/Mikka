@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 1,
+  "kind": "pr-e2b-test-terminal-review",
+  "repository": "alexj11324/Mikka",
+  "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "actualCheckout": "576c903cd6ede14520a79111d2b71154968ad910",
+  "actualSourceReceipt": {
+    "name": "actual-source-and-selection.safe.json",
+    "bytes": 2947,
+    "sha256": "98748c1f9164750363943ca18afe8d02b736d44888793a12f2b0988b7262ef45",
+    "gitBlob": "2b1563d80127a47bf83d6c5f9d7831b76a465e29"
+  },
+  "workflow": {
+    "path": ".github/workflows/e2b-official-runtime.yml",
+    "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+    "bytes": 18539,
+    "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+    "gitBlob": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9"
+  },
+  "run": {
+    "id": 42663994973,
+    "attempt": 1,
+    "event": "pull_request",
+    "name": "E2B additive runtime release"
+  },
+  "job": {
+    "id": 129322656507,
+    "name": "test",
+    "startedAt": "2026-11-09T17:24:00Z",
+    "completedAt": "2026-11-09T17:24:17Z",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "raw": {
+    "name": "e2b-test.original.log",
+    "gitBlob": "f2c86755c96c81fded1c7db0e79c245e4cf4a863",
+    "bytes": 53455,
+    "sha256": "58c42a4666cc010a84c182fecaea1bd28c391ff29a402f58e43d8bd2a3b0e959"
+  },
+  "execution": {
+    "nodeCount": 211,
+    "nodeSummary": [
+      "ℹ tests 211",
+      "ℹ suites 0",
+      "ℹ pass 211",
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 0",
+      "ℹ todo 0",
+      "ℹ duration_ms 2163.434724"
+    ],
+    "python": [
+      {
+        "command": "python3 scripts/e2b/build-template.test.py",
+        "startLine": 385,
+        "endLine": 421,
+        "summary": [
+          "Ran 32 tests in 0.588s",
+          "OK"
+        ],
+        "progress": [
+          ".................."
+        ],
+        "skipped": []
+      },
+      {
+        "command": "python3 packages/daemon/scripts/prepare-worker-install.test.py",
+        "startLine": 422,
+        "endLine": 430,
+        "summary": [
+          "Ran 5 tests in 0.007s",
+          "OK"
+        ],
+        "progress": [
+          "....."
+        ],
+        "skipped": []
+      },
+      {
+        "command": "python3 scripts/e2b/official-files.test.py",
+        "startLine": 431,
+        "endLine": 439,
+        "summary": [
+          "Ran 34 tests in 0.331s",
+          "OK"
+        ],
+        "progress": [
+          ".................................."
+        ],
+        "skipped": []
+      },
+      {
+        "command": "python3 scripts/e2b/cleanup-template-candidates.test.py",
+        "startLine": 440,
+        "endLine": 448,
+        "summary": [
+          "Ran 16 tests in 0.007s",
+          "OK"
+        ],
+        "progress": [
+          "................"
+        ],
+        "skipped": []
+      }
+    ],
+    "syntaxCommands": [
+      "##[group]Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+      "##[group]Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh"
+    ]
+  },
+  "versions": {
+    "node": "24.22.2",
+    "python": "not printed; do not borrow the separate local archive's Python version",
+    "pnpm": "not used by this job",
+    "dependencies": "Isolated npm prefix installed fixed tsx@4.23.15, @opentelemetry/sdk-trace-base@2.12.0 and zod@4.6.7; 10 packages installed",
+    "runner": "2.338.2",
+    "os": "Ubuntu 24.04.5",
+    "image": "ubuntu-24.04",
+    "imageVersion": "20261101.360.1"
+  },
+  "sourceFiles": [
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "gitBlob": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+      "bytes": 106533
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "gitBlob": "34324f43a29b3ad9a6cba88602782e8a3ccf30f3",
+      "bytes": 4355
+    },
+    {
+      "path": "scripts/e2b/official-files.py",
+      "gitBlob": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "bytes": 21445
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "gitBlob": "ce4fbffa210c3e3670cc9c8fbe51c6c11da7a7f4",
+      "bytes": 54158
+    }
+  ],
+  "officialFilesGate": {
+    "command": "python3 scripts/e2b/official-files.test.py",
+    "actualTests": 34,
+    "pass": 34,
+    "fail": 0,
+    "error": 0,
+    "skip": 0,
+    "elapsedSeconds": 0.331,
+    "sourceTestGitBlob": "ce4fbffa210c3e3670cc9c8fbe51c6c11da7a7f4",
+    "evidence": "Actual command, 34 dot indicators, Ran 34 tests and OK in this job, normalized lines 431–439. Non-verbose output does not list each method; method inventory is separately bound to this exact source.",
+    "earlierLocalRedGreenReview": "6dda620df2a4b9643b1648284d5b61e6653a95fa",
+    "currentCiExecutionNotBorrowedFromLocalProof": true
+  },
+  "otherJobOutcomes": [
+    {
+      "id": 129323633100,
+      "name": "check",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129323634982,
+      "name": "validate",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129323635881,
+      "name": "await-web",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129323637717,
+      "name": "subscriptions",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129323638762,
+      "name": "cleanup",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129323641143,
+      "name": "publish",
+      "status": "completed",
+      "conclusion": "skipped"
+    }
+  ],
+  "cleanup": {
+    "observed": [
+      "Post job cleanup for setup-node and checkout",
+      "checkout authentication configuration cleanup commands",
+      "Cleaning up orphan processes"
+    ],
+    "scope": "GitHub test-runner teardown only; release cleanup is conditionally skipped for this PR.",
+    "providerResourcesDeletedByThisJob": null,
+    "productionPublication": false,
+    "subscriptionModelAcceptance": false
+  },
+  "warnings": [
+    "Fixed @opentelemetry/sdk-trace-base package deprecation warning",
+    "Four /etc/bash.bashrc PS1 unbound-variable diagnostics occurred inside the succeeding Node test command",
+    "punycode deprecation in post-job cleanup",
+    "Actions Node20 deprecation/forced Node24 warning"
+  ],
+  "privacy": {
+    "masking": "GitHub public decoded log; preserve original bytes",
+    "closedPatternScan": [
+      {
+        "category": "private_key",
+        "count": 0
+      },
+      {
+        "category": "github_token",
+        "count": 0
+      },
+      {
+        "category": "posthog_secret",
+        "count": 0
+      },
+      {
+        "category": "aws_access",
+        "count": 0
+      },
+      {
+        "category": "bearer_value",
+        "count": 0
+      },
+      {
+        "category": "signed_url",
+        "count": 0
+      }
+    ],
+    "exhaustiveAudit": false
+  },
+  "reviewerActions": {
+    "jobLogReads": 1,
+    "newTests": 0,
+    "newResources": 0,
+    "refUpdates": 0
+  },
+  "limitation": "This PR test proves the selected local assertions on the actual combined tree. It is not a production R7 build, official provider-control observation, subscription validation, runtime publication, or provider cleanup receipt."
+}

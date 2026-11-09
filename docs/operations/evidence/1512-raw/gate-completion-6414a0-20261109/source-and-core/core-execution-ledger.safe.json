@@ -1,0 +1,3051 @@
+{
+  "schemaVersion": 1,
+  "kind": "actual-core-selected-target-and-driver-execution-ledger",
+  "repository": "alexj11324/Mikka",
+  "runId": 42663994959,
+  "attempt": 1,
+  "jobId": 129324156636,
+  "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "actualCheckout": "576c903cd6ede14520a79111d2b71154968ad910",
+  "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "raw": {
+    "jobId": 129324156636,
+    "runId": 42663994959,
+    "bytes": 1019842,
+    "sha256": "4dbc96f75d5d473cfa2ecfee452e125c24ad350ad754c919117b0aeff515a66a",
+    "gitBlob": "5933d3f78c7c3516ee6511487d6b1c715d737acf",
+    "logReadsByThisAgent": 1
+  },
+  "selection": {
+    "bytes": 131272,
+    "sha256": "f0d49e1389576b70342d54df5cc8ef0e61b4ecb54e6ffbbd1474ecde03565073",
+    "gitBlob": "cbdb27fa0d5b429b94bd0da88160064ed7fd5f58",
+    "startNormalizedLine": 2671,
+    "endNormalizedLine": 5732
+  },
+  "targetSet": {
+    "expected": 57,
+    "observed": 57,
+    "uniqueObserved": 57,
+    "missing": [],
+    "unexpected": [],
+    "entries": [
+      {
+        "project": "ci-core-2",
+        "target": "ci-tasks:core-2",
+        "command": "pnpm test:factory-check-independence",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 518
+      },
+      {
+        "project": "ci-core-3",
+        "target": "ci-tasks:core-3",
+        "command": "pnpm test:factory-check-recovery",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 521
+      },
+      {
+        "project": "ci-core-4",
+        "target": "ci-tasks:core-4",
+        "command": "pnpm test:factory-routing",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 782
+      },
+      {
+        "project": "ci-core-5",
+        "target": "ci-tasks:core-5",
+        "command": "pnpm test:self-improvement-semantic-source",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 839
+      },
+      {
+        "project": "ci-core-6",
+        "target": "ci-tasks:core-6",
+        "command": "node --test scripts/ci-docs-only.test.mjs",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 914
+      },
+      {
+        "project": "ci-core-7",
+        "target": "ci-tasks:core-7",
+        "command": "pnpm test:ui-policy",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 952
+      },
+      {
+        "project": "ci-core-8",
+        "target": "ci-tasks:core-8",
+        "command": "pnpm test:idle-budget",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1513
+      },
+      {
+        "project": "ci-core-9",
+        "target": "ci-tasks:core-9",
+        "command": "pnpm test:motion",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1530
+      },
+      {
+        "project": "ci-core-10",
+        "target": "ci-tasks:core-10",
+        "command": "pnpm test:i18n",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1548
+      },
+      {
+        "project": "ci-core-11",
+        "target": "ci-tasks:core-11",
+        "command": "pnpm i18n:check",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1575
+      },
+      {
+        "project": "ci-core-12",
+        "target": "ci-tasks:core-12",
+        "command": "pnpm test:ssh-target",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1594
+      },
+      {
+        "project": "ci-core-13",
+        "target": "ci-tasks:core-13",
+        "command": "pnpm test:linear-sync",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1607
+      },
+      {
+        "project": "ci-core-14",
+        "target": "ci-tasks:core-14",
+        "command": "pnpm check:agent-definitions",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1627
+      },
+      {
+        "project": "ci-core-15",
+        "target": "ci-tasks:core-15",
+        "command": "pnpm test:release-security",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1676
+      },
+      {
+        "project": "ci-core-16",
+        "target": "ci-tasks:core-16",
+        "command": "pnpm test:mailbox-verification",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1829
+      },
+      {
+        "project": "ci-core-17",
+        "target": "ci-tasks:core-17",
+        "command": "pnpm test:factory-approval",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1897
+      },
+      {
+        "project": "ci-core-18",
+        "target": "ci-tasks:core-18",
+        "command": "pnpm test:personal-mailbox-core",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1924
+      },
+      {
+        "project": "ci-core-19",
+        "target": "ci-tasks:core-19",
+        "command": "pnpm test:factory-monitor",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 1968
+      },
+      {
+        "project": "ci-core-20",
+        "target": "ci-tasks:core-20",
+        "command": "pnpm test:execution-rules",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2004
+      },
+      {
+        "project": "ci-core-21",
+        "target": "ci-tasks:core-21",
+        "command": "pnpm test:abuse",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2389
+      },
+      {
+        "project": "ci-core-22",
+        "target": "ci-tasks:core-22",
+        "command": "pnpm test:self-hosting",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2503
+      },
+      {
+        "project": "ci-core-23",
+        "target": "ci-tasks:core-23",
+        "command": "pnpm test:self-hosted-byok",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2535
+      },
+      {
+        "project": "ci-core-24",
+        "target": "ci-tasks:core-24",
+        "command": "pnpm test:cloud-services",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2605
+      },
+      {
+        "project": "ci-core-25",
+        "target": "ci-tasks:core-25",
+        "command": "pnpm test:hosted-usage",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2615
+      },
+      {
+        "project": "ci-core-26",
+        "target": "ci-tasks:core-26",
+        "command": "pnpm test:model-admission",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2677
+      },
+      {
+        "project": "ci-core-27",
+        "target": "ci-tasks:core-27",
+        "command": "pnpm test:audit",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2720
+      },
+      {
+        "project": "ci-core-28",
+        "target": "ci-tasks:core-28",
+        "command": "pnpm test:agent-kit",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2788
+      },
+      {
+        "project": "ci-core-29",
+        "target": "ci-tasks:core-29",
+        "command": "pnpm test:agent-kit-compat",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2819
+      },
+      {
+        "project": "ci-core-30",
+        "target": "ci-tasks:core-30",
+        "command": "pnpm test:approved-writes",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 2881
+      },
+      {
+        "project": "ci-core-31",
+        "target": "ci-tasks:core-31",
+        "command": "pnpm test:coordinator-events",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 3466
+      },
+      {
+        "project": "ci-core-32",
+        "target": "ci-tasks:core-32",
+        "command": "pnpm test:schedules",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 3523
+      },
+      {
+        "project": "ci-core-33",
+        "target": "ci-tasks:core-33",
+        "command": "pnpm test:run-recovery",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 3760
+      },
+      {
+        "project": "ci-core-34",
+        "target": "ci-tasks:core-34",
+        "command": "pnpm test:mvp-fixtures",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 3795
+      },
+      {
+        "project": "ci-core-35",
+        "target": "ci-tasks:core-35",
+        "command": "pnpm test:credentials",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 4257
+      },
+      {
+        "project": "ci-core-36",
+        "target": "ci-tasks:core-36",
+        "command": "pnpm test:run-publication",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 4348
+      },
+      {
+        "project": "ci-core-37",
+        "target": "ci-tasks:core-37",
+        "command": "pnpm test:workflow-wakes",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 4607
+      },
+      {
+        "project": "ci-core-38",
+        "target": "ci-tasks:core-38",
+        "command": "pnpm --filter @mikka/protocol exec vitest run src/run.test.ts\npnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 4860
+      },
+      {
+        "project": "ci-core-39",
+        "target": "ci-tasks:core-39",
+        "command": "pnpm test:mobile-push",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 5019
+      },
+      {
+        "project": "ci-core-40",
+        "target": "ci-tasks:core-40",
+        "command": "pnpm test:mobile",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 5068
+      },
+      {
+        "project": "ci-core-41",
+        "target": "ci-tasks:core-41",
+        "command": "pnpm test:coordinator-native-relay",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 5525
+      },
+      {
+        "project": "ci-core-42",
+        "target": "ci-tasks:core-42",
+        "command": "pnpm test:coordinator-native-scope",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 5536
+      },
+      {
+        "project": "ci-core-43",
+        "target": "ci-tasks:core-43",
+        "command": "pnpm test:coordinator-issue-tools",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 5632
+      },
+      {
+        "project": "ci-core-44",
+        "target": "ci-tasks:core-44",
+        "command": "pnpm test:signup-turnstile",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 5737
+      },
+      {
+        "project": "ci-core-45",
+        "target": "ci-tasks:core-45",
+        "command": "pnpm test:cloud-limits",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 5793
+      },
+      {
+        "project": "ci-core-46",
+        "target": "ci-tasks:core-46",
+        "command": "pnpm test:analytics",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 6138
+      },
+      {
+        "project": "ci-core-47",
+        "target": "ci-tasks:core-47",
+        "command": "pnpm test:artifacts",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 6235
+      },
+      {
+        "project": "ci-core-48",
+        "target": "ci-tasks:core-48",
+        "command": "pnpm test:factory-config",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 6324
+      },
+      {
+        "project": "ci-core-49",
+        "target": "ci-tasks:core-49",
+        "command": "pnpm test:user-message-text",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 6355
+      },
+      {
+        "project": "ci-core-50",
+        "target": "ci-tasks:core-50",
+        "command": "pnpm test:run-info",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 6375
+      },
+      {
+        "project": "ci-core-51",
+        "target": "ci-tasks:core-51",
+        "command": "pnpm test:thread-changes",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 6414
+      },
+      {
+        "project": "ci-core-52",
+        "target": "ci-tasks:core-52",
+        "command": "pnpm check:agent-ui",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 6502
+      },
+      {
+        "project": "ci-core-53",
+        "target": "ci-tasks:core-53",
+        "command": "pnpm test:dev-local",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 6512
+      },
+      {
+        "project": "ci-core-54",
+        "target": "ci-tasks:core-54",
+        "command": "pnpm test:lib-units",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 6745
+      },
+      {
+        "project": "ci-core-55",
+        "target": "ci-tasks:core-55",
+        "command": "pnpm test:project-decisions",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 6758
+      },
+      {
+        "project": "ci-core-56",
+        "target": "ci-tasks:core-56",
+        "command": "pnpm test:unread",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 7015
+      },
+      {
+        "project": "ci-core-57",
+        "target": "ci-tasks:core-57",
+        "command": "pnpm test:issue-readonly-dom",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 7089
+      },
+      {
+        "project": "ci-core-triage",
+        "target": "ci-tasks:core-triage",
+        "command": "node --test scripts/ci/*.test.mjs",
+        "reason": "full validation",
+        "observedCommandHeaderLine": 7510
+      }
+    ],
+    "terminalSummaryLine": 7837,
+    "cache": {
+      "line": 7841,
+      "value": "Skipped (--skip-nx-cache)",
+      "commandOutputReused": false
+    }
+  },
+  "driver": {
+    "productSource": {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec",
+      "gitBlob": "104075571c73b97a985458f206dba310e4894490"
+    },
+    "testSource": {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+      "bytes": 94496,
+      "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775",
+      "gitBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f"
+    },
+    "target": "ci-tasks:core-53",
+    "packageScript": "test:dev-local",
+    "commandLine": 6515,
+    "inventory": {
+      "literalTopLevelCases": 64,
+      "registeredLoopCases": 10,
+      "total": 74,
+      "method": "64 source literal registrations plus two registrations over the five explicit profileGet404s reasons; compare exact names to this job's passing test lines"
+    },
+    "independentlyMatched": 74,
+    "missing": 0,
+    "duplicate": 0,
+    "failures": 0,
+    "skips": 0,
+    "firstResultLine": 6600,
+    "lastResultLine": 6673,
+    "cases": [
+      {
+        "name": "preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks",
+        "line": 6600,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "preflight excludes only a version-bound Factory task proven to belong to another workspace",
+        "line": 6601,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked",
+        "line": 6602,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks",
+        "line": 6603,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "preflight does not request scope details for already settled Factory tasks",
+        "line": 6604,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task",
+        "line": 6605,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "a default team switches only this login session to its verified personal workspace before reading Coordinator",
+        "line": 6606,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "workspace selection rejects ambiguous choices, teams and another account personal membership before switching",
+        "line": 6607,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session",
+        "line": 6608,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "unsafe configuration blocks before any model call and reports only closed failure codes",
+        "line": 6609,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence",
+        "line": 6610,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "successful terminal runs close only their own machines and retain task evidence",
+        "line": 6611,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "a missing machine requires a fresh owned run and an explicit null machine read",
+        "line": 6612,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "machine failures never turn a completed task green and do not prevent closing another owned machine",
+        "line": 6613,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "legacy Factory tasks still require review and verify before the normal deliverable acceptance",
+        "line": 6614,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "missing, failed or stale Factory checks never reach approval, including legacy verify",
+        "line": 6615,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "deliverable approval requires its receipt, never accepts a repository and never retries a lost response",
+        "line": 6616,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "uncertain mutation responses never resubmit and still reconcile own temporary settings",
+        "line": 6617,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "wrong provider/model and an extra native attempt stop the case without retrying",
+        "line": 6618,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "pure source and budget guards reject shared credentials, inherited model choices and retries",
+        "line": 6619,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "cleanup preserves a concurrent model edit and reports incomplete restoration",
+        "line": 6620,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "prepare is explicit, requires execution and restores only its acknowledged settings",
+        "line": 6621,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings",
+        "line": 6622,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "a blocked case does not prevent preparation and execution of another available model",
+        "line": 6623,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "preparation failures restore acknowledged writes but never guess after a lost response",
+        "line": 6624,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "restoration failures and concurrent edits remain visible without overwriting them",
+        "line": 6625,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan",
+        "line": 6626,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "browser submission requires one executed case and does not authenticate on invalid options",
+        "line": 6627,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "browser mode publishes readiness then observes the real-shaped UI click through push without an API submission",
+        "line": 6628,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "browser waiting times out or blocks changed UI text without sending or repeating a task",
+        "line": 6629,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports",
+        "line": 6630,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "implicit default preflight requires server absence evidence and never writes a preference",
+        "line": 6631,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "implicit default restores absence with the stored binding and revision, not the catalogue option",
+        "line": 6632,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "implicit default never overwrites a preference created after preflight",
+        "line": 6633,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "implicit default stops after a lost or incomplete first selection receipt without guessing ownership",
+        "line": 6634,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "implicit default preserves a same-value concurrent rewrite when the revision no longer matches",
+        "line": 6635,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "implicit default checks absence once after a lost restoration response and does not repeat deletion",
+        "line": 6636,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first",
+        "line": 6637,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "Factory authority refusals remain failures without retrying an implicit workspace",
+        "line": 6638,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere",
+        "line": 6639,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "malformed or foreign personal workspace selection stops before any Factory call",
+        "line": 6640,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "workspace A idle cannot hide workspace B activity in either scoped reader",
+        "line": 6641,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic",
+        "line": 6642,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings",
+        "line": 6643,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "a changed workspace inventory cannot turn an incomplete scan into an idle proof",
+        "line": 6644,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope",
+        "line": 6645,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "fresh authorization failures in another workspace and during restoration remain visible",
+        "line": 6646,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "the scan rejects a 30-day row expiry at or during the scan and never filters it away",
+        "line": 6647,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "one overall scan deadline and backwards time fail closed without extending the scan per workspace",
+        "line": 6648,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "a real request AbortSignal expires within the remaining scan deadline and closes the login session",
+        "line": 6649,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read",
+        "line": 6650,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile absence preflight accepts only the normal authorized missing-profile response",
+        "line": 6661,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry",
+        "line": 6662,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "recovery journal refuses each new setting write when its preceding checkpoint fails",
+        "line": 6663,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "recovery journal failure after a model acknowledgement still restores explicit and implicit selections",
+        "line": 6664,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "recovery journal failure after each preparation acknowledgement does not prevent restoration",
+        "line": 6665,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case",
+        "line": 6666,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "recovery journal retains only validated recovery metadata and isolates callback mutation",
+        "line": 6667,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing",
+        "line": 6668,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "a lost temporary selection response records intent without inventing a binding receipt",
+        "line": 6669,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "an unresolved profile restore retains only the exact acknowledged version and digest",
+        "line": 6670,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails",
+        "line": 6671,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "the existing safe artifact includes only the fixed recovery filename alongside the reports",
+        "line": 6672,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "recovery metadata preserves the actual shared API-key menu shape and restores its explicit choice",
+        "line": 6673,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile preflight refuses workspace admission denied instead of treating any 404 as absence",
+        "line": 6651,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile cleanup refuses workspace admission denied without falsely marking an existing profile archived",
+        "line": 6652,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile preflight refuses profile scope denied instead of treating any 404 as absence",
+        "line": 6653,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile cleanup refuses profile scope denied without falsely marking an existing profile archived",
+        "line": 6654,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile preflight refuses unknown error instead of treating any 404 as absence",
+        "line": 6655,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile cleanup refuses unknown error without falsely marking an existing profile archived",
+        "line": 6656,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile preflight refuses nested not-found code instead of treating any 404 as absence",
+        "line": 6657,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile cleanup refuses nested not-found code without falsely marking an existing profile archived",
+        "line": 6658,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile preflight refuses malformed JSON instead of treating any 404 as absence",
+        "line": 6659,
+        "outcome": "PASS",
+        "occurrences": 1
+      },
+      {
+        "name": "profile cleanup refuses malformed JSON without falsely marking an existing profile archived",
+        "line": 6660,
+        "outcome": "PASS",
+        "occurrences": 1
+      }
+    ],
+    "boundary": "The 74 names are individually observed in the combined test:dev-local command. Its 195-test and subsequent 9-test summaries belong to combined files, not a standalone driver 74-test summary."
+  },
+  "printedNodeSummaries": {
+    "blocks": 92,
+    "total": {
+      "tests": 4726,
+      "pass": 4726,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "parsing": "Preserve each summary's original normalized line. Parse only until that summary's duration_ms; never consume a later adjacent summary.",
+    "allArithmeticClosed": true,
+    "entries": [
+      {
+        "startLine": 773,
+        "endLine": 780,
+        "tests": 244,
+        "suites": 0,
+        "pass": 244,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 546.69305,
+        "positions": {
+          "tests": 773,
+          "suites": 774,
+          "pass": 775,
+          "fail": 776,
+          "cancelled": 777,
+          "skipped": 778,
+          "todo": 779,
+          "duration_ms": 780
+        },
+        "issues": []
+      },
+      {
+        "startLine": 830,
+        "endLine": 837,
+        "tests": 21,
+        "suites": 0,
+        "pass": 21,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2754.111097,
+        "positions": {
+          "tests": 830,
+          "suites": 831,
+          "pass": 832,
+          "fail": 833,
+          "cancelled": 834,
+          "skipped": 835,
+          "todo": 836,
+          "duration_ms": 837
+        },
+        "issues": []
+      },
+      {
+        "startLine": 860,
+        "endLine": 867,
+        "tests": 22,
+        "suites": 0,
+        "pass": 22,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2913.295648,
+        "positions": {
+          "tests": 860,
+          "suites": 861,
+          "pass": 862,
+          "fail": 863,
+          "cancelled": 864,
+          "skipped": 865,
+          "todo": 866,
+          "duration_ms": 867
+        },
+        "issues": []
+      },
+      {
+        "startLine": 905,
+        "endLine": 912,
+        "tests": 34,
+        "suites": 0,
+        "pass": 34,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 3342.734622,
+        "positions": {
+          "tests": 905,
+          "suites": 906,
+          "pass": 907,
+          "fail": 908,
+          "cancelled": 909,
+          "skipped": 910,
+          "todo": 911,
+          "duration_ms": 912
+        },
+        "issues": []
+      },
+      {
+        "startLine": 943,
+        "endLine": 950,
+        "tests": 13,
+        "suites": 0,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1341.056094,
+        "positions": {
+          "tests": 943,
+          "suites": 944,
+          "pass": 945,
+          "fail": 946,
+          "cancelled": 947,
+          "skipped": 948,
+          "todo": 949,
+          "duration_ms": 950
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1365,
+        "endLine": 1372,
+        "tests": 305,
+        "suites": 0,
+        "pass": 305,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 8068.613987,
+        "positions": {
+          "tests": 1365,
+          "suites": 1366,
+          "pass": 1367,
+          "fail": 1368,
+          "cancelled": 1369,
+          "skipped": 1370,
+          "todo": 1371,
+          "duration_ms": 1372
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1504,
+        "endLine": 1511,
+        "tests": 135,
+        "suites": 0,
+        "pass": 135,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 14600.099799,
+        "positions": {
+          "tests": 1504,
+          "suites": 1505,
+          "pass": 1506,
+          "fail": 1507,
+          "cancelled": 1508,
+          "skipped": 1509,
+          "todo": 1510,
+          "duration_ms": 1511
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1521,
+        "endLine": 1528,
+        "tests": 9,
+        "suites": 0,
+        "pass": 9,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 5340.526534,
+        "positions": {
+          "tests": 1521,
+          "suites": 1522,
+          "pass": 1523,
+          "fail": 1524,
+          "cancelled": 1525,
+          "skipped": 1526,
+          "todo": 1527,
+          "duration_ms": 1528
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1539,
+        "endLine": 1546,
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 275.320307,
+        "positions": {
+          "tests": 1539,
+          "suites": 1540,
+          "pass": 1541,
+          "fail": 1542,
+          "cancelled": 1543,
+          "skipped": 1544,
+          "todo": 1545,
+          "duration_ms": 1546
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1566,
+        "endLine": 1573,
+        "tests": 14,
+        "suites": 0,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 295.72827,
+        "positions": {
+          "tests": 1566,
+          "suites": 1567,
+          "pass": 1568,
+          "fail": 1569,
+          "cancelled": 1570,
+          "skipped": 1571,
+          "todo": 1572,
+          "duration_ms": 1573
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1598,
+        "endLine": 1605,
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 9182.693986,
+        "positions": {
+          "tests": 1598,
+          "suites": 1599,
+          "pass": 1600,
+          "fail": 1601,
+          "cancelled": 1602,
+          "skipped": 1603,
+          "todo": 1604,
+          "duration_ms": 1605
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1618,
+        "endLine": 1625,
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 192.036208,
+        "positions": {
+          "tests": 1618,
+          "suites": 1619,
+          "pass": 1620,
+          "fail": 1621,
+          "cancelled": 1622,
+          "skipped": 1623,
+          "todo": 1624,
+          "duration_ms": 1625
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1667,
+        "endLine": 1674,
+        "tests": 34,
+        "suites": 0,
+        "pass": 34,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1629.858659,
+        "positions": {
+          "tests": 1667,
+          "suites": 1668,
+          "pass": 1669,
+          "fail": 1670,
+          "cancelled": 1671,
+          "skipped": 1672,
+          "todo": 1673,
+          "duration_ms": 1674
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1820,
+        "endLine": 1827,
+        "tests": 7,
+        "suites": 0,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2309.898227,
+        "positions": {
+          "tests": 1820,
+          "suites": 1821,
+          "pass": 1822,
+          "fail": 1823,
+          "cancelled": 1824,
+          "skipped": 1825,
+          "todo": 1826,
+          "duration_ms": 1827
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1888,
+        "endLine": 1895,
+        "tests": 155,
+        "suites": 0,
+        "pass": 155,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2319.623861,
+        "positions": {
+          "tests": 1888,
+          "suites": 1889,
+          "pass": 1890,
+          "fail": 1891,
+          "cancelled": 1892,
+          "skipped": 1893,
+          "todo": 1894,
+          "duration_ms": 1895
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1915,
+        "endLine": 1922,
+        "tests": 14,
+        "suites": 0,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 382.610461,
+        "positions": {
+          "tests": 1915,
+          "suites": 1916,
+          "pass": 1917,
+          "fail": 1918,
+          "cancelled": 1919,
+          "skipped": 1920,
+          "todo": 1921,
+          "duration_ms": 1922
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1959,
+        "endLine": 1966,
+        "tests": 17,
+        "suites": 0,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1852.809674,
+        "positions": {
+          "tests": 1959,
+          "suites": 1960,
+          "pass": 1961,
+          "fail": 1962,
+          "cancelled": 1963,
+          "skipped": 1964,
+          "todo": 1965,
+          "duration_ms": 1966
+        },
+        "issues": []
+      },
+      {
+        "startLine": 1995,
+        "endLine": 2002,
+        "tests": 15,
+        "suites": 0,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 777.4283,
+        "positions": {
+          "tests": 1995,
+          "suites": 1996,
+          "pass": 1997,
+          "fail": 1998,
+          "cancelled": 1999,
+          "skipped": 2000,
+          "todo": 2001,
+          "duration_ms": 2002
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2269,
+        "endLine": 2276,
+        "tests": 101,
+        "suites": 0,
+        "pass": 101,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 11805.8709,
+        "positions": {
+          "tests": 2269,
+          "suites": 2270,
+          "pass": 2271,
+          "fail": 2272,
+          "cancelled": 2273,
+          "skipped": 2274,
+          "todo": 2275,
+          "duration_ms": 2276
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2371,
+        "endLine": 2378,
+        "tests": 191,
+        "suites": 0,
+        "pass": 191,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 9569.34035,
+        "positions": {
+          "tests": 2371,
+          "suites": 2372,
+          "pass": 2373,
+          "fail": 2374,
+          "cancelled": 2375,
+          "skipped": 2376,
+          "todo": 2377,
+          "duration_ms": 2378
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2380,
+        "endLine": 2387,
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1421.530431,
+        "positions": {
+          "tests": 2380,
+          "suites": 2381,
+          "pass": 2382,
+          "fail": 2383,
+          "cancelled": 2384,
+          "skipped": 2385,
+          "todo": 2386,
+          "duration_ms": 2387
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2494,
+        "endLine": 2501,
+        "tests": 53,
+        "suites": 0,
+        "pass": 53,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 4236.063724,
+        "positions": {
+          "tests": 2494,
+          "suites": 2495,
+          "pass": 2496,
+          "fail": 2497,
+          "cancelled": 2498,
+          "skipped": 2499,
+          "todo": 2500,
+          "duration_ms": 2501
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2515,
+        "endLine": 2522,
+        "tests": 8,
+        "suites": 0,
+        "pass": 8,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 801.827103,
+        "positions": {
+          "tests": 2515,
+          "suites": 2516,
+          "pass": 2517,
+          "fail": 2518,
+          "cancelled": 2519,
+          "skipped": 2520,
+          "todo": 2521,
+          "duration_ms": 2522
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2526,
+        "endLine": 2533,
+        "tests": 3,
+        "suites": 0,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 78.356087,
+        "positions": {
+          "tests": 2526,
+          "suites": 2527,
+          "pass": 2528,
+          "fail": 2529,
+          "cancelled": 2530,
+          "skipped": 2531,
+          "todo": 2532,
+          "duration_ms": 2533
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2595,
+        "endLine": 2602,
+        "tests": 31,
+        "suites": 0,
+        "pass": 31,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2382.214198,
+        "positions": {
+          "tests": 2595,
+          "suites": 2596,
+          "pass": 2597,
+          "fail": 2598,
+          "cancelled": 2599,
+          "skipped": 2600,
+          "todo": 2601,
+          "duration_ms": 2602
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2633,
+        "endLine": 2640,
+        "tests": 11,
+        "suites": 0,
+        "pass": 11,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 500.901686,
+        "positions": {
+          "tests": 2633,
+          "suites": 2634,
+          "pass": 2635,
+          "fail": 2636,
+          "cancelled": 2637,
+          "skipped": 2638,
+          "todo": 2639,
+          "duration_ms": 2640
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2668,
+        "endLine": 2675,
+        "tests": 3,
+        "suites": 0,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 943.853419,
+        "positions": {
+          "tests": 2668,
+          "suites": 2669,
+          "pass": 2670,
+          "fail": 2671,
+          "cancelled": 2672,
+          "skipped": 2673,
+          "todo": 2674,
+          "duration_ms": 2675
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2711,
+        "endLine": 2718,
+        "tests": 18,
+        "suites": 0,
+        "pass": 18,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2999.715583,
+        "positions": {
+          "tests": 2711,
+          "suites": 2712,
+          "pass": 2713,
+          "fail": 2714,
+          "cancelled": 2715,
+          "skipped": 2716,
+          "todo": 2717,
+          "duration_ms": 2718
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2738,
+        "endLine": 2745,
+        "tests": 14,
+        "suites": 0,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 482.280651,
+        "positions": {
+          "tests": 2738,
+          "suites": 2739,
+          "pass": 2740,
+          "fail": 2741,
+          "cancelled": 2742,
+          "skipped": 2743,
+          "todo": 2744,
+          "duration_ms": 2745
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2779,
+        "endLine": 2786,
+        "tests": 3,
+        "suites": 0,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 787.867089,
+        "positions": {
+          "tests": 2779,
+          "suites": 2780,
+          "pass": 2781,
+          "fail": 2782,
+          "cancelled": 2783,
+          "skipped": 2784,
+          "todo": 2785,
+          "duration_ms": 2786
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2810,
+        "endLine": 2817,
+        "tests": 13,
+        "suites": 0,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2712.878713,
+        "positions": {
+          "tests": 2810,
+          "suites": 2811,
+          "pass": 2812,
+          "fail": 2813,
+          "cancelled": 2814,
+          "skipped": 2815,
+          "todo": 2816,
+          "duration_ms": 2817
+        },
+        "issues": []
+      },
+      {
+        "startLine": 2872,
+        "endLine": 2879,
+        "tests": 46,
+        "suites": 0,
+        "pass": 46,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1517.192079,
+        "positions": {
+          "tests": 2872,
+          "suites": 2873,
+          "pass": 2874,
+          "fail": 2875,
+          "cancelled": 2876,
+          "skipped": 2877,
+          "todo": 2878,
+          "duration_ms": 2879
+        },
+        "issues": []
+      },
+      {
+        "startLine": 3087,
+        "endLine": 3094,
+        "tests": 56,
+        "suites": 0,
+        "pass": 56,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 7864.420396,
+        "positions": {
+          "tests": 3087,
+          "suites": 3088,
+          "pass": 3089,
+          "fail": 3090,
+          "cancelled": 3091,
+          "skipped": 3092,
+          "todo": 3093,
+          "duration_ms": 3094
+        },
+        "issues": []
+      },
+      {
+        "startLine": 3457,
+        "endLine": 3464,
+        "tests": 215,
+        "suites": 0,
+        "pass": 215,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 19738.454718,
+        "positions": {
+          "tests": 3457,
+          "suites": 3458,
+          "pass": 3459,
+          "fail": 3460,
+          "cancelled": 3461,
+          "skipped": 3462,
+          "todo": 3463,
+          "duration_ms": 3464
+        },
+        "issues": []
+      },
+      {
+        "startLine": 3481,
+        "endLine": 3488,
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 343.788669,
+        "positions": {
+          "tests": 3481,
+          "suites": 3482,
+          "pass": 3483,
+          "fail": 3484,
+          "cancelled": 3485,
+          "skipped": 3486,
+          "todo": 3487,
+          "duration_ms": 3488
+        },
+        "issues": []
+      },
+      {
+        "startLine": 3505,
+        "endLine": 3512,
+        "tests": 97,
+        "suites": 0,
+        "pass": 97,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 27382.346364,
+        "positions": {
+          "tests": 3505,
+          "suites": 3506,
+          "pass": 3507,
+          "fail": 3508,
+          "cancelled": 3509,
+          "skipped": 3510,
+          "todo": 3511,
+          "duration_ms": 3512
+        },
+        "issues": []
+      },
+      {
+        "startLine": 3697,
+        "endLine": 3704,
+        "tests": 143,
+        "suites": 0,
+        "pass": 143,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 4814.768989,
+        "positions": {
+          "tests": 3697,
+          "suites": 3698,
+          "pass": 3699,
+          "fail": 3700,
+          "cancelled": 3701,
+          "skipped": 3702,
+          "todo": 3703,
+          "duration_ms": 3704
+        },
+        "issues": []
+      },
+      {
+        "startLine": 3751,
+        "endLine": 3758,
+        "tests": 63,
+        "suites": 0,
+        "pass": 63,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 4048.74895,
+        "positions": {
+          "tests": 3751,
+          "suites": 3752,
+          "pass": 3753,
+          "fail": 3754,
+          "cancelled": 3755,
+          "skipped": 3756,
+          "todo": 3757,
+          "duration_ms": 3758
+        },
+        "issues": []
+      },
+      {
+        "startLine": 3786,
+        "endLine": 3793,
+        "tests": 13,
+        "suites": 0,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1402.177254,
+        "positions": {
+          "tests": 3786,
+          "suites": 3787,
+          "pass": 3788,
+          "fail": 3789,
+          "cancelled": 3790,
+          "skipped": 3791,
+          "todo": 3792,
+          "duration_ms": 3793
+        },
+        "issues": []
+      },
+      {
+        "startLine": 3931,
+        "endLine": 3938,
+        "tests": 50,
+        "suites": 0,
+        "pass": 50,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 5320.26378,
+        "positions": {
+          "tests": 3931,
+          "suites": 3932,
+          "pass": 3933,
+          "fail": 3934,
+          "cancelled": 3935,
+          "skipped": 3936,
+          "todo": 3937,
+          "duration_ms": 3938
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4248,
+        "endLine": 4255,
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 7614.535871,
+        "positions": {
+          "tests": 4248,
+          "suites": 4249,
+          "pass": 4250,
+          "fail": 4251,
+          "cancelled": 4252,
+          "skipped": 4253,
+          "todo": 4254,
+          "duration_ms": 4255
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4298,
+        "endLine": 4305,
+        "tests": 37,
+        "suites": 0,
+        "pass": 37,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1311.193656,
+        "positions": {
+          "tests": 4298,
+          "suites": 4299,
+          "pass": 4300,
+          "fail": 4301,
+          "cancelled": 4302,
+          "skipped": 4303,
+          "todo": 4304,
+          "duration_ms": 4305
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4336,
+        "endLine": 4343,
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1039.146544,
+        "positions": {
+          "tests": 4336,
+          "suites": 4337,
+          "pass": 4338,
+          "fail": 4339,
+          "cancelled": 4340,
+          "skipped": 4341,
+          "todo": 4342,
+          "duration_ms": 4343
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4464,
+        "endLine": 4471,
+        "tests": 214,
+        "suites": 0,
+        "pass": 214,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 18651.251826,
+        "positions": {
+          "tests": 4464,
+          "suites": 4465,
+          "pass": 4466,
+          "fail": 4467,
+          "cancelled": 4468,
+          "skipped": 4469,
+          "todo": 4470,
+          "duration_ms": 4471
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4509,
+        "endLine": 4516,
+        "tests": 33,
+        "suites": 0,
+        "pass": 33,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 932.990007,
+        "positions": {
+          "tests": 4509,
+          "suites": 4510,
+          "pass": 4511,
+          "fail": 4512,
+          "cancelled": 4513,
+          "skipped": 4514,
+          "todo": 4515,
+          "duration_ms": 4516
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4524,
+        "endLine": 4531,
+        "tests": 4,
+        "suites": 0,
+        "pass": 4,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 225.648839,
+        "positions": {
+          "tests": 4524,
+          "suites": 4525,
+          "pass": 4526,
+          "fail": 4527,
+          "cancelled": 4528,
+          "skipped": 4529,
+          "todo": 4530,
+          "duration_ms": 4531
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4555,
+        "endLine": 4562,
+        "tests": 23,
+        "suites": 0,
+        "pass": 23,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1031.601165,
+        "positions": {
+          "tests": 4555,
+          "suites": 4556,
+          "pass": 4557,
+          "fail": 4558,
+          "cancelled": 4559,
+          "skipped": 4560,
+          "todo": 4561,
+          "duration_ms": 4562
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4598,
+        "endLine": 4605,
+        "tests": 26,
+        "suites": 0,
+        "pass": 26,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2819.722545,
+        "positions": {
+          "tests": 4598,
+          "suites": 4599,
+          "pass": 4600,
+          "fail": 4601,
+          "cancelled": 4602,
+          "skipped": 4603,
+          "todo": 4604,
+          "duration_ms": 4605
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4772,
+        "endLine": 4779,
+        "tests": 11,
+        "suites": 0,
+        "pass": 11,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 6681.141357,
+        "positions": {
+          "tests": 4772,
+          "suites": 4773,
+          "pass": 4774,
+          "fail": 4775,
+          "cancelled": 4776,
+          "skipped": 4777,
+          "todo": 4778,
+          "duration_ms": 4779
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4783,
+        "endLine": 4790,
+        "tests": 3,
+        "suites": 0,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 384.153075,
+        "positions": {
+          "tests": 4783,
+          "suites": 4784,
+          "pass": 4785,
+          "fail": 4786,
+          "cancelled": 4787,
+          "skipped": 4788,
+          "todo": 4789,
+          "duration_ms": 4790
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4812,
+        "endLine": 4819,
+        "tests": 21,
+        "suites": 0,
+        "pass": 21,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 251.986719,
+        "positions": {
+          "tests": 4812,
+          "suites": 4813,
+          "pass": 4814,
+          "fail": 4815,
+          "cancelled": 4816,
+          "skipped": 4817,
+          "todo": 4818,
+          "duration_ms": 4819
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4851,
+        "endLine": 4858,
+        "tests": 148,
+        "suites": 0,
+        "pass": 148,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 4321.330857,
+        "positions": {
+          "tests": 4851,
+          "suites": 4852,
+          "pass": 4853,
+          "fail": 4854,
+          "cancelled": 4855,
+          "skipped": 4856,
+          "todo": 4857,
+          "duration_ms": 4858
+        },
+        "issues": []
+      },
+      {
+        "startLine": 4868,
+        "endLine": 4875,
+        "tests": 3,
+        "suites": 0,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 542.458302,
+        "positions": {
+          "tests": 4868,
+          "suites": 4869,
+          "pass": 4870,
+          "fail": 4871,
+          "cancelled": 4872,
+          "skipped": 4873,
+          "todo": 4874,
+          "duration_ms": 4875
+        },
+        "issues": []
+      },
+      {
+        "startLine": 5010,
+        "endLine": 5017,
+        "tests": 85,
+        "suites": 0,
+        "pass": 85,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 19112.312104,
+        "positions": {
+          "tests": 5010,
+          "suites": 5011,
+          "pass": 5012,
+          "fail": 5013,
+          "cancelled": 5014,
+          "skipped": 5015,
+          "todo": 5016,
+          "duration_ms": 5017
+        },
+        "issues": []
+      },
+      {
+        "startLine": 5059,
+        "endLine": 5066,
+        "tests": 11,
+        "suites": 0,
+        "pass": 11,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2648.911269,
+        "positions": {
+          "tests": 5059,
+          "suites": 5060,
+          "pass": 5061,
+          "fail": 5062,
+          "cancelled": 5063,
+          "skipped": 5064,
+          "todo": 5065,
+          "duration_ms": 5066
+        },
+        "issues": []
+      },
+      {
+        "startLine": 5108,
+        "endLine": 5115,
+        "tests": 34,
+        "suites": 0,
+        "pass": 34,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 814.158007,
+        "positions": {
+          "tests": 5108,
+          "suites": 5109,
+          "pass": 5110,
+          "fail": 5111,
+          "cancelled": 5112,
+          "skipped": 5113,
+          "todo": 5114,
+          "duration_ms": 5115
+        },
+        "issues": []
+      },
+      {
+        "startLine": 5203,
+        "endLine": 5210,
+        "tests": 20,
+        "suites": 0,
+        "pass": 20,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2349.497649,
+        "positions": {
+          "tests": 5203,
+          "suites": 5204,
+          "pass": 5205,
+          "fail": 5206,
+          "cancelled": 5207,
+          "skipped": 5208,
+          "todo": 5209,
+          "duration_ms": 5210
+        },
+        "issues": []
+      },
+      {
+        "startLine": 5516,
+        "endLine": 5523,
+        "tests": 259,
+        "suites": 0,
+        "pass": 259,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 9392.484113,
+        "positions": {
+          "tests": 5516,
+          "suites": 5517,
+          "pass": 5518,
+          "fail": 5519,
+          "cancelled": 5520,
+          "skipped": 5521,
+          "todo": 5522,
+          "duration_ms": 5523
+        },
+        "issues": []
+      },
+      {
+        "startLine": 5623,
+        "endLine": 5630,
+        "tests": 78,
+        "suites": 0,
+        "pass": 78,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 3050.687665,
+        "positions": {
+          "tests": 5623,
+          "suites": 5624,
+          "pass": 5625,
+          "fail": 5626,
+          "cancelled": 5627,
+          "skipped": 5628,
+          "todo": 5629,
+          "duration_ms": 5630
+        },
+        "issues": []
+      },
+      {
+        "startLine": 5660,
+        "endLine": 5667,
+        "tests": 18,
+        "suites": 0,
+        "pass": 18,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1164.143879,
+        "positions": {
+          "tests": 5660,
+          "suites": 5661,
+          "pass": 5662,
+          "fail": 5663,
+          "cancelled": 5664,
+          "skipped": 5665,
+          "todo": 5666,
+          "duration_ms": 5667
+        },
+        "issues": []
+      },
+      {
+        "startLine": 5745,
+        "endLine": 5752,
+        "tests": 4,
+        "suites": 0,
+        "pass": 4,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 260.071118,
+        "positions": {
+          "tests": 5745,
+          "suites": 5746,
+          "pass": 5747,
+          "fail": 5748,
+          "cancelled": 5749,
+          "skipped": 5750,
+          "todo": 5751,
+          "duration_ms": 5752
+        },
+        "issues": []
+      },
+      {
+        "startLine": 5770,
+        "endLine": 5777,
+        "tests": 22,
+        "suites": 0,
+        "pass": 22,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2095.704288,
+        "positions": {
+          "tests": 5770,
+          "suites": 5771,
+          "pass": 5772,
+          "fail": 5773,
+          "cancelled": 5774,
+          "skipped": 5775,
+          "todo": 5776,
+          "duration_ms": 5777
+        },
+        "issues": []
+      },
+      {
+        "startLine": 5784,
+        "endLine": 5791,
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 262.665238,
+        "positions": {
+          "tests": 5784,
+          "suites": 5785,
+          "pass": 5786,
+          "fail": 5787,
+          "cancelled": 5788,
+          "skipped": 5789,
+          "todo": 5790,
+          "duration_ms": 5791
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6083,
+        "endLine": 6090,
+        "tests": 107,
+        "suites": 0,
+        "pass": 107,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 10014.239242,
+        "positions": {
+          "tests": 6083,
+          "suites": 6084,
+          "pass": 6085,
+          "fail": 6086,
+          "cancelled": 6087,
+          "skipped": 6088,
+          "todo": 6089,
+          "duration_ms": 6090
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6129,
+        "endLine": 6136,
+        "tests": 11,
+        "suites": 0,
+        "pass": 11,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1131.424106,
+        "positions": {
+          "tests": 6129,
+          "suites": 6130,
+          "pass": 6131,
+          "fail": 6132,
+          "cancelled": 6133,
+          "skipped": 6134,
+          "todo": 6135,
+          "duration_ms": 6136
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6226,
+        "endLine": 6233,
+        "tests": 31,
+        "suites": 0,
+        "pass": 31,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 494.594544,
+        "positions": {
+          "tests": 6226,
+          "suites": 6227,
+          "pass": 6228,
+          "fail": 6229,
+          "cancelled": 6230,
+          "skipped": 6231,
+          "todo": 6232,
+          "duration_ms": 6233
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6256,
+        "endLine": 6263,
+        "tests": 17,
+        "suites": 0,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 809.736327,
+        "positions": {
+          "tests": 6256,
+          "suites": 6257,
+          "pass": 6258,
+          "fail": 6259,
+          "cancelled": 6260,
+          "skipped": 6261,
+          "todo": 6262,
+          "duration_ms": 6263
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6266,
+        "endLine": 6273,
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 350.625841,
+        "positions": {
+          "tests": 6266,
+          "suites": 6267,
+          "pass": 6268,
+          "fail": 6269,
+          "cancelled": 6270,
+          "skipped": 6271,
+          "todo": 6272,
+          "duration_ms": 6273
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6315,
+        "endLine": 6322,
+        "tests": 135,
+        "suites": 0,
+        "pass": 135,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 15038.554167,
+        "positions": {
+          "tests": 6315,
+          "suites": 6316,
+          "pass": 6317,
+          "fail": 6318,
+          "cancelled": 6319,
+          "skipped": 6320,
+          "todo": 6321,
+          "duration_ms": 6322
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6346,
+        "endLine": 6353,
+        "tests": 7,
+        "suites": 0,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 242.172534,
+        "positions": {
+          "tests": 6346,
+          "suites": 6347,
+          "pass": 6348,
+          "fail": 6349,
+          "cancelled": 6350,
+          "skipped": 6351,
+          "todo": 6352,
+          "duration_ms": 6353
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6366,
+        "endLine": 6373,
+        "tests": 4,
+        "suites": 0,
+        "pass": 4,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 659.177902,
+        "positions": {
+          "tests": 6366,
+          "suites": 6367,
+          "pass": 6368,
+          "fail": 6369,
+          "cancelled": 6370,
+          "skipped": 6371,
+          "todo": 6372,
+          "duration_ms": 6373
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6386,
+        "endLine": 6393,
+        "tests": 7,
+        "suites": 0,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 401.30677,
+        "positions": {
+          "tests": 6386,
+          "suites": 6387,
+          "pass": 6388,
+          "fail": 6389,
+          "cancelled": 6390,
+          "skipped": 6391,
+          "todo": 6392,
+          "duration_ms": 6393
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6405,
+        "endLine": 6412,
+        "tests": 8,
+        "suites": 0,
+        "pass": 8,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 856.923645,
+        "positions": {
+          "tests": 6405,
+          "suites": 6406,
+          "pass": 6407,
+          "fail": 6408,
+          "cancelled": 6409,
+          "skipped": 6410,
+          "todo": 6411,
+          "duration_ms": 6412
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6454,
+        "endLine": 6461,
+        "tests": 19,
+        "suites": 0,
+        "pass": 19,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 676.495495,
+        "positions": {
+          "tests": 6454,
+          "suites": 6455,
+          "pass": 6456,
+          "fail": 6457,
+          "cancelled": 6458,
+          "skipped": 6459,
+          "todo": 6460,
+          "duration_ms": 6461
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6493,
+        "endLine": 6500,
+        "tests": 6,
+        "suites": 0,
+        "pass": 6,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 962.580405,
+        "positions": {
+          "tests": 6493,
+          "suites": 6494,
+          "pass": 6495,
+          "fail": 6496,
+          "cancelled": 6497,
+          "skipped": 6498,
+          "todo": 6499,
+          "duration_ms": 6500
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6719,
+        "endLine": 6726,
+        "tests": 195,
+        "suites": 0,
+        "pass": 195,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2440.87172,
+        "positions": {
+          "tests": 6719,
+          "suites": 6720,
+          "pass": 6721,
+          "fail": 6722,
+          "cancelled": 6723,
+          "skipped": 6724,
+          "todo": 6725,
+          "duration_ms": 6726
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6736,
+        "endLine": 6743,
+        "tests": 9,
+        "suites": 0,
+        "pass": 9,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 308.808219,
+        "positions": {
+          "tests": 6736,
+          "suites": 6737,
+          "pass": 6738,
+          "fail": 6739,
+          "cancelled": 6740,
+          "skipped": 6741,
+          "todo": 6742,
+          "duration_ms": 6743
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6749,
+        "endLine": 6756,
+        "tests": 30,
+        "suites": 0,
+        "pass": 30,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 12569.446511,
+        "positions": {
+          "tests": 6749,
+          "suites": 6750,
+          "pass": 6751,
+          "fail": 6752,
+          "cancelled": 6753,
+          "skipped": 6754,
+          "todo": 6755,
+          "duration_ms": 6756
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6838,
+        "endLine": 6845,
+        "tests": 21,
+        "suites": 0,
+        "pass": 21,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 583.06417,
+        "positions": {
+          "tests": 6838,
+          "suites": 6839,
+          "pass": 6840,
+          "fail": 6841,
+          "cancelled": 6842,
+          "skipped": 6843,
+          "todo": 6844,
+          "duration_ms": 6845
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6914,
+        "endLine": 6921,
+        "tests": 90,
+        "suites": 0,
+        "pass": 90,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 3644.689219,
+        "positions": {
+          "tests": 6914,
+          "suites": 6915,
+          "pass": 6916,
+          "fail": 6917,
+          "cancelled": 6918,
+          "skipped": 6919,
+          "todo": 6920,
+          "duration_ms": 6921
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6923,
+        "endLine": 6930,
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 184.088069,
+        "positions": {
+          "tests": 6923,
+          "suites": 6924,
+          "pass": 6925,
+          "fail": 6926,
+          "cancelled": 6927,
+          "skipped": 6928,
+          "todo": 6929,
+          "duration_ms": 6930
+        },
+        "issues": []
+      },
+      {
+        "startLine": 6997,
+        "endLine": 7004,
+        "tests": 73,
+        "suites": 0,
+        "pass": 73,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 3576.661114,
+        "positions": {
+          "tests": 6997,
+          "suites": 6998,
+          "pass": 6999,
+          "fail": 7000,
+          "cancelled": 7001,
+          "skipped": 7002,
+          "todo": 7003,
+          "duration_ms": 7004
+        },
+        "issues": []
+      },
+      {
+        "startLine": 7080,
+        "endLine": 7087,
+        "tests": 11,
+        "suites": 0,
+        "pass": 11,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 602.061883,
+        "positions": {
+          "tests": 7080,
+          "suites": 7081,
+          "pass": 7082,
+          "fail": 7083,
+          "cancelled": 7084,
+          "skipped": 7085,
+          "todo": 7086,
+          "duration_ms": 7087
+        },
+        "issues": []
+      },
+      {
+        "startLine": 7222,
+        "endLine": 7229,
+        "tests": 186,
+        "suites": 4,
+        "pass": 186,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 6837.174941,
+        "positions": {
+          "tests": 7222,
+          "suites": 7223,
+          "pass": 7224,
+          "fail": 7225,
+          "cancelled": 7226,
+          "skipped": 7227,
+          "todo": 7228,
+          "duration_ms": 7229
+        },
+        "issues": []
+      },
+      {
+        "startLine": 7245,
+        "endLine": 7252,
+        "tests": 9,
+        "suites": 0,
+        "pass": 9,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 276.085575,
+        "positions": {
+          "tests": 7245,
+          "suites": 7246,
+          "pass": 7247,
+          "fail": 7248,
+          "cancelled": 7249,
+          "skipped": 7250,
+          "todo": 7251,
+          "duration_ms": 7252
+        },
+        "issues": []
+      },
+      {
+        "startLine": 7285,
+        "endLine": 7292,
+        "tests": 19,
+        "suites": 0,
+        "pass": 19,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1532.91454,
+        "positions": {
+          "tests": 7285,
+          "suites": 7286,
+          "pass": 7287,
+          "fail": 7288,
+          "cancelled": 7289,
+          "skipped": 7290,
+          "todo": 7291,
+          "duration_ms": 7292
+        },
+        "issues": []
+      },
+      {
+        "startLine": 7433,
+        "endLine": 7440,
+        "tests": 129,
+        "suites": 0,
+        "pass": 129,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1840.349156,
+        "positions": {
+          "tests": 7433,
+          "suites": 7434,
+          "pass": 7435,
+          "fail": 7436,
+          "cancelled": 7437,
+          "skipped": 7438,
+          "todo": 7439,
+          "duration_ms": 7440
+        },
+        "issues": []
+      },
+      {
+        "startLine": 7501,
+        "endLine": 7508,
+        "tests": 28,
+        "suites": 0,
+        "pass": 28,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 28244.623322,
+        "positions": {
+          "tests": 7501,
+          "suites": 7502,
+          "pass": 7503,
+          "fail": 7504,
+          "cancelled": 7505,
+          "skipped": 7506,
+          "todo": 7507,
+          "duration_ms": 7508
+        },
+        "issues": []
+      },
+      {
+        "startLine": 7546,
+        "endLine": 7553,
+        "tests": 34,
+        "suites": 0,
+        "pass": 34,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 6592.719278,
+        "positions": {
+          "tests": 7546,
+          "suites": 7547,
+          "pass": 7548,
+          "fail": 7549,
+          "cancelled": 7550,
+          "skipped": 7551,
+          "todo": 7552,
+          "duration_ms": 7553
+        },
+        "issues": []
+      },
+      {
+        "startLine": 7560,
+        "endLine": 7567,
+        "tests": 27,
+        "suites": 0,
+        "pass": 27,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 92290.329732,
+        "positions": {
+          "tests": 7560,
+          "suites": 7561,
+          "pass": 7562,
+          "fail": 7563,
+          "cancelled": 7564,
+          "skipped": 7565,
+          "todo": 7566,
+          "duration_ms": 7567
+        },
+        "issues": []
+      },
+      {
+        "startLine": 7650,
+        "endLine": 7657,
+        "tests": 64,
+        "suites": 0,
+        "pass": 64,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 4322.097324,
+        "positions": {
+          "tests": 7650,
+          "suites": 7651,
+          "pass": 7652,
+          "fail": 7653,
+          "cancelled": 7654,
+          "skipped": 7655,
+          "todo": 7656,
+          "duration_ms": 7657
+        },
+        "issues": []
+      },
+      {
+        "startLine": 7826,
+        "endLine": 7833,
+        "tests": 168,
+        "suites": 0,
+        "pass": 168,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2822.059161,
+        "positions": {
+          "tests": 7826,
+          "suites": 7827,
+          "pass": 7828,
+          "fail": 7829,
+          "cancelled": 7830,
+          "skipped": 7831,
+          "todo": 7832,
+          "duration_ms": 7833
+        },
+        "issues": []
+      }
+    ],
+    "boundary": "Arithmetic of actual printed Node test summaries across this job, not a count of assertion statements and not a substitute for individual driver name matching."
+  }
+}

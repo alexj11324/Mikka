@@ -1,0 +1,247 @@
+{
+  "schemaVersion": 1,
+  "kind": "source-job-terminal-review",
+  "repository": "alexj11324/Mikka",
+  "run": {
+    "id": 42663994959,
+    "attempt": 1,
+    "event": "pull_request"
+  },
+  "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "actualCheckout": "576c903cd6ede14520a79111d2b71154968ad910",
+  "actualTree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "actualSourceReceipt": {
+    "name": "actual-source-and-selection.safe.json",
+    "bytes": 2947,
+    "sha256": "98748c1f9164750363943ca18afe8d02b736d44888793a12f2b0988b7262ef45",
+    "gitBlob": "2b1563d80127a47bf83d6c5f9d7831b76a465e29"
+  },
+  "workflow": {
+    "path": ".github/workflows/ui-policy.yml",
+    "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+    "bytes": 22943,
+    "sha256": "7da895fd0678b08acb1667bfc92afe7228872e10631b8578aa1a6696316d025c",
+    "gitBlob": "e3938ad5c343fb14d60709e014cb3d9a3189b104"
+  },
+  "job": {
+    "id": 129324156926,
+    "name": "Source checks",
+    "status": "completed",
+    "conclusion": "success",
+    "startedAt": "2026-11-09T17:25:14Z",
+    "completedAt": "2026-11-09T17:28:08Z"
+  },
+  "raw": {
+    "name": "source.original.log",
+    "jobId": 129324156926,
+    "runId": 42663994959,
+    "bytes": 136710,
+    "sha256": "bd2d2f782a8391c86eed413a15a1ab33af19e45533e2201f3c0332e691d11dcd",
+    "gitBlob": "134d59aa23a53b7cd0b259a37902bb2fe9a4c37d",
+    "logReadsByThisAgent": 1
+  },
+  "checkoutEvidence": {
+    "gitLogCommandLine": 132,
+    "gitLogValueLine": 133,
+    "rawValue": "576c903cd6ede14520a79111d2b71154968ad910"
+  },
+  "versions": {
+    "node": "24.22.2",
+    "pnpm": "10.34.3",
+    "runner": "2.338.2",
+    "os": "Ubuntu 22.04.5",
+    "image": "ubuntu-22.04",
+    "imageVersion": "20261101.347.1"
+  },
+  "tests": [
+    {
+      "command": "pnpm check:cloud-boundary",
+      "commandLine": 590,
+      "summaryLine": 657,
+      "tests": 46,
+      "suites": 0,
+      "pass": 46,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 4337.910636
+    },
+    {
+      "command": "node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs",
+      "commandLine": 665,
+      "summaryLine": 688,
+      "tests": 7,
+      "suites": 0,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 62.392876
+    },
+    {
+      "command": "node --test scripts/acceptance/auth-audit-production.test.mjs scripts/acceptance/cloud-lease-audit.test.mjs scripts/acceptance/cloud-lease-recovery.test.mjs scripts/acceptance/shared-account-queue.test.mjs scripts/ops/production-smoke.test.mjs",
+      "commandLine": 696,
+      "summaryLine": 741,
+      "tests": 29,
+      "suites": 0,
+      "pass": 29,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 407.569228
+    },
+    {
+      "command": "pnpm lint:code",
+      "commandLine": 749,
+      "summaryLine": 847,
+      "tests": 63,
+      "suites": 0,
+      "pass": 63,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 430.211456
+    },
+    {
+      "command": "pnpm test:api",
+      "commandLine": 899,
+      "summaryLine": 1023,
+      "tests": 102,
+      "suites": 0,
+      "pass": 102,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 5221.769202
+    },
+    {
+      "command": "pnpm test:api",
+      "commandLine": 899,
+      "summaryLine": 1497,
+      "tests": 69,
+      "suites": 0,
+      "pass": 69,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 13699.119336
+    },
+    {
+      "command": "pnpm --filter @mikka/frontend test",
+      "commandLine": 1505,
+      "summaryLine": 1584,
+      "tests": 45,
+      "suites": 0,
+      "pass": 45,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 25873.638484
+    }
+  ],
+  "totals": {
+    "tests": 361,
+    "pass": 361,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "attribution": "The 63-test block in pnpm lint:code is test:migrations. It is not the 74-case observability driver; the driver is independently checked in Core.",
+  "checks": {
+    "lintCode": {
+      "result": "pass",
+      "warnings": 0,
+      "errors": 0
+    },
+    "migrationsAndFactoryPolicy": "executed successfully within lint:code",
+    "canonicalRouteGenerator": {
+      "command": "node apps/api/scripts/generate-routes.mjs --check",
+      "result": "pass"
+    },
+    "runtimeLint": {
+      "result": "pass",
+      "warnings": 0,
+      "errors": 0
+    },
+    "typecheckCommands": [
+      "tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck",
+      "pnpm --filter @mikka/protocol typecheck",
+      "pnpm --filter @mikka/mobile typecheck"
+    ],
+    "typecheck": "pass",
+    "strictUi": {
+      "styleFiles": 3225,
+      "interactionFiles": 532,
+      "componentLibraryFilesExcludedFromStyleOnly": 287,
+      "errors": 0,
+      "upstreamSourceVerification": false
+    },
+    "auditArtifact": {
+      "id": 13695688738,
+      "loggedUploadBytes": 231,
+      "contentDownloaded": false
+    }
+  },
+  "expectedExecutionSkips": [
+    "Save the pnpm store (main only) skipped for this PR"
+  ],
+  "warningsPreserved": [
+    "pnpm failed to create the workspace daemon bin because dist/mikka.js was absent during install",
+    "pnpm ignored the configured dependency build scripts",
+    "Vite emitted chunk-size warnings in the successful frontend build test",
+    "url.parse/punycode deprecations and forced Node24 action warning"
+  ],
+  "cleanup": {
+    "observed": "GitHub post-job checkout/setup/cache cleanup and orphan-process cleanup",
+    "externalResourceDeletionProved": false
+  },
+  "privacy": {
+    "masking": "GitHub public decoded log; exact UTF8 bytes retained",
+    "closedPatternScan": [
+      {
+        "category": "private_key",
+        "count": 0
+      },
+      {
+        "category": "github_token",
+        "count": 0
+      },
+      {
+        "category": "posthog_secret",
+        "count": 0
+      },
+      {
+        "category": "aws_access",
+        "count": 0
+      },
+      {
+        "category": "bearer_value",
+        "count": 0
+      },
+      {
+        "category": "signed_url",
+        "count": 0
+      }
+    ],
+    "exhaustiveAudit": false
+  },
+  "limitations": [
+    "Only this actual Source job is reviewed here.",
+    "No PG, Integration or Native log is read or claimed.",
+    "No inherited 6cc counts; all seven summaries are parsed from this current source log."
+  ],
+  "reviewerActions": {
+    "jobLogReads": 1,
+    "newTests": 0,
+    "newResources": 0,
+    "refChanges": 0
+  }
+}

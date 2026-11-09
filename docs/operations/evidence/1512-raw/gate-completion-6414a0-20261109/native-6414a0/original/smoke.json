@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "revision": "576c903cd6ede14520a79111d2b71154968ad910",
+  "environmentId": "local-272a2801-1e66-4e89-99a0-811714af76f9",
+  "origin": "http://localhost:3000",
+  "database": "mikka_e2e",
+  "startedAt": "2026-11-09T17:41:43.353Z",
+  "checks": [
+    {
+      "name": "packaged local origin and isolated renderer",
+      "result": "passed"
+    },
+    {
+      "name": "local document CSP blocks external renderer fetches",
+      "result": "passed"
+    },
+    {
+      "name": "server choice: probe states, probed-only selection, the page follows the chosen server and returns",
+      "result": "passed"
+    },
+    {
+      "name": "system browser shows the signed-in account, then loopback and single-use PKCE session handoff",
+      "result": "passed"
+    },
+    {
+      "name": "the callback page opens the Dev build's own app link",
+      "result": "passed"
+    },
+    {
+      "name": "opening the app link brings the packaged app to the front",
+      "result": "passed"
+    },
+    {
+      "name": "no browser session credential in renderer-accessible state",
+      "result": "passed"
+    },
+    {
+      "name": "native badge, payload validation, device and quota bridge",
+      "result": "passed"
+    },
+    {
+      "name": "settings deep link and shared devices page",
+      "result": "passed"
+    },
+    {
+      "name": "sign-out clears the main-owned session",
+      "result": "passed"
+    }
+  ],
+  "builtInDiscovery": "ok",
+  "cleanupStages": [
+    {
+      "stage": "browser-close",
+      "result": "passed"
+    },
+    {
+      "stage": "electron-close",
+      "result": "passed"
+    },
+    {
+      "stage": "daemon-drain",
+      "result": "passed"
+    },
+    {
+      "stage": "native-resources",
+      "result": "passed"
+    },
+    {
+      "stage": "workspace-generated-name",
+      "result": "passed"
+    },
+    {
+      "stage": "lease-release",
+      "result": "passed"
+    }
+  ],
+  "nativeCleanup": {
+    "cleaned": true,
+    "counts": {
+      "desktop_auth_requests": 1,
+      "device_token_devices": 0,
+      "device_management_commands": 0,
+      "device_repos": 0,
+      "agents": 0,
+      "device_tokens": 0,
+      "device_enrollments": 0,
+      "devices": 0
+    }
+  },
+  "workspaceNameCleanup": {
+    "captured": true,
+    "phase": "restored",
+    "restored": true,
+    "initialName": {
+      "en": false,
+      "zhCN": true
+    },
+    "initialOwnerMatchesSealedBaseline": true,
+    "beforeName": {
+      "en": true,
+      "zhCN": false
+    },
+    "peerMatchesSealedBaseline": true,
+    "onlyGeneratedNameDifference": true,
+    "afterName": {
+      "en": false,
+      "zhCN": true
+    },
+    "ownerMatchesSealedBaseline": true
+  },
+  "accountObservation": {
+    "observed": true,
+    "state": "released",
+    "blockedReason": null,
+    "owner": {
+      "matchesSealedBaselineBefore": true,
+      "matchesSealedBaselineAfter": true,
+      "changedTableCount": 0,
+      "changes": []
+    },
+    "peer": {
+      "matchesSealedBaselineBefore": true,
+      "matchesSealedBaselineAfter": true,
+      "changedTableCount": 0,
+      "changes": []
+    }
+  },
+  "finishedAt": "2026-11-09T17:42:14.276Z",
+  "result": "passed"
+}

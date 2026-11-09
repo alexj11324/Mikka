@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "runId": 42663994959,
+  "attempt": 1,
+  "jobId": 129327506300,
+  "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "checkout": "576c903cd6ede14520a79111d2b71154968ad910",
+  "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "lifecycleOriginal": {
+    "path": "native-6414a0/original/lifecycle.json",
+    "kind": "exact-original-JSON",
+    "mode": "100644",
+    "bytes": 686827,
+    "sha256": "756aa75ae6b482b1e1a7ab1006c8451ac0650af09391ffa480d937efc8b4b06f",
+    "gitBlob": "633c0569408df7076b91df290bd9b4456d7992ef",
+    "remoteConfirmed": true
+  },
+  "issue1512SqlBudgetStatus": "FAILED",
+  "execution": "pure V8, no new test/CI/model/native execution",
+  "originalHashVerification": "Python raw bytes SHA256/Git blob ID, then independently reassembled V8 original bytes SHA256/Git blob ID",
+  "utilitySource": {
+    "bytes": 13782,
+    "sha256": "d2e81a0ff31f9c8c19c4efe0e0d0fb16ef0196124fe8eb2221994f64690b35ae",
+    "blob": "5cc66fff9c158dcdd23c5dacf4e84f0ef6f89128"
+  },
+  "verifierFunction": "utility:verifyNativeOriginals",
+  "result": {
+    "records": 24,
+    "checkpoints": 12,
+    "segments": 8,
+    "bucketCells": 2280,
+    "ordinalRows": 1220,
+    "errors": [
+      {
+        "label": "native full-window exceeds web"
+      },
+      {
+        "label": "native first startup exceeds hosted"
+      }
+    ]
+  },
+  "classification": {
+    "budgetFailures": [
+      {
+        "label": "native full-window exceeds web"
+      },
+      {
+        "label": "native first startup exceeds hosted"
+      }
+    ],
+    "conservationOrOtherErrors": []
+  },
+  "firstPairRule": {
+    "samples": "first pair only from the unchanged five-pair lifecycle sequence",
+    "clients": "bundled Electron and the preserved hosted Web renderer in the same compiled Electron shell",
+    "sessionCache": "same retained authenticated app profile/workspace; normal profile and OS caches, no purge",
+    "backend": "same primary API and fixed source; server is already warm",
+    "performanceThreshold": "none"
+  },
+  "diagnosticUnknownsPreserved": true,
+  "parentIndependentRecalculation": "Separate parent and ledger/source analysts receive the same immutable lifecycle; their conclusions are not claimed as this reader's execution"
+}
