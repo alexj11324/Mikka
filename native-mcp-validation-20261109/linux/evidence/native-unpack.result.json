@@ -1,0 +1,16 @@
+{
+  "name": "native-unpack",
+  "command": "tar",
+  "args": [
+    "-xzf",
+    "/vercel/sandbox/issue1505/assets/codex-x86_64-unknown-linux-musl.tar.gz",
+    "-C",
+    "/vercel/sandbox/issue1505/assets",
+    "codex-x86_64-unknown-linux-musl"
+  ],
+  "cwd": "/vercel/sandbox/issue1505",
+  "start": "2026-11-09T14:28:15.921Z",
+  "end": "2026-11-09T14:28:18.623Z",
+  "code": 0,
+  "signal": null
+}

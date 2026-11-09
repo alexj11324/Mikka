@@ -1,0 +1,13 @@
+{
+  "name": "fixture-syntax",
+  "command": "node",
+  "args": [
+    "--check",
+    "/vercel/sandbox/issue1505/fixture/fixture.mjs"
+  ],
+  "cwd": "/vercel/sandbox/issue1505/fixture",
+  "start": "2026-11-09T14:32:30.314Z",
+  "end": "2026-11-09T14:32:30.359Z",
+  "code": 0,
+  "signal": null
+}

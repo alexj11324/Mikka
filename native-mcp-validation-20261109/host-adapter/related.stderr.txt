@@ -1,0 +1,671 @@
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 37 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/adapters.test.ts > advertises the run gate without any sandbox (decision 2026-11-01-2335), for any Codex version
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-qgdzDA/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-qgdzDA/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/37]⎯
+
+ FAIL  test/adapters.test.ts > claude_code adapter > hands in through the MCP tool, then the daemon verifies, commits and pushes
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-HDbctv/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+ ❯ setup test/adapters.test.ts:76:51
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-HDbctv/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/37]⎯
+
+ FAIL  test/adapters.test.ts > claude_code adapter > ends as turn_ended, with nothing committed, when the agent never hands in
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-MaU9br/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-MaU9br/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/37]⎯
+
+ FAIL  test/adapters.test.ts > claude_code adapter > starts the CLI with the model the assignment named, and with none when it named none
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-B1dpFo/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-B1dpFo/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/37]⎯
+
+ FAIL  test/adapters.test.ts > codex adapter > hands in through the MCP tool, then the daemon verifies, commits and pushes
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-yqCvqL/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-yqCvqL/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/37]⎯
+
+ FAIL  test/adapters.test.ts > codex adapter > ends as turn_ended, with nothing committed, when the agent never hands in
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-iIY61T/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-iIY61T/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/37]⎯
+
+ FAIL  test/adapters.test.ts > codex adapter > starts the CLI with the model the assignment named, and with none when it named none
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-vFN0C6/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-vFN0C6/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/37]⎯
+
+ FAIL  test/adapters.test.ts > cursor adapter > hands in through the MCP tool, then the daemon verifies, commits and pushes
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-dh00Ga/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-dh00Ga/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/37]⎯
+
+ FAIL  test/adapters.test.ts > cursor adapter > ends as turn_ended, with nothing committed, when the agent never hands in
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-8U5AMj/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-8U5AMj/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/37]⎯
+
+ FAIL  test/adapters.test.ts > cursor adapter > starts the CLI with the model the assignment named, and with none when it named none
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-nU7bY8/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-nU7bY8/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/37]⎯
+
+ FAIL  test/adapters.test.ts > the issue branch > hands in unverified changes for a draft PR without inventing a verify pass
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-dfYoKe/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-dfYoKe/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/37]⎯
+
+ FAIL  test/adapters.test.ts > the issue branch > builds on the remote branch, keeping a person's commit, and pushes there
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-CeYzW8/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-CeYzW8/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/37]⎯
+
+ FAIL  test/adapters.test.ts > the issue branch > starts from the base branch when the issue branch cannot be fetched
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-wzThKU/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-wzThKU/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/37]⎯
+
+ FAIL  test/adapters.test.ts > the issue branch > continues an existing issue branch when push approval comes only from claim policy
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-jI0a0U/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-jI0a0U/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/37]⎯
+
+ FAIL  test/adapters.test.ts > workspace agent policy (ADR 0028) > keeps a verified run local when the workspace turned pushes off
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-ID7jWv/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-ID7jWv/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/37]⎯
+
+ FAIL  test/adapters.test.ts > workspace agent policy (ADR 0028) > commits and pushes nothing for a read-only check (ADR 0046)
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-W8lfz4/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-W8lfz4/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/37]⎯
+
+ FAIL  test/adapters.test.ts > verify > fails a hand-in, and commits nothing, when verify changes the worktree
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-G2IOCx/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-G2IOCx/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/37]⎯
+
+ FAIL  test/adapters.test.ts > interjections and cancel > claude: a message during the turn reaches the CLI and can lead to a hand-in
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-xRQfP4/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-xRQfP4/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/37]⎯
+
+ FAIL  test/adapters.test.ts > interjections and cancel > claude: a hand-in read before the last turn ends keeps that turn's last words
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-EKDizt/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-EKDizt/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/37]⎯
+
+ FAIL  test/adapters.test.ts > interjections and cancel > codex: a message during the turn is a turn/steer
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-AddMwe/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-AddMwe/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/37]⎯
+
+ FAIL  test/adapters.test.ts > interjections and cancel > claude_code: cancel stops the CLI and ends the run as cancelled
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-PVmUPV/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-PVmUPV/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/37]⎯
+
+ FAIL  test/adapters.test.ts > interjections and cancel > cursor: cancel stops the CLI and ends the run as cancelled
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-CqYa94/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-CqYa94/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/37]⎯
+
+ FAIL  test/adapters.test.ts > claude_code follow-up run > continues the earlier session with only the follow-up
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-NlPdLL/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-NlPdLL/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/37]⎯
+
+ FAIL  test/adapters.test.ts > claude_code follow-up run > starts a new session with the brief when the earlier one is gone
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-M91xlC/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-M91xlC/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/37]⎯
+
+ FAIL  test/adapters.test.ts > claude_code follow-up run > question continuation refuses a missing original session without a fresh prompt
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-ypIiqr/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-ypIiqr/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/37]⎯
+
+ FAIL  test/adapters.test.ts > claude_code follow-up run > question continuation resumes the exact original session
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-GkCADJ/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-GkCADJ/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/37]⎯
+
+ FAIL  test/adapters.test.ts > codex follow-up run > continues the earlier session with only the follow-up
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-SGkAqR/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-SGkAqR/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/37]⎯
+
+ FAIL  test/adapters.test.ts > codex follow-up run > starts a new session with the brief when the earlier one is gone
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-3sUNB7/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-3sUNB7/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/37]⎯
+
+ FAIL  test/adapters.test.ts > codex follow-up run > question continuation refuses a missing original session without a fresh prompt
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-gQqWJk/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-gQqWJk/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/37]⎯
+
+ FAIL  test/adapters.test.ts > codex follow-up run > question continuation resumes the exact original session
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-uS6xkU/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+ ❯ setup test/adapters.test.ts:76:51
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-uS6xkU/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/37]⎯
+
+ FAIL  test/adapters.test.ts > cursor follow-up run > continues the earlier session with only the follow-up
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-EvqVDM/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-EvqVDM/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/37]⎯
+
+ FAIL  test/adapters.test.ts > cursor follow-up run > starts a new session with the brief when the earlier one is gone
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-jR9xBr/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-jR9xBr/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/37]⎯
+
+ FAIL  test/adapters.test.ts > resume after a daemon restart > claude_code: uncertain question delivery fails closed without another CLI turn
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-aBGRc5/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-aBGRc5/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/37]⎯
+
+ FAIL  test/adapters.test.ts > resume after a daemon restart > codex: uncertain question delivery fails closed without another CLI turn
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-E80wqD/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-E80wqD/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/37]⎯
+
+ FAIL  test/adapters.test.ts > resume after a daemon restart > claude_code: the next daemon reopens the same session
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-rxTNaJ/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-rxTNaJ/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/37]⎯
+
+ FAIL  test/adapters.test.ts > resume after a daemon restart > cursor: the next daemon reopens the same session
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-BPCGYT/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-BPCGYT/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/37]⎯
+
+ FAIL  test/adapters.test.ts > resume after a daemon restart > ends at once, without the CLI, when the agent handed in before the restart
+Error: listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-q2RwzQ/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ boot test/adapters.test.ts:40:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '/workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-q2RwzQ/daemon.sock', port: -1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/37]⎯
+

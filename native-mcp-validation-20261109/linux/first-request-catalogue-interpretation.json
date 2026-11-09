@@ -1,0 +1,52 @@
+[
+  {
+    "mode": "cold",
+    "firstActualRequestNumber": 2,
+    "transport": "websocket",
+    "actualMarkerPresent": true,
+    "nativeMethods": {
+      "initialize": 1,
+      "response": 3,
+      "configWarning": 1,
+      "thread/start": 1,
+      "remoteControl/status/changed": 1,
+      "thread/started": 1,
+      "mcpServer/startupStatus/updated": 2,
+      "turn/start": 1,
+      "warning": 1,
+      "thread/status/changed": 2,
+      "turn/started": 1,
+      "item/started": 2,
+      "item/completed": 2,
+      "thread/tokenUsage/updated": 1,
+      "thread/readState/changed": 1,
+      "turn/completed": 1
+    },
+    "namedCapabilityMentions": []
+  },
+  {
+    "mode": "adopted",
+    "firstActualRequestNumber": 2,
+    "transport": "websocket",
+    "actualMarkerPresent": true,
+    "nativeMethods": {
+      "initialize": 1,
+      "response": 3,
+      "thread/start": 1,
+      "configWarning": 1,
+      "remoteControl/status/changed": 1,
+      "thread/started": 1,
+      "mcpServer/startupStatus/updated": 2,
+      "turn/start": 1,
+      "warning": 1,
+      "thread/status/changed": 2,
+      "turn/started": 1,
+      "item/started": 2,
+      "item/completed": 2,
+      "thread/tokenUsage/updated": 1,
+      "thread/readState/changed": 1,
+      "turn/completed": 1
+    },
+    "namedCapabilityMentions": []
+  }
+]

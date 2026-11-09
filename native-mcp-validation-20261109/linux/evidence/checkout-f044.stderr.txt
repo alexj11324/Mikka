@@ -1,0 +1,1 @@
+HEAD is now at f044f22d fix: preserve failed Codex MCP tool outcomes

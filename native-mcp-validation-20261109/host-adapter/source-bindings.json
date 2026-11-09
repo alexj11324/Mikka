@@ -1,0 +1,104 @@
+{
+  "sourceCommit": "f044f22d31f8fc2becdce02708ca0b4c033bcc93",
+  "sourceTree": "2800ee9a2df3afd78918899103cb98a4a68ba9c1",
+  "parent": "a7092db9a0328c6eeb467101c01f4836be0d1809",
+  "files": [
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "bytes": 51844,
+      "sha256": "81a9cd38c8a82440e1dc4afe64cffe2d20078a91a3a4c6004b7718943c35bf00",
+      "gitBlob": "e85815a955eaff56d7ac389c9d9722c64607345d"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex-protocol.ts",
+      "bytes": 3995,
+      "sha256": "eb6e8aabbcc5b24fc89f965ce49d35b672636e7b60174014233814b0e576e847",
+      "gitBlob": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407"
+    },
+    {
+      "path": "packages/daemon/test/codex-item-chunks.test.ts",
+      "bytes": 2834,
+      "sha256": "5e4013d06493b4212763bdbb022163f50574115d3ad851458611fcf54c1cc535",
+      "gitBlob": "7a72cbdf6ae495a62ec2b9684ce9889f69635893"
+    }
+  ],
+  "verification": {
+    "focusedRed": {
+      "tests": 6,
+      "passed": 4,
+      "failed": 2,
+      "exitCode": 1
+    },
+    "focusedGreen": {
+      "tests": 6,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "relatedHostAttempt": {
+      "tests": 62,
+      "passed": 23,
+      "failed": 37,
+      "skipped": 2,
+      "exitCode": 1,
+      "passedFiles": [
+        "codex-item-chunks.test.ts (6)",
+        "mikka-mcp-backend.test.ts (17)"
+      ],
+      "blockedFile": "adapters.test.ts (37 AF_UNIX EPERM failures; 2 existing Cursor question-continuation skips)"
+    },
+    "daemonTypecheck": {
+      "exitCode": 0,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "firstLaunch": "Wrong .js path; MODULE_NOT_FOUND; raw first-launch records retained"
+    }
+  },
+  "environment": {
+    "nodeVersion": "v24.22.1",
+    "nodeExecutableSha256": "61ab14cd750fc24d5db53490ec5fc40f756e4b6e136b78cf7004265471d9bd1d",
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.39",
+    "localTimezoneNames": [
+      "EST",
+      "EDT"
+    ],
+    "environmentNames": [
+      "CI",
+      "HOME",
+      "NO_COLOR",
+      "PATH",
+      "TMPDIR"
+    ],
+    "productionCredentialsPassed": false,
+    "freshInstallPerformed": false,
+    "dependencySource": "Symlinks to root frozen 869 installation; no manifest/lockfile change"
+  },
+  "scope": {
+    "productionModelCalls": false,
+    "productionDatabaseCalls": false,
+    "newVmCreated": false,
+    "remoteRefsMoved": false,
+    "historicalFailureRootCauseEstablished": false
+  },
+  "riskTriage": {
+    "occurrence": 6,
+    "impact": 6,
+    "product": 36,
+    "reason": "Real Mikka artifact/repository inspections return MCP isError on refusal; official Codex maps that to failed/result/error-null, which the old adapter incorrectly emits as available and the acceptance gate can count as successful execution. Scores are judgment, not measured incident frequency."
+  },
+  "officialSources": [
+    {
+      "url": "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/core/src/mcp_tool_call.rs",
+      "lines": "1060-1103"
+    },
+    {
+      "url": "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/app-server-protocol/src/protocol/v2/item.rs",
+      "lines": "1101-1124"
+    },
+    {
+      "url": "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/app-server-protocol/src/protocol/v2/mcp.rs",
+      "lines": "234-244,265-271"
+    }
+  ]
+}

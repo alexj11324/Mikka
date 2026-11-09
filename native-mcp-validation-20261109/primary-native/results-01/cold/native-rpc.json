@@ -1,0 +1,21 @@
+[
+  {
+    "atMs": 16.228,
+    "direction": "send",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "initialize",
+      "params": {
+        "clientInfo": {
+          "name": "mikka-native-fixture",
+          "title": "Synthetic native boundary probe",
+          "version": "1.0.0"
+        },
+        "capabilities": {
+          "experimentalApi": true
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "name": "frozen-install",
+  "command": "corepack",
+  "args": [
+    "pnpm",
+    "install",
+    "--frozen-lockfile"
+  ],
+  "cwd": "/vercel/sandbox/issue1505/repo",
+  "start": "2026-11-09T14:28:21.467Z",
+  "end": "2026-11-09T14:29:29.119Z",
+  "code": 0,
+  "signal": null
+}

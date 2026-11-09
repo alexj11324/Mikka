@@ -1,0 +1,10 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"result\": {\n    \"sandbox\": {\n      \"name\": \"mikka-1505-native-mcp-validation-20261109-1428\",\n      \"currentSessionId\": \"sbx_968Mad3ajBrkaNNqnU9TVh7V6lFC\",\n      \"status\": \"running\",\n      \"statusUpdatedAt\": 1794234435503,\n      \"persistent\": false,\n      \"workloadType\": \"sandbox\",\n      \"region\": \"iad1\",\n      \"failoverRegions\": [],\n      \"vcpus\": 2,\n      \"memory\": 4096,\n      \"runtime\": \"node24\",\n      \"architecture\": \"amd64\",\n      \"timeout\": 900000,\n      \"cwd\": \"/vercel/sandbox\",\n      \"createdAt\": 1794234435503,\n      \"updatedAt\": 1794234435503\n    },\n    \"session\": {\n      \"id\": \"sbx_968Mad3ajBrkaNNqnU9TVh7V6lFC\",\n      \"runtime\": \"node24\",\n      \"architecture\": \"amd64\",\n      \"requestedAt\": 1794234435445,\n      \"startedAt\": 1794234435474,\n      \"status\": \"running\",\n      \"vcpus\": 2,\n      \"memory\": 4096,\n      \"timeout\": 900000,\n      \"region\": \"iad1\",\n      \"cwd\": \"/vercel/sandbox\",\n      \"workloadType\": \"sandbox\",\n      \"createdAt\": 1794234435445,\n      \"updatedAt\": 1794234435482,\n      \"interactivePort\": 26661,\n      \"sourceSandboxName\": \"mikka-1505-native-mcp-validation-20261109-1428\",\n      \"projectId\": \"prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH\"\n    },\n    \"routes\": []\n  }\n}"
+    }
+  ],
+  "structuredContent": null,
+  "isError": false
+}

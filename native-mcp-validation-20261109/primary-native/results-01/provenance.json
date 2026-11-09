@@ -1,0 +1,46 @@
+{
+  "source": "869c71d7aa062c76fc7a75c1f8775d1ed8538168",
+  "upstream": "6ff1e1ca3b30fc8b914720681fcf5fe62e95f856",
+  "model": "gpt-6-luna",
+  "binary": {
+    "path": "/workspace/scratch/263e36984c81/native-mcp-first-turn-1505/assets/codex-x86_64-unknown-linux-musl",
+    "bytes": 319346888,
+    "sha256": "b8a11fedf24b2dfb59a70c9e52b030f9a508dcd49cd2dd0d41956f4c785156b8"
+  },
+  "catalogue": {
+    "gitBlob": "489ebe3f2483348641a16160ce8491dd077eabca",
+    "bytes": 539696,
+    "sha256": "1384625c0b6b3e67d3c60da29becea2b017f2c283fc1e2d05b8edafb4698eb10",
+    "modified": false
+  },
+  "sources": [
+    {
+      "path": "packages/daemon/src/agents/capture-copy.mjs",
+      "gitBlob": "3634a4cea39efe7b9f81f8da77d8a71760ef06cc",
+      "bytes": 1017,
+      "sha256": "05d1dff404e882f50c0798fae19dff7634af31044a06be48ea695d29d596b267"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "gitBlob": "308c9ed7ab78b636876fd661b55d36dd61b478d2",
+      "bytes": 50533,
+      "sha256": "96a0c7551fffd1d6bdd0386f9aa2ea8d37613dd969a244d2caf562a0594b13a9"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-context.mjs",
+      "gitBlob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+      "bytes": 2781,
+      "sha256": "bed5e23a0a3e72d73864594aa126a8240c8a1baba4a186c29a7df74e4ea243ce"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp.mjs",
+      "gitBlob": "e314a1c43ac0749a5a773bcef2be02a976fc166f",
+      "bytes": 2621,
+      "sha256": "1b73d39ba0a9705b2ac2e85d730dbc7f838b6a4c968c77bfcd1f194847445a21"
+    }
+  ],
+  "directModelOverrides": [],
+  "requiredOverride": false,
+  "optionalGraceOverride": false,
+  "scope": "synthetic native RPC boundary; not full daemon adoption, production, subscription, performance acceptance, or historical attribution"
+}

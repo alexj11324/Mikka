@@ -1,0 +1,7 @@
+{
+  "chunk_id": "763594",
+  "wall_time_seconds": 0.000043928,
+  "exit_code": 0,
+  "original_token_count": 244,
+  "output": "{\"verifiedFiles\": 65, \"captureBytes\": 338897, \"captureSha256\": \"fad1e8c5d1f5eefac32fc0c192c9fe3339f1f58fe6057c69bb0cf1084891944e\", \"native\": [{\"mode\": \"cold\", \"observed\": true, \"ok\": true, \"cleanupVerified\": true, \"transport\": \"websocket\", \"modelRequestCount\": 2, \"firstRequestAtMs\": 509.058, \"totalMs\": 1385.546}, {\"mode\": \"adopted\", \"observed\": true, \"ok\": true, \"cleanupVerified\": true, \"transport\": \"websocket\", \"modelRequestCount\": 2, \"firstRequestAtMs\": 393.336, \"totalMs\": 1261.914}], \"allCleanupVerified\": true}\ntatus\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m test/codex-item-chunks.test.ts\u001b[2m > \u001b[22mpreserves the existing availability behavior for an item without a status\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m60 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m2 skipped\u001b[39m\u001b[90m (62)\u001b[39m\n\u001b[2m   Start at \u001b[22m 14:32:30\n\u001b[2m   Duration \u001b[22m 24.57s\u001b[2m (tests 84%, import 9%, transform 8%)\u001b[22m\n\n\n"
+}

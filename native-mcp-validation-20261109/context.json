@@ -1,0 +1,145 @@
+{
+  "evidenceParent": "f2e59c778a6e04df30a4ad633aa7c6f7265caf86",
+  "evidenceBaseTree": "a76db81c0f7137e103808630e5b3f9527147fcda",
+  "productMcpCommit": "f044f22d31f8fc2becdce02708ca0b4c033bcc93",
+  "productMcpTree": "2800ee9a2df3afd78918899103cb98a4a68ba9c1",
+  "nativeFixtureCommit": "af38c3642239bd3791820ba7fad4b3bfe26af7cc",
+  "nativeMikkaSourcePin": "869c71d7aa062c76fc7a75c1f8775d1ed8538168",
+  "officialCodexCommit": "6ff1e1ca3b30fc8b914720681fcf5fe62e95f856",
+  "officialCodexVersion": "0.166.0",
+  "testedMergedTree": {
+    "tree": "a578997ffcb45caa6e5aae793a1d2116819aee30",
+    "contains": [
+      "f044f22d31f8fc2becdce02708ca0b4c033bcc93",
+      "4bff6e5c00bdd43153aaca2d350b675b8df0e179"
+    ],
+    "commands": {
+      "officialFiles": "python scripts/e2b/official-files.test.py",
+      "relatedNode": "node --import ./tests/support/server-only.mjs --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/release/web-deploy.test.mjs"
+    },
+    "commandSource": "root execution report; original stdout/stderr/exit files preserved",
+    "cwd": "/workspace/scratch/263e36984c81/Mikka-1505",
+    "python": "3.12.14",
+    "node": "24.22.1",
+    "officialFileTests": {
+      "passed": 29,
+      "failed": 0,
+      "seconds": 0.471,
+      "exitCode": 0
+    },
+    "nodeTests": {
+      "passed": 194,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 2558.093926,
+      "exitCode": 0
+    }
+  },
+  "finalUnreferencedCombination": {
+    "commit": "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+    "tree": "6748ac1196b68773b198ae5a690db4122a287fcb",
+    "orderedParents": [
+      "b7c5018597f293222488cc0a245a1e2d134a21c2",
+      "4bff6e5c00bdd43153aaca2d350b675b8df0e179"
+    ],
+    "differenceFromTestedMergedTree": "M\tdocs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+    "gitHubCommitReadbackVerified": true,
+    "rerunAfterDocumentationOnlyChange": false,
+    "ciClaimed": false,
+    "prRefAtRootReport": "869c71d7aa062c76fc7a75c1f8775d1ed8538168"
+  },
+  "linuxMcpAdapterTests": {
+    "tests": 62,
+    "passed": 60,
+    "failed": 0,
+    "skipped": 2,
+    "exitCode": 0,
+    "skips": [
+      "existing Cursor question continuation refuses missing session",
+      "existing Cursor question continuation resumes exact original session"
+    ]
+  },
+  "nativeResults": [
+    {
+      "mode": "cold",
+      "mcpStates": [
+        "starting",
+        "ready"
+      ],
+      "mcpReadyAtMs": 465.509,
+      "firstActualRequestNumber": 2,
+      "firstActualRequestAtMs": 509.058,
+      "transport": "websocket",
+      "captured": true,
+      "cleanupVerified": true,
+      "codeModeHostMissing": true,
+      "pathHelpersRefusedUnderTemporaryHome": true,
+      "fullCatalogueVerified": false,
+      "toolExecutionVerified": false,
+      "productionLatencyEvidence": false,
+      "rawCaseDirectory": "linux/fixture/results-02/cold"
+    },
+    {
+      "mode": "adopted",
+      "mcpStates": [
+        "starting",
+        "ready"
+      ],
+      "mcpReadyAtMs": 364.804,
+      "firstActualRequestNumber": 2,
+      "firstActualRequestAtMs": 393.336,
+      "transport": "websocket",
+      "captured": true,
+      "cleanupVerified": true,
+      "codeModeHostMissing": true,
+      "pathHelpersRefusedUnderTemporaryHome": true,
+      "fullCatalogueVerified": false,
+      "toolExecutionVerified": false,
+      "productionLatencyEvidence": false,
+      "rawCaseDirectory": "linux/fixture/results-02/adopted"
+    }
+  ],
+  "vm": {
+    "id": "sbx_968Mad3ajBrkaNNqnU9TVh7V6lFC",
+    "status": "stopped",
+    "vcpus": 2,
+    "memoryMiB": 4096,
+    "stoppedAt": "2026-11-09T14:38:12.628Z",
+    "durationMs": 657154,
+    "stopAndIndependentGetPreserved": true
+  },
+  "excludedAssets": {
+    "officialExecutableAndArchive": "hash metadata only",
+    "officialModelsJson": "hash metadata only; 539696 bytes; unchanged",
+    "captureGzip": {
+      "archived": false,
+      "bytes": 83507,
+      "sha256": "5f618743c86db3d37d367a054c9c9d8cb65b67a50065b607e88800a4cf136395",
+      "gitBlob": "e60fab1ac2798c6dbe487d19d593d6472ca673bb",
+      "decompressesToExactCapture": true
+    }
+  },
+  "capture": {
+    "bytes": 338897,
+    "sha256": "fad1e8c5d1f5eefac32fc0c192c9fe3339f1f58fe6057c69bb0cf1084891944e",
+    "gitBlob": "6e9c04a03038504339289130022b4e19853d7456",
+    "files": 65,
+    "allExpandedFileBytesAndSha256Verified": true,
+    "toolArgsDisplayTruncated": true,
+    "authoritativeFullDrivers": [
+      "linux/evidence/setup-driver.cjs",
+      "linux/evidence/validation-driver.cjs",
+      "linux/evidence/fixture-load-driver.cjs",
+      "linux/fixture/fixture.mjs"
+    ]
+  },
+  "claimsNotMade": [
+    "full-repository CI",
+    "production subscription acceptance",
+    "production five-second startup",
+    "full native tool catalogue",
+    "successful inspector execution",
+    "full daemon anonymous adoption",
+    "historical R89/P0 root cause"
+  ]
+}

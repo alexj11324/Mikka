@@ -1,0 +1,9 @@
+{
+  "operation": "socket.socket(AF_UNIX, SOCK_STREAM)",
+  "result": "PermissionError",
+  "errno": 1,
+  "message": "Operation not permitted",
+  "failureBeforeBind": true,
+  "alternateLocationNotTested": true,
+  "additionalRetryPerformed": false
+}

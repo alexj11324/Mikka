@@ -1,0 +1,19 @@
+{
+  "at": "2026-11-09T14:18:07.943676+00:00",
+  "source": "https://github.com/openai/codex/releases/download/rust-v0.166.0/codex-x86_64-unknown-linux-musl.tar.gz",
+  "sourceCommit": "6ff1e1ca3b30fc8b914720681fcf5fe62e95f856",
+  "archive": {
+    "bytes": 121764138,
+    "sha256": "a0bf572d2f93f056c6712a6da348e96078dc84f3885fd7be67807ef389cb3978"
+  },
+  "binary": {
+    "path": "/workspace/scratch/263e36984c81/native-mcp-first-turn-1505/assets/codex-x86_64-unknown-linux-musl",
+    "bytes": 319346888,
+    "sha256": "b8a11fedf24b2dfb59a70c9e52b030f9a508dcd49cd2dd0d41956f4c785156b8"
+  },
+  "version": {
+    "exitCode": 0,
+    "stdout": "codex-cli 0.166.0\n",
+    "stderr": ""
+  }
+}

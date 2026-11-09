@@ -1,0 +1,5 @@
+
+const fs=require("fs"),crypto=require("crypto");
+const root="/vercel/sandbox/issue1505/fixture";fs.mkdirSync(root,{recursive:true});
+const files={"fixture.mjs":"daf2a336cae973bb4b2b734f814885262be53770","prepare-model.py":"880d70cc86b82b46c1cc725ce10faaa3ca1d230c"};
+(async()=>{const manifest=[];for(const [name,expected] of Object.entries(files)){const url="https://raw.githubusercontent.com/alexj11324/Mikka/af38c3642239bd3791820ba7fad4b3bfe26af7cc/native-mcp-first-turn-20261109/"+name;const response=await fetch(url,{signal:AbortSignal.timeout(30000)});if(!response.ok)throw Error("fixture fetch "+response.status);const data=Buffer.from(await response.arrayBuffer());const actual=crypto.createHash("sha1").update("blob "+data.length+"\0").update(data).digest("hex");if(actual!==expected)throw Error("fixture hash mismatch");fs.writeFileSync(root+"/"+name,data);manifest.push({name,gitBlob:actual,bytes:data.length,sha256:crypto.createHash("sha256").update(data).digest("hex")});}fs.writeFileSync(root+"/bindings.json",JSON.stringify(manifest,null,2)+"\n");console.log(JSON.stringify(manifest));})().catch(e=>{console.error(String(e));process.exitCode=1;});

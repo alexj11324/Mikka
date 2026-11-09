@@ -1,0 +1,108 @@
+
+ RUN  v5.0.5 /workspace/scratch/263e36984c81/codex-mcp-failure-1505/packages/daemon
+
+ ✓ test/mikka-mcp-backend.test.ts > keeps every canonical field identical through the real stdio and official SDK transports 154ms
+ ✓ test/mikka-mcp-backend.test.ts > advertises only real static metadata and refuses all unbound or mid-bind tool work 37ms
+ ✓ test/codex-item-chunks.test.ts > rejects the official failed MCP result without copying its private content into the error 3ms
+ ✓ test/codex-item-chunks.test.ts > rejects an explicitly failed MCP completion even when its result is absent 2ms
+ ✓ test/codex-item-chunks.test.ts > preserves a normal completed MCP result 0ms
+ ✓ test/codex-item-chunks.test.ts > preserves the MCP started input and does not emit a completion 0ms
+ ✓ test/codex-item-chunks.test.ts > preserves explicit MCP errors with or without the failed status 0ms
+ ✓ test/codex-item-chunks.test.ts > preserves the existing availability behavior for an item without a status 0ms
+ ✓ test/mikka-mcp-backend.test.ts > retains the same handoff, capture bounds and repository selection handlers after one binding 36ms
+ ✓ test/mikka-mcp-backend.test.ts > uses the original business fetch, exact bound bearer and canonical claim catalogue without discovery or fallback storage 70ms
+ ✓ test/mikka-mcp-backend.test.ts > refuses a missing catalogue once without a remote discovery request 23ms
+ ✓ test/mikka-mcp-backend.test.ts > refuses a malformed catalogue once without a remote discovery request 20ms
+ ✓ test/mikka-mcp-backend.test.ts > refuses a changed catalogue once without a remote discovery request 22ms
+ ✓ test/mikka-mcp-backend.test.ts > drains a failed real path binding and never admits a replacement task 23ms
+ ✓ test/mikka-mcp-backend.test.ts > never transfers a bound backend to a second run or reads later mutated context values 31ms
+ ✓ test/mikka-mcp-backend.test.ts > refuses new work after local predicate revocation without contacting a server 18ms
+ ✓ test/mikka-mcp-backend.test.ts > refuses new work after local signal revocation without contacting a server 18ms
+ ✓ test/mikka-mcp-backend.test.ts > rechecks a local lease before an already queued call dispatches 19ms
+ ✓ test/mikka-mcp-backend.test.ts > closes and drains a unbound backend without permitting later activation 15ms
+ ✓ test/mikka-mcp-backend.test.ts > closes and drains a binding backend without permitting later activation 21ms
+ ✓ test/mikka-mcp-backend.test.ts > aborts and drains a real held HTTP response body before closing the bound context 54ms
+ ✓ test/mikka-mcp-backend.test.ts > keeps existing stdio EOF graceful while the original response body is still pending 136ms
+ ✓ test/mikka-mcp-backend.test.ts > does not expose mutable catalogue references or start business work during static metadata construction 1ms
+ × test/adapters.test.ts > advertises the run gate without any sandbox (decision 2026-11-01-2335), for any Codex version 139ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-qgdzDA/daemon.sock
+ × test/adapters.test.ts > claude_code adapter > hands in through the MCP tool, then the daemon verifies, commits and pushes 85ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-HDbctv/daemon.sock
+ × test/adapters.test.ts > claude_code adapter > ends as turn_ended, with nothing committed, when the agent never hands in 94ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-MaU9br/daemon.sock
+ × test/adapters.test.ts > claude_code adapter > starts the CLI with the model the assignment named, and with none when it named none 95ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-B1dpFo/daemon.sock
+ × test/adapters.test.ts > codex adapter > hands in through the MCP tool, then the daemon verifies, commits and pushes 109ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-yqCvqL/daemon.sock
+ × test/adapters.test.ts > codex adapter > ends as turn_ended, with nothing committed, when the agent never hands in 103ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-iIY61T/daemon.sock
+ × test/adapters.test.ts > codex adapter > starts the CLI with the model the assignment named, and with none when it named none 79ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-vFN0C6/daemon.sock
+ × test/adapters.test.ts > cursor adapter > hands in through the MCP tool, then the daemon verifies, commits and pushes 68ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-dh00Ga/daemon.sock
+ × test/adapters.test.ts > cursor adapter > ends as turn_ended, with nothing committed, when the agent never hands in 62ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-8U5AMj/daemon.sock
+ × test/adapters.test.ts > cursor adapter > starts the CLI with the model the assignment named, and with none when it named none 92ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-nU7bY8/daemon.sock
+ × test/adapters.test.ts > the issue branch > hands in unverified changes for a draft PR without inventing a verify pass 90ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-dfYoKe/daemon.sock
+ × test/adapters.test.ts > the issue branch > builds on the remote branch, keeping a person's commit, and pushes there 81ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-CeYzW8/daemon.sock
+ × test/adapters.test.ts > the issue branch > starts from the base branch when the issue branch cannot be fetched 78ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-wzThKU/daemon.sock
+ × test/adapters.test.ts > the issue branch > continues an existing issue branch when push approval comes only from claim policy 61ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-jI0a0U/daemon.sock
+ × test/adapters.test.ts > workspace agent policy (ADR 0028) > keeps a verified run local when the workspace turned pushes off 55ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-ID7jWv/daemon.sock
+ × test/adapters.test.ts > workspace agent policy (ADR 0028) > commits and pushes nothing for a read-only check (ADR 0046) 59ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-W8lfz4/daemon.sock
+ × test/adapters.test.ts > verify > fails a hand-in, and commits nothing, when verify changes the worktree 59ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-G2IOCx/daemon.sock
+ × test/adapters.test.ts > interjections and cancel > claude: a message during the turn reaches the CLI and can lead to a hand-in 66ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-xRQfP4/daemon.sock
+ × test/adapters.test.ts > interjections and cancel > claude: a hand-in read before the last turn ends keeps that turn's last words 65ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-EKDizt/daemon.sock
+ × test/adapters.test.ts > interjections and cancel > codex: a message during the turn is a turn/steer 56ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-AddMwe/daemon.sock
+ × test/adapters.test.ts > interjections and cancel > claude_code: cancel stops the CLI and ends the run as cancelled 61ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-PVmUPV/daemon.sock
+ × test/adapters.test.ts > interjections and cancel > cursor: cancel stops the CLI and ends the run as cancelled 59ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-CqYa94/daemon.sock
+ × test/adapters.test.ts > claude_code follow-up run > continues the earlier session with only the follow-up 63ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-NlPdLL/daemon.sock
+ × test/adapters.test.ts > claude_code follow-up run > starts a new session with the brief when the earlier one is gone 59ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-M91xlC/daemon.sock
+ × test/adapters.test.ts > claude_code follow-up run > question continuation refuses a missing original session without a fresh prompt 68ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-ypIiqr/daemon.sock
+ × test/adapters.test.ts > claude_code follow-up run > question continuation resumes the exact original session 69ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-GkCADJ/daemon.sock
+ × test/adapters.test.ts > codex follow-up run > continues the earlier session with only the follow-up 116ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-SGkAqR/daemon.sock
+ × test/adapters.test.ts > codex follow-up run > starts a new session with the brief when the earlier one is gone 73ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-3sUNB7/daemon.sock
+ × test/adapters.test.ts > codex follow-up run > question continuation refuses a missing original session without a fresh prompt 57ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-gQqWJk/daemon.sock
+ × test/adapters.test.ts > codex follow-up run > question continuation resumes the exact original session 57ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-uS6xkU/daemon.sock
+ × test/adapters.test.ts > cursor follow-up run > continues the earlier session with only the follow-up 67ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-EvqVDM/daemon.sock
+ × test/adapters.test.ts > cursor follow-up run > starts a new session with the brief when the earlier one is gone 62ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-jR9xBr/daemon.sock
+ ↓ test/adapters.test.ts > cursor follow-up run > question continuation refuses a missing original session without a fresh prompt
+ ↓ test/adapters.test.ts > cursor follow-up run > question continuation resumes the exact original session
+ × test/adapters.test.ts > resume after a daemon restart > claude_code: uncertain question delivery fails closed without another CLI turn 61ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-aBGRc5/daemon.sock
+ × test/adapters.test.ts > resume after a daemon restart > codex: uncertain question delivery fails closed without another CLI turn 60ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-E80wqD/daemon.sock
+ × test/adapters.test.ts > resume after a daemon restart > claude_code: the next daemon reopens the same session 66ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-rxTNaJ/daemon.sock
+ × test/adapters.test.ts > resume after a daemon restart > cursor: the next daemon reopens the same session 63ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-BPCGYT/daemon.sock
+ × test/adapters.test.ts > resume after a daemon restart > ends at once, without the CLI, when the agent handed in before the restart 60ms
+   → listen EPERM: operation not permitted /workspace/scratch/263e36984c81/codex-mcp-failure-validation-1505/tmp/orvd-q2RwzQ/daemon.sock
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  37 failed | 23 passed | 2 skipped (62)
+   Start at  09:23:39
+   Duration  4.67s (tests 52%, import 28%, transform 20%)
+

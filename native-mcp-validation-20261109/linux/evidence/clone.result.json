@@ -1,0 +1,19 @@
+{
+  "name": "clone",
+  "command": "git",
+  "args": [
+    "clone",
+    "--no-checkout",
+    "--filter=blob:none",
+    "--single-branch",
+    "--branch",
+    "root/issue1505-worker-dependency-install-20261109",
+    "https://github.com/alexj11324/Mikka.git",
+    "/vercel/sandbox/issue1505/repo"
+  ],
+  "cwd": "/vercel/sandbox/issue1505",
+  "start": "2026-11-09T14:28:14.885Z",
+  "end": "2026-11-09T14:28:15.927Z",
+  "code": 0,
+  "signal": null
+}

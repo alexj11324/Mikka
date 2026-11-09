@@ -1,0 +1,62 @@
+{
+  "binary": "/vercel/sandbox/issue1505/assets/codex-x86_64-unknown-linux-musl",
+  "args": [
+    "app-server",
+    "-c",
+    "model=\"gpt-6-luna\"",
+    "-c",
+    "model_provider=\"fixture\"",
+    "-c",
+    "model_catalog_json=\"/vercel/sandbox/issue1505/assets/official-models-0.166.0.json\"",
+    "-c",
+    "model_providers.fixture.name=\"Synthetic loopback fixture\"",
+    "-c",
+    "model_providers.fixture.base_url=\"http://127.0.0.1:36157/v1\"",
+    "-c",
+    "model_providers.fixture.wire_api=\"responses\"",
+    "-c",
+    "model_providers.fixture.requires_openai_auth=false",
+    "-c",
+    "model_providers.fixture.supports_websockets=true",
+    "-c",
+    "model_providers.fixture.request_max_retries=0",
+    "-c",
+    "model_providers.fixture.stream_max_retries=0",
+    "-c",
+    "features.shell_tool=false",
+    "-c",
+    "otel.exporter=\"none\"",
+    "-c",
+    "otel.trace_exporter=\"none\"",
+    "-c",
+    "otel.metrics_exporter=\"none\""
+  ],
+  "cwd": "/vercel/sandbox/issue1505/fixture/results-02/adopted/workspace",
+  "envKeys": [
+    "HOME",
+    "CODEX_HOME",
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "TMPDIR",
+    "NO_PROXY",
+    "no_proxy"
+  ],
+  "ordinaryCodexHome": true,
+  "threadConfig": {
+    "mcp_servers": {
+      "mikka": {
+        "command": "/vercel/runtimes/node24/bin/node",
+        "args": [
+          "/vercel/sandbox/issue1505/fixture/results-02/original-mikka/mikka-mcp-context.mjs",
+          "/vercel/sandbox/issue1505/fixture/results-02/adopted/mcp-contexts/774183c5-9c11-4828-8df9-b6159b85f343.json",
+          "774183c5-9c11-4828-8df9-b6159b85f343",
+          "f26c810b-15b3-41d3-a78b-4272cac2a257"
+        ],
+        "env": {}
+      }
+    }
+  },
+  "accountLoginSent": false,
+  "nativeModelCatalogueUnchanged": true
+}

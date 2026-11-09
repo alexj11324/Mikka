@@ -1,0 +1,12 @@
+{
+  "name": "native-version",
+  "command": "/vercel/sandbox/issue1505/assets/codex-x86_64-unknown-linux-musl",
+  "args": [
+    "--version"
+  ],
+  "cwd": "/vercel/sandbox/issue1505",
+  "start": "2026-11-09T14:28:19.653Z",
+  "end": "2026-11-09T14:28:19.681Z",
+  "code": 0,
+  "signal": null
+}

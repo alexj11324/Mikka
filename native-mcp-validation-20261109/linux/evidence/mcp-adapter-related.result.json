@@ -1,0 +1,17 @@
+{
+  "name": "mcp-adapter-related",
+  "command": "node",
+  "args": [
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "test/codex-item-chunks.test.ts",
+    "test/adapters.test.ts",
+    "test/mikka-mcp-backend.test.ts",
+    "--reporter=verbose"
+  ],
+  "cwd": "/vercel/sandbox/issue1505/repo/packages/daemon",
+  "start": "2026-11-09T14:32:30.306Z",
+  "end": "2026-11-09T14:32:55.473Z",
+  "code": 0,
+  "signal": null
+}

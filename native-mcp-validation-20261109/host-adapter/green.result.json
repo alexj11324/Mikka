@@ -1,0 +1,26 @@
+{
+  "command": [
+    "node",
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "test/codex-item-chunks.test.ts",
+    "--reporter=verbose"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/codex-mcp-failure-1505/packages/daemon",
+  "exitCode": 0,
+  "elapsedSeconds": 1.2382254600524902,
+  "environmentNames": [
+    "CI",
+    "HOME",
+    "NO_COLOR",
+    "PATH",
+    "TMPDIR"
+  ],
+  "nodeVersion": "v24.22.1",
+  "parent": "a7092db9a0328c6eeb467101c01f4836be0d1809",
+  "sourceHashes": {
+    "packages/daemon/src/adapters/codex.ts": "81a9cd38c8a82440e1dc4afe64cffe2d20078a91a3a4c6004b7718943c35bf00",
+    "packages/daemon/src/adapters/codex-protocol.ts": "eb6e8aabbcc5b24fc89f965ce49d35b672636e7b60174014233814b0e576e847",
+    "packages/daemon/test/codex-item-chunks.test.ts": "5e4013d06493b4212763bdbb022163f50574115d3ad851458611fcf54c1cc535"
+  }
+}

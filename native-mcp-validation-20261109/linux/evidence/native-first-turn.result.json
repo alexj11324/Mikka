@@ -1,0 +1,20 @@
+{
+  "name": "native-first-turn",
+  "command": "timeout",
+  "args": [
+    "--signal=TERM",
+    "--kill-after=5s",
+    "115s",
+    "node",
+    "/vercel/sandbox/issue1505/fixture/fixture.mjs",
+    "/vercel/sandbox/issue1505/assets/codex-x86_64-unknown-linux-musl",
+    "/vercel/sandbox/issue1505/repo",
+    "/vercel/sandbox/issue1505/fixture/results-02",
+    "/vercel/sandbox/issue1505/assets/official-models-0.166.0.json"
+  ],
+  "cwd": "/vercel/sandbox/issue1505/fixture",
+  "start": "2026-11-09T14:32:30.591Z",
+  "end": "2026-11-09T14:32:35.663Z",
+  "code": 0,
+  "signal": null
+}

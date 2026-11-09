@@ -1,0 +1,13 @@
+{
+  "name": "pnpm-version",
+  "command": "corepack",
+  "args": [
+    "pnpm",
+    "--version"
+  ],
+  "cwd": "/vercel/sandbox/issue1505/repo",
+  "start": "2026-11-09T14:28:20.127Z",
+  "end": "2026-11-09T14:28:21.466Z",
+  "code": 0,
+  "signal": null
+}

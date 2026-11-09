@@ -1,0 +1,13 @@
+{
+  "name": "model-prepare",
+  "command": "python3",
+  "args": [
+    "/vercel/sandbox/issue1505/fixture/prepare-model.py",
+    "/vercel/sandbox/issue1505/assets/official-models-0.166.0.json"
+  ],
+  "cwd": "/vercel/sandbox/issue1505/fixture",
+  "start": "2026-11-09T14:32:30.361Z",
+  "end": "2026-11-09T14:32:30.590Z",
+  "code": 0,
+  "signal": null
+}

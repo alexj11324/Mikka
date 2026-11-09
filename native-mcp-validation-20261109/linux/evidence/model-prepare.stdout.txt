@@ -1,0 +1,1 @@
+{"source": "https://raw.githubusercontent.com/openai/codex/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/models-manager/models.json", "path": "/vercel/sandbox/issue1505/assets/official-models-0.166.0.json", "bytes": 539696, "gitBlob": "489ebe3f2483348641a16160ce8491dd077eabca", "sha256": "1384625c0b6b3e67d3c60da29becea2b017f2c283fc1e2d05b8edafb4698eb10", "modified": false}

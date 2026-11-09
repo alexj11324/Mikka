@@ -1,0 +1,20 @@
+{
+  "command": [
+    "./node_modules/.bin/tsgo",
+    "--noEmit",
+    "-p",
+    "packages/daemon/tsconfig.json"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/codex-mcp-failure-1505",
+  "exitCode": 0,
+  "elapsedSeconds": 3.2454707622528076,
+  "environmentNames": [
+    "CI",
+    "HOME",
+    "NO_COLOR",
+    "PATH",
+    "TMPDIR"
+  ],
+  "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

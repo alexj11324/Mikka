@@ -1,0 +1,14 @@
+[
+  {
+    "name": "fixture.mjs",
+    "gitBlob": "daf2a336cae973bb4b2b734f814885262be53770",
+    "bytes": 23536,
+    "sha256": "9a106e32f7d4af345740ec6071e1198654a253fcc1db48dcc7291f88c85d263b"
+  },
+  {
+    "name": "prepare-model.py",
+    "gitBlob": "880d70cc86b82b46c1cc725ce10faaa3ca1d230c",
+    "bytes": 1663,
+    "sha256": "d2ecada76e9eb6a6fdc83d1d5e235fb5339990af612ca8f892e0b57b5381d2af"
+  }
+]

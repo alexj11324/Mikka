@@ -1,0 +1,17 @@
+
+ RUN  v5.0.5 /workspace/scratch/263e36984c81/codex-mcp-failure-1505/packages/daemon
+
+ × test/codex-item-chunks.test.ts > rejects the official failed MCP result without copying its private content into the error 12ms
+   → expected [ { …(3) } ] to deeply equal [ { type: 'tool-output-error', …(2) } ]
+ × test/codex-item-chunks.test.ts > rejects an explicitly failed MCP completion even when its result is absent 2ms
+   → expected [ { …(3) } ] to deeply equal [ { type: 'tool-output-error', …(2) } ]
+ ✓ test/codex-item-chunks.test.ts > preserves a normal completed MCP result 0ms
+ ✓ test/codex-item-chunks.test.ts > preserves the MCP started input and does not emit a completion 0ms
+ ✓ test/codex-item-chunks.test.ts > preserves explicit MCP errors with or without the failed status 0ms
+ ✓ test/codex-item-chunks.test.ts > preserves the existing availability behavior for an item without a status 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  09:22:43
+   Duration  1.81s (import 52%, transform 46%, worker 1%, tests 1%)
+

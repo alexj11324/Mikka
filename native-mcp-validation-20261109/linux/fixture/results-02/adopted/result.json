@@ -1,0 +1,133 @@
+{
+  "mode": "adopted",
+  "ok": true,
+  "initializeDelayMs": 0,
+  "marker": "SYNTHETIC_MCP_FIRST_TURN_15e32bf7-3445-4aa8-ad1f-e09fdb90be62",
+  "observed": true,
+  "cleanupVerified": true,
+  "descendantScanErrors": [],
+  "userAgent": "mikka-native-fixture/0.166.0 (Amazon Linux AMI 2023.0.0; x86_64) unknown (mikka-native-fixture; 1.0.0)",
+  "threadStartedAtMs": 276.576,
+  "firstRequestAtMs": 393.336,
+  "transport": "websocket",
+  "route": "/v1/responses",
+  "catalogue": {
+    "toolArrayPaths": [
+      "$.input[0].tools",
+      "$.input[0].tools[0].tools",
+      "$.input[0].tools[1].tools",
+      "$.input[0].tools[2].tools"
+    ],
+    "toolArrayLengths": [
+      3,
+      4,
+      1,
+      6
+    ],
+    "names": [
+      "clock",
+      "collaboration",
+      "exec",
+      "followup_task",
+      "functions",
+      "interrupt_agent",
+      "list_agents",
+      "request_user_input",
+      "request_user_input_async",
+      "send_message",
+      "sleep",
+      "spawn_agent",
+      "wait",
+      "wait_agent"
+    ],
+    "types": [
+      "array",
+      "boolean",
+      "custom",
+      "function",
+      "grammar",
+      "namespace",
+      "number",
+      "object",
+      "string"
+    ],
+    "inspect_artifact": false,
+    "inspect_repository": false,
+    "submit": false,
+    "toolArraysSha256": "5fb7a71273bd820b5da0c3ac4b2b710b805a5a85282859b40ba014a60874d2fc",
+    "interpretation": "Named definitions in captured tools arrays only; false is not proof of unavailable code/search-mediated capability."
+  },
+  "descendantsBeforeCleanup": [
+    {
+      "pid": 409,
+      "ppid": 218,
+      "pgid": 409,
+      "state": "Ssl"
+    },
+    {
+      "pid": 498,
+      "ppid": 409,
+      "pgid": 498,
+      "state": "Sl"
+    },
+    {
+      "pid": 532,
+      "ppid": 409,
+      "pgid": 409,
+      "state": "Sl"
+    },
+    {
+      "pid": 533,
+      "ppid": 532,
+      "pgid": 409,
+      "state": "S"
+    },
+    {
+      "pid": 534,
+      "ppid": 533,
+      "pgid": 409,
+      "state": "Sl"
+    },
+    {
+      "pid": 562,
+      "ppid": 532,
+      "pgid": 409,
+      "state": "R"
+    }
+  ],
+  "descendantsBeforeSignal": [
+    {
+      "pid": 532,
+      "ppid": 1,
+      "pgid": 409,
+      "state": "Sl"
+    },
+    {
+      "pid": 533,
+      "ppid": 532,
+      "pgid": 409,
+      "state": "S"
+    },
+    {
+      "pid": 534,
+      "ppid": 533,
+      "pgid": 409,
+      "state": "Sl"
+    },
+    {
+      "pid": 562,
+      "ppid": 532,
+      "pgid": 409,
+      "state": "R"
+    }
+  ],
+  "childExit": {
+    "code": 0,
+    "signal": null
+  },
+  "processGroupGone": true,
+  "descendantsAfterCleanup": [],
+  "liveDescendantsAfterCleanup": [],
+  "totalMs": 1261.914,
+  "modelRequestCount": 2
+}

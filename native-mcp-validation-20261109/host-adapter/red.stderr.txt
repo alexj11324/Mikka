@@ -1,0 +1,60 @@
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/codex-item-chunks.test.ts > rejects the official failed MCP result without copying its private content into the error
+AssertionError: expected [ { …(3) } ] to deeply equal [ { type: 'tool-output-error', …(2) } ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "errorText": "MCP tool call failed",
++     "output": [
++       {
++         "text": "PRIVATE_TOOL_FAILURE",
++         "type": "text",
++       },
++     ],
+      "toolCallId": "inspect-readme",
+-     "type": "tool-output-error",
++     "type": "tool-output-available",
+    },
+  ]
+
+ ❯ test/codex-item-chunks.test.ts:25:18
+     23| it('rejects the official failed MCP result without copying its private…
+     24|   const chunks = codexItemChunks('completed', failedMcpCall, new Set()…
+     25|   expect(chunks).toEqual([{ type: 'tool-output-error', toolCallId: 'in…
+       |                  ^
+     26|   expect(JSON.stringify(chunks)).not.toContain('PRIVATE_')
+     27| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/codex-item-chunks.test.ts > rejects an explicitly failed MCP completion even when its result is absent
+AssertionError: expected [ { …(3) } ] to deeply equal [ { type: 'tool-output-error', …(2) } ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "errorText": "MCP tool call failed",
++     "output": [],
+      "toolCallId": "inspect-readme",
+-     "type": "tool-output-error",
++     "type": "tool-output-available",
+    },
+  ]
+
+ ❯ test/codex-item-chunks.test.ts:31:6
+     29| it('rejects an explicitly failed MCP completion even when its result i…
+     30|   expect(codexItemChunks('completed', { ...failedMcpCall, result: null…
+     31|     .toEqual([{ type: 'tool-output-error', toolCallId: 'inspect-readme…
+       |      ^
+     32| })
+     33|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
