@@ -5696,7 +5696,10 @@
     "suggestion": "Suggestion",
     "running": "{count, plural, one {# task is still running} other {# tasks are still running}}",
     "needsReview": "Waiting for your review",
-    "needsConfirm": "Waiting for your OK"
+    "needsConfirm": "Waiting for your OK",
+    "status": "Status",
+    "waitingOnYou": "Waiting on you",
+    "inProgress": "Running"
   },
   "HostedSettings": {
     "back": "Back",

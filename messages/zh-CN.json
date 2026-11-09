@@ -5696,7 +5696,10 @@
     "suggestion": "建议",
     "running": "{count} 个任务还在进行",
     "needsReview": "等你审阅",
-    "needsConfirm": "等你确认"
+    "needsConfirm": "等你确认",
+    "status": "状态",
+    "waitingOnYou": "等你处理",
+    "inProgress": "进行中"
   },
   "HostedSettings": {
     "back": "返回",
