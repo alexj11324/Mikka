@@ -1,4 +1,4 @@
-import { mobileMessages } from '@/lib/messages'
+import { mobileMessages } from '../../../lib/messages'
 
 /**
  * A thread's folded tool calls (「已运行 2 条命令 · 调用了 1 个工具」), as the server sends them in the mobile thread read
