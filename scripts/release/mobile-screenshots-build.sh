@@ -64,6 +64,8 @@ try {
 } catch { process.exitCode = 1 }
 JS
 
+node scripts/release/mobile-screenshots.mjs driver-preflight
+
 cd apps/mobile
 run_build_phase expo-prebuild pnpm exec expo prebuild --platform ios --no-install
 # Keep the embedded bundle tied to GITHUB_SHA, even when a production OTA exists.
