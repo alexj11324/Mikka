@@ -1,0 +1,1858 @@
+{
+  "schema": "mikka.issue1512.pr1836-preintegration-source-review.v1",
+  "reviewedAtUtc": "2026-11-09T21:22:30.524Z",
+  "status": "no_source_conflict_or_static_blocker_found_in_fixed_pair",
+  "scope": "Only PR1836 exact ed60885d versus own84ce; excludes PR1839, PR1842 and any not-yet-read combined batch head.",
+  "identities": {
+    "ours": {
+      "commit": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+      "mainParent": "7848e79df9c5af67e526aeed1c828858db392066"
+    },
+    "theirs": {
+      "pr": 1836,
+      "commit": "ed60885d317240303d496b3bddfcf9a49caf4139",
+      "tree": "4c7fafd7f838d41ee26f5f3cdd604b949a5a4c6c",
+      "parent": "b070685483618d6dc145ed85a54ece95596ceb48"
+    },
+    "mergeBase": {
+      "commit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+      "tree": "a59d2e3ff90594a2625b131ab5a403393715cf40"
+    },
+    "prMetadata": {
+      "state": "open",
+      "merged": false,
+      "head": "ed60885d317240303d496b3bddfcf9a49caf4139",
+      "base": "ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d",
+      "changedFiles": 14,
+      "mergeable": true,
+      "meaning": "Metadata at this read; not a combined batch source or CI execution receipt."
+    },
+    "downstreamBatchHead": null
+  },
+  "structuralProof": {
+    "method": "Two Git compare responses plus complete recursive Git trees. Leaf comparisons use path, mode, type and blob; no source tree or commit was constructed.",
+    "treeResponses": {
+      "base": {
+        "truncated": false,
+        "entries": 7677,
+        "leaves": 6805
+      },
+      "ours": {
+        "truncated": false,
+        "entries": 7693,
+        "leaves": 6820
+      },
+      "theirs": {
+        "truncated": false,
+        "entries": 7679,
+        "leaves": 6807
+      }
+    },
+    "commonBaseToOursChangedPaths": 84,
+    "commonBaseToTheirsChangedPaths": 14,
+    "exactPathIntersection": [],
+    "pathPrefixCollisions": [],
+    "ownDeltaFromActualMainParent": {
+      "base": "7848e79df9c5af67e526aeed1c828858db392066",
+      "pathCount": 48,
+      "intersectionWith1836": []
+    },
+    "conclusion": "For these exact commits, all14 upstream changes lie on paths unchanged by84ce from the common base. Ordinary three-way composition requires no modify/modify or file/directory conflict resolution.",
+    "noClaim": "No git merge/test/build was executed. This does not prove the unknown future shared batch is conflict-free."
+  },
+  "upstreamChanges": [
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "710f70c3528e1b8eb5c37f1be52c6442445bf9be"
+      }
+    },
+    {
+      "path": "lib/bot-model-choice.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d2fd785e8e164ea86387bfd013d070da9ed3e3f0"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "20df161806c9647a77093746ca074fddf97643a9"
+      }
+    },
+    {
+      "path": "lib/bot-model-selection.test.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9a39ebf1f05ad2521297cfa577311955a51f9cec"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6453ff0fae3dd8549c7f6ecb68b315d65a59f633"
+      }
+    },
+    {
+      "path": "lib/model-call-timing.test.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d3bf5426989c74de27ed62c3bccdca4aafad5b68"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9b98a617cb833fed907a4947dc63a0097d8b554c"
+      }
+    },
+    {
+      "path": "lib/model-call-timing.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f5d5a9cae9f792e2b1b4a5573abcbc7579264f12"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d944022361313be7b13bcc0bc377ee6b42b248e1"
+      }
+    },
+    {
+      "path": "lib/subscription-workflow-model.test.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "96b23777317bedb29db1df3404d8b08c37cd099a"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c30d59512477d11703c23212a6a3f638fcc08765"
+      }
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-client.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e8cf0150fc8ce0962a55ec9723b441abbfb41c02"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cc1efb7058e1afc6a44ba6e224540886b1d9a378"
+      }
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-timing.test.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a81384d2249da654d52f63d0c426d41d9145636e"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0461fec9a9cb63bc974169df605315839ab9d297"
+      }
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-timing.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "622a0d39f562ff326dc42a4bd7af16b3d1c3d3e0"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "041dc0e73ef6446a37e73a50d7af977f0ad8da61"
+      }
+    },
+    {
+      "path": "packages/subscription-worker/http_transport_timing.go",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4156c512311676d451eb61075095dd735386d246"
+      }
+    },
+    {
+      "path": "packages/subscription-worker/http_transport_timing_test.go",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "12d7c565a713d6bd85f05c0e87804c961af2e8bc"
+      }
+    },
+    {
+      "path": "packages/subscription-worker/plain_model.go",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3c42dc694dbecae63d3f899779d4d94e2a21a186"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5348116628941ea4252d5ccc004e49492b42d4ba"
+      }
+    },
+    {
+      "path": "packages/subscription-worker/timing.go",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f8debf6cc695c2603945b190ddd18bbc301be4a9"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b7931270db2b77a5d7fddf108bb059a3941c3684"
+      }
+    },
+    {
+      "path": "packages/subscription-worker/timing_test.go",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "71402e0d9d3121ab4c257bcfe23f313c102b53a1"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "da2288ca4598c5c0a9a03fe63f451b7fbb152169"
+      }
+    }
+  ],
+  "oursChangedPathsFromCommonBase": [
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4"
+      }
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c1af7261fed4907c265041a549441b92f3ba6ab7"
+      }
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b"
+      }
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5a4c4f8486239161b325b9774b3086afe666dfa9"
+      }
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6fbced33e672f3fa0d5e35bed40b63fa103809d5"
+      }
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2"
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e7f6972a23519ae45e059038cd0c404789d44a98"
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dae8798653457afad334c2d909b10b63e9b3956f"
+      }
+    },
+    {
+      "path": "apps/mobile/env.d.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6348e9efe8f814ee98b2296df100101d2ef49b0c"
+      }
+    },
+    {
+      "path": "apps/mobile/features/tasks/components/agent-name.tsx",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4de5addd93e811ebf26e1970069d82f9eac42652"
+      }
+    },
+    {
+      "path": "apps/mobile/features/tasks/model/agent-marks.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ef97a8e88bae8d42435e54c5a5ae2b353c565362"
+      }
+    },
+    {
+      "path": "apps/mobile/features/tasks/model/task-conversation.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2547660a03611901985e229c4d31c3434d0ae7d6"
+      }
+    },
+    {
+      "path": "apps/mobile/features/tasks/screens/task-conversation-screen.tsx",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b6506cb28b8998ebdbc03def8ec737f2691167b1"
+      }
+    },
+    {
+      "path": "apps/mobile/features/tasks/screens/task-screen.tsx",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "be36830bcbbb155ae7cc8c8896278626c2456ef8"
+      }
+    },
+    {
+      "path": "apps/mobile/metro-svg-transformer.js",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7e94379c9552333bbbc469dbbead083f4f31e854"
+      }
+    },
+    {
+      "path": "apps/mobile/metro.config.js",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "76e82b29e5abfb7e5a6cecb8b2ba705032d33389"
+      }
+    },
+    {
+      "path": "apps/mobile/package.json",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cc0946570bbdc34fc1d5dbbf576d9b45c97bf649"
+      }
+    },
+    {
+      "path": "apps/mobile/scripts/tasks-screenshots.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e947208c8771099198b27835d5ea9101fba43afd"
+      }
+    },
+    {
+      "path": "apps/mobile/tests/messages.test.mts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "170dfbef3b490e760d630a6c01334fac2337cc14"
+      }
+    },
+    {
+      "path": "apps/mobile/tests/task-groups.test.mts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0174671b3acc6e60857c90c628c92e8e3bb849db"
+      }
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9b7a4385896b9aacc69ea898be23636b5a8c62fb"
+      }
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "383e0446d95a3e490b8e1c808b6e325b0539faaf"
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/dark-3-task-before.png",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "afbbe0fe1e9c289d35ff23acd210e6e4c0f3c661"
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/dark-3-task.png",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dbe7ae6530851cae1d5f388350833894695be171"
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/dark-4-conversation-before.png",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6a3cf7d17a2af82c333709b8c6d0e794d2cf3453"
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/dark-4-conversation.png",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "226fcb49a44c61d0fc0c18dc08810559a2f3d3ca"
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/light-3-task-before.png",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "353de8c95b87a96c532921d58b90df823c66e415"
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/light-3-task.png",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0704517737422bc8597be372715c933f7a47702b"
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/light-4-conversation-before.png",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7940359319777f3416104bcce77bb70d069e0250"
+      }
+    },
+    {
+      "path": "docs/design/agent-switch-no-verb/light-4-conversation.png",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0585abfb2dac416879533ab3a76ebe210255a75d"
+      }
+    },
+    {
+      "path": "docs/design/components.md",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cca3d71b98f6b21f39a9fe34180f1bb8716584fd"
+      }
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee"
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1505-official-path-control-20261109.json",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1dbd1907aca7c820be90ed6779fc2962717e5fec"
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1505-official-path-control-20261109.md",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "274f83e8c45c7f04acabf3bd0da15364a9cf879d"
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.json",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "868d0b251f884079611cbd9810775fc7146a9426"
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.md",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "95770c84ba87e690e45f2ea665b6e5b57d300616"
+      }
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ec15f7515853877c5940b9e08106df50b0d5c55"
+      }
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca"
+      }
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9109982d1c3245179b85a42d6969003aec2f5047"
+      }
+    },
+    {
+      "path": "lib/analytics-policy.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "152b941ff7b05004a7c57a909f776c6268ede106"
+      }
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d73e30c36212029a8951a25a692c4e04a2a5b86d"
+      }
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a5157f09e8022bf9077053686d36aa02760a4e94"
+      }
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa"
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5"
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ec8497366c9c46cdac494814bd832beb1828c880"
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a40f946620ec874320586cb12ddb90c4b2fc438d"
+      }
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "071b2243d35cd6fdd97b7be0f17f21728578c537"
+      }
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8fe53cb39985150e5fc05daa6370121cb5426d53"
+      }
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e8f4f35748707364e77c53fa594c166bafc3dae8"
+      }
+    },
+    {
+      "path": "lib/device-management.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c2243c5732d67b3ff5444196ce3b45e9aca67805"
+      }
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+      }
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f82563e766f5c0477479b2d487e0f92e60a08b75"
+      }
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "266aa82ba4a683e88d207bc197fd97cee1f2b1ae"
+      }
+    },
+    {
+      "path": "lib/mobile-threads.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "38ec55340fb276134e991c9ce5d61e1e547ce4c4"
+      }
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96"
+      }
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+      }
+    },
+    {
+      "path": "lib/replay-readiness.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d60598b09201228e23c5ac7a9df00938192f0e67"
+      }
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "69a827369bd71838ba8ac9ffbee928ca70219e76"
+      }
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "737fa373e4a8333a4a703bf6133f9a533d585460"
+      }
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "00775a5928228262a66b12b845ee0dc18f6c6047"
+      }
+    },
+    {
+      "path": "messages/en.json",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4d6b1a40230130fbb4d7e8afb1defbc4f5e2dd04"
+      }
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1fd3ad6714b3efdb93eede541bb156843b2d74d9"
+      }
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2f6cb3ab32695c64fa67191653c0add6e8720b39"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56412efdfe5bc638496b89de56281360b4cbe9b5"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4ca2cf35c1f499b338469556836ae0505649e82a"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "104075571c73b97a985458f206dba310e4894490"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f"
+      }
+    },
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+      }
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+      }
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f980c7258243a77a123207ccfe03911d4483064d"
+      }
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095"
+      }
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "52fac123eb4f1e6ba8513b38148295f2c2648458"
+      }
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5"
+      }
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "628395f91d97a64655afb80117788d70207200c0"
+      }
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "30ef728a5a2d465d389916a63d40a816d13b1d4c"
+      }
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f162a894cbada7fada30c63a3a49f4b665574f0f"
+      }
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "609029dde521868c00ab7eb687394ad5cacd6183"
+      }
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e"
+      }
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351"
+      }
+    },
+    {
+      "path": "tests/mobile-bot.db.test.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f1ed6a60a48a9e22a806ff3fe0cc17f12dc391a3"
+      }
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "58e4706039dafe6901082676f37a3c92da613d43"
+      }
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0e2ecce921c4b56795ad1096f2b1eae987299e95"
+      }
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d500795e9a62631b6c7619c4ffd1df67f137ee54"
+      }
+    }
+  ],
+  "ours48NetPaths": [
+    ".github/workflows/run-trace-acceptance.yml",
+    "app/actions/coordinator.ts",
+    "app/v1/devices/[deviceId]/repos/route.ts",
+    "app/v1/devices/[deviceId]/runs/route.ts",
+    "apps/api/generated/routes.json",
+    "apps/api/generated/routes.ts",
+    "apps/desktop/src/renderer/read-batch.ts",
+    "apps/desktop/src/renderer/rpc.ts",
+    "components/swr-defaults.tsx",
+    "components/workspace/issue-workspace.tsx",
+    "docs/operations/tracing.md",
+    "hooks/use-live-lists.ts",
+    "instrumentation-client.ts",
+    "lib/analytics-policy.ts",
+    "lib/coordinator/coordinator-bot.ts",
+    "lib/coordinator/repository-resolution.test.ts",
+    "lib/coordinator/repository-resolution.ts",
+    "lib/desktop-rpc/read-batch-context.test.ts",
+    "lib/desktop-rpc/read-batch-context.ts",
+    "lib/desktop-rpc/read-batch-contract.ts",
+    "lib/device-enrollment.db.test.ts",
+    "lib/device-enrollment.ts",
+    "lib/device-heartbeat.db.test.ts",
+    "lib/device-management.ts",
+    "lib/device-unit-fence.db.test.ts",
+    "lib/dispatch-timing.ts",
+    "lib/live/revision-read.ts",
+    "lib/personal-policy.test.ts",
+    "lib/personal-policy.ts",
+    "lib/replay-readiness.ts",
+    "lib/swr/read-observer.ts",
+    "lib/tracing/logs.test.ts",
+    "lib/tracing/node.ts",
+    "scripts/acceptance/run-observability-browser.mjs",
+    "scripts/acceptance/run-observability-browser.test.mjs",
+    "scripts/acceptance/run-observability.md",
+    "scripts/acceptance/run-observability.mjs",
+    "scripts/acceptance/run-observability.test.mjs",
+    "scripts/e2b/validate-template-subscriptions.mjs",
+    "scripts/e2b/validate-template-subscriptions.test.mjs",
+    "scripts/use-live-lists.live.test.tsx",
+    "tests/analytics-policy.test.mjs",
+    "tests/cloud-dispatch-startup.test.ts",
+    "tests/coordinator-bot.db.test.ts",
+    "tests/live-revision-reads.db.test.ts",
+    "tests/replay-readiness.test.mjs",
+    "workflows/coordinator/factory-steps.ts",
+    "workflows/coordinator/steps.ts"
+  ],
+  "protectedContractEntries": [
+    {
+      "path": "app/actions/coordinator.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bd24ef4c103b670d92d381d396d5c3e1b6aba083"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c1af7261fed4907c265041a549441b92f3ba6ab7"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bd24ef4c103b670d92d381d396d5c3e1b6aba083"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "app/api/coordinator/messages/route.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b6e7b570c4026906f67a8f878703ad87a9624d06"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b6e7b570c4026906f67a8f878703ad87a9624d06"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b6e7b570c4026906f67a8f878703ad87a9624d06"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "app/api/desktop/rpc/route.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "42466e8c8e23e0aca573390a141edb2956819189"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "42466e8c8e23e0aca573390a141edb2956819189"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "42466e8c8e23e0aca573390a141edb2956819189"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "app/api/mobile/model/route.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3dafb8efb5792af91aaa26a386e9426a9a2478a6"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3dafb8efb5792af91aaa26a386e9426a9a2478a6"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3dafb8efb5792af91aaa26a386e9426a9a2478a6"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "lib/subscription-workflow-model.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "24349e66f47d2ed935f89e509d022826fe37ffb2"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "24349e66f47d2ed935f89e509d022826fe37ffb2"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "24349e66f47d2ed935f89e509d022826fe37ffb2"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "lib/subscription-workflow-turn.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fa3c7dd9d05c2e5593addfe515e26b8b78d8431b"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fa3c7dd9d05c2e5593addfe515e26b8b78d8431b"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fa3c7dd9d05c2e5593addfe515e26b8b78d8431b"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0c0b7accd10ea84957428a79d9e58a9924b9d841"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0c0b7accd10ea84957428a79d9e58a9924b9d841"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0c0b7accd10ea84957428a79d9e58a9924b9d841"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "lib/bot-model-menu.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "74b14c3070d37b4c50591cf8849dc43fe5b7de96"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "74b14c3070d37b4c50591cf8849dc43fe5b7de96"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "74b14c3070d37b4c50591cf8849dc43fe5b7de96"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "lib/bot-model-selection.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7bdfe390ddb378f267fcf5089c2f5b4600af05fb"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7bdfe390ddb378f267fcf5089c2f5b4600af05fb"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7bdfe390ddb378f267fcf5089c2f5b4600af05fb"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "104075571c73b97a985458f206dba310e4894490"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ed07cf1751a0fc2885109201caf89cda71f704b"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2f6cb3ab32695c64fa67191653c0add6e8720b39"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ed07cf1751a0fc2885109201caf89cda71f704b"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "39e1facecdf28a661511f72e14580fdb4b1ae967"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "39e1facecdf28a661511f72e14580fdb4b1ae967"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "39e1facecdf28a661511f72e14580fdb4b1ae967"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c69dcfe5f459de0e603651fd510f06cf8d32e75b"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dae8798653457afad334c2d909b10b63e9b3956f"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c69dcfe5f459de0e603651fd510f06cf8d32e75b"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b72659facb8a5a710fb0c0121e2543add0ad8f33"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e7f6972a23519ae45e059038cd0c404789d44a98"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b72659facb8a5a710fb0c0121e2543add0ad8f33"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "38df2110ac19c41e413dbbdfae8fac34361b2480"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "38df2110ac19c41e413dbbdfae8fac34361b2480"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "38df2110ac19c41e413dbbdfae8fac34361b2480"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2dc3ab5a9934fed5146189fd236b450f0d223920"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "69a827369bd71838ba8ac9ffbee928ca70219e76"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2dc3ab5a9934fed5146189fd236b450f0d223920"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3"
+      },
+      "ours": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3"
+      },
+      "theirs": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3"
+      },
+      "theirsEqualsBase": true,
+      "preservation": "ours unchanged by this PR"
+    }
+  ],
+  "protectedTracingAndCoordinatorEntries": [
+    {
+      "path": "instrumentation-client.ts",
+      "baseBlob": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+      "oursBlob": "9109982d1c3245179b85a42d6969003aec2f5047",
+      "theirsBlob": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "instrumentation.ts",
+      "baseBlob": "e6635a158cc7f502f84cca60a2154605260646e4",
+      "oursBlob": "e6635a158cc7f502f84cca60a2154605260646e4",
+      "theirsBlob": "e6635a158cc7f502f84cca60a2154605260646e4",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "baseBlob": "7f5ca1b72b28823f00936a820edac001766f5e71",
+      "oursBlob": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+      "theirsBlob": "7f5ca1b72b28823f00936a820edac001766f5e71",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "lib/tracing/ai.test.ts",
+      "baseBlob": "5bb43681fd29ebce3c378b8f55bcdfee88165f72",
+      "oursBlob": "5bb43681fd29ebce3c378b8f55bcdfee88165f72",
+      "theirsBlob": "5bb43681fd29ebce3c378b8f55bcdfee88165f72",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "lib/tracing/ai.ts",
+      "baseBlob": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+      "oursBlob": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+      "theirsBlob": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "lib/tracing/context.ts",
+      "baseBlob": "fe005d26c2ea903250683d9351334b95ef328383",
+      "oursBlob": "fe005d26c2ea903250683d9351334b95ef328383",
+      "theirsBlob": "fe005d26c2ea903250683d9351334b95ef328383",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "baseBlob": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+      "oursBlob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "theirsBlob": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "lib/tracing/run-context.test.ts",
+      "baseBlob": "96f800cbec92a5ea4b8ff464155e2fd98683b7e9",
+      "oursBlob": "96f800cbec92a5ea4b8ff464155e2fd98683b7e9",
+      "theirsBlob": "96f800cbec92a5ea4b8ff464155e2fd98683b7e9",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "baseBlob": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "oursBlob": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "theirsBlob": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "packages/daemon/src/adapters/generation-metrics.ts",
+      "baseBlob": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+      "oursBlob": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+      "theirsBlob": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "packages/daemon/src/codex-generation-telemetry.ts",
+      "baseBlob": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+      "oursBlob": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+      "theirsBlob": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "packages/daemon/src/subscription-hosted-runner.ts",
+      "baseBlob": "62a2d8edd244293b511a00da618849638a943ac0",
+      "oursBlob": "62a2d8edd244293b511a00da618849638a943ac0",
+      "theirsBlob": "62a2d8edd244293b511a00da618849638a943ac0",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "packages/daemon/src/tracing-ai.ts",
+      "baseBlob": "6f7d7414fb07809880603dc4c20f6525616219ab",
+      "oursBlob": "6f7d7414fb07809880603dc4c20f6525616219ab",
+      "theirsBlob": "6f7d7414fb07809880603dc4c20f6525616219ab",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "packages/daemon/src/tracing.ts",
+      "baseBlob": "0eed0277c933b0d2457909851bab458a482c184d",
+      "oursBlob": "0eed0277c933b0d2457909851bab458a482c184d",
+      "theirsBlob": "0eed0277c933b0d2457909851bab458a482c184d",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "baseBlob": "665573940610341eea039de5fb2c02406c6ef3b7",
+      "oursBlob": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+      "theirsBlob": "665573940610341eea039de5fb2c02406c6ef3b7",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "baseBlob": "5002aebd9ed3df6047ccb3f7a083401c3cad34c3",
+      "oursBlob": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+      "theirsBlob": "5002aebd9ed3df6047ccb3f7a083401c3cad34c3",
+      "theirsEqualsBase": true,
+      "oursMode": "100644"
+    }
+  ],
+  "semanticReview": [
+    {
+      "area": "Saved subscription choice",
+      "paths": [
+        "lib/bot-model-choice.ts",
+        "lib/bot-model-selection.test.ts"
+      ],
+      "finding": "An exact saved own/shared binding is resolved before the full catalogue; a valid binding avoids unrelated catalogue reads/failures. Missing/unusable saved bindings retain fallback catalogue behavior. This is real model-selection/read-order behavior, not merely logging.",
+      "preserved": "chatBinding still performs exact binding and route-readiness checks; sharedChatBinding retains active owner/workspace/bot checks. freezeBotModel still freezes the current authority via freezeHostedModelSelection. Existing quota/API fallback logic is unchanged, and the1512 driver still explicitly requires own subscription plus API fallback off.",
+      "ownRecovery": "ExecutionSettings, mobile/model route and driver restore-implicit binding/xmin rules are not modified by1836. Temporary selection retains the existing binding rather than rewriting its choice merely to enumerate the catalogue.",
+      "testsReviewedOnly": [
+        "saved own bindings for Claude/Codex avoid catalogue and still reject disconnected authority",
+        "saved shared binding avoids unrelated own catalogue",
+        "missing saved binding propagates fallback catalogue failure",
+        "exhausted subscription retains existing same-model quota fallback"
+      ]
+    },
+    {
+      "area": "Workflow events transport",
+      "path": ".github/workflows/web-deploy.yml",
+      "finding": "Adds --env WORKFLOW_EVENTS_TRANSPORT=http to the production Vercel deploy command. This is an actual deployed runtime transport change.",
+      "preserved": "No coordinator action/route, workflow step implementation, W3C carrier, sanitizer policy, source pin, artifact handoff or approval/cleanup logic is edited in this PR.",
+      "boundary": "A source-only review does not measure this transport's latency or prove live trace continuity. Keep the already planned actual Coordinator-to-agent trace verification on the final deployed tree; do not substitute old production topology or old Native numbers."
+    },
+    {
+      "area": "Model versus HTTP transport timing",
+      "paths": [
+        "lib/model-call-timing.ts",
+        "packages/daemon/src/subscription-worker-client.ts",
+        "packages/daemon/src/subscription-worker-timing.ts",
+        "packages/subscription-worker/plain_model.go",
+        "packages/subscription-worker/http_transport_timing.go",
+        "packages/subscription-worker/timing.go"
+      ],
+      "finding": "Adds a separate subscription_transport_timing diagnostic for executeStream rows, while retaining the original model_call_timing payload and subscriptionStages schema.",
+      "semantics": "HTTP firstByteMs is the first response-header byte. Hook values are first offsets from the original Do clock, not additive phases. Existing firstEvent/firstText observations are copied separately; none replace native per-generation TTFT or duration fields.",
+      "privacy": "Only bounded numeric offsets/counts, boolean/null flags, bounded workflow/step identity and closed state/outcome values cross the new diagnostic boundary. Host/URL/header/token/body/free-form error hook arguments are discarded.",
+      "lifecycle": "WithClientTrace wraps the existing request context, preserving deadline/cancellation and composing prior hooks. No extra provider request or terminal IPC frame is introduced by the instrumentation; new transport payload drops independently if it exceeds the existing frame budget.",
+      "logging": "Each observed stream may now produce an additional diagnostic line, including a missing-state row when no HTTP receipt exists. This changes logging volume and model-path observation overhead; it is not measured by the old Web controlled-failure probe.",
+      "testContract": "Upstream workflow-model tests intentionally select logs by msg rather than assuming one timing line. Preserve that pair distinction on integration; do not merge these fields into legacy model timing or convert missing observations to zero."
+    },
+    {
+      "area": "Driver, recovery journal, browser and Native budgets",
+      "finding": "PR1836 changes none of the acceptance driver/journal/browser/main-only workflow, lifecycle timing windows, physical/logical counter code or78-source vocabulary.",
+      "preserved": "Own driver104075571c73b97a985458f206dba310e4894490, test2e3c8c7aad0594df165caf8f798c72034b3d484f, browser2f6cb3ab32695c64fa67191653c0add6e8720b39 and workflowebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4 remain the ordinary merge choices.",
+      "boundary": "The product read/transport changes can change observed Native/production behavior even though measurement code is unchanged. This report does not transfer84ce results to an unexecuted shared tree."
+    }
+  ],
+  "canonicalWorkerFingerprint": {
+    "builderBlob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+    "definition": "build-template.py WORKER_PATHS includes packages/daemon recursively, including tests. Listed non-package files contribute their Git entries.",
+    "changedInputs": [
+      {
+        "path": "packages/daemon/src/subscription-worker-client.ts",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e8cf0150fc8ce0962a55ec9723b441abbfb41c02"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cc1efb7058e1afc6a44ba6e224540886b1d9a378"
+        }
+      },
+      {
+        "path": "packages/daemon/src/subscription-worker-timing.test.ts",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a81384d2249da654d52f63d0c426d41d9145636e"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "0461fec9a9cb63bc974169df605315839ab9d297"
+        }
+      },
+      {
+        "path": "packages/daemon/src/subscription-worker-timing.ts",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "622a0d39f562ff326dc42a4bd7af16b3d1c3d3e0"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "041dc0e73ef6446a37e73a50d7af977f0ad8da61"
+        }
+      }
+    ],
+    "equivalentTo84ce": false,
+    "numericFingerprintComputed": false,
+    "boundary": "These three canonical entries differ, so do not claim unchanged worker inputs. This is not an AppSHA==runtimeSHA requirement or a new demand to rebuild solely because the Web SHA changes. Any claimed availability of the new transport diagnostic must be bound to the actual released components."
+  },
+  "controlledFailureApplicability": {
+    "priorProof": {
+      "gitBlob": "4cb08d969c98591fd36ab504072afbcddea274d2",
+      "bytes": 36385,
+      "sha256": "91db2ddbf1792f2e9463ef999fe0aa5ed91b3fc19dc284e6784ea8c2a68d258f"
+    },
+    "matrix": [
+      {
+        "path": "scripts/ops/run-trace-benchmark.ts",
+        "previousReviewCurrentBlob": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+        "oursBlob": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+        "theirsBlob": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "09280f0dfb945157aa8c692699fecbc2989f15dc"
+      },
+      {
+        "path": "apps/api/runtime/request-trace.ts",
+        "previousReviewCurrentBlob": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+        "oursBlob": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+        "theirsBlob": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b"
+      },
+      {
+        "path": "lib/tracing/node.ts",
+        "previousReviewCurrentBlob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+        "oursBlob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+        "theirsBlob": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "00775a5928228262a66b12b845ee0dc18f6c6047"
+      },
+      {
+        "path": "lib/tracing/config.ts",
+        "previousReviewCurrentBlob": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+        "oursBlob": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+        "theirsBlob": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483"
+      },
+      {
+        "path": "lib/tracing/context.ts",
+        "previousReviewCurrentBlob": "fe005d26c2ea903250683d9351334b95ef328383",
+        "oursBlob": "fe005d26c2ea903250683d9351334b95ef328383",
+        "theirsBlob": "fe005d26c2ea903250683d9351334b95ef328383",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "fe005d26c2ea903250683d9351334b95ef328383"
+      },
+      {
+        "path": "lib/tracing/spans.ts",
+        "previousReviewCurrentBlob": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+        "oursBlob": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+        "theirsBlob": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "9822a772a135fa77f4f4bb604cf40b17f7635a96"
+      },
+      {
+        "path": "lib/tracing/sampling.ts",
+        "previousReviewCurrentBlob": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+        "oursBlob": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+        "theirsBlob": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "62ffc81009b4b317b2242f42b56f072b594a44d0"
+      },
+      {
+        "path": "lib/tracing/sanitize.ts",
+        "previousReviewCurrentBlob": "9857985199066a39fdc96ba73f7047d21ba6406f",
+        "oursBlob": "9857985199066a39fdc96ba73f7047d21ba6406f",
+        "theirsBlob": "9857985199066a39fdc96ba73f7047d21ba6406f",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "9857985199066a39fdc96ba73f7047d21ba6406f"
+      },
+      {
+        "path": "lib/tracing/logs.ts",
+        "previousReviewCurrentBlob": "ac6a917887a94a6a673410753d4645e2dba25d21",
+        "oursBlob": "ac6a917887a94a6a673410753d4645e2dba25d21",
+        "theirsBlob": "ac6a917887a94a6a673410753d4645e2dba25d21",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "ac6a917887a94a6a673410753d4645e2dba25d21"
+      },
+      {
+        "path": "lib/tracing/flush.ts",
+        "previousReviewCurrentBlob": "0149083f1f9e36adca769c2e799afe84a90bd139",
+        "oursBlob": "0149083f1f9e36adca769c2e799afe84a90bd139",
+        "theirsBlob": "0149083f1f9e36adca769c2e799afe84a90bd139",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "0149083f1f9e36adca769c2e799afe84a90bd139"
+      },
+      {
+        "path": "lib/tracing/labels.ts",
+        "previousReviewCurrentBlob": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+        "oursBlob": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+        "theirsBlob": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "4eddcee8197d25708e18fc1070ce13b4e0125126"
+      },
+      {
+        "path": "packages/protocol/src/tracing.ts",
+        "previousReviewCurrentBlob": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+        "oursBlob": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+        "theirsBlob": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502"
+      },
+      {
+        "path": "packages/protocol/src/coded-error.ts",
+        "previousReviewCurrentBlob": "53c619750e667cba008192495928112da5de16f1",
+        "oursBlob": "53c619750e667cba008192495928112da5de16f1",
+        "theirsBlob": "53c619750e667cba008192495928112da5de16f1",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "53c619750e667cba008192495928112da5de16f1"
+      },
+      {
+        "path": "packages/protocol/src/trace-context.ts",
+        "previousReviewCurrentBlob": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+        "oursBlob": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+        "theirsBlob": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530"
+      },
+      {
+        "path": "lib/base-path-config.mjs",
+        "previousReviewCurrentBlob": "a5338d3516d88e4f911031a316ae5187a379ba33",
+        "oursBlob": "a5338d3516d88e4f911031a316ae5187a379ba33",
+        "theirsBlob": "a5338d3516d88e4f911031a316ae5187a379ba33",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "a5338d3516d88e4f911031a316ae5187a379ba33"
+      },
+      {
+        "path": "scripts/test-accounts/database-target.mjs",
+        "previousReviewCurrentBlob": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+        "oursBlob": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+        "theirsBlob": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "64a4ee0af06f9521bbe80123afd553ce977a69c4"
+      },
+      {
+        "path": "packages/protocol/src/local-test-mode.ts",
+        "previousReviewCurrentBlob": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+        "oursBlob": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+        "theirsBlob": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "02b4d3a979ac917a67b3d280c53896e8e46a33d9"
+      },
+      {
+        "path": "scripts/server-test.mjs",
+        "previousReviewCurrentBlob": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+        "oursBlob": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+        "theirsBlob": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae"
+      },
+      {
+        "path": "packages/protocol/package.json",
+        "previousReviewCurrentBlob": "52a7ed583d756b1575697556e29a6f65438d2410",
+        "oursBlob": "52a7ed583d756b1575697556e29a6f65438d2410",
+        "theirsBlob": "52a7ed583d756b1575697556e29a6f65438d2410",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "52a7ed583d756b1575697556e29a6f65438d2410"
+      },
+      {
+        "path": "lib/posthog-config.ts",
+        "previousReviewCurrentBlob": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+        "oursBlob": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+        "theirsBlob": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+        "theirsEqualsCommonBase": true,
+        "changedBy1836": false,
+        "preservedBlob": "b90fa7ae1d89462360dce3e5688852fb12a41977"
+      }
+    ],
+    "directIntersectionCount": 0,
+    "packageLockWorkspaceEditedBy1836": false,
+    "finding": "No1836 edit touches the actual probe entry, RunSampler, RetainingSpanProcessor, SafeExporter, StageLog/SafeLog, PG instrumentation hook/config/context or their20 reviewed dependency paths.",
+    "preservedPriorDifferences": "The previously reviewed84ce node.ts serverless-drain change and sanitizer workflow.events.transport enum remain exactly their prior after-blobs. The1836 HTTP env now selects an existing supported transport value in production; the controlled probe does not traverse that production path.",
+    "historicalScope": "The historical20 traces/80 spans/40 ERROR records and600 paired samples/100 warmups remain evidence of their original Web/loopback/memory-exporter scenario. They are not current whole-daemon/model-network/HTTP-transport costs.",
+    "measuredHistoricalOverhead": {
+      "meanDeltaMs": 0.344583,
+      "p95DeltaMs": 0.43658,
+      "basis": "Retained prior immutable proof, not a new measurement."
+    },
+    "repeatSameProbeRecommendedForThisPR": false,
+    "reason": "No new probe-path dependency change or required controlled-failure gate is established by these14 paths. Rerunning that unchanged probe would not measure the new actual model/Workflow transport behavior."
+  },
+  "mergePreparation": {
+    "conflictResolutionsNeededForFixedPair": [],
+    "preserveOurs": "All84 common-base delta entries, including48 direct changes from own main parent; especially coordinator backfill, Native batching/coverage, tracing/node, browser Replay guard and recovery journal.",
+    "preserveTheirs": "All14 exact upstream entries including HTTP deploy env, lazy exact binding resolution, distinct transport diagnostics and their matching tests.",
+    "whenBatchArrives": "Read its actual head/base/tree and re-evaluate its net paths against84ce. This fixed-pair proof applies only if these frozen changes survive without edits or collisions from1839/1842/other batch work.",
+    "validationBoundary": "Normal combined-source CI/Native/actual production evidence remains owned by the coordinated batch. This review neither creates nor skips a test gate."
+  },
+  "limitations": [
+    "No CI original logs/artifacts were read and no test pass is asserted.",
+    "No actual shared batch head was available or reviewed.",
+    "No Workflow SDK network behavior was executed; latency/trace continuity remain runtime evidence, not static proof."
+  ],
+  "actions": {
+    "sourceEdits": 0,
+    "sourceTreeOrCommitObjectsCreated": 0,
+    "refsChanged": 0,
+    "testsRun": 0,
+    "ciTriggered": 0,
+    "modelCalls": 0,
+    "accountsTouched": 0,
+    "resourcesCreated": 0,
+    "originalJobLogReads": 0,
+    "zipReads": 0,
+    "evidenceOnly": "One unreferenced safe review JSON blob and exact readback."
+  }
+}

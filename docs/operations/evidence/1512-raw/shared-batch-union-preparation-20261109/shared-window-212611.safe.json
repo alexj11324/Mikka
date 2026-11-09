@@ -1,0 +1,208 @@
+{
+  "schema": "mikka-1512-shared-release-readonly-observation-v1",
+  "observationStart": "2026-11-09 21:26:10 UTC",
+  "observationEnd": "2026-11-09 21:26:11 UTC",
+  "repository": "alexj11324/Mikka",
+  "scope": "Read only GitHub ref, workflow/job/step metadata and new issue comments. No job logs or artifact ZIPs, no account or resource action, no ref change.",
+  "priorProof": "3abd80a075d02c2dccb616a255b320488b75887c",
+  "main": {
+    "ref": "refs/heads/main",
+    "node_id": "REF_kwDOVRYxA69yZWZzL2hlYWRzL21haW4",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/main",
+    "object": {
+      "sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/12458fe22e1217f644e8b28f82ab856211e73b72"
+    }
+  },
+  "r7": {
+    "id": 42695935772,
+    "name": "E2B additive runtime release",
+    "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "failure",
+    "created_at": "2026-11-09T20:45:11Z",
+    "updated_at": "2026-11-09T21:21:56Z",
+    "run_started_at": "2026-11-09T20:45:11Z"
+  },
+  "r7Jobs": [
+    {
+      "id": 129428949477,
+      "name": "test",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T20:47:32Z",
+      "completed_at": "2026-11-09T20:47:49Z"
+    },
+    {
+      "id": 129429132057,
+      "name": "check",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T20:47:52Z",
+      "completed_at": "2026-11-09T20:48:09Z"
+    },
+    {
+      "id": 129429312566,
+      "name": "validate / build",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T20:48:12Z",
+      "completed_at": "2026-11-09T20:56:19Z"
+    },
+    {
+      "id": 129433803533,
+      "name": "await-web",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T20:56:21Z",
+      "completed_at": "2026-11-09T21:14:00Z"
+    },
+    {
+      "id": 129443739610,
+      "name": "subscriptions",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-11-09T21:18:57Z",
+      "completed_at": "2026-11-09T21:21:34Z",
+      "steps": [
+        {
+          "number": 4,
+          "name": "Refuse an obsolete source before real subscription work",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T21:19:04Z",
+          "completed_at": "2026-11-09T21:19:05Z"
+        },
+        {
+          "number": 7,
+          "name": "Bind the candidate bytes to this source, worker and run attempt",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T21:19:05Z",
+          "completed_at": "2026-11-09T21:19:05Z"
+        },
+        {
+          "number": 12,
+          "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-09T21:19:17Z",
+          "completed_at": "2026-11-09T21:21:31Z"
+        },
+        {
+          "number": 13,
+          "name": "Preserve closed diagnostics and any accepted subscription proof",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T21:21:31Z",
+          "completed_at": "2026-11-09T21:21:32Z"
+        },
+        {
+          "number": 14,
+          "name": "Make only fully accepted candidates public",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-09T21:21:32Z",
+          "completed_at": "2026-11-09T21:21:32Z"
+        },
+        {
+          "number": 15,
+          "name": "Preserve the complete public release report",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-09T21:21:32Z",
+          "completed_at": "2026-11-09T21:21:32Z"
+        }
+      ]
+    },
+    {
+      "id": 129447943112,
+      "name": "cleanup",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T21:21:36Z",
+      "completed_at": "2026-11-09T21:21:55Z",
+      "steps": [
+        {
+          "number": 5,
+          "name": "Close this attempt's instances and remove only its private candidates",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T21:21:50Z",
+          "completed_at": "2026-11-09T21:21:53Z"
+        },
+        {
+          "number": 6,
+          "name": "Preserve release cleanup receipt",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T21:21:53Z",
+          "completed_at": "2026-11-09T21:21:54Z"
+        }
+      ]
+    },
+    {
+      "id": 129447945340,
+      "name": "publish",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-09T21:21:34Z",
+      "completed_at": "2026-11-09T21:21:34Z",
+      "steps": []
+    }
+  ],
+  "web": {
+    "id": 42695935815,
+    "name": "Web deploy",
+    "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-11-09T20:45:11Z",
+    "updated_at": "2026-11-09T21:13:47Z",
+    "run_started_at": "2026-11-09T20:45:11Z"
+  },
+  "commentsQuery": {
+    "since": "2026-11-09T21:19:56Z",
+    "perPage": 100
+  },
+  "new1505Comments": [],
+  "new1752Comments": [
+    {
+      "id": 6751840130,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751840130",
+      "user": "alexj11324",
+      "created_at": "2026-11-09T21:24:13Z",
+      "updated_at": "2026-11-09T21:24:13Z",
+      "body": "#1505 当前段进入最后精确child清理：实际子窗口 **2026-11-09T21:24:11.000Z → 最迟进入2026-11-09T21:29:11.000Z → hard end 2026-11-09T21:39:11.000Z**，位于既有20:04–22:04段内，不延长该段。12458 Web READY；R7 42695935772/A1已FAIL，cleanup job129447943112 SUCCESS，原件确认三候选deleted、sandboxes[]、errors[]。Core兼容/Read-cache已SUCCESS、Project-decisions SKIP，目前该main没有运行中的自动消费者。\n\n本轮Codex实际错误为 `template_gate_execution_failed / startup_ended_before_execution_proof`：工具、ACK/runtime evidence已到，工具后回复未到且lastStatus=stopped；不是上一轮adoptionmissing的同一直接失败码。CLI仍0.167.0，准备回执仍null；不把两次故障合并归因。原件6099B/SHA1b5852b2a66a35edb23ac0041fd278e4901444f8374700d67769b221f923f7c7由本root读取，另做只读分支核查。\n\n现在仅按原prepare42689909155/A1、artifact13705908471的12项绑定撤销/断开本方readonly child；原Owner保持。main仍12458，closed carrier170a；新source形状保留全部APP+六新增、父序[APP,closed]，真实cleanup receipt闭合并关闭入口后立即在此释放。H未创建、正式六例0。"
+    },
+    {
+      "id": 6751862557,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751862557",
+      "user": "alexj11324",
+      "created_at": "2026-11-09T21:25:18Z",
+      "updated_at": "2026-11-09T21:25:58Z",
+      "body": "#1506 root 合批进展（2026-11-09 21:25 UTC）\n\n已按 #1839 / #1842 的精确 head 授权完成普通 Git octopus 合流；原 PR refs、原提交和作者均未改动。最终待发布批次只含以下三个父提交：\n- #1836 `ed60885d317240303d496b3bddfcf9a49caf4139`\n- #1839 `205d26db8f8435ab18ce74d1b14c9669550098e4`\n- #1842 `98a0db9e8ec4264eb641e7fd36c25e344a124cf2`\n\n实际合并无冲突，19路径 tree **`50f85fb5c687ec19c3e0c06d96e189fb6b18e62b`**；以当前 main `12458…` 的 tree 为底导出的 GitHub tree 已独立返回同一 SHA。#1836 原14路径逐 blob 不变，main 两份 README 和 lockfile保留；两处共享 Codex 文件的自动合并结果与独立源码审查一致。\n\nRoot在该精确19路径树执行的 Codex 联合回归：3文件 **60/60 PASS、0 SKIP**（spare/hosted/startup-config），源文件前后SHA一致。完整原 `pnpm check` 正从21:20 UTC运行，使用Node24.22.1/pnpm10.34.3、普通CI unit环境、无生产凭据、无runner身份模拟；未完成前不记PASS。原 #1836、#1839、#1842 的各自验证与历史失败均继续保留，最终批次另走自身CI。\n\n观测到当前main的R7 42695935772已FAILURE，publish SKIPPED、cleanup SUCCESS；未读取其原日志/ZIP，也不推断此次失败原因。仍尊重 #1505 已开始的实际窗口和其旧readonly child清理责任，尚未合并main、创建生产账号动作或登记未来占位。待其提供实际清理/关闭/释放回执后再处理本方实际入口。\n\n本批次当前冻结的范围不包含尚未发布的 mailbox native-resume 0.167 两文件头，也不声称 #1842 已覆盖该路径。"
+    }
+  ],
+  "findings": {
+    "currentMainUnchanged": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "r7Terminal": "FAILURE. subscriptions step 12 failed at 21:21:31 UTC, publication skipped, cleanup completed successfully at 21:21:55 UTC.",
+    "runtimePublication": "No successful runtime publication established by this run; Web success does not establish a new worker runtime publication.",
+    "failureReasonSource": "The exact failure description is the owner's safe projection in comment 6751840130, not this watcher's independent original-log review. It differs from the previous run's direct adoption-missing error and must not be collapsed into that cause.",
+    "childWindow": "Owner comment 6751840130 establishes actual cleanup subwindow 21:24:11 UTC, latest entry 21:29:11 UTC, hard end 21:39:11 UTC within original 20:04:10-22:04:10 window. No actual child revoke/closed/release receipt in queried comments.",
+    "candidateCleanup": "R7 cleanup job SUCCESS is metadata; deleted three candidate templates, no sandboxes and no errors are owner-reported safe projection, not an independent provider DELETE/GET404 check.",
+    "batch": "Comment 6751862557 reports exact tree 50f85fb5c687ec19c3e0c06d96e189fb6b18e62b, 19 changed paths, three ordinary merge parents ed60885d317240303d496b3bddfcf9a49caf4139 / 205d26db8f8435ab18ce74d1b14c9669550098e4 / 98a0db9e8ec4264eb641e7fd36c25e344a124cf2; it does not provide an actual published commit or branch head.",
+    "mailbox": "No new published native-resume 0.167 two-file head in these queried comments; batch owner expressly excludes that unpublished work.",
+    "futurePlans": "Future batch publication and future acceptance plans do not constitute a current hold."
+  }
+}

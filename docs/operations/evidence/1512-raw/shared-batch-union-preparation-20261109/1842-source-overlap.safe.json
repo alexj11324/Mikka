@@ -1,0 +1,615 @@
+{
+  "schema": "mikka.issue1512.pr1842.exact-compatibility-source-review.v1",
+  "observedAtUtc": "2026-11-09 21:18:30 UTC",
+  "status": "PASS_EXACT_SOURCE_REVIEW_NO_BLOCKING_FINDING; TWO_OVERLAP_FILES_TEXT_CHANGES_COMMUTE; NO_MERGE_OR_RUNTIME_EXECUTION",
+  "scope": {
+    "repository": "alexj11324/Mikka",
+    "dependencyPr": 1842,
+    "fixedHead": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+    "fixedTree": "3f9ff8a38e91ee3971ea255b9cc1e254ab4c61a4",
+    "parent": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "ownFixedHead": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+    "otherDependencyHead": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+    "sharedEarlierBase": "7848e79df9c5af67e526aeed1c828858db392066"
+  },
+  "priorProofReused": {
+    "gitBlob": "914e3641f3dd590b7c651558504ebba34712fab6",
+    "bytes": 179816,
+    "sha256": "d6363b9efd3d735073bf5e510c1cafb47280051c4edbc07a86a38cc25a4c28f2",
+    "priorReadbackVerified": true,
+    "newReadsOfIts14Trees": 0
+  },
+  "immutableCommit": {
+    "sha": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+    "tree": "3f9ff8a38e91ee3971ea255b9cc1e254ab4c61a4",
+    "parents": [
+      "12458fe22e1217f644e8b28f82ab856211e73b72"
+    ],
+    "message": "fix: adopt verified Codex 0.167 anonymous initialization"
+  },
+  "pullRequest": {
+    "url": "https://github.com/alexj11324/Mikka/pull/1842",
+    "state": "open",
+    "merged": false,
+    "head": "root/issue1505-codex-0167-20261109",
+    "head_sha": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+    "base": "main",
+    "base_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "changed_files": 4,
+    "additions": 65,
+    "deletions": 15
+  },
+  "directHeadRef": {
+    "ref": "refs/heads/root/issue1505-codex-0167-20261109",
+    "node_id": "REF_kwDOVRYxA9oALXJlZnMvaGVhZHMvcm9vdC9pc3N1ZTE1MDUtY29kZXgtMDE2Ny0yMDI2MTEwOQ",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/root/issue1505-codex-0167-20261109",
+    "object": {
+      "sha": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/98a0db9e8ec4264eb641e7fd36c25e344a124cf2"
+    }
+  },
+  "compare": {
+    "base": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "head": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+    "status": "ahead",
+    "ahead_by": 1,
+    "behind_by": 0,
+    "merge_base": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "files": [
+      {
+        "filename": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "status": "modified",
+        "additions": 45,
+        "deletions": 0,
+        "changes": 45,
+        "previous_filename": null
+      },
+      {
+        "filename": "packages/daemon/src/anonymous-codex-spare.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1,
+        "changes": 3,
+        "previous_filename": null
+      },
+      {
+        "filename": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+        "status": "modified",
+        "additions": 5,
+        "deletions": 5,
+        "changes": 10,
+        "previous_filename": null
+      },
+      {
+        "filename": "packages/daemon/test/anonymous-codex-spare.test.ts",
+        "status": "modified",
+        "additions": 13,
+        "deletions": 9,
+        "changes": 22,
+        "previous_filename": null
+      }
+    ]
+  },
+  "fileIdentities": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "ref": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "bytes": 95749,
+      "sha256": "f8f139bace1d139f0872beacce19ade048acc5ebc4e7965172d77043eed7d05f",
+      "gitBlob": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "ref": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+      "bytes": 99013,
+      "sha256": "a3b8e3d15f0c4d5e3dd87a4f32e05154d50cabe003cb60ab5a6439f26c699ade",
+      "gitBlob": "ea4f398aabb120f760d133168ed4ed49ddd4b767"
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "ref": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "bytes": 11991,
+      "sha256": "b7fac1b0fadd1374377ba27b9fe62d60a70a746218fe029237acf870855d6035",
+      "gitBlob": "00f476c51799a68c4af5edc38d9a62c91aeea545"
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "ref": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+      "bytes": 12105,
+      "sha256": "f9c3e82ea67e6a57cf53ef1978c861a7d127cd039e79e2bd9a7da5fd81fcb3ea",
+      "gitBlob": "92e737cc09ac29ac2f64363549a9723f35e7792f"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "ref": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "bytes": 13467,
+      "sha256": "3730a8b054fe913d8075dc510c188c66d2cfcadb51f8868beca2e633a3d824d0",
+      "gitBlob": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "ref": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+      "bytes": 13540,
+      "sha256": "b581c76457ddf2ac14833c4141496dbbb144dace5597b94d0c1d4e2a600239ad",
+      "gitBlob": "e2998a4ecf1eea10108202c2a94856518f7f5c1d"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+      "ref": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "bytes": 14630,
+      "sha256": "8edb0a30583ed610f9ad385830ec444ba73f69eb38df6b3931bbe1e247f8f8a9",
+      "gitBlob": "6a2e49857783a337e6be23ee53680b66e4f8a0bd"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+      "ref": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+      "bytes": 15067,
+      "sha256": "4ff047f7ddfbca99d6ac0b4b5b4524e5b90df7b041e81855242d5cd7acaaed06",
+      "gitBlob": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6"
+    }
+  ],
+  "exactEdits": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "edits": [
+        {
+          "baseStartLine": 1036,
+          "newStartLine": 1036,
+          "removed": [],
+          "added": [
+            "### 2026-11-09：Codex 0.167.0 的匿名初始化版本拒绝",
+            "",
+            "[R7 42690423873/A1 的订阅检查](https://github.com/alexj11324/Mikka/actions/runs/42690423873/job/129425290133)",
+            "绑定产品源 `7848e79df9c5af67e526aeed1c828858db392066`、worker",
+            "`aa7efbbe2969d8b1578bdba093e6400a26749e07`。Claude 的真实订阅及",
+            "bootstrap adoption 完整通过；Codex 的共享订阅执行、真实工具、工具后",
+            "回复及 runtime evidence 通过，但 `template_gate_bootstrap_adoption_missing`",
+            "使发布失败。Codex 的启动回执为1548.509ms，其中正常 `cli_init`",
+            "为88.531ms，准备回执为 unavailable/null；这不是完整 dispatch→agent",
+            "时间，也不能据此报告五秒验收通过。",
+            "",
+            "该轮候选记录的官方 CLI 是 `0.167.0`，原始二进制摘要为",
+            "`e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af`。",
+            "失败原件 `subscription-diagnostics.json` 保持6384B，SHA256为",
+            "`ca8ad628f11addabacbadfe4c7475d4186b0dfc0ec52ba50860b559f4122541e`。",
+            "原件没有匿名 `initialize` 响应或拒绝原因，不能补造一条已观测的异常。",
+            "源码中的 `startAnonymousCodex.prepare()` 只接受 `0.166.0`，因此正常的",
+            "`0.167.0` user agent 会在发送 `initialized` 前被拒绝。候选随后关闭，",
+            "适配器走原冷启动路径，只有成功采用候选才公开的准备回执保持缺失。",
+            "",
+            "版本扩展依据官方固定提交 `6ff1e1ca3b30fc8b914720681fcf5fe62e95f856`",
+            "（0.166.0）与 `086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a`",
+            "（0.167.0）的定点源码对照：",
+            "[user agent 生成](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/login/src/auth/default_client.rs)",
+            "仍使用官方包版本；`initialize` 的请求与响应合同不变，",
+            "[新增的 requiredHumanApproval](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server-protocol/src/protocol/v1.rs)",
+            "为默认 false 的选择项。两版 `ThreadStartParams`、",
+            "[线程启动处理](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server/src/request_processors/thread_processor.rs)",
+            "的相关完整函数，以及配置合并实现逐字相同。",
+            "",
+            "本修复只明确允许 `0.166.0` 和 `0.167.0` 的匿名初始化，其他版本继续",
+            "拒绝；不降级或覆盖官方 CLI。既有 hint profile 保持原 wire 标识，",
+            "无凭据的匿名握手、fresh claim 身份与环境比对、一次性采用、撤销及",
+            "一 Task 一 VM 边界不变，不给普通 Task 增加字段或轮询。",
+            "固定 `12458fe22e1217f644e8b28f82ab856211e73b72` 基线的合成 IPC",
+            "回归先证明旧保护恰好拒绝3个0.167.0正例，其余29例通过；修复后，",
+            "候选、hosted adapter 与配置保护三套60例全部通过、无跳过。它们使用",
+            "无生产凭据的非 root Linux/Node24.22.1，不执行真实模型，也不证明",
+            "0.167.0 的生产采用或整套上游功能兼容。",
+            "",
+            "官方文件只增不删、原校验和、两条真实订阅及实际 bootstrap adoption",
+            "发布门槛保持原样。后继仍须自己的完整 CI 和正式发布，再以同一实际",
+            "APP/DPL/runtime/worker/template 元组完成 Claude×3、Codex×3 的普通",
+            "生产任务；六次完整 dispatch→agent 各不超过5000ms 后才关闭 #1505。",
+            ""
+          ]
+        }
+      ],
+      "added": 45,
+      "removed": 0
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "edits": [
+        {
+          "baseStartLine": 138,
+          "newStartLine": 138,
+          "removed": [
+            "    if (!/^[A-Za-z0-9._-]+\\/0\\.166\\.0(?:\\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')"
+          ],
+          "added": [
+            "    // Keep the versions explicit: anonymous initialization and late thread config are verified together.",
+            "    if (!/^[A-Za-z0-9._-]+\\/0\\.(?:166|167)\\.0(?:\\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')"
+          ]
+        }
+      ],
+      "added": 2,
+      "removed": 1
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "edits": [
+        {
+          "baseStartLine": 2,
+          "newStartLine": 2,
+          "removed": [
+            "// Native initialize/config semantics are separately verified with fixed 0.166 bytes."
+          ],
+          "added": [
+            "// Native initialize/config contracts are compared separately at fixed upstream commits."
+          ]
+        },
+        {
+          "baseStartLine": 22,
+          "newStartLine": 22,
+          "removed": [
+            "async function fixture(diagnostics = false, hostOnly = false) {"
+          ],
+          "added": [
+            "async function fixture(diagnostics = false, hostOnly = false, version = '0.166.0') {"
+          ]
+        },
+        {
+          "baseStartLine": 36,
+          "newStartLine": 36,
+          "removed": [
+            "    FAKE_CODEX_USER_AGENT: 'mikka/0.166.0 (offline fixture)', FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))"
+          ],
+          "added": [
+            "    FAKE_CODEX_USER_AGENT: `mikka/${version} (offline fixture)`, FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))"
+          ]
+        },
+        {
+          "baseStartLine": 94,
+          "newStartLine": 94,
+          "removed": [
+            "it('records the adopted child\\'s asynchronous login in the late startup scope without repeating initialize', async () => {",
+            "  const f = await fixture(true, true); await f.candidate.ready"
+          ],
+          "added": [
+            "it.each(['0.166.0', '0.167.0'])('records the adopted %s child\\'s asynchronous login in the late startup scope without repeating initialize', async version => {",
+            "  const f = await fixture(true, true, version); await f.candidate.ready"
+          ]
+        }
+      ],
+      "added": 5,
+      "removed": 5
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+      "edits": [
+        {
+          "baseStartLine": 19,
+          "newStartLine": 19,
+          "removed": [
+            "function fixture(mode = 'normal', diagnostics = false) {"
+          ],
+          "added": [
+            "function fixture(mode = 'normal', diagnostics = false, version = '0.166.0') {"
+          ]
+        },
+        {
+          "baseStartLine": 31,
+          "newStartLine": 31,
+          "removed": [
+            " if(frame.id!==undefined)process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:frame.id,result:{userAgent:'mikka/'+(process.env.FIXTURE_MODE==='version'?'0.163.0':'0.166.0')+' (Linux)'}})+'\\\\n');"
+          ],
+          "added": [
+            " if(frame.id!==undefined)process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:frame.id,result:{userAgent:'mikka/'+process.env.FIXTURE_CODEX_VERSION+' (Linux)'}})+'\\\\n');"
+          ]
+        },
+        {
+          "baseStartLine": 41,
+          "newStartLine": 41,
+          "removed": [
+            "  const env = { HOME: home, PATH: process.env.PATH!, FIXTURE_TRACE: trace, FIXTURE_MODE: mode }, lifetime = new AbortController()"
+          ],
+          "added": [
+            "  const env = { HOME: home, PATH: process.env.PATH!, FIXTURE_TRACE: trace, FIXTURE_MODE: mode, FIXTURE_CODEX_VERSION: version }, lifetime = new AbortController()"
+          ]
+        },
+        {
+          "baseStartLine": 63,
+          "newStartLine": 63,
+          "removed": [
+            "it('sends only initialize before a repository exists, then adopts that exact process once', async () => {",
+            "  const f = fixture(); await f.candidate.ready"
+          ],
+          "added": [
+            "it.each(['0.166.0', '0.167.0'])('sends only initialize before a repository exists, then adopts that exact %s process once', async version => {",
+            "  const f = fixture('normal', false, version); await f.candidate.ready"
+          ]
+        },
+        {
+          "baseStartLine": 94,
+          "newStartLine": 94,
+          "removed": [
+            "it('does not adopt a different native protocol version', async () => {",
+            "  const f = fixture('version'); await expect(f.candidate.ready).rejects.toThrow('version')"
+          ],
+          "added": [
+            "it.each(['0.163.0', '0.166.1', '0.168.0', '0.167.0-alpha.1'])('does not adopt unverified native protocol version %s', async version => {",
+            "  const f = fixture('normal', true, version); await expect(f.candidate.ready).rejects.toThrow('version')"
+          ]
+        },
+        {
+          "baseStartLine": 97,
+          "newStartLine": 97,
+          "removed": [],
+          "added": [
+            "  expect(f.candidate.nativeExitObserved).toBe(true)",
+            "  expect(await f.candidate.adopt(await f.binding())).toBeUndefined()",
+            "  expect(f.candidate.preparationTiming).toBeUndefined()",
+            "  expect(f.events()).toEqual(['initialize'])"
+          ]
+        },
+        {
+          "baseStartLine": 98,
+          "newStartLine": 102,
+          "removed": [
+            "it('retains the true earlier timing origin only for successful adoption', async () => {",
+            "  const f = fixture('normal', true); await f.candidate.ready; const earlier = Date.now(); f.checkout()"
+          ],
+          "added": [
+            "it.each(['0.166.0', '0.167.0'])('retains the true earlier timing origin only for successful %s adoption', async version => {",
+            "  const f = fixture('normal', true, version); await f.candidate.ready; const earlier = Date.now(); f.checkout()"
+          ]
+        }
+      ],
+      "added": 13,
+      "removed": 9
+    }
+  ],
+  "fullFileRoundTripChecks": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "fullFileForwardEqual": true,
+      "fullFileReverseEqual": true,
+      "oldAssertionLines": 0,
+      "newAssertionLines": 0,
+      "oldAssertionSequencePreserved": true,
+      "appendOnly": true
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "fullFileForwardEqual": true,
+      "fullFileReverseEqual": true,
+      "oldAssertionLines": 0,
+      "newAssertionLines": 0,
+      "oldAssertionSequencePreserved": true
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "fullFileForwardEqual": true,
+      "fullFileReverseEqual": true,
+      "oldAssertionLines": 48,
+      "newAssertionLines": 48,
+      "oldAssertionSequencePreserved": true
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+      "fullFileForwardEqual": true,
+      "fullFileReverseEqual": true,
+      "oldAssertionLines": 59,
+      "newAssertionLines": 63,
+      "oldAssertionSequencePreserved": true
+    }
+  ],
+  "sourcePreservation": {
+    "prefixBeforeGuardEqual": true,
+    "entireSuffixFromInitializedEqual": true,
+    "adoptionAndCloseAndNativeGenerationLogicOutsideGuardPreserved": true
+  },
+  "overlapWithOwn": {
+    "ownChangeCount": 48,
+    "intersection": [],
+    "priorProofProvidesFullOwnPathList": true,
+    "mainReadmeChangesAlreadyInherited": true
+  },
+  "overlapWithPr1839": [
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "commonBaseFullTextEqual": true,
+      "branch1839BaseEdits": [
+        {
+          "baseStartLine": 189,
+          "newStartLine": 189,
+          "removed": [
+            "          threadConfig: { mcp_servers: { mikka: context.server } } }"
+          ],
+          "added": [
+            "          threadConfig: { mcp_servers: { mikka: { ...context.server, required: true } } } }"
+          ]
+        }
+      ],
+      "branch1842BaseEdits": [
+        {
+          "baseStartLine": 138,
+          "newStartLine": 138,
+          "removed": [
+            "    if (!/^[A-Za-z0-9._-]+\\/0\\.166\\.0(?:\\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')"
+          ],
+          "added": [
+            "    // Keep the versions explicit: anonymous initialization and late thread config are verified together.",
+            "    if (!/^[A-Za-z0-9._-]+\\/0\\.(?:166|167)\\.0(?:\\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')"
+          ]
+        }
+      ],
+      "textOperationMatchCountsAllOne": true,
+      "bothOrdersSameText": true,
+      "all1839AssertionLinesPreserved": true,
+      "all1842AssertionLinesPreserved": true,
+      "requiredTruePresent": true,
+      "version166167GuardPresent": true,
+      "combinedSourcePersisted": false
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "commonBaseFullTextEqual": true,
+      "branch1839BaseEdits": [
+        {
+          "baseStartLine": 33,
+          "newStartLine": 33,
+          "removed": [
+            "    .replace('  if (!method) {', \"  appendFileSync(process.env.FIXTURE_WIRE, JSON.stringify({ method, pid: process.pid, cwd: params?.cwd, config: params?.config }) + '\\\\n')\\n  if (!method) {\")"
+          ],
+          "added": [
+            "    .replace('  if (!method) {', \"  appendFileSync(process.env.FIXTURE_WIRE, JSON.stringify({ method, pid: process.pid, cwd: params?.cwd, config: params?.config, argv: process.argv }) + '\\\\n')\\n  if (!method) {\")"
+          ]
+        },
+        {
+          "baseStartLine": 84,
+          "newStartLine": 84,
+          "removed": [],
+          "added": [
+            "    expect(mcp.required).toBe(true)"
+          ]
+        },
+        {
+          "baseStartLine": 142,
+          "newStartLine": 143,
+          "removed": [],
+          "added": [
+            "  expect(login.argv).toContain('mcp_servers.mikka.required=true')"
+          ]
+        }
+      ],
+      "branch1842BaseEdits": [
+        {
+          "baseStartLine": 2,
+          "newStartLine": 2,
+          "removed": [
+            "// Native initialize/config semantics are separately verified with fixed 0.166 bytes."
+          ],
+          "added": [
+            "// Native initialize/config contracts are compared separately at fixed upstream commits."
+          ]
+        },
+        {
+          "baseStartLine": 22,
+          "newStartLine": 22,
+          "removed": [
+            "async function fixture(diagnostics = false, hostOnly = false) {"
+          ],
+          "added": [
+            "async function fixture(diagnostics = false, hostOnly = false, version = '0.166.0') {"
+          ]
+        },
+        {
+          "baseStartLine": 36,
+          "newStartLine": 36,
+          "removed": [
+            "    FAKE_CODEX_USER_AGENT: 'mikka/0.166.0 (offline fixture)', FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))"
+          ],
+          "added": [
+            "    FAKE_CODEX_USER_AGENT: `mikka/${version} (offline fixture)`, FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))"
+          ]
+        },
+        {
+          "baseStartLine": 94,
+          "newStartLine": 94,
+          "removed": [
+            "it('records the adopted child\\'s asynchronous login in the late startup scope without repeating initialize', async () => {",
+            "  const f = await fixture(true, true); await f.candidate.ready"
+          ],
+          "added": [
+            "it.each(['0.166.0', '0.167.0'])('records the adopted %s child\\'s asynchronous login in the late startup scope without repeating initialize', async version => {",
+            "  const f = await fixture(true, true, version); await f.candidate.ready"
+          ]
+        }
+      ],
+      "textOperationMatchCountsAllOne": true,
+      "bothOrdersSameText": true,
+      "all1839AssertionLinesPreserved": true,
+      "all1842AssertionLinesPreserved": true,
+      "argvAndRequiredAssertions": [
+        {
+          "text": ", argv: process.argv",
+          "count": 1
+        },
+        {
+          "text": "expect(mcp.required).toBe(true)",
+          "count": 1
+        },
+        {
+          "text": "expect(login.argv).toContain('mcp_servers.mikka.required=true')",
+          "count": 1
+        }
+      ],
+      "combinedSourcePersisted": false
+    }
+  ],
+  "review": {
+    "productionChange": "The only runtime-source change is the explicit anonymous initialize userAgent allowlist:0.166.0 becomes0.166.0 or0.167.0, retaining the anchored client-name prefix, exact patch0 and whitespace/end boundary. The same unsupported-version Error is thrown before initialized. Existing hint/wire profile is unchanged.",
+    "preservation": "All production bytes before the guard and from sendNotification(initialized) to the end of the file are unchanged. Native generation capture/transfer/drain, trace binding, preparation timing, fresh identity/environment/repository checks, single consumption, revocation, errors and process cleanup are intact. PR1839 adds required:true in a separate adoption-return block; both edits coexist.",
+    "hostedTests": "Fixture gains a default0.166.0 version parameter and parameterized synthetic userAgent. Existing asynchronous login/late-scope test runs with0.166.0 and0.167.0; its assertion body is unchanged. All48 existing assertion-containing lines remain in order.",
+    "spareTests": "Fixture gains a default0.166.0 version parameter. Existing initialize/adopt-once and earlier-timing cases retain0.166.0 and add0.167.0. Prior unsupported0.163.0 case remains in a negative matrix with0.166.1,0.168.0 and0.167.0-alpha.1; four new assertions require observed native exit, no adoption, no published preparation timing and initialize-only frames. All59 prior assertion-containing lines remain in order;new total63. This count describes source lines, not tests executed.",
+    "documentation": "45lines appended only; the entire95749-byte prior decision document remains an exact prefix. Its historical CI, binary and upstream-source claims were read as document content, not independently re-certified in this review.",
+    "currentConflictBlocks": [],
+    "overlapCoordinates": {
+      "anonymousSpare": {
+        "pr1839BaseLines": [
+          189
+        ],
+        "pr1842BaseLines": [
+          138
+        ]
+      },
+      "hostedTest": {
+        "pr1839BaseLines": [
+          33,
+          84,
+          142
+        ],
+        "pr1842BaseLines": [
+          2,
+          22,
+          36,
+          94,
+          95
+        ]
+      }
+    },
+    "mergeCondition": "For these exact fixed heads, changes operate on separate lines and commute in both orders. This is a pure text compatibility check; no git merge was executed and no combined source/tree/commit was persisted. A manual whole-file ours/theirs selection would discard one branch's changes and is unsuitable.",
+    "preservationRequirements": [
+      "Keep0.166.0 and0.167.0 exact version allowlist plus the original rejection boundary/error.",
+      "Keep PR1839 required:true in warm threadConfig and required=true in cold/resume argv.",
+      "Keep hosted version parameterization AND wire argv capture AND both required assertions.",
+      "Keep all84ce trace/driver/journal/Native contract changes; none is on a PR1842 modified path.",
+      "Retain actual branch ancestry when later performing the separately authorized ordinary branch merges."
+    ],
+    "expectedAdditionalPathsRelativeToOwnIfLaterCombined": [
+      "README.md",
+      "README.zh-CN.md",
+      "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "packages/daemon/src/adapters/codex.ts",
+      "packages/daemon/src/anonymous-codex-spare.ts",
+      "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "packages/daemon/test/anonymous-codex-spare.test.ts"
+    ],
+    "ancestryConsequence": "98a0 is a direct child of12458 and already carries its two root README changes. A later ordinary merge that includes98a0 also includes12458 ancestry; no extra synthetic final-source object is needed for this preparation.",
+    "workerBoundary": "The changed runtime and test files lie under canonical packages/daemon worker input. Prior source-input equality to84ce/main does not apply to the combined dependencies. No canonical worker digest, build, effective RuntimeSHA or AppSHA equality gate was executed or invented.",
+    "validationBoundary": "Synthetic source cases preserve0.166 and add0.167 coverage. Actual officialCLI/nativeMCP/production readiness is not certified by this read-only source review. Historical Native84ce data stays bound to its original actual source."
+  },
+  "method": {
+    "lineDiff": "function lineEdits(before,after){\n const a=before.split(\"\\n\"),b=after.split(\"\\n\");let prefix=0;while(prefix<a.length&&prefix<b.length&&a[prefix]===b[prefix])prefix++;\n let ae=a.length,be=b.length;while(ae>prefix&&be>prefix&&a[ae-1]===b[be-1]){ae--;be--;}\n const aa=a.slice(prefix,ae),bb=b.slice(prefix,be),width=bb.length+1,dp=new Uint32Array((aa.length+1)*width);\n for(let i=aa.length-1;i>=0;i--)for(let j=bb.length-1;j>=0;j--)dp[i*width+j]=aa[i]===bb[j]?1+dp[(i+1)*width+j+1]:Math.max(dp[(i+1)*width+j],dp[i*width+j+1]);\n let i=0,j=0,edit=null,out=[];const flush=()=>{if(edit){out.push(edit);edit=null;}};\n while(i<aa.length||j<bb.length){\n  if(i<aa.length&&j<bb.length&&aa[i]===bb[j]){flush();i++;j++;continue;}\n  if(!edit)edit={baseStartLine:prefix+i+1,newStartLine:prefix+j+1,removed:[],added:[]};\n  if(j<bb.length&&(i===aa.length||dp[i*width+j+1]>=dp[(i+1)*width+j]))edit.added.push(bb[j++]);else edit.removed.push(aa[i++]);\n }flush();return out;\n}",
+    "fullFileVerification": "Apply all computed edit segments forward and reverse and require exact entire-file equality. Verify unique text edits on the two overlapping files in both orders; report equality/preserved assertions only, discard the temporary combined string.",
+    "fileIdentity": "UTF8 byte count,SHA256 and canonical Git blob SHA1 of immutable raw files."
+  },
+  "boundaries": {
+    "originalWorkflowLogsRead": 0,
+    "workflowZipRead": 0,
+    "newTestsRun": 0,
+    "resourcesStarted": 0,
+    "resourcesRemaining": 0,
+    "ciTriggered": 0,
+    "refsUpdated": 0,
+    "treesCreated": 0,
+    "sourceBlobsCreated": 0,
+    "sourceCommitsCreated": 0,
+    "otherPrsMerged": 0,
+    "productionActions": 0,
+    "evidenceBlobOnly": true
+  }
+}

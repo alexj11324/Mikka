@@ -1,0 +1,485 @@
+{
+  "schema": "mikka.issue1512.actual-main-ref-and-active-subscriptions.v1",
+  "observedFromUtc": "2026-11-09T21:18:29Z",
+  "observedThroughUtc": "2026-11-09T21:19:56Z",
+  "repository": "alexj11324/Mikka",
+  "precedingSourceAndWindowProof": "add0e05e0d528f9519818bbe2ec5a471e9933da1",
+  "actualMain": {
+    "ref": "refs/heads/main",
+    "sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "tree": "3f804659ce05591aefb6d080ea873ba88e32ad46",
+    "parents": [
+      "7848e79df9c5af67e526aeed1c828858db392066",
+      "e3f163ad7945fd338403e6c49af815c541f71c0b"
+    ],
+    "committedAt": "2026-11-09T20:45:07Z",
+    "deltaFrom7848": {
+      "status": "ahead",
+      "files": [
+        {
+          "path": "README.md",
+          "status": "modified",
+          "blob": "d59106749f60229439efc9593aea2077bfc1367f"
+        },
+        {
+          "path": "README.zh-CN.md",
+          "status": "modified",
+          "blob": "842bad68e1a1470b90f4daa90f505494e7656f6b"
+        }
+      ]
+    },
+    "correspondingPr": {
+      "number": 1838,
+      "basis": "The same immutable12458 merge already independently bound to1838 in proof86b95277aaaa0c6ab733a1e40d19fb08540114a9. No new main commit is observed in this review."
+    }
+  },
+  "pr1836Snapshot": {
+    "head": "ed60885d317240303d496b3bddfcf9a49caf4139",
+    "base": "ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d",
+    "headBranch": "fix/issue1506-saved-binding-lazy-catalog-20261109",
+    "state": "open",
+    "merged": false,
+    "updatedAt": "2026-11-09T20:51:42Z",
+    "interpretation": "PRbase.ba1fb975... is the unchanged PR snapshot field, already recorded in preceding source proof. It is not the live refs/heads/main obtained in the same read batch and is not a batch head."
+  },
+  "currentMainRuns": [
+    {
+      "id": 42695935815,
+      "name": "Web deploy",
+      "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "created": "2026-11-09T20:45:11Z",
+      "updated": "2026-11-09T21:13:47Z"
+    },
+    {
+      "id": 42695935772,
+      "name": "E2B additive runtime release",
+      "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "created": "2026-11-09T20:45:11Z",
+      "updated": "2026-11-09T21:18:58Z"
+    }
+  ],
+  "noNewWriterFromSuspectedMove": "The exact current source has the same Web42695935815 and R742695935772 created20:45:11. No new main source or newly triggered writer from the suspected PRbase change is observed.",
+  "web": {
+    "id": 42695935815,
+    "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "updatedAt": "2026-11-09T21:13:47Z"
+  },
+  "r7": {
+    "runId": 42695935772,
+    "attempt": 1,
+    "jobs": [
+      {
+        "id": 129428949477,
+        "name": "test",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:32Z",
+        "completedAt": "2026-11-09T20:47:49Z"
+      },
+      {
+        "id": 129429132057,
+        "name": "check",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:52Z",
+        "completedAt": "2026-11-09T20:48:09Z"
+      },
+      {
+        "id": 129429312566,
+        "name": "validate / build",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:48:12Z",
+        "completedAt": "2026-11-09T20:56:19Z"
+      },
+      {
+        "id": 129433803533,
+        "name": "await-web",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:56:21Z",
+        "completedAt": "2026-11-09T21:14:00Z"
+      },
+      {
+        "id": 129443739610,
+        "name": "subscriptions",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T21:18:57Z",
+        "completedAt": null
+      }
+    ],
+    "subscription": {
+      "id": 129443739610,
+      "name": "subscriptions",
+      "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "startedAt": "2026-11-09T21:18:57Z",
+      "completedAt": null
+    },
+    "subscriptionSteps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:18:58Z",
+        "completedAt": "2026-11-09T21:18:59Z"
+      },
+      {
+        "number": 2,
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:18:59Z",
+        "completedAt": "2026-11-09T21:19:04Z"
+      },
+      {
+        "number": 3,
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:19:04Z",
+        "completedAt": "2026-11-09T21:19:04Z"
+      },
+      {
+        "number": 4,
+        "name": "Refuse an obsolete source before real subscription work",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:19:04Z",
+        "completedAt": "2026-11-09T21:19:05Z"
+      },
+      {
+        "number": 5,
+        "name": "Require one immutable candidate artifact reference",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:19:05Z",
+        "completedAt": "2026-11-09T21:19:05Z"
+      },
+      {
+        "number": 6,
+        "name": "Download this run's complete private candidate report",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:19:05Z",
+        "completedAt": "2026-11-09T21:19:05Z"
+      },
+      {
+        "number": 7,
+        "name": "Bind the candidate bytes to this source, worker and run attempt",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:19:05Z",
+        "completedAt": "2026-11-09T21:19:05Z"
+      },
+      {
+        "number": 8,
+        "name": "Install only the pinned gate SDKs",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:19:05Z",
+        "completedAt": "2026-11-09T21:19:16Z"
+      },
+      {
+        "number": 9,
+        "name": "Read the existing candidate E2B key",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:19:16Z",
+        "completedAt": "2026-11-09T21:19:16Z"
+      },
+      {
+        "number": 10,
+        "name": "Read the authorized acceptance account email",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:19:16Z",
+        "completedAt": "2026-11-09T21:19:17Z"
+      },
+      {
+        "number": 11,
+        "name": "Read the authorized acceptance account password",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:19:17Z",
+        "completedAt": "2026-11-09T21:19:17Z"
+      },
+      {
+        "number": 12,
+        "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T21:19:17Z",
+        "completedAt": null
+      }
+    ],
+    "interpretation": "Subscriptions progressed from pending at the initial snapshot to actual execution. The latest authoritative job started21:18:57; actual dual-subscription step12 began21:19:17 and remainsin_progress. The earlier queued snapshot start21:14:01 is not treated as actual runner execution."
+  },
+  "childCleanup": {
+    "runId": 42697265346,
+    "metadata": {
+      "total": 1,
+      "jobs": [
+        {
+          "id": 129432331990,
+          "name": "cleanup",
+          "head": "e78150601903ff19d4a9e11580ad6d6be26e40db",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-09T21:13:49Z",
+          "completedAt": "2026-11-09T21:14:08Z",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Verify the actual window, closed source and unchanged cleanup implementation",
+              "status": "completed",
+              "conclusion": "failure"
+            },
+            {
+              "number": 4,
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 5,
+              "name": "Run node --test scripts/ops/issue1505/github-readonly.test.mjs",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 6,
+              "name": "Run corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 7,
+              "name": "Recheck the actual window and current main after dependency installation",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 8,
+              "name": "Bind the original successful source attempt and artifact before downloading",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 9,
+              "name": "Download the exact fresh prepare ZIP without forwarding authorization",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 10,
+              "name": "Verify the single original archive member and copy only exact receipt.json",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 11,
+              "name": "Recheck the actual window immediately before production OIDC imports",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 12,
+              "name": "Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 13,
+              "name": "Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 14,
+              "name": "Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 15,
+              "name": "Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 16,
+              "name": "Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 17,
+              "name": "Recheck the actual window and clean only the saved exact child",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 18,
+              "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+              "status": "completed",
+              "conclusion": "failure"
+            },
+            {
+              "number": 36,
+              "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 37,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    },
+    "closureRunId": 42697533580,
+    "closureMetadata": {
+      "total": 1,
+      "jobs": [
+        {
+          "id": 129443894185,
+          "name": "cleanup",
+          "head": "170ab83489cd81935d32a0fc96a4213b72745cdf",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T21:14:17Z",
+          "completedAt": "2026-11-09T21:14:08Z",
+          "steps": []
+        }
+      ]
+    },
+    "interpretation": "Actual cleanup job ran21:13:49–21:14:08 andfailed the step3 window/source/implementation guard. Every OIDC import and actual exact-child cleanup step17 skipped. Therefore no successful revocation is established. Closure skipped; its original completion/start timestamp ordering is retained without invented duration.",
+    "failureBoundary": "Metadata does not identify which predicate inside step3 failed. This reviewer did not read the original log or independently assert the raw error string."
+  },
+  "window": {
+    "ownerIssue": 1505,
+    "start": "2026-11-09T20:04:10Z",
+    "absoluteEnd": "2026-11-09T22:04:10Z",
+    "earlyReleaseObserved": false,
+    "extensionObserved": false,
+    "actualWork": "Current12458 real subscriptions are actively executing using the normal retained credential. No new runtime publication or overall cleanup/release is observed.",
+    "newIssue1505Comments": []
+  },
+  "batchDiscovery": {
+    "recentFiveOpenPRs": [
+      {
+        "number": 1842,
+        "title": "fix: adopt verified Codex 0.167 anonymous initialization",
+        "head": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+        "branch": "root/issue1505-codex-0167-20261109",
+        "state": "open",
+        "draft": false,
+        "createdAt": "2026-11-09T21:14:19Z",
+        "updatedAt": "2026-11-09T21:18:15Z"
+      },
+      {
+        "number": 1841,
+        "title": "fix(core): release deferred device authority and close cleanup diagnostics (#1826)",
+        "head": "1ce527c666b06fbf399643c0040bf05bff78fc7f",
+        "branch": "fix/core-cleanup-1826",
+        "state": "open",
+        "draft": false,
+        "createdAt": "2026-11-09T21:09:24Z",
+        "updatedAt": "2026-11-09T21:09:24Z"
+      },
+      {
+        "number": 1840,
+        "title": "docs: restore Mikka slogans, community badge, signup copy, and OSS thanks",
+        "head": "c90eff4dbd7558cbd2faf01327cff16ce7432e4d",
+        "branch": "docs/readme-brand-and-acknowledgements-1837",
+        "state": "open",
+        "draft": false,
+        "createdAt": "2026-11-09T20:52:06Z",
+        "updatedAt": "2026-11-09T20:54:07Z"
+      },
+      {
+        "number": 1839,
+        "title": "fix(daemon): require local Mikka MCP before Codex turns",
+        "head": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+        "branch": "fix/1503-codex-required-mikka-mcp",
+        "state": "open",
+        "draft": false,
+        "createdAt": "2026-11-09T20:21:08Z",
+        "updatedAt": "2026-11-09T21:01:05Z"
+      },
+      {
+        "number": 1836,
+        "title": "perf: 使用 HTTP Workflow events 并细分订阅首字计时",
+        "head": "ed60885d317240303d496b3bddfcf9a49caf4139",
+        "branch": "fix/issue1506-saved-binding-lazy-catalog-20261109",
+        "state": "open",
+        "draft": false,
+        "createdAt": "2026-11-09T18:16:51Z",
+        "updatedAt": "2026-11-09T20:51:42Z"
+      }
+    ],
+    "published1506BatchHead": null,
+    "boundary": "No announced new batch head appears in the comments since21:15 or the latest5openPR inventory. This does not rule out an unreferenced/local prepared merge. Use an actual announced commit, not PR1836.base, for a later review.",
+    "newCoordination": [
+      {
+        "id": 6751688182,
+        "createdAt": "2026-11-09T21:16:56Z",
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751688182",
+        "summary": "1503 owns two-file mailbox0.167 qualification preparation, explicitly has no consumable new head yet, preserves1839exact205 and claims no future window."
+      }
+    ]
+  },
+  "causality": "No existing subscription gate failure is attributed to a source move. This check found no new main move, and the current subscription run has no terminal result yet.",
+  "activity": {
+    "sourceOrRefMutations": 0,
+    "publicCommentsWritten": 0,
+    "ciReruns": 0,
+    "accountCalls": 0,
+    "modelCalls": 0,
+    "newRuntimeResources": 0,
+    "originalJobLogReads": 0,
+    "artifactZipDownloads": 0,
+    "newSafeEvidenceBlobs": 1
+  }
+}

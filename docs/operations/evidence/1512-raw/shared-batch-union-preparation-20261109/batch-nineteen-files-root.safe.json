@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "batchTree": "50f85fb5c687ec19c3e0c06d96e189fb6b18e62b",
+  "publishedBatchHead": null,
+  "rootVerifiedAt": "2026-11-09 21:31:28 UTC",
+  "scope": "All 19 batch-vs-current-main changes, using exact reviewed source manifests and the independently verified two-file merge.",
+  "currentMain": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "upstream1836Proof": "4ee28523742ac4db8372e1c8387ee4a687b85734",
+  "fiveFileMergeProof": "7a2e43795102cf46c97c919299824af07236300a",
+  "reviewedChanges": [
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "710f70c3528e1b8eb5c37f1be52c6442445bf9be",
+      "actualBlob": "710f70c3528e1b8eb5c37f1be52c6442445bf9be"
+    },
+    {
+      "path": "lib/bot-model-choice.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "20df161806c9647a77093746ca074fddf97643a9",
+      "actualBlob": "20df161806c9647a77093746ca074fddf97643a9"
+    },
+    {
+      "path": "lib/bot-model-selection.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "6453ff0fae3dd8549c7f6ecb68b315d65a59f633",
+      "actualBlob": "6453ff0fae3dd8549c7f6ecb68b315d65a59f633"
+    },
+    {
+      "path": "lib/model-call-timing.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "9b98a617cb833fed907a4947dc63a0097d8b554c",
+      "actualBlob": "9b98a617cb833fed907a4947dc63a0097d8b554c"
+    },
+    {
+      "path": "lib/model-call-timing.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "d944022361313be7b13bcc0bc377ee6b42b248e1",
+      "actualBlob": "d944022361313be7b13bcc0bc377ee6b42b248e1"
+    },
+    {
+      "path": "lib/subscription-workflow-model.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "c30d59512477d11703c23212a6a3f638fcc08765",
+      "actualBlob": "c30d59512477d11703c23212a6a3f638fcc08765"
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-client.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "cc1efb7058e1afc6a44ba6e224540886b1d9a378",
+      "actualBlob": "cc1efb7058e1afc6a44ba6e224540886b1d9a378"
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-timing.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "0461fec9a9cb63bc974169df605315839ab9d297",
+      "actualBlob": "0461fec9a9cb63bc974169df605315839ab9d297"
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-timing.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "041dc0e73ef6446a37e73a50d7af977f0ad8da61",
+      "actualBlob": "041dc0e73ef6446a37e73a50d7af977f0ad8da61"
+    },
+    {
+      "path": "packages/subscription-worker/http_transport_timing.go",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "4156c512311676d451eb61075095dd735386d246",
+      "actualBlob": "4156c512311676d451eb61075095dd735386d246"
+    },
+    {
+      "path": "packages/subscription-worker/http_transport_timing_test.go",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "12d7c565a713d6bd85f05c0e87804c961af2e8bc",
+      "actualBlob": "12d7c565a713d6bd85f05c0e87804c961af2e8bc"
+    },
+    {
+      "path": "packages/subscription-worker/plain_model.go",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "5348116628941ea4252d5ccc004e49492b42d4ba",
+      "actualBlob": "5348116628941ea4252d5ccc004e49492b42d4ba"
+    },
+    {
+      "path": "packages/subscription-worker/timing.go",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "b7931270db2b77a5d7fddf108bb059a3941c3684",
+      "actualBlob": "b7931270db2b77a5d7fddf108bb059a3941c3684"
+    },
+    {
+      "path": "packages/subscription-worker/timing_test.go",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "da2288ca4598c5c0a9a03fe63f451b7fbb152169",
+      "actualBlob": "da2288ca4598c5c0a9a03fe63f451b7fbb152169"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "ea4f398aabb120f760d133168ed4ed49ddd4b767",
+      "actualBlob": "ea4f398aabb120f760d133168ed4ed49ddd4b767"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "1c8ca694b2f3eec633fb71440970170485957703",
+      "actualBlob": "1c8ca694b2f3eec633fb71440970170485957703"
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "080ddc3797f196d9db97d2790ccceb87f7ca1c4d",
+      "actualBlob": "080ddc3797f196d9db97d2790ccceb87f7ca1c4d"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "8ffd1fa642e7e3b22463c4127471f02a4e7eb6fd",
+      "actualBlob": "8ffd1fa642e7e3b22463c4127471f02a4e7eb6fd"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "expectedBlob": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6",
+      "actualBlob": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6"
+    }
+  ],
+  "errors": [],
+  "readmesAndOtherMainLeavesPreserved": true,
+  "lockfilePreserved": true,
+  "mailboxChanged": false,
+  "ownSourceHead": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "preparedUnionTree": "84e5abc87cd5fcd3d6c9459d3e9ff1e6a2dde058",
+  "featureRefUpdated": false,
+  "sourceCommitCreated": false,
+  "ciTriggered": false,
+  "productionCases": 0
+}
