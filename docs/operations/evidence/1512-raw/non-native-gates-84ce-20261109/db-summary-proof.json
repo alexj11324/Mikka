@@ -1,0 +1,13 @@
+{
+  "schema": "mikka.issue1512.ci84ce.required-db-summary.v1",
+  "run": 42691592260,
+  "job": 129416823562,
+  "displayName": "Production build and browser interactions",
+  "actualOperation": "Required database-selection/result summary plus scripts/ci/summary.mjs",
+  "changesResult": "success",
+  "expectDb": true,
+  "dbResult": "success",
+  "originalLog": "8f6aa0f37e7c2e31f816c921ab5d8f4f685ca302",
+  "originalWrapper": "9472dd67ed1be1985f3cc1839e552cc96eebd1aa",
+  "limitation": "The display name does not establish a separate production build or browser test execution."
+}

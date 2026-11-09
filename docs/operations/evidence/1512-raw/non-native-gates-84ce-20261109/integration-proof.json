@@ -1,0 +1,558 @@
+{
+  "schema": "mikka.issue1512.84ce-integration-independent-review.v1",
+  "repository": "alexj11324/Mikka",
+  "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "run": {
+    "id": 42691592260,
+    "attempt": 1
+  },
+  "job": {
+    "id": 129412917984,
+    "name": "Integration unit checks",
+    "conclusion": "success",
+    "terminalStatusAuthority": "Root's original-reader metadata plus successful final Nx result in this original"
+  },
+  "actualCheckout": "197ba2452796ce6d5942309f488009963b7cbc7d",
+  "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+  "orderedCheckoutParents": [
+    "7848e79df9c5af67e526aeed1c828858db392066",
+    "84ce7f876817f0d73c34a1ef89797fc27ba8661e"
+  ],
+  "sourceBindingReference": {
+    "gitBlob": "121aa074fbd2ee0c2b891a7ef7884888d5ad2b1d",
+    "bytes": 1671,
+    "sha256": "f668b103f6126c245486c57fb55998f48827b6f4c6c5f9ff15a4ddcadfadd920"
+  },
+  "selectionReference": {
+    "gitBlob": "d3e61b6b61f088d39c8a2d92f6213b8db4386376",
+    "bytes": 131212,
+    "sha256": "3706572c8aab82a34908b418c3d2eadb28c092c198cfcf893513489ed7d4586b"
+  },
+  "original": {
+    "gitBlob": "43b5fda5dcc0cd946a92897fcab709ff1d439b93",
+    "bytes": 679890,
+    "sha256": "926c8e3f9ea108e4d086e265eee5bca522934b2cda31d311c4fd3e9f9c5e52c6",
+    "ownerJobLogReads": 1,
+    "thisReviewerJobLogReads": 0,
+    "thisReviewerImmutableGitBlobReads": 1,
+    "byteAndGitHashVerified": true
+  },
+  "checkoutAnchor": {
+    "line": 132,
+    "text": "197ba2452796ce6d5942309f488009963b7cbc7d"
+  },
+  "nodeVersion": "v24.22.2",
+  "targets": {
+    "count": 29,
+    "expected": [
+      "ci-tasks:integration-10",
+      "ci-tasks:integration-11",
+      "ci-tasks:integration-12",
+      "ci-tasks:integration-13",
+      "ci-tasks:integration-14",
+      "ci-tasks:integration-15",
+      "ci-tasks:integration-16",
+      "ci-tasks:integration-17",
+      "ci-tasks:integration-18",
+      "ci-tasks:integration-19",
+      "ci-tasks:integration-2",
+      "ci-tasks:integration-20",
+      "ci-tasks:integration-21",
+      "ci-tasks:integration-22",
+      "ci-tasks:integration-23",
+      "ci-tasks:integration-24",
+      "ci-tasks:integration-25",
+      "ci-tasks:integration-26",
+      "ci-tasks:integration-27",
+      "ci-tasks:integration-28",
+      "ci-tasks:integration-29",
+      "ci-tasks:integration-3",
+      "ci-tasks:integration-4",
+      "ci-tasks:integration-5",
+      "ci-tasks:integration-6",
+      "ci-tasks:integration-7",
+      "ci-tasks:integration-8",
+      "ci-tasks:integration-9",
+      "ci-tasks:integration-factory-activity"
+    ],
+    "actual": [
+      "ci-tasks:integration-10",
+      "ci-tasks:integration-11",
+      "ci-tasks:integration-12",
+      "ci-tasks:integration-13",
+      "ci-tasks:integration-14",
+      "ci-tasks:integration-15",
+      "ci-tasks:integration-16",
+      "ci-tasks:integration-17",
+      "ci-tasks:integration-18",
+      "ci-tasks:integration-19",
+      "ci-tasks:integration-2",
+      "ci-tasks:integration-20",
+      "ci-tasks:integration-21",
+      "ci-tasks:integration-22",
+      "ci-tasks:integration-23",
+      "ci-tasks:integration-24",
+      "ci-tasks:integration-25",
+      "ci-tasks:integration-26",
+      "ci-tasks:integration-27",
+      "ci-tasks:integration-28",
+      "ci-tasks:integration-29",
+      "ci-tasks:integration-3",
+      "ci-tasks:integration-4",
+      "ci-tasks:integration-5",
+      "ci-tasks:integration-6",
+      "ci-tasks:integration-7",
+      "ci-tasks:integration-8",
+      "ci-tasks:integration-9",
+      "ci-tasks:integration-factory-activity"
+    ],
+    "setsEqual": true,
+    "completion": {
+      "line": 4996,
+      "text": " NX   Successfully ran targets integration-2, integration-3, integration-4, integration-5, integration-6, integration-7, integration-8, integration-9, integration-10, integration-11, integration-12, integration-13, integration-14, integration-15, integration-16, integration-17, integration-18, integration-19, integration-20, integration-21, integration-22, integration-23, integration-24, integration-25, integration-26, integration-27, integration-28, integration-29, integration-factory-activity for project ci-tasks"
+    },
+    "cache": [
+      {
+        "line": 5000,
+        "text": "  Cache:             Skipped (--skip-nx-cache)"
+      }
+    ]
+  },
+  "live": {
+    "entry": "ci-tasks:integration-7 / pnpm test:live-lists",
+    "packageSource": {
+      "bytes": 80877,
+      "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+      "gitBlob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+    },
+    "actualCommandMatchesExactPackageScript": true,
+    "command": {
+      "line": 963,
+      "text": "ci-tasks: > node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-lists.live.test.tsx scripts/desktop-notification-lifetime.live.test.tsx tests/desktop-notifications.test.ts"
+    },
+    "fullThreeFiles": [
+      "scripts/use-live-lists.live.test.tsx",
+      "scripts/desktop-notification-lifetime.live.test.tsx",
+      "tests/desktop-notifications.test.ts"
+    ],
+    "aggregate": {
+      "tests": 104,
+      "suites": 0,
+      "pass": 104,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 129516.068269
+    },
+    "summaryLines": [
+      {
+        "line": 3228,
+        "text": "ci-tasks: ℹ tests 104"
+      },
+      {
+        "line": 3229,
+        "text": "ci-tasks: ℹ suites 0"
+      },
+      {
+        "line": 3230,
+        "text": "ci-tasks: ℹ pass 104"
+      },
+      {
+        "line": 3231,
+        "text": "ci-tasks: ℹ fail 0"
+      },
+      {
+        "line": 3232,
+        "text": "ci-tasks: ℹ cancelled 0"
+      },
+      {
+        "line": 3233,
+        "text": "ci-tasks: ℹ skipped 0"
+      },
+      {
+        "line": 3234,
+        "text": "ci-tasks: ℹ todo 0"
+      },
+      {
+        "line": 3235,
+        "text": "ci-tasks: ℹ duration_ms 129516.068269"
+      }
+    ],
+    "cases": [
+      {
+        "scenario": "committed-after-ready",
+        "name": "native workspace snapshot: committed-after-ready",
+        "pass": {
+          "line": 3192,
+          "text": "ci-tasks: ✔ native workspace snapshot: committed-after-ready (649.029813ms)"
+        },
+        "diagnostic": {
+          "line": 3193,
+          "receipt": {
+            "kind": "native_workspace_snapshot_dispatch",
+            "scenario": "committed-after-ready",
+            "physicalCalls": 1,
+            "counts": {
+              "teams.listTeams": 1,
+              "team-relations.listProjectTeams": 1
+            },
+            "phases": [
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+              "dispatch:1",
+              "response:1"
+            ],
+            "rejected": []
+          }
+        }
+      },
+      {
+        "scenario": "pending-after-ready",
+        "name": "native workspace snapshot: pending-after-ready",
+        "pass": {
+          "line": 3194,
+          "text": "ci-tasks: ✔ native workspace snapshot: pending-after-ready (487.893579ms)"
+        },
+        "diagnostic": {
+          "line": 3195,
+          "receipt": {
+            "kind": "native_workspace_snapshot_dispatch",
+            "scenario": "pending-after-ready",
+            "physicalCalls": 1,
+            "counts": {
+              "teams.listTeams": 1,
+              "team-relations.listProjectTeams": 1
+            },
+            "phases": [
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+              "dispatch:1",
+              "response:1"
+            ],
+            "rejected": []
+          }
+        }
+      },
+      {
+        "scenario": "late-subscription",
+        "name": "native workspace snapshot: late-subscription",
+        "pass": {
+          "line": 3197,
+          "text": "ci-tasks: ✔ native workspace snapshot: late-subscription (648.413136ms)"
+        },
+        "diagnostic": {
+          "line": 3198,
+          "receipt": {
+            "kind": "native_workspace_snapshot_dispatch",
+            "scenario": "late-subscription",
+            "physicalCalls": 1,
+            "counts": {
+              "teams.listTeams": 1,
+              "team-relations.listProjectTeams": 1
+            },
+            "phases": [
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+              "dispatch:1",
+              "response:1"
+            ],
+            "rejected": []
+          }
+        }
+      },
+      {
+        "scenario": "dispatch-before-ready",
+        "name": "native workspace snapshot: dispatch-before-ready",
+        "pass": {
+          "line": 3199,
+          "text": "ci-tasks: ✔ native workspace snapshot: dispatch-before-ready (645.841399ms)"
+        },
+        "diagnostic": {
+          "line": 3200,
+          "receipt": {
+            "kind": "native_workspace_snapshot_dispatch",
+            "scenario": "dispatch-before-ready",
+            "physicalCalls": 2,
+            "counts": {
+              "teams.listTeams": 2,
+              "team-relations.listProjectTeams": 2
+            },
+            "phases": [
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "dispatch:1",
+              "response:1",
+              "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "dispatch:2",
+              "response:2"
+            ],
+            "rejected": []
+          }
+        }
+      },
+      {
+        "scenario": "newer-push",
+        "name": "native workspace snapshot: newer-push",
+        "pass": {
+          "line": 3202,
+          "text": "ci-tasks: ✔ native workspace snapshot: newer-push (646.750561ms)"
+        },
+        "diagnostic": {
+          "line": 3203,
+          "receipt": {
+            "kind": "native_workspace_snapshot_dispatch",
+            "scenario": "newer-push",
+            "physicalCalls": 2,
+            "counts": {
+              "teams.listTeams": 2,
+              "team-relations.listProjectTeams": 2
+            },
+            "phases": [
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+              "dispatch:1",
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "dispatch:2",
+              "response:2",
+              "response:1"
+            ],
+            "rejected": []
+          }
+        }
+      },
+      {
+        "scenario": "workspace-change",
+        "name": "native workspace snapshot: workspace-change",
+        "pass": {
+          "line": 3205,
+          "text": "ci-tasks: ✔ native workspace snapshot: workspace-change (967.979738ms)"
+        },
+        "diagnostic": {
+          "line": 3206,
+          "receipt": {
+            "kind": "native_workspace_snapshot_dispatch",
+            "scenario": "workspace-change",
+            "physicalCalls": 2,
+            "counts": {
+              "teams.listTeams": 2,
+              "team-relations.listProjectTeams": 2
+            },
+            "phases": [
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+              "dispatch:1",
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000002",
+              "dispatch:2",
+              "response:2",
+              "response:1"
+            ],
+            "rejected": [
+              {
+                "action": "teams.listTeams",
+                "code": "desktop_session_changed",
+                "status": 409
+              },
+              {
+                "action": "team-relations.listProjectTeams",
+                "code": "desktop_session_changed",
+                "status": 409
+              }
+            ]
+          }
+        }
+      },
+      {
+        "scenario": "identity-change",
+        "name": "native workspace snapshot: identity-change",
+        "pass": {
+          "line": 3210,
+          "text": "ci-tasks: ✔ native workspace snapshot: identity-change (971.878481ms)"
+        },
+        "diagnostic": {
+          "line": 3211,
+          "receipt": {
+            "kind": "native_workspace_snapshot_dispatch",
+            "scenario": "identity-change",
+            "physicalCalls": 2,
+            "counts": {
+              "teams.listTeams": 2,
+              "team-relations.listProjectTeams": 2
+            },
+            "phases": [
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+              "dispatch:1",
+              "fetcher:teams.listTeams",
+              "enqueue:teams.listTeams",
+              "fetcher:team-relations.listProjectTeams",
+              "enqueue:team-relations.listProjectTeams",
+              "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+              "dispatch:2",
+              "response:2",
+              "response:1"
+            ],
+            "rejected": [
+              {
+                "action": "teams.listTeams",
+                "code": "desktop_session_changed",
+                "status": 409
+              },
+              {
+                "action": "team-relations.listProjectTeams",
+                "code": "desktop_session_changed",
+                "status": 409
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "last404": {
+      "pass": {
+        "line": 3214,
+        "text": "ci-tasks: ✔ native pending dispatch: real 404 capability fallback revokes an already awaited hint (812.353292ms)"
+      },
+      "diagnostic": {
+        "line": 3215,
+        "receipt": {
+          "kind": "native_real_capability_fallback",
+          "physical": 5,
+          "logical": {
+            "bots": 2,
+            "roster": 2
+          },
+          "phases": [
+            "enqueue:roster",
+            "enqueue:bots",
+            "ready",
+            "dispatch:1:desktop.readBatch",
+            "flush:bots",
+            "flush:bot-chats",
+            "batch_404",
+            "dispatch:2:bots.pollBots",
+            "fallback_held:roster",
+            "dispatch:3:coordinator.pollBotChatSummaries",
+            "fallback_held:bots",
+            "enqueue:roster",
+            "dispatch:4:bots.pollBots",
+            "catchup:roster",
+            "response:4",
+            "enqueue:bots",
+            "dispatch:5:coordinator.pollBotChatSummaries",
+            "catchup:bots",
+            "response:5",
+            "release_fallback",
+            "response:2",
+            "response:3"
+          ]
+        }
+      }
+    },
+    "interpretation": "Complete original three-file entry ran. 104 tests all passed, including all seven new workspace snapshot cases and the final actual 404 fallback regression. This is not a selected-name rerun."
+  },
+  "teamImport": {
+    "entry": "ci-tasks:integration-26",
+    "name": "all real team dependencies and auth export/session metadata load before the denied native SQL boundary",
+    "pass": {
+      "line": 4938,
+      "text": "ci-tasks: ✔ all real team dependencies and auth export/session metadata load before the denied native SQL boundary (13949.067515ms)"
+    },
+    "diagnostic": {
+      "line": 4939,
+      "receipt": {
+        "teamImportContract": true,
+        "dynamicImportOccurrences": 26,
+        "uniqueModules": 24,
+        "scenarios": 22,
+        "realAuthExports": [
+          "MOBILE_APP_ORIGIN",
+          "auth",
+          "authBaseURL",
+          "githubEnabled",
+          "githubSignInEnabled",
+          "googleEnabled",
+          "oauthCallbackBaseURL"
+        ],
+        "deniedConnections": 1,
+        "nativeTransportAttempts": 0,
+        "nativeSqlSubmissions": 0
+      }
+    },
+    "durationMs": 13949.067515,
+    "childDeadlineMs": 15000,
+    "outerTestDeadlineMs": 20000,
+    "source": {
+      "path": "scripts/team-import-contract.test.mjs",
+      "bytes": 1785,
+      "sha256": "bcc91735116b0fc2ff8fc1e75f4de1f8caa2335b30c32edad80c8d68f31d0f35",
+      "gitBlob": "5f8ff18a692ef5e8f63a94a21ed27822e2206347",
+      "sameBytesAsOriginalF346": true,
+      "originalRef": "f3466ba479ef51918790f521a288feaef5160e44",
+      "currentRef": "84ce7f876817f0d73c34a1ef89797fc27ba8661e"
+    },
+    "deadlineInterpretation": "The execFile child deadline remains 15000 ms. The enclosing node:test deadline remains 20000 ms. The entire current test source is byte-identical to fixed original f346. The actual passing test duration is 13949.067515 ms; no timeout increase or retry occurred in this review."
+  },
+  "cleanup": {
+    "postJobCleanup": true,
+    "orphanProcessCleanup": true,
+    "scope": "Original GitHub runner post-job cleanup only; this reviewer created no resource."
+  },
+  "privacy": {
+    "closedPatterns": [
+      "privateKey",
+      "githubToken",
+      "posthogToken",
+      "awsAccessKey",
+      "bearerOrBasic",
+      "signedUrl",
+      "email",
+      "credentialUrl"
+    ],
+    "hits": [],
+    "boundary": "Existing public Git original was already masked by GitHub. Bounded scan is not a complete privacy proof; derived fields contain only closed test/CI metadata, and no signed download URL or tool envelope is copied."
+  },
+  "limits": {
+    "oldManualFullLive": "UNKNOWN remains unchanged. No terminal was recovered for that older manual run; this separate canonical run does not retroactively resolve it.",
+    "earlierFailures": "All earlier source-specific failures remain unchanged.",
+    "productionAcceptance": false,
+    "nativeBudget": "Not assessed by this review.",
+    "testsExecutedByReviewer": 0,
+    "newResources": 0,
+    "newJobLogFetches": 0,
+    "otherJobOriginalsRead": 0,
+    "refChanges": 0
+  },
+  "siblingEvidenceIndex": "3b481dd1678f97dbc4f4edf6f1b68a0817e4f424"
+}

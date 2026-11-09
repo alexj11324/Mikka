@@ -1,0 +1,168 @@
+{
+  "schema": "mikka.issue1512.84ce-source-core-selected-pg-index.v1",
+  "repository": "alexj11324/Mikka",
+  "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "checkout": "197ba2452796ce6d5942309f488009963b7cbc7d",
+  "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+  "orderedCheckoutParents": [
+    "7848e79df9c5af67e526aeed1c828858db392066",
+    "84ce7f876817f0d73c34a1ef89797fc27ba8661e"
+  ],
+  "run": {
+    "id": 42691592260,
+    "attempt": 1
+  },
+  "files": [
+    {
+      "kind": "source",
+      "path": "source.original.log",
+      "jobId": 129412918197,
+      "bytes": 136456,
+      "sha256": "f2ba570f77c3144076e2ae199e353bf6d54ba65e385410c98830ff27452bc609",
+      "gitBlob": "20ff2831e44d71f19cd45d5fc76f7d7c2f72f0f9",
+      "originalJobLogToolReads": 1,
+      "conclusion": "success",
+      "startedAt": "2026-11-09T20:18:43Z",
+      "completedAt": "2026-11-09T20:22:48Z",
+      "actualCheckout": "197ba2452796ce6d5942309f488009963b7cbc7d",
+      "nodeVersion": "v24.22.2",
+      "remoteExactReadback": true,
+      "closedPatternScanHits": 0
+    },
+    {
+      "kind": "core",
+      "path": "core.original.log",
+      "jobId": 129412917967,
+      "bytes": 1020196,
+      "sha256": "9881813acf67a2adc44bbb8d18554604429e22fe120d2c3b55eca8437458c547",
+      "gitBlob": "4a2f5ad79c75b0a4333d97ee0fd4561559d3a70f",
+      "originalJobLogToolReads": 1,
+      "conclusion": "success",
+      "startedAt": "2026-11-09T20:18:43Z",
+      "completedAt": "2026-11-09T20:25:48Z",
+      "actualCheckout": "197ba2452796ce6d5942309f488009963b7cbc7d",
+      "nodeVersion": "v24.22.2",
+      "remoteExactReadback": true,
+      "closedPatternScanHits": 0
+    },
+    {
+      "kind": "pg3",
+      "path": "pg3.original.log",
+      "jobId": 129412918088,
+      "bytes": 2767148,
+      "sha256": "411f47dd2357ecc573b0ad208362718b93ae3bf1453b05fa80aa771514a6f5a1",
+      "gitBlob": "786866059c5b836cab202f28635895f953c44742",
+      "originalJobLogToolReads": 1,
+      "conclusion": "success",
+      "startedAt": "2026-11-09T20:18:44Z",
+      "completedAt": "2026-11-09T20:25:38Z",
+      "actualCheckout": "197ba2452796ce6d5942309f488009963b7cbc7d",
+      "nodeVersion": "v24.22.2",
+      "remoteExactReadback": true,
+      "closedPatternScanHits": 0
+    },
+    {
+      "kind": "pg4",
+      "path": "pg4.original.log",
+      "jobId": 129412918515,
+      "bytes": 687545,
+      "sha256": "9bcc672c64968a697542add943bc8bdd0685d8842c94773dd2f8c422fe2d03f3",
+      "gitBlob": "4045ddfb63a2c7330a3bd2ccaa2af5aa0baf595e",
+      "originalJobLogToolReads": 1,
+      "conclusion": "success",
+      "startedAt": "2026-11-09T20:18:44Z",
+      "completedAt": "2026-11-09T20:23:13Z",
+      "actualCheckout": "197ba2452796ce6d5942309f488009963b7cbc7d",
+      "nodeVersion": "v24.22.2",
+      "remoteExactReadback": true,
+      "closedPatternScanHits": 0
+    },
+    {
+      "path": "ci84ce-source-core-pg.safe.json",
+      "bytes": 104937,
+      "sha256": "66cf6776ed1d6fcd6219f0fa181cbd01a888b8bd9ffca16f24e0968596c55d46",
+      "gitBlob": "06fa6b26670338f3591909e469a52eda9ab98a10",
+      "remoteExactReadback": true
+    }
+  ],
+  "payloadFiles": 5,
+  "payloadBytes": 4716282,
+  "integrity": "All five payloads were created as immutable Git blobs and then read back exactly; UTF-8 bytes, SHA256 and Git blob SHA agree. Original log calls are one per each of four assigned jobs.",
+  "results": {
+    "source": {
+      "tests": 361,
+      "pass": 361,
+      "fail": 0,
+      "skip": 0,
+      "migrations63AreNotDriver74": true
+    },
+    "core": {
+      "selectedTargets": 57,
+      "executedTargets": 57,
+      "missingTargets": [],
+      "cache": "skip-nx-cache",
+      "policyNamesPassed": 22,
+      "driverNamesPassed": 74
+    },
+    "postgres3": {
+      "suites": 18,
+      "tests": 1694,
+      "pass": 1694,
+      "fail": 0,
+      "skipped": 0,
+      "botThreads": {
+        "files": 25,
+        "tests": 375,
+        "pass": 375,
+        "coordinatorParentPassed": true,
+        "retainedChildrenPassed": 25,
+        "addedChildrenPassed": 21
+      },
+      "batchContextNamesPassed": 23
+    },
+    "postgres4": {
+      "suites": 18,
+      "tests": 685,
+      "pass": 685,
+      "fail": 0,
+      "skipped": 0,
+      "revisionPair": {
+        "beforeStatements": 3,
+        "afterStatements": 1,
+        "resultsEqual": true,
+        "returnedRefsUnchanged": true
+      }
+    },
+    "node": "24.22.2",
+    "assignedJobsAll": "success",
+    "postgresCleanup": "Both exact ephemeral service containers and GitHub Docker networks removed, confirmed in originals"
+  },
+  "references": {
+    "selection": {
+      "gitBlob": "d3e61b6b61f088d39c8a2d92f6213b8db4386376",
+      "bytes": 131212,
+      "sha256": "3706572c8aab82a34908b418c3d2eadb28c092c198cfcf893513489ed7d4586b"
+    },
+    "publicationAndCheckout": {
+      "gitBlob": "121aa074fbd2ee0c2b891a7ef7884888d5ad2b1d",
+      "bytes": 1671,
+      "sha256": "f668b103f6126c245486c57fb55998f48827b6f4c6c5f9ff15a4ddcadfadd920"
+    },
+    "isolatedPgNameInventory": {
+      "gitBlob": "6c46d672305d775f4b028fd5245bc123b29168e2",
+      "bytes": 52446,
+      "sha256": "a0f0a4fdeb8330cfcace2b44b4d9fd766da04adcfb33f8e6296df314b009109b",
+      "scope": "Used only for source-bound names and preserved25/added21 inventory; canonical results independently observed in current original."
+    }
+  },
+  "privacy": "GitHub masked public logs passed a bounded closed-pattern scan with zero hits. This is not an exhaustive content privacy guarantee; tool envelopes and signed download URLs are excluded.",
+  "limits": [
+    "Only Source, Core, PG3/4 and PG4/4 original logs were retrieved by this reader.",
+    "Changes selection/source proof reused via root's immutable blobs; original Changes was not read.",
+    "Integration, Native, strict, E2B and PG1/4/PG2/4 originals were not read.",
+    "The 375 count already includes the Coordinator parent and its 46 children; no double count.",
+    "This does not establish Native budget, production runtime, models, or PostHog acceptance.",
+    "Previous RED and UNKNOWN receipts remain attached to their actual source and run. No old result was relabeled.",
+    "No tests, resources, workflow reruns or git ref writes were performed by this reader."
+  ]
+}

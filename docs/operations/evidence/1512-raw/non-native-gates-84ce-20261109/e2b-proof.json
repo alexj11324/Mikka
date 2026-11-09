@@ -1,0 +1,152 @@
+{
+  "schema": "mikka.issue1512.ci84ce.e2b-offline-original-verification.v1",
+  "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "checkout": "197ba2452796ce6d5942309f488009963b7cbc7d",
+  "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+  "run": 42691592613,
+  "attempt": 1,
+  "job": 129412422764,
+  "originalLog": "808ad2e36bf1dd103a600393892d6be14eb86fa0",
+  "originalWrapper": "e0899138211cd2d796612b564a082f1c1ac38dac",
+  "node": {
+    "tests": 215,
+    "suites": 0,
+    "pass": 215,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "python": [
+    {
+      "command": "python3 scripts/e2b/build-template.test.py",
+      "tests": 32,
+      "duration": "0.566s",
+      "followedByOK": true
+    },
+    {
+      "command": "python3 packages/daemon/scripts/prepare-worker-install.test.py",
+      "tests": 5,
+      "duration": "0.007s",
+      "followedByOK": true
+    },
+    {
+      "command": "python3 scripts/e2b/official-files.test.py",
+      "tests": 38,
+      "duration": "0.330s",
+      "followedByOK": true
+    },
+    {
+      "command": "python3 scripts/e2b/cleanup-template-candidates.test.py",
+      "tests": 16,
+      "duration": "0.007s",
+      "followedByOK": true
+    }
+  ],
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install only the offline gate test dependencies",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run python3 scripts/e2b/build-template.test.py",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run python3 packages/daemon/scripts/prepare-worker-install.test.py",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run python3 scripts/e2b/official-files.test.py",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "productionJobs": [
+    {
+      "id": 129412622699,
+      "name": "check",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129412625159,
+      "name": "validate",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129412625191,
+      "name": "await-web",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129412625922,
+      "name": "subscriptions",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129412626839,
+      "name": "publish",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 129412629097,
+      "name": "cleanup",
+      "conclusion": "skipped"
+    }
+  ],
+  "boundary": "PR offline tests only; six production jobs are skipped. This is not actual main R7 publication.",
+  "historicalE093": "Prior E2B failure retained; not relabeled."
+}

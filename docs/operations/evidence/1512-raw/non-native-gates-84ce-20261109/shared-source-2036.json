@@ -1,0 +1,253 @@
+{
+  "schema": "mikka.issue1512.shared-r7-web-wait-increment.v1",
+  "observedAtUtc": "2026-11-09T20:36:03Z",
+  "incrementSinceUtc": "2026-11-09T20:26:00Z",
+  "previousProof": "ca7578637668184af5e9981732c39556d7ef26b3",
+  "repository": "alexj11324/Mikka",
+  "main": "7848e79df9c5af67e526aeed1c828858db392066",
+  "exactSourceRunMetadata": [
+    {
+      "id": 42690424415,
+      "name": "Web deploy",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "createdAt": "2026-11-09T20:10:41Z",
+      "runStartedAt": "2026-11-09T20:10:41Z",
+      "updatedAt": "2026-11-09T20:10:45Z"
+    },
+    {
+      "id": 42690423873,
+      "name": "E2B additive runtime release",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "createdAt": "2026-11-09T20:10:41Z",
+      "runStartedAt": "2026-11-09T20:10:41Z",
+      "updatedAt": "2026-11-09T20:19:25Z"
+    }
+  ],
+  "r7": {
+    "runId": 42690423873,
+    "attempt": 1,
+    "totalJobs": 4,
+    "jobs": [
+      {
+        "id": 129408388061,
+        "name": "test",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:10:44Z",
+        "completedAt": "2026-11-09T20:10:59Z"
+      },
+      {
+        "id": 129408559181,
+        "name": "check",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:11:02Z",
+        "completedAt": "2026-11-09T20:11:22Z"
+      },
+      {
+        "id": 129408783957,
+        "name": "validate / build",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:11:25Z",
+        "completedAt": "2026-11-09T20:19:22Z"
+      },
+      {
+        "id": 129413303700,
+        "name": "await-web",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T20:19:25Z",
+        "completedAt": null
+      }
+    ],
+    "activeAwaitWebSteps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:19:25Z",
+        "completedAt": "2026-11-09T20:19:26Z"
+      },
+      {
+        "number": 2,
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:19:26Z",
+        "completedAt": "2026-11-09T20:19:31Z"
+      },
+      {
+        "number": 3,
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:19:31Z",
+        "completedAt": "2026-11-09T20:19:34Z"
+      },
+      {
+        "number": 4,
+        "name": "Await this source's actual Web build and public version",
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T20:19:34Z",
+        "completedAt": null
+      },
+      {
+        "number": 7,
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "pending",
+        "conclusion": null,
+        "startedAt": null,
+        "completedAt": null
+      },
+      {
+        "number": 8,
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "pending",
+        "conclusion": null,
+        "startedAt": null,
+        "completedAt": null
+      }
+    ],
+    "newSubscriptionPublishOrFinalCleanupJobs": [],
+    "interpretation": "Only test, check, build and await-web exist in this exact-attempt snapshot. The first three succeeded; await-web is active. There is no actual dual-subscription or publication result in this snapshot."
+  },
+  "web": {
+    "runId": 42690424415,
+    "attempt": 1,
+    "job": {
+      "id": 129408389004,
+      "name": "deploy",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "startedAt": "2026-11-09T20:10:44Z",
+      "completedAt": null
+    },
+    "relevantSteps": [
+      {
+        "number": 15,
+        "name": "Publish the verified additive runtime pair inside the deployment queue",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T20:11:01Z",
+        "completedAt": "2026-11-09T20:11:01Z"
+      },
+      {
+        "number": 24,
+        "name": "Build (runs migrations last, as the Vercel build did)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:13:35Z",
+        "completedAt": "2026-11-09T20:20:27Z"
+      },
+      {
+        "number": 25,
+        "name": "Record official build capacity without private diagnostics",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:20:27Z",
+        "completedAt": "2026-11-09T20:20:29Z"
+      },
+      {
+        "number": 26,
+        "name": "Audit the public output for source and source maps",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:20:29Z",
+        "completedAt": "2026-11-09T20:20:30Z"
+      },
+      {
+        "number": 27,
+        "name": "Upload the prebuilt output to production",
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T20:20:30Z",
+        "completedAt": null
+      },
+      {
+        "number": 28,
+        "name": "Verify the public production version before releasing the deployment queue",
+        "status": "pending",
+        "conclusion": null,
+        "startedAt": null,
+        "completedAt": null
+      }
+    ],
+    "interpretation": "Initial Web build passed. Production upload remains in progress; public-version verification has not started. The initial normal-push runtime-publication step is skipped; no completed effective runtime refresh is proved."
+  },
+  "newSafetyProjections": {
+    "issue1505NewComments": [],
+    "coordinationComments": [
+      {
+        "id": 6750631149,
+        "createdAt": "2026-11-09T20:28:05Z",
+        "updatedAt": "2026-11-09T20:28:05Z",
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6750631149",
+        "body": "#1505 本轮实际 R742690423873/A1：test、check、**validate/build均SUCCESS**，main CI42690424468也已SUCCESS；现为await-web，Web42690424415仍在生产上传。三模板安装前后原文件摘要完全一致，候选原件与安全投影见[#1505/6750531333](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6750531333)。\n\n请注意这次实际候选W为 **aa7efbbe2969d8b1578bdba093e6400a26749e07**，不是旧75b；两侧worker_hash已独立离线复算吻合，480输入中只变了纳入recipe的两份保全policy文件，daemon与依赖输入未变。候选仍未完成双订阅/公开发布，不能提前引用为production tuple或性能PASS。root继续唯一读取本轮原件；其他owner直接复用上述投影。实际有限段继续，新正式六例0。"
+      },
+      {
+        "id": 6750798889,
+        "createdAt": "2026-11-09T20:35:11Z",
+        "updatedAt": "2026-11-09T20:35:11Z",
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6750798889",
+        "body": "## #1608 / #1831 当前合流恢复（20:36 UTC）\n\n本批旧source **aec0b4441228b85d7f7a35a051ca8f43c86e97df** 的独立batch CI **42639362735/A1** 已于15:28:56 SUCCESS；13/13 workflows全绿，原始business/platform证据与Native ZIP仍完整，现直接复用已存原件，没有重新下载。当前main已到 **7848e79df9c5af67e526aeed1c828858db392066**，本批已出现真实合流冲突，旧绿色不能代替新组合。\n\n已完整读回backend-fixes的[6747507603](https://github.com/alexj11324/Mikka/pull/1831#issuecomment-6747507603)：AEC+d8的未关联tree0f12。另一路已独立重建0f12全部6896叶相同，并核main d8→784十路径的前像全匹配；root正在primary云环境做实际Git三方合流和必要共享内容复核，预计最终tree200435763e56f2be2dde1573e510b8c5ac78de8c，以实际Git结果为准。只推进自己#1831的feature，SAML两文件保留父AEC，#1753仍原owner872自持。\n\n已读#1505当前 **20:04:10–22:04:10实际段**、main7848/R742690423873/Web42690424415。此时不移动main、不登录共享账号、不读该owner原log/ZIP；本方在窗口内完成新组合CI，随后按真正release/cleanup和fresh main检查接续。没有新增本方生产窗口或未来hold。"
+      }
+    ],
+    "candidateWorker": {
+      "sha": "aa7efbbe2969d8b1578bdba093e6400a26749e07",
+      "basis": "Owner public projection6750631149, dated20:28:05; no new original file acquisition by this reviewer.",
+      "addedOwnerAssertion": "Independent worker_hash calculations on both sides match. Of480canonical inputs only two policy recipe files changed; daemon/dependency inputs are unchanged.",
+      "boundary": "Still a candidate. Owner explicitly says dual subscriptions/public release are unfinished and new formal performance cases remain0."
+    },
+    "effectiveTuple": {
+      "newRuntimeSource": null,
+      "newEffectiveWorker": null,
+      "newDeploymentId": null,
+      "status": "No new completed effectiveR/W/DPL witness observed; null means not established by this increment, not that no previously published runtime exists."
+    }
+  },
+  "window": {
+    "ownerIssue": 1505,
+    "start": "2026-11-09T20:04:10Z",
+    "absoluteEnd": "2026-11-09T22:04:10Z",
+    "earlyReleaseObserved": false,
+    "extensionObserved": false,
+    "actualWork": "RealWebproductionupload and R7await-web continue.",
+    "newOwnerConfirmation": "6750631149 explicitly says the existing finite segment continues.",
+    "futurePreparation": "1831/1608 comment6750798889 concerns feature merge and CI preparation only. Owner explicitly avoids main/source/account changes; it creates no production hold."
+  },
+  "claimLimits": [
+    "Job names/success metadata alone are not parsed subscription evidence, native runtime identity, completed environment publication or complete resource cleanup.",
+    "No actual public endpoint/VercelREADY read or account call was made by this reviewer.",
+    "No inference of a new failure, stall or timeout from still-running metadata or workflow updated_at timestamps.",
+    "RootNative and production0/2 remain outside this shared pipeline check."
+  ],
+  "activity": {
+    "originalJobLogReads": 0,
+    "artifactZipDownloads": 0,
+    "accountCalls": 0,
+    "modelCalls": 0,
+    "newRuntimeResources": 0,
+    "ciReruns": 0,
+    "sourceOrRefMutations": 0,
+    "newSafeEvidenceBlobs": 1
+  }
+}
