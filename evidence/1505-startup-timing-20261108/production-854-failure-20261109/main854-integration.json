@@ -1,0 +1,29 @@
+{
+  "observedAt": "2026-11-09T06:59:00Z",
+  "main": "854583566f4f55fc15490a240c3e38a2c1fd16b6",
+  "mainTree": "d11a9eeac6f3c2952d6b9dbcc3f4002e579e96f8",
+  "candidate": "5fde6ffae3c01769b69aa9c14abec26f2ceddfda",
+  "prospectiveTree": "3e558d97ab957c9697787ff7fa91291bebfd091f",
+  "ownPaths": 5,
+  "preservedOtherMainLeaves": 6728,
+  "totalLeaves": 6733,
+  "agentMethod": "read-only Merkle calculation verified original roots and 869 subtrees",
+  "rootMethod": "GitHub create_tree from exact main plus exact 5 candidate entries, same resulting tree, no ref change",
+  "startupStageSchemaChanged": false,
+  "agentAcceptedChanged": false,
+  "driverFormulaChanged": false,
+  "workerInstallLockOrManifestsChanged": false,
+  "sdkRelativeClosureChanged": false,
+  "upstreamToolDurationAlwaysEnabled": true,
+  "upstreamResultPayloadBytesIncrease": true,
+  "noNewChunkSqlHttpCallFromToolDuration": true,
+  "viewOutputMaxUtf16Units": 8212,
+  "priorWorkerHashReusable": false,
+  "newWorkerHash": null,
+  "limits": [
+    "Static compatibility only",
+    "Existing candidate CI does not prove this prospective combined tree",
+    "New production source and worker identity must be read from actual pipeline",
+    "No measured performance or formal sample"
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "events": [
+    {
+      "created": 1794208050244,
+      "date": 1794208050244,
+      "type": "stdout",
+      "text": "Running build in Washington, D.C., USA (East) – iad1",
+      "info": {
+        "type": "build",
+        "name": "bld_ek86f9dm0",
+        "entrypoint": "."
+      }
+    },
+    {
+      "created": 1794208050244,
+      "date": 1794208050244,
+      "type": "stdout",
+      "text": "Build machine configuration: 4 cores, 8 GB (Standard Build Machine)",
+      "info": {
+        "type": "build",
+        "name": "bld_ek86f9dm0",
+        "entrypoint": "."
+      }
+    },
+    {
+      "created": 1794208050258,
+      "date": 1794208050258,
+      "type": "stdout",
+      "text": "Retrieving list of deployment files...",
+      "info": {
+        "type": "build",
+        "name": "bld_ek86f9dm0",
+        "entrypoint": "."
+      }
+    },
+    {
+      "created": 1794208050360,
+      "date": 1794208050360,
+      "type": "stdout",
+      "text": "Previous build caches not available.",
+      "info": {
+        "type": "build",
+        "name": "bld_ek86f9dm0",
+        "entrypoint": "."
+      }
+    },
+    {
+      "created": 1794208050567,
+      "date": 1794208050567,
+      "type": "stdout",
+      "text": "Concatenating deployment archive files...",
+      "info": {
+        "type": "build",
+        "name": "bld_ek86f9dm0",
+        "entrypoint": "."
+      }
+    },
+    {
+      "created": 1794208050567,
+      "date": 1794208050567,
+      "type": "stdout",
+      "text": "Extracting deployment files...",
+      "info": {
+        "type": "build",
+        "name": "bld_ek86f9dm0",
+        "entrypoint": "."
+      }
+    }
+  ]
+}

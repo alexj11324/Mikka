@@ -1,0 +1,95 @@
+{
+  "observedAt": "2026-11-09T06:49:10Z",
+  "pr": 1805,
+  "head": "5fde6ffae3c01769b69aa9c14abec26f2ceddfda",
+  "headTree": "a1c4bfbc53e08307e9f3461c18c31a5f58131048",
+  "executedCheckout": "aaaa97fc745eed66f56e8c3543fa50f61815cc38",
+  "syntheticTree": "7e4973cc149fafa8e05ec3b2090a628417b4c049",
+  "syntheticParents": [
+    "88b144d52d091d7ff566c63fce6e902e33edc59e",
+    "5fde6ffae3c01769b69aa9c14abec26f2ceddfda"
+  ],
+  "actualMainAtObservation": "854583566f4f55fc15490a240c3e38a2c1fd16b6",
+  "mergeable": true,
+  "mergeableState": "clean",
+  "reviews": [],
+  "workflows": [
+    [
+      42572633216,
+      "Unattended",
+      "success"
+    ],
+    [
+      42572633377,
+      "Cloud computer",
+      "success"
+    ],
+    [
+      42572633404,
+      "custody",
+      "success"
+    ],
+    [
+      42572633501,
+      "SSH",
+      "success"
+    ],
+    [
+      42572633560,
+      "CI",
+      "success"
+    ],
+    [
+      42572633378,
+      "Node22",
+      "success"
+    ],
+    [
+      42572633390,
+      "Browser",
+      "success"
+    ],
+    [
+      42572633375,
+      "E2B PR-only",
+      "success"
+    ]
+  ],
+  "checks": {
+    "total": 41,
+    "success": 34,
+    "skipped": 7,
+    "active": 0,
+    "failure": 0
+  },
+  "apple": {
+    "job": 129015402772,
+    "attempt": 1,
+    "result": "success",
+    "completedAt": "2026-11-09T06:44:09Z",
+    "returnedSteps": 26,
+    "allStepsSuccess": true
+  },
+  "strict": {
+    "job": 129020228073,
+    "result": "success",
+    "completedAt": "2026-11-09T06:44:22Z"
+  },
+  "ci": {
+    "run": 42572633560,
+    "attempt": 1,
+    "result": "success",
+    "updatedAt": "2026-11-09T06:44:23Z"
+  },
+  "sourceLog": {
+    "job": 129013574372,
+    "bytes": 133103,
+    "sha256": "4ffa2985c57da2d85feaf5da03debc9a435a3dc3810f5e97dc1f1042f386dcc1",
+    "readCount": 1,
+    "evidenceCommit": "1036fb55316330db871aa08fba9e7d52212cc69c"
+  },
+  "newMainCombinationTested": false,
+  "formalSamples": 0,
+  "e2bRealSubscriptions": "skipped",
+  "metadataSource": "Independent observer /root/daemon_start; root Source job log read independently establishes checkout"
+}

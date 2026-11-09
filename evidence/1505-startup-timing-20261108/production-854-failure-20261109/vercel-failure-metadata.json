@@ -1,0 +1,15 @@
+{
+  "observedAt": "2026-11-09T07:20:00Z",
+  "id": "dpl_92FvyNqdM5iZCwGbwBzqpMjy1Y7W",
+  "sourceCommit": "854583566f4f55fc15490a240c3e38a2c1fd16b6",
+  "state": "ERROR",
+  "readyState": "ERROR",
+  "errorCode": "BUILD_FAILED",
+  "errorMessage": null,
+  "createdAt": 1794208049258,
+  "buildingAt": 1794208050539,
+  "ready": 1794208117700,
+  "meta": {
+    "githubCommitSha": "854583566f4f55fc15490a240c3e38a2c1fd16b6"
+  }
+}

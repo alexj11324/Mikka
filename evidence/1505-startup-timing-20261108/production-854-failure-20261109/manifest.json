@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "prefix": "evidence/1505-startup-timing-20261108/production-854-failure-20261109/",
+  "files": [
+    {
+      "path": "cleanup-job-129029993188.log",
+      "bytes": 29289,
+      "sha256": "69a5471edf5ac4e138adc18474415560d41b16a8c20d79dd84295ec34fd47cb4",
+      "gitBlob": "72685495815ddd2cc9ed84152b69eaa471d805b2"
+    },
+    {
+      "path": "cleanup-log-receipt.json",
+      "bytes": 180,
+      "sha256": "b66ac368ab39e26ba591a748574224563b9287868bb61bc323d00339119c6a9b",
+      "gitBlob": "dc860b01e0b575f983ca74fb941a1f9d504b9f1c"
+    },
+    {
+      "path": "vercel-build-events.json",
+      "bytes": 1631,
+      "sha256": "b4b04ddb9a0ce4280c3ca8f7bf9d3cf092999a1970f301a3bc640d6dfaed23d1",
+      "gitBlob": "c75b7153e09c89194d8da69080937016da0c7f0e"
+    },
+    {
+      "path": "vercel-failure-metadata.json",
+      "bytes": 419,
+      "sha256": "15826430c77e412615387165596016ff8915adee935fec86b622fd5428f49f73",
+      "gitBlob": "2926050464db52278676fe3f59a0de04d3a35a1a"
+    },
+    {
+      "path": "owner-handoff.json",
+      "bytes": 3756,
+      "sha256": "c7af19a37c0dcc3df043bd313505acbdc245cc4c0c6c8f650682fb49e6e42dfc",
+      "gitBlob": "16dc4ea7eadb43885d81e03105916196bfa027df"
+    },
+    {
+      "path": "main854-integration.json",
+      "bytes": 1249,
+      "sha256": "4a2294cd2b2f60017e04b80775f31527c66970feb79cb24bb45c26d20f706e66",
+      "gitBlob": "b248ab67ceaad9ab27f0f32796d53412fe6735a7"
+    },
+    {
+      "path": "pr1805-final-ci.json",
+      "bytes": 2084,
+      "sha256": "2cccd72dbd073ddc1d5ff3717af770af4932432fa34d512a6697b7dfdded18b2",
+      "gitBlob": "2a203cf5030050013493980f159cdc2a56808907"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2075,
+      "sha256": "769563a69894184942331d0d7d0d90955e02831d9ddd7a017238bb3bd6fa61a9",
+      "gitBlob": "cbaa818a42fdc1ba6dd3aee2e8308d9c695f8d82"
+    }
+  ],
+  "scans": {
+    "githubToken": 0,
+    "privateKey": 0,
+    "signedUrl": 0
+  },
+  "note": "Hashes describe preserved text or explicitly labelled closed projections; no raw receipt reconstructed."
+}
