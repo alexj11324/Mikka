@@ -33,7 +33,7 @@ jobs:
       - uses: ./.github/actions/pnpm-install
         with:
           ffmpeg-github-token: ${{ github.token }}
-      - run: node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs scripts/acceptance/memory-production.test.mjs scripts/acceptance/memory-production-target.test.mjs
+      - run: node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs scripts/acceptance/memory-production.test.mjs scripts/acceptance/memory-production-target.test.mjs scripts/acceptance/memory-production-pending.test.mjs scripts/acceptance/memory-production-cases.test.mjs
 
   acceptance:
     name: Core production API and gateway acceptance
@@ -114,11 +114,24 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
       - name: Verify memory owner APIs and independently observe both subscription prompts
+        id: memory
         if: always() && steps.memory_select.outputs.selected == 'true'
         timeout-minutes: 6
         run: node --import tsx scripts/acceptance/memory-production.mjs
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Confirm Memory owner API acceptance
+        if: always() && steps.memory.outputs.owner_passed == 'true'
+        run: node --import tsx scripts/acceptance/memory-production.mjs --confirm-case owner
+      - name: Confirm Claude Memory reply and real usage
+        if: always() && steps.memory.outputs.claude_code_passed == 'true'
+        run: node --import tsx scripts/acceptance/memory-production.mjs --confirm-case claude_code
+      - name: Confirm Codex Memory reply and real usage
+        if: always() && steps.memory.outputs.codex_passed == 'true'
+        run: node --import tsx scripts/acceptance/memory-production.mjs --confirm-case codex
+      - name: Confirm Memory notification pending review
+        if: always() && steps.memory.outputs.pending_passed == 'true'
+        run: node --import tsx scripts/acceptance/memory-production.mjs --confirm-case pending
       - name: Retain memory acceptance and nonce-bound fixture receipts
         if: always()
         continue-on-error: true

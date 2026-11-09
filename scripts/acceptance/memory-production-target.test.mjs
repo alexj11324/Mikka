@@ -1,24 +1,31 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import yaml from 'js-yaml'
 import { MEMORY_BRANCH, memoryWindowProof, selectMemoryProduction } from './memory-production-target.mjs'
 import { CORE_MODE, CORE_WORKFLOW, CORE_ISSUES, CORE_BUSINESS_ISSUES, coreBusinessSelected, coreProductionGuard } from './self-hosted-production-target.mjs'
 import { runCoreProduction } from './self-hosted-production.mjs'
 import { runMemoryProduction } from './memory-production.mjs'
+import { MEMORY_CASE_STEPS } from './memory-production-cases.mjs'
 
 const SOURCE = 'a'.repeat(40), HEAD = 'b'.repeat(40), PREVIOUS = 'c'.repeat(40)
 const API = 'https://api.github.com/repos/alexj11324/Mikka'
 const NOW = Date.parse('2026-11-09T22:00:00Z')
 const repository = { full_name: 'alexj11324/Mikka', owner: { login: 'alexj11324' } }
+const NONCE = '60000000-0000-4000-8000-000000000001'
+const NOTIFICATION_URL = 'https://github.com/alexj11324/Mikka/issues/1821#issuecomment-1821002'
+const NOTIFICATION_BODY = 'Normal notification mikka-memory-1821:' + NONCE
+const NOTIFICATION = { provider: 'github', url: NOTIFICATION_URL,
+  bodySha256: createHash('sha256').update(NOTIFICATION_BODY).digest('hex') }
 const marker = (patch = {}) => '<!-- mikka-memory-1821 ' + JSON.stringify({ state: 'active', issue: 1821, pr: 1830,
   branch: MEMORY_BRANCH, headSha: HEAD, sourceSha: SOURCE, startsAt: '2026-11-09T21:59:00Z',
-  expiresAt: '2026-11-09T22:30:00Z', ...patch }) + ' -->'
+  expiresAt: '2026-11-09T22:30:00Z', phase: 'inventory', fixtureNonce: NONCE, ...patch }) + ' -->'
 
 function metadata(options = {}) {
   const calls = [], env = { MIKKA_ACCEPTANCE_TARGET_MODE: CORE_MODE, GITHUB_REPOSITORY: repository.full_name,
     GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_run',
-    GITHUB_SHA: SOURCE, GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: '1', GH_TOKEN: 'synthetic-metadata-token',
+    GITHUB_SHA: SOURCE, GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: String(options.attempt ?? 1), GH_TOKEN: 'synthetic-metadata-token',
     GITHUB_WORKFLOW_REF: repository.full_name + '/' + CORE_WORKFLOW + '@refs/heads/main' }
   for (const key of ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD', 'INFISICAL_CLIENT_SECRET'])
     Object.defineProperty(env, key, { get() { return assert.fail('selection cannot read ' + key) } })
@@ -51,13 +58,26 @@ function metadata(options = {}) {
       if (options.slowWindowRead) clock = Date.parse('2026-11-09T22:30:00Z')
       return Response.json(comment)
     }
+    if (path === '/issues/comments/1821002') {
+      if (options.slowNotificationRead) clock = Date.parse('2026-11-09T22:30:00Z')
+      return Response.json({ id: 1821002, html_url: NOTIFICATION_URL,
+        issue_url: API + '/issues/1821', created_at: '2026-11-09T21:59:30Z', updated_at: '2026-11-09T21:59:30Z',
+        body: options.notificationBody ?? NOTIFICATION_BODY })
+    }
     if (path.startsWith('/issues/')) {
       const number = Number(path.slice(8)); assert.ok(CORE_ISSUES.includes(number))
       return Response.json({ number, url: url.href, repository_url: API, state: number === 1821 && !options.closed ? 'open' : 'closed' })
     }
-    if (path === '/actions/runs/17') return Response.json({ id: 17, run_attempt: 1, repository, head_repository: repository,
+    if (path === '/actions/runs/17') return Response.json({ id: 17, run_attempt: options.attempt ?? 1, repository, head_repository: repository,
       url: url.href, path: CORE_WORKFLOW, event: 'workflow_run', head_branch: 'main', head_sha: SOURCE,
       status: 'in_progress', conclusion: null })
+    if (path === '/actions/runs/17/attempts/1/jobs?per_page=100') return Response.json({ total_count: 1, jobs: [{
+      id: 171, name: 'Core production API and gateway acceptance', run_id: 17, run_attempt: 1,
+      head_sha: options.priorHead ?? SOURCE, status: 'completed', conclusion: 'failure',
+      steps: [{ number: 10, name: MEMORY_CASE_STEPS.claude_code, status: 'completed', conclusion: 'success' },
+        { number: 11, name: MEMORY_CASE_STEPS.codex, status: 'completed', conclusion: 'success' },
+        { number: 12, name: MEMORY_CASE_STEPS.pending, status: 'completed', conclusion: 'skipped' }],
+    }] })
     if (path === '/git/ref/heads/main') return Response.json({ ref: 'refs/heads/main', object: { type: 'commit', sha: options.main ?? SOURCE } })
     if (path === '/actions/runs/51') return Response.json(release)
     if (path === '/actions/runs/51/attempts/1/jobs?per_page=100') return Response.json({ total_count: 1,
@@ -81,6 +101,29 @@ test('only the ordinary PR 1830 merge, current real Web publication and live own
   assert.equal(f.calls.filter(path => path.endsWith('/mikka/api/version')).length, 2)
   assert.ok(f.calls.includes(API + '/git/commits/' + SOURCE))
   assert.ok(f.calls.includes(API + '/issues/comments/' + f.comment.id))
+  assert.equal(proof.notification, null)
+  assert.equal(f.calls.some(path => path.includes('/issues/comments/1821002')), false)
+  assert.equal(f.calls.some(path => path.includes('/actions/runs/17/attempts/')), false)
+})
+
+test('fixture selection verifies the real source event and same-run prior successful cases before owner credentials', async () => {
+  const f = metadata({ attempt: 2, marker: { phase: 'fixture', notification: NOTIFICATION } }), proof = await f.select()
+  assert.equal(proof.selected, true); assert.equal(proof.notification.url, NOTIFICATION_URL)
+  assert.equal(proof.notification.nonce, NONCE); assert.equal(proof.notification.createdAt, '2026-11-09T21:59:30Z')
+  assert.equal(proof.cases.claude_code.reused.sourceSha, SOURCE); assert.equal(proof.cases.codex.reused.runAttempt, 1)
+  assert.equal(proof.cases.pending.reused, null)
+  assert.ok(f.calls.includes(API + '/actions/runs/17/attempts/1/jobs?per_page=100'))
+  assert.ok(f.calls.includes(API + '/issues/comments/1821002'))
+  assert.equal((await f.select(proof)).selected, true)
+})
+
+test('an edited notification, wrong prior source or expiry during provider metadata cannot reach account access', async () => {
+  for (const [options, code] of [[{ notificationBody: NOTIFICATION_BODY + 'changed' }, 'notification_fixture_invalid'],
+    [{ attempt: 2, priorHead: PREVIOUS }, 'memory_case_proof_invalid'], [{ slowNotificationRead: true }, 'memory_window_invalid']]) {
+    const f = metadata({ ...options, marker: { phase: 'fixture', notification: NOTIFICATION } })
+    await assert.rejects(f.select(), new RegExp(code))
+    assert.ok(f.calls.every(path => !path.includes('/api/auth/')))
+  }
 })
 
 test('a different PR, future head, squash, ordinary later release or unmerged PR declines without an owner request', async () => {

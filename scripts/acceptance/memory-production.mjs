@@ -12,6 +12,8 @@ import { createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, rest
   chooseSharedChatModel, startupFailure } from './cloud-startup.mjs'
 import { CORE_ORIGIN, assertCoreProductionTarget, attestCoreProduction, coreTargetFailure } from './self-hosted-production-target.mjs'
 import { selectMemoryProduction, memorySelectionFailure } from './memory-production-target.mjs'
+import { reviewPendingMemoryFixture, memoryPendingFailure } from './memory-production-pending.mjs'
+import { MEMORY_CASE_STEPS, memoryCasePassed, confirmMemoryCase, memoryCaseFailure } from './memory-production-cases.mjs'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 const SHA = /^[a-f0-9]{40}$/
@@ -52,6 +54,8 @@ function failure(error) {
   if (error instanceof MemoryProbeError) return { code: error.message, httpStatus: error.httpStatus, ...(error.body ? { body: error.body } : {}) }
   const selection = memorySelectionFailure(error)
   if (selection) return selection
+  const pending = memoryPendingFailure(error), priorCase = memoryCaseFailure(error)
+  if (pending || priorCase) return pending ?? priorCase
   const core = coreTargetFailure(error)
   if (core.code !== 'core_read_failed' || error?.name === 'CoreProductionError') return core
   const startup = startupFailure(error)
@@ -146,6 +150,7 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
       projectScope: 'not_observed', crossWorkspace: 'not_observed', removalUndo: 'not_exercised',
       pendingList: 'not_observed', pendingReview: 'not_exercised_no_owned_notification_fixture', realUse: 'not_exercised' },
     pendingFixture: { github: { status: 'not_read' } },
+    pending: { status: 'not_exercised', extractionInvoked: false, existingPendingMutated: false },
     cleanup: { factRemoved: false, originalFactsPreserved: false, preferencePreserved: false,
       workspaceRestored: false, sessionRevoked: false, failures: [] },
     boundaries: { notificationInjected: false, databaseAccess: false, profileWrites: false, sharedModelOrderWrites: false,
@@ -156,6 +161,7 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
   let factId, createAttempted = false, signInAttempted = false, closing = false, cleaning = 0, deadline = 0, target = attestation
   let marker, requestId, subject, challenge
   const ownedBots = new Map(), candidateBotIds = new Set(), baselineBotIds = new Set(), allowedWorkspaces = new Set()
+  const ownedPendingFacts = new Map(), ownedPendingSuggestions = new Map()
   const boundedFetch = (url, init = {}) => {
     const duration = closing || cleaning ? 20_000 : Math.min(new URL(url).pathname.endsWith('/coordinator/stream') ? 90_000 : 20_000, deadline - now())
     check(Number.isFinite(duration) && duration > 0, 'request_failed')
@@ -168,7 +174,10 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
         driverRunId: Number(env.GITHUB_RUN_ID), driverAttempt: Number(env.GITHUB_RUN_ATTEMPT),
         fixtureNonce: marker, requestId, subjectFingerprint: digest(subject), ownerFingerprint: digest(ownerId),
         factFingerprint: factId ? digest(factId) : null,
-        botFingerprints: [...ownedBots.keys()].map(digest), state, observedAt: new Date(now()).toISOString() })
+        botFingerprints: [...ownedBots.keys()].map(digest),
+        notificationFacts: [...ownedPendingFacts].map(([id, row]) => ({ factFingerprint: digest(id),
+          subjectFingerprint: digest(row.subject), workspaceFingerprint: digest(row.workspaceId), suggestionFingerprint: digest(row.suggestionId) })),
+        state, observedAt: new Date(now()).toISOString() })
     } catch (cause) { throw new MemoryProbeError('receipt_failed', null, null, { cause }) }
   }
   const request = async (step, path, init = {}, expected = 200) => {
@@ -238,6 +247,7 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
     check(selection.selected === true && target?.status === 'ready' && target.openIssues?.includes(1821)
       && SHA.test(target.applicationSha ?? '') && Date.parse(selection.window?.expiresAt) > now(), 'target_refused')
     source = target.applicationSha; report.applicationSha = source; report.driverRunId = target.driverRunId
+    report.driverRunAttempt = target.driverRunAttempt
     report.window = selection.window; report.prHeadSha = selection.headSha
     deadline = now() + 300_000
     account = smokeAcceptanceAccount(env)
@@ -251,17 +261,25 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
     client = createSessionClient(CORE_ORIGIN, async (input, init = {}) => {
       const url = new URL(input), headers = new Headers(init.headers), path = url.pathname.slice('/mikka'.length)
       check(url.origin === CORE_ORIGIN && url.pathname.startsWith('/mikka/api/') && !headers.has('authorization'), 'target_refused')
-      check(['/api/auth/sign-in/email', '/api/auth/get-session', '/api/auth/sign-out', '/api/workspace', '/api/rpc', '/api/integrations/github'].includes(path)
+      check(['/api/auth/sign-in/email', '/api/auth/get-session', '/api/auth/sign-out', '/api/workspace', '/api/rpc', '/api/integrations/github', '/api/inbox'].includes(path)
         || [...ownedBots.keys(), ...candidateBotIds].some(id => path === '/api/bots/' + id)
         || path === '/api/coordinator/stream' && ownedBots.has(url.searchParams.get('botId')), 'target_refused')
       let businessWrite = path === '/api/auth/sign-in/email'
       if (path === '/api/integrations/github') check((init.method ?? 'GET') === 'GET', 'target_refused')
+      if (path === '/api/inbox') {
+        if ((init.method ?? 'GET') === 'GET') check(allowedWorkspaces.has(url.searchParams.get('workspaceId')), 'fixture_binding_failed')
+        else {
+          const body = JSON.parse(init.body)
+          check((closing || cleaning) && init.method === 'POST' && body.type === 'suggestion' && body.action === 'reject'
+            && ownedPendingSuggestions.get(body.id) === body.workspaceId, 'fixture_binding_failed')
+        }
+      }
       if (path === '/api/rpc') {
         const body = JSON.parse(init.body), args = decode(body.args)
         check(actions.has(body.action), 'target_refused')
         businessWrite = businessWrites.has(body.action)
         if (['memory.removeFact', 'memory.undoRemoveFact', 'memory.setFactScope', 'memory.reviewFact'].includes(body.action))
-          check(factId && args[0] === factId, 'fixture_binding_failed')
+          check(factId && args[0] === factId || ownedPendingFacts.has(args[0]), 'fixture_binding_failed')
         if (['execution-settings.getBotModelMenu', 'execution-settings.chooseBotModel', 'coordinator.pollCoordinatorChat', 'coordinator.stopCoordinatorTurn'].includes(body.action))
           check(ownedBots.has(args[0]), 'fixture_binding_failed')
         if (body.action === 'coordinator.sendCoordinatorMessage') check(ownedBots.has(args[2]) && args[9] === selectedWorkspaceId, 'fixture_binding_failed')
@@ -353,9 +371,33 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
     check(await rpc('memory.undoRemoveFact', [factId]) === true, 'undo_failed')
     report.coverage.removalUndo = 'removed_then_restored_within_two_minutes'
     report.checks.ownerCrud = true
+    if (selection.cases?.pending?.reused) {
+      report.pending = { status: 'reused', proof: selection.cases.pending.reused, extractionInvoked: false, existingPendingMutated: false }
+      report.coverage.pendingReview = 'reused_exact_source_run_attempt_case'
+    } else if (selection.notification) {
+      const personal = settings.choices.filter(row => row.kind === 'personal')
+      try {
+        check(personal.length === 1 && allowedWorkspaces.has(personal[0].id), 'identity_failed')
+        await switchWorkspace(personal[0].id)
+        await reviewPendingMemoryFixture({ proof: selection.notification, ownerId, workspaceId: personal[0].id,
+          otherWorkspaceId: selectedWorkspaceId, readMemory, request, rpc, switchWorkspace, cleanupStep, report: report.pending, now,
+          bind: (row, workspaceId, suggestionId) => {
+            check(UUID.test(row.id) && row.id !== factId && !initial.facts.some(old => old.id === row.id), 'fixture_binding_failed')
+            ownedPendingFacts.set(row.id, { subject: row.subject, kind: row.kind, workspaceId, suggestionId })
+            ownedPendingSuggestions.set(suggestionId, workspaceId)
+          },
+          saveReceipt: () => checkpoint('notification_fixture_bound_or_cleaned') })
+        report.coverage.pendingReview = 'real_notification_reject_undo_approve_and_cleanup'
+      } catch (error) { report.pending.status = 'failed'; report.pending.failure = failure(error) }
+      finally { await cleanupStep('restore_team_after_pending', () => switchWorkspace(selectedWorkspaceId)) }
+    } else report.pending = { status: 'awaiting_fixture', reason: 'no_registered_real_notification',
+      extractionInvoked: false, existingPendingMutated: false,
+      producerBoundary: 'normal_notification_ingest_only_builtin_extraction_not_forced_or_paid_retried' }
     if (initial.enabled) {
       for (const bot of await listBots()) baselineBotIds.add(bot.id)
       for (const sample of modelCases) {
+        const reused = selection.cases?.[sample.harness]?.reused
+        if (reused) { report.models.push({ ...sample, status: 'reused', proof: reused }); continue }
         const result = { ...sample, status: 'failed', reply: false, usage: false, botStopped: false }
         report.models.push(result)
         let botId, botName = `测试1821 ${marker} ${sample.harness}`, botAttempted = false, promptSent = false
@@ -415,9 +457,13 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
           })
         }
       }
-      report.coverage.realUse = report.models.every(row => row.status === 'passed') ? 'both_fixed_subscription_bot_replies_and_usage_observed'
-        : report.models.some(row => row.status === 'passed') ? 'one_subscription_observed_other_incomplete' : 'not_observed'
-    } else for (const sample of modelCases) report.models.push({ ...sample, status: 'blocked', reason: 'existing_memory_preference_disabled' })
+      report.coverage.realUse = report.models.every(row => ['passed', 'reused'].includes(row.status)) ? 'both_fixed_subscription_bot_replies_and_usage_observed'
+        : report.models.some(row => ['passed', 'reused'].includes(row.status)) ? 'one_subscription_observed_other_incomplete' : 'not_observed'
+    } else for (const sample of modelCases) {
+      const reused = selection.cases?.[sample.harness]?.reused
+      report.models.push(reused ? { ...sample, status: 'reused', proof: reused }
+        : { ...sample, status: 'blocked', reason: 'existing_memory_preference_disabled' })
+    }
     await pin(); report.checks.finalTarget = true
   } catch (error) { report.failures.push({ phase, ...failure(error) }) }
   finally {
@@ -435,7 +481,7 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
           check(!tombstone || tombstone.subject === subject && tombstone.source === null, 'cleanup_failed')
           report.cleanup.factRemoved = true
           report.cleanup.undoUntil = tombstone?.undoUntil ?? null
-          report.cleanup.originalFactsPreserved = [...initial.facts, ...initial.pending].every(row =>
+          report.cleanup.originalFactsPreserved = [...initial.facts, ...initial.pending].filter(row => !ownedPendingFacts.has(row.id)).every(row =>
             [...after.facts, ...after.pending].some(next => factIdentity(next) === factIdentity(row)))
           report.cleanup.preferencePreserved = after.enabled === initial.enabled
           check(report.cleanup.originalFactsPreserved && report.cleanup.preferencePreserved, 'baseline_changed')
@@ -465,32 +511,42 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
   }
   const clean = report.cleanup.factRemoved && report.cleanup.originalFactsPreserved && report.cleanup.preferencePreserved
     && report.cleanup.workspaceRestored && report.cleanup.sessionRevoked && !report.cleanup.failures.length
-  report.status = report.failures.length || !report.checks.ownerCrud || !clean || report.models.some(row => row.status === 'failed') ? 'failed' : 'partial'
-  // Pending review needs a real self-owned notification fixture, not an
-  // approved manual fact relabelled by a test. Its absence stays explicit.
+  const pendingPassed = ['passed', 'reused'].includes(report.pending.status)
+  report.completeAcceptance = !report.failures.length && report.checks.ownerCrud === true && clean && pendingPassed
+    && report.models.length === 2 && report.models.every(row => ['passed', 'reused'].includes(row.status))
+  report.status = report.failures.length || !report.checks.ownerCrud || !clean || report.models.some(row => row.status === 'failed')
+    || report.pending.status === 'failed' ? 'failed' : report.completeAcceptance ? 'passed' : 'partial'
+  // A missing actual notification is not approval coverage. Already confirmed
+  // subscription cases remain reusable without sending another paid prompt.
   return report
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const directory = 'memory-production-report'
   const selectOnly = process.argv.length === 3 && process.argv[2] === '--select'
+  const confirming = process.argv.length === 4 && process.argv[2] === '--confirm-case' && Object.hasOwn(MEMORY_CASE_STEPS, process.argv[3])
   await mkdir(directory, { recursive: true, mode: 0o700 })
   let report
   try {
-    check(selectOnly || process.argv.length === 2, 'target_refused')
-    const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))
-    if (selectOnly) report = await selectMemoryProduction({ event })
+    check(selectOnly || confirming || process.argv.length === 2, 'target_refused')
+    if (confirming) report = confirmMemoryCase(JSON.parse(await readFile(directory + '/report.json', 'utf8')), process.argv[3], process.env)
     else {
-      const selection = JSON.parse(await readFile(directory + '/selection.json', 'utf8'))
-      check(selection?.purpose === 'memory-1821-production-selection' && selection.selected === true, 'target_refused')
-      const attestation = await attestCoreProduction({ event })
-      report = await runMemoryProduction({ event, attestation, selection,
-        writeReceipt: receipt => writeFile(directory + '/fixture.json', JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 }) })
+      const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))
+      if (selectOnly) report = await selectMemoryProduction({ event })
+      else {
+        const selection = JSON.parse(await readFile(directory + '/selection.json', 'utf8'))
+        check(selection?.purpose === 'memory-1821-production-selection' && selection.selected === true, 'target_refused')
+        const attestation = await attestCoreProduction({ event })
+        report = await runMemoryProduction({ event, attestation, selection,
+          writeReceipt: receipt => writeFile(directory + '/fixture.json', JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 }) })
+      }
     }
   } catch (error) { report = { schema: 1, kind: 'mikka1821-production-memory', status: 'failed', completeAcceptance: false, failure: failure(error) } }
   const json = JSON.stringify(report, null, 2) + '\n'
-  await writeFile(directory + (selectOnly ? '/selection.json' : '/report.json'), json, { mode: 0o600 })
+  await writeFile(directory + (selectOnly ? '/selection.json' : confirming ? '/confirmation-' + process.argv[3] + '.json' : '/report.json'), json, { mode: 0o600 })
   if (selectOnly && process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, 'selected=' + (report.selected === true) + '\n')
+  if (!selectOnly && !confirming && process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT,
+    Object.keys(MEMORY_CASE_STEPS).map(kind => kind + '_passed=' + memoryCasePassed(report, kind)).join('\n') + '\n')
   console.log(json)
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY,
     '## #1821 memory production ' + (selectOnly ? 'selection' : 'API acceptance') + '\n\nResult: ' + report.status

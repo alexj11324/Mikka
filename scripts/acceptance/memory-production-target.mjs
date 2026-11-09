@@ -2,6 +2,8 @@
 // This read-only selection runs before the existing Infisical account step.
 import { createHash } from 'node:crypto'
 import { coreProductionGuard, attestCoreProduction, assertCoreProductionTarget, CoreProductionError } from './self-hosted-production-target.mjs'
+import { memoryNotificationDeclaration, verifyMemoryNotification } from './memory-production-pending.mjs'
+import { readPriorMemoryCases } from './memory-production-cases.mjs'
 
 export const MEMORY_PR = 1830
 export const MEMORY_BRANCH = 'feat/1821-memory-provenance-scope'
@@ -36,6 +38,7 @@ export function memoryWindowProof(comment, { headSha, sourceSha, now = Date.now(
   try { marker = JSON.parse(matches[0][1]) }
   catch (cause) { throw new MemorySelectionError('memory_window_invalid', 'marker', { cause }) }
   const starts = Date.parse(marker.startsAt), expires = Date.parse(marker.expiresAt)
+  const notification = memoryNotificationDeclaration(marker)
   check(marker.state === 'active' && marker.issue === 1821 && marker.pr === MEMORY_PR && marker.branch === MEMORY_BRANCH
     && SHA.test(headSha ?? '') && marker.headSha === headSha && SHA.test(sourceSha ?? '') && marker.sourceSha === sourceSha,
   'memory_window_invalid', 'marker')
@@ -45,7 +48,9 @@ export function memoryWindowProof(comment, { headSha, sourceSha, now = Date.now(
   check(!expected || expected.markerSha256 === markerSha256 && expected.headSha === headSha && expected.sourceSha === sourceSha,
     'memory_window_invalid', 'marker')
   return { commentId: comment.id, branch: MEMORY_BRANCH, headSha, sourceSha,
-    startsAt: marker.startsAt, expiresAt: marker.expiresAt, markerSha256 }
+    startsAt: marker.startsAt, expiresAt: marker.expiresAt, markerSha256,
+    phase: marker.phase, fixtureNonce: marker.fixtureNonce,
+    ...(notification ? { notification: marker.notification } : {}) }
 }
 
 export async function readMemoryWindow(read, { headSha, sourceSha, now = Date.now, expected } = {}) {
@@ -125,5 +130,9 @@ export async function selectMemoryProduction({ env = process.env, event, attesta
     throw error
   }
   check(Date.parse(window.expiresAt) > now(), 'memory_window_invalid', 'time')
-  return { ...empty('exact_pr_merge_and_active_window'), selected: true, status: 'selected', headSha: pr.head.sha, window, attestation: target }
+  const notification = await verifyMemoryNotification(window, { env, fetchImpl, now })
+  const cases = await readPriorMemoryCases(read, { sourceSha: guard.applicationSha, runId: guard.driverRunId, runAttempt: guard.driverRunAttempt })
+  check(Date.parse(window.expiresAt) > now(), 'memory_window_invalid', 'time')
+  return { ...empty('exact_pr_merge_and_active_window'), selected: true, status: 'selected', headSha: pr.head.sha,
+    window, notification, cases, attestation: target }
 }
