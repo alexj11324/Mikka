@@ -129,17 +129,34 @@ fresh 的精确链接依次为 `e2b-ca.pem` 和 `/usr/local/share/ca-certificate
 三项本 run 候选均已删除，最终清理确认精确名字 absent、sandbox 和 errors 列表为空；
 真实双订阅和公开发布均未执行。这个失败不等于新运行时或五秒验收通过。
 
-本后继先准备仅适用于 `claude` 的两条精确规则，等待
-[#1724 的无 Mikka 官方 Claude 对照](https://github.com/alexj11324/Mikka/issues/1724#issuecomment-6745956055)
-补齐 before/ready/fresh 的完整 stat、链接终点和根证书证据后再确认可发布性。
-不把 Desktop 对照或本次差异行直接推广成 Claude 的 provider 证明。
-候选只追加规则数据并同步其摘要，不改变匹配算法：原摘要、原 file 类型、
-精确链接、mode/uid/gid 不变及精确 provider root 普通文件终点均继续校验，
-provider 每次启动的实际 root 摘要可轮换；不要求它等于旧 `4e04ce…`。
-strict 安装阶段、官方 CLI、普通证书、其他路径和模板的拒绝条件保持。
+后续独立官方 Claude 对照
+[42661569263/1](https://github.com/alexj11324/Mikka/actions/runs/42661569263)
+在没有安装 Mikka 产品、worker 或执行 CLI/模型的情况下复现了同一变化。
+固定观察源码为 `7fd8a2681cd71bb6603a485854c8beda2044911b`；
+`623a1afd8715433a58c3e88ce88f8fbcc29d1761` 仅是该控制所用 cleanup helper 的产品上下文，
+不是失败 R7 的源码，也不是官方 base 身份。观察程序只新增 `/opt/mikka` 下的诊断文件。
+四阶段 `before / pre_finalization / ready / fresh` 中，前三阶段两条 CA 引用都是
+上述 `4e04ce…` 普通文件，仅 fresh 变为上述精确链接；三节点全程 mode `0777`、
+uid/gid `0/0`。根证书保持普通文件，本轮 fresh 摘要是
+`0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4`，
+两条实际解析链的终点路径和摘要都与它一致。
+[控制来源、完整结构化观测、原件摘要和清理回执](../../operations/evidence/1782-official-claude-certificate-relinks-20261109.json)
+保留四阶段观测及本轮一个私有模板、一个 fresh sandbox 的精确清理回执。
+原 schema 没有采集官方 base 的 immutable ID、base build ID 或 envd version，
+这些字段保持 unknown，不能用诊断衍生 build ID 替代。
+
+因此仅为 `claude` 追加两条精确规则并同步摘要和控制来源，原 320 条规则保持。
+匹配算法不变：原摘要、原 file 类型、精确链接、mode/uid/gid 不变及精确
+provider root 普通文件终点均继续校验；provider 每次启动的实际 root 摘要
+可轮换，不要求它等于旧 `4e04ce…`。不增加 mode 例外；strict 安装阶段、
+官方 CLI、普通证书、其他路径和模板的拒绝条件保持。
 测试保留原用例和原失败证据，仅将已被新行为取代的 Claude 正确形状旧负例
 更新为 Claude 错误旧摘要负例，并增加针对该规则的正例和拒绝回归。
-此处仍是未发布候选；完整保全、真实双订阅及同一生产元组六次 ≤5000ms 仍待完成。
+本 PR 的本地回归为 34/34、0 skip；完整红绿原件固定于
+[800eff40 的候选证据](https://github.com/alexj11324/Mikka/tree/800eff40eeead9c78fb83cd2260adc0cf40fbd4f/claude-ca-relink-candidate-20261109)。
+导入的控制发布者范围说明保留其独立的 33 项回归结果，不混作本 PR 的测试计数。
+这个三路径定点控制不代表全量文件保全或发布通过；完整保全、真实双订阅及
+同一生产元组六次 ≤5000ms 仍须由后续实际发布和正常 Task 验收完成。
 
 构建记录轻量 CLI manifest，包含构建前官方 CLI 的真实路径和摘要；官方原本缺少
 某个 harness 时，才记录 `/opt/mikka` 内补装的位置。每个 worker release 保存
