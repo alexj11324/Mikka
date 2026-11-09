@@ -9,6 +9,7 @@ import { refreshPublishedPullRequest } from './publication-webhook'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { readFactoryFlow } from '../factory/public-flow'
 import type { FactoryTask } from '../factory/store'
+import { afterDatabaseCommit, captureDatabaseQuery, observePoolCommits } from '../db/commit-effects'
 
 const base = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true')
@@ -35,6 +36,9 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
   await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`)
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString())
   const pool = new Pool({ connectionString: target.toString(), max: 2 })
+  // The race clients are real transaction executors, just like the application
+  // pool. Live invalidations must observe their COMMIT rather than a raw client.
+  observePoolCommits(pool)
   try {
     const dir = new URL('../../drizzle/', import.meta.url)
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'))
@@ -141,9 +145,12 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
     // head and task counts. Admission must be re-evaluated after that wait.
     const beforeRace = await task(delivered), lock = await pool.connect(), waiting = await pool.connect()
     let oldEvent: Promise<void> | undefined
+    let committed = 0
     try {
       const pid = (await waiting.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid
       await lock.query('BEGIN')
+      afterDatabaseCommit(lock, 'publication-race-fixture', () => { committed++ })
+      assert.equal(committed, 0, 'a webhook transaction cannot notify before COMMIT')
       await lock.query('SELECT "runId" FROM run_publications WHERE "runId"=$1 FOR UPDATE', [runId])
       oldEvent = refreshPublishedPullRequest('pull_request', change(newHead, 'c'.repeat(40), '2026-11-09T16:00:00Z', 50), waiting)
       let blocked = false
@@ -154,7 +161,9 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
       }
       assert.equal(blocked, true, 'the stale webhook must actually be waiting for the publication row')
       await refreshPublishedPullRequest('pull_request', change(newHead, 'd'.repeat(40), '2026-11-09T17:00:00Z', 80), lock)
+      assert.equal(committed, 0)
       await lock.query('COMMIT')
+      assert.equal(committed, 1, 'the real transaction executor releases its commit effects once')
       await oldEvent
     } finally {
       await lock.query('ROLLBACK')
@@ -171,10 +180,13 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
     let reached!: () => void, resume!: () => void
     const reachedCounts = new Promise<void>(resolve => { reached = resolve })
     const resumeCounts = new Promise<void>(resolve => { resume = resolve })
-    const pausedDatabase = { query: async (...args: unknown[]) => {
+    const retained = captureDatabaseQuery(pool)
+    const pausedDatabase = { ...retained, query: async (...args: unknown[]) => {
       if (String(args[0]).includes('WITH delivered AS')) { reached(); await resumeCounts }
-      return Reflect.apply(pool.query, pool, args)
+      return Reflect.apply(retained.query, retained, args)
     } } as Pick<Pool, 'query'>
+    afterDatabaseCommit(pausedDatabase, 'publication-autocommit-fixture', () => { committed++ })
+    assert.equal(committed, 2, 'a retained query keeps its underlying autocommit executor')
     const delayed = refreshPublishedPullRequest('pull_request', change('d'.repeat(40), 'e'.repeat(40), '2026-11-09T18:00:00Z', 85), pausedDatabase)
     try {
       await Promise.race([reachedCounts, delayed.then(() => { assert.fail('the old event must pause before task counts') })])
