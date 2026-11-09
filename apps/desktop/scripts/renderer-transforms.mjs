@@ -134,11 +134,6 @@ export function nativeOfflineView() {
               return [`.desktop-offline ${selector}`]
             })
           })
-          // The card's own variables get their own names, so the app can hand them its tokens (renderer/styles.css).
-          css.walkDecls(declaration => {
-            if (declaration.prop.startsWith('--')) declaration.prop = `--offline-${declaration.prop.slice(2)}`
-            declaration.value = declaration.value.replace(/var\(--([\w-]+)\)/g, 'var(--offline-$1)')
-          })
           css.walkAtRules('keyframes', rule => { rule.params = `desktop-offline-${rule.params}` })
           css.walkDecls('animation', declaration => { declaration.value = declaration.value.replace(/^pulse\b/, 'desktop-offline-pulse') })
           return { contents: css.toString(), loader: 'css' }

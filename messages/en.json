@@ -5581,8 +5581,6 @@
   },
   "DesktopRenderer": {
     "serverUnavailable": "Can't reach Mikka",
-    "serverError": "Mikka couldn't load",
-    "serverErrorStatus": "Server error {status}",
     "networkUnavailable": "No network",
     "reconnecting": "Reconnecting…",
     "offlineHint": "Waiting for the connection to recover.",
