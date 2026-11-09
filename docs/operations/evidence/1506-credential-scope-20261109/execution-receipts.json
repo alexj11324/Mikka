@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "issue": 1506,
+  "pr": 1810,
+  "source": {
+    "base": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+    "pureCommit": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+    "pureTree": "2fa4d7e09a90e7a75151e9ae4065245b391ea366",
+    "parent": "01b302385666dc5b7a1535a335ef1d953c5d12b8",
+    "worktreeHeadAtExecution": "927260894305e066e15a4ad50114abce433e6001",
+    "scope": "11 increment files independently byte-bound to b87 and then published pure; this is targeted execution, not full pure/composite CI",
+    "sourceExportCreatedAt": "2026-11-09T09:37:49.514429+00:00"
+  },
+  "red": {
+    "command": [
+      "node",
+      "--test",
+      "--test-name-pattern",
+      "shared install defaults|verified API-read-only caller|actual composite input|credential opt-ins",
+      "tests/mvp/pinned-pnpm.test.mjs"
+    ],
+    "exitCode": 1,
+    "tests": 14,
+    "pass": 9,
+    "fail": 5,
+    "skip": 0,
+    "log": "red.log",
+    "logSHA256": "74bd5ced4bc2036677a789ad26baa423f1cd28f04d0f3377dfdbf43e72e8c479",
+    "observed": "Both default-input and ambient-token real postinstall probes returned true where false was required."
+  },
+  "green": {
+    "command": [
+      "node",
+      "--test",
+      "tests/mvp/pinned-pnpm.test.mjs"
+    ],
+    "exitCode": 0,
+    "tests": 22,
+    "pass": 22,
+    "fail": 0,
+    "skip": 0,
+    "log": "green.log",
+    "logSHA256": "b80d562634a1c319f271e4c5cd079c004ff63ac20bee18d459411af8eab94910",
+    "sourceUnchangedDuringExecution": true,
+    "sourceHashes": {
+      ".github/actions/pnpm-install/action.yml": "a7158d12a9b6025674fc7c01079b30f2ee29475caf0dafc66a68b0611f4b8200",
+      ".github/workflows/issue1415-deployed-production.yml": "4647cfb3bc0cd71b8a52ad8add07ab27a9f36e0ce65ec762e195bb514031a880",
+      ".github/workflows/issue1415-managed-inspection.yml": "83c91b0249a4f4e232b949d1a91f643b64caffbf5d87cad0cd4c477321802a3e",
+      ".github/workflows/issues-1516-welcome-acceptance.yml": "0e9fdc0063fc7c3c4e3285c7dc941f202c1e1e0b27489f75ffb0061795b430f1",
+      ".github/workflows/read-cache-production.yml": "c9b737a96718e2c913ed5f6792413aa9ae625c8d0299a3deb1ad178214a5d108",
+      ".github/workflows/read-cache.yml": "66026952e65f631d6844ac86a3a24d5fc6f11b5fd9009c72ae019d1178262bb0",
+      ".github/workflows/self-hosted-production.yml": "867f1bafcb613fdb6a544b65c0ef2d044899da452f18fc6d054841411f6ccdc5",
+      ".github/workflows/thread-lifecycle-acceptance.yml": "768a2a9cf7edd806ec619e4b5c6fcc32466f7b8814fff94838f93a9eccd37f38",
+      ".github/workflows/ui-policy.yml": "7da895fd0678b08acb1667bfc92afe7228872e10631b8578aa1a6696316d025c",
+      ".github/workflows/self-hosted-image.yml": "7618e82b4fb3d571a394fe82fc562acd2af422cc772db86c0a2c94ba041af310",
+      "tests/mvp/pinned-pnpm.test.mjs": "adefe699f39fadddc3eb6239bb6e7aa42748cef31d5ecb2167d3e8ebf12a7dee"
+    }
+  },
+  "checks": [
+    {
+      "name": "scope-lint",
+      "command": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "--deny-warnings",
+        "tests/mvp/pinned-pnpm.test.mjs"
+      ],
+      "exitCode": 0,
+      "originalLogSHA256": "6b08fb36ba6fd5b8c1905c262f9acae0a19434f6a513ef66e022bcb5012a6a30"
+    },
+    {
+      "name": "scope-diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "originalLogSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "boundaries": {
+    "packageManager": "pnpm@10.34.3",
+    "realPostinstall": true,
+    "fixtureDependencies": 0,
+    "networkDisabled": true,
+    "credentials": "fictional token only; presence receipt stores boolean",
+    "productionRequests": 0,
+    "modelRequests": 0,
+    "independentReviewerRepeatedTests": false,
+    "previousSuitesNotRepeated": [
+      "installer25",
+      "SSR20",
+      "CI/self-host37"
+    ],
+    "batchStill": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+    "batchIncludesPure": false,
+    "productionTTFTGoalMet": false
+  },
+  "originalTestPreservation": {
+    "originalBytes": 4658,
+    "originalSha256": "41ccbaf785d22fb8a39d5833a23be777622599550b2655c7000c6c5ce1a30df4",
+    "originalWholeFileOccursUnmodifiedExactlyOnce": true,
+    "originalOffset": 272,
+    "originalTests": 8,
+    "newTopLevelTests": 4,
+    "totalTestsIncludingSubtests": 22
+  }
+}

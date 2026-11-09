@@ -1,0 +1,562 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+  "sourceTree": "6fa16961ce5a81d83970c426384fbd6685d6091e",
+  "scope": "Shared pnpm install GITHUB_TOKEN process visibility; read-only inventory, no credential/test/production requests.",
+  "inspectedAtUtc": "2026-11-09 09:31:45 UTC",
+  "inspection": {
+    "repository": "/vercel/recovery/issue1506-web-ffmpeg-install",
+    "method": "git show/rev-parse/grep against exact b87 objects, not current working-tree files",
+    "priorIndex": {
+      "path": "/vercel/recovery/issue1506-web-asset-diagnostic/mac403-1810/INSTALL-CONSUMER-PERMISSIONS.json",
+      "source": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sha256": "79b63aa904f390580ef40400f5f68e20b1fc467c3d51aff13babd987d451514a"
+    },
+    "binding": "17 caller sites retain the prior entire workflow blob; image workflow changed but its actual permission block and upstream reusable caller were read at b87. git grep found exactly the same 18 callsites."
+  },
+  "sharedAction": {
+    "path": ".github/actions/pnpm-install/action.yml",
+    "blob": "20a5db53847172db9f52ee12c6c0feeec6c48dce",
+    "installLine": 27,
+    "unconditionalTokenLine": 29
+  },
+  "counts": {
+    "sharedCallsites": 18,
+    "githubApiReadOnlyOptInAllowed": 16,
+    "rejectedWriteTokenCallsites": 2
+  },
+  "rows": [
+    {
+      "path": ".github/workflows/issue1415-deployed-production.yml",
+      "blob": "8ef902848aba3a2e59ce01608782697ec7f4d14c",
+      "job": "acceptance",
+      "callLine": 45,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": {
+        "contents": "read",
+        "actions": "read",
+        "issues": "read",
+        "id-token": "write"
+      },
+      "effectivePermissions": {
+        "contents": "read",
+        "actions": "read",
+        "issues": "read",
+        "id-token": "write"
+      },
+      "permissionSource": "job override; unspecified scopes none",
+      "oidcWrite": true,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/issue1415-managed-inspection.yml",
+      "blob": "0d8cc322ddddb2bada48abff741cf7887b6631b0",
+      "job": "inspect",
+      "callLine": 40,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": {
+        "contents": "read",
+        "actions": "read",
+        "issues": "read",
+        "id-token": "write"
+      },
+      "effectivePermissions": {
+        "contents": "read",
+        "actions": "read",
+        "issues": "read",
+        "id-token": "write"
+      },
+      "permissionSource": "job override; unspecified scopes none",
+      "oidcWrite": true,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+      "blob": "74c7dd24872ef8e02ef27d559822fb6440d01c0a",
+      "job": "recovery-contract",
+      "callLine": 27,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": null,
+      "effectivePermissions": {
+        "contents": "read"
+      },
+      "permissionSource": "workflow explicit map; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+      "blob": "74c7dd24872ef8e02ef27d559822fb6440d01c0a",
+      "job": "preflight",
+      "callLine": 57,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": {
+        "contents": "read",
+        "id-token": "write"
+      },
+      "effectivePermissions": {
+        "contents": "read",
+        "id-token": "write"
+      },
+      "permissionSource": "job override; unspecified scopes none",
+      "oidcWrite": true,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/read-cache-production.yml",
+      "blob": "82b0a711738730df3dcdc5f6e2f07beda4b7c8c1",
+      "job": "guards",
+      "callLine": 44,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": {
+        "contents": "read",
+        "issues": "read"
+      },
+      "effectivePermissions": {
+        "contents": "read",
+        "issues": "read"
+      },
+      "permissionSource": "job override; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/read-cache-production.yml",
+      "blob": "82b0a711738730df3dcdc5f6e2f07beda4b7c8c1",
+      "job": "acceptance",
+      "callLine": 86,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": {
+        "contents": "read",
+        "actions": "read",
+        "issues": "read",
+        "id-token": "write"
+      },
+      "effectivePermissions": {
+        "contents": "read",
+        "actions": "read",
+        "issues": "read",
+        "id-token": "write"
+      },
+      "permissionSource": "job override; unspecified scopes none",
+      "oidcWrite": true,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/read-cache-production.yml",
+      "blob": "82b0a711738730df3dcdc5f6e2f07beda4b7c8c1",
+      "job": "workflow-migration",
+      "callLine": 154,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": {
+        "contents": "read",
+        "actions": "read",
+        "issues": "read",
+        "id-token": "write"
+      },
+      "effectivePermissions": {
+        "contents": "read",
+        "actions": "read",
+        "issues": "read",
+        "id-token": "write"
+      },
+      "permissionSource": "job override; unspecified scopes none",
+      "oidcWrite": true,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/read-cache.yml",
+      "blob": "54464667276af18611ba083e968ce9f1672fb301",
+      "job": "read-cache",
+      "callLine": 78,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": null,
+      "effectivePermissions": {
+        "contents": "read"
+      },
+      "permissionSource": "workflow explicit map; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/self-hosted-image.yml",
+      "blob": "46f05f36960559221030e89e1add41ecdfced3b4",
+      "job": "image",
+      "callLine": 70,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": {
+        "contents": "read",
+        "packages": "write"
+      },
+      "effectivePermissions": {
+        "contents": "read",
+        "packages": "write"
+      },
+      "permissionSource": "job override; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": false,
+      "reason": "Reject token opt-in: packages:write",
+      "reusable": {
+        "workflowCall": true,
+        "callerPath": ".github/workflows/ui-policy.yml",
+        "callerBlob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212",
+        "callerJob": "image-checks",
+        "callerUsesLine": 237,
+        "callerPermissions": {
+          "contents": "read",
+          "packages": "write"
+        },
+        "outcome": "caller and callee both permit packages:write; no read-only attenuation"
+      },
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": false
+    },
+    {
+      "path": ".github/workflows/self-hosted-production.yml",
+      "blob": "77788506cdb928f64b6975483c73c6523c76d483",
+      "job": "guards",
+      "callLine": 32,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": null,
+      "effectivePermissions": {
+        "contents": "read"
+      },
+      "permissionSource": "workflow explicit map; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/self-hosted-production.yml",
+      "blob": "77788506cdb928f64b6975483c73c6523c76d483",
+      "job": "acceptance",
+      "callLine": 57,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": {
+        "contents": "read",
+        "actions": "read",
+        "issues": "read",
+        "id-token": "write"
+      },
+      "effectivePermissions": {
+        "contents": "read",
+        "actions": "read",
+        "issues": "read",
+        "id-token": "write"
+      },
+      "permissionSource": "job override; unspecified scopes none",
+      "oidcWrite": true,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/self-hosting-ui.yml",
+      "blob": "5aa39770c0a4d6166e0088d5e1d84af746b57d58",
+      "job": "screenshots",
+      "callLine": 35,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": {
+        "contents": "write"
+      },
+      "effectivePermissions": {
+        "contents": "write"
+      },
+      "permissionSource": "job override; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": false,
+      "reason": "Reject token opt-in: contents:write",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+      "blob": "e90d6530e978d638d3040c0daa4ac6dc84b39767",
+      "job": "acceptance",
+      "callLine": 126,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": {
+        "contents": "read",
+        "actions": "read",
+        "id-token": "write"
+      },
+      "effectivePermissions": {
+        "contents": "read",
+        "actions": "read",
+        "id-token": "write"
+      },
+      "permissionSource": "job override; unspecified scopes none",
+      "oidcWrite": true,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "blob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212",
+      "job": "ui-policy-full",
+      "callLine": 99,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": null,
+      "effectivePermissions": {
+        "contents": "read"
+      },
+      "permissionSource": "workflow explicit map; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "blob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212",
+      "job": "ui-policy-integrations",
+      "callLine": 119,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": null,
+      "effectivePermissions": {
+        "contents": "read"
+      },
+      "permissionSource": "workflow explicit map; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "blob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212",
+      "job": "source-checks",
+      "callLine": 139,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": null,
+      "effectivePermissions": {
+        "contents": "read"
+      },
+      "permissionSource": "workflow explicit map; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "blob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212",
+      "job": "daemon-checks",
+      "callLine": 202,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": null,
+      "effectivePermissions": {
+        "contents": "read"
+      },
+      "permissionSource": "workflow explicit map; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "blob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212",
+      "job": "browser-tests-full",
+      "callLine": 341,
+      "callee": "./.github/actions/pnpm-install",
+      "workflowPermissions": {
+        "contents": "read"
+      },
+      "jobPermissions": null,
+      "effectivePermissions": {
+        "contents": "read"
+      },
+      "permissionSource": "workflow explicit map; unspecified scopes none",
+      "oidcWrite": false,
+      "allowed": true,
+      "reason": "All declared GitHub repository/API scopes are read-only; explicit opt-in is permissible. OIDC permission, when present, is separate.",
+      "reusable": null,
+      "existingInventorySource": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "sameFileBlobAsInventory": true
+    }
+  ],
+  "directEntries": [
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "blob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+      "job": "deploy",
+      "installLine": 194,
+      "tokenLine": 197,
+      "effectivePermissions": {
+        "contents": "read",
+        "id-token": "write"
+      },
+      "allowed": true,
+      "reason": "Explicit job map is repository/API read-only. OIDC write is a separate capability; do not describe the entire job as read-only."
+    },
+    {
+      "path": ".github/workflows/self-hosted-image.yml",
+      "blob": "46f05f36960559221030e89e1add41ecdfced3b4",
+      "job": "image",
+      "tokenLine": 36,
+      "dockerBuildLine": 39,
+      "effectivePermissions": {
+        "contents": "read",
+        "packages": "write"
+      },
+      "allowed": false,
+      "reason": "BuildKit secret prevents layer persistence but passes a package-write token to every install lifecycle in this RUN. Remove this automatic source binding and --secret supply; preserve registry publish permissions/step."
+    },
+    {
+      "path": "Dockerfile",
+      "blob": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+      "secretMountLine": 17,
+      "allowed": null,
+      "reason": "Optional mount itself does not grant/attenuate a token; when no --secret is supplied the default anonymous install remains. Repository workflow must not automatically supply its write token."
+    }
+  ],
+  "permissionRules": [
+    "When a workflow/job permissions map is declared, omitted scopes are none; a job map overrides workflow defaults rather than unioning them.",
+    "Missing both workflow/job permissions is unknown repository/organization default, not proof of read-only; no automatic opt-in.",
+    "Reject write-all or any repository/API write scope, including contents/packages/actions/issues/pull-requests/deployments/checks/statuses etc.",
+    "id-token:write allows OIDC JWT requests and does not itself grant repository/API writes. Preserve it for existing workloads.",
+    "Reusable workflow token permissions can be maintained or reduced, never elevated. Actual ui-policy/image-checks and self-hosted-image/image both request packages:write.",
+    "Sibling jobs do not share their GITHUB_TOKEN permission maps. ui-policy's five direct installers retain contents:read independently of image-checks."
+  ],
+  "preservation": [
+    "Preserve all existing workflow/job permissions and publish/screenshot duties.",
+    "Do not remove the image's REGISTRY_TOKEN publish step or screenshot evidence publisher.",
+    "Keep b87 downloader/helper, manifest hashes, two-source/timeout/redirect/integrity/cleanup contracts unchanged.",
+    "Shared action credential must be explicit optional input default empty, with no github.token fallback.",
+    "The install step should use only the explicit input, overriding ambient FFMPEG_GITHUB_TOKEN to empty when absent."
+  ],
+  "focusedTestsRequired": [
+    "Execute the actual composite install command with a tiny offline package's real postinstall: omitted input plus synthetic write-capable caller token must not expose FFMPEG_GITHUB_TOKEN.",
+    "Execute the same real postinstall for an explicitly opted-in API-read-only caller; only the explicit synthetic value is visible.",
+    "Default empty input must not silently fall back to github.token or an ambient FFMPEG_GITHUB_TOKEN.",
+    "Static actual-callsite coverage rejects an opt-in for screenshots/image, write-all, any non-OIDC write key, and unknown permission defaults.",
+    "Permission fixtures verify job contents:read overrides workflow write map; job write overrides workflow read map; id-token:write plus API read map is classified separately.",
+    "Verify reusable image caller and callee permissions are considered and no automatic image env/--secret supply remains; preserve existing original permission and publishing steps."
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/alexj11324/Mikka/pull/1810#pullrequestreview-5823372853",
+      "purpose": "Actual blocker and process visibility scope"
+    },
+    {
+      "url": "https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows",
+      "lines": "282-289",
+      "ref": "turn113view0",
+      "purpose": "Reusable permission ceiling and same-commit local references"
+    },
+    {
+      "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax",
+      "purpose": "Workflow/job permission maps and omitted scopes; independently read by root"
+    },
+    {
+      "url": "https://docs.github.com/en/actions/concepts/security/openid-connect",
+      "purpose": "OIDC token permission distinction; independently read by root"
+    }
+  ],
+  "limitations": [
+    "No token value or CI log inspected.",
+    "No tests or model/production requests run.",
+    "Inventory classification is not an automatic runtime token inspection or a claim that every OIDC job is globally read-only."
+  ]
+}

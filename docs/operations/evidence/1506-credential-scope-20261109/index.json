@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+  "sourceTree": "2fa4d7e09a90e7a75151e9ae4065245b391ea366",
+  "files": [
+    {
+      "path": "source-review.json",
+      "bytes": 122471,
+      "sha256": "2010b1d8b91c5741fb09d8d2e8b0b9db949c63ba2073ebe483777500ae96319c"
+    },
+    {
+      "path": "independent-review.json",
+      "bytes": 23496,
+      "sha256": "e442955ffea0452ce1a1a57617ed0f33d55496502d77edcabb1d9e95042870dc"
+    },
+    {
+      "path": "caller-permissions.json",
+      "bytes": 22427,
+      "sha256": "2ce0d726eb8c8510d381d540a36387e2ab067c0c7693ef88ef33209af4fdfea5"
+    },
+    {
+      "path": "scope-change.patch",
+      "bytes": 17231,
+      "sha256": "3207f132f9cf4178f6fa5c5b7ff0c5b64cd2dc30e14663d49bf956631c2653dd"
+    },
+    {
+      "path": "red.log",
+      "bytes": 5030,
+      "sha256": "74bd5ced4bc2036677a789ad26baa423f1cd28f04d0f3377dfdbf43e72e8c479"
+    },
+    {
+      "path": "green.log",
+      "bytes": 1897,
+      "sha256": "b80d562634a1c319f271e4c5cd079c004ff63ac20bee18d459411af8eab94910"
+    },
+    {
+      "path": "execution-receipts.json",
+      "bytes": 4280,
+      "sha256": "10bd72fb05bd466a1c605570a22777b6eaff7754938cb8b625503303fe2e3611"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1517,
+      "sha256": "ef0e0cc503e07408c1caf448db934cd3892abe03c3d250bc0849f342759d4220"
+    }
+  ]
+}
