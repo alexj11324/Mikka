@@ -1,3 +1,8 @@
+# Runtime input deduplication: first release receipt
+
+This historical receipt records the first implementation release. The actual documentation-only main-push verification is recorded on [issue #1843](https://github.com/alexj11324/Mikka/issues/1843) against its then-current runtime inputs.
+
+```json
 {
   "issue": 1843,
   "implementationPullRequest": 1845,
@@ -80,3 +85,4 @@
     "sourceBinding": "Use the eligible failed run matching that main's input digest. A matching published worker is a separate skip reason."
   }
 }
+```
