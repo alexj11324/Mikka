@@ -143,6 +143,10 @@ const take = (f: Fixture, candidate = firstSettings) => runtime![2].takeStartupI
 async function receiptRows(f: Fixture) {
   return (await f.pool.query('SELECT holder,round,version,settings,inbox FROM coordinator_startup_receipts WHERE "userId"=$1 AND "botId"=$2 ORDER BY holder,round', [f.owner, f.botId])).rows
 }
+async function decodeReceiptRow(row: { version: unknown; settings: unknown; inbox: unknown }) {
+  const { decodeStoredStartupReceipt } = await import('./startup-receipt')
+  return { ...row, ...decodeStoredStartupReceipt(row.version, row.settings, row.inbox) }
+}
 async function lease(f: Fixture) {
   return (await f.pool.query('SELECT "leaseHolder","leaseUntil","updatedAt" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2', [f.owner, f.botId])).rows[0]
 }
@@ -159,13 +163,31 @@ async function pending(f: Fixture, id: string) {
   assert.equal(row.payload.mikkaTelegramReply, undefined, 'later input must not acquire a reply receipt')
 }
 
-type QueryMetrics = { statements: number; sqlTextUtf8Bytes: number; bindingsJsonUtf8Bytes: number; rowsJsonUtf8Bytes: number; pgProtocolReceiveBytes: number | null }
-const queryMetrics = (): QueryMetrics => ({ statements: 0, sqlTextUtf8Bytes: 0, bindingsJsonUtf8Bytes: 0, rowsJsonUtf8Bytes: 0, pgProtocolReceiveBytes: null })
+type QueryMetrics = { statements: number; sqlTextUtf8Bytes: number; bindingsJsonUtf8Bytes: number; rowsJsonUtf8Bytes: number; pgProtocolReceiveBytes: number | null; pgProtocolSendBytes: number | null; pgProtocolTotalBytes: number | null }
+const queryMetrics = (): QueryMetrics => ({ statements: 0, sqlTextUtf8Bytes: 0, bindingsJsonUtf8Bytes: 0, rowsJsonUtf8Bytes: 0, pgProtocolReceiveBytes: null, pgProtocolSendBytes: null, pgProtocolTotalBytes: null })
 function protocolReceived(client: PoolClient): number | null {
   // Same pure-memory source as lib/db/transport-sample.ts. Read only around
   // one operation on one held client, never overlapping individual queries.
   const value = (client as unknown as { connection?: { stream?: { bytesRead?: number } } }).connection?.stream?.bytesRead
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+}
+function protocolSent(client: PoolClient): number | null {
+  const value = (client as unknown as { connection?: { stream?: { bytesWritten?: number } } }).connection?.stream?.bytesWritten
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+}
+type QuerySnapshot = { metrics: QueryMetrics; received: number | null; sent: number | null }
+const querySnapshot = (client: PoolClient, metrics: QueryMetrics): QuerySnapshot => ({ metrics: { ...metrics }, received: protocolReceived(client), sent: protocolSent(client) })
+function queryRange(before: QuerySnapshot, after: QuerySnapshot): QueryMetrics {
+  const received = before.received !== null && after.received !== null && after.received >= before.received ? after.received - before.received : null
+  const sent = before.sent !== null && after.sent !== null && after.sent >= before.sent ? after.sent - before.sent : null
+  return {
+    statements: after.metrics.statements - before.metrics.statements,
+    sqlTextUtf8Bytes: after.metrics.sqlTextUtf8Bytes - before.metrics.sqlTextUtf8Bytes,
+    bindingsJsonUtf8Bytes: after.metrics.bindingsJsonUtf8Bytes - before.metrics.bindingsJsonUtf8Bytes,
+    rowsJsonUtf8Bytes: after.metrics.rowsJsonUtf8Bytes - before.metrics.rowsJsonUtf8Bytes,
+    pgProtocolReceiveBytes: received, pgProtocolSendBytes: sent,
+    pgProtocolTotalBytes: received !== null && sent !== null ? received + sent : null,
+  }
 }
 type QueryHook = { before?: (text: string) => Promise<void> | void; after?: (text: string, result: QueryResult) => Promise<void> | void; statements?: string[]; metrics?: QueryMetrics }
 /** Only observes/gates actual PG calls; never substitutes a result row. */
@@ -293,7 +315,11 @@ dbTest('startup retry after a committed take keeps E1 and leaves E2 pending', { 
     await pending(f, e2)
     const receipts = await receiptRows(f)
     assert.equal(receipts.length, 1)
-    assert.deepEqual(receipts[0], { holder: f.holder, round: 0, version: 1, settings: first.settings, inbox: first.inbox })
+    assert.ok(receipts[0].settings && typeof receipts[0].settings === 'object' && !Array.isArray(receipts[0].settings))
+    assert.ok(receipts[0].inbox && typeof receipts[0].inbox === 'object' && !Array.isArray(receipts[0].inbox))
+    assert.deepEqual(Object.keys(receipts[0].settings).sort(), ['f', 'r'])
+    assert.deepEqual(Object.keys(receipts[0].inbox).sort(), ['a', 'f', 'k', 'p', 's', 't'])
+    assert.deepEqual(await decodeReceiptRow(receipts[0]), { holder: f.holder, round: 0, version: 1, settings: first.settings, inbox: first.inbox })
   })
 })
 
@@ -466,7 +492,9 @@ dbTest('an empty receipt stays empty and later input remains available to the or
     assert.equal(roundOne.held, true)
     assert.equal(roundOne.sourceEventId, e2)
     assert.equal(roundOne.added, 1)
-    assert.deepEqual((await receiptRows(f))[0].inbox, emptyInbox, 'round one does not replace round zero')
+    const stored = (await receiptRows(f))[0]
+    assert.deepEqual(Object.keys(stored.inbox).sort(), ['a', 'f'], 'empty required arrays are absent in compact storage')
+    assert.deepEqual((await decodeReceiptRow(stored)).inbox, emptyInbox, 'round one does not replace round zero')
   })
 })
 
@@ -664,6 +692,8 @@ dbTest('failure after the real receipt INSERT rolls back delivery, lease, Telegr
 dbTest('a real receipt key conflict fails closed and rolls back the newer inbox', { timeout: 30_000 }, async t => {
   await fixture(t, async f => {
     const [{ withDatabaseClient }] = runtime!
+    const { encodeStoredStartupReceipt } = await import('./startup-receipt')
+    const conflict = encodeStoredStartupReceipt({ settings: { ...firstSettings, coordinator: true }, inbox: emptyInbox })
     const e1 = await event(f, 'E1 for receipt conflict')
     const originalLease = await lease(f)
     const worker = await clientFor(f), originalQuery = worker.query.bind(worker)
@@ -675,7 +705,7 @@ dbTest('a real receipt key conflict fails closed and rolls back the newer inbox'
         // lookup. The product's INSERT must encounter a genuine PG unique
         // conflict; no synthetic empty RETURNING result is supplied.
         await originalQuery('INSERT INTO coordinator_startup_receipts ("userId","botId",holder,round,version,settings,inbox) VALUES ($1,$2,$3,0,1,$4,$5)',
-          [f.owner, f.botId, f.holder, { ...firstSettings, coordinator: true }, emptyInbox])
+          [f.owner, f.botId, f.holder, conflict.settings, conflict.inbox])
       }
     } })
     try {
@@ -695,30 +725,93 @@ dbTest('a real receipt key conflict fails closed and rolls back the newer inbox'
 })
 
 dbTest('malformed stored receipts never fall back to consuming a later input', { timeout: 40_000 }, async t => {
-  for (const malformed of [
-    { label: 'false held', field: 'inbox', value: { ...emptyInbox, held: false } },
-    { label: 'missing settings flag', field: 'settings', value: { coordinator: true } },
-    { label: 'unknown receipt field', field: 'inbox', value: { ...emptyInbox, newAuthority: true } },
-  ] as const) await t.test(malformed.label, async child => {
+  type DamagedReceipt = { version: number; settings: Record<string, unknown> | null; inbox: Record<string, unknown> | null }
+  const corruptions: { label: string; corrupt: (row: DamagedReceipt) => void; constraint?: string }[] = [
+    { label: 'false held', corrupt: row => { row.inbox!.held = false } },
+    { label: 'missing settings flag', corrupt: row => { delete row.settings!.f } },
+    { label: 'unknown receipt field', corrupt: row => { row.inbox!.newAuthority = true } },
+    { label: 'unknown settings bit', corrupt: row => { row.settings!.f = Number(row.settings!.f) | 256 } },
+    { label: 'unknown inbox bit', corrupt: row => { row.inbox!.f = Number(row.inbox!.f) | 512 } },
+    { label: 'missing added', corrupt: row => { delete row.inbox!.a } },
+    { label: 'null added', corrupt: row => { row.inbox!.a = null } },
+    { label: 'null declared optional questions', corrupt: row => { row.inbox!.f = Number(row.inbox!.f) | 128; row.inbox!.q = null } },
+    { label: 'declared source field missing', corrupt: row => { assert.equal(typeof row.inbox!.s, 'string'); delete row.inbox!.s } },
+    { label: 'optional questions without presence bit', corrupt: row => { assert.equal(Object.hasOwn(row.inbox!, 'q'), false); row.inbox!.q = [] } },
+    { label: 'empty declared push list', corrupt: row => { assert.ok(Array.isArray(row.inbox!.p) && row.inbox!.p.length > 0); row.inbox!.p = [] } },
+    // These shapes cannot exist in the real table: retain its CHECKs and
+    // prove PostgreSQL itself rejects them, without disabling constraints.
+    { label: 'unknown stored version', corrupt: row => { row.version = 2 }, constraint: 'coordinator_startup_receipts_version_check' },
+    { label: 'JSON null settings', corrupt: row => { row.settings = null }, constraint: 'coordinator_startup_receipts_settings_check' },
+    { label: 'JSON null inbox', corrupt: row => { row.inbox = null }, constraint: 'coordinator_startup_receipts_inbox_check' },
+  ]
+  for (const malformed of corruptions) await t.test(malformed.label, async child => {
     await fixture(child, async f => {
       await event(f, 'Original receipt before corrupt data')
-      await take(f)
-      assert.ok(malformed.field === 'inbox' || malformed.field === 'settings')
-      await f.pool.query('UPDATE coordinator_startup_receipts SET ' + malformed.field + '=$4 WHERE "userId"=$1 AND "botId"=$2 AND holder=$3',
-        [f.owner, f.botId, f.holder, malformed.value])
+      const first = ready(await take(f)), [stored] = await receiptRows(f)
+      // Start from an actually committed, valid compact row and damage only
+      // the relevant compact fields; old canonical JSON is never the seed.
+      assert.deepEqual(await decodeReceiptRow(stored), { holder: f.holder, round: 0, version: 1, settings: first.settings, inbox: first.inbox })
+      const damaged = structuredClone(stored) as DamagedReceipt
+      malformed.corrupt(damaged)
       const e2 = await event(f, 'Later input after corrupt receipt', true)
       const before = { lease: await lease(f), messages: await messages(f), receipts: await receiptRows(f) }
-      await assert.rejects(take(f), error => {
-        assert.ok(error instanceof Error)
-        assert.equal((error as Error & { code: string }).code, 'agentEventConflict')
-        assert.ok(error.cause, 'the original decoder failure remains available')
-        return true
-      })
+      const write = () => f.pool.query('UPDATE coordinator_startup_receipts SET version=$4,settings=$5::jsonb,inbox=$6::jsonb WHERE "userId"=$1 AND "botId"=$2 AND holder=$3',
+        [f.owner, f.botId, f.holder, damaged.version, JSON.stringify(damaged.settings), JSON.stringify(damaged.inbox)])
+      let expectedReceipts = before.receipts
+      if (malformed.constraint) {
+        await assert.rejects(write(), error => {
+          assert.ok(error instanceof Error)
+          assert.equal((error as Error & { code: string }).code, '23514')
+          assert.equal((error as Error & { constraint: string }).constraint, malformed.constraint)
+          return true
+        })
+      } else {
+        await write()
+        expectedReceipts = await receiptRows(f)
+        await assert.rejects(take(f), error => {
+          assert.ok(error instanceof Error)
+          assert.equal((error as Error & { code: string }).code, 'agentEventConflict')
+          assert.ok(error.cause, 'the original decoder failure remains available')
+          return true
+        })
+      }
       assert.deepEqual(await lease(f), before.lease)
       assert.deepEqual(await messages(f), before.messages)
-      assert.deepEqual(await receiptRows(f), before.receipts)
+      assert.deepEqual(await receiptRows(f), expectedReceipts)
       await pending(f, e2)
+      if (malformed.constraint) {
+        const replay = ready(await take(f))
+        assert.equal(replay.replayed, true)
+        assert.deepEqual(replay.inbox, first.inbox)
+        assert.deepEqual(replay.settings, first.settings)
+        assert.deepEqual(await receiptRows(f), before.receipts)
+        await pending(f, e2)
+      }
     })
+  })
+})
+
+dbTest('compact receipt replay preserves an explicitly stored empty optional question list', { timeout: 30_000 }, async t => {
+  await fixture(t, async f => {
+    const first = ready(await take(f))
+    assert.equal(Object.hasOwn(first.inbox, 'attentionQuestions'), false)
+    const inbox = { ...first.inbox, attentionQuestions: [] }
+    const { encodeStoredStartupReceipt } = await import('./startup-receipt')
+    const encoded = encodeStoredStartupReceipt({ settings: first.settings, inbox })
+    await f.pool.query('UPDATE coordinator_startup_receipts SET settings=$4::jsonb,inbox=$5::jsonb WHERE "userId"=$1 AND "botId"=$2 AND holder=$3',
+      [f.owner, f.botId, f.holder, JSON.stringify(encoded.settings), JSON.stringify(encoded.inbox)])
+    const before = await receiptRows(f)
+    assert.deepEqual(Object.keys(before[0].inbox).sort(), ['a', 'f', 'q'])
+    assert.ok(Object.hasOwn(before[0].inbox, 'q'))
+    assert.deepEqual(before[0].inbox.q, [])
+    const e2 = await event(f, 'Input after explicit empty question metadata')
+    const replay = ready(await take(f, changedSettings))
+    assert.equal(replay.replayed, true)
+    assert.deepEqual(replay.settings, first.settings)
+    assert.deepEqual(replay.inbox, inbox)
+    assert.ok(Object.hasOwn(replay.inbox, 'attentionQuestions'))
+    assert.deepEqual(await receiptRows(f), before, 'replay cannot rewrite explicit empty metadata to absence')
+    await pending(f, e2)
   })
 })
 
@@ -755,41 +848,93 @@ dbTest('receipt keys keep owner, bot and holder isolated and follow session dele
 })
 
 dbTest('startup normal paths use no more statements than old settings plus inbox', { timeout: 60_000 }, async t => {
+  const personal = await import('./personal-instructions')
+  const { modelMessage } = await import('./message-safety')
+  const system = 'You are a helpful coordinator.', personalText = 'Keep answers concise.', memory = 'The person prefers practical examples.'
+  // Both normal definitions already carry this same authorized empty snapshot.
+  // Supplying it uses the real formatter without another plugin discovery phase.
+  const plugins = { servers: [], skills: [] }
   for (const scenario of ['user', 'empty', 'not-held', 'telegram', 'expired-schedule'] as const) await t.test(scenario, async child => {
     const measurements: Partial<Record<'old' | 'startup', QueryMetrics>> = {}
+    const promptMeasurements: Partial<Record<'old' | 'startup', QueryMetrics>> = {}
+    const completeMeasurements: Partial<Record<'old' | 'startup', QueryMetrics>> = {}
+    const promptInputs: Partial<Record<'old' | 'startup', unknown>> = {}
+    const expectsPrompt = scenario === 'user' || scenario === 'telegram'
     for (const mode of ['old', 'startup'] as const) await fixture(child, async f => {
-      if (scenario === 'user' || scenario === 'telegram') await event(f, 'Query budget input', scenario === 'telegram')
+      let sourceEventId: string | undefined
+      if (expectsPrompt) {
+        sourceEventId = await event(f, 'Query budget input', scenario === 'telegram')
+        // Identical short real rows, created before any measurement window.
+        await runtime![0].db.insert(runtime![1].userPreferences).values({ userId: f.owner, memoryEnabled: true, personalInstructions: personalText })
+        await runtime![0].db.insert(runtime![1].attentionSettings).values({ userId: f.owner, enabled: true })
+        assert.equal(await runtime![2].editMemory(f.owner, () => ({ memory, result: true }), f.botId), true)
+      }
       if (scenario === 'expired-schedule') await scheduledEvent(f, false)
       if (scenario === 'not-held') await f.pool.query('UPDATE coordinator_sessions SET "leaseHolder"=$3,"leaseUntil"=$4 WHERE "userId"=$1 AND "botId"=$2',
         [f.owner, f.botId, 'wrun_other_' + randomUUID(), new Date(Date.now() + 60_000)])
       const client = await clientFor(f), statements: string[] = []
-      const metrics = queryMetrics()
-      const receivedBefore = protocolReceived(client)
+      const metrics = queryMetrics(), before = querySnapshot(client, metrics)
+      let middle = before, startupStatementCount = 0, promptExecuted = false
       const restore = observe(client, { statements, metrics })
       try {
         await runtime![0].withDatabaseClient(client, async () => {
+          let inbox: InboxTake
           if (mode === 'old') {
             await runtime![4].isCoordinatorBot(client, f.owner, f.botId)
-            await runtime![2].takeInbox(f.owner, f.holder, f.botId)
-          } else await take(f)
+            inbox = await runtime![2].takeInbox(f.owner, f.holder, f.botId)
+          } else inbox = (await take(f)).inbox
+          // Adjacent A->B and B->C windows on this one held client. The whole
+          // segment below is measured directly A->C, never across fixtures.
+          middle = querySnapshot(client, metrics)
+          startupStatementCount = statements.length
+          if (inbox.held && inbox.added > 0 && !inbox.scheduledRead) {
+            promptExecuted = true
+            const conversation = mode === 'old'
+              ? await runtime![2].loadConversation(f.owner, f.botId)
+              : await runtime![2].loadConversationForPrompt(f.owner, f.botId)
+            let instructions: string
+            if (mode === 'old') instructions = await personal.withPersonalInstructions(f.owner, system, plugins)
+            else {
+              assert.ok('personalInstructions' in conversation && typeof conversation.personalInstructions === 'string')
+              instructions = await personal.withPersonalInstructionText(f.owner, system, conversation.personalInstructions, plugins)
+            }
+            assert.equal(inbox.added, 1)
+            assert.equal(inbox.sourceEventId, sourceEventId)
+            assert.equal(conversation.memory, memory)
+            assert.equal(conversation.messages.length, 1)
+            assert.ok(instructions.includes(personalText))
+            // Real model projection removes only each fixture's source receipt
+            // metadata; SQL/result byte measurements above remain untouched.
+            promptInputs[mode] = { summary: conversation.summary, memory: conversation.memory,
+              messages: conversation.messages.map(row => ({ position: row.position, message: modelMessage(row.message) })), system: instructions }
+          }
         })
       } finally {
-        const receivedAfter = protocolReceived(client)
-        metrics.pgProtocolReceiveBytes = receivedBefore !== null && receivedAfter !== null && receivedAfter >= receivedBefore
-          ? receivedAfter - receivedBefore : null
+        const after = querySnapshot(client, metrics)
+        measurements[mode] = queryRange(before, middle)
+        promptMeasurements[mode] = queryRange(middle, after)
+        completeMeasurements[mode] = queryRange(before, after)
         restore(); client.release()
       }
-      measurements[mode] = metrics
-      assert.equal(metrics.statements, statements.length)
-      assert.ok(statements.some(text => /^\s*begin\b/i.test(text)), 'count includes the actual transaction BEGIN')
-      assert.ok(statements.some(text => /^\s*commit\b/i.test(text)), 'count includes the actual transaction COMMIT')
+      assert.equal(promptExecuted, expectsPrompt, 'only an actually delivered non-schedule batch enters prompt preparation')
+      assert.equal(measurements[mode]!.statements, startupStatementCount)
+      assert.equal(completeMeasurements[mode]!.statements, statements.length)
+      const startupStatements = statements.slice(0, startupStatementCount)
+      assert.ok(startupStatements.some(text => /^\s*begin\b/i.test(text)), 'count includes the actual transaction BEGIN')
+      assert.ok(startupStatements.some(text => /^\s*commit\b/i.test(text)), 'count includes the actual transaction COMMIT')
     })
+    assert.deepEqual(promptInputs.startup, promptInputs.old, 'real prompt inputs and complete system bytes are unchanged')
     const old = measurements.old!, startup = measurements.startup!
+    const completeOld = completeMeasurements.old!, completeStartup = completeMeasurements.startup!
     child.diagnostic(JSON.stringify({ event: 'startup_receipt_statement_budget', scenario,
-      method: 'SQL/bindings/rows are byte approximations; pgProtocolReceiveBytes is pinned-client plaintext PG receive only, excluding startup/TLS/TCP/billed traffic',
+      method: 'SQL/bindings/rows are byte approximations; PG counters measure plaintext receive/send on one pinned client. Startup and prompt windows are adjacent; complete is directly measured over both. Excludes connection startup, TLS/TCP, billed traffic, deferred live connections and model traffic.',
       old, startup, statementDelta: startup.statements - old.statements,
       approximateByteDelta: startup.sqlTextUtf8Bytes + startup.bindingsJsonUtf8Bytes + startup.rowsJsonUtf8Bytes
-        - old.sqlTextUtf8Bytes - old.bindingsJsonUtf8Bytes - old.rowsJsonUtf8Bytes }))
+        - old.sqlTextUtf8Bytes - old.bindingsJsonUtf8Bytes - old.rowsJsonUtf8Bytes,
+      promptExecuted: expectsPrompt, prompt: { old: promptMeasurements.old, startup: promptMeasurements.startup },
+      complete: { old: completeOld, startup: completeStartup, statementDelta: completeStartup.statements - completeOld.statements,
+        pgProtocolTotalByteDelta: completeStartup.pgProtocolTotalBytes !== null && completeOld.pgProtocolTotalBytes !== null
+          ? completeStartup.pgProtocolTotalBytes - completeOld.pgProtocolTotalBytes : null } }))
     assert.ok(startup.statements <= old.statements, scenario + ' must not add normal-path SQL round trips')
   })
 })

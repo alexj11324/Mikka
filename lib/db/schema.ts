@@ -573,8 +573,8 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
 export const coordinatorStartupReceipts = pgTable('coordinator_startup_receipts', {
   userId: text('userId').notNull(), botId: uuid('botId').notNull(), holder: text('holder').notNull(),
   round: integer('round').notNull(), version: integer('version').notNull().default(1),
-  settings: jsonb('settings').$type<import('@/lib/coordinator/startup-receipt').CoordinatorStartupSettings>().notNull(),
-  inbox: jsonb('inbox').$type<import('@/lib/coordinator/store').InboxTake>().notNull(),
+  settings: jsonb('settings').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupSettings>().notNull(),
+  inbox: jsonb('inbox').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupInbox>().notNull(),
 }, table => [
   primaryKey({ columns: [table.userId, table.botId, table.holder, table.round] }),
   foreignKey({ columns: [table.userId, table.botId], foreignColumns: [coordinatorSessions.userId, coordinatorSessions.botId] }).onDelete('cascade'),

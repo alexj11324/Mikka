@@ -138,13 +138,13 @@ export async function takeStartupInbox(userId: string, holder: string, botId: st
 }
 
 type InboxTransactionResult = { inbox: InboxTake; startup?: CoordinatorStartupTake }
-/** SQL-only transport tuple: version, settings, inbox. The persisted JSON and
- * strict application receipt schema remain unchanged. */
+/** SQL-only transport tuple: version and the two compact stored objects.
+ * The storage codec restores and checks the strict canonical receipt. */
 type StoredStartupReceipt = [unknown, unknown, unknown]
 type StartupEventRow = Omit<typeof coordinatorEvents.$inferSelect, 'id' | 'createdAt' | 'deliveredAt' | 'lastTriageAttemptAt' | 'nextWakeAt' | 'wakeLeaseUntil'> & {
   id: string | null; createdAt: string | Date; deliveredAt: string | Date | null;
   lastTriageAttemptAt: string | Date | null; nextWakeAt: string | Date; wakeLeaseUntil: string | Date | null;
-  startupReceipt: StoredStartupReceipt | null;
+  r: StoredStartupReceipt | null;
 }
 type TimestampDecoder = Pick<typeof coordinatorSessions.leaseUntil, 'mapFromDriverValue'>
 function startupTimestamp(column: TimestampDecoder, value: string | Date): Date
@@ -172,17 +172,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
       // holder commits, supplies the acquisition predicate and old holder.
       // A single result column avoids four RowDescription fields. Tuple order
       // is previous holder, previous expiry, acquired, Coordinator marker.
-      const lease = (await tx.execute(sql`WITH previous AS MATERIALIZED (
-        SELECT "userId", "botId", "leaseHolder", "leaseUntil" FROM coordinator_sessions
-        WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE
-      ), acquired AS (
-        UPDATE coordinator_sessions AS s SET "leaseHolder"=${holder}, "leaseUntil"=${new Date(now.getTime() + LEASE_MS)}, "updatedAt"=${now}
-        FROM previous AS p WHERE s."userId"=p."userId" AND s."botId"=p."botId"
-          AND (p."leaseUntil" IS NULL OR p."leaseUntil" < ${now} OR p."leaseHolder"=${holder})
-        RETURNING s."userId"
-      ) SELECT jsonb_build_array(p."leaseHolder",p."leaseUntil",EXISTS(SELECT 1 FROM acquired),
-        EXISTS(SELECT 1 FROM coordinator_bots c WHERE c."ownerId"=p."userId" AND c."botId"=p."botId")) AS lease
-        FROM previous AS p`)).rows[0]?.lease as [string | null, string | Date | null, boolean, boolean] | undefined
+      const lease = (await tx.execute(sql`WITH previous AS MATERIALIZED(SELECT "userId" u,"botId" b,"leaseHolder" h,"leaseUntil" t FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE),acquired AS(UPDATE coordinator_sessions s SET "leaseHolder"=v.h,"leaseUntil"=v.e,"updatedAt"=v.n FROM previous p,(VALUES(${holder}::text,${new Date(now.getTime() + LEASE_MS)}::timestamptz,${now}::timestamptz))v(h,e,n) WHERE (s."userId",s."botId")=(p.u,p.b) AND(p.t IS NULL OR p.t<v.n OR p.h=v.h) RETURNING 1) SELECT jsonb_build_array(p.h,p.t,EXISTS(SELECT 1 FROM acquired),EXISTS(SELECT 1 FROM coordinator_bots c WHERE(c."ownerId",c."botId")=(p.u,p.b))) l FROM previous p`)).rows[0]?.l as [string | null, string | Date | null, boolean, boolean] | undefined
       previousLease = lease && { leaseHolder: lease[0], leaseUntil: startupTimestamp(coordinatorSessions.leaseUntil, lease[1]) }
       taken = lease?.[2] === true
       settings = { ...frozenCandidate, coordinator: lease?.[3] === true }
@@ -192,21 +182,14 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
       if (!taken) {
         // A competing lease cannot take events. Still check the old key after
         // the lock, without returning seventeen unused event column headers.
-        stored = (await tx.execute(sql`SELECT jsonb_build_array(version,settings,inbox) AS receipt
-          FROM coordinator_startup_receipts WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND holder=${holder} AND round=0`)).rows[0]?.receipt as StoredStartupReceipt | undefined
+        stored = (await tx.execute(sql`SELECT jsonb_build_array(version,settings,inbox) r FROM coordinator_startup_receipts WHERE("userId","botId",holder,round)=(${userId},${botId}::uuid,${holder},0)`)).rows[0]?.r as StoredStartupReceipt | undefined
       } else {
-        startupRows = (await tx.execute(sql`SELECT CASE WHEN r.holder IS NULL THEN NULL ELSE jsonb_build_array(r.version,r.settings,r.inbox) END AS "startupReceipt",e.*
-          FROM (VALUES (${userId}::text,${botId}::uuid,${holder}::text)) AS k("userId","botId",holder)
-          LEFT JOIN coordinator_startup_receipts r ON r."userId"=k."userId" AND r."botId"=k."botId" AND r.holder=k.holder AND r.round=0
-          LEFT JOIN coordinator_events e ON r.holder IS NULL AND e."userId"=k."userId" AND e."botId"=k."botId" AND e."deliveredAt" IS NULL
-            AND (e.kind='user_message' OR (e.tier IS NOT NULL AND e.tier<>'background'))
-          WHERE r.holder IS NOT NULL OR e.id IS NOT NULL
-          ORDER BY e."createdAt" ASC LIMIT ${INBOX_BATCH}`)).rows as typeof startupRows
-        stored = startupRows?.[0]?.startupReceipt
+        startupRows = (await tx.execute(sql`SELECT CASE WHEN r.holder IS NOT NULL THEN jsonb_build_array(r.version,r.settings,r.inbox) END r,e.* FROM(VALUES(${userId}::text,${botId}::uuid,${holder}::text))k(u,b,h) LEFT JOIN coordinator_startup_receipts r ON(r."userId",r."botId",r.holder,r.round)=(k.u,k.b,k.h,0) LEFT JOIN coordinator_events e ON r.holder IS NULL AND(e."userId",e."botId")=(k.u,k.b) AND e."deliveredAt" IS NULL AND(e.kind='user_message' OR(e.tier IS NOT NULL AND e.tier<>'background')) WHERE r.holder IS NOT NULL OR e.id IS NOT NULL ORDER BY e."createdAt" LIMIT ${INBOX_BATCH}`)).rows as typeof startupRows
+        stored = startupRows?.[0]?.r
       }
       if (stored !== null && stored !== undefined) {
         // Presence comes from the row key, never the stored inbox's truthiness.
-        const receipt = codec.readStartupReceipt(stored[0], stored[1], stored[2])
+        const receipt = codec.decodeStoredStartupReceipt(stored[0], stored[1], stored[2])
         if (!taken || previousLease?.leaseHolder !== holder) {
           // Stop/release/new holder is terminal for this old key. Roll back
           // even an otherwise eligible temporary claim, before any callbacks.
@@ -236,9 +219,8 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
     const finish = async (inbox: InboxTake): Promise<InboxTransactionResult> => {
       if (!codec || !settings) return { inbox }
       const receipt = codec.readStartupReceipt(1, settings, inbox)
-      const inserted = await tx.execute(sql`INSERT INTO coordinator_startup_receipts ("userId", "botId", holder, round, version, settings, inbox)
-        VALUES (${userId}, ${botId}::uuid, ${holder}, 0, 1, ${JSON.stringify(receipt.settings)}::jsonb, ${JSON.stringify(receipt.inbox)}::jsonb)
-        ON CONFLICT ("userId", "botId", holder, round) DO NOTHING`)
+      const stored = codec.encodeStoredStartupReceipt(receipt)
+      const inserted = await tx.execute(sql`INSERT INTO coordinator_startup_receipts("userId","botId",holder,round,version,settings,inbox) VALUES(${userId},${botId}::uuid,${holder},0,1,${JSON.stringify(stored.settings)}::jsonb,${JSON.stringify(stored.inbox)}::jsonb) ON CONFLICT("userId","botId",holder,round) DO NOTHING`)
       if (inserted.rowCount !== 1) throw codec.startupReceiptConflict(new Error('coordinatorStartupReceiptConflict'))
       return { inbox: receipt.inbox, startup: { kind: 'ready', ...receipt, replayed: false } }
     }
@@ -254,7 +236,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
     // payload/source handling; empty seed rows are filtered in SQL already.
     const candidates = startupRows ? startupRows.flatMap(row => {
       if (row.id === null) return []
-      const { startupReceipt: _receipt, ...event } = row
+      const { r: _receipt, ...event } = row
       return [{ ...event, id: row.id,
         createdAt: startupTimestamp(coordinatorEvents.createdAt, row.createdAt),
         deliveredAt: startupTimestamp(coordinatorEvents.deliveredAt, row.deliveredAt),
@@ -357,8 +339,8 @@ export async function recoverStartupInbox(userId: string, holder: string, botId:
     JOIN bots b ON b.id=r."botId" AND b."ownerId"=${userId}
     WHERE r."userId"=${userId} AND r."botId"=${botId}::uuid AND r.holder=${holder} AND r.round=0`)).rows[0]
   if (!row) return null
-  const { readStartupReceipt } = await import('./startup-receipt')
-  return readStartupReceipt(row.version, row.settings, row.inbox)
+  const { decodeStoredStartupReceipt } = await import('./startup-receipt')
+  return decodeStoredStartupReceipt(row.version, row.settings, row.inbox)
 }
 
 function carriesCode(event: { payload: Record<string, unknown> }): boolean {
