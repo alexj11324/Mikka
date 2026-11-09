@@ -5776,7 +5776,7 @@
     "replySelection": "回复选中的文字",
     "messageTask": "给这个任务发消息",
     "noTasks": "没有任务",
-    "noAttempts": "还没有尝试",
+    "notStarted": "还没开始",
     "allTasks": "全部任务",
     "info": "资料",
     "all": "全部",
@@ -5824,7 +5824,18 @@
     "noPriority": "无",
     "activity": "活动",
     "comment": "+ 评论",
-    "attemptNumber": "第 {number} 次尝试",
+    "conversation": {
+      "switched": "换 {agent} 继续",
+      "switchedAfterFailure": "{previous} 没跑通 · 换 {agent} 继续",
+      "switchedTo": "换 {agent}",
+      "fix": "修复",
+      "needsYou": "需要你：{what}",
+      "verdicts": {
+        "passed": "通过",
+        "changes_requested": "需要修改",
+        "needs_judgment": "需要你判断"
+      }
+    },
     "threadReplaced": "换了新线程",
     "taskCreatedBy": "{name} 创建了任务",
     "taskCreated": "创建了任务",
