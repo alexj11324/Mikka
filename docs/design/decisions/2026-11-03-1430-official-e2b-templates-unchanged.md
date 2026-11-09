@@ -20,6 +20,23 @@ Node、Mikka worker 源码与构建产物、daemon 依赖、gh 和 desktop 额�
 向 Agent 批量注入所有 Secret。任何订阅凭证、设备身份、签名密钥或工作区数据均
 不得进入可复用模板。
 
+模板依赖安装使用同一 release 内新增的私有构建工作区，只选择 daemon、protocol、
+config 三个 worker 工作区；保留这些包的完整源码及生产、开发依赖。原始源码归档
+不改写，原 workspace 安装策略、overrides、patches 和锁定版本继续生效。派生根项目
+不带 Web 依赖，安装锁只投影所需 importer；包与 snapshot 记录不重新解析版本。
+正常 `--frozen-lockfile` 安装及获准的生命周期脚本仍须成功，再通过相对
+`node_modules` 链接供原 worker 构建入口和 CLI manifest 读取。工作区与链接均在
+该 release 内，整体 staging 发布移动后仍须可解析，并可供正常 worker 用户读取。
+
+这一区分来自 2026-11-09 的两次实际构建失败：
+[第一次](https://github.com/alexj11324/Mikka/actions/runs/42566225093/attempts/1)
+在根项目专用的 `ffmpeg-static` 二进制下载收到 HTTP 504，
+[第二次](https://github.com/alexj11324/Mikka/actions/runs/42566225093/attempts/2)
+则在 desktop 的同包 LICENSE 下载失败。该包原安装器仅凭二进制已存在就可提前
+返回成功，因此原地重试不能证明下载文件齐全。修复针对 worker 的安装集合，
+不通过禁用脚本、忽略缺文件或降低校验门槛放行。原失败与清理回执继续保留；
+隔离构建通过也不替代新模板的完整文件守恒、双真实订阅及生产五秒验收。
+
 ## 发布门槛
 
 `scripts/e2b/build-template.py` 使用 E2B 的 `Template.from_template` 在构建时执行

@@ -87,7 +87,16 @@ mikka_phase_done gh
 fi
 export PATH=/opt/mikka/runtime/node/bin:$PATH
 cd "$mikka_release/source"
-env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile
+# pnpm 10 also installs the root importer of a filtered shared-lock workspace.
+# Keep the fetched source intact and install only the worker's locked importers.
+mikka_install="$mikka_release/worker-install"
+(
+  umask 022
+  python3 packages/daemon/scripts/prepare-worker-install.py "$mikka_release/source" "$mikka_install"
+  cd "$mikka_install"
+  env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile
+)
+python3 packages/daemon/scripts/prepare-worker-install.py "$mikka_release/source" "$mikka_install" --link
 mikka_phase_done dependencies
 MIKKA_CLOUD_WORKER_BUILD_SHA="$mikka_sha" node packages/daemon/scripts/build-cloud-worker.mjs
 mikka_phase_done build
