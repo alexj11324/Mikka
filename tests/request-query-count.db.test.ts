@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -18,7 +19,7 @@ pg.Client.prototype.query = function (this: pg.Client, ...args: unknown[]) {
 } as typeof pg.Client.prototype.query
 async function counted<T>(work: () => Promise<T>) {
   statements = []
-  try { const value = await work(); return { value, queries: statements.length, bytes: Buffer.byteLength(JSON.stringify(value) ?? '') } }
+  try { const value = await work(); return { value, queries: statements.length, bytes: Buffer.byteLength(JSON.stringify(value) ?? ''), queryShapes: statements.map(sql => ({ command: sql.trim().split(/\s+/, 1)[0], tables: [...sql.matchAll(/(?:from|join)\s+"?([a-z_]+)"?/gi)].map(match => match[1]) })) } }
   finally { statements = null }
 }
 
@@ -48,7 +49,7 @@ test('the polled routes read with a fixed number of queries, whatever the number
       const bot = randomUUID(), issue = randomUUID(), run = randomUUID(), index = bots.length
       bots.push(bot); tasks.push(issue)
       await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)', [bot, owner, workspaceId, `Bot ${index}`])
-      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)', [issue, owner, `Task ${index}`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: index + 1 } }, content: [] }), 'doing', 'normal', 'personal'])
+      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,$8,\'bound\')', [issue, owner, `Task ${index}`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: index + 1 } }, content: [] }), 'doing', 'normal', 'personal', workspaceId])
       await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt) values($1,$2,$3,$4,$5,$6)', [run, owner, issue, agent, 'succeeded', `Fix thing ${index}`])
       await pool.query('insert into coordinator_messages(id,"userId","botId",position,message) values($1,$2,$3,1,$4)', [randomUUID(), owner, bot, JSON.stringify({ role: 'assistant', content: [{ type: 'text', text: `Started [[run:${run}]] for [[issue:${issue}]]` }] })])
     }
@@ -120,8 +121,22 @@ test('the polled routes read with a fixed number of queries, whatever the number
     await addTasks(bots[1], bots[3])
     const fourScopes = await counted(() => as(async () => json(await tasksRoute.GET(new Request(url)))))
     assert.deepEqual(fourScopes.value.tasks.map((task: { id: string }) => task.id).sort(), [...listed].sort())
+    assert.equal(fourScopes.value.liveWorkspaceId, workspaceId, 'the live channel matches the authorized list tenant')
     assert.equal(fourScopes.queries, twoScopes.queries, 'factory tasks: the same queries for 2 and 4 bot scopes')
+    if (fourScopes.queries > 13) t.diagnostic(JSON.stringify({ read: 'factory-task-list', queryShapes: fourScopes.queryShapes }))
     assert.ok(fourScopes.queries <= 13, `factory tasks: ${fourScopes.queries} queries`)
+
+    const originalContent = (await pool.query('SELECT content FROM issues WHERE id=$1', [issue])).rows[0].content
+    try {
+      const deletedContent = {
+        ...originalContent,
+        attrs: { ...originalContent.attrs, mikka: { ...originalContent.attrs.mikka, deletedAt: new Date().toISOString() } },
+      }
+      await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [issue, JSON.stringify(deletedContent)])
+      const denied = await as(() => tasksRoute.GET(new Request(url)))
+      assert.equal(denied.status, 404, 'the authorization snapshot preserves the canonical tombstone')
+      assert.deepEqual(await denied.json(), { error: 'factoryNotFound' })
+    } finally { await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [issue, JSON.stringify(originalContent)]) }
 
     await as(() => pollIssues())
     const issues = await counted(() => as(() => pollIssues()))
@@ -165,8 +180,9 @@ test('issuesForUser answers as issueForUser does for each task: personal, shared
     }
     await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)', [sharedTeam, shared, owner, 'Shared', 'BSH'])
     await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)', [revokedTeam, revoked, owner, 'Revoked', 'BRV'])
-    const insert = (id: string, userId: string, scope: string, deleted = false) => pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)',
-      [id, userId, id, JSON.stringify({ type: 'doc', attrs: deleted ? { mikka: { deletedAt: new Date().toISOString() } } : {}, content: [] }), 'todo', 'normal', scope])
+    const insert = async (id: string, userId: string, scope: string, deleted = false) => pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,$8,\'bound\')',
+      [id, userId, id, JSON.stringify({ type: 'doc', attrs: deleted ? { mikka: { deletedAt: new Date().toISOString() } } : {}, content: [] }), 'todo', 'normal', scope,
+        scope === 'personal' ? await seedFixtureWorkspace(pool, userId) : id === ids.revokedTask ? revoked : shared])
     await insert(ids.peerPersonal, peer, 'personal'); await insert(ids.peerDeleted, peer, 'personal', true); await insert(ids.ownerPersonal, owner, 'personal')
     await insert(ids.teamTask, owner, 'workspace'); await insert(ids.revokedTask, owner, 'workspace'); await insert(ids.peerWorkspace, peer, 'workspace')
     await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [ids.teamTask, sharedTeam, shared, owner])
@@ -213,4 +229,44 @@ test('readOnce shares an identical read within one operation, never a write, a l
   assert.equal(run.queries, 4)
   const fresh = await counted(() => readOnce(pool).query('SELECT $1::text AS v', [marker]))
   assert.equal(fresh.queries, 1, 'a new operation reads again')
+})
+
+test('held Workspace membership remains exact and expires before detached reads can outlive its transaction', { skip: !enabled, timeout: 30_000 }, async () => {
+  const { pool } = await import('../lib/db')
+  const { activeTaskWorkspaces, withTaskWorkspace } = await import('../lib/task-workspace')
+  const { tokenWorkspace } = await import('../lib/tokens/principal')
+  const owner = `held-reader-${randomUUID()}`, peer = `held-peer-${randomUUID()}`
+  const tenants: string[] = []
+  const later = Promise.withResolvers<void>()
+  let detached: Promise<Awaited<ReturnType<typeof activeTaskWorkspaces>>> | undefined
+  try {
+    for (const userId of [owner, peer]) await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
+    const alpha = await seedFixtureWorkspace(pool, owner, 'team')
+    const beta = await seedFixtureWorkspace(pool, owner, 'team')
+    tenants.push(alpha, beta)
+    const pinned = { id: owner, [tokenWorkspace]: alpha }
+    await withTaskWorkspace(owner, alpha, async () => {
+      assert.deepEqual(await activeTaskWorkspaces(pinned, alpha), [{ id: alpha, kind: 'team' }])
+      assert.deepEqual(await activeTaskWorkspaces(pinned, beta), [], 'an explicit request cannot override the principal pin')
+      assert.deepEqual(await activeTaskWorkspaces({ id: peer, [tokenWorkspace]: alpha }, alpha), [], 'a lease never supplies another person membership')
+      assert.deepEqual((await activeTaskWorkspaces(owner)).map(row => row.id).sort(), [...tenants].sort(), 'an unscoped read still discovers all current memberships')
+      assert.deepEqual(await activeTaskWorkspaces(owner, beta), [{ id: beta, kind: 'team' }], 'another explicit tenant gets its own real membership read')
+      await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [beta, owner])
+      assert.deepEqual(await activeTaskWorkspaces(owner, beta), [], 'the held Alpha lease cannot hide revocation in another tenant')
+      // This continuation retains the real ALS context, but not its authority
+      // after withTaskWorkspace has committed and invalidated the lease.
+      detached = later.promise.then(() => activeTaskWorkspaces(pinned, alpha))
+    })
+    await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner])
+    assert.ok(detached)
+    later.resolve()
+    assert.deepEqual(await detached, [], 'a detached read must observe revocation after the owner transaction ends')
+    assert.deepEqual(await activeTaskWorkspaces(pinned, alpha), [])
+  } finally {
+    later.resolve()
+    if (detached) await detached.catch(() => undefined)
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [tenants])
+    await pool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [tenants])
+    await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
+  }
 })

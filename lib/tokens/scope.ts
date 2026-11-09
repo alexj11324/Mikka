@@ -2,15 +2,13 @@ import 'server-only'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { tokenWorkspace } from '@/lib/tokens/principal'
+import { effectiveRequestWorkspace, type RequestWorkspaceUser } from '@/lib/request-workspace'
 
 /** An API session user; a personal access token pins it to one workspace. */
-type ApiUser = { id: string; [tokenWorkspace]?: string }
+type ApiUser = RequestWorkspaceUser
 
-// The workspace is the tenant: a workspace token reaches only its owner's records that
-// belong to its workspace. A record belongs to the workspaces its Bot, group or task name;
-// one that names none (older rows, an OAuth client's artifact) belongs to the owner's
-// personal workspace, so only a token for that workspace reaches it. Without a token
-// nothing is excluded, so browser sessions keep their owner-only checks.
+// Request workspace scope only narrows ordinary ACL. Task, thread and artifact
+// tenants are persisted; unresolved historical records grant no request access.
 
 type Scope = { workspaceId: string; personal: () => Promise<boolean> }
 
@@ -36,24 +34,19 @@ async function outside(scope: Scope, named: readonly (string | null | undefined)
   return workspaces.length ? workspaces.some(id => id !== scope.workspaceId) : !await scope.personal()
 }
 
-async function issueWorkspaces(issueIds: readonly (string | null)[]) {
-  const ids = [...new Set(issueIds.filter((id): id is string => Boolean(id)))]
-  if (!ids.length) return new Map<string, string>()
-  const { rows } = await workspacePool.query<{ issueId: string; workspaceId: string }>('SELECT "issueId","workspaceId" FROM mikka_team_issues WHERE "issueId"=ANY($1::uuid[])', [ids])
-  return new Map(rows.map(row => [row.issueId, row.workspaceId]))
+/** Thread tenant is immutable even after its source links are removed. */
+export async function runsOutsideToken(user: ApiUser, runIds: readonly string[]): Promise<Set<string>> {
+  if (!runIds.length) return new Set()
+  return runsOutsideWorkspace(await effectiveRequestWorkspace(user), runIds)
 }
 
-/** The runs, of these, outside the token's workspace: by their Bot, cloud computer binding or task. */
-export async function runsOutsideToken(user: ApiUser, runIds: readonly string[]): Promise<Set<string>> {
-  const scope = tokenScope(user)
-  if (!scope || !runIds.length) return new Set()
-  const { rows } = await pool.query<{ id: string; issueId: string | null; botWorkspace: string | null; bindingWorkspace: string | null }>(
-    `SELECT r.id, r."issueId", b."workspaceId" AS "botWorkspace", c."workspaceId" AS "bindingWorkspace" FROM agent_runs r
-     LEFT JOIN bots b ON b.id=r."botId" LEFT JOIN computer_run_bindings c ON c."runId"=r.id WHERE r.id=ANY($1::uuid[])`, [runIds])
-  const tasks = await issueWorkspaces(rows.map(row => row.issueId))
-  const result = new Set<string>()
+async function runsOutsideWorkspace(workspaceId: string | null, runIds: readonly string[]): Promise<Set<string>> {
+  const result = new Set(runIds)
+  if (!result.size) return result
+  if (!workspaceId) return result
+  const { rows } = await pool.query<{ id: string; workspaceId: string | null }>('SELECT id,"workspaceId" FROM agent_runs WHERE id=ANY($1::uuid[])', [runIds])
   for (const row of rows) {
-    if (await outside(scope, [row.botWorkspace, row.bindingWorkspace, row.issueId && tasks.get(row.issueId)])) result.add(row.id)
+    if (row.workspaceId === workspaceId) result.delete(row.id)
   }
   return result
 }
@@ -64,38 +57,43 @@ export async function runOutsideToken(user: ApiUser, runId: string) {
 
 // The runs a self-improvement record was made from.
 const improvementSourceRuns = {
-  proposal: 'SELECT "runId" FROM improvement_proposal_sources WHERE "proposalId"=$1',
-  instance: 'SELECT "sourceRunId" AS "runId" FROM improvement_benchmark_instances WHERE id=$1',
-  evaluation: `SELECT i."sourceRunId" AS "runId" FROM improvement_skill_evaluations e JOIN improvement_benchmark_instances i ON i.id=e."instanceId" WHERE e.id=$1
-    UNION SELECT s."runId" FROM improvement_skill_evaluations e JOIN improvement_proposal_sources s ON s."proposalId"=e."proposalId" WHERE e.id=$1`,
+  proposal: `SELECT s."runId",i."workspaceId",i."ownershipState" FROM improvement_proposals p
+    LEFT JOIN improvement_proposal_sources s ON s."proposalId"=p.id LEFT JOIN issues i ON i.id=p."issueId" WHERE p.id=$1`,
+  instance: `SELECT b."sourceRunId" AS "runId",i."workspaceId",i."ownershipState" FROM improvement_benchmark_instances b
+    LEFT JOIN issues i ON i.id=b."issueId" WHERE b.id=$1`,
+  evaluation: `SELECT b."sourceRunId" AS "runId",i."workspaceId",i."ownershipState" FROM improvement_skill_evaluations e
+    JOIN improvement_benchmark_instances b ON b.id=e."instanceId" LEFT JOIN issues i ON i.id=b."issueId" WHERE e.id=$1
+    UNION ALL SELECT s."runId",i."workspaceId",i."ownershipState" FROM improvement_skill_evaluations e
+    LEFT JOIN improvement_proposals p ON p.id=e."proposalId" LEFT JOIN improvement_proposal_sources s ON s."proposalId"=p.id
+    LEFT JOIN issues i ON i.id=p."issueId" WHERE e.id=$1
+    UNION ALL SELECT b."sourceRunId" AS "runId",i."workspaceId",i."ownershipState" FROM improvement_skill_evaluations e
+    JOIN improvement_benchmark_instances b ON b.id=e."instanceId" LEFT JOIN improvement_skill_candidates c ON c."versionId"=e."candidateVersionId"
+    LEFT JOIN issues i ON i.id=c."issueId" WHERE e.id=$1`,
 }
 
 /** A self-improvement record belongs to its source runs; one whose source runs cannot be found is outside. */
 export async function improvementRecordOutsideToken(user: ApiUser, record: { kind: 'run' | keyof typeof improvementSourceRuns; id: string }) {
-  if (!user[tokenWorkspace]) return false
   if (record.kind === 'run') return runOutsideToken(user, record.id)
-  const { rows } = await pool.query<{ runId: string }>(improvementSourceRuns[record.kind], [record.id])
+  const workspaceId = await effectiveRequestWorkspace(user)
+  if (!workspaceId) return true
+  const { rows } = await pool.query<{ runId: string; workspaceId: string | null; ownershipState: string | null }>(improvementSourceRuns[record.kind], [record.id])
+  if (!rows.length || rows.some(row => !row.runId || row.ownershipState !== 'bound' || row.workspaceId !== workspaceId)) return true
   const runIds = [...new Set(rows.map(row => row.runId))]
-  if (!runIds.length) return true
-  const { rows: found } = await pool.query<{ id: string }>('SELECT id FROM agent_runs WHERE id=ANY($1::uuid[])', [runIds])
-  return found.length < runIds.length || (await runsOutsideToken(user, runIds)).size > 0
+  return (await runsOutsideWorkspace(workspaceId, runIds)).size > 0
 }
 
 /** A capture belongs to its run. */
 export async function captureOutsideToken(user: ApiUser, captureId: string) {
-  if (!user[tokenWorkspace]) return false
   const { rows: [capture] } = await pool.query<{ runId: string }>('SELECT "runId" FROM run_captures WHERE id=$1', [captureId])
-  return capture ? runOutsideToken(user, capture.runId) : false
+  return capture ? runOutsideToken(user, capture.runId) : true
 }
 
-/** An artifact belongs to the run that made it, else to its task. */
+/** Provenance can be retired; the artifact keeps its immutable tenant. */
 export async function artifactOutsideToken(user: ApiUser, artifactId: string) {
-  const scope = tokenScope(user)
-  if (!scope) return false
-  const { rows: [artifact] } = await pool.query<{ runId: string | null; issueId: string | null }>('SELECT "runId","issueId" FROM artifacts WHERE id=$1', [artifactId])
-  if (!artifact) return false
-  if (artifact.runId) return runOutsideToken(user, artifact.runId)
-  return outside(scope, [artifact.issueId && (await issueWorkspaces([artifact.issueId])).get(artifact.issueId)])
+  const workspaceId = await effectiveRequestWorkspace(user)
+  if (!workspaceId) return true
+  const { rows: [artifact] } = await pool.query<{ workspaceId: string | null }>('SELECT "workspaceId" FROM artifacts WHERE id=$1', [artifactId])
+  return artifact?.workspaceId !== workspaceId
 }
 
 /** The proposals, of these pending actions, outside the token's workspace: by the Bot that made them. */

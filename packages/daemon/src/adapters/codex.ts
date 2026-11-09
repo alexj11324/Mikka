@@ -316,11 +316,12 @@ export function codexItemChunks(
         ]
       }
       return [
-        call.error
+        // MCP isError results carry a failed status with a null error.
+        call.error || call.status === "failed"
           ? {
               type: "tool-output-error",
               toolCallId: item.id,
-              errorText: call.error.message,
+              errorText: call.error?.message ?? "MCP tool call failed",
             }
           : {
               type: "tool-output-available",

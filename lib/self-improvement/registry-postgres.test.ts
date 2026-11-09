@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import { isolatedPostgresURL } from '../../tests/helpers/isolated-postgres.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -29,7 +30,7 @@ test('PG candidate registration, immutable replay and exact-version claim/resume
     await pool.query(await readFile(new URL('20261029044009_skill_candidate_registry.sql', dir), 'utf8'))
     const userId = `synthetic-${randomUUID()}`, issueId = randomUUID(), agentId = randomUUID(), deviceId = randomUUID(), repoId = randomUUID()
     const repository = 'https://github.com/example/public'
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Registry boundary fixture','{}','todo','normal')`, [issueId,userId])
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Registry boundary fixture','{}','todo','normal')`, [issueId, userId, await seedFixtureWorkspace(pool, userId)])
     await pool.query(`INSERT INTO devices(id,"ownerId",name,enabled) VALUES($1,$2,'Synthetic registry device',true)`, [deviceId,userId])
     await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,'Synthetic registry agent','codex',$3)`, [agentId,userId,deviceId])
     await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,'/synthetic/registry',$4)`, [repoId,deviceId,userId,repository])

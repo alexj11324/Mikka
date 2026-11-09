@@ -48,7 +48,7 @@ test('desktop links preserve real workspace membership and public share permissi
       const id = randomUUID(), token = `mks_${randomBytes(24).toString('base64url')}`
       const content = kind === 'markdown' ? '# Shared fixture\n\nThe existing document.' : '<h1>Shared fixture</h1>'
       artifactIds.push(id)
-      await database.query('INSERT INTO artifacts(id,"userId",kind,title) VALUES($1,$2,$3,\'Shared fixture\')', [id, owner, kind])
+      await database.query('INSERT INTO artifacts(id,"userId","workspaceId",kind,title) VALUES($1,$2,$3,$4,\'Shared fixture\')', [id, owner, workspaceId, kind])
       await database.query('INSERT INTO artifact_versions(id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") VALUES($1,$2,1,$3,$4,$5,$6,\'Fixture author\')', [randomUUID(), id, `private/${id}`, content, createHash('sha256').update(content).digest('hex'), Buffer.byteLength(content)])
       await database.query('INSERT INTO artifact_shares(id,"artifactId","tokenHash","createdBy") VALUES($1,$2,$3,$4)', [randomUUID(), id, createHash('sha256').update(token).digest('hex'), owner])
       return { id, token, content }
@@ -79,11 +79,14 @@ test('desktop links preserve real workspace membership and public share permissi
       await database.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner])
       assert.equal(await readWorkspaceLink(owner, slug), null)
       assert.equal(await readWorkspaceLink(owner, oldSlug), null)
+      assert.equal((await get(markdown.token)).status, 404, 'a suspended issuer cannot leave an anonymous tenant share')
       await database.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner])
       assert.equal(await readWorkspaceLink(owner, oldSlug), null)
+      assert.equal((await get(html.token)).status, 404, 'a removed issuer cannot leave an anonymous tenant share')
       queries.length = 0
       for (const invalid of ['', '../private', 'UPPER', 'a'.repeat(65)]) assert.equal(await readWorkspaceLink(owner, invalid), null)
       assert.equal(queries.length, 0)
+      await database.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [workspaceId, owner, `${owner}@example.invalid`])
     })
     await t.test('a signed-out reader receives only the original shared props without additional database reads', async () => {
       await readShared(markdown.token)

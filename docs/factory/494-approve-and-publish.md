@@ -5,9 +5,10 @@
 > 验收并合并 merges its PR instead (`warp-aligned-factory.md`). This flow now
 > applies only to a skill candidate (`activate_skill`).
 
-The browser's existing `approve` operation now approves and starts the selected
-publication. A live, provider-linked human session still supplies the approval;
-request JSON cannot supply that identity.
+The existing `approve` operation approves and starts the selected publication.
+A verified, live browser or native human session supplies the approval; request
+JSON cannot supply that identity. The [human-session decision](../design/decisions/2026-11-09-1155-factory-human-session-authentication.md)
+replaces the older GitHub/Google account-link prerequisite.
 
 ## Transaction and execution
 
@@ -62,8 +63,8 @@ paid deployment or feature flag is changed here.
 Cloud Linux tests use the isolated PostgreSQL 17 container
 `mikka-494-postgres` on loopback port 55494, disposable fixture databases and
 schemas, real SQL transactions, and a real local filesystem publication adapter.
-The HTTP authentication case uses real Better Auth with synthetic account/link
-fixtures. Vercel calls are a loopback protocol fixture, not paid cloud
+The HTTP authentication regression uses real Better Auth with a disposable
+credential-only account and no linked OAuth account. Vercel calls are a loopback protocol fixture, not paid cloud
 publication; upstream review/verify runs remain explicit harness fixtures.
 
 New cases cover one-request approval, ten-way concurrent replay, reservation

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
+import { seedFixtureWorkspace } from '../tests/helpers/task-workspace'
 
 // Database regressions execute only in CI against ephemeral Postgres 17.
 // Local pure runs skip them; REQUIRE_DB=1 makes a missing database fail.
@@ -45,6 +46,7 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
   }
   await scope.run(async () => {
     await pool.query(`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values ($1, 'Heartbeat fixture', $1 || '@example.invalid', false, now(), now())`, [owner])
+    const workspaceId = await seedFixtureWorkspace(pool, owner)
     await pool.query(`insert into devices (id, name, "ownerId", harnesses, "lastSeenAt", "updateFailure") values ($1, 'mine', $2, $3, now(), $4)`,
       [device, owner, JSON.stringify([codex]), JSON.stringify({ code: 'download_failed' })])
     await pool.query(`insert into device_tokens (id, "userId", "tokenHash") values ($1, $2, $3)`, [randomUUID(), owner, createHash('sha256').update(token).digest('hex')])
@@ -94,7 +96,7 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
 
     // With a run, its lease is renewed; a run the device no longer holds is revoked.
     const [{ id: agent }] = (await pool.query(`select id from agents where "userId"=$1 and "deviceId"=$2`, [owner, device])).rows
-    await pool.query(`insert into agent_runs (id, "agentId", "userId", "deviceId", status, "leaseExpiresAt") values ($1, $2, $3, $4, 'running', now() + interval '5 seconds')`, [run, agent, owner, device])
+    await pool.query(`insert into agent_runs (id, "agentId", "userId", "deviceId", "workspaceId", status, "leaseExpiresAt") values ($1, $2, $3, $4, $5, 'running', now() + interval '5 seconds')`, [run, agent, owner, device, workspaceId])
     const ownToken = (await pool.query('SELECT id FROM device_tokens WHERE "tokenHash"=$1', [createHash('sha256').update(token).digest('hex')])).rows[0].id
     await pool.query('UPDATE agent_runs SET "deviceTokenId"=$2 WHERE id=$1', [run, ownToken])
     const old = await beat({ harnesses: [claude, codex], runs: [{ runId: run, lastProgressAt: new Date().toISOString() }, { runId: stranger, lastProgressAt: new Date().toISOString() }, { runId: 'not-a-uuid', lastProgressAt: new Date().toISOString() }] }, '0.0.329')

@@ -1,9 +1,51 @@
 // In-memory claim boundary tests. No sockets, providers or database connections.
 import { registerHooks } from 'node:module'
+import assert from 'node:assert/strict'
+import { PgDialect } from 'drizzle-orm/pg-core'
+
+const dialect = new PgDialect()
+function workspaceQuery() {
+  let table, condition
+  const query = {
+    from(value) { table = value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')]; return query },
+    innerJoin() { return query },
+    where(value) { condition = dialect.sqlToQuery(value); return query },
+    async for(mode) {
+      const p = globalThis.claimResponseProbe
+      assert.equal(mode, 'share')
+      if (table === 'mikka_workspaces') {
+        assert.deepEqual(condition.params, [p.workspace.id])
+        p.locks.push('workspaces')
+        return [p.workspace]
+      }
+      assert.equal(table, 'mikka_workspace_members')
+      assert.deepEqual(condition.params, [p.workspace.id, p.run.userId, 'active'])
+      p.locks.push('workspace_members')
+      return p.memberAllowed && p.workspaceMemberAllowed ? [{ id: p.run.userId }] : []
+    },
+    async orderBy() {
+      const p = globalThis.claimResponseProbe
+      assert.equal(table, 'mikka_workspaces')
+      assert.deepEqual(condition.params, [p.run.userId, 'active', p.workspace.id, 'team', 'personal', p.run.userId])
+      return p.memberAllowed && p.workspaceMemberAllowed ? [p.workspace] : []
+    },
+  }
+  return query
+}
+// Keep withRunWorkspace, mayCompleteIssue and their lock order real. Only the
+// workspace database transport is modeled alongside the App transaction below.
+export const claimWorkspaceDatabase = { select: workspaceQuery, transaction: callback => callback({ select: workspaceQuery }) }
+export const claimWorkspacePool = { async query(sql, args) {
+  const p = globalThis.claimResponseProbe
+  assert.equal(sql.replace(/\s+/g, ' ').trim(), 'SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[]) AND status=\'active\'')
+  ;(p.membershipReads ??= []).push(args)
+  return { rows: p.workspaceMemberAllowed === false ? [] : args[1].map(userId => ({ userId })) }
+} }
 const nextServer = import.meta.resolve('next/server')
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
 const repositoryContract = import.meta.resolve('@mikka/protocol/repository')
-const dbSource = `import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
+const dbSource = `import assert from 'node:assert/strict'
+import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
 
 function query(columns){
   let table
@@ -34,23 +76,37 @@ function update(value){
     return {then(resolve,reject){return once().then(()=>undefined).then(resolve,reject)},returning(){return once()}}
   }}}}
 }
-export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
+let checkedOutClient
+export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
 export const pool={async query(sql,args){
   const p=globalThis.claimResponseProbe
+  assert.equal(p.appActive,1,'execution identity remains inside the checked-out APP transaction')
   if(sql==='SELECT "ownerId",kind,enabled FROM devices WHERE id=$1'&&args[0]===p.device.id)return {rows:[p.device]}
   throw new Error('unsupported claim identity query: '+sql)
+},connect:async()=>{
+  const p=globalThis.claimResponseProbe
+  assert.equal(checkedOutClient,undefined,'claim cannot acquire a second APP client')
+  assert.equal(p.appActive,0)
+  assert.equal(p.locks.at(-1),'workspace_members','Workspace admission precedes APP checkout')
+  p.appActive=1;p.appCheckouts++
+  const client={release(){
+    assert.equal(checkedOutClient,client,'release the exact owning APP client')
+    assert.equal(p.appActive,1)
+    checkedOutClient=undefined;p.appActive=0;p.appReleases++
+  }}
+  checkedOutClient=client
+  return client
 }}
+export async function withDatabaseClient(client,operation){
+  assert.equal(client,checkedOutClient,'bind the exact checked-out APP client')
+  return operation()
+}
 `
 const sources = new Map([
   ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],
   ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
   ['/lib/db/index.ts', dbSource],
-  ['/lib/workspace-db.ts', `export const workspacePool={async query(sql,args){
-    const p=globalThis.claimResponseProbe
-    if(sql.replace(/\\s+/g,' ').trim()!==${JSON.stringify('SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[]) AND status=\'active\'')})throw new Error('unsupported claim membership query')
-    ;(p.membershipReads??=[]).push(args)
-    return {rows:p.workspaceMemberAllowed===false?[]:args[1].map(userId=>({userId}))}
-  }}`],
+  ['/lib/workspace-db.ts', `export {claimWorkspaceDatabase as workspaceDb, claimWorkspacePool as workspacePool} from ${JSON.stringify(import.meta.url)}`],
   ['/lib/device-link.ts', 'export async function authenticateDevice(){const p=globalThis.claimResponseProbe;return Object.hasOwn(p,"caller") ? (p.caller && {tokenId:"synthetic-device-token",...p.caller}) : {userId:"member",tokenId:"synthetic-device-token"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device};export async function ownedDeviceWithReport(){return globalThis.claimResponseProbe.device}'],
   ['/lib/device-repositories.ts', 'export async function readRepositorySettings(...args){const p=globalThis.claimResponseProbe;p.preparation.push("settings");(p.settingsReads??=[]).push(args);return p.repositorySettings??null}'],
   ['/lib/agent-tool-approval/policy-store.ts', 'export async function readCliRunPolicy(){const p=globalThis.claimResponseProbe;p.preparation.push("policy");return structuredClone(p.cliPolicy)}'],

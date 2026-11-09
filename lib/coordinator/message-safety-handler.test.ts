@@ -50,7 +50,15 @@ const transport = {
         return selection
       },
       orderBy() { return selection },
-      limit() { return table === agentRuns ? selection : Promise.resolve(table === coordinatorMessages ? [...historical] : table === coordinatorSessions ? [] : []) },
+      limit() {
+        if (table === agentRuns && fields && Object.keys(fields).length === 1 && 'workspaceId' in fields) {
+          assert.ok(dialect.sqlToQuery(condition).params.includes(runId))
+          // Initial tenant lookup succeeds; the locked read below still
+          // exercises a concurrent ownership/STOP change before the write.
+          return Promise.resolve([{ workspaceId: workspace }])
+        }
+        return table === agentRuns ? selection : Promise.resolve(table === coordinatorMessages ? [...historical] : table === coordinatorSessions ? [] : [])
+      },
       async for(mode: string) {
         assert.equal(table, agentRuns); assert.equal(mode, 'update'); locks++
         beforeLock?.()
@@ -88,8 +96,24 @@ stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () =
 // The person's Coordinator is an ordinary bot row; MCP resolves it for the authenticated owner.
 const coordinator = '28700000-0000-4000-8000-0000000c0de1'
 const workspace = '28700000-0000-4000-8000-0000000000a1'
-stub('../workspace-db.ts', { workspacePool: { query: async (sql: string, params: unknown[]) => {
-  assert.equal(sql, `SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active'`)
+stub('../workspace-db.ts', { workspaceDb: { select: () => {
+  const selection = {
+    from: () => selection,
+    innerJoin: () => selection,
+    where: (condition: SQL) => {
+      const query = dialect.sqlToQuery(condition)
+      assert.ok(query.params.includes(owner)); assert.ok(query.params.includes(workspace))
+      assert.ok(query.params.includes('active')); assert.ok(query.params.includes('team')); assert.ok(query.params.includes('personal'))
+      return selection
+    },
+    orderBy: async () => [{ id: workspace, kind: 'team' }],
+  }
+  return selection
+} }, workspacePool: { query: async (sql: string, params: unknown[]) => {
+  assert.match(sql, /mikka_workspace_members m JOIN mikka_workspaces w/)
+  assert.match(sql, /m.status='active'/)
+  assert.match(sql, /w.kind='team'/)
+  assert.match(sql, /w.kind='personal' AND w\."userId"=\$2/)
   assert.deepEqual(params, [workspace, owner], 'scope membership uses the same authenticated owner')
   return { rows: [{ allowed: 1 }], rowCount: 1 }
 } } })
@@ -100,8 +124,9 @@ stub('./coordinator-bot.ts', {
 })
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('Unrelated tool outside test') } })
 stub('../issue-access.ts', { issueForUser: () => {} })
-stub('../acting-user.ts', { actAs: () => { throw Error('Unrelated tool outside test') } })
-stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000 })
+const unexpectedAuth = () => { throw new Error('No browser authentication or OAuth issuance in MCP bearer fixture') }
+stub('../auth.ts', { auth: new Proxy({}, { get: unexpectedAuth }), authBaseURL: 'https://auth-fixture.example.invalid' })
+stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, issueDeviceToken: unexpectedAuth })
 stub('../composio.ts', { runComposioAction: () => { throw Error('No provider') } })
 stub('../mcp/worker.ts', { RUN_TOKEN_PREFIX: 'mkw_', verifyRunToken: async () => undefined, workerRun: () => { throw Error('Worker outside this batch') }, report: () => {}, ask: () => {}, blocked: () => {} })
 stub('../mcp/artifacts.ts', { submit: () => {}, oauthSubmitter: () => {}, runSubmitter: () => {} })
@@ -121,7 +146,7 @@ before(async () => {
 })
 let id = 0
 async function request(name: string, args: unknown, bearer: string | null = syntheticBearer) {
-  return POST(new Request('http://localhost/mikka/api/mcp', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(bearer ? { authorization: 'Bearer ' + bearer } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name, arguments: args } }) }))
+  return POST(new Request('http://localhost/mikka/api/mcp', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(bearer ? { authorization: 'Bearer ' + bearer } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name, arguments: { workspaceId: workspace, ...args as object } } }) }))
 }
 async function result(response: Response) {
   assert.equal(response.status, 200)

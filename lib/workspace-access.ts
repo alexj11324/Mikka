@@ -3,7 +3,7 @@ import { getLocale } from 'next-intl/server'
 import 'server-only'
 import { cache } from 'react'
 import { cookies } from 'next/headers'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { z } from 'zod'
@@ -16,6 +16,8 @@ import type { ListLiveRead } from '@/lib/live/list-read'
 import { ownerLiveScope } from '@/lib/live/owner-scope'
 import { getEdition, type MikkaEdition } from '@/lib/edition'
 import { isServerAdmin } from '@/lib/server-admin'
+import { currentRequestScope } from '@/apps/api/src/context'
+import { workspaceSelection } from '@/lib/workspace-selection'
 
 function workspaceLocale(value: string): WorkspaceLocale {
   return value === 'en' ? 'en' : 'zh-CN'
@@ -39,10 +41,15 @@ export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: st
 
 export async function loadWorkspaceContext(requestedId?: string, authenticatedUser?: AuthenticatedUser) {
   if (requestedId) z.uuid().parse(requestedId)
+  const selection = workspaceSelection(currentRequestScope()?.headers)
+  if (selection.present && !selection.workspaceId) throw new WorkspaceError('workspaceAccessDenied')
   const [user, locale] = await Promise.all([authenticatedUser ?? requireUser(), getLocale().then(workspaceLocale)])
   const patWorkspace = (user as typeof user & { [tokenWorkspace]?: string })[tokenWorkspace]
-  if (patWorkspace && requestedId && requestedId !== patWorkspace) throw new WorkspaceError('workspaceAccessDenied')
-  const context = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? '', locale)
+  if (patWorkspace && (requestedId && requestedId !== patWorkspace || selection.workspaceId && selection.workspaceId !== patWorkspace)) throw new WorkspaceError('workspaceAccessDenied')
+  // An explicit business target keeps its existing access check. A supplied
+  // transport selection is exact: inaccessible choices never fall back home.
+  const context = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? selection.workspaceId ?? '', locale)
+  if (selection.present && !context.choices.some(choice => choice.id === selection.workspaceId)) throw new WorkspaceError('workspaceAccessDenied')
   return patWorkspace ? { ...context, choices: context.choices.filter(choice => choice.id === patWorkspace) } : context
 }
 
@@ -53,7 +60,8 @@ const readWorkspaceContext = cache(async (userId: string, email: string, name: s
   const cookieStore = await cookies()
   const readChoices = () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, role: workspaceMembers.role }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
-    .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaces.createdAt))
+    .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'),
+      or(eq(workspaces.kind, 'team'), eq(workspaces.userId, user.id)))).orderBy(asc(workspaces.createdAt))
 
   let choices = await readChoices()
   // Every person has one personal workspace, including people whose first workspace came from an invite.

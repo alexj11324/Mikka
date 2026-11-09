@@ -67,7 +67,7 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
       await tx.query(await readFile(new URL("../../drizzle/20261029044005_factory_195_monitor.sql", import.meta.url), "utf8"));
       await tx.query('CREATE TABLE factory_questions ("continuationRunId" uuid)');
       const monitorRun = randomUUID(), monitorAttempt = randomUUID();
-      await tx.query(`INSERT INTO agent_runs(id,"userId","issueId","sessionId",status,kind) VALUES($1,$2,$3,$4,'succeeded','acceptance')`, [monitorRun,f.actor.userId,r.issueId,"synthetic-monitor"]);
+      await tx.query(`INSERT INTO agent_runs(id,"userId","issueId","workspaceId","sessionId",status,kind) VALUES($1,$2,$3,$5,$4,'succeeded','acceptance')`, [monitorRun,f.actor.userId,r.issueId,"synthetic-monitor",f.workspaceId]);
       await tx.query(`INSERT INTO factory_attempts(id,"taskId","candidateId",stage,position,"runId","sessionId",status) VALUES($1,$2,$3,'monitor',5,$4,$5,'running')`, [monitorAttempt,x.task.id,r.candidateId,monitorRun,"synthetic-monitor"]);
       const task = { id:x.task.id,userId:f.actor.userId,issueId:r.issueId,sourceEventId:"synthetic-source",stage:"monitor",status:"running",attemptId:monitorAttempt,candidateId:r.candidateId };
       const input = {ownerId:f.actor.userId,workspaceKey:"synthetic",fingerprint:"f".repeat(64),checkKey:"c".repeat(64),issueId:r.issueId,eventId:"failure",outcome:"unhealthy" as const,publicationId:r.publicationId,candidateId:r.candidateId,runId:monitorRun};
@@ -77,7 +77,7 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
       const audit = (await tx.query('SELECT request FROM factory_monitor_observations WHERE "sourceEventId"=$1',[factoryEventId("monitor-v2-observation","recovery-evidence")])).rows[0].request.identity;
       assert.match(audit.evidenceDigest,/^[a-f0-9]{64}$/); assert.equal(audit.publicationId,r.publicationId); assert.equal(audit.runId,monitorRun); assert.equal(audit.candidateId,r.candidateId);
       await tx.query('ALTER TABLE agent_runs ADD COLUMN "baseBranch" text');
-      const lifecycleTask:FactoryTask={...task,scopeVersion:null,stage:"monitor",status:"running",botId:null,revision:1,reason:"fixture",route:{issueId:r.issueId,eventId:randomUUID(),sourceEventId:randomUUID(),rationale:"fixture",missingInformation:[],missingPermissions:[],needsSpec:false}};
+      const lifecycleTask:FactoryTask={...task,workspaceId:f.workspaceId,scopeVersion:null,stage:"monitor",status:"running",botId:null,revision:1,reason:"fixture",route:{issueId:r.issueId,eventId:randomUUID(),sourceEventId:randomUUID(),rationale:"fixture",missingInformation:[],missingPermissions:[],needsSpec:false}};
       const proof={observation:o,incident:input,artifact:`run-report:${monitorRun}`,sessionId:"synthetic-monitor",recordedAt:at};
       const adapters=createFactoryMonitorConsumers({productionOrigin:"https://app.example.com",readProbe:async()=>proof});
       await tx.query("UPDATE agent_runs SET status='queued' WHERE id=$1",[monitorRun]);

@@ -95,7 +95,7 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
   const runs = async () => (await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [userId])).rows[0].n as number
 
   await t.test('dispatch_run: a model outside the list, even one an account offers, is refused and nothing is queued', async () => {
-    const issueId = await seedIssue(pool, userId)
+    const issueId = await seedIssue(pool, userId, ws.id)
     // A numbered task, so its thread gets a publication branch.
     await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
     const dispatch = (model: { harness: 'codex' | 'claude_code'; model?: string }) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', model, requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator)
@@ -112,7 +112,7 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
     assert.equal(queued.status, 'queued', JSON.stringify(queued))
     assert.deepEqual((await pool.query('SELECT "agentDefinition"->>\'model\' AS model,"deviceId" FROM agent_runs WHERE "userId"=$1', [userId])).rows, [{ model: 'fx-codex-a', deviceId }], 'only the computer with subscription injection')
     // An allowed model absent from CLI shortcuts runs exactly as selected.
-    const other = await seedIssue(pool, userId)
+    const other = await seedIssue(pool, userId, ws.id)
     await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":8}}}' WHERE id=$1`, [other])
     const unreported = await steps.dispatchRun(userId, { issueId: other, repo: 'octo/repo', model: { harness: 'codex', model: 'fx-codex-c' }, requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator) as { status?: string; runId?: string; error?: string }
     assert.equal(unreported.status, 'queued', JSON.stringify(unreported))
@@ -123,7 +123,7 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
 
   await t.test('dispatch_bot_computer: a model outside the list is refused before anything is queued', async () => {
     const before = await runs()
-    const issueId = await seedIssue(pool, userId)
+    const issueId = await seedIssue(pool, userId, ws.id)
     const refused = await steps.dispatchComputerThread(userId, { botId: bot, issueId, harness: 'codex', model: 'fx-not-offered' }, `call-${randomUUID()}`) as { error: string; allowed: unknown[] }
     assert.equal(refused.error, 'modelNotAllowed')
     assert.ok(refused.allowed.length > 0)

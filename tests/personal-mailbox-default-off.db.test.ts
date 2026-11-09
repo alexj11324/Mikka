@@ -53,7 +53,9 @@ test('default-off claim, MCP and Coordinator work on the tracked schema with the
     await pool.query('insert into devices(id,"ownerId",name,kind,enabled,"protocolVersion",harnesses) values($1,$2,$3,\'local\',true,$4,$5::jsonb)', [deviceId, owner, 'Mailbox default-off CI', DAEMON_PROTOCOL_VERSION, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents(id,"userId",harness,name,"deviceId") values($1,$2,\'codex\',$3,$4)', [agentId, owner, 'Mailbox default-off CI', deviceId])
     await pool.query('insert into device_repos(id,"deviceId","userId","repoPath","remoteUrl") values($1,$2,$3,$4,$5)', [repoId, deviceId, owner, repository.key, repository.remoteUrl])
-    await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,\'{"type":"doc","content":[]}\',\'todo\',\'normal\',\'personal\')', [issueId, owner, 'Mailbox default-off CI'])
+    const coordinatorFixture = await seedCoordinator(owner)
+    const workspaceId = coordinatorFixture.workspaceId
+    await pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId") values($1,$2,$3,\'{"type":"doc","content":[]}\',\'todo\',\'normal\',\'personal\',$4)', [issueId, owner, 'Mailbox default-off CI', workspaceId])
     const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'No model runs in this test', prompt: 'Fixture', parent: null, executionId: null })
     await pool.query('insert into agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"agentDefinition") values($1,$2,$3,$4,$5,$6,\'queued\',$7)', [runId, owner, issueId, agentId, deviceId, repoId, JSON.stringify(definition)])
     await pool.query('insert into device_tokens(id,"userId",name,"tokenHash","lastUsedAt","expiresAt") values($1,$2,$3,$4,now(),now()+interval \'5 minutes\')', [deviceTokenId, owner, 'Mailbox default-off CI', tokenHash(deviceToken)])
@@ -104,7 +106,7 @@ test('default-off claim, MCP and Coordinator work on the tracked schema with the
       assert.equal((await mailbox(request('/v1/mailbox', runToken, { action: 'inbox' }))).status, 503)
     })
     await t.test('real Coordinator catalogue and callback do not load mailbox schema when off', async () => {
-      const coordinator = (await seedCoordinator(owner)).botId
+      const coordinator = coordinatorFixture.botId
       const registry = createCoordinatorRegistry(owner, coordinator, undefined, { coordinator: true })
       assert.ok('dispatch_run' in registry && 'send_to_run' in registry)
       assert.equal(Object.keys(registry).some(name => name.startsWith('mailbox_')), false)

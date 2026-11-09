@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { z } from 'zod'
+import { PgDialect } from 'drizzle-orm/pg-core'
+import type { SQL } from 'drizzle-orm'
+import { workspaceMembers } from '../lib/db/workspace-schema'
 import { ActionFailureError } from '../lib/action-error'
 import { FactoryError } from '../lib/factory/contract'
 import { threadQuestionView } from '../lib/issue-threads'
@@ -10,6 +13,8 @@ import { threadQuestionView } from '../lib/issue-threads'
 const OWNER = 'fixture-owner', ISSUE = '41500000-0000-4000-8000-000000000001'
 const ORIGIN = '41500000-0000-4000-8000-000000000002', CHILD = '41500000-0000-4000-8000-000000000003'
 const GENERATION = '41500000-0000-4000-8000-000000000004'
+const WORKSPACE = '41500000-0000-4000-8000-000000000005'
+const dialect = new PgDialect()
 const failure = { generation: GENERATION, error: 'Original task machine unavailable' }
 let viewer = OWNER, requestHeaders = new Headers({ cookie: 'fixture-session' })
 let currentStatus = 'queued', selectedRun = CHILD, hostError: Error | null = null
@@ -17,7 +22,7 @@ let memberIds: string[] = [], factoryEnabled = true
 let questionState: 'resuming' | 'waiting' | null = 'resuming', wakeFailure: typeof failure | null = failure
 const wakes: unknown[][] = [], reads: unknown[][] = [], ordinary: unknown[][] = []
 const pool = { query: async () => ({ rows: [], rowCount: 0 }) }
-const fixtureRun = () => ({ id: selectedRun, issueId: ISSUE, userId: OWNER,
+const fixtureRun = () => ({ id: selectedRun, issueId: ISSUE, userId: OWNER, workspaceId: WORKSPACE,
   status: selectedRun === ORIGIN ? 'stopped' : currentStatus, prompt: 'Fixture task', sessionId: null,
   deviceRepoId: null, report: null, error: null, createdAt: new Date(0), finishedAt: null,
   agentName: 'Fixture Bot', harness: 'codex', ownerName: null, stopRequestedAt: null, outcome: null })
@@ -42,9 +47,17 @@ before(async () => {
     }
     return selection('id' in fields ? memberIds.map(id => ({ id })) : [])
   } } })
-  stub('../lib/workspace-db.ts', { workspaceDb: { select: () => selection([]) }, workspacePool: pool })
+  stub('../lib/workspace-db.ts', { workspaceDb: { select: () => ({ from: (table: unknown) => {
+    assert.equal(table, workspaceMembers)
+    return { where: (condition: SQL) => {
+      const query = dialect.sqlToQuery(condition)
+      assert.ok(query.params.includes(WORKSPACE)); assert.ok(query.params.includes('active'))
+      return selection([OWNER, ...memberIds].map(id => ({ id })))
+    } }
+  } }) }, workspacePool: pool })
+  stub('../lib/workspace-access.ts', { loadWorkspaceContext: () => assert.fail('workspace selection outside task-bound wake fixture') })
   stub('../lib/deployment-switches.ts', { deploymentSwitch: () => factoryEnabled })
-  stub('../lib/issue-access.ts', { requireIssueAccess: async () => ({ issue: { id: ISSUE, userId: OWNER }, user: { id: viewer } }) })
+  stub('../lib/issue-access.ts', { requireIssueAccess: async () => ({ issue: { id: ISSUE, userId: OWNER, workspaceId: WORKSPACE }, user: { id: viewer } }) })
   stub('../lib/device-link.ts', { issueDeviceToken: () => assert.fail('no device token') })
   stub('../lib/device-presence.ts', { deviceOnlineStates: () => assert.fail('no device selection') })
   stub('../lib/device-removal.ts', { removeOwnedDevice: () => assert.fail('no device removal'), renameOwnedDevice: () => assert.fail('no rename') })
@@ -60,7 +73,7 @@ before(async () => {
     // #1236: the thread actions read the state together with its next answer deadline.
     readThreadQuestionState: async () => ({ states: questionStates(), deadline: null }),
   })
-  stub('../lib/run-chain.ts', { listIssueRunChains: async () => [fixtureChain()], readRunChain: async () => fixtureChain() })
+  stub('../lib/run-chain.ts', { listIssueRunChains: async () => [fixtureChain()], readRunChain: async () => fixtureChain(), readRunChainCheckpoint: () => assert.fail('checkpoint reads outside wake fixture') })
   stub('../lib/run-quota-view.ts', { threadQuotaView: async () => null, threadModelFallbackState: async () => null })
   stub('../lib/factory/questions/wake.ts', {
     questionWakeFailure: async (...args: unknown[]) => { reads.push(args); return wakeFailure },

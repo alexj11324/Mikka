@@ -1,3 +1,5 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
 // below are explicit synthetic fixtures, never live-provider acceptance.
@@ -42,8 +44,10 @@ test('isolated PG: direct question recovery exposes historical native observatio
   const target = new URL(url!)
   target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
+  let closeWorkspaceDatabase: (() => Promise<void>) | undefined
   const flags = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
   try {
+    closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(pool)
     const dir = new URL('../../drizzle/', import.meta.url)
     for (const file of orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))) await pool.query(await readFile(new URL(file, dir), 'utf8'))
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','snapshot@example.invalid',true,now(),now())`)
@@ -54,7 +58,8 @@ test('isolated PG: direct question recovery exposes historical native observatio
       const issueId = randomUUID(), sourceEventId = randomUUID(), workspaceId = randomUUID(), botId = randomUUID()
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = randomUUID(), sandboxId = `retained-${randomUUID()}`
       const repoPath = `/home/user/.mikka/bot-workspaces/${botId}`, worktreePath = `/home/user/.mikka/worker/worktrees/${randomUUID()}`
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Synthetic legacy delivery','{"type":"doc","content":[]}','todo','normal')`, [issueId])
+      await seedFixtureWorkspace(pool, 'owner', 'team', workspaceId)
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Synthetic legacy delivery','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`, [issueId, workspaceId])
       await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,'owner','Fixture Bot')`, [botId, workspaceId])
       await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture cloud','cloud',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
       await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,'owner',$3,'codex',$2)`, [agentId, deviceId, `Fixture Codex ${agentId}`])
@@ -94,9 +99,10 @@ test('isolated PG: direct question recovery exposes historical native observatio
       const originId = randomUUID(), originAttemptId = randomUUID(), originalQuestionId = randomUUID(), originalQuestionEventId = randomUUID(), answerId = randomUUID()
       const historyRunId = randomUUID(), historyAttemptId = randomUUID(), recoveryRequestId = randomUUID()
       const recoveryEventId = factoryEventId('question-recover', recoveryRequestId)
-      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [producerRunId, JSON.stringify({ questionId: originalQuestionId, originRunId: originId, originSessionId: 'original-native-session', requireSessionResume: true, requiredSandboxId: sandboxId })])
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,"stopReason","sessionId","agentDefinition",prompt)
         SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",'stopped','asked_human','original-native-session',"agentDefinition",'Original question' FROM agent_runs WHERE id=$1`, [producerRunId, originId])
+      // The persisted parent exists before the continuation references it.
+      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [producerRunId, JSON.stringify({ questionId: originalQuestionId, originRunId: originId, originSessionId: 'original-native-session', requireSessionResume: true, requiredSandboxId: sandboxId })])
       await pool.query(`UPDATE agent_runs SET "worktreePath"=$2,"baseBranch"='main',"startedAt"=now()-interval '126 minutes',"finishedAt"=now()-interval '124 minutes' WHERE id=$1`, [originId, worktreePath])
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",kind,status,"stopReason","sessionId","agentDefinition",prompt,"baseBranch","worktreePath","questionContinuation","startedAt","finishedAt")
         SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",'implement','failed','error',"sessionId","agentDefinition",'Synthetic historical command turn',"baseBranch","worktreePath","questionContinuation",now()-interval '122 minutes',now()-interval '121 minutes' FROM agent_runs WHERE id=$1`, [producerRunId, historyRunId])
@@ -407,6 +413,7 @@ test('isolated PG: direct question recovery exposes historical native observatio
   } finally {
     if (flags.routing === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = flags.routing
     if (flags.lifecycle === undefined) delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED; else process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = flags.lifecycle
+    await closeWorkspaceDatabase?.()
     await dropTestDatabase(admin, database, pool)
     await admin.end()
   }
