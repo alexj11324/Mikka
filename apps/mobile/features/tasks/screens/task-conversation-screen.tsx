@@ -11,6 +11,7 @@ import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
 import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { ThreadSteps } from '@/features/tasks/components/thread-steps'
+import { AgentName } from '@/features/tasks/components/agent-name'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
@@ -42,7 +43,7 @@ async function readConversation(id: string): Promise<Conversation> {
 
 /**
  * A task's one conversation (Alex 2026-11-07, 2026-11-08): every run's messages in order, oldest at the top. A line
- * only where the task switched Agent (「换 Codex 继续」, 「Claude Code 没跑通 · 换 Codex 继续」); a small marker
+ * only where the task switched Agent (the next Agent's glyph and name, no verb); a small marker
  * where a factory stage started (「独立审查」); same-Agent runs otherwise read as one. The bar is ← and the task's title over the current
  * Agent; the composer, 停止 and a quota pause act on the newest attempt. It updates on the task's and the newest
  * attempt's live keys.
@@ -192,20 +193,20 @@ function ReviewCard({ flow, running, children }: { flow: TaskFlow | null | undef
 }
 
 /**
- * Between two runs of the task's one conversation: a centred line where the task switched Agent (「换 Claude Code 继续」),
+ * Between two runs of the task's one conversation: where the Agent changed, the next Agent (glyph and name) between hairlines,
  * a small marker where a factory stage started (「独立审查」), nothing otherwise.
  */
 function Boundary({ at }: { at: ReturnType<typeof boundary> }) {
   if (!at) return null
-  return at.kind === 'switch' ? <Divider text={at.text} /> : <Text style={styles.stage}>{at.text}</Text>
+  return at.kind === 'agent' ? <Divider harness={at.harness} /> : <Text style={styles.stage}>{at.text}</Text>
 }
 
-/** The line where the Agent changed, as the chat's event lines are drawn: centred grey words between hairlines. */
-function Divider({ text }: { text: string }) {
+/** Where the Agent changed, as the chat's event lines are drawn: the next Agent, centred between hairlines; no verb. */
+function Divider({ harness }: { harness: string }) {
   return (
     <View style={styles.divider} accessibilityRole="header">
       <View style={styles.rule} />
-      <Text style={styles.dividerText} numberOfLines={1}>{text}</Text>
+      <AgentName harness={harness} size={13} style={styles.dividerText} />
       <View style={styles.rule} />
     </View>
   )

@@ -17,8 +17,8 @@ test('Chinese device variants preserve Chinese navigation and task copy', () => 
     assert.equal(messages.Nav.tasks, '任务')
     assert.equal(messages.MobileCore.groups.done, '已完成')
     // Alex 2026-11-09 (decisions/2026-11-09-0045): a task is one conversation; no 「尝试」 and no run numbers.
-    assert.equal(messages.MobileCore.conversation.switchedAfterFailure.replace('{previous}', 'Claude Code').replace('{agent}', 'Codex'), 'Claude Code 没跑通 · 换 Codex 继续')
-    assert.equal(messages.MobileCore.conversation.switched.replace('{agent}', 'Codex'), '换 Codex 继续')
+    // …and no switch verb (as Warp): where the Agent changes the conversation shows the Agent itself.
+    assert.doesNotMatch(JSON.stringify(messages.MobileCore.conversation), /换|没跑通/)
     assert.doesNotMatch(JSON.stringify(messages.MobileCore), /尝试/)
     assert.equal(messages.MobileCore.threadSteps.commands.replace('{count}', '2'), '已运行 2 条命令')
     assert.equal(messages.MobileCore.steps.replace('{count}', '3'), '执行了 3 步')

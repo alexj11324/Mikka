@@ -1,7 +1,6 @@
 import { HARNESS } from '@/lib/harness'
 import { mobileMessages } from '@/lib/messages'
 import type { TaskActivity, ThreadItem } from '@/lib/types'
-import { attemptState } from './task-groups'
 
 export type Attempt = Extract<TaskActivity, { kind: 'attempt' }>
 /** One attempt's part of the task's conversation, and the raw error it ended with (2026-11-05-0330: inside the attempt). */
@@ -44,41 +43,33 @@ const STAGE_MARK: Partial<Record<NonNullable<Attempt['stage']>, string>> = { fix
 export const reviewRun = (attempt: Pick<Attempt, 'stage'>) => attempt.stage === 'review'
 
 /**
- * What sits between two runs of the task's conversation (Alex 2026-11-09: no 「尝试」 and no numbering anywhere). Only
- * where the Agent changed: 「换 Codex 继续」, or 「Claude Code 没跑通 · 换 Codex 继续」 when the run before failed. With the
- * same Agent nothing divides them; where the factory goes back to fix (`stage`, when the server sends it) a small
- * marker says so. No stage, no marker; the review is its own card.
+ * What sits between two runs of the task's conversation (Alex 2026-11-09: no 「尝试」, no numbering and, as Warp shows
+ * it, no switch verb). Only where the Agent changed: the next Agent itself, its glyph and name. With the same Agent
+ * nothing divides them; where the factory goes back to fix (`stage`, when the server sends it) a small marker says so.
+ * No stage, no marker; the review is its own card.
  */
-export type Boundary = { kind: 'switch'; text: string } | { kind: 'stage'; text: string } | null
+export type Boundary = { kind: 'agent'; harness: string } | { kind: 'stage'; text: string } | null
 export function boundary(previous: Attempt, next: Attempt): Boundary {
-  if (next.harness !== previous.harness) {
-    const words = mobileMessages.MobileCore.conversation
-    return { kind: 'switch', text: attemptState(previous) === 'failed'
-      ? words.switchedAfterFailure.replace('{previous}', agent(previous.harness)).replace('{agent}', agent(next.harness))
-      : words.switched.replace('{agent}', agent(next.harness)) }
-  }
+  if (next.harness !== previous.harness) return { kind: 'agent', harness: next.harness }
   const mark = next.stage ? STAGE_MARK[next.stage] : undefined
   return mark ? { kind: 'stage', text: mark } : null
 }
 
 /** 活动 on the task's page: its creation and replaced threads, and one row per Agent's stretch, oldest first. */
-export type ActivityEntry = Exclude<TaskActivity, Attempt> | { kind: 'agent'; run: AgentRun; switched: boolean }
+export type ActivityEntry = Exclude<TaskActivity, Attempt> | { kind: 'agent'; run: AgentRun }
 export function activityEntries(activity: readonly TaskActivity[]): ActivityEntry[] {
   // The server sends 活动 newest first.
   const oldestFirst = [...activity].reverse()
   const entries: ActivityEntry[] = []
-  let runs = 0
   for (const item of oldestFirst) {
     if (item.kind !== 'attempt') { entries.push(item); continue }
     const last = entries.at(-1)
     if (last?.kind === 'agent' && last.run.harness === item.harness) last.run.attempts.push(item)
-    else entries.push({ kind: 'agent', run: { harness: item.harness, attempts: [item] }, switched: runs++ > 0 })
+    else entries.push({ kind: 'agent', run: { harness: item.harness, attempts: [item] } })
   }
   return entries
 }
 
-/** An Agent's row in 活动: 「Codex」, or 「换 Claude Code」 where the task switched to it. */
-export const agentRunTitle = (entry: Extract<ActivityEntry, { kind: 'agent' }>) => entry.switched ? mobileMessages.MobileCore.conversation.switchedTo.replace('{agent}', agent(entry.run.harness)) : agent(entry.run.harness)
 
 /** The Agent of the newest attempt, under the task's title. */
 export const currentAgent = (segments: readonly Segment[]) => segments.length ? agent(segments[segments.length - 1]!.attempt.harness) : null

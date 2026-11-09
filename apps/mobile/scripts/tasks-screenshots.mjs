@@ -189,8 +189,8 @@ async function run() {
       await page.getByText('活动').waitFor({ timeout: 20_000 })
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-3-task.png`) })
-      await page.getByText('换 Claude Code', { exact: true }).first().click()
-      await page.getByText('Codex 没跑通 · 换 Claude Code 继续').waitFor({ timeout: 20_000 })
+      await page.getByRole('link').filter({ hasText: 'Claude Code' }).first().click()
+      await page.getByRole('header').filter({ hasText: 'Claude Code' }).first().waitFor({ timeout: 20_000 })
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-4-conversation.png`) })
       // 审阅 is one result card; it opens to the reviewer's transcript.
