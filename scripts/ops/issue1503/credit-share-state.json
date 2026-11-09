@@ -7,12 +7,12 @@
   "ownerUserId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
   "smokeUserId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
   "payerWorkspaceId": "ed898131-d8ea-4734-8e83-9ee2cdfe9206",
-  "startedAt": "2026-11-09T14:28:36.671Z",
+  "startedAt": "2026-11-09T19:14:43.033Z",
   "status": "passed",
   "changed": true,
-  "operatorSha": "9135023fb9495e024b4db5e895987a367c706d31",
-  "marker": "42634855489-1",
-  "productionBuild": "76537e4c2996f717cbd19589e1efae328028aa4a",
+  "operatorSha": "4e1044a7569b0c2727452bbb8e30d02f877e4f30",
+  "marker": "42681272495-1",
+  "productionBuild": "d8e09ac218f5656763a5bc42a75e45fc385caede",
   "payerBefore": {
     "verified": true,
     "positiveBudget": true
@@ -24,7 +24,7 @@
   "after": {
     "mine": true,
     "canShare": true,
-    "sharedAt": "2026-11-09 14:28:37.849605+00"
+    "sharedAt": "2026-11-09 19:14:44.551816+00"
   },
   "sharedPayer": {
     "workspaceId": "ed898131-d8ea-4734-8e83-9ee2cdfe9206",
@@ -33,5 +33,5 @@
     "positiveBudget": true
   },
   "stage": "complete",
-  "completedAt": "2026-11-09T14:28:39.026Z"
+  "completedAt": "2026-11-09T19:14:46.256Z"
 }

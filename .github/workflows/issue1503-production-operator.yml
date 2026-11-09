@@ -1,4 +1,4 @@
-name: Issue 1503 production setup operator
+name: Issue 1503 production acceptance operator
 on:
   push:
     branches: [ops/issue-1503-production-smoke]
@@ -13,10 +13,10 @@ concurrency:
   cancel-in-progress: false
   queue: max
 jobs:
-  setup:
-    if: false
+  delivery:
+    if: true
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 90
     concurrency:
       group: web-deploy-production
       cancel-in-progress: false
@@ -34,96 +34,6 @@ jobs:
           node-version: 24
       - id: dependencies
         run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
-      - name: Read the Vercel team token through Infisical workload identity
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: VERCEL_TEAM_TOKEN
-          include-imports: false
-      - name: Record the normal production runtime pair before setup writes
-        id: runtime_witness
-        if: always()
-        env:
-          MIKKA_RUNTIME_WITNESS_PRIOR_STATUS: ${{ job.status }}
-        run: |
-          node --input-type=module - <<'JS'
-          import { createHash } from 'node:crypto'
-          import { mkdirSync, writeFileSync } from 'node:fs'
-          
-          const sha = process.env.GITHUB_SHA
-          const runId = process.env.GITHUB_RUN_ID
-          const attempt = process.env.GITHUB_RUN_ATTEMPT
-          const report = {
-            version: 1, phase: 'runtime_witness', status: 'failed',
-            code: 'runtime_witness_not_completed', consistency: 'unverified',
-            sourceCommit: /^[a-f0-9]{40}$/.test(sha ?? '') ? sha : null,
-            runId: /^[1-9][0-9]*$/.test(runId ?? '') ? runId : null,
-            runAttempt: /^[1-9][0-9]*$/.test(attempt ?? '') ? attempt : null,
-            startedAt: new Date().toISOString(),
-          }
-          let code = 'runtime_witness_source_invalid'
-          try {
-            if (!report.sourceCommit || !report.runId || !report.runAttempt) throw Error()
-            code = 'runtime_witness_prerequisite_failed'
-            if (process.env.MIKKA_RUNTIME_WITNESS_PRIOR_STATUS !== 'success') throw Error()
-            code = 'runtime_witness_token_unavailable'
-            const token = process.env.VERCEL_TEAM_TOKEN
-            if (!token) throw Error()
-            code = 'runtime_witness_module_unavailable'
-            const { api, PROJECT, TEAM, TEMPLATE_ENV, runtimeConfigurationSha } =
-              await import('./scripts/e2b/publish-template-env.mjs')
-            report.projectId = PROJECT
-            report.teamId = TEAM
-            const keys = [...Object.values(TEMPLATE_ENV), 'MIKKA_CLOUD_WORKER_SHA',
-              'MIKKA_CLOUD_TEMPLATE_MODELS', 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT']
-            code = 'runtime_witness_configuration_read_failed'
-            const { envs } = await api('/v10/projects/' + PROJECT + '/env', { token, method: 'GET' })
-            if (!Array.isArray(envs)) throw Error()
-            code = 'runtime_witness_production_binding_invalid'
-            const rows = keys.map(key => {
-              const matches = envs.filter(row => row.key === key && row.target?.includes('production') && !row.gitBranch)
-              if (matches.length !== 1 || typeof matches[0].id !== 'string' || !matches[0].id) throw Error()
-              return [key, matches[0].id]
-            })
-            code = 'runtime_witness_configuration_read_failed'
-            const pairs = await Promise.all(rows.map(async ([key, id]) => [key,
-              (await api('/v1/projects/' + PROJECT + '/env/' + encodeURIComponent(id), { token, method: 'GET' })).value,
-            ]))
-            const configuration = Object.fromEntries(pairs)
-            code = 'runtime_witness_configuration_inconsistent'
-            const workerSha = runtimeConfigurationSha(configuration, { allowLegacy: false })
-            if (!workerSha) { report.consistency = 'inconsistent'; throw Error() }
-            report.runtimeSourceCommit = configuration.MIKKA_CLOUD_WORKER_SOURCE_COMMIT
-            report.workerSha = workerSha
-            report.templateIds = Object.fromEntries(Object.entries(TEMPLATE_ENV).map(([kind, key]) => [kind, configuration[key]]))
-            report.catalogueSha256 = createHash('sha256').update(configuration.MIKKA_CLOUD_TEMPLATE_MODELS).digest('hex')
-            report.consistency = 'consistent'
-            report.status = 'passed'
-            report.code = 'runtime_configuration_consistent'
-          } catch {
-            report.code = code
-            process.exitCode = 1
-          } finally {
-            report.finishedAt = new Date().toISOString()
-            mkdirSync('issue1503-report', { recursive: true, mode: 0o700 })
-            writeFileSync('issue1503-report/runtime-witness.json', JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })
-            console.log(JSON.stringify({ phase: report.phase, status: report.status, code: report.code, consistency: report.consistency }))
-          }
-          JS
-      - name: Upload the actual runtime witness before setup writes
-        id: upload_runtime_witness
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: issue1503-runtime-witness
-          path: issue1503-report/runtime-witness.json
-          if-no-files-found: error
-          retention-days: 3
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         id: smoke_secrets
         with:
@@ -133,6 +43,19 @@ jobs:
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
           secret-path: /
+          recursive: false
+          include-imports: false
+      - name: Import optional own-VM diagnostic key
+        continue-on-error: true
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
           recursive: false
           include-imports: false
       - name: Import the pinned production application database
@@ -148,8 +71,8 @@ jobs:
           secret-name: MIKKA_DATABASE_URL
           recursive: false
           include-imports: false
-      - name: Import the production auth key for normal setup services
-        id: setup_auth_secret
+      - name: Import the production auth key for the CI token adapter
+        id: ci_auth_secret
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -161,91 +84,53 @@ jobs:
           secret-name: BETTER_AUTH_SECRET
           recursive: false
           include-imports: false
-      - name: Import the pinned production workspace database
-        id: setup_workspace_database
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /neon
-          secret-name: DATABASE_URL
-          recursive: false
-          include-imports: false
-      - name: Import the normal GitHub application client identifier
-        id: setup_github_client_id
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: GITHUB_CLIENT_ID
-          recursive: false
-          include-imports: false
-      - name: Import the normal GitHub application client secret
-        id: setup_github_client_secret
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: GITHUB_CLIENT_SECRET
-          recursive: false
-          include-imports: false
-      - name: Validate setup configuration before application modules load
-        id: setup_configuration
-        run: |
-          node --input-type=module - <<'JS'
-          const keys = ['MIKKA_DATABASE_URL', 'DATABASE_URL', 'BETTER_AUTH_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']
-          const missing = keys.filter(key => !process.env[key]?.trim())
-          if (missing.length) {
-            console.error(JSON.stringify({ phase: 'setup_configuration', status: 'failed', code: 'setup_configuration_missing', keys: missing }))
-            process.exitCode = 1
-          } else {
-            console.log(JSON.stringify({ phase: 'setup_configuration', status: 'passed', keys }))
-          }
-          JS
-      - name: Prepare the existing smoke workspace and a new scoped GitHub child
-        id: preflight_reentry
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/preflight-reentry.ts
+      - name: Require the exact fixture idle and R5 lifetime after acquiring both queues
+        id: start_guard
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.start_database.outcome == 'success' && steps.ci_auth_secret.outcome == 'success' }}
+        timeout-minutes: 2
+        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/start-guard.mjs
         env:
           NODE_ENV: production
           VERCEL_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: "d8e09ac218f5656763a5bc42a75e45fc385caede"
-      - name: Upload the actual preflight receipt
-        id: upload_preflight
+          MIKKA_1503_START_FIXTURE_SHA256: 0da23cbb104014a36e130c82c3ae583f01a16825686da1393fb572bc8b199791
+      - name: Exercise explicit cloud task creation and full delivery on Claude Code
+        id: claude_delivery
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.ci_auth_secret.outcome == 'success' && steps.start_guard.outcome == 'success' }}
+        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/delivery-with-ci-token.mjs
+        env:
+          NODE_ENV: production
+          VERCEL_ENV: production
+          MIKKA_EDITION: cloud
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: d8e09ac218f5656763a5bc42a75e45fc385caede
+          MIKKA_1503_SUBMISSION_MODE: explicit_new_task
+          MIKKA_1503_HARNESS: claude_code
+          MIKKA_1503_CODEX_QUESTION: '0'
+          MIKKA_1503_REPORT: issue1503-report/claude-code-delivery.json
+      - name: Upload Claude Code delivery receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-preflight-reentry
-          path: issue1503-report/preflight-reentry.json
-          if-no-files-found: error
+          name: issue1503-claude-code-delivery
+          path: issue1503-report/claude-code-delivery.json
           retention-days: 3
-      - name: Enable the normal credit share without starting a task
-        id: credit_share_setup
-        if: success() && steps.preflight_reentry.outcome == 'success'
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/credit-share-setup.ts
+      - name: Exercise explicit cloud task creation and full delivery on Codex
+        id: codex_delivery
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.ci_auth_secret.outcome == 'success' && steps.start_guard.outcome == 'success' }}
+        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/delivery-with-ci-token.mjs
         env:
           NODE_ENV: production
           VERCEL_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: "d8e09ac218f5656763a5bc42a75e45fc385caede"
-          MIKKA_1503_CREDIT_SHARE_REPORT: issue1503-report/credit-share-setup.json
-      - name: Upload the actual credit-share setup receipt
-        id: upload_credit_share
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: d8e09ac218f5656763a5bc42a75e45fc385caede
+          MIKKA_1503_SUBMISSION_MODE: explicit_new_task
+          MIKKA_1503_HARNESS: codex
+          MIKKA_1503_CODEX_QUESTION: '1'
+          MIKKA_1503_REPORT: issue1503-report/codex-delivery.json
+      - name: Upload all delivery receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-credit-share-setup
-          path: issue1503-report/credit-share-setup.json
-          if-no-files-found: error
+          name: issue1503-delivery
+          path: issue1503-report
           retention-days: 3
