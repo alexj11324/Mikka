@@ -1,7 +1,6 @@
 import { actAs } from '../acting-user'
 import { auth } from '../api-auth'
 import { pool } from '../db'
-import { humanSessionHeaders } from '../desktop-rpc/handler'
 import { readCapturePoster } from '../captures/poster-store'
 import { privateCaptureDownload } from '../captures/private-download'
 import { captureFileResponse } from '../captures/serve'
@@ -10,11 +9,10 @@ import { authorizeFactoryTaskCapture } from './task-media'
 import { FactoryError } from './contract'
 import { causeFields } from '@mikka/protocol/coded-error'
 
-/** Browser/native session adapter, shared by originals and their derived covers.
+/** Task-detail session adapter, shared by originals and their derived covers.
  * actAs preserves the same workspace principal as the task-detail route. */
 export async function serveFactoryTaskMedia(request: Request, taskId: string, captureId: string, poster = false) {
-  const headers = humanSessionHeaders(request)
-  const session = headers ? await auth.api.getSession({ headers, query: { disableCookieCache: true } }) : null
+  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
   const privateHeaders = { 'cache-control': 'private, no-store' }
   if (!session) return new Response(null,{ status: 401, headers: privateHeaders })
   return actAs(session.user,async () => {

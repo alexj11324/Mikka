@@ -71,6 +71,10 @@ export interface FactorySpecArtifactOptions {
  * changes notification only; it never relaxes source or execution authority. */
 export async function syncFactorySpecArtifact(tx: PoolClient, task: FactoryTask, options: FactorySpecArtifactOptions = {}): Promise<FactorySpecArtifactRef | null> {
   if (task.stage !== 'spec' || task.status !== 'passed') return null;
+  // Reuse the account deletion barrier on the caller's transaction, before any
+  // object upload. The Artifact INSERT trigger would run too late, after PUT.
+  // Lock/statement failures propagate so deletion races cannot become late writes.
+  await tx.query('SELECT mikka_account_assert_writable($1)', [task.userId]);
   const { rows: [source] } = await tx.query<FactorySpecSource & { author: string }>(`SELECT r.id AS "runId",left(i.title,500) AS title,
       left(r.report->>'summary',10000) AS summary,r.report->'plan'->'spec' AS specification,
       left(agent.name,200) AS author,COALESCE(settings.locale,'zh-CN') AS locale

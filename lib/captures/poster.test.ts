@@ -14,7 +14,7 @@ test('video covers decode a real private frame, bounded to 640 pixels and JPEG s
   const directory = await mkdtemp(join(tmpdir(),'capture-poster-test-'))
   try {
     const path = join(directory,'real-video.mp4')
-    await run(capturePosterBinary(),['-nostdin','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=red:s=1280x720:d=0.12',
+    await run(await capturePosterBinary(),['-nostdin','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=red:s=1280x720:d=0.12',
       '-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-movflags','+faststart',path],{timeout:15_000})
     const image = await renderCapturePoster(new Uint8Array(await readFile(path)))
     const metadata = await sharp(image).metadata()

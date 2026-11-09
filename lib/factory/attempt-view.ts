@@ -41,7 +41,7 @@ export function factoryAttemptTitle(...sources: readonly (string | null | undefi
     if (typeof source !== 'string' || !source.trim()) continue;
     const first = maskFactoryNote(source).split(/\r?\n/).map(line => line.trim()).find(Boolean);
     if (!first) continue;
-    const line = first.replace(/^#{1,6}\s+/, '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+    const line = first.replace(/^#{1,6}\s+/, '').replace(/\p{Cc}/gu, ' ').replace(/\s+/g, ' ').trim();
     if (line) return [...line].slice(0, 200).join('');
   }
   return null;

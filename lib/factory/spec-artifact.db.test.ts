@@ -206,6 +206,50 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
       await assert.rejects(backfillFactorySpecArtifacts(pool, store, 'spec-owner', { limit: 101 }), { code: 'factoryInvalid' });
       await assert.rejects(backfillFactorySpecArtifacts(pool, store, 'spec-owner', { cursor: { through: '2999-01-01T00:00:00.000Z', afterId: null } }), { code: 'factoryInvalid' });
     });
+
+    await t.test('the same transaction fences account deletion before any Artifact write', async () => {
+      const writer = await pool.connect(), deletion = await pool.connect();
+      try {
+        await writer.query('BEGIN');
+        // An existing Artifact performs no INSERT, so only the explicit writer
+        // barrier can protect this transaction from account deletion.
+        await syncFactorySpecArtifact(writer, task, { historical: true });
+        await deletion.query('BEGIN');
+        const locked = async () => (await deletion.query<{ acquired: boolean }>(
+          `SELECT pg_try_advisory_xact_lock(hashtextextended('mikka-account-write:' || $1::text,0)) AS acquired`, ['spec-owner'])).rows[0].acquired;
+        assert.equal(await locked(), false, 'the deletion barrier waits for the actual writer transaction');
+        await writer.query('COMMIT');
+        assert.equal(await locked(), true, 'the shared barrier releases with the same COMMIT');
+        await deletion.query('ROLLBACK');
+      } finally {
+        await writer.query('ROLLBACK'); await deletion.query('ROLLBACK');
+        writer.release(); deletion.release();
+      }
+      const pending = await fixture();
+      await pool.query(`UPDATE factory_attempts SET status='passed',"finishedAt"=now() WHERE id=$1`, [pending.task.attemptId]);
+      const guardedTask = { ...pending.task, status: 'passed' as const };
+      const before = (await pool.query(`SELECT
+        (SELECT count(*)::int FROM artifacts) AS artifacts,
+        (SELECT count(*)::int FROM artifact_versions) AS versions,
+        (SELECT count(*)::int FROM coordinator_events) AS events`)).rows[0];
+      await pool.query('INSERT INTO account_deletion_guards("subjectId","jobId") VALUES ($1,$2)', ['spec-owner', randomUUID()]);
+      try {
+        await assert.rejects(synchronize(guardedTask), { code: '55000', message: 'account_deletion_pending' });
+        for (const dryRun of [true, false]) {
+          const tx = await pool.connect();
+          try {
+            await tx.query('BEGIN');
+            await assert.rejects(syncFactorySpecArtifact(tx, guardedTask, { historical: true, dryRun }),
+              { code: '55000', message: 'account_deletion_pending' });
+          } finally { await tx.query('ROLLBACK'); tx.release(); }
+        }
+        assert.deepEqual((await pool.query(`SELECT
+          (SELECT count(*)::int FROM artifacts) AS artifacts,
+          (SELECT count(*)::int FROM artifact_versions) AS versions,
+          (SELECT count(*)::int FROM coordinator_events) AS events`)).rows[0], before);
+        assert.equal((await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [pending.task.attemptId])).rows[0].output.specArtifact, undefined);
+      } finally { await pool.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1', ['spec-owner']); }
+    });
   } finally {
     await dropTestDatabase(admin, name, pool);
     await admin.end();

@@ -6,9 +6,9 @@
 
 `GET /api/factory/tasks/:taskId/activity`，路径参数 `taskId` 为 Factory task UUID，无查询参数或请求体。浏览器使用现有登录会话。通过 `withBasePath` 构造请求地址；默认前缀下实际地址为 `/mikka/api/factory/tasks/:taskId/activity`。响应里的 `url`、`downloadUrl`、`posterUrl` 已带前缀，直接使用。
 
-响应头为 `Cache-Control: private, no-store`。权限沿用任务详情的 owner、Bot/source、issue 和工作区边界；知道 task、run 或 capture ID 不授予访问权。文档还遵守现有 Artifact token 工作区范围。
+响应头为 `Cache-Control: private, no-store`。权限沿用任务详情的 owner、Bot/source、issue 和工作区边界；知道 task、run 或 capture ID 不授予访问权。支持与任务详情相同的 PAT 认证。受限 PAT 只返回其工作区可见的运行、电脑区间、等待记录、产物及 flow 内嵌引用；文档同时检查版本提交者和原 Artifact 的范围。原文件及封面采用相同限制。
 
-首次进入读取一次。沿用 `useLiveKey('factory_task', taskId, [activityKey], liveWorkspaceId)` 使现有 live 通道失效缓存；`liveWorkspaceId` 来自本响应，可以为 `null`。复用现有 run、capture、Artifact 相关 live 订阅处理相应变化，不增加 `refreshInterval`、定时 fetch 或轮询。等待时长需要持续显示时，在客户端按 `observedAt` 推进时钟。
+首次进入读取一次。沿用 `useLiveKey('factory_task', taskId, [activityKey], liveWorkspaceId)` 使现有 live 通道失效缓存；`liveWorkspaceId` 来自本响应，可以为 `null`。VM 区间与媒体就绪写入在提交后通知同一任务 key，无需逐个订阅 run 或猜测其工作区，不增加 `refreshInterval`、定时 fetch 或轮询。等待时长需要持续显示时，在客户端按 `observedAt` 推进时钟。
 
 ## 响应结构
 

@@ -169,13 +169,20 @@ test('real Factory notifications retain their database across COMMIT and delayed
           assert.equal((await requestPool.query('SELECT prompt FROM agent_runs WHERE id=$1', [runId])).rows[0].prompt, '')
         }
         assert.deepEqual(sent.slice(before), [expected(task)])
-        for (const [runOwner, issueId] of [[`${owner}-other`, task.issueId], [owner, null]]) {
-          await requestPool.query('UPDATE agent_runs SET "userId"=$2,"issueId"=$3 WHERE id=$1', [runId,runOwner,issueId])
-          await requestScope.run(() => taskActivityChanged(app.pool, runId))
+        for (const runOwner of [`${owner}-other`, owner]) {
+          const issueId = randomUUID(), otherAgent = randomUUID(), otherRun = randomUUID()
+          if (runOwner !== owner) await requestPool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,\'Activity fixture\',$2,true,now(),now())', [runOwner,`${runOwner}@example.invalid`])
+          await requestPool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Other activity fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId,runOwner])
+          await requestPool.query('INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,\'codex\',$3)', [otherAgent,runOwner,otherAgent])
+          await requestPool.query('INSERT INTO agent_runs(id,"userId","issueId","agentId") VALUES($1,$2,$3,$4)', [otherRun,runOwner,issueId,otherAgent])
+          // Each run obeys the real issue/owner constraints. Only the task's
+          // attempt link is mismatched, which this reader must reject.
+          await requestPool.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1', [task.attemptId,otherRun])
+          await requestScope.run(() => taskActivityChanged(app.pool, otherRun))
           await drain(); await drain()
           assert.deepEqual(sent.slice(before), [expected(task)], 'mismatched run owner or issue cannot invalidate a task')
         }
-        await requestPool.query('UPDATE agent_runs SET "userId"=$2,"issueId"=$3 WHERE id=$1', [runId,owner,task.issueId])
+        await requestPool.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1', [task.attemptId,runId])
       } finally { await writer.query('ROLLBACK'); writer.release() }
     })
 

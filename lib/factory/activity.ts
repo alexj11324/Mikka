@@ -1,6 +1,9 @@
 import type { Pool, PoolClient } from 'pg'
-import { withBasePath } from '../base-path'
+import { actingContext } from '../activity-actor'
 import { readFactoryComputerSessions } from '../cloud-computer/thread-machine-sessions'
+import { withDatabaseClient } from '../db/request-scope'
+import { tokenWorkspace } from '../tokens/principal'
+import { runsOutsideToken } from '../tokens/scope'
 import { projectFactoryAttempts, type FactoryAttemptViewSource, type FactoryAttemptTransitionSource } from './attempt-view'
 import { readFactoryTaskMedia } from './task-media'
 import { readFactoryActivityDocuments } from './activity-artifacts'
@@ -93,9 +96,11 @@ async function questionWaits(tx: PoolClient, task: FactoryTask, endedAt: string 
 export async function readFactoryActivity(pool: Pool, store: Pick<ReturnType<typeof createFactoryStore>, 'readTask'>, userId: string, taskId: string) {
   const tx = await pool.connect()
   try {
-    await tx.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
+    // The canonical authorization takes shared locks to fence revocation.
+    // Keep those locks even though this projection itself issues no writes.
+    await tx.query('BEGIN ISOLATION LEVEL REPEATABLE READ')
     const task = await store.readTask(tx, userId, taskId)
-    const result = await projectFactoryActivity(tx, task)
+    const result = await withDatabaseClient(tx, () => projectFactoryActivity(tx, task))
     await tx.query('COMMIT')
     return result
   } catch (error) { await tx.query('ROLLBACK'); throw error }
@@ -120,7 +125,7 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
   const endedAt = iso(endedAtSource === 'cancelled' ? times.cancelledAt : endedAtSource === 'accepted' ? times.acceptedAt
     : endedAtSource === 'merged' ? times.mergedAt : null)
   const observedAt = iso(times.observedAt)!
-  const { rows: attempts } = await tx.query<AttemptRow>(`SELECT a.id,a.stage,a.position,a.status,a."candidateId",a."createdAt",a."finishedAt",a.reason,
+  const { rows: allAttempts } = await tx.query<AttemptRow>(`SELECT a.id,a.stage,a.position,a.status,a."candidateId",a."createdAt",a."finishedAt",a.reason,
       r.id AS "runId",left(r.report->>'summary',4000) AS summary,left(a.output->'completion'->>'summary',4000) AS "completionSummary",
       COALESCE(a.output->>'requestEpoch',$4::text) AS "requestEpoch",a.output->>'reasonCode' AS "reasonCode",
       r.status AS "runStatus",r."createdAt" AS "runCreatedAt",r."startedAt",r."finishedAt" AS "runFinishedAt",r."agentId",
@@ -132,6 +137,12 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
     LEFT JOIN agents agent ON agent.id=r."agentId" AND agent."userId"=$2
     LEFT JOIN devices device ON device.id=r."deviceId" AND device."ownerId"=$2
     WHERE a."taskId"=$1 ORDER BY a.position,a.id`, [task.id, task.userId, task.issueId, task.sourceEventId])
+  const actor = actingContext.getStore()
+  const scopedWorkspace = actor?.userId === task.userId ? actor.tokenWorkspaceId : undefined
+  const hiddenRuns = scopedWorkspace ? await runsOutsideToken({ id: task.userId, [tokenWorkspace]: scopedWorkspace },
+    allAttempts.flatMap(attempt => attempt.runId ? [attempt.runId] : [])) : new Set<string>()
+  const hiddenAttempts = new Set(allAttempts.filter(attempt => attempt.runId && hiddenRuns.has(attempt.runId)).map(attempt => attempt.id))
+  const attempts = allAttempts.filter(attempt => !attempt.runId || !hiddenRuns.has(attempt.runId))
   const { rows: events } = await tx.query<TransitionRow>(`SELECT e."eventId" AS id,e."createdAt",e.request->'change'->>'action' AS action,
       e.request->>'kind' AS kind,e.result->'task'->>'attemptId' AS "attemptId",e.request->'binding'->>'attemptId' AS "previousAttemptId",
       e.result->'task'->>'stage' AS stage,e.result->'task'->>'status' AS status,
@@ -151,9 +162,9 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
     machine: attempt.deviceId ? { id: attempt.deviceId, name: text(attempt.deviceName), kind: attempt.deviceKind } : null,
     artifactIds: [] as string[], plan: null as PlanReference | null,
   }))
-  const computers = await readFactoryComputerSessions(tx, task)
+  const computers = (await readFactoryComputerSessions(tx, task)).filter(session => !hiddenRuns.has(session.runId))
   const media = await readFactoryTaskMedia(tx, task)
-  const documents = await readFactoryActivityDocuments(tx, task)
+  const documents = (await readFactoryActivityDocuments(tx, task)).filter(document => !hiddenRuns.has(document.runId))
   const { rows: publications } = await tx.query<{ runId: string; attemptId: string; candidateId: string | null; url: string; title: string | null; state: string | null; createdAt: Instant }>(
     `SELECT r.id AS "runId",attempt.id AS "attemptId",attempt."candidateId",p."pullRequest"->>'url' AS url,
       left(p."pullRequest"->>'title',200) AS title,p."pullRequest"->>'state' AS state,p."createdAt"
@@ -165,7 +176,7 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
   const artifacts = [
     ...documents,
     ...media.map(capture => ({ ...capture, id: capture.captureId, attemptId: attemptsByRun.get(capture.runId) ?? null })),
-    ...publications.flatMap(publication => {
+    ...publications.filter(publication => !hiddenRuns.has(publication.runId)).flatMap(publication => {
       const url = githubPullRequest(publication.url)
       return url ? [{ id: `pr:${publication.runId}`, kind: 'pull_request' as const, title: text(publication.title), url,
         state: publication.state, runId: publication.runId, attemptId: publication.attemptId, candidateId: publication.candidateId,
@@ -188,10 +199,11 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
     agent.plan = plans.get(agent.attemptId) ?? null
   }
   const questions = await questionWaits(tx, task, endedAt, observedAt)
-  const waits = [...transitionWaits(events, attempts, endedAt, observedAt), ...questions.waits]
+  const waits = [...transitionWaits(events, allAttempts, endedAt, observedAt), ...questions.waits]
+    .filter(wait => (!wait.runId || !hiddenRuns.has(wait.runId)) && (!wait.attemptId || !hiddenAttempts.has(wait.attemptId)))
   // Keep the existing current-attention contract even for legacy tasks whose
   // early transition receipts predate this read model.
-  if (flow.needsYou && !(flow.needsYou.kind === 'question' && questions.hasWaitingReceipt)
+  if (flow.needsYou && !hiddenAttempts.has(task.attemptId) && !(flow.needsYou.kind === 'question' && questions.hasWaitingReceipt)
       && !waits.some(wait => wait.kind === flow.needsYou!.kind && wait.endedAt === null)) {
     waits.push({ id: `attention:${task.attemptId}`, kind: flow.needsYou.kind, attemptId: task.attemptId,
       runId: attempts.find(attempt => attempt.id === task.attemptId)?.runId ?? null,
@@ -199,9 +211,23 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
   }
   waits.sort((a,b) => a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id))
   const starts = agents.flatMap(agent => agent.startedAt ? [agent.startedAt] : []).sort()
+  // Embedded flow references obey the same producer and original-Artifact
+  // boundaries as the sidebar collections. State/attention remain canonical.
+  const visibleCaptures = new Set(media.map(capture => capture.captureId))
+  const lastReview = allAttempts.findLast(attempt => attempt.stage === 'review' && attempt.runId
+    && ['passed','failed','blocked','waiting'].includes(attempt.status))
+  const taskFlow = { ...flow,
+    review: scopedWorkspace && lastReview?.runId && hiddenRuns.has(lastReview.runId) ? null : flow.review,
+    acceptance: scopedWorkspace && flow.acceptance ? documents.some(document => document.kind === 'acceptance'
+      && document.artifactId === flow.acceptance!.artifactId && document.version === flow.acceptance!.version
+      && document.runId === flow.acceptance!.runId && document.candidateId === flow.acceptance!.candidateId)
+      ? { ...flow.acceptance, media: flow.acceptance.media.filter(capture => visibleCaptures.has(capture.captureId)) } : null : flow.acceptance,
+    pullRequest: scopedWorkspace && flow.pullRequest
+      && !artifacts.some(artifact => artifact.kind === 'pull_request' && artifact.url === flow.pullRequest!.url) ? null : flow.pullRequest,
+  }
   return {
     version: 1 as const, observedAt,
-    task: { ...flow, status: task.status, createdAt: iso(times.createdAt), startedAt: starts[0] ?? null,
+    task: { ...taskFlow, status: task.status, createdAt: iso(times.createdAt), startedAt: starts[0] ?? null,
       endedAt, endedAtSource: endedAt ? endedAtSource : null },
     timeline: { attempts: timelineAttempts, computers, waits }, agents, artifacts,
   }

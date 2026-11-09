@@ -24,12 +24,13 @@ CREATE INDEX IF NOT EXISTS thread_machine_sessions_scope_run
 -- neither is evidence for a historical VM interval.
 INSERT INTO thread_machine_sessions("runId","ownerId","workspaceId","botId","sandboxId","startedAt",source)
   SELECT "runId","ownerId","workspaceId","botId","sandboxId","runningSince",'running_since_backfill'
-  FROM thread_machines WHERE "sandboxId" IS NOT NULL AND "runningSince" IS NOT NULL AND state<>'paused'
+  FROM thread_machines WHERE "sandboxId" IS NOT NULL AND "runningSince" IS NOT NULL
   ON CONFLICT ("runId") WHERE "endedAt" IS NULL DO NOTHING;
 
 CREATE OR REPLACE FUNCTION record_thread_machine_session() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   observed_at timestamptz := clock_timestamp();
+  closed_at timestamptz;
   close_reason text;
   changed_scope boolean := false;
   new_binding boolean;
@@ -45,13 +46,20 @@ BEGIN
         WHEN NEW.lifecycle->>'phase'='retired' THEN 'retired'
         WHEN NEW."sandboxId" IS NULL AND NEW.state='starting' THEN 'provider_missing'
         ELSE 'replaced' END;
-    ELSIF NEW.state='paused' AND (OLD.state<>'paused' OR OLD."runningSince" IS NOT NULL)
+    ELSIF NEW.state='paused' AND NEW."runningSince" IS NULL
+      AND (OLD.state<>'paused' OR OLD."runningSince" IS NOT NULL)
       THEN close_reason := 'paused';
-    ELSIF NEW.state='error' AND NEW."runningSince" IS NULL AND OLD."runningSince" IS NOT NULL
+    ELSIF NEW.state='error' AND NEW."runningSince" IS NULL AND (OLD."runningSince" IS NOT NULL
+      OR (NEW.lifecycle->>'providerMissingReceipt' IS NOT NULL
+        AND NEW.lifecycle->>'providerMissingReceipt' IS DISTINCT FROM OLD.lifecycle->>'providerMissingReceipt'))
       THEN close_reason := 'provider_missing';
     END IF;
     IF close_reason IS NOT NULL THEN
-      UPDATE thread_machine_sessions SET "endedAt"=GREATEST("startedAt",observed_at),reason=close_reason
+      -- A running custody transfer shares one server timestamp with the next
+      -- run. Keep its microseconds; transaction_timestamp() can predate it.
+      closed_at := CASE WHEN close_reason='transferred'
+        THEN COALESCE((NEW.lifecycle->>'transferredAt')::timestamptz,observed_at) ELSE observed_at END;
+      UPDATE thread_machine_sessions SET "endedAt"=GREATEST("startedAt",closed_at),reason=close_reason
         WHERE "runId"=OLD."runId" AND "ownerId"=OLD."ownerId" AND "workspaceId"=OLD."workspaceId"
           AND "sandboxId"=OLD."sandboxId" AND "endedAt" IS NULL;
     END IF;
@@ -63,9 +71,11 @@ BEGIN
 
   -- A late successful create can be recorded after cancellation, with state
   -- ended and no runningSince. Its observed binding proves that a VM exists;
-  -- its actual earlier allocation time is unknown. A paused retained VM does
-  -- not start another running interval until it is resumed.
-  IF new_binding AND NEW."sandboxId" IS NOT NULL AND NEW.state<>'paused' THEN
+  -- its actual earlier allocation time is unknown. recordThreadSandbox also
+  -- writes a confirmed resume's runningSince before registration changes the
+  -- paused custody state. That timestamp already proves a running interval.
+  IF new_binding AND NEW."sandboxId" IS NOT NULL
+    AND (NEW.state<>'paused' OR NEW."runningSince" IS NOT NULL) THEN
     INSERT INTO thread_machine_sessions("runId","ownerId","workspaceId","botId","sandboxId","startedAt",source)
       VALUES (NEW."runId",NEW."ownerId",NEW."workspaceId",NEW."botId",NEW."sandboxId",
         CASE WHEN changed_scope THEN observed_at ELSE COALESCE(NEW."runningSince",observed_at) END,
