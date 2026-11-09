@@ -20,8 +20,6 @@ jobs:
       DIAGNOSTIC_SOURCE_COMMIT: 89eae89e9e79422e0a8b4b1346aa1c7fb6470016
       DIAGNOSTIC_SOURCE_TREE: a850a89f11cbb467df869651ee39beca157c6351
       DIAGNOSTIC_COLLECTOR_SHA256: 8612ce46b956cb3f32a92fdfbfd5563879a8a8b48f4dd4c6e78026126d751f85
-      DIAGNOSTIC_SOURCE_DIR: ${{ github.workspace }}
-      DIAGNOSTIC_OUTPUT: ${{ runner.temp }}/issue1505-reply-observation.json
     steps:
       - name: Check out the exact historical application source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -54,7 +52,7 @@ jobs:
           import { createHash } from 'node:crypto';
           assert.equal(createHash('sha256').update(readFileSync('.issue1505-reply-diagnostic/scripts/ops/issue1505-codex-reply-diagnostic.mjs')).digest('hex'), process.env.DIAGNOSTIC_COLLECTOR_SHA256);
           JS
-          node .issue1505-reply-diagnostic/scripts/ops/issue1505-codex-reply-diagnostic.mjs --source-dir "$DIAGNOSTIC_SOURCE_DIR" --output "$DIAGNOSTIC_OUTPUT" --verify-only
+          node .issue1505-reply-diagnostic/scripts/ops/issue1505-codex-reply-diagnostic.mjs --source-dir "$GITHUB_WORKSPACE" --output "$RUNNER_TEMP/issue1505-reply-observation.json" --verify-only
       - name: Read only the existing application database binding
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -69,7 +67,7 @@ jobs:
           include-imports: false
       - name: Read the single retained run and write closed diagnostic predicates
         id: collector
-        run: node .issue1505-reply-diagnostic/scripts/ops/issue1505-codex-reply-diagnostic.mjs --source-dir "$DIAGNOSTIC_SOURCE_DIR" --output "$DIAGNOSTIC_OUTPUT"
+        run: node .issue1505-reply-diagnostic/scripts/ops/issue1505-codex-reply-diagnostic.mjs --source-dir "$GITHUB_WORKSPACE" --output "$RUNNER_TEMP/issue1505-reply-observation.json"
       - name: Preserve only the closed diagnostic receipt
         if: always() && steps.collector.outcome != 'skipped'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
