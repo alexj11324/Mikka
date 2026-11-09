@@ -14,7 +14,7 @@ concurrency:
   queue: max
 jobs:
   diagnose:
-    if: true
+    if: false
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
@@ -27,7 +27,7 @@ jobs:
     env:
       MIKKA_EDITION: cloud
       MIKKA_EXPECTED_DEPLOYMENT_SHA: '5ba1f9e2359ce714d83cd16fc040f2567c40a6d0'
-      MIKKA_1503_PRIVATE_THREAD_DIAGNOSTIC_GO: 'read_and_seal_fixed_child_tools_once'
+      MIKKA_1503_PRIVATE_THREAD_DIAGNOSTIC_GO: ''
       MIKKA_1503_START_FIXTURE_SHA256: 9e0836aa5e5d290dac5c282e82f56907b99207820ded44396159b935c53f9de7
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
