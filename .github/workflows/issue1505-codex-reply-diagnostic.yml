@@ -10,7 +10,7 @@ concurrency:
   queue: max
 jobs:
   diagnose:
-    if: github.repository == 'alexj11324/Mikka'
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
