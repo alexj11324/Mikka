@@ -62,10 +62,13 @@ export function useAgentCitations() {
  * A chip's icon and title. The icon and the title's first character are held together, so a chip that wraps with the
  * sentence never leaves its icon alone at a line's end (R-15); the rest of the title wraps like words.
  */
+const CHIP_ICON = { display: 'inline-flex', marginInlineEnd: '0.25rem', verticalAlign: '-0.125em' } as const
+
 function ChipHead({ icon, title }: { icon: ReactNode; title: string }) {
   const [first = '', ...rest] = Array.from(title)
   return <InlineCitationLabel>
-    <span data-slot="chip-head" className="whitespace-nowrap [&>[role=img]]:mr-1 [&>[role=img]]:inline-flex [&>[role=img]]:align-[-0.125em] [&>svg]:mr-1 [&>svg]:inline [&>svg]:align-[-0.125em]">{icon}{first}</span>{rest.join('')}
+    {/* The icon sits in an inline box with its own style: a layer's reset (`svg { display: block }`) cannot drop it onto its own line. */}
+    <span data-slot="chip-head" className="whitespace-nowrap"><span data-slot="chip-icon" style={CHIP_ICON}>{icon}</span>{first}</span>{rest.join('')}
   </InlineCitationLabel>
 }
 

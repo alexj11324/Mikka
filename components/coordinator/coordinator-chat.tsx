@@ -543,7 +543,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       <PendingActions />
     </>
     return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
-      <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 min-w-0 flex-1 flex-col">
+      {/* The page's floating title pill sits over the top 56px on wide screens: the screen starts below it. */}
+      <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 min-w-0 flex-1 flex-col md:pt-14">
         <Screen botId={botId} name={name} mark={avatar('pill')} entries={data ? entries : null} empty={empty}
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
           working={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}

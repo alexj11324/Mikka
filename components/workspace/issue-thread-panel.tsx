@@ -352,7 +352,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       open = { id: `${runId}:${id}`, role: 'bot', at: at(extra?.at), parts: [...parts], ...(author ? { author } : {}), ...extra }
       entries.push(open)
     }
-    bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
+    // A later attempt's status line says nothing unless it is stopping (the thread-header slot): no empty row for it.
+    if (!attempt || attempt.first || stopRequested) bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
       issueId={issueId} runId={runId} harness={detail?.harness ?? null} {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} /> }])
     if (!attempt && data.thread.prompt.trim()) { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: data.thread.prompt.trim() }) }
     for (const item of items) {
