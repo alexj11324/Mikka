@@ -348,15 +348,17 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
     const started = Date.now()
     try { return await work() } finally { contextMs[part] = Math.max(0, Date.now() - started) }
   }
-  const [execution, rules, github] = await Promise.all([
+  const { memoryForBotPrompt } = await import('@/lib/profile/memory')
+  const [execution, rules, github, profile] = await Promise.all([
     timed('execution', () => executionContextParts(userId, botId)),
     timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
     timed('github', () => githubPromptContext(userId, githubScope, undefined, undefined, botId)),
+    memoryForBotPrompt(userId, botId),
   ])
   // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
   // guidance or the complete legacy/fallback repository context; it can change between turns (lib/prompt-cache.ts).
   // Memory and live model availability remain in the later prompt parts.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
+  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), [memory, profile].filter(Boolean).join('\n'), factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
   return { prompt: { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }, contextMs }
 }
 

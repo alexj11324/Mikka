@@ -15,7 +15,7 @@ if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=
 const pgTest = databaseUrl ? test : test.skip
 
 pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/writes and short undo', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, { projects }, { workspaces, workspaceMembers }, memory, profile, { and, eq, inArray, sql }] = await Promise.all([
+  const [{ createRequestDatabaseScope, db }, schema, { projects }, { workspaces, workspaceMembers }, memory, profile, { eq, inArray, sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('../db/project-schema'), import('../db/workspace-schema'),
     import('./memory'), import('./store'), import('drizzle-orm'),
   ])
@@ -58,7 +58,7 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
     ])
     await db.insert(projects).values({
       id: projectId, userId: owner, name: 'Private project', summary: '', description: '',
-      status: 'active', priority: 'medium', lead: '', team: '', startDate: '', targetDate: '',
+      status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '',
       issueIds: [], revision: 1,
     })
     await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: wsA, name: 'Memory consumer' })
@@ -108,6 +108,19 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
       { ...event, eventId: randomUUID(), url: 'https://evil.invalid/capture' }, [manual!]), 1)
     assert.equal((await memory.readMemoryView(owner, wsA)).facts[0].recentUses[0].url, null, 'external URL never stored')
 
+
+    // When the current session really prepares a model turn, the in-scope
+    // fact is added as data and exactly one usage receipt is attributed.
+    await db.update(schema.coordinatorSessions).set({ leaseHolder: 'test-memory-turn-1' })
+      .where(eq(schema.coordinatorSessions.botId, botId))
+    const included = await memory.memoryForBotPrompt(owner, botId)
+    assert.match(included, /Own fact/)
+    assert.doesNotMatch(included, /First candidate/, 'unapproved facts are never included')
+    assert.equal(await memory.memoryForBotPrompt(owner, botId), included, 'retry uses the same prompt facts')
+    assert.equal((await memory.readMemoryView(owner, wsA)).facts.find(item => item.id === manual)?.usedCount, 3)
+    await db.update(schema.coordinatorSessions).set({ leaseHolder: null })
+      .where(eq(schema.coordinatorSessions.botId, botId))
+
     // New, model-extracted facts require approval. Provenance is a trusted reference
     // supplied by the internal producer, not fabricated from old evidence.
     const at = new Date('2026-11-09T12:00:00Z')
@@ -152,6 +165,11 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
     assert.equal(await memory.setMemoryFactScope(owner, wsA, manual!, { kind: 'projects', ids: [projectId] }), true)
     assert.equal((await memory.readMemoryView(owner, wsA)).facts.some(item => item.id === manual), false)
     assert.equal((await memory.readMemoryView(owner, personal)).facts.some(item => item.id === manual), true)
+    // Project-scoped memory is visible for management, but not in an unbound bot chat.
+    await db.insert(schema.bots).values({ id: randomUUID(), ownerId: owner, workspaceId: personal, name: 'Project-unbound' })
+    assert.doesNotMatch(await memory.memoryForBotPrompt(owner, botId), /Own fact/)
+    assert.equal(await memory.recordMemoryFactUsage(owner, wsA,
+      { ...event, eventId: randomUUID() }, [manual!]), 0, 'project fact cannot leak into generic thread')
     assert.equal(await memory.removeMemoryFact(owner, wsA, manual!), false, 'hidden project fact cannot be removed from A')
     assert.equal(await memory.removeMemoryFact(owner, personal, manual!), true)
     assert.equal(await memory.removeMemoryFact(owner, personal, manual!), true, 'delete retried is idempotent')
