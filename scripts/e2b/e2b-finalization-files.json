@@ -34,6 +34,29 @@
       "targetedOnly": true,
       "releaseAccepted": false,
       "evidence": "docs/operations/evidence/1506-official-base-conservation-control-20261109.json"
+    },
+    {
+      "template": "desktop",
+      "paths": [
+        "/etc/ssl/certs/1560546e.0",
+        "/etc/ssl/certs/e2b-ca.pem"
+      ],
+      "fields": [
+        "kind",
+        "sha256",
+        "target"
+      ],
+      "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/42628079564",
+      "controlOpsCommit": "08d822da081190364530343bf918bbcc2fbbf624",
+      "sourceContextCommit": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "artifactId": 13678489689,
+      "artifactZipBytes": 3748,
+      "artifactZipSha256": "3a51e3a158dbba0fb4c84e658215fec84a032fd155a1514845e522eff476fd4f",
+      "targetedOnly": true,
+      "releaseAccepted": false,
+      "evidence": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.json",
+      "evidenceBytes": 26988,
+      "evidenceSha256": "a438b3315bbd10bf470aed59ccb21fb502ceddc06102e49164eeeb9ca6416d3f"
     }
   ],
   "additionalControls": [
@@ -116,5 +139,5 @@
       }
     }
   },
-  "certificateRelinksSha256": "158beede3395bd38b001eae7b92d3fe440004ead6c583cf640fdbb31386d605a"
+  "certificateRelinksSha256": "a28165d7a9de3bed0b78af59c728004e82dc4d7815a14f97c2779c1eb090a845"
 }
