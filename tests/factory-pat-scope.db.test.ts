@@ -44,6 +44,7 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
   const token = await createPersonalAccessToken(owner, workspace.id, { name: 'Factory scope fixture' })
   const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
   const detail = await import('../app/api/factory/tasks/[taskId]/route')
+  const activity = await import('../app/api/factory/tasks/[taskId]/activity/route')
   const list = await import('../app/api/factory/tasks/route')
   const route = await import('../app/api/factory/tasks/route/route')
   async function fixture(foreign: boolean, withTask = true) {
@@ -71,6 +72,19 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
   await t.test('foreign task detail is not disclosed', async () => {
     const response = await detail.GET(request(`/api/factory/tasks/${foreign.task!.id}`), { params: Promise.resolve({ taskId: foreign.task!.id }) })
     assert.equal(response.status, 404)
+  })
+  await t.test('sidebar uses the same workspace boundary and private cache policy as task detail', async () => {
+    for (const [taskId, expected] of [[own.task!.id,200],[foreign.task!.id,404]] as const) {
+      const response = await activity.GET(request(`/api/factory/tasks/${taskId}/activity`), { params: Promise.resolve({ taskId }) })
+      assert.equal(response.status, expected)
+      assert.equal(response.headers.get('cache-control'),'private, no-store')
+      if (expected === 200) {
+        const body = await response.json()
+        assert.equal(body.task.id,taskId)
+        assert.deepEqual(body.agents,[])
+        assert.deepEqual(body.artifacts,[])
+      }
+    }
   })
   await t.test('foreign task discovery is not disclosed', async () => {
     assert.equal((await list.GET(request(`/api/factory/tasks?issueId=${foreign.issueId}`))).status, 404)
@@ -135,6 +149,10 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
       headers: { authorization: `Bearer ${otherToken.token}` },
     }), { params: Promise.resolve({ taskId: own.task!.id }) })
     assert.equal(response.status, 404)
+    const sidebar = await activity.GET(new Request(`${origin}/api/factory/tasks/${own.task!.id}/activity`, {
+      headers: { authorization: `Bearer ${otherToken.token}` },
+    }), { params: Promise.resolve({ taskId: own.task!.id }) })
+    assert.equal(sidebar.status,404)
   })
   await t.test('a browser reads only its selected workspace, including another owned workspace', async () => {
     browser = true

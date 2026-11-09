@@ -86,6 +86,18 @@ test('durable deletion stages preserve data until authorization/cleanup and resu
     assert.equal((await resumeAccountDeletion(id, { ...options, now: () => new Date(expires.getTime() + 1), deleteObject: async key => { removed.push(key) } })).stage, 'completed')
     assert.deepEqual(removed.sort(), [verified, staging].sort())
   })
+  await t.test('private video covers retire with their original capture during account deletion', async () => {
+    const user = await seedUser(main, 'delete-poster'), agent = await seedAgent(main,user), run = await seedRun(main,{userId:user,agentId:agent})
+    const capture = randomUUID(), sourceKey = `${user}/video.mp4`, posterKey = `${user}/poster.jpg`, sha = 'a'.repeat(64)
+    await main.query(`INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,"storageKey",size,sha256)
+      VALUES($1,$2,$3,'video','video/mp4','local','ready','Video',$4,1,$5)`,[capture,user,run,sourceKey,sha])
+    await main.query('INSERT INTO run_capture_posters("captureId","captureSha256","storageKey",size,sha256) VALUES($1,$2,$3,1,$2)',[capture,sha,posterKey])
+    const id = await request(user), removed:string[] = []
+    const result = await resumeAccountDeletion(id,{...options,deleteObject:async key=>{removed.push(key)}})
+    assert.equal(result.stage,'completed')
+    assert.deepEqual(removed.sort(),[sourceKey,posterKey].sort())
+    assert.equal((await main.query('SELECT count(*)::int n FROM run_capture_posters WHERE "captureId"=$1',[capture])).rows[0].n,0)
+  })
   await t.test('a failed workspace commit keeps the main-deleted phase and survives a new pool/process', async () => {
     const user = await seedUser(main, 'delete-workspace'), ws = await seedWorkspace(workspace, user, [{ userId: user, role: 'admin' }])
     const outsider = await seedUser(main, 'delete-outsider'), id = await request(user)
