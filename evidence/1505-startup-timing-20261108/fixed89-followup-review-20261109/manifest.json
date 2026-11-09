@@ -1,0 +1,29 @@
+{
+  "schema": "issue1505.fixed89-followup-source-reviews.v1",
+  "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "sourceTree": "a850a89f11cbb467df869651ee39beca157c6351",
+  "kind": "source-only",
+  "productionReads": 0,
+  "newFormalSamples": 0,
+  "productionCredentialsRead": 0,
+  "performanceConclusion": "Existing historical timings do not justify another independent optimization; use the next authorized formal production samples.",
+  "environmentConclusion": "The frozen formal and scope helpers use normal APIs and do not require direct database secrets; future runtime/OIDC availability remains unproven.",
+  "files": [
+    {
+      "path": "evidence/1505-startup-timing-20261108/fixed89-followup-review-20261109/performance-fixed89-existing-six-review.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8e7e6f5cab82c0b2c52d2d3fe4b6407c119bc283",
+      "bytes": 11941,
+      "sha256": "20a01d3536ef702c924bd3f18e2379a88ceb38c2c5f8a703ed252719fa45e083"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/fixed89-followup-review-20261109/formal-environment-dependency-review.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5ba2d258500ac28001e623377e44801ce973ad00",
+      "bytes": 11992,
+      "sha256": "49c0ccce3f8aa6efdbd966f0897d1a3cb337684e9b8dfb00df6c2e96c33988a3"
+    }
+  ]
+}

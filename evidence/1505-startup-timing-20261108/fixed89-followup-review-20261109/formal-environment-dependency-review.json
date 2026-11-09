@@ -1,0 +1,266 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-11-09 08:25:35 UTC",
+  "mode": "read_only_fixed_public_git_source",
+  "status": "no_database_url_dependency_gap_found_in_reviewed_formal_or_scope_runner",
+  "scope": {
+    "rendererCommit": "79ca443952a5232f520d3b5312eef6b32cd68438",
+    "rendererPrefix": "evidence/1505-startup-timing-20261108/formal-renderer/",
+    "formalCommit": "433afa3af70c9b8373f63698d993d1e297ed7a23",
+    "formalTree": "d1426166abf672e96c2b1adda3684613fe39344a",
+    "helperCommit": "f997dbe4f97829cd54f96705ec4e56d624f61c52",
+    "helperTree": "cabe0754abf789856b889d7a8fefe9c29f340754",
+    "helperSoleParent": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+    "driverCommit": "bb5d1f9e224aea395b9c45823960e8ad10f1a099"
+  },
+  "sourceVerification": [
+    {
+      "key": "FormalEnvReview_Renderer_render.py",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/79ca443952a5232f520d3b5312eef6b32cd68438/evidence/1505-startup-timing-20261108/formal-renderer/render.py",
+      "bytes": 12368,
+      "sha256": "bf3afe1e40c5218a9f28cc5980595ba8c04e66e6a0e33f2a73c2780a20dd38c4",
+      "gitBlob": "2db0c65c49306fcfc20ff57f3fb9d45173ed6cfe",
+      "sha256AndBytesMatchExpected": true
+    },
+    {
+      "key": "FormalEnvReview_Renderer_workflow.template.yml.in",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/79ca443952a5232f520d3b5312eef6b32cd68438/evidence/1505-startup-timing-20261108/formal-renderer/workflow.template.yml.in",
+      "bytes": 76125,
+      "sha256": "2059caf7dfd907685b3cb201a715f56cbf0ef9f3266636e3571e6504b3ff9209",
+      "gitBlob": "7b362afec496c51a3f8d2d5bfe8ab86ba437762c",
+      "sha256AndBytesMatchExpected": true
+    },
+    {
+      "key": "FormalEnvReview_Renderer_base.yml.snapshot",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/79ca443952a5232f520d3b5312eef6b32cd68438/evidence/1505-startup-timing-20261108/formal-renderer/base.yml.snapshot",
+      "bytes": 75974,
+      "sha256": "2fc8d8a480a35f0f97011dc4149d3e368bcb45901e604aeb354a1d5d9e2e1d89",
+      "gitBlob": "3c65028b80cee0b983bce68c47843b77e8435481",
+      "sha256AndBytesMatchExpected": true
+    },
+    {
+      "key": "FormalEnvReview_HHelper",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/f997dbe4f97829cd54f96705ec4e56d624f61c52/scripts/ops/issue1505-diagnostic-window.mjs",
+      "bytes": 27870,
+      "sha256": "8b19d8f763a49a3813d104d3adb57b34f718db515da008df1f915c364b546f4c",
+      "gitBlob": "3e1f366d6752822c8b68d78df0481df227043f3c",
+      "sha256AndBytesMatchExpected": true
+    },
+    {
+      "key": "FormalEnvReview_FWorkflow",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/433afa3af70c9b8373f63698d993d1e297ed7a23/.github/workflows/issue1505-startup-acceptance.yml",
+      "bytes": 76074,
+      "sha256": "e6e85917b509154873eff1d3205a54cb3697474471a8f8e436807620461f629f",
+      "gitBlob": "cfef9cb3c0404ee248f4b82609d8417f405c3db1",
+      "sha256AndBytesMatchExpected": true
+    }
+  ],
+  "importClosure": [
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/scripts/acceptance/cloud-startup.mjs",
+      "bytes": 83254,
+      "sha256": "e3ae3c84925100ac0c79a2b0d7dac70933312acd2e235fef5f2fe9d572da65b2",
+      "databaseMentions": []
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "scripts/acceptance/team-workspace.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/scripts/acceptance/team-workspace.mjs",
+      "bytes": 6653,
+      "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5",
+      "databaseMentions": []
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "lib/smoke-account.ts",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/lib/smoke-account.ts",
+      "bytes": 417,
+      "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997",
+      "databaseMentions": []
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "lib/desktop-rpc/wire.ts",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/lib/desktop-rpc/wire.ts",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+      "databaseMentions": []
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "scripts/acceptance/cloud-startup-report.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/scripts/acceptance/cloud-startup-report.mjs",
+      "bytes": 25154,
+      "sha256": "95a3315ffe6014d71e60a7e81e8b44fc3aa85b72a61d4eab177bd7a683a5a860",
+      "databaseMentions": []
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "scripts/acceptance/cloud-startup-evidence.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/scripts/acceptance/cloud-startup-evidence.mjs",
+      "bytes": 22658,
+      "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+      "databaseMentions": []
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "scripts/ops/deployment-regression.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/scripts/ops/deployment-regression.mjs",
+      "bytes": 15757,
+      "sha256": "cedaf2573ea945f87285d3a8d20a38624532868fcbc2d4380842fef8baa607af",
+      "databaseMentions": []
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/scripts/e2b/publish-template-env.mjs",
+      "bytes": 17883,
+      "sha256": "2c15611a5304d3b5c4cf6b12e7969426dbc14c65404e1de197eab3aebd26819a",
+      "databaseMentions": []
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "scripts/e2b/runtime-report.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/scripts/e2b/runtime-report.mjs",
+      "bytes": 6202,
+      "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3",
+      "databaseMentions": []
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "scripts/release/web-deploy.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/scripts/release/web-deploy.mjs",
+      "bytes": 19867,
+      "sha256": "e8012d49653ab635ea26d3ba881450860f8c3ead2893d799a98bc395eb65bf9a",
+      "databaseMentions": [
+        {
+          "line": 16,
+          "text": "export const REQUIRED = ['MIKKA_DATABASE_URL', 'DATABASE_URL', 'NEXT_PUBLIC_POSTHOG_KEY', 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',"
+        }
+      ]
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "scripts/vercel-ignore-build.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/scripts/vercel-ignore-build.mjs",
+      "bytes": 2621,
+      "sha256": "bd16434eb54cbf56a83755a1c381cae6af7435a452bf4ada9b0e2bafaa877e0f",
+      "databaseMentions": []
+    },
+    {
+      "source": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "path": "scripts/ci-docs-only.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/bb5d1f9e224aea395b9c45823960e8ad10f1a099/scripts/ci-docs-only.mjs",
+      "bytes": 6993,
+      "sha256": "c42b6617863ff137635a86fe5bddfdaeeb31cbdec8f9ace7e49e48ff6becf01a",
+      "databaseMentions": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "renderer_offline",
+      "source": "render.py",
+      "lines": [
+        4,
+        10,
+        51,
+        54,
+        87,
+        155,
+        157,
+        184,
+        186,
+        215
+      ],
+      "statement": "Pure standard-library source reads, hash checks, Git reads and local review-file renderer. No database imports or secret environment use. It was read but not executed."
+    },
+    {
+      "id": "scope_http",
+      "source": "scripts/ops/issue1505-diagnostic-window.mjs",
+      "lines": [
+        73,
+        187,
+        193,
+        218,
+        293,
+        339
+      ],
+      "statement": "Normal same-account authentication/team selection/idle read are HTTPS/RPC; diagnostic environment creation/removal uses Vercel API with VERCEL_TEAM_TOKEN. No direct DB client."
+    },
+    {
+      "id": "scope_explicit_secret_mapping",
+      "source": ".github/workflows/issue1505-diagnostic-window.yml",
+      "lines": [
+        617,
+        652,
+        670,
+        682
+      ],
+      "statement": "Exact / SMOKE_OWNER_EMAIL, / SMOKE_OWNER_PASSWORD, /platform VERCEL_TEAM_TOKEN; imports and recursion disabled; GitHub token is step-local for operator/API actions. No /neon or DB secret required by this runner."
+    },
+    {
+      "id": "formal_root_secret_scope",
+      "source": "workflow.template.yml.in",
+      "lines": [
+        226,
+        248,
+        733,
+        766
+      ],
+      "statement": "Existing formal workflow imports prod root / with recursive:false/include-imports:false and no secret-name filter, plus exact /platform VERCEL_TEAM_TOKEN. The driver consumes SMOKE email/password and platform token, performs HTTP/RPC/WebSocket, and does not request direct DB access. This is not a claim root import fetches only two keys."
+    },
+    {
+      "id": "build_only_required_keys",
+      "source": "scripts/release/web-deploy.mjs",
+      "lines": [
+        16,
+        17,
+        51,
+        64,
+        276,
+        280
+      ],
+      "statement": "The import closure contains DB variable names only in build REQUIRED. Validation is in buildEnvironmentValues, invoked by the env CLI/build path, not at module import or readProductionWorkerRelease's api call. Import does not require DB secrets."
+    },
+    {
+      "id": "conditional_lease_audit",
+      "source": "scripts/acceptance/cloud-startup.mjs",
+      "lines": [
+        836,
+        871,
+        1052,
+        1053
+      ],
+      "statement": "leaseAudit defaults false; formal parseOptions has no leaseAudit CLI key and formal invocation does not set it. Its conditional helper is not loaded in reviewed F."
+    },
+    {
+      "id": "cleanup_platform_only",
+      "source": ".github/workflows/issue1505-startup-acceptance.yml",
+      "lines": [
+        805,
+        839
+      ],
+      "statement": "Existing always cleanup invokes exact H removeOwnedWindow with VERCEL_TEAM_TOKEN and pinned scope identity; no SMOKE login or DB needed for removal."
+    }
+  ],
+  "conclusion": "The reviewed fixed formal/helper runner is not subject to the demonstrated #1503 direct-DB setup omission of /neon/DATABASE_URL. No basis to add either DB secret to these runners.",
+  "limits": [
+    "Source-only dependency audit; no OIDC trust/secret availability/runtime connectivity or permission verification.",
+    "Normal server and dispatched Web build still require their own correct DB configuration; not independently checked here.",
+    "Future A/R/H require their own exact-source binding; historical F/H are not activation-ready.",
+    "Existing root secret import is broader than the two runtime values consumed; no scope expansion or rewrite proposed.",
+    "Original helper direct-parent5958, pins, budgets, formula and formal guards unchanged."
+  ],
+  "operations": {
+    "secretReads": 0,
+    "productionRequests": 0,
+    "vm": 0,
+    "renderExecutions": 0,
+    "tests": 0,
+    "filesWritten": 0,
+    "refWrites": 0,
+    "scopeOrFormalActivation": 0
+  }
+}

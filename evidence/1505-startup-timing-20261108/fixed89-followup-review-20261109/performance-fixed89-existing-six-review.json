@@ -1,0 +1,280 @@
+{
+  "schemaVersion": 1,
+  "task": "1505 fixed-89 residual startup critical-path review",
+  "mode": "source_and_existing_evidence_only",
+  "source": {
+    "commit": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "tree": "a850a89f11cbb467df869651ee39beca157c6351",
+    "notRollingMain": true
+  },
+  "verdict": {
+    "newIndependentPerformancePatchSupported": false,
+    "reason": "历史六例没有当前89下的未重复工作归因；已能证明的减少工作候选已在1799/1803/1810或已合入的broker/initial-claim路径中。不能按旧整段时长再造缓存/轮询/授权短路。",
+    "performancePassClaim": false,
+    "formalNewSamples": 0,
+    "historicalFormalFailures": 6
+  },
+  "evidence": {
+    "commit": "79ca443952a5232f520d3b5312eef6b32cd68438",
+    "directory": "evidence/1505-startup-timing-20261108/formal-78c-bottlenecks-20261109",
+    "observed": {
+      "path": "observed-v2.json",
+      "blob": "afd8808f215ed38f063ca7ec7e2e50da26bcef3e",
+      "bytes": 59264,
+      "sha256": "904cfcf8f9eed5ae8392dd521d7e6deaf4d5bbdeeb834f19f3dfa5a137b2f5ff"
+    },
+    "review": {
+      "path": "review-v2.md",
+      "blob": "fb310d0968768cfcce537f818061011e198f5649",
+      "sha256": "4c658445138982a98a0b73d3fcdfe46f0feed66702ff9b0c79809744c9aa63e3"
+    },
+    "rawNotRedownloaded": {
+      "runId": 42430097946,
+      "attempt": 1,
+      "bytes": 312085,
+      "sha256": "8a33c1d6470655b845cf4c271019cceca64291536e7af5f5fa44643a3350ca8a"
+    },
+    "useV2Only": "v1 Date.parse(number)产生NaN的旧投影仍保留，不用作本表。"
+  },
+  "formula": "Date.parse(agentStart.storedAt)-Date.parse(timing.dispatchStartedAt)+Math.max(0,runtimeTiming.agentAccepted.ms-runtimeTiming.executionStartMs)",
+  "sixCases": [
+    {
+      "case": 1,
+      "harness": "claude_code",
+      "fiveSegmentsMs": {
+        "beforeEnsure": 1359,
+        "ensure": 8109,
+        "ensureToDispatchReturn": 74,
+        "dispatchReturnToStoredAgentStart": 7782,
+        "laterNativeAckOffset": 1521.6980000000003
+      },
+      "unroundedTotalMs": 18845.698,
+      "withinTarget": false,
+      "gitIntervalsAvailable": false
+    },
+    {
+      "case": 2,
+      "harness": "codex",
+      "fiveSegmentsMs": {
+        "beforeEnsure": 1526,
+        "ensure": 4678,
+        "ensureToDispatchReturn": 146,
+        "dispatchReturnToStoredAgentStart": 9098,
+        "laterNativeAckOffset": 0
+      },
+      "unroundedTotalMs": 15448,
+      "withinTarget": false,
+      "gitIntervalsAvailable": false
+    },
+    {
+      "case": 3,
+      "harness": "claude_code",
+      "fiveSegmentsMs": {
+        "beforeEnsure": 1187,
+        "ensure": 7302,
+        "ensureToDispatchReturn": 73,
+        "dispatchReturnToStoredAgentStart": 6735,
+        "laterNativeAckOffset": 1213.4769999999994
+      },
+      "unroundedTotalMs": 16510.477,
+      "withinTarget": false,
+      "gitIntervalsAvailable": false
+    },
+    {
+      "case": 4,
+      "harness": "codex",
+      "fiveSegmentsMs": {
+        "beforeEnsure": 1391,
+        "ensure": 3950,
+        "ensureToDispatchReturn": 89,
+        "dispatchReturnToStoredAgentStart": 9067,
+        "laterNativeAckOffset": 0
+      },
+      "unroundedTotalMs": 14497,
+      "withinTarget": false,
+      "gitIntervalsAvailable": false
+    },
+    {
+      "case": 5,
+      "harness": "claude_code",
+      "fiveSegmentsMs": {
+        "beforeEnsure": 1491,
+        "ensure": 5629,
+        "ensureToDispatchReturn": 184,
+        "dispatchReturnToStoredAgentStart": 6040,
+        "laterNativeAckOffset": 1064.969
+      },
+      "unroundedTotalMs": 14408.969000000001,
+      "withinTarget": false,
+      "gitIntervalsAvailable": false
+    },
+    {
+      "case": 6,
+      "harness": "codex",
+      "fiveSegmentsMs": {
+        "beforeEnsure": 1485,
+        "ensure": 5016,
+        "ensureToDispatchReturn": 167,
+        "dispatchReturnToStoredAgentStart": 11261,
+        "laterNativeAckOffset": 0
+      },
+      "unroundedTotalMs": 17929,
+      "withinTarget": false,
+      "gitIntervalsAvailable": false
+    }
+  ],
+  "historicalNestedRangesMs": {
+    "resolveRepository": [
+      729,
+      851
+    ],
+    "createAPI": [
+      889,
+      1862
+    ],
+    "readWorker": [
+      925,
+      1352
+    ],
+    "startWorker": [
+      811,
+      1669
+    ],
+    "workerRegister": [
+      803,
+      2889
+    ],
+    "claim": [
+      1222,
+      3080
+    ],
+    "acquireLease": [
+      623,
+      2146
+    ],
+    "nativeCredentials": [
+      366,
+      991
+    ],
+    "githubCredentials": [
+      208,
+      284
+    ]
+  },
+  "timingLimits": [
+    "仅五顶层段构成公式分区；内层/并行段不能与父段相加。",
+    "preparation与startup是各自单调时钟，不能直接加到服务端墙钟。",
+    "六例没有Git子区间；CC late phases为空，CX只有部分cli_init/account_check等区间。",
+    "旧create API不是单独restore/boot或Node初始化耗时。",
+    "当前89没有新的完整正式六例；不能宣称剩余必然大于或小于5秒。"
+  ],
+  "currentSourceFindings": [
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "blob": "9d2cb49a991f7ab0bf89718aabc08fe78b78b66e",
+      "lines": "798-895,992-1129",
+      "finding": "合格fresh repository VM已通过一个stdin broker承载worker身份验证和后续commit/start/注册通知；四handoff文件一次files.write。非repository桌面安装已独立并行，repository无该工作；只有legacy capability明确缺席才走原500ms注册回读。",
+      "invariants": "创建后及凭据发布前仍分别fresh检查；五写顺序/COMMIT先于凭据handoff，最终registration fence保留。",
+      "noNewPatch": "不能仅凭templateId跳worker/source/nonce/lease验证，或将legacy路径观察当当前默认轮询。"
+    },
+    {
+      "path": "lib/computer/bootstrap-broker.ts",
+      "blob": "c862e8893758a61781203ac02e986eef1ed43958",
+      "lines": "105-176",
+      "finding": "同一broker流已绑定run/lease/worker、root-owned文件与完整hash，提交确认与未知结果收口已有实现。",
+      "noNewPatch": "再提read_worker/start_worker合并会重复已有协议；删files upload需新凭据通道/失败语义，旧数据不支持。"
+    },
+    {
+      "path": "packages/daemon/src/main.ts",
+      "blob": "abe9cf6dc0dd634fb76458b0a192f76258d32b43",
+      "lines": "947-967,1330-1365,1395-1435,1495-1500",
+      "finding": "register仍先于初始claim，但initialRun直接claimQueued，无需先GET queued runs；claim与heartbeat并行，完整initialRepository投影替代首次listRepos，heartbeat/revoke/rotation/uninstall/checkpoint仍保留。",
+      "noNewPatch": "不能用1799 runs/repos GET收益套到已命中投影的新Task；register+claim单HTTP尚缺独立fresh请求上下文、部分提交/幂等/重试/wire守恒证明。"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "blob": "946d198e7f3885cfb94fca3d78cbae5700c03942",
+      "lines": "196-232,286-328,348-388,444-481",
+      "finding": "native与GitHub credential现已Promise.allSettled并发，并与MCP/assignment工作重叠；final authorizedClaimResponse仍在返回prompt/credential前重新fence。",
+      "noNewPatch": "不能再将native与GitHub整段相加为省时；不提前跳过admission/lease/fresh借用授权/final fence。"
+    },
+    {
+      "path": "lib/model-order.ts",
+      "blob": "2ec3a5e377aacaae152dd7a47b0919f229b16d8f",
+      "lines": "188-193,216-239",
+      "finding": "shared-quota严格 requester membership→credential owner workspace→share→allowance；provider异步等待后重读连接/撤销状态。",
+      "noNewPatch": "Promise.all改变拒绝前缀且会多读owner；邻接own-owner去重不惠及SMOKE借用账号。"
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-client.ts",
+      "blob": "e8cf0150fc8ce0962a55ec9723b441abbfb41c02",
+      "lines": "77-85,107-168",
+      "finding": "每call创建native child，spawn后身份解析已并发进行；私有configuration后才能实际工作，结束收口。已有identity/configWrite/terminal观测入口。",
+      "noNewPatch": "旧acquire_lease未覆盖PG span的差额不能归因child初始化；没有纯本地无I/O独立预热的实测收益证明。"
+    }
+  ],
+  "pendingCoverage": [
+    {
+      "pr": 1799,
+      "head": "1ffa581f16319381054e0636ae41e6292719a1fe",
+      "status": "unmerged_at_review",
+      "covered": "no-receipt pendingDeviceCommands改单SELECT；runs/repos原fresh authority/owner/result合一；SSH enrollment原子consume；bounded Native read-batch policy观察复用。",
+      "startupIntersection": "heartbeat route107调用pendingDeviceCommands，main1435/1498在初始repository-ready前等heartbeat，故无receipt分支可能处于关键路径；尚无当前正式ms归因。",
+      "limits": "初始hint/完整repo投影已绕过runs/repos GET；SSH enrollment不能算普通云新Task必经。Native read-batch不是claim授权缓存。telemetry改动不能叫全wire不变；两个mode修正仍改变canonical W。"
+    },
+    {
+      "pr": 1803,
+      "head": "36bde90f433d54d3cfbb64fac4ffde3cf181a232",
+      "status": "unmerged_at_review",
+      "covered": "shared-custody access-snapshot机器Bearer有界复用(最长59s/8项)，保留fresh权限SQL和version1 GET，401/403清除后本次拒绝；全部captured task/event/run为空才省Coordinator递归CTE；attention缩列；resolver计时上下文。",
+      "startupIntersection": "subscriptionRuntime snapshot分支可进入claim nativeCredentials；实际只有shared-custody分支并有有效warm token才减少一次machine login，cold仍登录。",
+      "limits": "非shared/ordinary custody仍fresh；不缓存用户OAuth或授权/业务结果。Coordinator pre-dispatch工作不在dispatch_run_entry起点后的公式里，不能以其他TTFT样本替代正式性能。"
+    },
+    {
+      "pr": 1810,
+      "head": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+      "status": "unmerged_at_review",
+      "reviewSource": "production_traces固定23路径独立审查，复用其闭式结论",
+      "covered": "包括上述1803同一perf改动及ffmpeg依赖完整性修复；不重复计为第二份性能收益。",
+      "limits": "ffmpeg/build改动解决发布可靠性，不证明单Task startup节省；workspace+patch+lock metadata影响W须正常pipeline重算。"
+    }
+  ],
+  "minimalAction": {
+    "now": "复用已有修复，保持1805的worker依赖闭包安装修复；不另开等价缓存/broker/轮询补丁。",
+    "nextExistingObservation": "下一次本来就授权的正式六例按同run五段+39stage分析：先ensure/broker/register，再fresh claim/acquire/identity，再repository与采用后native tail及ACK。只读取现成opt-in字段，不加新业务查询、模型轮次或默认wire。",
+    "independentCandidate": "当前无可直接实现且已证明满足全部成本/授权合同的新补丁。单HTTP register→claim、shared-quota条件SQL、浅clone/snapshot预热均仍为待证设计，不作为提交建议或额外入场门槛。"
+  },
+  "conservation": {
+    "stages": 39,
+    "pins": 15,
+    "actualObservedPins": 14,
+    "formulaChanged": false,
+    "gateChanged": false,
+    "oneTaskVM": true,
+    "homeGitGh": "preserved",
+    "freshAuthFinalFence": "preserved",
+    "newSQL": 0,
+    "newModels": 0,
+    "newVMs": 0,
+    "newTests": 0,
+    "newPolling": 0,
+    "sourceChanges": 0
+  },
+  "references": [
+    {
+      "path": "app/v1/devices/[deviceId]/heartbeat/route.ts",
+      "blob": "7f2aec2241f2842e12ce7be6bfee68f13d2db9b3",
+      "lines": "103-107"
+    },
+    {
+      "path": "lib/subscription-runtime.ts",
+      "blob": "a38fa4d16a8736b4e0299b5c5540fd1e7e514f2b",
+      "lines": "69-94"
+    },
+    {
+      "path": "lib/subscription-access-snapshot.ts",
+      "blob": "e9ecf72a9e73788811ed181698f1d26d96b5c79d",
+      "lines": "15-32,42-62"
+    }
+  ]
+}
