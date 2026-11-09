@@ -68,3 +68,15 @@ it('resolves the late entry beside the real stdio assets after bundling', async 
     expect(JSON.parse(result.out).result.tools.map((tool: { name: string }) => tool.name)).toContain('submit')
   } finally { value.close() }
 })
+
+it('rejects an unrelated environment key even alongside the supported trace carrier', async () => {
+  const f = fixture(); f.value.close()
+  const bound = writeCodexMcpContext(f.root, runId, { ...f.spec,
+    env: { MIKKA_DECISION_MCP_TRACEPARENT: '', UNREVIEWED_ENV: 'PRIVATE_SYNTHETIC_VALUE' } })
+  try {
+    expect(() => readMcpContext(...bound.server.args.slice(1) as [string, string, string])).toThrow('mcp_context_invalid')
+    expect(await request(bound.server.command, bound.server.args)).toEqual({
+      code: 2, out: '', err: 'mikka-mcp: run context unavailable\n',
+    })
+  } finally { bound.close() }
+})

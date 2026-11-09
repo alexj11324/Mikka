@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { APIError } from 'better-auth/api'
 import { localTestAccountsMode } from '@/scripts/test-accounts/database-target.mjs'
 import { isLoopbackHost } from '@/lib/loopback'
 import { isCloudEdition } from '@/lib/edition'
@@ -6,9 +8,35 @@ import { CodedError } from '@mikka/protocol/coded-error'
 type AuthEnvironment = Record<string, string | undefined>
 export const MOBILE_APP_ORIGIN = 'mikka://'
 
+/** Native Apple credentials use the app bundle as their audience. */
+export function authAppleOptions(env: AuthEnvironment) {
+  const bundle = env.APPLE_APP_BUNDLE_IDENTIFIER?.trim() || (isCloudEdition(env) ? 'com.aspectlylabs.mikka' : undefined)
+  return bundle ? { clientId: bundle, appBundleIdentifier: bundle, requireEmailVerification: true } : undefined
+}
+
+/** Reject relayed credentials before Better Auth verifies Apple's signature and claims. */
+export function requireAppleSignInNonce(ctx: {
+  path?: string
+  body?: { provider?: unknown; idToken?: { nonce?: unknown; token?: unknown } }
+  context: { baseURL: string }
+}) {
+  if (ctx.path !== '/sign-in/social' || ctx.body?.provider !== 'apple' || !ctx.body.idToken) return
+  const { nonce, token } = ctx.body.idToken
+  const hash = (value: string) => createHash('sha256').update(value).digest('hex')
+  const authURL = new URL(ctx.context.baseURL).href.replace(/\/$/, '')
+  let claim: unknown
+  if (typeof token === 'string') {
+    try { claim = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')).nonce } catch { /* Invalid credentials are refused below. */ }
+  }
+  if (typeof nonce !== 'string' || !/^[0-9a-f]{64}\.[0-9a-f]{64}$/.test(nonce)
+    || nonce.slice(65) !== hash(authURL) || claim !== hash(nonce)) {
+    throw new APIError('UNAUTHORIZED', { code: 'INVALID_TOKEN', message: 'Invalid token' })
+  }
+}
+
 export function authSignInMethods(env: AuthEnvironment) {
   return { google: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
-    github: Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET), email: true }
+    github: Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET), apple: Boolean(authAppleOptions(env)), email: true }
 }
 
 export function resolveAppOrigin(env: AuthEnvironment) {

@@ -15,6 +15,7 @@ import { ServerGate } from '@/components/ServerGate'
 import { Text } from '@/components/Text'
 import { CardButton } from '@/components/cards'
 import { authClient } from '@/lib/auth'
+import { watchAppleCredential } from '@/lib/apple-auth'
 import { apiCache } from '@/lib/api-cache'
 import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
@@ -52,6 +53,9 @@ function SessionGate() {
   const account = currentAccount()
   const [saveFailed, setSaveFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    if (data?.user) return watchAppleCredential(account.id)
+  }, [account.id, data?.user?.id])
   useEffect(() => {
     let live = true
     setSaveFailed(false)

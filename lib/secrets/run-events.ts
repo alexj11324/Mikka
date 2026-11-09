@@ -2,14 +2,15 @@ import 'server-only'
 // Stores one batch of a run's UI message chunks (POST /v1/runs/:runId/events). Split out of the
 // route so the DB tests drive the real write path. #438 A: streamed parts are masked across the
 // chunks of a batch (stream-mask.ts, hold-back in memory only); lastReply is masked again on its full text.
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { agentRuns, runChunks } from '@/lib/db/schema'
 import { freshChunks, nextReply } from '@/lib/thread-groups'
 import { identityMasker, type Masker } from './mask'
 import { maskStreamedChunks } from './stream-mask'
-import { threadChanged } from '../live/panels'
+import { runChanged, threadChanged } from '../live/panels'
 import { runListChanged } from '../live/lists'
+import { taskActivityChanged } from '../factory/activity-live'
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -49,6 +50,13 @@ export async function persistRunEventBatch(runId: string, fromSeq: number, input
     // Only chunks stored now count, so a re-sent batch never appends its text twice.
     const fresh = freshChunks(chunks, fromSeq, inserted.map(row => row.seq))
     await recordLastReply(tx, runId, fresh, mask)
+    const started = await tx.update(agentRuns).set({ status: 'running', updatedAt: new Date() })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing'))).returning({ id: agentRuns.id })
+    if (started.length) {
+      await runListChanged(tx, runId)
+      await runChanged(tx, runId)
+      taskActivityChanged(tx, runId)
+    }
     if (inserted.length) await threadChanged(tx, runId)
     // The list displays completed reply previews. Individual text tokens stay
     // on the thread's stream and do not re-read every task on the board.

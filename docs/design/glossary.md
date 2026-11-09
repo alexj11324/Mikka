@@ -33,7 +33,7 @@ not on the dispatching bot's machine (`cloud-computer-backend.md` § 2).
 | --- | --- | --- |
 | **Account** | 账号 | The person: 账户, security, 偏好, 通知, profile memory (个人资料类记忆), 密钥与登录, 设备 and 「模型与订阅」. The same in every workspace. |
 | **Personal workspace** | 个人工作区 | One per person. Only that person's bots, chats, tasks, threads and their memory; personal 计费 and 用量; no team settings. |
-| **Shared workspace** | 共享工作区 (the UI says 团队工作区 until the rename in Known naming debt) | Members, 团队权限, 密钥与环境, 审计日志, team 用量 and 计费. Nothing moves between it and a personal workspace. |
+| **Shared workspace** | 共享工作区 | Members, 团队权限, 密钥与环境, 审计日志, team 用量 and 计费. Nothing moves between it and a personal workspace. |
 
 Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md).
 
@@ -129,7 +129,7 @@ credits and seats, transfer.
 _Owner_: its owner account; administered by its admins (Workspace aggregate).
 _Avoid_: 团队工作区 and 团队 on its own (a 团队 is only a group inside a workspace), organization.
 _Note_: target term (decision D11 of the coordinating session, 2026-11-02). The UI
-and code still say 团队工作区 / team workspace until the rename in Known naming debt.
+now says 共享工作区 / shared workspace (2026-11-08); code still says `team` for it until the rename in Known naming debt.
 
 **Team (团队)**:
 A named group of members inside a shared workspace, with its own task prefix,
@@ -224,7 +224,7 @@ read the code name in the sense given below.
 | --- | --- | --- | --- |
 | `coordinator` (tables, `lib/coordinator/*`, `CoordinatorChat`) | Any bot's chat, not only the Coordinator bot: `coordinator_sessions`, `coordinator_messages`, `coordinator_events` (`lib/db/schema.ts`), `lib/coordinator/*`, `components/coordinator/coordinator-chat.tsx`. | **Bot chat**: `bot_chat_*` tables, `lib/bot-chat/*`. | Tables need a migration. Keep `coordinator` only for the Coordinator bot itself. |
 | `agent` | Three things: an `agents` row is a harness configuration and subscription-consumer identity registered against a device (`lib/db/schema.ts`, `lib/device-agents.ts`); the Agent brand (Claude Code, Codex), stored as `harness`; and a group-chat member/author type `'agent'` plus `conversations.leadAgentId` (`lib/db/schema.ts`, `lib/group-conversations-store.ts`). A cloud task's actual execution device is `agent_runs.deviceId`, proved by that run's owner-bound `computer_run_bindings` and `thread_machines`; host placement can differ from the configuration's registered device. | Agent configuration identity for the row; the run and its machine binding for execution placement; `harness` for the brand; **bot** for the group-chat member, author and lead. | Local execution retains the registered-device check. Cloud placement retains the exact owner, workspace, bot, issue, device and repository checks. The UI word **Agent** above is unchanged: the coding Agent runs on the thread machine, and the bot only dispatches. |
-| 团队 / `teams` | Both a team workspace (`workspaces.kind = 'team'`, `lib/db/workspace-schema.ts`) and a sub-team inside a workspace (`mikka_teams`, `lib/db/team-schema.ts`). | **Team** (团队, `mikka_teams`) is only the sub-team inside a workspace, matching Linear's Team, since tasks sync to Linear. The team workspace becomes **shared workspace** (共享工作区) in code and copy, opposite **personal workspace**. | Copy changes when the related UI is next changed, after Figma. |
+| 团队 / `teams` | Both a team workspace (`workspaces.kind = 'team'`, `lib/db/workspace-schema.ts`) and a sub-team inside a workspace (`mikka_teams`, `lib/db/team-schema.ts`). | **Team** (团队, `mikka_teams`) is only the sub-team inside a workspace, matching Linear's Team, since tasks sync to Linear. The team workspace becomes **shared workspace** (共享工作区) in code and copy, opposite **personal workspace**. | Copy renamed 2026-11-08 (UI audit gap-12); code names (`workspaces.kind = 'team'`) still to rename. |
 | `issues.scope` `'personal'` / `'workspace'` | Linear-sync visibility of an issue (`lib/db/schema.ts`), not the personal workspace. | `'unsynced'` (not synced to Linear) for `'personal'`. | Collides with **Personal workspace**. Renaming needs a migration. |
 | `factory_tasks` | A factory job, not a task (`lib/db/schema.ts`). | `factory_jobs`. | "Task" means only an issue (`MIK-xx`); `TaskDetail` (`components/workspace/task-detail.tsx`) loads a task and keeps its name. |
 | Chat key | One chat, three encodings: `conversation_reads` id `'coordinator'` or `'bot:<uuid>'` (`lib/conversation-reads-store.ts`); `chat_preferences.chatKey` = raw bot id; `bot_model_choices.botKey` = bot id or `'coordinator'` (`lib/model-api-keys.ts`). | One `chatKey(botId)` format. | Remove the `'coordinator'` sentinel with a migration. |
