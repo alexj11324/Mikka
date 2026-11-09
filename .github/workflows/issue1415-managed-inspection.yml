@@ -38,6 +38,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
 
       - name: Run the existing managed proof and historical inspection guards
         run: node --import tsx --test scripts/acceptance/workflow-migration-production.test.mjs
