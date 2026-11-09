@@ -37,15 +37,7 @@ test('task review: current owner, session, tenant and immutable physical checkou
     await pool.query('INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES($1,$2,$1,now()+interval \'1 hour\',now(),now())', [sessionId, id])
     return { user: { id, name: id, email: `${id}@example.invalid`, image: null }, session: { id: sessionId } }
   }
-  const fixture = async () => {
-    const userId = await seedUser(pool, 'review-owner'), peerId = await seedUser(pool, 'review-peer'), strangerId = await seedUser(pool, 'review-other')
-    const { id: workspaceId } = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }, { userId: peerId, role: 'member' }])
-    const { id: otherWorkspaceId } = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])
-    const { id: teamId } = await seedTeam(pool, workspaceId, userId)
-    await pool.query('INSERT INTO mikka_team_members("teamId","userId",role) VALUES($1,$2,\'member\')', [teamId, peerId])
-    const taskId = randomUUID()
-    await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Review fixture\',\'{"type":"doc"}\',\'doing\',\'normal\',\'workspace\')', [taskId, userId, workspaceId])
-    await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [taskId, teamId, workspaceId, userId])
+  const checkout = async (userId: string, workspaceId: string, taskId: string) => {
     const botId = await seedBot(pool, workspaceId, userId), agentId = await seedAgent(pool, userId)
     const deviceId = randomUUID(), repoId = randomUUID(), deviceTokenId = randomUUID(), runId = randomUUID()
     const remoteKey = 'v2/github.com/mikka-ci/review-fixture', sandboxId = `synthetic-${randomUUID()}`, worktreePath = `/home/user/.mikka/worktrees/${runId}`
@@ -60,10 +52,23 @@ test('task review: current owner, session, tenant and immutable physical checkou
     await pool.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,$4)', [runId, botId, workspaceId, userId])
     await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","sandboxId","snapshotId","operationId",state,"deviceId","issueId","repoId","botId",epoch)
       VALUES($1,$2,$3,$4,'synthetic', $5,'running',$6,$7,$8,$9,1)`, [runId, workspaceId, userId, sandboxId, randomUUID(), deviceId, taskId, repoId, botId])
-    return { userId, peerId, strangerId, workspaceId, otherWorkspaceId, teamId, taskId, botId, agentId, deviceId, repoId, deviceTokenId, runId, remoteKey, sandboxId, worktreePath,
+    return { botId, agentId, deviceId, repoId, deviceTokenId, runId, remoteKey, sandboxId, worktreePath, definition }
+  }
+  const fixture = async () => {
+    const userId = await seedUser(pool, 'review-owner'), peerId = await seedUser(pool, 'review-peer'), strangerId = await seedUser(pool, 'review-other')
+    const { id: workspaceId } = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }, { userId: peerId, role: 'member' }])
+    const { id: otherWorkspaceId } = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])
+    const { id: teamId } = await seedTeam(pool, workspaceId, userId)
+    await pool.query('INSERT INTO mikka_team_members("teamId","userId",role) VALUES($1,$2,\'member\')', [teamId, peerId])
+    const taskId = randomUUID()
+    await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Review fixture\',\'{"type":"doc"}\',\'doing\',\'normal\',\'workspace\')', [taskId, userId, workspaceId])
+    await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [taskId, teamId, workspaceId, userId])
+    return { userId, peerId, strangerId, workspaceId, otherWorkspaceId, teamId, taskId, ...await checkout(userId, workspaceId, taskId),
       session: await account(userId), peer: await account(peerId), stranger: await account(strangerId) }
   }
   type Fixture = Awaited<ReturnType<typeof fixture>>
+  const assign = (f: Fixture, userId: string) => pool.query('UPDATE issues SET content=$2 WHERE id=$1',
+    [f.taskId, JSON.stringify({ type: 'doc', attrs: { mikka: { assignee: { kind: 'member', id: userId, name: userId, image: null } } } })])
   const read = (f: Fixture, session = f.session, expected = {}) => resolve(pool, pool, session, f.taskId, expected)
   const refused = (operation: Promise<unknown>, status: number, code?: string) => assert.rejects(operation, error => error instanceof ReviewAuthorityError && error.status === status && (!code || error.code === code))
   // Model inconsistent historical rows that predate immutable stored tenancy.
@@ -103,6 +108,38 @@ test('task review: current owner, session, tenant and immutable physical checkou
     const f = await fixture()
     await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [f.taskId, JSON.stringify({ type: 'doc', attrs: { mikka: { assignee: { kind: 'member', id: f.peerId, name: 'peer', image: null } } } })])
     await refused(read(f), 403, 'not_owner_terminal')
+    await refused(read(f, f.peer), 403, 'not_owner_terminal')
+  })
+  await t.test('a human assignee with a new owned Run can review without taking the creator checkout', async () => {
+    const f = await fixture(), before = await read(f)
+    await assign(f, f.peerId)
+    const next = await checkout(f.peerId, f.workspaceId, f.taskId), authority = await read(f, f.peer)
+    assert.deepEqual([authority.taskId, authority.userId, authority.ownerId, authority.workspaceId, authority.runId,
+      authority.deviceId, authority.repoId, authority.deviceTokenId, authority.sandboxId, authority.worktreePath],
+    [f.taskId, f.peerId, f.peerId, f.workspaceId, next.runId, next.deviceId, next.repoId, next.deviceTokenId, next.sandboxId, next.worktreePath])
+    assert.deepEqual(authority.credential, { kind: 'session', id: f.peer.session.id })
+    assert.notEqual(authority.bindingId, before.bindingId)
+    await refused(read(f), 403, 'not_owner_terminal')
+    await refused(read(f, f.peer, { runId: before.runId, bindingId: before.bindingId }), 409, 'review_binding_changed')
+    const { rows } = await pool.query(`SELECT r."userId" AS "runOwner",r."workspaceId",r."agentDefinition",r."worktreePath",
+      d."ownerId" AS "deviceOwner",p."userId" AS "repoOwner",t."userId" AS "tokenOwner",
+      c."ownerId" AS "bindingOwner",m."ownerId" AS "machineOwner",m."sandboxId"
+      FROM agent_runs r JOIN devices d ON d.id=r."deviceId" JOIN device_repos p ON p.id=r."deviceRepoId"
+      JOIN device_tokens t ON t.id=r."deviceTokenId" JOIN computer_run_bindings c ON c."runId"=r.id
+      JOIN thread_machines m ON m."runId"=r.id WHERE r.id=$1`, [f.runId])
+    assert.deepEqual(rows, [{ runOwner: f.userId, workspaceId: f.workspaceId, agentDefinition: f.definition, worktreePath: f.worktreePath,
+      deviceOwner: f.userId, repoOwner: f.userId, tokenOwner: f.userId, bindingOwner: f.userId, machineOwner: f.userId, sandboxId: f.sandboxId }])
+  })
+  await t.test('returning assignment to the creator cannot fall back past the newest Run of another owner', async () => {
+    const f = await fixture(), before = await read(f)
+    await assign(f, f.peerId)
+    const next = await checkout(f.peerId, f.workspaceId, f.taskId)
+    assert.equal((await read(f, f.peer)).runId, next.runId, 'the new owner has a usable physical checkout')
+    await assign(f, f.userId)
+    const { rows } = await pool.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY "createdAt" DESC,id DESC', [f.taskId])
+    assert.deepEqual(rows.map(row => row.id), [next.runId, f.runId])
+    await refused(read(f), 403, 'not_owner_terminal')
+    await refused(read(f, f.session, { runId: before.runId, bindingId: before.bindingId }), 403, 'not_owner_terminal')
     await refused(read(f, f.peer), 403, 'not_owner_terminal')
   })
   await t.test('session revocation and expiry defeat a previously authorized object', async () => {
