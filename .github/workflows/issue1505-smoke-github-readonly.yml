@@ -1,4 +1,4 @@
-# Disabled review draft. Root must separately review activation; no production work has run.
+# Reviewed one-off renewal of the exact original #1505 read-only child; helper source is unchanged.
 name: Issue 1505 read-only Smoke GitHub repair
 on:
   push:
@@ -15,14 +15,15 @@ concurrency:
   queue: max
 jobs:
   prepare:
-    if: false
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       MIKKA_EDITION: cloud
-      MIKKA_GITHUB_REPAIR_GO: ''
+      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-readonly-v1'
     permissions:
       contents: read
+      actions: read
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -32,7 +33,7 @@ jobs:
       - name: Verify source, closed file scope and single-run intent before credentials
         run: |
           python3 - <<'PY'
-          import hashlib,json,os,pathlib,subprocess
+          import datetime,hashlib,json,os,pathlib,subprocess
           root=pathlib.Path('.')
           assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-readonly-v1'
           assert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'
@@ -40,6 +41,8 @@ jobs:
           assert os.environ.get('GITHUB_REF')=='refs/heads/ops/1505-smoke-github-readonly-20261109'
           def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
           assert git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
+          assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==['4dff704382a5f91fdc3146826fe1cb1e39fa4fb7']
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T07:07:00+00:00')
           base='1d1261b607c8d60a27e2131ef59b463156d346d1'
           subprocess.run(['git','merge-base','--is-ancestor',base,'HEAD'],check=True)
           expected={'scripts/ops/issue1505/github-readonly-provider.mjs': '11b100e92c24d91b98200c18eea9a50a9c6a09ac3e3d5ece1166bbcc559f8937', 'scripts/ops/issue1505/github-readonly-helper.mjs': 'dcb7972129083c4b291a490f3965680935799413ad286a97c93042b96a4fe9d0', 'scripts/ops/issue1505/github-readonly-store.mjs': '3170e335a9623575c52a027372093a5eea32d2def30f178c2aa552c5ba176327', 'scripts/ops/issue1505/github-readonly-runner.mjs': '3ef68dd706ef605e68623ec24dcde593a47e8b9a882833069b38d36e1667f2c6', 'scripts/ops/issue1505/github-readonly.test.mjs': 'f4d75ebec6948be7a55e6096b909fcea0d8daf98fb87c2b18636d27974dded78'}
@@ -55,6 +58,34 @@ jobs:
         with:
           node-version: 24
       - run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+      - name: Download the exact original child receipt before production credentials
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: '13646865930'
+          github-token: ${{ github.token }}
+          repository: alexj11324/Mikka
+          run-id: '42553844998'
+          path: original-readonly-child
+      - name: Verify immutable original receipt and renewal deadline
+        run: |
+          python3 - <<'PY'
+          import datetime,hashlib,json,pathlib
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T07:07:00+00:00')
+          files=[p for p in pathlib.Path('original-readonly-child').rglob('*') if p.is_file()]
+          assert len(files)==1 and files[0].name=='receipt.json'
+          raw=files[0].read_bytes()
+          assert len(raw)==1691
+          assert hashlib.sha256(raw).hexdigest()=='4d68933de480e7a56ee9b83606708ea80fdc533a507ba22d4118b2320eb7aaec'
+          original=json.loads(raw)
+          assert original['status']=='passed' and original['operation']=='prepare'
+          assert original['state']['tokenSha256']=='5c40a52b822aeb0b48c2b12f6e31c77aef9d5db3139cccb0ae258fa7cc413e01'
+          assert original['state']['connectionUpdatedAt']=='2026-11-09T03:00:09.267Z'
+          assert original['state']['connectionExpiresAt']=='2026-11-09T06:59:59.266Z'
+          target=pathlib.Path('issue1505-github-readonly-report')
+          target.mkdir(mode=0o700,exist_ok=True)
+          (target/'original-child-input.json').write_bytes(raw)
+          print(json.dumps({'status':'passed','originalRun':42553844998,'artifact':13646865930,'receiptSha256':hashlib.sha256(raw).hexdigest()}))
+          PY
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -111,8 +142,12 @@ jobs:
           recursive: false
           include-imports: false
 
-      - name: Prepare only a new scoped read-only child and use normal repository access
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --prepare
+      - name: Clean up the exact original child, then prepare one new read-only child
+        run: |
+          python3 -c "import datetime; assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T07:07:00+00:00')"
+          node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --cleanup issue1505-github-readonly-report/original-child-input.json 4d68933de480e7a56ee9b83606708ea80fdc533a507ba22d4118b2320eb7aaec
+          mv issue1505-github-readonly-report/receipt.json issue1505-github-readonly-report/cleanup-original-child.json
+          node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --prepare
         env:
           NODE_ENV: production
           VERCEL_ENV: production
@@ -121,7 +156,7 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1505-github-readonly-receipt
-          path: issue1505-github-readonly-report/receipt.json
+          name: issue1505-github-readonly-renewal-receipts
+          path: issue1505-github-readonly-report/*.json
           if-no-files-found: warn
           retention-days: 3
