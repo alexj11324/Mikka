@@ -1,0 +1,18 @@
+[
+  {
+    "name": "install-uv",
+    "args": [
+      "python3",
+      "-m",
+      "pip",
+      "install",
+      "--disable-pip-version-check",
+      "--target",
+      "/vercel/sandbox/merge1505/pytools",
+      "uv"
+    ],
+    "exit": 1,
+    "stdout": "/vercel/sandbox/merge1505/logs/install-uv.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/install-uv.stderr"
+  }
+]

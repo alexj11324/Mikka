@@ -1,0 +1,15 @@
+M	.github/workflows/e2b-official-runtime.yml
+M	docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md
+A	docs/operations/1506-official-base-conservation-control-20261109.md
+A	docs/operations/evidence/1506-official-base-conservation-control-20261109.json
+M	docs/operations/web-deploy.md
+M	packages/daemon/scripts/official-e2b-instance-bootstrap.sh
+A	packages/daemon/scripts/prepare-worker-install.py
+A	packages/daemon/scripts/prepare-worker-install.test.py
+M	scripts/acceptance/cloud-startup.mjs
+M	scripts/acceptance/cloud-startup.test.mjs
+M	scripts/e2b/e2b-finalization-files.json
+M	scripts/e2b/official-files.py
+M	scripts/e2b/official-files.test.py
+M	scripts/release/web-deploy.mjs
+M	scripts/release/web-deploy.test.mjs

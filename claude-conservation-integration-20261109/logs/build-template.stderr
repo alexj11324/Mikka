@@ -1,0 +1,117 @@
+.....mikka-conservation-stage {"kind":"codex","phase":"create","elapsedMs":0}
+mikka-conservation-stage {"kind":"codex","phase":"preload_receipts","elapsedMs":0}
+mikka-conservation-stage {"kind":"codex","phase":"fresh_scan","elapsedMs":1}
+mikka-conservation-stage {"kind":"codex","phase":"fresh_receipt","elapsedMs":0}
+...{"event":"mikka_model_probe_failed","kind":"desktop","stage":"ready_check","error":"worker_not_ready","bytes":{"workerIdentity":null,"manifest":null,"receipt":null},"elapsedMs":0,"receiptJsonReceived":false}
+{"event":"mikka_model_probe_failed","kind":"desktop","stage":"worker_identity","error":"worker_mismatch","bytes":{"workerIdentity":41,"manifest":null,"receipt":null},"elapsedMs":0,"receiptJsonReceived":false}
+{"event":"mikka_model_probe_failed","kind":"desktop","stage":"worker_identity","error":"worker_mismatch","bytes":{"workerIdentity":41,"manifest":null,"receipt":null},"elapsedMs":0,"receiptJsonReceived":false}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"manifest_invalid","bytes":{"workerIdentity":41,"manifest":457,"receipt":1160},"elapsedMs":0,"receiptJsonReceived":true}
+.{"event":"mikka_model_probe_failed","kind":"desktop","stage":"receipt_read","error":"read_failed","bytes":{"workerIdentity":41,"manifest":356,"receipt":null},"elapsedMs":0,"receiptJsonReceived":false}
+{"event":"mikka_model_probe_failed","kind":"desktop","stage":"receipt_read","error":"read_failed","bytes":{"workerIdentity":41,"manifest":356,"receipt":null},"elapsedMs":0,"receiptJsonReceived":false}
+{"event":"mikka_model_probe_failed","kind":"desktop","stage":"ready_check","error":"worker_not_ready","bytes":{"workerIdentity":null,"manifest":null,"receipt":null},"elapsedMs":0,"receiptJsonReceived":false}
+....{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"identity_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1028},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"identity_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1031},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"identity_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1028},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"identity_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1028},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"identity_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1066},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"manifest_mismatch","bytes":{"workerIdentity":41,"manifest":325,"receipt":1029},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"manifest_mismatch","bytes":{"workerIdentity":41,"manifest":325,"receipt":1028},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"selection_mismatch","bytes":{"workerIdentity":41,"manifest":325,"receipt":1032},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"selection_mismatch","bytes":{"workerIdentity":41,"manifest":325,"receipt":991},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"reports_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":816},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"reports_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1034},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"reports_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1029},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"reports_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1007},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"reports_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":946},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"reports_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1021},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"reports_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1021},"elapsedMs":0,"receiptJsonReceived":true}
+{"event":"mikka_model_probe_failed","kind":"claude","stage":"receipt_validate","error":"reports_invalid","bytes":{"workerIdentity":41,"manifest":325,"receipt":1066},"elapsedMs":0,"receiptJsonReceived":true}
+..................
+======================================================================
+ERROR: test_model_probe_cleanup_and_logging_failures_do_not_mask_the_original_error (__main__.Publish) (log_fails=False)
+----------------------------------------------------------------------
+OSError: private transport cause
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.py", line 525, in probe_models
+    raw = read_file('receipt', path)
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.py", line 500, in read_file
+    data = sandbox.files.read(path, user='user', request_timeout=30)
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.test.py", line 383, in read
+    raise failure from cause
+TimeoutError: private receipt read failure
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.py", line 572, in probe_models
+    sandbox.kill()
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.test.py", line 387, in kill
+    raise RuntimeError('private cleanup failure')
+RuntimeError: private cleanup failure
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.test.py", line 397, in test_model_probe_cleanup_and_logging_failures_do_not_mask_the_original_error
+    bt.probe_models('private-template', 'codex', 'private-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.py", line 576, in probe_models
+    failure.add_note('model_probe_cleanup_failed')
+AttributeError: 'TimeoutError' object has no attribute 'add_note'
+
+======================================================================
+ERROR: test_model_probe_cleanup_and_logging_failures_do_not_mask_the_original_error (__main__.Publish) (log_fails=True)
+----------------------------------------------------------------------
+OSError: private transport cause
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.py", line 525, in probe_models
+    raw = read_file('receipt', path)
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.py", line 500, in read_file
+    data = sandbox.files.read(path, user='user', request_timeout=30)
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.test.py", line 383, in read
+    raise failure from cause
+TimeoutError: private receipt read failure
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.py", line 561, in probe_models
+    print(json.dumps({
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.test.py", line 391, in write
+    raise OSError('private logging failure')
+OSError: private logging failure
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.py", line 567, in probe_models
+    error.add_note('model_probe_diagnostic_failed')
+AttributeError: 'TimeoutError' object has no attribute 'add_note'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.py", line 572, in probe_models
+    sandbox.kill()
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.test.py", line 387, in kill
+    raise RuntimeError('private cleanup failure')
+RuntimeError: private cleanup failure
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.test.py", line 397, in test_model_probe_cleanup_and_logging_failures_do_not_mask_the_original_error
+    bt.probe_models('private-template', 'codex', 'private-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: sandbox)
+  File "/vercel/sandbox/merge1505/repo/scripts/e2b/build-template.py", line 576, in probe_models
+    failure.add_note('model_probe_cleanup_failed')
+AttributeError: 'TimeoutError' object has no attribute 'add_note'
+
+----------------------------------------------------------------------
+Ran 32 tests in 0.485s
+
+FAILED (errors=2)

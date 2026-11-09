@@ -1,0 +1,22 @@
+{
+  "tsx": [
+    {
+      "name": "cloud-startup-tsx",
+      "args": [
+        "node",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/cloud-startup.test.mjs"
+      ],
+      "exit": 0,
+      "stdout": "/vercel/sandbox/merge1505/logs/cloud-startup-tsx.stdout",
+      "stderr": "/vercel/sandbox/merge1505/logs/cloud-startup-tsx.stderr"
+    }
+  ],
+  "tsxTail": "sion change after failed execution stops later dispatches and preserves both failures (9.020638ms)\n\u2714 candidate bootstrap callback runs once after owner provenance and before any task stream observation (3.377128ms)\n\u2714 candidate bootstrap refuses provenance failure and retains normal cleanup after a publication failure (4.262783ms)\n\u2714 repository Git receipt stays independent and closed (0.94298ms)\n\u2139 tests 73\n\u2139 suites 0\n\u2139 pass 73\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 2064.752559\n",
+  "unstaged": "",
+  "tree": "61207b65e30026c0cde5cd4eb9b794cb4faf308e"
+}

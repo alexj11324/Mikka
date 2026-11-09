@@ -1,0 +1,34 @@
+[
+  {
+    "name": "install-python311",
+    "args": [
+      "dnf",
+      "install",
+      "-y",
+      "python3.11"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/install-python311.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/install-python311.stderr"
+  },
+  {
+    "name": "python311-version",
+    "args": [
+      "python3.11",
+      "--version"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/python311-version.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/python311-version.stderr"
+  },
+  {
+    "name": "build-template-python311",
+    "args": [
+      "python3.11",
+      "scripts/e2b/build-template.test.py"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/build-template-python311.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/build-template-python311.stderr"
+  }
+]

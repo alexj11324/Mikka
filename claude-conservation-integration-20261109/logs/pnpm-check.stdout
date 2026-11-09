@@ -1,0 +1,873 @@
+
+> next-app@0.0.1 check /vercel/sandbox/merge1505/repo
+> pnpm test:self-hosting && pnpm test:settings-backend && pnpm test:signup-turnstile && pnpm test:hosted-usage && pnpm test:execution-rules && pnpm test:abuse && pnpm test:unattended && pnpm check:agent-definitions && pnpm test:agent-kit && pnpm test:agent-kit-compat && pnpm check:agent-ui && pnpm test:credentials && pnpm test:preview && pnpm test:lib-units && pnpm test:project-decisions && pnpm test:unread && pnpm test:issue-readonly-dom && pnpm test:idle-budget && pnpm test:dev-local && pnpm test:mvp-fixtures && pnpm test:agent && pnpm test:acceptance && pnpm test:test-accounts && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:platform && pnpm test:motion && pnpm test:view-state && pnpm test:i18n && pnpm i18n:check && node scripts/check-copy.mjs && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:schedules && pnpm test:run-recovery && pnpm test:run-publication && pnpm test:coordinator-native-relay && pnpm test:coordinator-native-scope && pnpm test:coordinator-issue-tools && pnpm test:coordinator-native && pnpm test:groups && pnpm test:group-turns && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:account && pnpm test:issues && pnpm test:issue-search && pnpm test:slack && pnpm test:telegram && pnpm test:suggestions && pnpm test:artifacts && pnpm test:captures && pnpm test:cloud-limits && pnpm test:factory-config && pnpm lint && pnpm typecheck && pnpm test:db-runner && pnpm test:active-agents && pnpm test:conversation-reads && pnpm test:request-log && pnpm test:legacy-reads && pnpm test:mailbox-verification && pnpm test:personal-mailbox-core && pnpm test:preview-driver && pnpm test:mobile && pnpm test:github && pnpm test:factory-monitor && pnpm test:factory-approval && pnpm test:factory-check-independence && pnpm test:factory-check-recovery && pnpm test:factory && pnpm test:self-improvement-unit && pnpm test:workspace-settings && pnpm test:model-admission && pnpm test:release-security && pnpm test:audit && pnpm test:user-message-text && pnpm test:chat-actions && pnpm test:run-info && pnpm test:thread-changes && pnpm check:cloud-boundary && pnpm test:factory-activity
+
+
+> next-app@0.0.1 test:self-hosting /vercel/sandbox/merge1505/repo
+> node --import ./tests/support/server-only.mjs --import tsx --test lib/edition.test.ts scripts/release/verify-cloud-edition.test.ts lib/server-info.test.ts && node --test scripts/self-hosted-start.test.mjs
+
+✔ edition defaults to community and rejects misspelled deployment configuration (1.007625ms)
+✔ community own-provider usage never touches hosted billing, including beyond the free trial (2.164725ms)
+✔ community settings omit billing, and the GitHub install target is the configured app (0.379106ms)
+✔ fresh and existing installations use one boolean query without disclosing accounts or server credentials (23.064291ms)
+✔ database errors and invalid configuration cannot reopen setup or leak error details (1.224573ms)
+✔ email delivery and effective OAuth availability are separate from existing account state (0.866512ms)
+✔ cloud and wrong methods do no database work; HEAD has no body; compatibility UI and HTTPS state are explicit (1.155124ms)
+✔ official rollout requires both the source and actual production runtime edition (22.739436ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1220.101188
+✔ installation keys survive restart, remain private, and explicit overrides never enter the file (7.679396ms)
+✔ standalone startup uses the operator database and durable local Workflow only (0.737605ms)
+✔ bad self-hosted origins fail before migration or sign-in (0.337002ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 83.680859
+
+> next-app@0.0.1 test:settings-backend /vercel/sandbox/merge1505/repo
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/audit/cursor.test.ts lib/audit/delivery-arm.test.ts lib/secrets/audit-map.test.ts lib/secrets/dotenv.test.ts lib/usage/month.test.ts lib/billing/stripe.test.ts lib/billing/points-purchase.test.ts tests/settings-backend-routes.test.ts tests/workspace-secret-actions.test.ts
+
+✔ audit cursors round-trip and reject anything else (4.472595ms)
+✔ CSV fields are quoted and never start a formula (0.243895ms)
+(node:726) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:726) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ enqueueing an audit receipt arms the audit-retention timer on the same transaction (47.473892ms)
+(node:743) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:743) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ each fixed USD amount creates a payment session with server-owned pricing and matching payment metadata (60.688494ms)
+✔ English returns to the localized billing section and Preview keeps its isolated origin (7.046015ms)
+✔ non-admins and client-supplied values outside the fixed list cannot create customers or sessions (4.161137ms)
+✔ unconfigured payment fulfillment is unavailable before any Stripe request (0.462791ms)
+✔ first purchase creates one workspace customer and persists it for the next session (1.622307ms)
+✔ provider failures and unsafe Checkout URLs fail without leaking provider response details (2.052141ms)
+✔ from a chat: a dialog session with a publishable key, else a hosted page; both come back to that chat (4.017661ms)
+✔ config is null without a key; form encoding nests the way Stripe expects (1.445765ms)
+✔ requests carry the key as a bearer header; failures keep only the status (26.377866ms)
+✔ webhook signatures: valid, tampered, stale and missing (0.699287ms)
+✔ secret and env events map onto the audit catalogue with allowlisted metadata only (4.997708ms)
+✔ denied and skipped events stay out of the log (0.173335ms)
+✔ secret delivery changes are auditable without copying secret-bearing configuration (0.713623ms)
+✔ one KEY=value per line, with an optional # note after the value (1.732121ms)
+✔ quotes keep # and spaces in the value; export, blank and comment lines; CRLF (0.32986ms)
+✔ each bad line is reported by number; good lines still parse (0.257956ms)
+✔ a file over 2 MB is refused whole (2.694591ms)
+✔ usage months are UTC calendar months (5.109753ms)
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.557Z","requestId":"541052a7-4d2a-4df6-ac86-896efc6a0698","invocationId":"39a409cd-289d-46f6-a93f-a54ef4ac1685","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-09T13:16:15.562Z","requestId":"541052a7-4d2a-4df6-ac86-896efc6a0698","invocationId":"39a409cd-289d-46f6-a93f-a54ef4ac1685","route":"/api/workspace/switcher","method":"GET","status":200,"durationMs":5,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.565Z","requestId":"bf23eb77-4b2e-4579-8779-26c6977a587a","invocationId":"38f346f4-a7e2-4d04-860d-0595e7ad5bdc","route":"/api/workspace/switcher","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-09T13:16:15.565Z","requestId":"bf23eb77-4b2e-4579-8779-26c6977a587a","invocationId":"38f346f4-a7e2-4d04-860d-0595e7ad5bdc","route":"/api/workspace/switcher","method":"GET","status":401,"durationMs":0,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.566Z","requestId":"a9cde7e3-344a-4d18-bd8c-371f5b68e552","invocationId":"9b0b45b6-fccb-40fe-a76f-d2fcd58bca64","route":"/api/workspace/switcher","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-09T13:16:15.566Z","requestId":"a9cde7e3-344a-4d18-bd8c-371f5b68e552","invocationId":"9b0b45b6-fccb-40fe-a76f-d2fcd58bca64","route":"/api/workspace/switcher","method":"GET","status":403,"durationMs":0,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.566Z","requestId":"3ccd3462-adfb-4869-ba45-8699c43e7ce2","invocationId":"cbfc3d08-9134-4483-a32f-1e11b17623c7","route":"/api/workspace/switcher","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-09T13:16:15.566Z","requestId":"3ccd3462-adfb-4869-ba45-8699c43e7ce2","invocationId":"cbfc3d08-9134-4483-a32f-1e11b17623c7","route":"/api/workspace/switcher","method":"GET","status":403,"durationMs":0,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.567Z","requestId":"009554ba-5942-490f-a0d9-4c0e7dcadfa1","invocationId":"2bce5673-b8fb-406a-ba42-03356f16fc2d","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.568Z","requestId":"5fb36b83-42f8-404f-ac53-10d569d62fce","invocationId":"2f15c899-c719-4529-8339-0385043d233c","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.568Z","requestId":"586de654-fa54-497a-8dfd-80f5153ef212","invocationId":"2acb13e2-8f5b-4adc-9e0c-cf0b5bd1d5e9","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.569Z","requestId":"b33d7a50-6055-4aee-82ab-a1f183550540","invocationId":"2728936f-8850-4917-bfbc-c6bbdfad9981","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.570Z","requestId":"904a962d-4e0c-43e1-aadd-cb5080a567a3","invocationId":"7d4d53f0-3045-4f58-9a8d-d14128d4cdc9","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-09T13:16:15.574Z","requestId":"904a962d-4e0c-43e1-aadd-cb5080a567a3","invocationId":"7d4d53f0-3045-4f58-9a8d-d14128d4cdc9","route":"/api/settings/[read]","method":"GET","status":200,"durationMs":4,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.574Z","requestId":"3699cd86-2768-48de-bf38-7f30e957f026","invocationId":"b361fce0-3243-42e5-9c69-cdf8b35e1bcb","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.576Z","requestId":"80e4ed3b-9194-44bf-9518-8c7c5710e7a0","invocationId":"a17aa9fc-e721-4c1e-bc46-10e480ecd3a7","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.577Z","requestId":"4229609f-d214-412e-8cef-6d3006361789","invocationId":"0487d122-421e-46c0-b4cd-4229ff657a8a","route":"/api/settings/[read]","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-09T13:16:15.576Z","requestId":"3699cd86-2768-48de-bf38-7f30e957f026","invocationId":"b361fce0-3243-42e5-9c69-cdf8b35e1bcb","route":"/api/settings/[read]","method":"GET","status":401,"durationMs":1,"userIdHash":null}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-09T13:16:15.577Z","requestId":"80e4ed3b-9194-44bf-9518-8c7c5710e7a0","invocationId":"a17aa9fc-e721-4c1e-bc46-10e480ecd3a7","route":"/api/settings/[read]","method":"GET","status":403,"durationMs":1,"userIdHash":null}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-09T13:16:15.578Z","requestId":"4229609f-d214-412e-8cef-6d3006361789","invocationId":"0487d122-421e-46c0-b4cd-4229ff657a8a","route":"/api/settings/[read]","method":"GET","status":403,"durationMs":1,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.578Z","requestId":"dacb9ab9-ba94-4560-88c1-65d1adb311ad","invocationId":"8123e2c6-23d8-4ff9-a6fd-452f252d5e5f","route":"/api/settings/[read]","method":"GET"}
+{"level":"error","msg":"api_request","timestamp":"2026-11-09T13:16:15.579Z","requestId":"dacb9ab9-ba94-4560-88c1-65d1adb311ad","invocationId":"8123e2c6-23d8-4ff9-a6fd-452f252d5e5f","route":"/api/settings/[read]","method":"GET","status":500,"durationMs":1,"userIdHash":null,"error":"Error"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.579Z","requestId":"0ed86524-d6f5-4642-b520-07924a25b6f6","invocationId":"53c992a6-4936-4bfb-b213-cefe9882f1f2","route":"/api/settings/[read]","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-09T13:16:15.580Z","requestId":"0ed86524-d6f5-4642-b520-07924a25b6f6","invocationId":"53c992a6-4936-4bfb-b213-cefe9882f1f2","route":"/api/settings/[read]","method":"GET","status":404,"durationMs":0,"userIdHash":null}
+(node:833) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:833) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.580Z","requestId":"8604719d-7ce8-4e18-a40d-4efab3b170e2","invocationId":"d0ed57e6-d6ef-4084-ad41-51e453543296","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-09T13:16:15.580Z","requestId":"8f7b612d-f22b-4889-bdb5-f8f21d06184e","invocationId":"1921428d-5e29-480d-8d46-bbdd9e54d060","route":"/api/settings/[read]","method":"GET"}
+✔ workspace switcher uses the authenticated session and keeps its successful response private (223.544736ms)
+✔ workspace switcher refuses a missing session before reading workspace data (0.812226ms)
+✔ workspace switcher keeps explicit workspace and membership refusals as 403 (1.275628ms)
+✔ workspace switcher does not turn database or unknown read failures into authority refusals (2.211222ms)
+✔ workspace switcher keeps an unknown session lookup failure retryable without reading workspace data (0.618629ms)
+✔ workspace-bots GET preserves the full workspace activity result and delegates scope to the existing action (4.494093ms)
+✔ workspace-bots GET preserves auth and membership refusals and never substitutes an empty activity list (5.424176ms)
+{"level":"info","msg":"api_request","timestamp":"2026-11-09T13:16:15.586Z","requestId":"8604719d-7ce8-4e18-a40d-4efab3b170e2","invocationId":"d0ed57e6-d6ef-4084-ad41-51e453543296","route":"/api/settings/[read]","method":"GET","status":200,"durationMs":6,"userIdHash":null}
+{"level":"info","msg":"api_request","timestamp":"2026-11-09T13:16:15.586Z","requestId":"8f7b612d-f22b-4889-bdb5-f8f21d06184e","invocationId":"1921428d-5e29-480d-8d46-bbdd9e54d060","route":"/api/settings/[read]","method":"GET","status":200,"durationMs":6,"userIdHash":null}
+[billing] webhook event rejected { name: 'SyntaxError' }
+✔ concurrent devices of one owner retain their own current-session marker (6.869399ms)
+✔ audit JSON resumes the same snapshot and preserves explicit export failures (4.979867ms)
+✔ audit CSV requires a session and service authorization, preserves the workspace/filter, and escapes formulas (1.819464ms)
+✔ Stripe webhook verifies raw-body signatures before applying an event and leaves DB failures retryable (1.99678ms)
+✔ signed setup Checkout events and legacy SetupIntents reach verification; invalid signatures do not (8.174825ms)
+(node:853) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:853) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ saving and deleting an E2B key pass the authenticated actor’s transaction audit hook to storage (29.888683ms)
+✔ E2B actions authorize the page workspace and reject a foreign workspace before storage (0.638652ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3497.751178
+
+> next-app@0.0.1 test:signup-turnstile /vercel/sandbox/merge1505/repo
+> node --import tsx --test lib/signup-refusal.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/auth/turnstile.test.tsx
+
+✔ maps the #527 sign-up codes to their messages (0.753962ms)
+✔ leaves other failures to the generic message (0.168623ms)
+✔ sends the Turnstile token only when the widget produced one (0.701545ms)
+✔ a wrong password and an unknown email read the same; only an unverified email offers verification (N4) (0.139615ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 165.535445
+(node:915) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:915) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+(node:915) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+✔ renders the Cloudflare widget when a site key is set (9.251399ms)
+✔ renders nothing without a site key (local, previews) (0.44804ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 266.696218
+
+> next-app@0.0.1 test:hosted-usage /vercel/sandbox/merge1505/repo
+> node --experimental-test-module-mocks --import tsx --test lib/billing/hosted-usage.test.ts lib/billing/verification-client.test.ts lib/subscription-refusal.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-wait.test.tsx
+
+✔ finds the hosted refusal code in a failed turn (0.991491ms)
+✔ shows the allowance and purchased points as one balance, 100 points per dollar, rounded down (0.200147ms)
+✔ the refusal line offers only what the person's state allows (0.923278ms)
+✔ a refused turn moves to the person's own subscription: the first in the menu's order (3.736357ms)
+(node:969) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:969) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ forwards each real action with the selected workspace and purchase amount (1.864959ms)
+✔ keeps the whole-point display and every transaction from the billing action (20.198403ms)
+✔ preserves billing authorization failures without a fallback read (1.640025ms)
+✔ a failed billing read rejects instead of showing an empty balance (1.035368ms)
+✔ a subscription refusal maps to its notice, never the raw step error (1.995375ms)
+✔ recovery follows the cause rather than retrying a disconnected account (0.174637ms)
+✔ other failures keep their own message (0.123643ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 544.429167
+(node:1010) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1010) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ idle, it registers no key and reads nothing (27.421742ms)
+✔ waiting, it listens on the workspace key and ends with the pushed read, with no read of its own (9.072775ms)
+✔ with no push, one backstop read at the timeout, and the last data either way (2.592985ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 657.325051
+
+> next-app@0.0.1 test:execution-rules /vercel/sandbox/merge1505/repo
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/bot-quota-stop.test.ts lib/execution-worker.test.ts lib/execution-identity.test.ts lib/execution-settings-view.test.ts lib/model-options-source.test.ts lib/factory/agent-profile-target.test.ts lib/model-order-plan.test.ts lib/enabled-models-policy.test.ts lib/enabled-models-hosted.test.ts lib/credential-only-models.test.ts lib/model-order-context.test.ts lib/model-order-allowance.test.ts lib/device-scheduling.test.ts lib/model-routing.test.ts lib/model-provider-health.test.ts lib/run-model-fallback-view.test.ts lib/model-api-key-providers.test.ts lib/device-ssh-view.test.ts lib/factory/profile-quota.test.ts lib/computer/native-run-binding.test.ts lib/factory/authorize.test.ts lib/personal-policy.test.ts && pnpm --filter @mikka/daemon exec vitest run src/harness-models.test.ts test/commands.test.ts && pnpm --filter @mikka/protocol exec vitest run src/execution.test.ts
+
+(node:1049) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1049) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a frozen subscription that runs out stops the turn; it never switches account or model mid-turn (32.373275ms)
+(node:1066) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1066) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ native own execution combines its final binding and connection read (3.387148ms)
+✔ native shared execution combines its final binding and connection read (4.46981ms)
+✔ native execution rereads present after both membership checks (0.989427ms)
+✔ native execution rereads share after both membership checks (0.752886ms)
+✔ native execution rereads agentOwned after both membership checks (0.793487ms)
+✔ native execution rereads connected after both membership checks (0.6502ms)
+✔ native execution rereads epoch after both membership checks (0.590558ms)
+✔ a native scheduling history read still exposes an unavailable selection for existing callers (0.355453ms)
+✔ claude_code: an enabled credential model needs no device model report (1.181578ms)
+✔ codex: an enabled credential model needs no device model report (0.159857ms)
+✔ dispatch ranks match cloud-first and local-first planner selection, load and exclusions (2.427449ms)
+✔ future, offline, uninstalled and unavailable models have backend reasons and no dispatch rank (0.503334ms)
+✔ per-harness supported models come from the same account-aware device support as dispatch (0.217842ms)
+✔ dispatch availability never depends on a device model report (0.181749ms)
+✔ an earlier credential check keeps the node checking instead of inventing an install/update failure (0.195016ms)
+✔ the installer's five steps fold into the four Figma shows (1.39991ms)
+✔ a failure marks only its own step and keeps the rest waiting (0.150741ms)
+✔ online completes every step (0.117026ms)
+✔ an ssh alias counts as added by device name or host name (0.186118ms)
+✔ 添加这台电脑 shows 安装 → 启动 → 已上线, with the node check counted as installing (0.16991ms)
+✔ 重新连接 this computer shows 启动 → 已上线; SSH keeps all four steps (0.13506ms)
+(node:1136) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1136) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ hosted settings expose the actual default target when cloud supersedes a configured local provider (84.019256ms)
+✔ a valid selected subscription does not query unrelated hosted policy (1.565474ms)
+✔ a valid shared subscription does not query unrelated hosted policy (0.284589ms)
+✔ a valid default subscription does not query unrelated hosted policy (0.231264ms)
+✔ a valid pooled subscription does not query unrelated hosted policy (0.260146ms)
+✔ a valid explicit API key does not query hosted policy (0.260576ms)
+✔ explicit hosted choice reads once before subscriptions and each new choice reads fresh policy (5.537753ms)
+✔ disabled explicit hosted choice keeps an available subscription fallback (0.750459ms)
+✔ disabled implicit hosted choice keeps the configured subscription fallback (0.647039ms)
+✔ disabled implicit hosted choice keeps the configured api_key fallback (0.604586ms)
+✔ actual hosted policy failure propagates without fallback and the next invocation can recover (0.69655ms)
+✔ concurrent owners do not share hosted policy and community defaults still respect disabled hosted (1.45073ms)
+✔ subscription defaults use #1515 release families and keep distinct tiers (1.900599ms)
+✔ automatic upgrades retire automatic old versions but preserve both explicit on and off (0.27522ms)
+✔ auto-enable off holds previous choices and new models remain off, including returning models (0.204185ms)
+✔ subscription reconciliation preserves the last successful refresh time until the refresh writer stamps it (0.145397ms)
+✔ borrowing a Bot uses the requester, their own device/account, and their private output (2.575727ms)
+✔ a Bot owner cannot lend their personal device implicitly (0.816385ms)
+✔ resource ownership is distinct from the Bot owner and explicit sharing is mandatory (4.090414ms)
+✔ revoking requester's membership ends a previously valid grant (0.588799ms)
+✔ revoking bot-owner's membership ends a previously valid grant (0.517983ms)
+✔ revoking resource-owner's membership ends a previously valid grant (0.531613ms)
+✔ Bot takeover and workspace migration cannot silently reassign an accepted run (2.051137ms)
+✔ subscription disconnect and revision changes revoke frozen subscription authority (1.097123ms)
+✔ retries retain immutable attribution and refuse an injected payment account (1.056296ms)
+✔ handoff reauthorizes a same-owner destination without refreshing withdrawn shares (1.224798ms)
+✔ E2B billing remains the requester's own external account and deletion denies execution (0.770473ms)
+✔ historical runs remain unattributed instead of fabricating current owners as past payers (0.349623ms)
+✔ the final provider boundary rejects stopped, completed and expired executions (1.430977ms)
+✔ usage attributes the frozen payer and leaves external amounts unknown (15.078646ms)
+✔ the provider mark follows the model id, then the account or harness (0.998724ms)
+✔ bot models group by account and list a copied binding once (2.370752ms)
+✔ a Bot with no saved model shows the Claude account first, then ChatGPT (0.281761ms)
+✔ subscription workers retain CLI auto unless a provider model is explicitly selected (2.309677ms)
+✔ explicit model and device stay frozen through retries (2.186331ms)
+(node:1222) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1222) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ fixed own dispatch avoids unrelated sources while retaining fresh credential refusal (13.957559ms)
+✔ fixed shared dispatch avoids unrelated sources while retaining fresh credential refusal (2.807219ms)
+✔ a harness-only dispatch keeps its preference model even with a conflicting exact source (36.817142ms)
+✔ fixed own subscription reads only its selected source, with the original final fences (5.359183ms)
+ℹ {"kind":"subscription","shared":false,"originalQueries":12,"selectedQueries":5,"originalMembershipChecks":2,"selectedMembershipChecks":0,"providerCalls":0}
+✔ fixed own api_key reads only its selected source, with the original final fences (2.322188ms)
+ℹ {"kind":"api_key","shared":false,"originalQueries":12,"selectedQueries":6,"originalMembershipChecks":2,"selectedMembershipChecks":0,"providerCalls":0}
+✔ fixed shared subscription reads only its selected source, with the original final fences (2.440075ms)
+ℹ {"kind":"subscription","shared":true,"originalQueries":13,"selectedQueries":6,"originalMembershipChecks":2,"selectedMembershipChecks":1,"providerCalls":0}
+✔ fixed shared api_key reads only its selected source, with the original final fences (1.648592ms)
+ℹ {"kind":"api_key","shared":true,"originalQueries":12,"selectedQueries":6,"originalMembershipChecks":2,"selectedMembershipChecks":0,"providerCalls":0}
+✔ fixed subscription keeps the full implementation refusal: paused (1.788407ms)
+✔ fixed subscription keeps the full implementation refusal: removed (1.496876ms)
+✔ fixed subscription keeps the full implementation refusal: reconnect (1.715045ms)
+✔ fixed subscription keeps the full implementation refusal: epoch_changed (1.532548ms)
+✔ fixed subscription keeps the full implementation refusal: model_gone (1.415135ms)
+✔ fixed subscription keeps the full implementation refusal: quota (1.759357ms)
+✔ fixed subscription keeps the full implementation refusal: stale_quota (1.628349ms)
+✔ fixed subscription keeps the full implementation refusal: share_revoked (1.211399ms)
+✔ fixed subscription keeps the full implementation refusal: team_denied (1.130736ms)
+✔ fixed subscription keeps the full implementation refusal: payor_left (1.53027ms)
+✔ fixed subscription keeps the full implementation refusal: health (2.251388ms)
+✔ fixed API key keeps the full implementation refusal: unshared (1.599144ms)
+✔ fixed API key keeps the full implementation refusal: team_denied (1.208817ms)
+✔ fixed API key keeps the full implementation refusal: models_error (1.39395ms)
+✔ fixed API key keeps the full implementation refusal: model_gone (1.425663ms)
+✔ fixed API key keeps the full implementation refusal: protocol (1.560192ms)
+✔ fixed API key keeps the full implementation refusal: responses (1.328238ms)
+✔ fixed API key keeps the full implementation refusal: health (1.966505ms)
+✔ the original post-lock fresh read still sees pause (1.938234ms)
+✔ the original post-lock fresh read still sees share (2.411163ms)
+✔ the original post-lock fresh read still sees key_share (1.896368ms)
+✔ builtin target retains the complete catalogue and its ordering path (2.594679ms)
+✔ inherit target retains the complete catalogue and its ordering path (2.229241ms)
+✔ fixed Profile admission still refuses archived before reading its source (0.646381ms)
+✔ fixed Profile admission still refuses disabled before reading its source (0.348136ms)
+✔ fixed Profile admission still refuses revision before reading its source (0.307339ms)
+✔ fixed Profile admission still refuses owner before reading its source (0.320931ms)
+✔ fixed Profile admission still refuses workspace before reading its source (0.267528ms)
+✔ fixed Profile admission still refuses definition before reading its source (0.464677ms)
+✔ fixed Profile admission still refuses pin before reading its source (0.403042ms)
+(node:1242) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1242) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ Factory authorization asks canonical issue access for metadata without its body (1.616483ms)
+✔ Factory authorization rechecks access on every call and returns only the access result (0.233705ms)
+✔ Factory authorization propagates the canonical access failure without accepting or retrying (0.511391ms)
+(node:1259) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1259) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ fixed queue quota reads only the admitted candidate after exact native binding validation (2.755473ms)
+✔ fixed claim quota keeps its always probe after current run identity and exact binding validation (0.604943ms)
+✔ builtin quota preparation preserves the full preference path (1.612913ms)
+✔ inherit quota preparation preserves the full preference path (0.804097ms)
+✔ revoked binding refuses both quota preparations before reading another source (0.82347ms)
+✔ revoked execution identity prevents the forced provider probe (0.365144ms)
+✔ origin continuation keeps its existing quota exemption (0.274442ms)
+✔ question continuation keeps its existing quota exemption (0.150247ms)
+✔ foreign frozen scope cannot start quota preparation (0.190363ms)
+✔ a preset serves every protocol its official API speaks; DeepSeek and Kimi both, so their keys run on both Agents (1.38285ms)
+✔ each Agent talks to its own protocol's endpoint; a key that does not speak it has none (0.309933ms)
+✔ a custom provider serves only the protocol the person picked, at its own base URL (0.163081ms)
+✔ Codex runs on the Responses API: an OpenAI-protocol provider without it serves no Agent, but still speaks its protocol (0.916704ms)
+✔ no model name is written into lib/ or components/: model options come only from what was reported (1797.526225ms)
+✔ the guard catches a written model name and ignores comments (0.642334ms)
+✔ routing metadata exemption cannot hide model options, defaults or another file (1.655638ms)
+(node:1310) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1310) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ forced startup refresh uses allowance after its original owner checks (6.921357ms)
+✔ shared startup still checks requester, payer and the share before allowance (2.50327ms)
+✔ membership denial cannot start either allowance or Settings usage (1.002554ms)
+✔ share withdrawal cannot start allowance or switch to the requester account (1.17723ms)
+✔ each completed forced refresh still performs a fresh allowance call (1.479305ms)
+(node:1327) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1327) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ prompt projection skips only unused credential counts when sharing is false (93.847092ms)
+ℹ {"kind":"order_projection_query_budget","allowed":false,"full":10,"context":7,"saved":3}
+✔ prompt projection skips only unused credential counts when sharing is true (3.550515ms)
+ℹ {"kind":"order_projection_query_budget","allowed":true,"full":13,"context":9,"saved":4}
+✔ an unused count failure cannot discard prompt facts, while the full view still reports it (3.64005ms)
+✔ the prompt still rejects a required failCandidates check (0.930232ms)
+✔ the prompt still rejects a required failStates check (1.580376ms)
+✔ new prompt reads observe paused credentials and keep concurrent owners separate (4.333455ms)
+(node:1344) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1344) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ untouched defaults keep the newest release per account and family while retaining the full catalogue (2.385325ms)
+✔ device readiness is independent of the credential model catalogue and CLI shortcuts (0.297075ms)
+✔ an allowance check that failed keeps the subscription preference and does not silently charge a key (0.366152ms)
+✔ the first allowed model that can run takes the run; the full provider model is what runs despite a CLI slot (0.186252ms)
+✔ ordered fallback: quota used up, signed out, or no device moves to the next model, and says why each was skipped (0.328597ms)
+✔ 本地 picks only among the devices that can run it, never one with 参与调度 off, offline, or unable to take a subscription run (0.345473ms)
+✔ an admitted subscription model runs on any eligible broker without an exact CLI model report (0.189063ms)
+✔ no computer can run it: the reason comes from the computer closest to running it (0.352504ms)
+✔ failed subscription preflight is actionable and overrides a stale broker flag without blocking API-key runs (0.315321ms)
+✔ 本地 order: a server before a computer, then the fewest unfinished runs, then the one that joined first; the same input gives the same device (0.339923ms)
+✔ a model the person picked for the thread goes first, before the list (0.221587ms)
+✔ 云端 runs the first usable model on the person's E2B machine (0.14396ms)
+✔ nothing can run: the card names why (0.214499ms)
+✔ an untouched list: opus first, then the first Codex model reported, else the first model anything reported (0.700899ms)
+✔ 云端: the cloud, then a server, then a computer; a place is tried only when the one before it can run nothing (0.195906ms)
+✔ 本地: a server, then a computer, never the cloud (0.149841ms)
+✔ a run the person put in the cloud goes nowhere else (0.087977ms)
+✔ a model whose allowance check failed stops the search in every place, unless one before it can run (0.134988ms)
+✔ a configured cloud without measured template models cannot take a subscription run (0.136288ms)
+✔ dispatch order: the 优先使用的 Agent's list first, then the other's, each keeping its own order (decision 2026-11-05-0400) (0.175204ms)
+✔ a place in the 运行位置 chain says why it cannot take a run: 参与调度 off before offline before a missing Agent (0.109321ms)
+✔ order view serializes supplied heartbeat times without changing its display snapshot (264.804828ms)
+✔ native model rejection never changes global credential or model availability (2.927447ms)
+✔ runtime balance and authentication failures remain blocked until the credential is handled (1.635587ms)
+✔ provider unavailability expires after two minutes, including its exact boundary (1.857952ms)
+✔ health accepts only the structured provider contract and never returns raw errors (0.404355ms)
+✔ no authorized candidates means no credential or runtime history is read (0.3034ms)
+✔ exact model tiers leave unknown versions and aliases at standard (1.141597ms)
+✔ offered efforts exist in the retained native capability reports and run protocol (1.261136ms)
+✔ Decision asks two independent ordered scores and never sends candidates (0.352254ms)
+✔ the transport validates score answers against the question levels (0.465325ms)
+✔ the rounded tier picks the first listed model of that tier, regardless of the list head (0.512905ms)
+✔ scores round to the nearest level within bounds (0.174149ms)
+✔ the judge reads what must change, not process, acceptance or reporting sections (0.441352ms)
+✔ a missing tier goes up, never down, and only falls lower when nothing higher can run (0.224203ms)
+✔ effort maps to the nearest level the selected model supports (0.335626ms)
+✔ only an uncertain, missing or malformed tier keeps list order (0.356446ms)
+✔ tier and effort use separate confidence floors (0.157279ms)
+✔ confidence combinations: effort never abandons the tier judgement (0.30963ms)
+✔ diagnostics carry scores, confidence and the outcome, never candidate IDs (0.283319ms)
+✔ toggle off ignores the Decision and follows the person's list position without mutation (0.129193ms)
+✔ a light failure goes to the nearest higher available tier, before an earlier strongest entry (0.382228ms)
+✔ escalation preserves list order inside a tier and never returns a lower or failed tier (0.154506ms)
+✔ escalation keeps an accepted effort only when the new model supports it (0.105523ms)
+✔ a version-1 snapshot from before the tier judgement still escalates, with an unknown required tier (0.258408ms)
+✔ the labeled routing set is well formed and each label is reachable through the host mapping (5.200557ms)
+(node:1397) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1397) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a shared credential check returns its current authorization in one read (1.55701ms)
+✔ a missing share does not issue an additional read or write (0.186858ms)
+✔ a refused share does not issue an additional read or write (0.097087ms)
+✔ repeated permission checks observe revoke and restore without reusing an earlier grant (0.181544ms)
+✔ a failed authorization read propagates its original cause without another query (0.468339ms)
+✔ only a committed continuation within the same authorized chain is shown as switched (5.226627ms)
+✔ the composer follows only a confirmed switch to its current live run (0.261497ms)
+✔ multiple switch notices cannot replace the current run with an unrelated historical target (0.234576ms)
+✔ blocked and explicitly picked models keep the safe per-model reasons and setup actions (1.612733ms)
+✔ host receipt parsing rejects raw fields and malformed digests without exposing private receipt fields (0.390188ms)
+ℹ tests 180
+ℹ suites 0
+ℹ pass 180
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10236.296721
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/vercel/sandbox/merge1505/repo/packages/daemon[39m
+
+ [32m✓[39m test/commands.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 2266[2mms[22m[39m
+   [33m[2m✓[22m[39m uninstall waits for active threads, persists and sends its receipt, removes the service and credentials, then exits[33m 359[2mms[22m[39m
+   [32m✓[39m run commands [2m(6)[22m
+     [33m[2m✓[22m[39m hands a person's message to the running agent and acks it once[33m 366[2mms[22m[39m
+     [33m[2m✓[22m[39m cancels the run when a person stops it, and closes its message[33m 494[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps taking messages for other runs while one is being stopped[33m 353[2mms[22m[39m
+     [33m[2m✓[22m[39m ignores commands for runs it does not have, and keeps polling after a network cut[33m 401[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 13:16:29
+[2m   Duration [22m 3.84s[2m (tests 61%, transform 22%, import 17%)[22m
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/vercel/sandbox/merge1505/repo/packages/protocol[39m
+
+ [32m✓[39m src/execution.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 13:16:34
+[2m   Duration [22m 370ms[2m (transform 59%, import 37%, tests 3%, worker 1%)[22m
+
+
+> next-app@0.0.1 test:abuse /vercel/sandbox/merge1505/repo
+> node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/abuse/policy.test.ts lib/abuse/model.test.ts lib/abuse/zerocat.test.ts lib/abuse/card.test.ts lib/abuse/card-checkout.test.ts
+
+(node:1732) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1732) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ any member, from a team, gets hosted setup Checkout for their own personal workspace; no charge or Payment Element data (52.244548ms)
+✔ someone outside the workspace cannot create a Stripe customer or a verification session (0.628668ms)
+✔ a missing Stripe key, fulfillment secret or configured origin makes verification unavailable (0.401368ms)
+✔ customer creation is shared with points purchases and each verification session gets its own local binding (6.296969ms)
+✔ English Preview returns to the same configured deployment and billing section (2.323576ms)
+✔ provider failure or a non-Stripe Checkout URL cannot return a redirect or create a session binding (4.466571ms)
+(node:1752) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1752) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ legacy webhook trusts locally stored intent/customer and retrieves the card fingerprint and last4 (1.556771ms)
+✖ Checkout setup completion retrieves its intent and verifies through the local session/customer binding (1.192621ms)
+✖ foreign intent/customer, non-card methods and missing fingerprint never verify (0.301718ms)
+✖ status is for members only, unavailable when unconfigured, and unverified before any setup (3.831724ms)
+✖ status reads current session: open or complete is pending, expired or foreign customer is unverified (0.658889ms)
+✖ verified status preserves granted after allowance is spent and never returns a fingerprint (0.512343ms)
+2026-11-09T13:16:38.135Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+(node:1770) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1770) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ self-hosted default generation keeps direct admission and records only its actual model receipt (209.899561ms)
+✔ self-hosted default stream keeps direct admission and records only its actual model receipt (5.156157ms)
+✔ a refused self-hosted generation stays refused without provider or paid fallback and without borrowed owner scope (1.034422ms)
+✔ verification and zero balance prevent provider I/O, including another tool step (1.468796ms)
+✔ stream finish settles before delivery; every call has its own ledger identity (1.476759ms)
+✔ missing provider cost is held for reconciliation, never silently free (0.558242ms)
+✔ managed provider options replace caller fallback, credentials and provider order (11.237221ms)
+✔ managed refusal precedes budget reservation; revocation during reservation precedes provider I/O (11.773529ms)
+✔ an unverified injected transport cannot impersonate the managed Gateway endpoint (0.595932ms)
+✔ a trusted custom-key Gateway remains usable under an allowed managed route (11.745128ms)
+✔ early Gateway identity survives error without invented cost (1.255303ms)
+✔ early Gateway identity survives cancel without invented cost (0.682387ms)
+✔ early Gateway identity survives finish without invented cost (0.449546ms)
+✔ consumer cancellation stops upstream before blocked settlement and safely completes a pending read (0.586574ms)
+✔ cancel still stops upstream when unknown-cost settlement fails, and rejects the accounting failure (0.520201ms)
+✔ a stream processing error stops upstream before waiting for its unknown-cost settlement (0.554346ms)
+✔ server-owned billing adapter reuses the full route and settles in its own ledger exactly once (0.392148ms)
+signup_turnstile_not_configured
+✔ fixed $1 allowance, invalid caps never mean unlimited (0.857633ms)
+✔ cost metadata is rounded upwards, missing cost is never zero (0.178694ms)
+✔ Gmail aliases normalize; other domains keep dots; disposable subdomains are refused (0.205485ms)
+✔ Turnstile local skip, production missing config, invalid and valid provider token (22.981974ms)
+✔ alerts at 50%, 100% and strictly more than the first-use threshold (0.796817ms)
+✔ signup IP uses the trusted Vercel header and finite overrides never mean unlimited (1.069059ms)
+✔ local test mode defaults to CI's limits; production, Vercel and other databases keep 5 an hour (0.657457ms)
+2026-11-09T13:16:41.266Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+(node:1812) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1812) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ the default model calls ZeroCat with the configured key and its own model id (277.648525ms)
+✖ a streamed default-model turn settles its cost from the finish usage (12.038706ms)
+✖ a ZeroCat 500 goes to the Gateway route, billed by Gateway's receipt (3.057993ms)
+✖ a ZeroCat 503 goes to the Gateway route, billed by Gateway's receipt (2.525713ms)
+✖ a ZeroCat 429 goes to the Gateway route, billed by Gateway's receipt (4.694308ms)
+✖ a ZeroCat 402 goes to the Gateway route, billed by Gateway's receipt (3.176701ms)
+✖ a network failure or timeout before ZeroCat answers goes to Gateway (2.948121ms)
+✖ missing ZeroCat variables or another base URL use the Gateway route, before any ZeroCat request (18.196542ms)
+✖ a workspace rule that admits only the Gateway route sends the default model there (4.849783ms)
+✖ a stream error before the first token goes to Gateway; after it the stream fails as is (1.709123ms)
+✖ a cancelled call never falls back (2.557139ms)
+✖ only the trusted Gateway transport may be handed in for the default model, and only as its fallback (2.03117ms)
+✔ missing token counts leave the cost unknown, never free (0.51289ms)
+✔ failure reasons come from a closed set (0.348575ms)
+✔ the route span keeps every attribute through the tracing privacy filter (6.054508ms)
+✖ a refused redirect is named, the failure is logged by names and code only, and later calls skip ZeroCat for a while (1.823576ms)
+✔ a connection error keeps its system code (0.616811ms)
+ℹ tests 53
+ℹ suites 0
+ℹ pass 34
+ℹ fail 19
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6349.354927
+
+✖ failing tests:
+
+test at lib/abuse/card.test.ts:1:2826
+✖ legacy webhook trusts locally stored intent/customer and retrieves the card fingerprint and last4 (1.556771ms)
+  Error: billingNotConfigured
+      at applyBoundCardSetup (/vercel/sandbox/merge1505/repo/lib/abuse/card.ts:16:22)
+      at Module.applyCardSetup (/vercel/sandbox/merge1505/repo/lib/abuse/card.ts:31:22)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/card.test.ts:52:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at lib/abuse/card.test.ts:1:3339
+✖ Checkout setup completion retrieves its intent and verifies through the local session/customer binding (1.192621ms)
+  Error: billingNotConfigured
+      at Module.applyCardCheckout (/vercel/sandbox/merge1505/repo/lib/abuse/card.ts:40:22)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/card.test.ts:60:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at lib/abuse/card.test.ts:1:3954
+✖ foreign intent/customer, non-card methods and missing fingerprint never verify (0.301718ms)
+  Error: billingNotConfigured
+      at Module.applyCardCheckout (/vercel/sandbox/merge1505/repo/lib/abuse/card.ts:40:22)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/card.test.ts:67:96)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at lib/abuse/card.test.ts:1:4502
+✖ status is for members only, unavailable when unconfigured, and unverified before any setup (3.831724ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      allowance: null,
+      last4: null,
+      remainingAllowanceMicroUsd: 0,
+      remainingAllowancePoints: 0,
+  +   status: 'unavailable'
+  -   status: 'unverified'
+    }
+  
+      at TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/card.test.ts:80:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { status: 'unavailable', last4: null, allowance: null, remainingAllowanceMicroUsd: 0, remainingAllowancePoints: 0 },
+    expected: { status: 'unverified', last4: null, allowance: null, remainingAllowanceMicroUsd: 0, remainingAllowancePoints: 0 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at lib/abuse/card.test.ts:1:5131
+✖ status reads current session: open or complete is pending, expired or foreign customer is unverified (0.658889ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unavailable'
+  - 'pending'
+  
+      at TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/card.test.ts:88:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'pending',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/abuse/card.test.ts:1:5700
+✖ verified status preserves granted after allowance is spent and never returns a fingerprint (0.512343ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   allowance: null,
+  +   last4: null,
+  +   remainingAllowanceMicroUsd: 0,
+  +   remainingAllowancePoints: 0,
+  +   status: 'unavailable'
+  -   allowance: 'granted',
+  -   last4: '4242',
+  -   remainingAllowanceMicroUsd: 500000,
+  -   remainingAllowancePoints: 50,
+  -   status: 'verified'
+    }
+  
+      at TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/card.test.ts:96:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { status: 'unavailable', last4: null, allowance: null, remainingAllowanceMicroUsd: 0, remainingAllowancePoints: 0 },
+    expected: { status: 'verified', last4: '4242', allowance: 'granted', remainingAllowanceMicroUsd: 500000, remainingAllowancePoints: 50 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at lib/abuse/zerocat.test.ts:1:4956
+✖ the default model calls ZeroCat with the configured key and its own model id (277.648525ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:101:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:6050
+✖ a streamed default-model turn settles its cost from the finish usage (12.038706ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:122:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:6651
+✖ a ZeroCat 500 goes to the Gateway route, billed by Gateway's receipt (3.057993ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:134:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:6651
+✖ a ZeroCat 503 goes to the Gateway route, billed by Gateway's receipt (2.525713ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:134:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:6651
+✖ a ZeroCat 429 goes to the Gateway route, billed by Gateway's receipt (4.694308ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:134:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:6651
+✖ a ZeroCat 402 goes to the Gateway route, billed by Gateway's receipt (3.176701ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:134:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:7631
+✖ a network failure or timeout before ZeroCat answers goes to Gateway (2.948121ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:150:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:8185
+✖ missing ZeroCat variables or another base URL use the Gateway route, before any ZeroCat request (18.196542ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:163:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:9010
+✖ a workspace rule that admits only the Gateway route sends the default model there (4.849783ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:173:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:9405
+✖ a stream error before the first token goes to Gateway; after it the stream fails as is (1.709123ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:181:17)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:10545
+✖ a cancelled call never falls back (2.557139ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:201:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+
+test at lib/abuse/zerocat.test.ts:1:10976
+✖ only the trusted Gateway transport may be handed in for the default model, and only as its fallback (2.03117ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /modelRouteDenied/. Input:
+  
+  'Error: connect ECONNREFUSED 127.0.0.1:5432'
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:209:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: connect ECONNREFUSED 127.0.0.1:5432
+        at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+        at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+        at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:209:3)
+        at async Test.run (node:internal/test_runner/test:1409:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:974:7),
+    expected: /modelRouteDenied/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at lib/abuse/zerocat.test.ts:1:12867
+✖ a refused redirect is named, the failure is logged by names and code only, and later calls skip ZeroCat for a while (1.823576ms)
+  Error: connect ECONNREFUSED 127.0.0.1:5432
+      at /vercel/sandbox/merge1505/repo/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async CloudClientStore.capability (/vercel/sandbox/merge1505/repo/lib/cloud-services/store.ts:214:29)
+      at async defaultModelTarget (/vercel/sandbox/merge1505/repo/lib/default-model.ts:16:23)
+      at async hostedModel (/vercel/sandbox/merge1505/repo/lib/abuse/model.ts:87:44)
+      at async TestContext.<anonymous> (/vercel/sandbox/merge1505/repo/lib/abuse/zerocat.test.ts:244:17)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 5432
+  }
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

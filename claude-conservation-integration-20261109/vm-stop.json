@@ -1,0 +1,53 @@
+{
+  "result": {
+    "sandbox": {
+      "name": "green-beautiful-mandrill-4tD7NB",
+      "currentSessionId": "sbx_Jof7ZXv7aRjmEJYigkO2UbrHzAfJ",
+      "status": "stopped",
+      "statusUpdatedAt": 1794230690988,
+      "persistent": false,
+      "workloadType": "sandbox",
+      "region": "iad1",
+      "failoverRegions": [],
+      "vcpus": 2,
+      "memory": 4096,
+      "runtime": "node24",
+      "architecture": "amd64",
+      "timeout": 900000,
+      "totalEgressBytes": 3407930,
+      "totalIngressBytes": 1340903995,
+      "totalActiveCpuDurationMs": 170528,
+      "totalDurationMs": 675090,
+      "cwd": "/vercel/sandbox",
+      "createdAt": 1794230015727,
+      "updatedAt": 1794230015727
+    },
+    "session": {
+      "id": "sbx_Jof7ZXv7aRjmEJYigkO2UbrHzAfJ",
+      "runtime": "node24",
+      "architecture": "amd64",
+      "requestedAt": 1794230015651,
+      "startedAt": 1794230015678,
+      "requestedStopAt": 1794230689604,
+      "stoppedAt": 1794230690768,
+      "status": "stopped",
+      "duration": 675090,
+      "vcpus": 2,
+      "memory": 4096,
+      "timeout": 900000,
+      "region": "iad1",
+      "cwd": "/vercel/sandbox",
+      "workloadType": "sandbox",
+      "createdAt": 1794230015651,
+      "updatedAt": 1794230015701,
+      "interactivePort": 26661,
+      "activeCpuDurationMs": 170528,
+      "networkTransfer": {
+        "ingress": 1340903995,
+        "egress": 3407930
+      },
+      "sourceSandboxName": "green-beautiful-mandrill-4tD7NB",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+    }
+  }
+}

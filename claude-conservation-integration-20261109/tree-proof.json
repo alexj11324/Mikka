@@ -1,0 +1,44 @@
+{
+  "tree": "61207b65e30026c0cde5cd4eb9b794cb4faf308e",
+  "mergeBase": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "ownPaths": [
+    ".github/workflows/e2b-official-runtime.yml",
+    "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+    "docs/operations/web-deploy.md",
+    "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+    "packages/daemon/scripts/prepare-worker-install.py",
+    "packages/daemon/scripts/prepare-worker-install.test.py",
+    "scripts/acceptance/cloud-startup.mjs",
+    "scripts/acceptance/cloud-startup.test.mjs",
+    "scripts/release/web-deploy.mjs",
+    "scripts/release/web-deploy.test.mjs"
+  ],
+  "fixPaths": [
+    "docs/operations/1506-official-base-conservation-control-20261109.md",
+    "docs/operations/evidence/1506-official-base-conservation-control-20261109.json",
+    "scripts/e2b/e2b-finalization-files.json",
+    "scripts/e2b/official-files.py",
+    "scripts/e2b/official-files.test.py"
+  ],
+  "relativeE78": [
+    ".github/workflows/e2b-official-runtime.yml",
+    "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+    "docs/operations/1506-official-base-conservation-control-20261109.md",
+    "docs/operations/evidence/1506-official-base-conservation-control-20261109.json",
+    "docs/operations/web-deploy.md",
+    "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+    "packages/daemon/scripts/prepare-worker-install.py",
+    "packages/daemon/scripts/prepare-worker-install.test.py",
+    "scripts/acceptance/cloud-startup.mjs",
+    "scripts/acceptance/cloud-startup.test.mjs",
+    "scripts/e2b/e2b-finalization-files.json",
+    "scripts/e2b/official-files.py",
+    "scripts/e2b/official-files.test.py",
+    "scripts/release/web-deploy.mjs",
+    "scripts/release/web-deploy.test.mjs"
+  ],
+  "bothSideBlobsAndModesIdentical": true,
+  "extraProductDelta": false,
+  "versions": "v24.22.1\ngit version 2.49.0\nPython 3.9.25\n",
+  "check": "pnpm test:self-hosting && pnpm test:settings-backend && pnpm test:signup-turnstile && pnpm test:hosted-usage && pnpm test:execution-rules && pnpm test:abuse && pnpm test:unattended && pnpm check:agent-definitions && pnpm test:agent-kit && pnpm test:agent-kit-compat && pnpm check:agent-ui && pnpm test:credentials && pnpm test:preview && pnpm test:lib-units && pnpm test:project-decisions && pnpm test:unread && pnpm test:issue-readonly-dom && pnpm test:idle-budget && pnpm test:dev-local && pnpm test:mvp-fixtures && pnpm test:agent && pnpm test:acceptance && pnpm test:test-accounts && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:platform && pnpm test:motion && pnpm test:view-state && pnpm test:i18n && pnpm i18n:check && node scripts/check-copy.mjs && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:schedules && pnpm test:run-recovery && pnpm test:run-publication && pnpm test:coordinator-native-relay && pnpm test:coordinator-native-scope && pnpm test:coordinator-issue-tools && pnpm test:coordinator-native && pnpm test:groups && pnpm test:group-turns && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:account && pnpm test:issues && pnpm test:issue-search && pnpm test:slack && pnpm test:telegram && pnpm test:suggestions && pnpm test:artifacts && pnpm test:captures && pnpm test:cloud-limits && pnpm test:factory-config && pnpm lint && pnpm typecheck && pnpm test:db-runner && pnpm test:active-agents && pnpm test:conversation-reads && pnpm test:request-log && pnpm test:legacy-reads && pnpm test:mailbox-verification && pnpm test:personal-mailbox-core && pnpm test:preview-driver && pnpm test:mobile && pnpm test:github && pnpm test:factory-monitor && pnpm test:factory-approval && pnpm test:factory-check-independence && pnpm test:factory-check-recovery && pnpm test:factory && pnpm test:self-improvement-unit && pnpm test:workspace-settings && pnpm test:model-admission && pnpm test:release-security && pnpm test:audit && pnpm test:user-message-text && pnpm test:chat-actions && pnpm test:run-info && pnpm test:thread-changes && pnpm check:cloud-boundary && pnpm test:factory-activity"
+}

@@ -1,0 +1,197 @@
+[
+  {
+    "name": "versions",
+    "args": [
+      "sh",
+      "-c",
+      "node --version && git --version && python3 --version"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/versions.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/versions.stderr"
+  },
+  {
+    "name": "git-init",
+    "args": [
+      "git",
+      "init",
+      "repo"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/git-init.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/git-init.stderr"
+  },
+  {
+    "name": "git-remote",
+    "args": [
+      "git",
+      "remote",
+      "add",
+      "origin",
+      "https://github.com/alexj11324/Mikka.git"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/git-remote.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/git-remote.stderr"
+  },
+  {
+    "name": "git-fetch",
+    "args": [
+      "git",
+      "fetch",
+      "--no-tags",
+      "--depth=128",
+      "origin",
+      "2c3edf02d630c88b092f21db47b6f312a3c26f96",
+      "8b9dea4b85a9ffe13dab5687774664e1a49a336e"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/git-fetch.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/git-fetch.stderr"
+  },
+  {
+    "name": "merge-base",
+    "args": [
+      "git",
+      "merge-base",
+      "2c3edf02d630c88b092f21db47b6f312a3c26f96",
+      "8b9dea4b85a9ffe13dab5687774664e1a49a336e"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/merge-base.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/merge-base.stderr"
+  },
+  {
+    "name": "checkout",
+    "args": [
+      "git",
+      "checkout",
+      "--detach",
+      "2c3edf02d630c88b092f21db47b6f312a3c26f96"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/checkout.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/checkout.stderr"
+  },
+  {
+    "name": "merge",
+    "args": [
+      "git",
+      "-c",
+      "user.name=Mikka validation",
+      "-c",
+      "user.email=validation@invalid.example",
+      "merge",
+      "--no-commit",
+      "--no-ff",
+      "8b9dea4b85a9ffe13dab5687774664e1a49a336e"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/merge.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/merge.stderr"
+  },
+  {
+    "name": "write-tree",
+    "args": [
+      "git",
+      "write-tree"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/write-tree.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/write-tree.stderr"
+  },
+  {
+    "name": "diff-base",
+    "args": [
+      "git",
+      "diff",
+      "--cached",
+      "--name-status",
+      "e78fccffd9dd878edd490b113ea80efcff1525e7"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/diff-base.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/diff-base.stderr"
+  },
+  {
+    "name": "diff-check",
+    "args": [
+      "git",
+      "diff",
+      "--cached",
+      "--check"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/diff-check.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/diff-check.stderr"
+  },
+  {
+    "name": "test-paths",
+    "args": [
+      "git",
+      "ls-files",
+      "scripts/e2b",
+      "scripts/acceptance",
+      "packages/daemon",
+      "package.json"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/test-paths.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/test-paths.stderr"
+  },
+  {
+    "name": "official-files",
+    "args": [
+      "python3",
+      "scripts/e2b/official-files.test.py"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/official-files.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/official-files.stderr"
+  },
+  {
+    "name": "worker-install",
+    "args": [
+      "python3",
+      "packages/daemon/scripts/prepare-worker-install.test.py"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/worker-install.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/worker-install.stderr"
+  },
+  {
+    "name": "build-template",
+    "args": [
+      "python3",
+      "scripts/e2b/build-template.test.py"
+    ],
+    "exit": 1,
+    "stdout": "/vercel/sandbox/merge1505/logs/build-template.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/build-template.stderr"
+  },
+  {
+    "name": "cleanup-template",
+    "args": [
+      "python3",
+      "scripts/e2b/cleanup-template-candidates.test.py"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/cleanup-template.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/cleanup-template.stderr"
+  },
+  {
+    "name": "runtime-and-drivers",
+    "args": [
+      "node",
+      "--test",
+      "scripts/e2b/runtime-report.test.mjs",
+      "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "scripts/e2b/publish-template-env.test.mjs",
+      "scripts/acceptance/cloud-startup.test.mjs",
+      "scripts/release/web-deploy.test.mjs"
+    ],
+    "exit": 1,
+    "stdout": "/vercel/sandbox/merge1505/logs/runtime-and-drivers.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/runtime-and-drivers.stderr"
+  }
+]

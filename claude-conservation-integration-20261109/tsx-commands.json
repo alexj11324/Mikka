@@ -1,0 +1,17 @@
+[
+  {
+    "name": "cloud-startup-tsx",
+    "args": [
+      "node",
+      "--import",
+      "./tests/support/server-only.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "scripts/acceptance/cloud-startup.test.mjs"
+    ],
+    "exit": 0,
+    "stdout": "/vercel/sandbox/merge1505/logs/cloud-startup-tsx.stdout",
+    "stderr": "/vercel/sandbox/merge1505/logs/cloud-startup-tsx.stderr"
+  }
+]

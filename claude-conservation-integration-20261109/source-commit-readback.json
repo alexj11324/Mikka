@@ -1,0 +1,40 @@
+{
+  "sha": "869c71d7aa062c76fc7a75c1f8775d1ed8538168",
+  "node_id": "C_kwDOVRYxA9oAKDg2OWM3MWQ3YWEwNjJjNzZmYzdhNzVjMWY4Nzc1ZDFlZDg1MzgxNjg",
+  "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/869c71d7aa062c76fc7a75c1f8775d1ed8538168",
+  "html_url": "https://github.com/alexj11324/Mikka/commit/869c71d7aa062c76fc7a75c1f8775d1ed8538168",
+  "author": {
+    "name": "Zhixuan Jiang",
+    "email": "zhixuanj@andrew.cmu.edu",
+    "date": "2026-11-09T13:24:52Z"
+  },
+  "committer": {
+    "name": "Zhixuan Jiang",
+    "email": "zhixuanj@andrew.cmu.edu",
+    "date": "2026-11-09T13:24:52Z"
+  },
+  "tree": {
+    "sha": "61207b65e30026c0cde5cd4eb9b794cb4faf308e",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/61207b65e30026c0cde5cd4eb9b794cb4faf308e"
+  },
+  "message": "fix: integrate measured Claude directory finalization into startup work",
+  "parents": [
+    {
+      "sha": "2c3edf02d630c88b092f21db47b6f312a3c26f96",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/2c3edf02d630c88b092f21db47b6f312a3c26f96",
+      "html_url": "https://github.com/alexj11324/Mikka/commit/2c3edf02d630c88b092f21db47b6f312a3c26f96"
+    },
+    {
+      "sha": "8b9dea4b85a9ffe13dab5687774664e1a49a336e",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/8b9dea4b85a9ffe13dab5687774664e1a49a336e",
+      "html_url": "https://github.com/alexj11324/Mikka/commit/8b9dea4b85a9ffe13dab5687774664e1a49a336e"
+    }
+  ],
+  "verification": {
+    "verified": false,
+    "reason": "unsigned",
+    "signature": null,
+    "payload": null,
+    "verified_at": null
+  }
+}
