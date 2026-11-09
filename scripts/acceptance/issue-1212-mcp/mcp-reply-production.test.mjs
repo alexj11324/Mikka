@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test, { after } from 'node:test'
-import { configuration, ORIGIN, OWNER, REF, WORKFLOW, readMcpReply, runMcpReplyProof } from './mcp-reply-production.mjs'
+import { configuration, ORIGIN, REF, WORKFLOW, readMcpReply, runMcpReplyProof } from './mcp-reply-production.mjs'
 
 const APP = 'a'.repeat(40), DRIVER = 'b'.repeat(40), OTHER = 'c'.repeat(40)
-const EMAIL = 'synthetic-acme@example.invalid', PASSWORD = 'SYNTHETIC_PASSWORD_NOT_A_CREDENTIAL'
+const OWNER = 'synthetic-smoke-owner', EMAIL = 'synthetic+mikka-smoke@example.invalid', PASSWORD = 'SYNTHETIC_PASSWORD_NOT_A_CREDENTIAL'
 const COOKIE = 'SYNTHETIC_PRIVATE_SESSION', CLIENT = 'synthetic_this_run_client', BEFORE = 'synthetic_existing_client'
 const TOKEN = 'mka_SYNTHETIC_PRIVATE_ACCESS', HISTORY = 'PRIVATE_HISTORY_SHOULD_NEVER_REACH_A_REPORT_中文'
 const nativeFetch = globalThis.fetch
@@ -12,7 +12,7 @@ globalThis.fetch = () => { throw new Error('offline_network_forbidden') }
 after(() => { globalThis.fetch = nativeFetch })
 const env = () => ({ GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_EVENT_NAME: 'push', GITHUB_REF: REF,
   GITHUB_WORKFLOW_REF: `alexj11324/Mikka/${WORKFLOW}@${REF}`, GITHUB_SHA: DRIVER, GITHUB_RUN_ID: '987654321',
-  GITHUB_RUN_ATTEMPT: '1', MIKKA_ACCEPTANCE_SHA: APP, ACME_DEMO_EMAIL: EMAIL, ACME_DEMO_PASSWORD: PASSWORD })
+  GITHUB_RUN_ATTEMPT: '1', MIKKA_ACCEPTANCE_SHA: APP, SMOKE_OWNER_EMAIL: EMAIL, SMOKE_OWNER_PASSWORD: PASSWORD })
 const event = { ref: REF, after: DRIVER, repository: { full_name: 'alexj11324/Mikka' } }
 const json = (value, status = 200, headers = {}) => Response.json(value, { status, headers })
 const result = (id, value) => ({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(value) }] } })
@@ -190,11 +190,11 @@ const used = (f, ending) => f.requests.filter(row => row.path.endsWith(ending))
 test('exact workflow/build guard rejects before credentials or network, and wrong deployed version never reads credentials', async () => {
   for (const changes of [{ GITHUB_REF: 'refs/heads/main' }, { MIKKA_ACCEPTANCE_SHA: '' }, { GITHUB_WORKFLOW_REF: 'other' }]) {
     const e = { ...env(), ...changes }
-    Object.defineProperty(e, 'ACME_DEMO_PASSWORD', { get() { assert.fail('credentials were read') } })
+    Object.defineProperty(e, 'SMOKE_OWNER_PASSWORD', { get() { assert.fail('credentials were read') } })
     const { f, report } = await run({}, e)
     assert.equal(report.error, 'configuration_invalid'); assert.equal(f.requests.length, 0)
   }
-  const e = env(); Object.defineProperty(e, 'ACME_DEMO_EMAIL', { get() { assert.fail('credentials were read') } })
+  const e = env(); Object.defineProperty(e, 'SMOKE_OWNER_EMAIL', { get() { assert.fail('credentials were read') } })
   const { f, report } = await run({ wrongVersion: true }, e)
   assert.equal(report.error, 'version_mismatch'); assert.equal(f.requests.length, 1)
   assert.throws(() => configuration(env(), { ...event, after: OTHER }))

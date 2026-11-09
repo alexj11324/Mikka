@@ -14,7 +14,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: issue-1506-acme-acceptance
+  group: production-smoke-owner-acceptance
   cancel-in-progress: false
   queue: max
 
@@ -129,6 +129,164 @@ jobs:
           include-imports: false
       - name: Observe bounded reads and cancel only this client's HTTP wait
         run: node scripts/acceptance/issue-1212-mcp/mcp-reply-production.mjs observe
+      - name: Retain the sanitized observations and exact cleanup status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: issue-1212-mcp-reply-${{ github.run_id }}
+          path: issue-1212-mcp-report/*.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  final-acceptance:
+    if: >-
+      ${{ github.repository == 'alexj11324/Mikka' && github.event_name == 'push' &&
+      github.ref == 'refs/heads/acceptance/issues-1504-1506' &&
+      startsWith(github.event.head_commit.message, 'test: run root final issue acceptance') }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    # MCP is bounded to 240s; four independent native Stop cases are each
+    # bounded to 120s plus normal Stop and session cleanup.
+    timeout-minutes: 12
+    env:
+      MIKKA_ACCEPTANCE_SHA: 'bb5d1f9e224aea395b9c45823960e8ad10f1a099' # Only the verified final production application SHA.
+      MIKKA_GROUP_MODE: mcp
+      MIKKA_RELEASE_SOURCE: ${{ github.workspace }}/released
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify the exact input and offline request cleanup boundaries
+        run: |
+          node scripts/acceptance/issue-1212-mcp/mcp-reply-production.mjs --check-config
+          node --input-type=module -e "if (!['mcp','observe','audit','cleanup','lifecycle'].includes(process.env.MIKKA_GROUP_MODE)) throw Error('GROUP_MODE_INVALID')"
+          node --test scripts/acceptance/issue-1212-mcp/mcp-reply-production.test.mjs
+          node --test scripts/acceptance/issue-1212-mcp/group-stop-production.test.mjs
+          node --test scripts/acceptance/issue-1212-mcp/group-stop-audit.test.mjs
+          node --test scripts/acceptance/issue-1212-mcp/thread-lifecycle-bounds.test.mjs
+      - name: Require the exact main and completed public releases before new acceptance
+        if: env.MIKKA_GROUP_MODE == 'mcp' || env.MIKKA_GROUP_MODE == 'observe' || env.MIKKA_GROUP_MODE == 'lifecycle'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import { mkdirSync, writeFileSync } from 'node:fs'
+          const sha = process.env.MIKKA_ACCEPTANCE_SHA
+          if (!/^[a-f0-9]{40}$/.test(sha)) throw Error('RELEASE_PIN_REQUIRED')
+          const read = async path => {
+            const response = await fetch('https://api.github.com/repos/alexj11324/Mikka/'+path, {
+              headers: { authorization:'Bearer '+process.env.GITHUB_TOKEN, accept:'application/vnd.github+json' },
+              redirect:'error', signal:AbortSignal.timeout(20000) })
+            if (!response.ok) throw Error('RELEASE_READ_REFUSED')
+            return response.json()
+          }
+          const [main,runs] = await Promise.all([read('git/ref/heads/main'),read('actions/runs?head_sha='+sha+'&per_page=100')])
+          if(main.object?.sha!==sha || runs.total_count>100) throw Error('RELEASE_SOURCE_CHANGED')
+          const live=await fetch('https://app.aspectlylabs.com/mikka/api/version',{
+            headers:{'cache-control':'no-store'},redirect:'error',signal:AbortSignal.timeout(20000)})
+          if(!live.ok || (await live.json()).build!==sha) throw Error('PUBLIC_SOURCE_CHANGED')
+          const workflows=['CI','Web deploy','E2B additive runtime release','Self-hosted image'].map(name=>{
+            const candidates=runs.workflow_runs.filter(r=>r.name===name&&r.head_sha===sha&&r.head_branch==='main')
+              .sort((a,b)=>b.id-a.id || b.run_attempt-a.run_attempt)
+            const run=candidates[0]
+            if(!run||run.status!=='completed'||run.conclusion!=='success') throw Error('RELEASE_NOT_COMPLETE')
+            return {name,runId:run.id,attempt:run.run_attempt}
+          })
+          mkdirSync('issue-1212-mcp-report',{recursive:true})
+          writeFileSync('issue-1212-mcp-report/release-gate.json',JSON.stringify({sourceSha:sha,workflows,credentialsDelivered:false})+'\n')
+          JS
+      - name: Read only the exact released source for normal shared-account helpers
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.MIKKA_ACCEPTANCE_SHA }}
+          path: released
+          persist-credentials: false
+      - name: Install only the pinned released dependencies for the read-only audit
+        if: env.MIKKA_GROUP_MODE == 'audit' || env.MIKKA_GROUP_MODE == 'lifecycle'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - if: env.MIKKA_GROUP_MODE == 'audit' || env.MIKKA_GROUP_MODE == 'lifecycle'
+        run: pnpm --dir released install --frozen-lockfile --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Read the shared smoke account email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the shared smoke account password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Observe bounded reads and cancel only this client's HTTP wait
+        if: env.MIKKA_GROUP_MODE == 'mcp' || env.MIKKA_GROUP_MODE == 'observe'
+        run: node scripts/acceptance/issue-1212-mcp/mcp-reply-production.mjs observe
+      - name: Observe public and private group Stop on both fixed small subscriptions
+        if: ${{ !cancelled() && env.MIKKA_GROUP_MODE == 'observe' }}
+        run: node scripts/acceptance/issue-1212-mcp/group-stop-production.mjs observe
+      - name: Read the production database only for the terminal-bound scoped audit
+        if: ${{ !cancelled() && (env.MIKKA_GROUP_MODE == 'audit' || env.MIKKA_GROUP_MODE == 'lifecycle') }}
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - name: Read the existing provider observer key only for the native lifecycle case
+        if: env.MIKKA_GROUP_MODE == 'lifecycle'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          recursive: false
+          include-imports: false
+      - name: Measure startup, actual lease renewal, native exits and owned cancellation
+        if: env.MIKKA_GROUP_MODE == 'lifecycle'
+        timeout-minutes: 32
+        env:
+          DATABASE_URL: ${{ env.MIKKA_DATABASE_URL }}
+        run: timeout --signal=TERM --kill-after=4m 28m node scripts/acceptance/issue-1212-mcp/thread-lifecycle-bounds.mjs
+      - name: Audit each server-confirmed terminal with exactly one read-only snapshot
+        if: ${{ !cancelled() && env.MIKKA_GROUP_MODE == 'audit' }}
+        env:
+          DATABASE_URL: ${{ env.MIKKA_DATABASE_URL }}
+        run: node scripts/acceptance/issue-1212-mcp/group-stop-audit.mjs
+      - name: Clean only the independently audited owned group fixtures
+        if: ${{ !cancelled() && env.MIKKA_GROUP_MODE == 'cleanup' }}
+        run: node scripts/acceptance/issue-1212-mcp/group-stop-production.mjs cleanup
       - name: Retain the sanitized observations and exact cleanup status
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Normal ACME OAuth plus at most three read-only MCP calls. No Coordinator
+// Normal shared-smoke OAuth plus at most three read-only MCP calls. No Coordinator
 // writes, models, Stop, notification cancellation, fake cursors, or retries.
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -7,7 +7,6 @@ import { pathToFileURL } from 'node:url'
 import { authorizeMcpSession } from './pkce-session.mjs'
 
 export const ORIGIN = 'https://app.aspectlylabs.com'
-export const OWNER = 'OFtPbAHifGBAOYiek9hd3w'
 export const REF = 'refs/heads/acceptance/issues-1504-1506'
 export const WORKFLOW = '.github/workflows/issue-1212-mcp-reply.yml'
 const BASE = '/mikka', AUTH = BASE + '/api/auth', MCP = BASE + '/api/mcp'
@@ -43,9 +42,9 @@ export function configuration(env, event) {
     runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT }
 }
 
-function ownedClient(row, { clientId, name, before }) {
+function ownedClient(row, { clientId, ownerId, name, before }) {
   need(row && CLIENT.test(row.client_id ?? '') && row.client_id === clientId && !before.has(clientId)
-    && row.user_id === OWNER && row.client_name === name && row.token_endpoint_auth_method === 'none'
+    && row.user_id === ownerId && row.client_name === name && row.token_endpoint_auth_method === 'none'
     && row.application_type === 'native' && same(row.redirect_uris, [CALLBACK])
     && same(row.grant_types, ['authorization_code']) && same(row.response_types, ['code'])
     && row.scope === 'mikka' && row.client_secret === undefined, 'client_ownership')
@@ -123,7 +122,7 @@ export async function readMcpReply(response, id, signal) {
 
 export async function runMcpReplyProof({ env = process.env, event, fetchImpl = globalThis.fetch,
   now = Date.now, monotonic = () => performance.now(), later = setTimeout, cancelTimer = clearTimeout } = {}) {
-  const report = { schemaVersion: 1, issues: [1212, 1506], case: 'acme-mcp-bounded-read', status: 'failed',
+  const report = { schemaVersion: 1, issues: [1212, 1506], case: 'smoke-mcp-bounded-read', status: 'failed',
     startedAt: new Date(now()).toISOString(), binding: null, phase: 'configuration', error: null,
     version: { beforeMatches: false, afterMatches: false }, identityMatched: false,
     oauth: { registrationMode: 'owner-managed', registrationAttempts: 0, clientOwned: false,
@@ -141,7 +140,7 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
   }
   const close = async response => { await response.body?.cancel().catch(() => {}) }
   const deadline = now() + 240_000
-  let binding, clientId, name, token, protocol, before = new Set(), registrationStarted = false
+  let binding, ownerId, clientId, name, token, protocol, before = new Set(), registrationStarted = false
   let registrationSettled = false, signInStarted = false, sessionObserved = false, complete = false
   let versionVerified = false, activeController, timer, serial = 30, evidenceRejected = false
   const oauthCalls = new Set(), helperCalls = new Set()
@@ -185,7 +184,7 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
   async function owned(cleanup = false) {
     const { status, value } = await ownRead(AUTH + '/oauth2/get-client?client_id=' + encodeURIComponent(clientId), cleanup)
     need(status === 200, 'client_ownership')
-    return ownedClient(value, { clientId, name, before })
+    return ownedClient(value, { clientId, ownerId, name, before })
   }
   async function version(cleanup = false) {
     const response = await raw(BASE + '/api/version', {}, { cleanup })
@@ -232,22 +231,24 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
   try {
     binding = configuration(env, event); report.binding = binding
     report.phase = 'version-before'; await version(); versionVerified = true; report.version.beforeMatches = true
-    const email = env.ACME_DEMO_EMAIL, password = env.ACME_DEMO_PASSWORD
-    need(/^[^@\s]+@[^@\s]+$/.test(email ?? '') && typeof password === 'string' && password.length > 0, 'credentials_missing')
+    const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
+    need(/^[^@\s]+\+mikka-smoke(?:-[a-z0-9]+)*@[^@\s]+$/i.test(email ?? '') && typeof password === 'string' && password.length > 0, 'credentials_missing')
     remember([email, password]); name = 'Mikka issue1212 MCP readonly ' + randomUUID(); remember([name])
     report.phase = 'sign-in'; signInStarted = true
     const response = await ownPost(AUTH + '/sign-in/email', { email, password })
     const signed = await json(response); remember([signed?.token])
-    need(response.status === 200, 'identity_mismatch')
+    need(response.status === 200 && typeof signed?.user?.id === 'string' && signed.user.id.length > 0
+      && signed.user.email?.toLowerCase() === email.toLowerCase(), 'identity_mismatch')
+    ownerId = signed.user.id; remember([ownerId])
     const session = await ownRead(AUTH + '/get-session')
-    need(session.status === 200 && session.value?.user?.id === OWNER
+    need(session.status === 200 && session.value?.user?.id === ownerId
       && session.value.user.email?.toLowerCase() === email.toLowerCase(), 'identity_mismatch')
     sessionObserved = true; report.identityMatched = true
     report.phase = 'oauth-register'
     const original = await clients()
     before = new Set(original.map(row => row.client_id)); remember([...before])
     need(!original.some(row => row.client_name === name), 'intent_collision')
-    const owner = { userId: OWNER, async request(path, init = {}) {
+    const owner = { userId: ownerId, async request(path, init = {}) {
       need(typeof path === 'string' && path.startsWith('/api/auth/oauth2/'), 'request_denied')
       const url = new URL(BASE + path, ORIGIN), method = init.method ?? 'GET'
       if (url.pathname === AUTH + '/oauth2/create-client') {
@@ -262,7 +263,7 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
         if (result.status !== 201) return result
         need(CLIENT.test(value?.client_id ?? ''), 'registration_ambiguous')
         clientId = value.client_id; remember([clientId])
-        ownedClient(value, { clientId, name, before }); await owned()
+        ownedClient(value, { clientId, ownerId, name, before }); await owned()
         registrationSettled = true; report.oauth.clientOwned = true
         return result
       }
@@ -348,7 +349,7 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
         if (!clientId && !registrationSettled) {
           const matches = (await clients(true)).filter(row => row.client_name === name && !before.has(row.client_id))
           need(matches.length <= 1, 'registration_ambiguous')
-          if (matches.length === 1) { clientId = matches[0].client_id; remember([clientId]); ownedClient(matches[0], { clientId, name, before }) }
+          if (matches.length === 1) { clientId = matches[0].client_id; remember([clientId]); ownedClient(matches[0], { clientId, ownerId, name, before }) }
           else registrationSettled = true
         }
         if (clientId) {
@@ -406,7 +407,7 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
     evidenceRejected = [...privateValues].some(value => value.length >= 8 && serialized.includes(value))
     token = clientId = name = undefined; cookies.clear(); privateValues.clear()
   }
-  if (evidenceRejected) return { schemaVersion: 1, case: 'acme-mcp-bounded-read', status: 'failed', error: 'report_rejected',
+  if (evidenceRejected) return { schemaVersion: 1, case: 'smoke-mcp-bounded-read', status: 'failed', error: 'report_rejected',
     toolsCalls: report.toolsCalls, modelCalls: 0, coordinatorWriteCalls: 0, acceptancePassed: false,
     runtimeEvidence: report.runtimeEvidence, cleanup: report.cleanup }
   return report
@@ -465,7 +466,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       if (report.status !== 'observed') process.exitCode = report.status === 'not_covered' ? 2 : 1
     }
   } catch {
-    console.log(JSON.stringify({ schemaVersion: 1, case: 'acme-mcp-bounded-read', status: 'failed', error: 'configuration_invalid' }))
+    console.log(JSON.stringify({ schemaVersion: 1, case: 'smoke-mcp-bounded-read', status: 'failed', error: 'configuration_invalid' }))
     process.exitCode = 1
   }
 }
