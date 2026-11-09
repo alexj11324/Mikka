@@ -65,6 +65,12 @@ function cleanValue(value: AttributeValue | undefined): AttributeValue | undefin
 export function sanitizeAttributes(attributes: Attributes): Attributes {
   const clean: Attributes = {}
   for (const [key, value] of Object.entries(attributes)) {
+    // Workflow uses HTTP-shaped spans for WS writes too. Keep only the
+    // transport enum; socket URLs, request ids and payloads remain private.
+    if (key === 'workflow.events.transport') {
+      if (value === 'http' || value === 'ws') clean[key] = value
+      continue
+    }
     if (!allowed(key)) continue
     if (STATEMENT_KEYS.has(key)) {
       if (typeof value === 'string') clean[key] = normalizeStatement(value)
