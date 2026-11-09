@@ -166,7 +166,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const coordinator = await bots.coordinatorBot(p.id, p.workspaceId, { backfill: false })
     const oldPolicy = { permissions: { git_push: 'deny' } }, currentPolicy = { permissions: { git_push: 'ask' } }
     await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy)
-      VALUES ($1,'coordinator',NULL,NULL,$4),($1,$2,$2::uuid,$3,$5)`, [p.id, coordinator.botId, p.workspaceId, oldPolicy, currentPolicy])
+      VALUES ($1,'coordinator',NULL,NULL,$4),($1,$2,$6,$3,$5)`, [p.id, coordinator.botId, p.workspaceId, oldPolicy, currentPolicy, coordinator.botId])
     const heads = () => pool.query('SELECT bot_key,active_version,cli_run_policy FROM agent_kit_heads WHERE owner_id=$1 ORDER BY bot_key', [p.id]).then(result => result.rows)
     const before = await heads()
     const observed = await observeCoordinatorCall(p.id, p.workspaceId)
@@ -208,8 +208,11 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
       case 'factory_tasks': {
         const event = await sourceEvent(p.id)
         await pool.query('UPDATE coordinator_events SET "botId"=$2 WHERE id=$1', [event, personal.botId])
-        await pool.query(`INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId","workspaceId",route,stage,status,"attemptId",reason)
-          VALUES ($1,$2,$3,$4,$5,'{}','execute','running',$6,'Single legacy task fixture')`,
+        await pool.query(`WITH task AS (
+          INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId","workspaceId",route,stage,status,"attemptId",reason)
+          VALUES ($1,$2,$3,$4,$5,'{}','execute','running',$6,'Single legacy task fixture') RETURNING id)
+          INSERT INTO factory_attempts (id,"taskId",stage,status,ordinal,position,reason)
+          SELECT $6,id,'execute','running',1,1,'Single legacy task fixture' FROM task`,
         [id, p.id, await seedIssue(pool, p.id), event, p.workspaceId, randomUUID()])
         statement = 'SELECT "botId" AS value FROM factory_tasks WHERE id=$1'
         // A source already outside the captured null-Bot family retains the task.
@@ -240,7 +243,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
       case 'suggestions':
         st.after(() => pool.query('DELETE FROM suggestions WHERE id=$1', [id]))
         await pool.query(`INSERT INTO suggestions (id,"userId",source,"externalId",action,title,shown,"decidedBy","occurredAt")
-          VALUES ($1,$2,'github',$1::text,'read','Legacy suggestion',false,'rule',now())`, [id, p.id])
+          VALUES ($1,$2,'github',$3,'read','Legacy suggestion',false,'rule',now())`, [id, p.id, id])
         statement = 'SELECT "botId" AS value FROM suggestions WHERE id=$1'
         break
       case 'pending_actions':

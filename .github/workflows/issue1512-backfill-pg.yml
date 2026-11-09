@@ -151,7 +151,7 @@ jobs:
       - name: Check out exact candidate source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 'a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4'
+          ref: '5a0c90774b8c48fc390ea05cf782bbc9cbe79a62'
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
         with:

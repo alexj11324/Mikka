@@ -1,6 +1,6 @@
 {
   "schema": "issue1512-isolated-pg17-v1",
-  "enabled": false,
+  "enabled": true,
   "opsBranch": "ops/1512-backfill-pg-20261109",
   "admissionMessage": "issue1512: backfill-pg admit 20261109",
   "expiresAt": "2026-11-09T21:28:05.000Z",
@@ -12,10 +12,10 @@
     "testBlob": "32a8321c981dd6a534f8859fa35f281e874466e6"
   },
   "after": {
-    "sha": "a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4",
-    "tree": "e4f12292616357f46a981cfa92588248f1ad452b",
+    "sha": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+    "tree": "442e7d50bbec1f78b7508d062e6076627a3e47c7",
     "sourceBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
-    "testBlob": "13fb6f222c061d115916557b796006c2073dc628"
+    "testBlob": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e"
   },
   "unchangedBlobs": {
     "package.json": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
@@ -121,9 +121,5 @@
     "greenJobTimeoutMinutes": 12,
     "independentServices": true,
     "productionAccess": false
-  },
-  "closedAt": "2026-11-09T20:06:14.424Z",
-  "closedReason": "REJECTED_EXPECTED_RED_DUE_TO_THREE_NEW_FIXTURE_SQL_ERRORS",
-  "closedRunId": 42689043866,
-  "evidenceIndexBlob": "614b4de450478763e2f400b1677ae8d6122fa6b7"
+  }
 }
