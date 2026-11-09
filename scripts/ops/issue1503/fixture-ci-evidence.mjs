@@ -275,7 +275,9 @@ export function reviewCriteriaEvidence(criteria, candidateSha, receipt, { requir
   for (const [index, criterion] of criteria.entries()) {
     if (!criterion || typeof criterion !== 'object' || Array.isArray(criterion)) return null
     const externalId = typeof criterion.text === 'string' && Object.hasOwn(EXTERNAL_CRITERIA, criterion.text) ? EXTERNAL_CRITERIA[criterion.text] : null
-    const implementationId = criterion.text === IMPLEMENTATION_CRITERION ? 'implementation_file_command' : null
+    // Both exact terminal-period forms name the same observed fixture command.
+    const implementationId = (criterion.text === IMPLEMENTATION_CRITERION
+      || criterion.text === IMPLEMENTATION_CRITERION.slice(0, -1)) ? 'implementation_file_command' : null
     const observationId = externalId ?? implementationId
     if (observationId) {
       if (seenExternal.has(observationId)) return null

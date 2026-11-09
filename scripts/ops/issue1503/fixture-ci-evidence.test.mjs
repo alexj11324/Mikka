@@ -397,3 +397,109 @@ test('implementation command: a historical review retains only its initial produ
   assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, repaired.receipt),
     /issue1503_verification_criteria_missing/)
 })
+
+/** F42606137512 observed the same fixture command label without its final period.
+ * Accept only those two complete strings, with the existing daemon and CI proof. */
+for (const [name, text] of [
+  ['the canonical label with its final period', implementationLabel],
+  ['the exact label without its final period', implementationLabel.slice(0, -1)],
+]) test('terminal period: accepts ' + name, async () => {
+  const external = await evidence(fixtures()), implementation = await implementationEvidence()
+  const criteria = commandCriteria(); criteria[3].text = text
+  const before = structuredClone(criteria), { state, attempt } = commandTask(criteria)
+  assert.equal(driver.matchedCheckEvidence(state, [attempt], external, implementation.receipt).length, 1)
+  const covered = ci.reviewCriteriaEvidence(criteria, head, external,
+    { implementationReceipt: implementation.receipt }).covered
+  const command = covered.find(item => item.criterion === 'implementation_file_command')
+  assert.ok(command)
+  assert.equal(command.taskId, state.task.id)
+  assert.equal(command.producerRunId, state.candidates[0].runId)
+  assert.equal(command.candidateSha, head)
+  assert.equal(command.fileSha256, implementation.verifiedContent.sha256)
+  assert.equal(command.commandSha256, implementation.verifiedContent.commandSha256)
+  assert.deepEqual(criteria, before)
+  assert.equal(criteria[3].passed, false)
+  assert.equal(criteria[3].status, 'unverified')
+})
+
+test('terminal period: rejects whitespace, other punctuation, narrative and non-string labels', async () => {
+  const external = await evidence(fixtures()), implementation = await implementationEvidence()
+  const bare = implementationLabel.slice(0, -1)
+  for (const text of [
+    ' ' + bare, implementationLabel + ' ', bare + '\n',
+    bare + '..', bare + '…', bare + '。', bare + '!',
+    bare.replace('Run', 'run'), 'Observed: ' + bare,
+    implementationLabel + ' The producer already did this.',
+    bare + ' and an unrelated deployment', null, [bare],
+  ]) {
+    const { state, attempt } = commandTask(); state.checks[0].criteria[3].text = text
+    assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, implementation.receipt),
+      /issue1503_verification_criteria_missing/)
+  }
+})
+
+test('terminal period: both forms share one duplicate identity even when one is passed', async () => {
+  const external = await evidence(fixtures()), implementation = await implementationEvidence()
+  const forms = [implementationLabel, implementationLabel.slice(0, -1)]
+  for (const first of forms) for (const second of forms) for (const passed of [false, true]) {
+    const { state, attempt } = commandTask(), criteria = state.checks[0].criteria
+    criteria[3].text = first
+    criteria.push({ ...criteria[3], text: second, passed,
+      status: passed ? 'passed' : 'unverified', ...(passed ? { evidence: 'Independent observation.' } : {}) })
+    assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, implementation.receipt),
+      /issue1503_verification_criteria_missing/)
+  }
+})
+
+test('terminal period: the no-period label still refuses absent, fabricated and copied receipts', async () => {
+  const external = await evidence(fixtures()), implementation = await implementationEvidence()
+  for (const receipt of [null, {}, { ...implementation.receipt }, JSON.parse(JSON.stringify(implementation.receipt))]) {
+    const { state, attempt } = commandTask()
+    state.checks[0].criteria[3].text = implementationLabel.slice(0, -1)
+    assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, receipt),
+      /issue1503_verification_criteria_missing/)
+  }
+})
+
+test('terminal period: the no-period label remains bound to the same task, producer and exact head', async () => {
+  const external = await evidence(fixtures()), implementation = await implementationEvidence()
+  for (const mutate of [
+    state => { state.task.id = '20000000-0000-4000-8000-000000000009' },
+    state => { state.candidates[0].runId = '20000000-0000-4000-8000-000000000009' },
+  ]) {
+    const { state, attempt } = commandTask(); state.checks[0].criteria[3].text = implementationLabel.slice(0, -1)
+    mutate(state)
+    assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, implementation.receipt),
+      /issue1503_verification_criteria_missing/)
+  }
+  const otherHead = await implementationEvidence(implementationFixture(base)), { state, attempt } = commandTask()
+  state.checks[0].criteria[3].text = implementationLabel.slice(0, -1)
+  assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, otherHead.receipt),
+    /issue1503_verification_criteria_missing/)
+})
+
+test('terminal period: the no-period label preserves explicit unverified reason and failure guards', async () => {
+  const external = await evidence(fixtures()), implementation = await implementationEvidence()
+  for (const mutate of [
+    criterion => { criterion.status = 'failed' },
+    criterion => { criterion.passed = true },
+    criterion => { delete criterion.reason },
+    criterion => { criterion.reason = '  ' },
+    criterion => { criterion.reason = 'x'.repeat(2001) },
+  ]) {
+    const { state, attempt } = commandTask(), criterion = state.checks[0].criteria[3]
+    criterion.text = implementationLabel.slice(0, -1); mutate(criterion)
+    assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, implementation.receipt),
+      /issue1503_verification_criteria_missing/)
+  }
+})
+
+test('terminal period: the no-period label cannot replace CI or change legacy review admission', async () => {
+  const external = await evidence(fixtures()), implementation = await implementationEvidence()
+  const { state, attempt } = commandTask(); state.checks[0].criteria[3].text = implementationLabel.slice(0, -1)
+  assert.throws(() => driver.matchedCheckEvidence(state, [attempt], null, implementation.receipt),
+    /issue1503_verification_criteria_missing/)
+  state.task.route.flowVersion = 1
+  assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, implementation.receipt),
+    /issue1503_verification_criteria_missing/)
+})
