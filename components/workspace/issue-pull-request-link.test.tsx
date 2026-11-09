@@ -66,6 +66,16 @@ test('refresh and lost authorization immediately suppress previously fetched Git
   assert.ok(!markup.includes('text-success-foreground'))
 })
 
+test('with no GitHub connection the link stays and says nothing beside it', () => {
+  for (const error of ['githubNotConfigured', 'githubNotConnected', 'githubReconnectRequired']) {
+    validating = false; data = { error }
+    const markup = render()
+    assert.ok(markup.includes('#81'), error)
+    assert.ok(!markup.includes('>disconnected<') && !markup.includes('>unavailable<'), error)
+    assert.ok(markup.includes('aria-label="disconnected'), error)
+  }
+})
+
 test('signed out or changing sessions cannot display cached private state', () => {
   data = { state: 'merged', checkedAt: Number.POSITIVE_INFINITY }
   for (const loading of [false, true]) {

@@ -10,6 +10,7 @@ import { retainedDeliverableForRecovery, type ObserveRetainedDeliverable, type R
 import { snapshotMatchesScope } from '../factory/deliverable-snapshot'
 import type { FactoryTask } from '../factory/store'
 import { retainedDeliverableProbeCommand } from './retained-deliverable-probe.mjs'
+import { recordThreadMaintenanceSession } from './thread-machine-sessions'
 
 type Budget = (maximumMs: number) => number
 type ProbeOptions = { user: 'user'; timeoutMs: number; requestTimeoutMs: number; signal: AbortSignal }
@@ -88,7 +89,7 @@ export function createRetainedDeliverableObserver(pool: Pool,
     }
     let leased = false, connectAttempted = false, connectConfirmed = false, confirmedPaused = false, initialStateMismatch = false
     let phase = 'admission', failure = false, probeCode: string | undefined, snapshot: RetainedDeliverableSnapshot | undefined
-    const checkCustody = async (budget: Budget, acquire = false) => {
+    const checkCustody = async (budget: Budget, acquire = false, observation?: 'running' | 'paused') => {
       let tx: PoolClient | undefined, abandoned = false, released = false
       const releaseClient = (error?: Error) => {
         if (tx && !released) { released = true; tx.release(error) }
@@ -106,6 +107,9 @@ export function createRetainedDeliverableObserver(pool: Pool,
             if (computerPermission(policy?.permission) !== 'allow') throw unavailable()
             const eligible = await retainedDeliverableForRecovery(tx, task, acquire ? undefined : leaseId)
             if (!eligible || !isDeepStrictEqual(eligible.scope, scope)) throw unavailable()
+            // Session history's FK checks this run. Keep run→machine order
+            // before taking custody, as the normal lifecycle writers do.
+            await tx.query('SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR KEY SHARE', [scope.machineRunId,scope.ownerId])
             await tx.query(`SELECT "runId" FROM thread_machines
               WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [scope.machineRunId, scope.ownerId, scope.workspaceId])
             const locked = await retainedDeliverableForRecovery(tx, task, acquire ? undefined : leaseId)
@@ -121,6 +125,10 @@ export function createRetainedDeliverableObserver(pool: Pool,
               // Also clean up this token if the COMMIT response is uncertain.
               leased = true
             }
+            if (observation && !await recordThreadMaintenanceSession(tx, {
+              runId: scope.machineRunId, ownerId: scope.ownerId, workspaceId: scope.workspaceId,
+              sandboxId: scope.sandboxId, operationId: scope.machineOperationId,
+            }, leaseId, observation)) throw unavailable()
             transactionBudget(1)
             await tx.query('COMMIT')
           } catch (error) { if (!released) await tx.query('ROLLBACK').catch(() => undefined); throw error }
@@ -139,12 +147,16 @@ export function createRetainedDeliverableObserver(pool: Pool,
       const state = await bounded(workBudget, 8_000, budget => runtime.state(scope, budget))
       if (state !== 'paused') { initialStateMismatch = true; throw unavailable() }
       phase = 'connect_custody'
-      await checkCustody(workBudget)
+      // This also closes any earlier uncertain interval at the first proven
+      // pause observation, never at a guessed historical provider timestamp.
+      await checkCustody(workBudget, false, 'paused')
       phase = 'connect'
       connectAttempted = true
       const sandbox = await bounded(workBudget, 10_000, budget => runtime.connect(scope, budget))
       if (sandbox.sandboxId !== scope.sandboxId) throw unavailable()
       connectConfirmed = true
+      phase = 'running_custody'
+      await checkCustody(workBudget, false, 'running')
       phase = 'script'
       const source = await bounded(workBudget, 3_000, () => runtime.script())
       if (!source || Buffer.byteLength(source, 'utf8') > 64 * 1024) throw unavailable()
@@ -192,7 +204,7 @@ export function createRetainedDeliverableObserver(pool: Pool,
         if (await bounded(restoreBudget, 8_000, budget => runtime.state(scope, budget)) !== 'paused') throw unavailable()
         confirmedPaused = true
         restorePhase = 'post_pause_custody'
-        await checkCustody(restoreBudget)
+        await checkCustody(restoreBudget, false, 'paused')
       } catch { confirmedPaused = false }
       if (!confirmedPaused) { failure = true; phase = restorePhase; snapshot = undefined }
     }

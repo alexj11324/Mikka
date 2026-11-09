@@ -53,12 +53,15 @@ import { readAccessFailure } from '@/lib/swr/persistent-cache'
 // R-32 chat: 13/21 as in Comma, also for the agent's Markdown inside a bubble.
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.25'
 
-/** A person's words in a thread, under the agent's words they quote (lib/chat-quote.ts), and 复制 below on hover. */
+/**
+ * A person's words in a thread, under the agent's words they quote (lib/chat-quote.ts), and 复制 below on hover. Theirs sit
+ * on the page surface with a hairline, as the main chat's person bubble does; the accent is kept for actions (UI audit task-07).
+ */
 function PersonBubble({ text, mine }: { text: string; mine: boolean }) {
   const { quote, text: words } = splitReplyQuote(text)
   const attached = splitChatFiles(words)
   return <>
-    <div className={cn(BUBBLE, 'flex flex-col', mine ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}><CollapsibleMessage>{quote && <QuoteLine slot="reply-quote" text={quote} />}<ChatFileCards files={attached.files} sent /><span>{attached.text}</span></CollapsibleMessage></div>
+    <div className={cn(BUBBLE, 'flex flex-col', mine ? 'self-end bg-background text-foreground ring-1 ring-border' : 'self-start')}><CollapsibleMessage>{quote && <QuoteLine slot="reply-quote" text={quote} />}<ChatFileCards files={attached.files} sent /><span>{attached.text}</span></CollapsibleMessage></div>
     <MessageActions className={cn(HOVER_ACTIONS, mine ? 'self-end' : 'self-start')}><CopyAction text={words} /></MessageActions>
   </>
 }
