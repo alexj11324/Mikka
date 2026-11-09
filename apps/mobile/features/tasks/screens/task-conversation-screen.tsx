@@ -4,12 +4,12 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Check } from 'lucide-react-native'
 import { BotBubble, MyBubble } from '@/components/chat'
 import { Spinner } from '@/components/icons'
 import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
 import { useScrolledUnderBar } from '@/components/BarBackdrop'
+import { ThreadSteps } from '@/features/tasks/components/thread-steps'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
@@ -137,12 +137,7 @@ export function TaskConversationScreen() {
 function Item({ item, live }: { item: ThreadItem; live: boolean }) {
   switch (item.kind) {
     case 'steps':
-      return (
-        <View style={styles.step}>
-          {live ? <Spinner size={14} /> : <Check size={15} color={colors.secondary} strokeWidth={2.2} />}
-          <Text style={styles.stepText}>{mobileMessages.MobileCore.steps.replace('{count}', String(item.count))}</Text>
-        </View>
-      )
+      return <ThreadSteps steps={item.steps} count={item.count} live={live} />
     case 'agent': return <View style={styles.message}><BotBubble><Markdown text={item.text} /></BotBubble></View>
     case 'error': return <AttemptError raw={item.text} />
     case 'person': return <View style={styles.message}><MyBubble text={item.text} /></View>
@@ -184,8 +179,6 @@ const styles = StyleSheet.create({
   center: { paddingTop: 40, alignItems: 'center' },
   empty: { paddingTop: 40, textAlign: 'center', fontSize: 15, color: colors.secondary },
   message: { marginVertical: 4 },
-  step: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 26 },
-  stepText: { fontSize: 14, color: colors.secondary },
   error: { fontSize: 14, color: colors.danger, marginVertical: 4 },
   segment: { gap: 4 },
   cause: { gap: 4, marginVertical: 4 },
