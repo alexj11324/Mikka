@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "kind": "posthog_source_alert_public_configuration_proof",
+  "status": "requested_configuration_matches",
+  "observedUTC": {
+    "readStarted": "2026-11-09 00:38:58 UTC",
+    "readCompleted": "2026-11-09 00:39:32 UTC"
+  },
+  "source": {
+    "projectId": 670821,
+    "insightId": 13703263,
+    "shortId": "k3M88Rs8",
+    "url": "https://us.posthog.com/project/670821/insights/k3M88Rs8",
+    "sql": {
+      "sha256": "0380c78c1ba9ef7ed04ec70d4f5155da166c75ca71313ab44fc83e626488bbd4",
+      "bytes": 11298,
+      "matchesPublishedSourceBytes": true,
+      "alertEmbeddedSqlMatches": true,
+      "repository": "alexj11324/Mikka",
+      "revision": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+      "path": "scripts/ops/posthog/alert-source-anomaly.sql",
+      "publishedSourceUrl": "https://github.com/alexj11324/Mikka/blob/6180cd8889006f4e1618c2549b1aa12d13506ee8/scripts/ops/posthog/alert-source-anomaly.sql"
+    }
+  },
+  "alert": {
+    "id": "01a1a9eb-1a3a-0000-6f0b-151446674319",
+    "sourceInsightId": 13703263,
+    "url": "https://us.posthog.com/project/670821/alerts?alert_type=insights&alert_id=01a1a9eb-1a3a-0000-6f0b-151446674319",
+    "enabled": true,
+    "frequency": "hourly",
+    "scheduleStartTime": "00:15",
+    "snoozedUntil": null,
+    "skipWeekend": false,
+    "scheduleRestriction": null,
+    "condition": {
+      "type": "absolute_value"
+    },
+    "series": {
+      "type": "HogQLAlertConfig",
+      "column": "value",
+      "evaluation": "first_row",
+      "labelColumn": "source"
+    },
+    "threshold": {
+      "type": "absolute",
+      "bounds": {
+        "upper": 0.5
+      }
+    },
+    "recipientCount": 1
+  },
+  "windowAndRule": {
+    "evaluation": "last complete UTC hour",
+    "lookbackDays": 7,
+    "sourceScanDays": 8,
+    "minimumCoveredFullHoursPerRoute": 24,
+    "historyStartsAfterOwnFirstPartialHour": true,
+    "queryThreshold": {
+      "comparison": "greater_than",
+      "historicalMedianMultiplier": 3,
+      "absoluteMinimum": 2000
+    },
+    "byteThreshold": {
+      "comparison": "greater_than",
+      "historicalMedianMultiplier": 3,
+      "absoluteMinimum": 10000000,
+      "minimumWeightedCoverage": 0.95
+    },
+    "breakdown": {
+      "authenticatedHashTopCount": 3,
+      "rpcActionTopCount": 5,
+      "scope": "same_request_only",
+      "unattributedCountsIncluded": true
+    },
+    "absentCurrentTelemetry": "null"
+  },
+  "rawReceiptIntegrity": [
+    {
+      "role": "source",
+      "sha256": "71fdc61294cd1fbca7d070fb76ea686ba4dff8a55a46f2ff3a373b672cef919b",
+      "bytes": 29453,
+      "includedInPublicProjection": false
+    },
+    {
+      "role": "alert",
+      "sha256": "005ceb7f538bfd29bbe702e159b48c0f83d9d93b23bba7c75fae5b65b6277054",
+      "bytes": 16460,
+      "includedInPublicProjection": false
+    }
+  ],
+  "metadataOmitted": {
+    "strictFieldAllowlist": true,
+    "accountAndRecipientMetadataOmitted": true,
+    "omittedCategories": [
+      "platform account identifiers and profile fields",
+      "recipient identities and contact fields",
+      "created_by and last_modified_by objects",
+      "subscribed_users objects",
+      "stored check details",
+      "raw tool envelopes"
+    ],
+    "rawReceiptsKeptLocalUnmodified": true
+  },
+  "scope": {
+    "insightMetadataReads": 1,
+    "alertMetadataReads": 1,
+    "sqlExecutions": 0,
+    "alertSimulations": 0,
+    "checksTriggered": 0,
+    "objectMutations": 0,
+    "newSessions": 0,
+    "newModelOrBusinessRuns": 0,
+    "limitation": "Saved configuration readback only; this proof does not assert a new SQL execution or notification delivery."
+  }
+}
