@@ -293,15 +293,6 @@ jobs:
           git fetch --depth=1 origin "$MIKKA_COMMUNITY_REVISION"
           git worktree add --detach "$RUNNER_TEMP/mikka-community-source" "$MIKKA_COMMUNITY_REVISION"
           pnpm --dir "$RUNNER_TEMP/mikka-community-source" install --frozen-lockfile
-          node --input-type=module <<'JS'
-          import { readFileSync, writeFileSync } from 'node:fs'
-          import { execFileSync } from 'node:child_process'
-          import { communityDaemonHelper } from './scripts/ops/self-hosting-subscription-acceptance.mjs'
-          const source = process.env.RUNNER_TEMP + '/mikka-community-source'
-          const path = process.env.RUNNER_TEMP + '/community-daemon-preflight.mts'
-          writeFileSync(path, communityDaemonHelper(readFileSync(source + '/scripts/e2b/acceptance-daemon.mts', 'utf8'), 'https://owned-preflight.trycloudflare.com'))
-          execFileSync(process.execPath, ['--check', path], { stdio: 'inherit' })
-          JS
           docker pull "ghcr.io/alexj11324/mikka:$MIKKA_COMMUNITY_REVISION"
           curl --fail --silent --show-error --location --max-time 60 https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 -o "$RUNNER_TEMP/mikka-cloudflared"
           node --input-type=module <<'JS'
@@ -365,7 +356,7 @@ jobs:
 
   final-community-subscriptions:
     if: >-
-      false && github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
       startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final')
@@ -476,9 +467,18 @@ jobs:
           git fetch --depth=1 origin "$MIKKA_COMMUNITY_REVISION"
           git worktree add --detach "$RUNNER_TEMP/mikka-community-source" "$MIKKA_COMMUNITY_REVISION"
           pnpm --dir "$RUNNER_TEMP/mikka-community-source" install --frozen-lockfile
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          import { execFileSync } from 'node:child_process'
+          import { communityDaemonHelper } from './scripts/ops/self-hosting-subscription-acceptance.mjs'
+          const source = process.env.RUNNER_TEMP + '/mikka-community-source'
+          const path = process.env.RUNNER_TEMP + '/community-daemon-preflight.mts'
+          writeFileSync(path, communityDaemonHelper(readFileSync(source + '/scripts/e2b/acceptance-daemon.mts', 'utf8'), 'https://owned-preflight.trycloudflare.com'))
+          execFileSync(process.execPath, ['--check', path], { stdio: 'inherit' })
+          JS
           mkdir -p .artifacts/self-hosting
           docker pull "ghcr.io/alexj11324/mikka:$MIKKA_COMMUNITY_REVISION"
-          curl --fail --silent --show-error --location --retry 2 --retry-max-time 120 --max-time 60 --header 'Accept: application/octet-stream' https://api.github.com/repos/cloudflare/cloudflared/releases/assets/692817008 -o "$RUNNER_TEMP/mikka-cloudflared"
+          curl --fail --silent --show-error --location --retry 2 --retry-max-time 120 --max-time 60 --header 'Accept: application/octet-stream' --header "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/cloudflare/cloudflared/releases/assets/692817008 -o "$RUNNER_TEMP/mikka-cloudflared"
           node --input-type=module <<'JS'
           import { readFileSync, chmodSync } from 'node:fs'
           import { createHash } from 'node:crypto'
