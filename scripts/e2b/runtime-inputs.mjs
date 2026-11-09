@@ -69,7 +69,9 @@ async function* pages(path, key, options) {
 /** Artifacts only index fingerprints. Trust the native latest run attempt and
  * its exact failing build/gate step, not a generic workflow failure. In
  * particular mainChanged, cancellation, Web and cleanup failures stay retryable.
- * This also prevents an artifact left by an older rerun from suppressing work. */
+ * A newly uploaded marker can precede the overall run's completed status by a
+ * few seconds; its build/gate job must already have failed. An older rerun's
+ * artifact cannot suppress work from a different attempt. */
 export async function findFailedInputs({ digest, currentRunId, token, fetchImpl = fetch }) {
   if (!/^[a-f0-9]{64}$/.test(digest ?? '')) throw Error('runtimeInputs:digestRequired')
   const options = { token, fetchImpl }, name = `e2b-runtime-inputs-${digest}`
@@ -81,7 +83,8 @@ export async function findFailedInputs({ digest, currentRunId, token, fetchImpl 
     const run = await githubRead(`/actions/runs/${source.id}`, options)
     if (run.id !== source.id || run.path !== WORKFLOW || run.head_branch !== 'main' || run.head_sha !== source.head_sha
       || run.repository?.full_name !== REPOSITORY || run.head_repository?.full_name !== REPOSITORY
-      || !['push', 'workflow_dispatch'].includes(run.event) || run.status !== 'completed' || run.conclusion !== 'failure'
+      || !['push', 'workflow_dispatch'].includes(run.event)
+      || !(run.status === 'completed' && run.conclusion === 'failure' || run.status === 'in_progress' && run.conclusion === null)
       || !id(run.run_attempt) || !(Date.parse(artifact.created_at) >= Date.parse(run.run_started_at))) continue
     if (await failedRuntimeAttempt(run, options)) return run.id
   }
@@ -119,13 +122,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log(remember ? `Remember failed runtime inputs ${digest}` : 'No current-source build/gate failure to remember')
   } else {
     const manual = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
-    // Validate before doing any work. The reason remains in the dispatch event;
-    // do not render operator-supplied text as commands, outputs or Markdown.
+    // Validate before network work. Render the reason only as escaped text,
+    // never as commands, job outputs or operator-supplied Markdown.
     if (manual) releaseDecision({ eventName: 'workflow_dispatch', reason: process.env.RETRY_REASON })
     const failedRunId = manual ? null : await findFailedInputs({ digest, currentRunId: process.env.GITHUB_RUN_ID, token: process.env.GITHUB_TOKEN })
-    const reason = failedRunId ? `skipped: same inputs as failed run ${failedRunId}` : 'no matching failed runtime inputs'
+    const reason = manual ? 'manual retry; failed-input skip bypassed'
+      : failedRunId ? `skipped: same inputs as failed run ${failedRunId}` : 'no matching failed runtime inputs'
     console.log(`Runtime inputs ${digest}: ${reason}`)
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `digest=${digest}\nskip=${Boolean(failedRunId)}\n`)
-    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\nRuntime inputs: \`${digest}\`\n\n${reason}\n`)
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\nRuntime inputs: \`${digest}\`\n\n${reason}\n`)
+      if (manual) appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\nManual retry reason:\n<pre>'
+        + process.env.RETRY_REASON.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') + '</pre>\n')
+    }
   }
 }

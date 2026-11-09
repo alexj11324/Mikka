@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -119,4 +119,29 @@ test('only a real failure still bound to current main is remembered; superseded 
       ? Promise.resolve(Response.json({ object: { type: 'commit', sha: current } })) : mock.fetchImpl(url, init)
     assert.equal(await rememberFailure({ sourceCommit: sha, runId: 10, runAttempt: 2, token: 'test', fetchImpl }), expected)
   }
+})
+
+
+test('manual dispatch needs no history API and records its reason as escaped text', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'runtime-dispatch-'))
+  try {
+    const script = new URL('./runtime-inputs.mjs', import.meta.url).pathname
+    const output = join(dir, 'output'), summary = join(dir, 'summary')
+    const env = { PATH: process.env.PATH, GITHUB_SHA: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+      GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary,
+      RETRY_REASON: 'service recovered <script> & $(false)' }
+    const result = spawnSync(process.execPath, [script], { env, encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(readFileSync(output, 'utf8'), /skip=false/)
+    assert.match(readFileSync(summary, 'utf8'), /service recovered &lt;script&gt; &amp; \$\(false\)/)
+    assert.doesNotMatch(readFileSync(summary, 'utf8'), /<script>/)
+    const invalid = spawnSync(process.execPath, [script], { env: { ...env, RETRY_REASON: '  ' }, encoding: 'utf8' })
+    assert.notEqual(invalid.status, 0)
+    assert.match(invalid.stderr, /retryReasonRequired/)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+
+test('the queue recheck recognizes a just-recorded failure before the overall run finishes', async () => {
+  assert.equal(await findFailedInputs({ ...options, ...api({ previousRun: { ...run, status: 'in_progress', conclusion: null } }) }), 10)
 })
