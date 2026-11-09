@@ -951,6 +951,7 @@ jobs:
 
   root-self-hosted-github-1565:
     if: >-
+      false &&
       github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
@@ -1049,6 +1050,113 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/mikka-github-source"
           node --import tsx "$GITHUB_WORKSPACE/scripts/ops/self-hosted-github-closeout.mjs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: root-self-hosted-github-${{ github.run_id }}
+          path: ${{ runner.temp }}/mikka-github-source/artifacts/self-hosted-github.json
+          if-no-files-found: error
+          retention-days: 7
+
+  root-self-hosted-github-revocation-1565:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
+      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final github webhook 1565 revocation only')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: production-smoke-owner-acceptance
+      queue: max
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+      id-token: write
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - name: Validate exact driver before credentials
+        run: node scripts/ops/self-hosted-github-revocation-closeout.mjs
+        env:
+          MIKKA_GITHUB_PREFLIGHT: '1'
+      - name: Prepare only the existing officially published source and image
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          const get = async path => {
+            const r = await fetch('https://api.github.com/repos/alexj11324/Mikka/' + path, { headers: { authorization: 'Bearer ' + process.env.GITHUB_TOKEN }, redirect: 'error', signal: AbortSignal.timeout(20000) })
+            if (!r.ok) throw Error('SERVICES_RELEASE_HTTP')
+            return r.json()
+          }
+          for (const [id,name] of [[42569765628,'Self-hosted image'],[42569765699,'CI']]) {
+            const r = await get('actions/runs/' + id)
+            if (r.name !== name || r.head_sha !== '88b144d52d091d7ff566c63fce6e902e33edc59e' || r.head_branch !== 'main' || r.event !== 'push' || r.conclusion !== 'success' || r.status !== 'completed') throw Error('SERVICES_IMAGE_NOT_RELEASED')
+          }
+          JS
+          git fetch --depth=1 origin 88b144d52d091d7ff566c63fce6e902e33edc59e
+          git worktree add --detach "$RUNNER_TEMP/mikka-github-source" 88b144d52d091d7ff566c63fce6e902e33edc59e
+          pnpm --dir "$RUNNER_TEMP/mikka-github-source" install --frozen-lockfile --ignore-scripts
+          docker pull ghcr.io/alexj11324/mikka@sha256:96de4972ea7820dca9d7f03d116f8a4589c662ee6a6db9cb33cf8ad0f89ec98e
+          curl --fail --silent --show-error --location --retry 2 --retry-max-time 120 --max-time 60 --header 'Accept: application/octet-stream' --header "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/cloudflare/cloudflared/releases/assets/692817008 -o "$RUNNER_TEMP/mikka-cloudflared"
+          node --input-type=module <<'JS'
+          import { readFileSync, chmodSync } from 'node:fs'
+          import { createHash } from 'node:crypto'
+          const path = process.env.RUNNER_TEMP + '/mikka-cloudflared'
+          if (createHash('sha256').update(readFileSync(path)).digest('hex') !== '1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872') throw Error('SERVICES_TUNNEL_DIGEST')
+          chmodSync(path,0o700)
+          JS
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Measure actual provider revocation and real post-disconnect webhook exclusion
+        timeout-minutes: 14
+        run: |
+          cd "$RUNNER_TEMP/mikka-github-source"
+          node --import tsx "$GITHUB_WORKSPACE/scripts/ops/self-hosted-github-revocation-closeout.mjs"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
