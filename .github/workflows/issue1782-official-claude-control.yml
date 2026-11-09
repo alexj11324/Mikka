@@ -1,0 +1,85 @@
+name: PR 1782 official Claude certificate control
+on:
+  push:
+    branches: [ops/self-hosted-vault-closeout-20261108]
+    paths:
+      - .github/workflows/issue1782-official-claude-control.yml
+      - scripts/ops/issue1782-official-claude-control.py
+      - scripts/ops/issue1782-official-claude-control.test.py
+permissions:
+  contents: read
+concurrency:
+  group: issue1782-official-claude-certificate-control
+  cancel-in-progress: false
+  queue: max
+jobs:
+  official_claude_control:
+    # Bind the exact reviewed Ops append and one <=15-minute absolute window.
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    # Observation remains <=15m. This ceiling leaves the existing independent
+    # 150-second always-cleanup step time after a failed observation deadline.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      CONTROL_GO: 'true'
+      CONTROL_NOT_BEFORE: 2026-11-09T17:07:29Z
+      CONTROL_DEADLINE: 2026-11-09T17:22:29Z
+    steps:
+      - name: Check out the exact product source for cleanup only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 623a1afd8715433a58c3e88ce88f8fbcc29d1761
+          path: source
+          persist-credentials: false
+      - name: Check out this owned diagnostic append
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify offline guards and the exact sources before credentials
+        run: |
+          python3 -B ops/scripts/ops/issue1782-official-claude-control.test.py
+          python3 -B ops/scripts/ops/issue1782-official-claude-control.py verify --source source --output "$RUNNER_TEMP/issue1782-official-claude-control"
+      - name: Install only the pinned host control SDK
+        run: |
+          python3 -m venv "$RUNNER_TEMP/issue1782-official-control-sdk"
+          "$RUNNER_TEMP/issue1782-official-control-sdk/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Recheck the absolute observation budget before requesting the key
+        run: python3 -B ops/scripts/ops/issue1782-official-claude-control.py verify --source source --output "$RUNNER_TEMP/issue1782-official-claude-control"
+      - name: Read only the existing E2B key through the existing owned subject
+        id: key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          include-imports: false
+          recursive: false
+      - name: Observe one official-only Claude derivative and one fresh instance
+        run: >-
+          "$RUNNER_TEMP/issue1782-official-control-sdk/bin/python" -B ops/scripts/ops/issue1782-official-claude-control.py diagnose
+          --source source --output "$RUNNER_TEMP/issue1782-official-claude-control"
+      - name: Recheck only the exact owned private template and instance
+        if: always() && steps.key.outcome == 'success'
+        timeout-minutes: 3
+        run: >-
+          "$RUNNER_TEMP/issue1782-official-control-sdk/bin/python" -B ops/scripts/ops/issue1782-official-claude-control.py cleanup
+          --source source --output "$RUNNER_TEMP/issue1782-official-claude-control"
+      - name: Preserve only closed public-certificate metadata and cleanup receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1782-official-claude-control-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue1782-official-claude-control/
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,15 +1,21 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { readFile } from 'node:fs/promises'
 import { createSessionClient } from '../acceptance/cloud-startup.mjs'
-import { candidateInventory, guardContext, guardMain, MAIN, projectRows, publicFailure, searchCandidates, selectScope, snapshot, SQL, verifyScope } from './domain-history-before-1782.mjs'
+import { candidateInventory, EPIC_MIGRATIONS, guardContext, guardMain, MAIN, projectRows, publicFailure, searchCandidates, selectScope, snapshot, SQL, verifyScope } from './domain-history-before-1782.mjs'
 
 const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
-const scope = { ownerId: 'smoke-owner', workspaceId: id(90), workspaceKind: 'personal', taskIds: [id(1), id(2)], candidateTaskIds: [id(1), id(2)] }
-const personalView = () => ({ currentUserId: scope.ownerId, workspace: { id: scope.workspaceId, kind: 'personal' }, role: 'admin',
-  choices: [{ id: scope.workspaceId, kind: 'personal' }], members: [{ userId: scope.ownerId, role: 'admin', status: 'active' }] })
+const owners = ids => Object.fromEntries(ids.map(value => [value, 'smoke-owner']))
+const scope = { ownerId: 'smoke-owner', workspaceId: id(90), workspaceKind: 'team', adminId: 'policy-admin',
+  taskIds: [id(1), id(2)], candidateTaskIds: [id(1), id(2)], taskOwners: owners([id(1), id(2)]) }
+const sharedView = () => ({ currentUserId: scope.ownerId, workspace: { id: scope.workspaceId, kind: 'team' }, role: 'admin',
+  choices: [{ id: scope.workspaceId, kind: 'team' }], members: [{ userId: scope.ownerId, role: 'admin', status: 'active' },
+    { userId: scope.adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] })
 const fixture = () => ({ task: scope.taskIds.map(value => ({ id: value, owner: scope.ownerId,
-  workspace: scope.workspaceId, scope: 'workspace', identifier: 'MIK-' + value.slice(-1) })),
+  workspace: scope.workspaceId, scope: 'workspace', state: 'bound', identifier: 'MIK-' + value.slice(-1) })),
 publication: scope.taskIds.map((value, index) => ({ id: id(index + 3), issueId: value, identifier: 'MIK-' + (index + 1), branch: 'private-branch', baseBranch: 'main', remoteKey: 'private-repo' })),
 run: scope.taskIds.map((value, index) => ({ id: id(index + 3), issueId: value, hasProjectSnapshot: false, frozenDigest: 'a'.repeat(32) })) })
 const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka',
@@ -65,7 +71,8 @@ test('snapshot contains only closed projections and sorted finite UUIDs; no raw 
 })
 
 for (const [name, change] of [
-  ['different owner', rows => { rows.task[0].owner = 'other' }],
+  ['changed frozen creator', rows => { rows.task[0].owner = 'other' }],
+  ['ownership no longer bound', rows => { rows.task[0].state = 'pending' }],
   ['different workspace', rows => { rows.task[0].workspace = id(99) }],
   ['unknown legacy scope', rows => { rows.task[0].scope = 'private' }],
   ['missing task', rows => { rows.task.pop() }],
@@ -93,24 +100,24 @@ test('at most ten explicit Task UUIDs, not an arbitrary SQL or all-tenant scan',
   assert.throws(() => projectRows({ ...scope, taskIds: [] }, fixture()))
 })
 
-function database({ readonly = 'on', isolation = 'repeatable read', epic = 0, failRun = false, bindingOverride,
+function database({ readonly = 'on', isolation = 'repeatable read', epic = 0, legacy = 0, failRun = false, bindingOverride,
   selected = scope.taskIds.map(value => ({ id: value })) } = {}) {
   const calls = [], rows = fixture()
   return { calls, query: async (sql, args) => {
     calls.push({ sql, args })
     if (sql === SQL.settings) return { rows: [{ readonly, isolation }] }
-    if (sql === SQL.ledger) return { rows: [{ epic, digest: 'c'.repeat(32) }] }
+    if (sql === SQL.ledger) return { rows: [{ epic, legacy, digest: 'c'.repeat(32) }] }
     if (sql === SQL.binding) {
-      assert.equal(args[1], scope.ownerId); assert.equal(args[2], scope.workspaceId)
+      assert.deepEqual(args[1], args[0].map(value => scope.taskOwners[value] ?? scope.ownerId)); assert.equal(args[2], scope.workspaceId)
       return { rows: [bindingOverride ?? { present: args[0].length, bound: args[0].length, published: 2, ended: 2, historical: 2 }] }
     }
     if (sql === SQL.select) {
-      assert.equal(args[1], scope.ownerId); assert.equal(args[2], scope.workspaceId)
+      assert.deepEqual(args[1], args[0].map(value => scope.taskOwners[value] ?? scope.ownerId)); assert.equal(args[2], scope.workspaceId)
       return { rows: selected }
     }
     for (const kind of ['task', 'publication', 'run']) if (sql === SQL[kind]) {
       if (kind === 'run' && failRun) throw Error('synthetic-private-provider-error')
-      assert.deepEqual(args, [scope.taskIds]); return { rows: rows[kind] }
+      assert.deepEqual(args, [scope.taskIds, scope.taskIds.map(value => scope.taskOwners[value]), scope.workspaceId]); return { rows: rows[kind] }
     }
     return { rows: [] }
   } }
@@ -124,7 +131,7 @@ test('one repeatable read, read-only transaction uses fixed SQL and always rolls
   assert.ok(db.calls.every(({ sql }) => !/\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|COMMIT)\b/i.test(sql)))
   assert.equal(db.calls.filter(({ args }) => args).length, 5)
 })
-for (const options of [{ readonly: 'off' }, { isolation: 'read committed' }, { epic: 1 }, { failRun: true }]) {
+for (const options of [{ readonly: 'off' }, { isolation: 'read committed' }, { epic: 1 }, { legacy: 1 }, { failRun: true }]) {
   test('fails closed and rolls back for ' + JSON.stringify(options), async () => {
     const db = database(options)
     await assert.rejects(snapshot(db, scope))
@@ -134,15 +141,16 @@ for (const options of [{ readonly: 'off' }, { isolation: 'read committed' }, { e
 
 test('one hundred authorized candidate UUIDs produce only the fixed historical subset for all three snapshots', async () => {
   const db = database(), candidateTaskIds = Array.from({ length: 100 }, (_, i) => id(i + 1))
-  const result = await snapshot(db, { ...scope, candidateTaskIds })
+  const result = await snapshot(db, { ...scope, candidateTaskIds, taskOwners: owners(candidateTaskIds) })
   assert.equal(result.candidateCount, 100)
   assert.deepEqual(result.taskIds, scope.taskIds)
-  assert.deepEqual(db.calls.find(row => row.sql === SQL.select).args, [candidateTaskIds, scope.ownerId, scope.workspaceId])
-  for (const kind of ['task', 'publication', 'run']) assert.deepEqual(db.calls.find(row => row.sql === SQL[kind]).args, [scope.taskIds])
+  assert.deepEqual(db.calls.find(row => row.sql === SQL.select).args, [candidateTaskIds, candidateTaskIds.map(() => scope.ownerId), scope.workspaceId])
+  for (const kind of ['task', 'publication', 'run']) assert.deepEqual(db.calls.find(row => row.sql === SQL[kind]).args, [scope.taskIds, scope.taskIds.map(value => scope.taskOwners[value]), scope.workspaceId])
   assert.match(SQL.select, /p.status='published'/)
   assert.match(SQL.select, /r.status IN \('succeeded','stopped','failed','cancelled'\)/)
-  assert.match(SQL.select, /i\."userId"=\$2/)
-  assert.match(SQL.select, /workspaceId',''\)=\$3/)
+  assert.match(SQL.select, /unnest\(\$1::uuid\[\], \$2::text\[\]\)/)
+  assert.match(SQL.select, /a.creator=i\."userId"/)
+  assert.match(SQL.select, /i\."workspaceId"=\$3::uuid/)
   assert.match(SQL.select, /i.scope IN \('workspace','personal'\)/)
   assert.match(SQL.select, /LIMIT 10$/)
 })
@@ -163,7 +171,7 @@ test('refuses more than one hundred API candidates before opening any transactio
   assert.equal(db.calls.length, 0)
 })
 
-test('normal API candidates admit both owned labels and emit counts without raw identity or content', () => {
+test('normal API candidates admit both legal labels and other creators and emit counts without raw identity or content', () => {
   const rows = [
     { id: id(1), ownerId: scope.ownerId, scope: 'workspace', status: 'completed', title: 'sensitive-title' },
     { id: id(2), ownerId: scope.ownerId, scope: 'personal', status: 'stopped', content: 'sensitive-body' },
@@ -172,13 +180,14 @@ test('normal API candidates admit both owned labels and emit counts without raw 
     { id: id(5), userId: scope.ownerId, scope: 'personal' },
   ]
   const result = candidateInventory(rows, scope.ownerId)
-  assert.deepEqual(result.candidateTaskIds, [id(1), id(2)])
+  assert.deepEqual(result.candidateTaskIds, [id(1), id(2), id(3)])
+  assert.equal(result.taskOwners[id(3)], 'other-owner')
   assert.deepEqual(result.counts, { returned: 5, ownerIdFieldPresent: 4, own: 3, ownWorkspace: 1, ownPersonal: 1,
     ownUnknownScope: 1, ownScopeOmitted: 0, workspaceLabel: 1, personalLabel: 3, unknownScope: 1, scopeOmitted: 0, listCapacityReached: false })
   const output = JSON.stringify(result.counts)
   for (const privateValue of [scope.ownerId, 'other-owner', 'sensitive-title', 'sensitive-body', id(1)]) assert.ok(!output.includes(privateValue))
   assert.equal(candidateInventory([], scope.ownerId).counts.returned, 0)
-  assert.deepEqual(candidateInventory(rows.filter(row => row.ownerId !== scope.ownerId), scope.ownerId).candidateTaskIds, [])
+  assert.deepEqual(candidateInventory(rows.filter(row => row.ownerId !== scope.ownerId), scope.ownerId).candidateTaskIds, [id(3)])
 })
 
 test('each candidate collection has a hard one-hundred UUID bound', () => {
@@ -190,7 +199,7 @@ test('each candidate collection has a hard one-hundred UUID bound', () => {
 })
 
 test('post-query API authorization loss invalidates evidence', async () => {
-  const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : personalView(), rpc: async (action, [value]) => {
+  const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : sharedView(), rpc: async (action, [value]) => {
     assert.equal(action, 'issues.getIssue')
     return { issue: { id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'workspace' } }
   } }
@@ -200,7 +209,7 @@ test('post-query API authorization loss invalidates evidence', async () => {
 })
 
 test('post-query API verifies the same owner and Workspace for a personal-label Task', async () => {
-  const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : personalView(), rpc: async (action, [value]) => {
+  const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : sharedView(), rpc: async (action, [value]) => {
     assert.equal(action, 'issues.getIssue')
     return { issue: { id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } }
   } }
@@ -243,19 +252,19 @@ test('runner context is resolved only inside install and capture steps, never jo
   }
 })
 
-test('real opaque search pagination reaches own historical Tasks beyond the first one hundred visible rows', async () => {
+test('real opaque search pagination retains API-visible Tasks from both creators with server cursors', async () => {
   const paths = [], inventories = []
   const client = { json: async path => {
     paths.push(path); const page = paths.length
-    const rows = Array.from({ length: page < 3 ? 50 : 2 }, (_, index) => ({
-      id: id((page - 1) * 50 + index + 1), ownerId: page < 3 ? 'other-owner' : scope.ownerId,
+    const rows = Array.from({ length: 2 }, (_, index) => ({
+      id: id((page - 1) * 2 + index + 1), ownerId: page < 3 ? 'other-owner' : scope.ownerId,
       title: 'private-title', content: 'private-content',
     }))
     return { items: rows, nextCursor: page < 3 ? 'opaque' + page : null, truncated: false }
   } }
   const result = await searchCandidates(client, scope, counts => inventories.push(counts))
-  assert.deepEqual(result.candidateTaskIds, [id(101), id(102)])
-  assert.equal(result.counts.pages, 3); assert.equal(result.counts.returned, 102)
+  assert.deepEqual(result.candidateTaskIds, [id(1), id(2), id(3), id(4), id(5), id(6)])
+  assert.equal(result.counts.pages, 3); assert.equal(result.counts.returned, 6)
   assert.equal(result.counts.ownScopeOmitted, 2); assert.equal(result.counts.hasMore, false)
   for (const [index, path] of paths.entries()) {
     const url = new URL(path, 'https://synthetic.invalid')
@@ -267,12 +276,12 @@ test('real opaque search pagination reaches own historical Tasks beyond the firs
   for (const text of ['other-owner', scope.ownerId, 'private-title', 'private-content', 'opaque1', id(101)]) assert.ok(!evidence.includes(text))
 })
 
-test('search stops at five pages or one hundred own candidates and declares the finite boundary', async () => {
+test('search stops at five pages or one hundred authorized candidates and declares the finite boundary', async () => {
   for (const own of [false, true]) {
     let calls = 0
     const result = await searchCandidates({ json: async () => {
       const page = calls++
-      return { items: Array.from({ length: 50 }, (_, i) => ({ id: id(page * 50 + i + 1), ownerId: own ? scope.ownerId : 'other' })),
+      return { items: Array.from({ length: 50 }, (_, i) => ({ id: id(page * 50 + i + 1), ownerId: own ? scope.ownerId : 'other', ...(own ? {} : { scope: 'unknown' }) })),
         nextCursor: 'cursor' + calls, truncated: false }
     } }, scope)
     assert.equal(calls, own ? 2 : 5)
@@ -322,16 +331,16 @@ test('rollback evidence follows the actual ACK on success or failure, never a fa
 
 test('exact older Task revalidation never depends on the newest list or includes another tenant', async () => {
   const seen = [], client = {
-    json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : personalView(),
+    json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : sharedView(),
     rpc: async (action, [value], options) => { seen.push({ action, value });
       assert.deepEqual(options, { headers: { 'x-mikka-workspace-id': scope.workspaceId } }); return { issue: {
       id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal', content: 'never-recorded',
     } } },
   }
-  await verifyScope(client, { ...scope, taskIds: [id(501)] })
+  await verifyScope(client, { ...scope, taskIds: [id(501)], taskOwners: owners([id(501)]) })
   assert.deepEqual(seen, [{ action: 'issues.getIssue', value: id(501) }])
   client.rpc = async (_action, [value]) => ({ issue: { id: value, userId: scope.ownerId, workspaceId: id(999), ownershipState: 'bound', scope: 'personal' } })
-  await assert.rejects(verifyScope(client, { ...scope, taskIds: [id(501)] }))
+  await assert.rejects(verifyScope(client, { ...scope, taskIds: [id(501)], taskOwners: owners([id(501)]) }))
 })
 
 test('the existing session transport reads fixed Tasks in an authorized request Workspace without changing the selected cookie', async () => {
@@ -344,7 +353,7 @@ test('the existing session transport reads fixed Tasks in an authorized request 
     assert.equal(init.headers.cookie, 'mikka-workspace=' + selectedWorkspace)
     if (url.pathname.endsWith('/api/workspace')) {
       assert.equal(url.searchParams.get('workspace'), scope.workspaceId)
-      return new Response(JSON.stringify(personalView()))
+      return new Response(JSON.stringify(sharedView()))
     }
     assert.equal(url.pathname, '/mikka/api/rpc')
     const body = JSON.parse(init.body)
@@ -352,25 +361,25 @@ test('the existing session transport reads fixed Tasks in an authorized request 
     // The account's saved choice is deliberately different. The existing API
     // requires the membership-checked transport preference for this target.
     if (init.headers['x-mikka-workspace-id'] !== scope.workspaceId) return new Response('{}', { status: 403 })
-    return new Response(JSON.stringify({ ok: true, result: { issue: { id: body.args[0], userId: scope.ownerId,
+    return new Response(JSON.stringify({ ok: true, result: { issue: { id: body.args[0], userId: body.args[0] === id(502) ? 'another-owner' : scope.ownerId,
       workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } } }))
   })
   await verifyScope(client, scope)
-  assert.deepEqual(paths, ['/mikka/api/auth/get-session', '/mikka/api/workspace', '/mikka/api/rpc', '/mikka/api/rpc'])
+  assert.deepEqual(paths, ['/mikka/api/auth/get-session', '/mikka/api/workspace', '/mikka/api/rpc', '/mikka/api/rpc', '/mikka/api/workspace'])
 })
 
-test('normal session transport selects its unique owned Personal Workspace and revalidates fixed Tasks without switching the Team cookie', async () => {
-  const teamId = id(999), email = 'synthetic@example.invalid', calls = []
+test('normal session transport authorizes other creators in the policy Shared Workspace without switching the saved Personal cookie', async () => {
+  const savedId = id(999), email = 'synthetic@example.invalid', calls = []
   const client = createSessionClient('https://synthetic.invalid', async (url, init) => {
     calls.push({ path: url.pathname, search: url.search, body: init.body })
     if (url.pathname.endsWith('/api/auth/get-session')) return new Response(JSON.stringify({ user: { id: scope.ownerId, email } }), {
-      headers: { 'set-cookie': 'mikka-workspace=' + teamId + '; Path=/mikka' },
+      headers: { 'set-cookie': 'mikka-workspace=' + savedId + '; Path=/mikka' },
     })
-    assert.equal(init.headers.cookie, 'mikka-workspace=' + teamId)
+    assert.equal(init.headers.cookie, 'mikka-workspace=' + savedId)
     if (url.pathname.endsWith('/api/workspace')) {
-      const value = personalView(); value.choices.push({ id: teamId, kind: 'team' })
+      const value = sharedView(); value.choices.push({ id: savedId, kind: 'personal' })
       if (url.searchParams.has('workspace')) assert.equal(url.searchParams.get('workspace'), scope.workspaceId)
-      else value.workspace = { id: teamId, kind: 'team' }
+      else value.workspace = { id: savedId, kind: 'personal' }
       return new Response(JSON.stringify(value))
     }
     if (url.pathname.endsWith('/api/issues/search')) {
@@ -382,44 +391,193 @@ test('normal session transport selects its unique owned Personal Workspace and r
     const body = JSON.parse(init.body)
     assert.equal(body.action, 'issues.getIssue')
     assert.equal(init.headers['x-mikka-workspace-id'], scope.workspaceId)
-    return new Response(JSON.stringify({ ok: true, result: { issue: { id: body.args[0], userId: scope.ownerId,
+    return new Response(JSON.stringify({ ok: true, result: { issue: { id: body.args[0], userId: body.args[0] === id(502) ? 'another-owner' : scope.ownerId,
       workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } } }))
   })
   const selected = await selectScope(client, email)
   assert.equal(selected.workspaceId, scope.workspaceId)
-  assert.equal(selected.workspaceKind, 'personal')
-  assert.deepEqual(selected.candidateTaskIds, [id(501)])
+  assert.equal(selected.workspaceKind, 'team')
+  assert.deepEqual(selected.candidateTaskIds, [id(501), id(502)])
+  assert.equal(selected.taskOwners[id(502)], 'another-owner')
   await verifyScope(client, { ...selected, taskIds: selected.candidateTaskIds })
   assert.equal(calls.filter(row => row.path.endsWith('/api/issues/search')).length, 1)
-  assert.deepEqual(calls.filter(row => row.body).map(row => JSON.parse(row.body).action), ['issues.getIssue'])
+  assert.deepEqual(calls.filter(row => row.body).map(row => JSON.parse(row.body).action), ['issues.getIssue', 'issues.getIssue', 'issues.getIssue', 'issues.getIssue'])
 })
 
 for (const [name, change] of [
-  ['missing Personal choice', value => { value.choices = [] }],
-  ['ambiguous Personal choices', value => { value.choices.push({ id: id(998), kind: 'personal' }) }],
+  ['missing Shared choice', value => { value.choices = [] }],
+  ['duplicate Shared choices', value => { value.choices.push({ id: scope.workspaceId, kind: 'team' }) }],
   ['another session owner', value => { value.currentUserId = 'other' }],
   ['another explicit Workspace', value => { value.workspace.id = id(998) }],
-  ['a Team returned for the Personal target', value => { value.workspace.kind = 'team' }],
+  ['a Personal returned for the Shared target', value => { value.workspace.kind = 'personal' }],
   ['no own membership', value => { value.members = [{ userId: 'other', role: 'admin', status: 'active' }] }],
   ['suspended own membership', value => { value.members[0].status = 'suspended' }],
   ['duplicate own membership', value => { value.members.push({ ...value.members[0] }) }],
   ['membership role mismatch', value => { value.members[0].role = 'member' }],
-]) test('Personal selection rejects ' + name + ' before searching Task IDs', async () => {
+]) test('Shared selection rejects ' + name + ' before searching Task IDs', async () => {
   const email = 'synthetic@example.invalid'
   const client = { json: async path => {
     if (path.includes('get-session')) return { user: { id: scope.ownerId, email } }
     assert.ok(path.startsWith('/api/workspace'), 'refused scope never reaches Task search')
-    const value = personalView()
-    if (path.includes('?workspace=') || name.startsWith('missing') || name.startsWith('ambiguous')) change(value)
+    const value = sharedView()
+    if (path.includes('?workspace=') || name.startsWith('missing') || name.startsWith('duplicate Shared')) change(value)
     return value
   } }
   await assert.rejects(selectScope(client, email))
 })
 
-test('a revoked Personal membership fails fixed-UUID revalidation before any Task read', async () => {
+test('a revoked Shared membership fails fixed-UUID revalidation before any Task read', async () => {
   const client = { json: async path => {
     if (path.includes('get-session')) return { user: { id: scope.ownerId } }
-    const value = personalView(); value.members[0].status = 'suspended'; return value
+    const value = sharedView(); value.members[0].status = 'suspended'; return value
   }, rpc: async () => { assert.fail('revoked membership cannot read a Task') } }
   await assert.rejects(verifyScope(client, scope))
+})
+
+test('a separately authorized creator is accepted only under its frozen per-Task identity and emits its hash', () => {
+  const rows = fixture(), taskOwners = { ...scope.taskOwners, [id(2)]: 'authorized-other-creator' }
+  rows.task[1].owner = taskOwners[id(2)]
+  const projected = projectRows({ ...scope, taskOwners }, rows)
+  assert.equal(projected.task[1].creatorSha256, createHash('sha256').update(taskOwners[id(2)]).digest('hex'))
+  assert.notEqual(projected.task[0].creatorSha256, projected.task[1].creatorSha256)
+  assert.ok(!JSON.stringify(projected).includes(taskOwners[id(2)]))
+  rows.task[1].owner = 'changed-after-api'
+  assert.throws(() => projectRows({ ...scope, taskOwners }, rows), error => error.code === 'database_binding')
+})
+
+test('each frozen Task must retain both published and ended history, not merely another Task in the batch', () => {
+  for (const kind of ['publication', 'run']) {
+    const rows = fixture(); rows[kind].pop()
+    assert.throws(() => projectRows(scope, rows), error => error.code === 'history_missing')
+  }
+})
+
+test('a missing creator mapping fails before opening APP rather than substituting the reader', async () => {
+  const db = database()
+  await assert.rejects(snapshot(db, { ...scope, taskOwners: { [id(1)]: scope.ownerId } }), error => error.code === 'sample_invalid')
+  assert.equal(db.calls.length, 0)
+})
+
+const authorizedClient = (readIssue, observe = () => {}) => ({
+  json: async path => {
+    observe(path)
+    if (path.includes('get-session')) return { user: { id: scope.ownerId, email: 'synthetic@example.invalid' } }
+    if (path.startsWith('/api/workspace')) return sharedView()
+    assert.ok(path.startsWith('/api/issues/search?'))
+    return { items: [{ id: id(1), ownerId: 'authorized-other-creator' }], nextCursor: null, truncated: false }
+  },
+  rpc: async (action, [value], options) => {
+    assert.equal(action, 'issues.getIssue'); assert.equal(value, id(1))
+    assert.deepEqual(options, { headers: { 'x-mikka-workspace-id': scope.workspaceId } })
+    return readIssue({ id: value, userId: 'authorized-other-creator', workspaceId: scope.workspaceId,
+      ownershipState: 'bound', scope: 'personal' })
+  },
+})
+
+test('ordinary per-Task detail authorization precedes any database work for a different creator', async () => {
+  let detailReads = 0, databaseStarted = false
+  const client = authorizedClient(issue => { assert.equal(databaseStarted, false); detailReads++; return { issue } })
+  const selected = await selectScope(client, 'synthetic@example.invalid')
+  databaseStarted = true
+  assert.equal(detailReads, 1); assert.equal(selected.taskOwners[id(1)], 'authorized-other-creator')
+  assert.equal(selected.ownerId, scope.ownerId); assert.equal(selected.workspaceKind, 'team')
+})
+
+for (const [name, response] of [
+  ['API refusal', () => { throw Object.assign(Error('private-api-message'), { code: 'forbidden' }) }],
+  ['unknown response', () => ({})],
+  ['creator changed after search', issue => ({ issue: { ...issue, userId: 'another-creator' } })],
+  ['different tenant', issue => ({ issue: { ...issue, workspaceId: id(999) } })],
+  ['pending Task', issue => ({ issue: { ...issue, ownershipState: 'pending' } })],
+  ['unknown label', issue => ({ issue: { ...issue, scope: 'private' } })],
+]) test(name + ' refuses the candidate before any database work', async () => {
+  let databaseStarted = false
+  await assert.rejects((async () => {
+    await selectScope(authorizedClient(response), 'synthetic@example.invalid')
+    databaseStarted = true
+  })())
+  assert.equal(databaseStarted, false)
+})
+
+test('membership is rechecked after candidate detail reads before any APP work', async () => {
+  const client = authorizedClient(issue => ({ issue })), original = client.json
+  let explicitReads = 0
+  client.json = async path => {
+    const value = await original(path)
+    if (path.includes('/api/workspace?') && ++explicitReads === 3) value.members[0].status = 'suspended'
+    return value
+  }
+  await assert.rejects(selectScope(client, 'synthetic@example.invalid'), error => error.code === 'sample_changed')
+  assert.equal(explicitReads, 3)
+})
+
+test('at most four detail reads start and outstanding reads settle after a refusal without retry', async () => {
+  const taskIds = Array.from({ length: 12 }, (_, i) => id(i + 1)), started = [], blocked = []
+  const fourStarted = Promise.withResolvers()
+  let active = 0, maxActive = 0, settled = false
+  const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : sharedView(),
+    rpc: async (_action, [value]) => {
+      started.push(value); active++; maxActive = Math.max(maxActive, active)
+      if (started.length === 4) fourStarted.resolve()
+      try {
+        if (value === id(1)) throw Error('refused')
+        const pending = Promise.withResolvers(); blocked.push(pending)
+        await pending.promise
+        return { issue: { id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'workspace' } }
+      } finally { active-- }
+    } }
+  const verification = verifyScope(client, { ...scope, taskIds, taskOwners: owners(taskIds) }).finally(() => { settled = true })
+  await fourStarted.promise
+  assert.equal(settled, false); assert.equal(started.length, 4)
+  for (const pending of blocked) pending.resolve()
+  await assert.rejects(verification)
+  assert.equal(active, 0); assert.ok(maxActive <= 4); assert.equal(started.length, 4)
+  assert.equal(new Set(started).size, started.length)
+})
+
+test('the PG fixture gate refuses missing, remote, wrong database and inherited production targets before loading a driver', () => {
+  const filename = fileURLToPath(new URL('./domain-history-before-1782.db.test.mjs', import.meta.url))
+  for (const change of [{},
+    { DOMAIN_HISTORY_TEST_DATABASE_URL: 'postgresql://e2e:e2e-local-only@remote.invalid:5432/mikka_domain_history_1782_fixture' },
+    { DOMAIN_HISTORY_TEST_DATABASE_URL: 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/production' },
+    { DOMAIN_HISTORY_TEST_DATABASE_URL: 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_history_1782_fixture', MIKKA_DATABASE_URL: 'synthetic-production-target' },
+    { DOMAIN_HISTORY_TEST_DATABASE_URL: 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_history_1782_fixture', DATABASE_URL: 'synthetic-production-target' },
+  ]) {
+    const result = spawnSync(process.execPath, ['--test', filename], { encoding: 'utf8', timeout: 10000,
+      env: { PATH: process.env.PATH, DOMAIN_HISTORY_DEPENDENCIES: '/must-not-load-driver', ...change } })
+    assert.equal(result.status, 1)
+    assert.match(result.stdout + result.stderr, /fixture_target_refused/)
+    assert.doesNotMatch(result.stdout + result.stderr, /MODULE_NOT_FOUND|synthetic-production-target/)
+  }
+})
+
+test('PG17 SQL regression is a required pre-credential step with a dedicated loopback service', async () => {
+  const source = await readFile(new URL('../../.github/workflows/issue1782-domain-history-before.yml', import.meta.url), 'utf8')
+  const step = source.indexOf('      - name: Verify paired creator and verified-history SQL on isolated PG17 before credentials')
+  assert.ok(step > source.indexOf('npm install --prefix'))
+  assert.ok(step < source.indexOf('uses: Infisical/secrets-action'))
+  assert.match(source, /image: postgres:17\n/)
+  assert.match(source, /127\.0\.0\.1:5432:5432/)
+  assert.match(source, /run: node --test scripts\/ops\/domain-history-before-1782.db.test.mjs/)
+  assert.doesNotMatch(source, /continue-on-error/)
+  const databaseTest = await readFile(new URL('./domain-history-before-1782.db.test.mjs', import.meta.url), 'utf8')
+  assert.doesNotMatch(databaseTest, /\.skip\(|\bskip\s*:/)
+})
+
+test('before refuses exact canonical or old-alias Epic identities and reports their distinct closed counts', async () => {
+  assert.equal(EPIC_MIGRATIONS.canonical.length, 9); assert.equal(EPIC_MIGRATIONS.legacy.length, 9)
+  assert.equal(new Set([...EPIC_MIGRATIONS.canonical, ...EPIC_MIGRATIONS.legacy]).size, 18)
+  for (const [index, name] of EPIC_MIGRATIONS.canonical.entries()) {
+    assert.equal(name.replace('202611091430', '202611081203'), EPIC_MIGRATIONS.legacy[index])
+    assert.ok(SQL.ledger.includes("'" + name + "'")); assert.ok(SQL.ledger.includes("'" + EPIC_MIGRATIONS.legacy[index] + "'"))
+  }
+  assert.doesNotMatch(SQL.ledger, /\bLIKE\b|202611081202|202611090350|202611091431|202611082304/)
+  for (const counts of [{ epic: 0, legacy: 1 }, { epic: 1, legacy: 0 }]) {
+    const db = database(counts), observed = []
+    await assert.rejects(snapshot(db, scope, value => observed.push(value)), error => error.code === 'migration_already_applied')
+    assert.deepEqual(observed.find(value => value.lastReadStage === 'ledger_refused'), { lastReadStage: 'ledger_refused',
+      ledgerDigest: 'c'.repeat(32), canonicalEpicMigrations: counts.epic, legacyEpicMigrations: counts.legacy })
+    assert.equal(observed.at(-1).transactionRolledBack, true)
+    assert.equal(db.calls.some(value => value.sql === SQL.binding), false)
+  }
 })

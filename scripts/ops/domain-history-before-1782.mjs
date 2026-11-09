@@ -9,8 +9,9 @@ import { pathToFileURL } from 'node:url'
 import { workflowGuard } from './self-hosted-closeout.mjs'
 import { createSessionClient, smokeAcceptanceAccount } from '../acceptance/cloud-startup.mjs'
 
-export const MAIN = 'e189d7652fd2fce48b77a3697abf5bb177d8ebd1'
+export const MAIN = '8db16095f46be955df22f42914e0f89b6e5f3d11'
 export const ORIGIN = 'https://app.aspectlylabs.com'
+const ADMIN_HASH = '0049e13c050f799070a7d1a95bb843f2a0519b5e8732bf6986e2e1613b8941c3'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const SHA = /^[0-9a-f]{40}$/
 const LABELS = new Set(['workspace', 'personal'])
@@ -18,6 +19,7 @@ const CODES = new Set(['source_refused', 'main_changed', 'build_changed', 'http_
   'workspace_refused', 'sample_missing', 'sample_invalid', 'sample_changed', 'database_binding', 'database_readonly',
   'sample_too_large', 'history_missing', 'migration_already_applied', 'database_failed', 'signout_failed', 'before_failed'])
 const hash = value => createHash('sha256').update(value).digest('hex')
+const creator = value => typeof value === 'string' && value.length > 0 && value.length <= 256
 const check = (ok, code) => { if (!ok) throw Object.assign(new Error(code), { code }) }
 const post = body => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 export const publicFailure = error => ({ code: CODES.has(error?.code) ? error.code : 'before_failed' })
@@ -59,7 +61,8 @@ export function candidateInventory(rows, ownerId) {
   return {
     // The relation-search DTO deliberately omits scope; APP and exact detail
     // reads still enforce the two legal labels. An explicit unknown value is refused.
-    candidateTaskIds: own.filter(row => row.scope === undefined || LABELS.has(row.scope)).map(row => row.id).sort(),
+    candidateTaskIds: rows.filter(row => creator(row.ownerId) && (row.scope === undefined || LABELS.has(row.scope))).map(row => row.id).sort(),
+    taskOwners: Object.fromEntries(rows.filter(row => creator(row.ownerId) && (row.scope === undefined || LABELS.has(row.scope))).map(row => [row.id, row.ownerId])),
     counts: { returned: rows.length, ownerIdFieldPresent: rows.filter(row => typeof row.ownerId === 'string').length,
       own: own.length, ownWorkspace: count(own, 'workspace'), ownPersonal: count(own, 'personal'),
       ownUnknownScope: own.filter(row => row.scope !== undefined && !LABELS.has(row.scope)).length,
@@ -71,10 +74,10 @@ export function candidateInventory(rows, ownerId) {
 }
 
 /** Use the existing relation-picker's real cursor, never fabricate a cursor or
- * search all APP rows. Read at most five authorized pages and retain <=100 own IDs. */
+ * search all APP rows. Read at most five authorized pages and retain <=100 IDs. */
 export async function searchCandidates(client, scope, observeInventory = () => {}) {
   check(UUID.test(scope.workspaceId) && typeof scope.ownerId === 'string' && scope.ownerId.length > 0, 'sample_invalid')
-  const ids = new Set(), seenRows = new Set(), seenCursors = new Set()
+  const ids = new Set(), taskOwners = {}, seenRows = new Set(), seenCursors = new Set()
   let cursor = null
   const counts = { pages: 0, returned: 0, own: 0, ownWorkspace: 0, ownPersonal: 0, ownUnknownScope: 0,
     ownScopeOmitted: 0, ownerIdFieldPresent: 0, candidateCount: 0, hasMore: false, pageLimitReached: false,
@@ -88,7 +91,7 @@ export async function searchCandidates(client, scope, observeInventory = () => {
     const inventory = candidateInventory(result.items, scope.ownerId)
     check(result.items.every(row => !seenRows.has(row.id)), 'sample_invalid')
     for (const row of result.items) seenRows.add(row.id)
-    for (const id of inventory.candidateTaskIds) if (ids.size < 100) ids.add(id)
+    for (const id of inventory.candidateTaskIds) if (ids.size < 100) { ids.add(id); taskOwners[id] = inventory.taskOwners[id] }
     counts.pages++; counts.returned += result.items.length
     for (const key of ['own', 'ownWorkspace', 'ownPersonal', 'ownUnknownScope', 'ownScopeOmitted', 'ownerIdFieldPresent']) counts[key] += inventory.counts[key]
     counts.candidateCount = ids.size; counts.hasMore = result.nextCursor !== null
@@ -99,7 +102,7 @@ export async function searchCandidates(client, scope, observeInventory = () => {
     check(result.items.length > 0 && !seenCursors.has(result.nextCursor), 'response_invalid')
     seenCursors.add(result.nextCursor); cursor = result.nextCursor
   }
-  return { candidateTaskIds: [...ids].sort(), counts }
+  return { candidateTaskIds: [...ids].sort(), taskOwners, counts }
 }
 
 export async function selectScope(client, email, observeInventory = () => {}) {
@@ -108,82 +111,145 @@ export async function selectScope(client, email, observeInventory = () => {}) {
   check(typeof ownerId === 'string' && ownerId.length > 0 && session.user.email?.trim().toLowerCase() === email.trim().toLowerCase(), 'account_refused')
   const initial = await client.json('/api/workspace')
   check(initial.currentUserId === ownerId && Array.isArray(initial.choices), 'workspace_refused')
-  // loadWorkspaceContext's normal choices admit Personal only when its creator
-  // is the signed-in user. Membership alone in somebody else's Personal is not
-  // sufficient. Refuse ambiguity instead of guessing from a name or cookie.
-  const choices = initial.choices.filter(row => row?.kind === 'personal')
-  check(choices.length === 1 && UUID.test(choices[0].id), 'workspace_refused')
-  const workspaceId = choices[0].id
-  ownedPersonalWorkspace(await client.json('/api/workspace?workspace=' + workspaceId), ownerId, workspaceId, 'workspace_refused')
-  const { candidateTaskIds } = await searchCandidates(client, { ownerId, workspaceId }, observeInventory)
+  // The existing public policy-admin anchor identifies the authorized shared
+  // Workspace. The display name, creator and compatibility scope grant nothing.
+  const choices = initial.choices.filter(row => row?.kind === 'team')
+  check(choices.length > 0 && choices.length <= 32 && choices.every(row => UUID.test(row.id))
+    && new Set(choices.map(row => row.id)).size === choices.length, 'workspace_refused')
+  const matches = []
+  for (const choice of choices) {
+    const adminId = sharedWorkspace(await client.json('/api/workspace?workspace=' + choice.id), ownerId, choice.id, 'workspace_refused')
+    if (adminId !== null) matches.push({ workspaceId: choice.id, adminId })
+  }
+  check(matches.length === 1, 'workspace_refused')
+  const { workspaceId, adminId } = matches[0]
+  const { candidateTaskIds, taskOwners } = await searchCandidates(client, { ownerId, workspaceId }, observeInventory)
   check(candidateTaskIds.length > 0, 'sample_missing')
-  return { ownerId, workspaceId, workspaceKind: 'personal', candidateTaskIds }
+  const scope = { ownerId, workspaceId, workspaceKind: 'team', adminId, candidateTaskIds, taskOwners }
+  // Every candidate needs a fresh ordinary detail read before APP is opened.
+  // The returned map is private memory; only per-Task hashes enter the artifact.
+  await verifyScope(client, { ...scope, taskIds: candidateTaskIds })
+  return scope
 }
 
-function ownedPersonalWorkspace(value, ownerId, workspaceId, code) {
-  check(value?.currentUserId === ownerId && value.workspace?.id === workspaceId && value.workspace.kind === 'personal'
+function sharedWorkspace(value, ownerId, workspaceId, code) {
+  check(value?.currentUserId === ownerId && value.workspace?.id === workspaceId && value.workspace.kind === 'team'
     && ['member', 'admin'].includes(value.role) && Array.isArray(value.choices) && Array.isArray(value.members), code)
-  const choices = value.choices.filter(row => row?.kind === 'personal')
+  const choices = value.choices.filter(row => row?.id === workspaceId)
   const members = value.members.filter(row => row?.userId === ownerId)
-  check(choices.length === 1 && choices[0].id === workspaceId && members.length === 1
+  check(choices.length === 1 && choices[0].kind === 'team' && members.length === 1
     && members[0].status === 'active' && members[0].role === value.role, code)
+  const admins = value.members.filter(row => row?.userId !== ownerId && creator(row?.userId) && row.role === 'admin'
+    && row.status === 'active' && typeof row.email === 'string' && hash(row.email.trim().toLowerCase()) === ADMIN_HASH)
+  check(admins.length <= 1, code)
+  return admins[0]?.userId ?? null
+}
+
+function pairedCreators(scope, ids) {
+  check(Array.isArray(ids) && ids.length > 0 && ids.length <= 100 && ids.every(id => UUID.test(id))
+    && new Set(ids).size === ids.length && scope.taskOwners && ids.every(id => Object.hasOwn(scope.taskOwners, id) && creator(scope.taskOwners[id])), 'sample_invalid')
+  return ids.map(id => scope.taskOwners[id])
 }
 
 export async function verifyScope(client, scope) {
+  pairedCreators(scope, scope.taskIds)
   const session = await client.json('/api/auth/get-session')
-  const workspace = await client.json('/api/workspace?workspace=' + scope.workspaceId)
-  check(session?.user?.id === scope.ownerId && scope.workspaceKind === 'personal', 'sample_changed')
-  ownedPersonalWorkspace(workspace, scope.ownerId, scope.workspaceId, 'sample_changed')
+  check(session?.user?.id === scope.ownerId && scope.workspaceKind === 'team' && UUID.test(scope.workspaceId)
+    && creator(scope.adminId), 'sample_changed')
+  const membership = async () => check(sharedWorkspace(await client.json('/api/workspace?workspace=' + scope.workspaceId),
+    scope.ownerId, scope.workspaceId, 'sample_changed') === scope.adminId, 'sample_changed')
+  await membership()
   // Exact IDs can be older than the newest list page. The existing request
   // preference is membership checked, and does not mutate the account's cookie.
   // Normal getIssue performs fresh authorization; no body, title or prompt enters the report.
-  for (const id of scope.taskIds) {
-    const value = await client.rpc('issues.getIssue', [id], { headers: { 'x-mikka-workspace-id': scope.workspaceId } }), issue = value?.issue
-    check(issue?.id === id && issue.userId === scope.ownerId && issue.workspaceId === scope.workspaceId
-      && issue.ownershipState === 'bound' && LABELS.has(issue.scope), 'sample_changed')
+  // At most four in-flight reads, no retries. A refusal stops new work and all
+  // already-started reads settle before caller cleanup or any database access.
+  let next = 0, failure
+  const worker = async () => {
+    while (!failure && next < scope.taskIds.length) {
+      const id = scope.taskIds[next++]
+      try {
+        const value = await client.rpc('issues.getIssue', [id], { headers: { 'x-mikka-workspace-id': scope.workspaceId } }), issue = value?.issue
+        check(issue?.id === id && issue.userId === scope.taskOwners[id] && issue.workspaceId === scope.workspaceId
+          && issue.ownershipState === 'bound' && LABELS.has(issue.scope), 'sample_changed')
+      } catch (error) { failure ??= error }
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(4, scope.taskIds.length) }, worker))
+  if (failure) throw failure
+  await membership()
 }
 
-// Constant SQL only. Parameters are the already frozen API UUIDs and owner.
+// Constant SQL only. UUIDs and their independently API-authorized creators are
+// paired, never independent ANY sets. Ordinary Task visibility does not grant
+// another user's Run content: only the rollout's operational digest is read.
 // Raw execution definitions are hashed inside PostgreSQL, never transported.
+const AUTHORIZED = `WITH authorized AS (
+    SELECT * FROM unnest($1::uuid[], $2::text[]) AS a(id, creator)
+  ), tasks AS (
+    SELECT i.id, i."userId", i."workspaceId", i."ownershipState", i.scope,
+      coalesce(to_jsonb(i)->>'issuedIdentifier','') AS identifier FROM issues i JOIN authorized a ON a.id=i.id AND a.creator=i."userId"
+    WHERE i."workspaceId"=$3::uuid AND i."ownershipState"='bound' AND i.scope IN ('workspace','personal')
+  )`
+const PUBLISHED = `EXISTS (SELECT 1 FROM run_publications p JOIN agent_runs r ON r.id=p."runId"
+      AND r."issueId"=p."issueId" AND r."userId"=p."userId"
+      WHERE p."issueId"=i.id AND r."workspaceId"=i."workspaceId" AND p.status='published')`
+const ENDED = `EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=i.id AND r."workspaceId"=i."workspaceId"
+      AND r.status IN ('succeeded','stopped','failed','cancelled'))`
+// Exact Epic identities from product scripts/migration-order.mjs. P0 081202 /
+// 090350 and Coding 091431 migrations are distinct and do not invalidate before.
+export const EPIC_MIGRATIONS = Object.freeze({
+  canonical: Object.freeze([
+    '20261109143000_project_v2.sql', '20261109143001_task_identity.sql', '20261109143002_task_identity_aliases.sql',
+    '20261109143003_team_lifecycle.sql', '20261109143004_project_resources.sql', '20261109143005_project_lifecycle.sql',
+    '20261109143006_project_history_retention.sql', '20261109143007_task_alias_tenant.sql', '20261109143008_project_writer_fence.sql',
+  ]),
+  legacy: Object.freeze([
+    '20261108120300_project_v2.sql', '20261108120301_task_identity.sql', '20261108120302_task_identity_aliases.sql',
+    '20261108120303_team_lifecycle.sql', '20261108120304_project_resources.sql', '20261108120305_project_lifecycle.sql',
+    '20261108120306_project_history_retention.sql', '20261108120307_task_alias_tenant.sql', '20261108120308_project_writer_fence.sql',
+  ]),
+})
 export const SQL = Object.freeze({
   settings: `SELECT current_setting('transaction_read_only') AS readonly,
     current_setting('transaction_isolation') AS isolation`,
-  ledger: `SELECT count(*) FILTER (WHERE name LIKE '202611091430%')::int AS epic,
+  ledger: `SELECT count(*) FILTER (WHERE name IN (${EPIC_MIGRATIONS.canonical.map(name => "'" + name + "'").join(',')}))::int AS epic,
+    count(*) FILTER (WHERE name IN (${EPIC_MIGRATIONS.legacy.map(name => "'" + name + "'").join(',')}))::int AS legacy,
     md5(coalesce(string_agg(name, E'\\n' ORDER BY name),'')) AS digest FROM schema_migrations`,
-  binding: `WITH candidates AS (
-    SELECT i.id, i."userId"=$2 AND coalesce(to_jsonb(i)->>'workspaceId','')=$3
+  binding: `WITH authorized AS (SELECT * FROM unnest($1::uuid[], $2::text[]) AS a(id, creator)), candidates AS (
+    SELECT i.id, i."userId"=a.creator AND i."workspaceId"=$3::uuid AND i."ownershipState"='bound'
       AND i.scope IN ('workspace','personal') AS matches_scope,
-      EXISTS (SELECT 1 FROM run_publications p WHERE p."issueId"=i.id AND p.status='published') AS published,
-      EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=i.id AND r.status IN ('succeeded','stopped','failed','cancelled')) AS ended
-    FROM issues i WHERE i.id=ANY($1::uuid[])
+      ${PUBLISHED} AS published, ${ENDED} AS ended
+    FROM issues i JOIN authorized a ON a.id=i.id
     ) SELECT count(*)::int AS present, count(*) FILTER (WHERE matches_scope)::int AS "bound",
       count(*) FILTER (WHERE matches_scope AND published)::int AS published,
       count(*) FILTER (WHERE matches_scope AND ended)::int AS ended,
       count(*) FILTER (WHERE matches_scope AND published AND ended)::int AS historical FROM candidates`,
-  select: `SELECT i.id FROM issues i WHERE i.id=ANY($1::uuid[]) AND i."userId"=$2
-    AND coalesce(to_jsonb(i)->>'workspaceId','')=$3 AND i.scope IN ('workspace','personal')
-    AND EXISTS (SELECT 1 FROM run_publications p WHERE p."issueId"=i.id AND p.status='published')
-    AND EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=i.id AND r.status IN ('succeeded','stopped','failed','cancelled'))
-    ORDER BY EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=i.id
+  select: `${AUTHORIZED} SELECT i.id FROM tasks i WHERE ${PUBLISHED} AND ${ENDED}
+    ORDER BY EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=i.id AND r."workspaceId"=i."workspaceId"
       AND r.status IN ('succeeded','stopped','failed','cancelled') AND r."agentDefinition"->'projectExecution' IS NOT NULL) DESC,
       i.id LIMIT 10`,
-  task: `SELECT id, "userId" AS owner, scope,
-    coalesce(to_jsonb(i)->>'workspaceId','') AS workspace,
-    coalesce(to_jsonb(i)->>'issuedIdentifier','') AS identifier
-    FROM issues i WHERE id=ANY($1::uuid[]) ORDER BY id`,
-  publication: `SELECT "runId" AS id, "issueId" AS "issueId", identifier, branch, "baseBranch" AS "baseBranch", "remoteKey" AS "remoteKey"
-    FROM run_publications WHERE "issueId"=ANY($1::uuid[]) AND status='published' ORDER BY "runId" LIMIT 1001`,
-  run: `SELECT id, "issueId" AS "issueId", "agentDefinition"->'projectExecution' IS NOT NULL AS "hasProjectSnapshot",
-    md5(jsonb_build_object('agentDefinition',"agentDefinition",'baseBranch',"baseBranch")::text) AS "frozenDigest"
-    FROM agent_runs WHERE "issueId"=ANY($1::uuid[]) AND status IN ('succeeded','stopped','failed','cancelled') ORDER BY id LIMIT 1001`,
+  task: `${AUTHORIZED} SELECT id, "userId" AS owner, scope, "ownershipState" AS state,
+    "workspaceId" AS workspace,
+    identifier
+    FROM tasks i ORDER BY id`,
+  publication: `${AUTHORIZED} SELECT p."runId" AS id, p."issueId" AS "issueId", p.identifier, p.branch,
+    p."baseBranch" AS "baseBranch", p."remoteKey" AS "remoteKey"
+    FROM run_publications p JOIN agent_runs r ON r.id=p."runId" AND r."issueId"=p."issueId" AND r."userId"=p."userId"
+    JOIN tasks i ON i.id=p."issueId" AND i."workspaceId"=r."workspaceId"
+    WHERE p.status='published' ORDER BY p."runId" LIMIT 1001`,
+  run: `${AUTHORIZED} SELECT r.id, r."issueId" AS "issueId", r."agentDefinition"->'projectExecution' IS NOT NULL AS "hasProjectSnapshot",
+    md5(jsonb_build_object('agentDefinition',r."agentDefinition",'baseBranch',r."baseBranch")::text) AS "frozenDigest"
+    FROM agent_runs r JOIN tasks i ON i.id=r."issueId" AND i."workspaceId"=r."workspaceId"
+    WHERE r.status IN ('succeeded','stopped','failed','cancelled') ORDER BY r.id LIMIT 1001`,
 })
 
 export function projectRows(scope, rows) {
   check(Array.isArray(scope.taskIds) && scope.taskIds.length > 0 && scope.taskIds.length <= 10
     && scope.taskIds.every(id => UUID.test(id)) && new Set(scope.taskIds).size === scope.taskIds.length, 'sample_invalid')
+  pairedCreators(scope, scope.taskIds)
   check(rows.task.length === scope.taskIds.length && rows.task.every(row => scope.taskIds.includes(row.id)
-    && row.owner === scope.ownerId && row.workspace === scope.workspaceId && LABELS.has(row.scope))
+    && row.owner === scope.taskOwners[row.id] && row.workspace === scope.workspaceId && row.state === 'bound' && LABELS.has(row.scope))
     && new Set(rows.task.map(row => row.id)).size === scope.taskIds.length, 'database_binding')
   check(rows.publication.length > 0 && rows.run.length > 0, 'history_missing')
   for (const kind of ['publication', 'run']) {
@@ -192,9 +258,10 @@ export function projectRows(scope, rows) {
       && new Set(rows[kind].map(row => row.id)).size === rows[kind].length, 'sample_invalid')
   }
   check(rows.run.every(row => typeof row.hasProjectSnapshot === 'boolean' && /^[a-f0-9]{32}$/.test(row.frozenDigest)), 'sample_invalid')
+  check(scope.taskIds.every(id => rows.publication.some(row => row.issueId === id) && rows.run.some(row => row.issueId === id)), 'history_missing')
   const field = value => { check(value === null || typeof value === 'string' && value.length <= 8192, 'sample_invalid'); return hash(JSON.stringify(value)) }
   const result = {
-    task: rows.task.map(row => ({ id: row.id, workspaceId: row.workspace,
+    task: rows.task.map(row => ({ id: row.id, workspaceId: row.workspace, creatorSha256: hash(row.owner),
       issuedIdentifierPresent: row.identifier !== '', issuedIdentifierSha256: field(row.identifier) })),
     publication: rows.publication.map(row => ({ id: row.id, issueId: row.issueId,
       ...Object.fromEntries(['identifier', 'branch', 'baseBranch', 'remoteKey'].map(key => [key + 'Sha256', field(row[key])])) })),
@@ -209,6 +276,7 @@ export async function snapshot(db, scope, observe = () => {}) {
   check(Array.isArray(scope.candidateTaskIds) && scope.candidateTaskIds.length > 0 && scope.candidateTaskIds.length <= 100
     && scope.candidateTaskIds.every(id => UUID.test(id)) && new Set(scope.candidateTaskIds).size === scope.candidateTaskIds.length
     && UUID.test(scope.workspaceId) && typeof scope.ownerId === 'string' && scope.ownerId.length > 0, 'sample_invalid')
+  const candidates = [scope.candidateTaskIds, pairedCreators(scope, scope.candidateTaskIds), scope.workspaceId]
   let begun = false
   try {
     await db.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'); begun = true
@@ -219,22 +287,26 @@ export async function snapshot(db, scope, observe = () => {}) {
     check(settings?.readonly === 'on' && settings.isolation === 'repeatable read', 'database_readonly')
     observe({ lastReadStage: 'read_only_verified', readOnly: true, isolation: 'repeatable read' })
     const ledger = (await db.query(SQL.ledger)).rows[0]
-    check(ledger?.epic === 0 && /^[a-f0-9]{32}$/.test(ledger.digest), 'migration_already_applied')
-    observe({ lastReadStage: 'ledger_verified', ledgerDigest: ledger.digest, canonicalEpicMigrations: 0 })
-    const binding = (await db.query(SQL.binding, [scope.candidateTaskIds, scope.ownerId, scope.workspaceId])).rows[0]
+    check(ledger && ['epic', 'legacy'].every(key => Number.isSafeInteger(ledger[key]) && ledger[key] >= 0 && ledger[key] <= 9)
+      && /^[a-f0-9]{32}$/.test(ledger.digest), 'migration_already_applied')
+    observe({ lastReadStage: ledger.epic === 0 && ledger.legacy === 0 ? 'ledger_verified' : 'ledger_refused',
+      ledgerDigest: ledger.digest, canonicalEpicMigrations: ledger.epic, legacyEpicMigrations: ledger.legacy })
+    check(ledger.epic === 0 && ledger.legacy === 0, 'migration_already_applied')
+    const binding = (await db.query(SQL.binding, candidates)).rows[0]
     const keys = ['present', 'bound', 'published', 'ended', 'historical']
     check(binding && keys.every(key => Number.isSafeInteger(binding[key]) && binding[key] >= 0 && binding[key] <= scope.candidateTaskIds.length), 'database_binding')
     const candidateCounts = Object.fromEntries(keys.map(key => [key, binding[key]]))
     observe({ lastReadStage: 'candidate_binding', candidateCounts })
     check(binding.present === scope.candidateTaskIds.length && binding.bound === scope.candidateTaskIds.length, 'database_binding')
-    const selected = (await db.query(SQL.select, [scope.candidateTaskIds, scope.ownerId, scope.workspaceId])).rows
+    const selected = (await db.query(SQL.select, candidates)).rows
     observe({ lastReadStage: 'history_selection', selectedCount: selected.length })
     check(selected.length > 0, 'history_missing')
     check(selected.length <= 10 && selected.every(row => scope.candidateTaskIds.includes(row.id))
       && new Set(selected.map(row => row.id)).size === selected.length, 'sample_invalid')
     const taskIds = selected.map(row => row.id).sort()
+    const selectedPairs = [taskIds, pairedCreators(scope, taskIds), scope.workspaceId]
     const rows = {}
-    for (const kind of ['task', 'publication', 'run']) rows[kind] = (await db.query(SQL[kind], [taskIds])).rows
+    for (const kind of ['task', 'publication', 'run']) rows[kind] = (await db.query(SQL[kind], selectedPairs)).rows
     return { taskIds, candidateCount: scope.candidateTaskIds.length, rows: projectRows({ ...scope, taskIds }, rows), ledgerDigest: ledger.digest,
       readOnly: true, isolation: 'repeatable read', statementTimeoutMs: 20000, lockTimeoutMs: 2000 }
   } finally {
@@ -258,11 +330,11 @@ async function main(operation) {
   const deadline = AbortSignal.timeout(100000)
   const client = createSessionClient(ORIGIN, (url, init) => fetch(url, { ...init,
     signal: cleaning ? AbortSignal.timeout(10000) : AbortSignal.any([deadline, init.signal, AbortSignal.timeout(10000)]) }))
-  const report = { version: 1, issue: 1687, batch: 1782, phase: 'before', status: 'incomplete',
+  const report = { version: 2, issue: 1687, batch: 1782, phase: 'before', status: 'incomplete',
     opsSource: env.GITHUB_SHA, mainSha: MAIN, runId: env.GITHUB_RUN_ID, runAttempt: 1,
     sourceSha256: hash(await readFile(new URL(import.meta.url))), before, startedAt: new Date().toISOString(),
     cleanup: { databaseConnectionClosed: false, transactionRolledBack: false, signedOut: false },
-    scope: 'at_most_ten_existing_owned_tasks_authorized_by_normal_api',
+    scope: 'at_most_ten_existing_shared_tasks_authorized_by_normal_api',
     limitations: ['bounded_sample_not_all_history', 'api_database_entity_match_not_vercel_environment_inspection',
       'normal_api_read_maintenance_writes_not_measured', 'before_only_after_same_uuids_required'] }
   let pool, signedIn = false
@@ -273,8 +345,11 @@ async function main(operation) {
     report.candidateCount = scope.candidateTaskIds.length
     report.workspaceId = scope.workspaceId
     report.workspaceKind = scope.workspaceKind
-    report.selectionBasis = 'normal_api_unique_owned_personal_workspace_and_active_membership'
-    report.ownerSha256 = hash(scope.ownerId)
+    report.selectionBasis = 'normal_api_unique_policy_admin_workspace_and_per_task_detail_acl'
+    report.readerSha256 = hash(scope.ownerId)
+    report.policyAdminSha256 = hash(scope.adminId)
+    report.apiAuthorization = { mode: 'shared_workspace_per_task_detail_acl', taskCount: scope.candidateTaskIds.length,
+      allPassed: true, maximumConcurrentReads: 4, retries: 0 }
     report.databaseTargetSha256 = hash('app-db-target\0' + target.hostname + '\0' + target.pathname)
     await guardMain(env)
     pool = new Pool({ connectionString: env.MIKKA_DATABASE_URL, max: 1, connectionTimeoutMillis: 15000,

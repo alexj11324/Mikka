@@ -17,6 +17,18 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_domain_history_1782_fixture
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_domain_history_1782_fixture"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
@@ -37,6 +49,12 @@ jobs:
         env:
           DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
         run: npm install --prefix "$DOMAIN_HISTORY_DEPENDENCIES" --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Verify paired creator and verified-history SQL on isolated PG17 before credentials
+        timeout-minutes: 1
+        env:
+          DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
+          DOMAIN_HISTORY_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_history_1782_fixture
+        run: node --test scripts/ops/domain-history-before-1782.db.test.mjs
       - name: Read only the shared account email from existing OIDC
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
