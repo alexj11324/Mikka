@@ -1,0 +1,38 @@
+{
+  "source": "e78fccffd9dd878edd490b113ea80efcff1525e7",
+  "tree": "48b0d459ca1c9087e8abab29e7c3ccf9428fbbcc",
+  "closedOpsHead": "e41f41369b7944143fda5269a799e00aed5b6dd3",
+  "branch": "ops/1505-smoke-github-readonly-20261109",
+  "go": "root-reviewed-1505-github-trusted-v4",
+  "observedAt": "2026-11-09T12:19:00Z",
+  "deadline": "2026-11-09T14:00:00+00:00",
+  "workflowSha256": "b58efa843dc9d21434728d7ee4581bda89e5a17ad28d1a570db2eefb8a69e4cc",
+  "checks": {
+    "baselineHashes": true,
+    "exactLiteralCounts": {
+      "source": 7,
+      "tree": 1,
+      "branch": 3,
+      "go": 2,
+      "deadline": 6
+    },
+    "inverseFullBytes": true,
+    "productDelta": false,
+    "published": false,
+    "triggered": false,
+    "exactOrderedParents": [
+      "e78fccffd9dd878edd490b113ea80efcff1525e7",
+      "e41f41369b7944143fda5269a799e00aed5b6dd3"
+    ],
+    "addedRegularFilesOnly": true,
+    "smokeAndWebQueues": true,
+    "businessLogicUnchanged": true,
+    "historicalSubjectReused": true,
+    "needsNewGitGuardExecution": true
+  },
+  "gitCommitCreated": false,
+  "refCreatedOrUpdated": false,
+  "productionRun": null,
+  "newChild": false,
+  "testExecutionPending": true
+}
