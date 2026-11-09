@@ -27,3 +27,4 @@ allowBuilds:
 
 patchedDependencies:
   '@novnc/novnc@1.6.0': patches/@novnc__novnc@1.6.0.patch
+  ffmpeg-static@5.3.0: patches/ffmpeg-static@5.3.0.patch
