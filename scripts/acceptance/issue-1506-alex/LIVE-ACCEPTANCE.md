@@ -1,6 +1,6 @@
 # Disabled next-source preparation
 
-Application source candidate: bb5d1f9e224aea395b9c45823960e8ad10f1a099; tree f70f40367331b6408c5b68b6f7be6483cc7cbc0d. Acceptance baseline: fddf3eda7fe480012c1335393ccbfb1084b49932.
+Application source candidate: 0e4118020311ae8f9083d0d21cfb990be0282f25; tree 72f1661362ceaefde626fa7402116ae8f8ad7417. Acceptance baseline: fddf3eda7fe480012c1335393ccbfb1084b49932.
 
 This is an offline source binding only. Production deployment, current alias, deployment ID and main ancestry have not been verified here. The continuation control is disabled; expectedSha remains null. Both prepared business jobs retain literal false guards. After committing this exact prepared tree, use bind mode with that immutable acceptance SHA. Deployment and activation require the root's separate review.
 

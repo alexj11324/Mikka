@@ -8,22 +8,22 @@ import { dirname, join, resolve, posix } from 'node:path'
 import { stripTypeScriptTypes } from 'node:module'
 
 // Local content review base, not a claim that this commit has been published.
-export const LIVE_SOURCE_CONTENT_BASE = 'bb5d1f9e224aea395b9c45823960e8ad10f1a099'
+export const LIVE_SOURCE_CONTENT_BASE = '0e4118020311ae8f9083d0d21cfb990be0282f25'
 // Exact explicitly supplied application source; no deployment claim. The future workflow/control remain disabled
 // until the separately verified production application SHA is supplied.
-export const LIVE_SOURCE_COMMIT = 'bb5d1f9e224aea395b9c45823960e8ad10f1a099'
+export const LIVE_SOURCE_COMMIT = '0e4118020311ae8f9083d0d21cfb990be0282f25'
 export const LIVE_SOURCE_HASHES = Object.freeze({
   'lib/live/channel.ts': '7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede',
   'lib/live/tab-share.ts': '38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f',
   'lib/live/revisions.ts': 'bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328',
   'lib/live/events.ts': 'd32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5',
   'lib/live/presence.ts': '03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0',
-  'lib/swr/persistent-cache.ts': 'b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f',
-  'lib/swr/cache-policy.ts': 'abcca8af114ef23d16c2ab5402ef44f5e41cac5bf065514b441f483ccb37219f',
+  'lib/swr/persistent-cache.ts': 'd1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a',
+  'lib/swr/cache-policy.ts': 'b87b7847e2ea02cf4d25b8d106dc33ba30b2e8b3862d1843a7d6ada4b93e51a0',
   'lib/swr/indexed-db.ts': 'a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809',
   'hooks/use-live-key.tsx': '5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857',
-  'components/coordinator/coordinator-chat.tsx': '220f35dbfbdde3ddfb93d5bff1a642b86188a15cb5ff7813989b4bf607a6ab7d',
-  'lib/swr/read-observer.ts': '4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463',
+  'components/coordinator/coordinator-chat.tsx': 'd30805df38c0d3a6f8413dae6d7b4f79f280ac60682a742de5bbaa67b6e499f9',
+  'lib/swr/read-observer.ts': '2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b',
   'components/swr-defaults.tsx': 'cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33',
 })
 
