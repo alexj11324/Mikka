@@ -1,0 +1,32 @@
+{
+  "label": "red",
+  "exit": 1,
+  "signal": null,
+  "errorCode": null,
+  "ms": 2944,
+  "bytes": 12605,
+  "sha256": "4ed4d43f8c071633c364124d95ad5ccc1feb88aec33cddf458dda74682efcc6b",
+  "counts": [
+    "ℹ tests 73",
+    "ℹ suites 0",
+    "ℹ pass 68",
+    "ℹ fail 5",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 2882.078965"
+  ],
+  "failed": [
+    "✖ terminal handoff tools do not prove execution before a text reply (1.316311ms)",
+    "✖ a previous submit cannot provide the independent tool for a submitted report (0.73506ms)",
+    "✖ the minimum tool count excludes delivery while keeping the successful read and report (0.411068ms)",
+    "✖ a tool error replaces its earlier success in the replay execution count (0.351978ms)",
+    "✖ the complete candidate driver rejects submit-only output with valid runtime evidence and cleans up (28.691189ms)",
+    "✖ failing tests:",
+    "✖ terminal handoff tools do not prove execution before a text reply (1.316311ms)",
+    "✖ a previous submit cannot provide the independent tool for a submitted report (0.73506ms)",
+    "✖ the minimum tool count excludes delivery while keeping the successful read and report (0.411068ms)",
+    "✖ a tool error replaces its earlier success in the replay execution count (0.351978ms)",
+    "✖ the complete candidate driver rejects submit-only output with valid runtime evidence and cleans up (28.691189ms)"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "label": "red",
+  "exit": 1,
+  "signal": null,
+  "errorCode": null,
+  "ms": 3144,
+  "bytes": 17115,
+  "sha256": "45747f2a8f6be212d6d3d545f9ae27a222833a4130a4518b09dc10bf502f99c1",
+  "counts": [
+    "ℹ tests 73",
+    "ℹ suites 0",
+    "ℹ pass 66",
+    "ℹ fail 7",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 3076.891687"
+  ],
+  "failed": [
+    "✖ terminal handoff tools do not prove execution before a text reply (1.205877ms)",
+    "✖ a previous submit cannot provide the independent tool for a submitted report (0.714423ms)",
+    "✖ the minimum tool count excludes delivery while keeping the successful read and report (0.422243ms)",
+    "✖ a tool error replaces its earlier success in the replay execution count (0.362928ms)",
+    "✖ the complete candidate driver rejects submit-only output with valid runtime evidence and cleans up (33.451879ms)",
+    "✖ lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics (159.190891ms)",
+    "✖ worker configuration is pinned before and after every case and never exposes other environment values (13.493548ms)",
+    "✖ failing tests:",
+    "✖ terminal handoff tools do not prove execution before a text reply (1.205877ms)",
+    "✖ a previous submit cannot provide the independent tool for a submitted report (0.714423ms)",
+    "✖ the minimum tool count excludes delivery while keeping the successful read and report (0.422243ms)",
+    "✖ a tool error replaces its earlier success in the replay execution count (0.362928ms)",
+    "✖ the complete candidate driver rejects submit-only output with valid runtime evidence and cleans up (33.451879ms)",
+    "✖ lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics (159.190891ms)",
+    "✖ worker configuration is pinned before and after every case and never exposes other environment values (13.493548ms)"
+  ]
+}

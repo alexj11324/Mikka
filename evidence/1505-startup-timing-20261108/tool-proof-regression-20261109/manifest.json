@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "commit": "37ffccac0e76bd32885178eef9a300dedcb9315f",
+  "files": [
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/full-tool-proof-red.log",
+      "bytes": 12605,
+      "sha256": "4ed4d43f8c071633c364124d95ad5ccc1feb88aec33cddf458dda74682efcc6b"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/full-tool-proof-red.json",
+      "bytes": 1461,
+      "sha256": "6a11e7484f1da2f81c5ee069803b37e44975c68d91c2fe7c317d6d82bae914d2"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/full-tool-proof-green.log",
+      "bytes": 8179,
+      "sha256": "eec39c82f091d2dcc5fbf6233a4be77d78ddd4830dc1b5fa4881ded57c5c1824"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/full-tool-proof-green.json",
+      "bytes": 394,
+      "sha256": "bad265d3174b437d141ef9ace43c987ae2980ad4384f28cf6d9933a3c9493d70"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/preinstall-attempt.json",
+      "bytes": 1950,
+      "sha256": "7edf4b9265f837ab28ecd3abdfb8008150530bc84620faaa2d1c2e113cd28651"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/preinstall-attempt.log",
+      "bytes": 12727,
+      "sha256": "53326855d04016412e9122749457e137f2b7bc6ce935efa701294980e5be38a4"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/missing-docs-helper-red.json",
+      "bytes": 2005,
+      "sha256": "f577f45812a1af490ee1ad0c8e1a4d284ceba4d5a95acba30c41700d160580d6"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/missing-docs-helper-green.log",
+      "bytes": 12701,
+      "sha256": "3a7eb6e06aaba31119b72ec07f15a3569f16622dc3ab62e793f09a0480b7533d"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/missing-docs-helper-green.json",
+      "bytes": 965,
+      "sha256": "dbc3d2a2bb18a77aa1d775c7a1898905e36e570329d2e1c6ccbb72f605ec8c55"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/partial-log-capture.json",
+      "bytes": 10805,
+      "sha256": "f99fae49acacbb5a558b6a7e51cd2aa7dcef83fb3931bb86115a4b200d0caa03"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/source-hashes.json",
+      "bytes": 532,
+      "sha256": "d403ccb667c5b0632d91b13f54f8ad2f40978bcbfc7c3508d775e2629ee414eb"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/peer-review.json",
+      "bytes": 2649,
+      "sha256": "86dd93f44e53850e2d20593e99a6080aa9613261ec854554c47aed95695b0456"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/counterexample.mjs",
+      "bytes": 986,
+      "sha256": "48f098d711f90caa221ba141a1a55171c60ee877d03ffcbdca427b34c1df1e1d"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/focused-suite.mjs",
+      "bytes": 9809,
+      "sha256": "709a1659ffd0088d45aa51cf3e3e3afb543f8f6da3ab8a37a83521286b12d033"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/final-red-green-summary.json",
+      "bytes": 1964,
+      "sha256": "9019f40808936bd2817216ac941c560e95409f0fa7f33e007c97cf4c3555e8d9"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/vm-stopped.json",
+      "bytes": 826,
+      "sha256": "2de7ab4a76879d3eeadec5277f344dad24f9e6e5527e9c4a892cbbe06326cba6"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/first-red-command.json",
+      "bytes": 1260,
+      "sha256": "f1c899e3344978fa155e06e2f43b39e0888e2a8dea9bf9beaa9c8ec56ed24246"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/final-test-command.json",
+      "bytes": 2083,
+      "sha256": "bf1dba5627dc1110d318af46a40016bb85b67bd6d381d4aca8b362c633118418"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109/README.md",
+      "bytes": 3010,
+      "sha256": "db05bee0178e6f1b20b74723fef51729cf9f97e1f7948b70ad89bf69f481a375"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/source-interpretation.json",
+      "bytes": 4693,
+      "sha256": "9ca8593cfdd6af53f202cf1a064d25db42170564713bbec885a52700ac81ed9f"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-reply-diagnosis-20261109/native-prompt-source-review.json",
+      "bytes": 2734,
+      "sha256": "06e867c1edf7972910f84646daee1ba06c2a77062e5217ccb23002e6ef6877f8"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/integration0415-20261109/compatibility.json",
+      "bytes": 6896,
+      "sha256": "1e085a66d725cdaa3ac77a36c6209474cb3b31ac631b2ab1820bbba140408f87"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/integration0415-20261109/old-head-5fde-merge-tree.json",
+      "bytes": 3830,
+      "sha256": "c7cf6d5f6ed62a774640ee5dbf031f4e256c1795549761d9260789fa628bcd16"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/integration0415-20261109/pnpm-unused-patch-review.json",
+      "bytes": 3695,
+      "sha256": "1e6a8ab36bb1bd02bac1d4ee273eedd69cad1f1cbd3222735c5b801819450dd6"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime0415-cleanup-20261109/job-129086843302.log",
+      "bytes": 29286,
+      "sha256": "189ccadff7c2eee083868f58d0ca9edea1866748f68f1f1eb1150f99fff4edda"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime0415-cleanup-20261109/receipt.json",
+      "bytes": 982,
+      "sha256": "04092facb64fd89fbe24570b9537b4106fdcd4cf7eb6744ef2bf81591b6fcca6"
+    }
+  ],
+  "formalSamples": 0
+}

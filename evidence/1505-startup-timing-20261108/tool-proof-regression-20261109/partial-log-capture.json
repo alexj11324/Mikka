@@ -1,0 +1,134 @@
+{
+  "missing-docs-helper-red.log": {
+    "metadata": {
+      "kind": "meta",
+      "path": "missing-docs-helper-red.log",
+      "bytes": 17115,
+      "sha256": "45747f2a8f6be212d6d3d545f9ae27a222833a4130a4518b09dc10bf502f99c1",
+      "parts": 43
+    },
+    "parts": [
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 0,
+        "text": "✔ v3 requires an exact observed claim catalogue before accepting zero physical startup sends (5.906966ms)\n✔ sampler IDs satisfy the installed 10% sampler, while invalid live configuration fails closed (4.924219ms)\n✔ startup failure projection is closed, preserves only bounded HTTP status, and unwraps native abort classes (1.884617ms)\n✔ a native stream reader abort or timeout before run binding ret"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 1,
+        "text": "ains its actual phase and still cleans the owned issue (188.946101ms)\n✔ a fetch timeout wrapped by the session client preserves the coordinator-submit phase without retrying dispatch (9.396739ms)\n✔ fixed pre-execution entry phases distinguish HTTP, API, RPC and action refusal without copying response bodies (55.379552ms)\n✔ stream refusal, missing workflow identity and completed stream without disp"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 2,
+        "text": "atch retain distinct closed codes (47.223934ms)\n✔ profile validation and pre-sample build pin keep their own stage instead of fabricating a run failure (8.558288ms)\n✔ claim/running state and daemon stages do not prove provider execution; split marker only counts after agent_start (1.927598ms)\n✔ an early marker stays before the tool when full run history is replayed (1.347594ms)\n✔ a completed tool "
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 3,
+        "text": "followed by the task marker proves reply order (0.506367ms)\n✖ terminal handoff tools do not prove execution before a text reply (1.205877ms)\n✖ a previous submit cannot provide the independent tool for a submitted report (0.714423ms)\n✖ the minimum tool count excludes delivery while keeping the successful read and report (0.422243ms)\n✖ a tool error replaces its earlier success in the replay executio"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 4,
+        "text": "n count (0.362928ms)\n✔ a successful same-run canonical submit report proves delivery after the completed read (0.431463ms)\n✔ an empty final report cannot borrow a residual error through the real summary selector (1.186174ms)\n✔ canonical delivery cannot borrow another run, a pending or failed result, or an unordered submit (3.541339ms)\n✖ the complete candidate driver rejects submit-only output with"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 5,
+        "text": " valid runtime evidence and cleans up (33.451879ms)\n✔ the complete candidate driver accepts canonical report delivery with all runtime and cleanup gates intact (15.644931ms)\n✔ three real-shaped runs use normal cookies, pinned subscriptions, push reads and strictly owned cleanup (23.16107ms)\n✔ SMOKE chooses the verified team without fixed IDs and accepts checking quota with a new catalogue clone ID"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 6,
+        "text": " (22.868428ms)\n✔ foreign payer, workspace or frozen profile cannot satisfy the shared subscription receipt (54.157126ms)\n✔ wrong or ambiguous sources and sharing revoked during choice fail before dispatch without changing preferences (17.791388ms)\n✔ workspace restore failure is visible but never suppresses profile cleanup or sign-out (18.468876ms)\n✔ startup intervals retain only closed fields and "
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 7,
+        "text": "reject foreign run data or unknown phases (2.066395ms)\n✔ prepared_agent_start keeps its actual earlier origin and requires both real initialization boundaries (0.888352ms)\n✔ bootstrap_claude_start keeps its actual earlier origin and requires both real initialization boundaries (0.63639ms)\n✔ bootstrap_codex_initialize keeps its actual earlier origin and requires both real initialization boundaries "
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 8,
+        "text": "(0.263592ms)\n✔ prepared_agent_start invalid evidence cannot hide behind an otherwise valid ordinary initialization (1.180741ms)\n✔ bootstrap_claude_start invalid evidence cannot hide behind an otherwise valid ordinary initialization (0.498447ms)\n✔ bootstrap_codex_initialize invalid evidence cannot hide behind an otherwise valid ordinary initialization (0.514388ms)\n✔ ordinary startup evidence stays "
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 9,
+        "text": "compatible while missing or failed CLI initialization stays incomplete (0.330463ms)\n✔ the scoped runtime receipt gates direct execution, preserves only closed evidence and does not claim OTLP completeness (1.070359ms)\n✔ an HTTP-only legacy receipt cannot prove child-send coverage (0.319489ms)\n✔ v2 MCP body evidence keeps its own terminal time and sequence while v1 remains readable (1.275194ms)\n✔ c"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 10,
+        "text": "hild business observations cannot become global coverage or fail solely for a missing lifecycle close (1.52743ms)\n✔ child evidence rejects foreign identity, fake completeness, malformed sequences and unobserved remote MCP scope (2.512163ms)\n✔ direct diagnostics use and delete only this test repository variable, and extra auth fails after cleanup (27.740709ms)\n✔ member candidate diagnostics use the"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 11,
+        "text": " trusted host without reading or writing workspace secrets (40.739457ms)\n✔ trusted candidate timing still refuses missing official CLI or MCP observations (10.462204ms)\n✔ member production acceptance observes its dedicated Bot window without reading or writing workspace secrets (60.614215ms)\n✔ formal prepared Claude acceptance needs the independently bounded initialization receipt and preserves cl"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 12,
+        "text": "eanup (42.426374ms)\n✔ trusted cloud timing refuses missing CLI/MCP observations and extra remote authorization (42.72086ms)\n✔ formal cloud diagnostics require the prepared dedicated Bot before creating task fixtures (6.2543ms)\n✔ optional historical baseline reads keep missing detailed diagnostics unavailable (11.552306ms)\n✔ trusted candidate timing cannot claim a host without a pinned device and a"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 13,
+        "text": "gent (1.463985ms)\n✖ lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics (159.190891ms)\n✔ member cloud diagnostics fail before creating any variable they cannot delete (20.140694ms)\n✔ admin diagnostics preserve an existing timing variable without replacing or deleting it (15.149349ms)\n✔ candidate gate checks frozen device and marker "
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 14,
+        "text": "without representing itself as cloud latency acceptance (11.124274ms)\n✔ candidate finish receipt waits for the same run terminal push before cleanup (14.998662ms)\n✔ candidate failure cleanup waits for actual terminal after an accepted stop request (7.420093ms)\n✔ candidate cleanup deadline retains its fixture when the daemon never confirms terminal (1006.092016ms)\n✔ candidate cleanup stops a queued"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 38,
+        "text": "est.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'failed',\n    expected: 'candidate_subscription_proved',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at scripts/acceptance/cloud-startup.test.mjs:1335:1\n✖ worker configuration is pinned "
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 39,
+        "text": "before and after every case and never exposes other environment values (13.493548ms)\n  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/vercel/sandbox/issue1505-tool-proof/scripts/ci-docs-only.mjs' imported from /vercel/sandbox/issue1505-tool-proof/scripts/vercel-ignore-build.mjs\n      at finalizeResolution (node:internal/modules/esm/resolve:272:11)\n      at moduleResolve (node:internal/modules/"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 40,
+        "text": "esm/resolve:879:10)\n      at defaultResolve (node:internal/modules/esm/resolve:1006:11)\n      at #cachedDefaultResolve (node:internal/modules/esm/loader:705:20)\n      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:725:38)\n      at nextStep (node:internal/modules/customization_hooks:189:26)\n      at resolveBaseSync (file:///vercel/sandbox/issue1505-tool-proof/node_modules/"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 41,
+        "text": "tsx/dist/register-nyXW-TH3.mjs:2:11092)\n      at resolveDirectorySync (file:///vercel/sandbox/issue1505-tool-proof/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:12398)\n      at resolveTsPathsSync (file:///vercel/sandbox/issue1505-tool-proof/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:13605)\n      at resolve (file:///vercel/sandbox/issue1505-tool-proof/node_modules/tsx/dist/register-nyXW-TH3.mjs:"
+      },
+      {
+        "kind": "part",
+        "path": "missing-docs-helper-red.log",
+        "index": 42,
+        "text": "2:16832) {\n    code: 'ERR_MODULE_NOT_FOUND',\n    url: 'file:///vercel/sandbox/issue1505-tool-proof/scripts/ci-docs-only.mjs'\n  }\n"
+      }
+    ],
+    "reason": "stream_sampling_or_incomplete_capture"
+  }
+}

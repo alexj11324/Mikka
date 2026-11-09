@@ -1,0 +1,20 @@
+{
+  "label": "green",
+  "exit": 0,
+  "signal": null,
+  "errorCode": null,
+  "ms": 3036,
+  "bytes": 8179,
+  "sha256": "eec39c82f091d2dcc5fbf6233a4be77d78ddd4830dc1b5fa4881ded57c5c1824",
+  "counts": [
+    "ℹ tests 73",
+    "ℹ suites 0",
+    "ℹ pass 73",
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 2976.200925"
+  ],
+  "failed": []
+}

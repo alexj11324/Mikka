@@ -1,0 +1,16 @@
+[
+  {
+    "path": "scripts/acceptance/cloud-startup.mjs",
+    "key": "toolProofPatchedDriver1505",
+    "bytes": 84226,
+    "sha256": "5738324428183c1844cab595f5ef9680d0ef7ad7b7f3effad4b9117587e7b8f6",
+    "gitBlob": "5b5dd2d6b06f5b26f2c04db31cbc99a1b265ce63"
+  },
+  {
+    "path": "scripts/acceptance/cloud-startup.test.mjs",
+    "key": "toolProofPatchedTests1505",
+    "bytes": 109615,
+    "sha256": "6bf42307bb853cdb3052752c199f6f4579c15bdaa2cecfcaa6c444bb8c433d0e",
+    "gitBlob": "9101b030d59dfb552f96aea05d30cbfe5163417a"
+  }
+]

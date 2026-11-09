@@ -1,0 +1,68 @@
+{
+  "schema": "pnpm-unused-patch-source-review-v1",
+  "scope": "source_only_no_VM_no_install_no_ref_mutation",
+  "pnpm": {
+    "version": "10.34.3",
+    "tagObject": "df3eee4f4a7710da2fce6efd5588ef30b642211b",
+    "commit": "c7c97c30dfa0640063e79362dbd5663ae9cc1b66"
+  },
+  "candidate": {
+    "pr": 1810,
+    "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+    "workspaceBlob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+    "explicitAllowUnusedPatches": false,
+    "rootPnpmKeyPresent": false
+  },
+  "conclusion": "The unused-patch concern is closed for the unchanged valid frozen/headless worker install path. A configured ffmpeg patch outside the selected worker closure is not itself an UNUSED_PATCH or per-package patch-application failure. Existing successful noVNC-unselected-patch installation is the same category. No new VM/test is required solely to close this concern; combined installation has not been executed by this review.",
+  "reasoning": [
+    "core/install calculates current patch hashes and compares lockfile settings before frozen install; mismatches still fail rather than being ignored.",
+    "A valid explicitly frozen install uses tryFrozenInstall -> headlessInstall and returns before full dependency resolution.",
+    "resolve-dependencies only calls verifyPatches when full lockfile reanalysis is required (forceFullResolution or no packages) and all importers are resolved.",
+    "verifyPatches uses error code UNUSED_PATCH (singular) only if an unused patch remains and allowUnusedPatches is false/unspecified.",
+    "headless filters dependency snapshots to selected importers and their recursive dependencies before graph construction. buildModules applies patches only to actual graph nodes.",
+    "The original full workspace policy, both patch files, and lock-level patchedDependencies/hash entries are retained by #1805 projection. Neither three worker importer blocks nor worker package manifests changed in the #1810 ffmpeg patch delta."
+  ],
+  "boundaries": [
+    "Do not add allowUnusedPatches or remove patch/lock metadata: neither is required for this path.",
+    "This conclusion does not cover non-frozen or forced full resolution, a future worker dependency on ffmpeg, missing/changed patch bytes, or pnpm version changes.",
+    "Original noVNC installation counts are existing root/owner execution evidence, not a new test performed here.",
+    "The exact #1810+#1805 combination was not installed or built in this review; its worker fingerprint must be derived anew from actual combined source."
+  ],
+  "sources": [
+    {
+      "path": "pkg-manager/core/src/install/index.ts",
+      "blob": "497a4ee567f72810cb2781fe45ba147b5d95a296",
+      "lines": "414-445;477-487;700-820"
+    },
+    {
+      "path": "pkg-manager/resolve-dependencies/src/index.ts",
+      "blob": "e4cc4fe8b63241ce4bb580f6cb13cbbc13630561",
+      "lines": "148-158"
+    },
+    {
+      "path": "patching/config/src/verifyPatches.ts",
+      "blob": "928b510bbccbe4cfb61cf0e86e5cadbe2732da1f",
+      "lines": "12-30"
+    },
+    {
+      "path": "pkg-manager/headless/src/index.ts",
+      "blob": "fe5fe5e2a0ffc3400fa8bfb8d1a6f45359ada5da",
+      "lines": "301-304;358-368;531-574"
+    },
+    {
+      "path": "lockfile/filtering/src/filterLockfileByImportersAndEngine.ts",
+      "blob": "c1491eec03710a1d4620d8f8a1cccf2fa7cad099",
+      "lines": "46-90;94-114"
+    },
+    {
+      "path": "deps/graph-builder/src/lockfileToDepGraph.ts",
+      "blob": "b89ffc6b82885b9a7173390995bf1e6e6080c770",
+      "lines": "184-237"
+    },
+    {
+      "path": "exec/build-modules/src/index.ts",
+      "blob": "8bea2ba15f4b7cf6d1bb55e7a0c1536deced74b4",
+      "lines": "148-154"
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "kind": "source_only_installation_compatibility_review",
+  "identities": {
+    "main": {
+      "head": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "tree": "dba5247cc453a7978f4f0dffe637f37e4d9a88f8",
+      "parent": "89870a876fa436da51598aa7e089d74d0f177001"
+    },
+    "pr1805": {
+      "head": "5fde6ffae3c01769b69aa9c14abec26f2ceddfda",
+      "tree": "a1c4bfbc53e08307e9f3461c18c31a5f58131048",
+      "parent": "02401458a7fe26e00ce4caa653084c7f9680696d"
+    },
+    "pr1810": {
+      "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+      "tree": "6fa16961ce5a81d83970c426384fbd6685d6091e",
+      "parents": [
+        "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+        "01b302385666dc5b7a1535a335ef1d953c5d12b8"
+      ]
+    },
+    "pr1810Synthetic": {
+      "head": "5e8255a4c1b32660a06c6f944eefac06648a520a",
+      "tree": "6fa16961ce5a81d83970c426384fbd6685d6091e",
+      "parents": [
+        "89870a876fa436da51598aa7e089d74d0f177001",
+        "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10"
+      ]
+    }
+  },
+  "sourceFindings": {
+    "ownFive": [
+      {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "blob": "40fec295ab9cb92557f66df1594d5b42f7b0371f"
+      },
+      {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "blob": "c9559eeede51bfb540d2e46d1d97a7f821b43bc4"
+      },
+      {
+        "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+        "blob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460"
+      },
+      {
+        "path": "packages/daemon/scripts/prepare-worker-install.py",
+        "blob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f"
+      },
+      {
+        "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+        "blob": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540"
+      }
+    ],
+    "actualMergeBase": "02401458a7fe26e00ce4caa653084c7f9680696d",
+    "upstreamChangedPaths": 122,
+    "upstreamIntersectionWithOwnFive": [],
+    "pr1810ChangedPaths": 27,
+    "pr1810IntersectionWithOwnFive": [],
+    "rootManifest": {
+      "baseBlob": "4d4d856e9f90ea102c4e42cf42114e9d5daad731",
+      "mainBlob": "ec9951453307dd586dfe058648d9fc762a6665ad",
+      "pr1810Blob": "2a8647a5e9075eba8c948b38c3954a5177ea9efd",
+      "baseToMainChangedKeys": [
+        "scripts"
+      ],
+      "mainChangedScript": "test:issues",
+      "pr1810ChangedScript": "test:captures",
+      "inheritedKeysUnchanged": [
+        "packageManager",
+        "engines",
+        "pnpm"
+      ],
+      "packageManager": "pnpm@10.34.3",
+      "nodeEngine": "24.x",
+      "rootDependenciesUnchanged": true,
+      "rootDevDependenciesUnchanged": true
+    },
+    "lock": {
+      "blob": "4b67909739360248e279efa0c3bb7344379e04fe",
+      "workspaceBlob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+      "patchBlob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa",
+      "patchHash": "7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b",
+      "changedSections": [
+        "global patchedDependencies",
+        "root importer ffmpeg-static version patch_hash",
+        "ffmpeg-static snapshot key"
+      ],
+      "workerImportersChanged": false,
+      "workerManifestPathsChanged": false,
+      "helperPreserves": [
+        "all non-importer lock sections",
+        "original three worker importer blocks",
+        "whole pnpm-workspace.yaml",
+        "whole patches directory",
+        "packageManager/engines/pnpm root keys"
+      ],
+      "helperDrops": [
+        "unselected importers",
+        "Web root dependency declarations",
+        "Web root scripts"
+      ]
+    },
+    "workerHash": {
+      "algorithmBlob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+      "scriptOnlyRootDeltaExcluded": true,
+      "allPatchedDependenciesWorkspaceAndPatchBytesRetained": true,
+      "integratedHashNotCalculated": true,
+      "cannotReuseOldCandidateHashBecause": [
+        "upstream daemon tool-duration/chunks/supervisor changed",
+        "new global FFmpeg patch inputs changed"
+      ]
+    },
+    "authIngress": {
+      "actionBlob": "20a5db53847172db9f52ee12c6c0feeec6c48dce",
+      "webBlob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+      "imageBlob": "46f05f36960559221030e89e1add41ecdfced3b4",
+      "dockerBlob": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+      "officialWorkerBootstrapChangedBy1810": false,
+      "actionChanges": "step-scoped existing GitHub token for normal root install",
+      "dockerChanges": "optional BuildKit secret mount for existing install RUN"
+    }
+  },
+  "ciMetadata": {
+    "readOnly": true,
+    "logsRead": 0,
+    "artifactsDownloaded": 0,
+    "workflows": [
+      {
+        "id": 42585848140,
+        "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+        "attempt": 1,
+        "name": "CI",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42585847660,
+        "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+        "attempt": 1,
+        "name": "E2B subscription custody",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42585847623,
+        "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+        "attempt": 1,
+        "name": "SSH device backend",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42585847671,
+        "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+        "attempt": 1,
+        "name": "Unattended sandbox acceptance",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42585847740,
+        "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+        "attempt": 1,
+        "name": "Read cache API acceptance",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42585847712,
+        "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+        "attempt": 1,
+        "name": "Browser gate",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42585847969,
+        "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+        "attempt": 1,
+        "name": "E2B additive runtime release",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "checks": {
+      "total": 35,
+      "success": 28,
+      "skipped": 7
+    },
+    "ciRun": 42585848140,
+    "noNewProductionRuntimeProof": true,
+    "no1805Plus1810CombinationTestClaim": true
+  },
+  "conclusion": {
+    "concreteInstallerBlockerFound": false,
+    "mergeOrRebasePerformed": false,
+    "noMechanicalRebaseRequirementFrom0415ScriptChange": true,
+    "limits": [
+      "static compatibility only",
+      "normal combined-source review/release gates remain",
+      "no global whole-Task bytes invariance claim",
+      "old formal six FAIL retained",
+      "new formal samples zero",
+      "P0 08:55–10:25 window respected"
+    ]
+  }
+}

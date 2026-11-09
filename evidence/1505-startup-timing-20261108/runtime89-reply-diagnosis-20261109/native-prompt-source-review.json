@@ -1,0 +1,66 @@
+{
+  "sourceCommit": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "reviewedAt": "2026-11-09 09:16:30 UTC",
+  "scope": "finalOptions.prompt → native turn/start，包含anonymous adoption",
+  "sources": [
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "gitBlob": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7",
+      "bytes": 51717,
+      "sha256": "2cfe4babcf59f031a58ffc68a286aef4aa5e9bf4b9f6da8a34126537ce3da9f1"
+    },
+    {
+      "path": "packages/daemon/src/subscription-hosted-runner.ts",
+      "bytes": 26481,
+      "sha256": "f517f5711da1fb01c17ea3222bb233b624875572557cbb6000596ec370a6beed"
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude-prewarm.ts",
+      "bytes": 9298,
+      "sha256": "f19db8dffe5641115b53a4462bdbbf0727f4f3ade6c429c4fec5455cd54803e2"
+    }
+  ],
+  "facts": [
+    {
+      "path": "packages/daemon/src/adapters/claude-prewarm.ts",
+      "lines": "19–20,49–51",
+      "fact": "first non-cancelled start accepts the same StartOptions object; later/aborted calls reject"
+    },
+    {
+      "path": "packages/daemon/src/subscription-hosted-runner.ts",
+      "lines": "369–385",
+      "fact": "Codex continuation awaits control.finalOptions then calls start(assignment,final)"
+    },
+    {
+      "path": "packages/daemon/src/subscription-hosted-runner.ts",
+      "lines": "314–316,332–333",
+      "fact": "runtimeOptions spreads final options and does not replace prompt; fresh path calls adapter.start"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "lines": "344–352,364–370",
+      "fact": "fresh path passes options.prompt as firstMessage; explicit continuation separately uses continuation.message"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "lines": "520–526,547,557,909–920",
+      "fact": "adoption reuses child/rpc/initialized and skips repeated initialize; does not take or replace firstMessage"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "lines": "946–955,992",
+      "fact": "developerInstructions is a separate thread field; after thread selection always await startTurn(firstMessage)"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "lines": "156–158,853–883",
+      "fact": "text(value) wraps the original string as [{type:text,text:value,text_elements:[]}]; turn/start input uses it after account verification"
+    }
+  ],
+  "conclusion": "这些fresh交接路径没有prompt遗漏/替换的源码证据。",
+  "limits": [
+    "不证明生产模型实际收到哪份payload",
+    "未替代server/supervisor原始prompt构造与profile/MCP reader审阅",
+    "无新测试/SQL/模型/日志/工件/资源或mutation"
+  ]
+}

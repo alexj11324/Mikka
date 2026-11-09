@@ -1,0 +1,37 @@
+{
+  "observedLogAt": "2026-11-09T09:42:42.5132870Z",
+  "runAttempt": 1,
+  "jobId": 129086843302,
+  "originalLog": {
+    "bytes": 29286,
+    "sha256": "189ccadff7c2eee083868f58d0ca9edea1866748f68f1f1eb1150f99fff4edda"
+  },
+  "receipt": {
+    "sourceCommit": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+    "runId": "42588519491",
+    "sandboxes": [],
+    "templates": [
+      {
+        "name": "mikka-0415e5e0aabc-42588519491-1-desktop",
+        "kind": "desktop",
+        "templateId": "i9ore4ejrno9sng26ntq",
+        "status": "deleted"
+      },
+      {
+        "name": "mikka-0415e5e0aabc-42588519491-1-claude",
+        "kind": "claude",
+        "templateId": "0a78ulxe25yz5y08g2h5",
+        "status": "deleted"
+      },
+      {
+        "name": "mikka-0415e5e0aabc-42588519491-1-codex",
+        "kind": "codex",
+        "templateId": "1fsnkv5nc65j813ioymh",
+        "status": "deleted"
+      }
+    ],
+    "errors": []
+  },
+  "originalReadCount": 1,
+  "artifactDownloadCount": 0
+}

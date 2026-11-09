@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "main": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+  "mainTree": "dba5247cc453a7978f4f0dffe637f37e4d9a88f8",
+  "pr": "5fde6ffae3c01769b69aa9c14abec26f2ceddfda",
+  "base": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "prospectiveTree": "91648a0019aae99c61d26b8de956a811cca75972",
+  "mainLeafCount": 6760,
+  "preservedUnrelatedLeaves": 6757,
+  "ownChanges": [
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "before": {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+        "size": 18463,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/be1f902f97e50628fbe26fa55b9dab0160f749be"
+      },
+      "after": {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "40fec295ab9cb92557f66df1594d5b42f7b0371f",
+        "size": 18539,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/40fec295ab9cb92557f66df1594d5b42f7b0371f"
+      }
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "before": {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7cfc7e5ac68e66870fa741174361df51324a7566",
+        "size": 85182,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/7cfc7e5ac68e66870fa741174361df51324a7566"
+      },
+      "after": {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c9559eeede51bfb540d2e46d1d97a7f821b43bc4",
+        "size": 86629,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/c9559eeede51bfb540d2e46d1d97a7f821b43bc4"
+      }
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "before": {
+        "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+        "size": 11661,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/27c2146b45054c3eb5510afc94ea7ee9696dcb87"
+      },
+      "after": {
+        "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+        "size": 12114,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/c0172bb8a2d0d4adde7e89991fce36c97b8f8460"
+      }
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.py",
+      "before": null,
+      "after": {
+        "path": "packages/daemon/scripts/prepare-worker-install.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f",
+        "size": 4990,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f"
+      }
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+      "before": null,
+      "after": {
+        "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540",
+        "size": 5659,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/cfffaf6cac62d01e075b0fcb08a41f8b40c5f540"
+      }
+    }
+  ],
+  "testsRerun": false,
+  "productionReleasePins": false,
+  "githubTreeVerified": true,
+  "createdTree": "91648a0019aae99c61d26b8de956a811cca75972",
+  "allOtherLeavesPreserved": true
+}

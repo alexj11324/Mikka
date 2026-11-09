@@ -1,0 +1,186 @@
+✔ v3 requires an exact observed claim catalogue before accepting zero physical startup sends (5.555867ms)
+✔ sampler IDs satisfy the installed 10% sampler, while invalid live configuration fails closed (4.684911ms)
+✔ startup failure projection is closed, preserves only bounded HTTP status, and unwraps native abort classes (1.581821ms)
+✔ a native stream reader abort or timeout before run binding retains its actual phase and still cleans the owned issue (170.237743ms)
+✔ a fetch timeout wrapped by the session client preserves the coordinator-submit phase without retrying dispatch (8.702583ms)
+✔ fixed pre-execution entry phases distinguish HTTP, API, RPC and action refusal without copying response bodies (52.908349ms)
+✔ stream refusal, missing workflow identity and completed stream without dispatch retain distinct closed codes (44.609015ms)
+✔ profile validation and pre-sample build pin keep their own stage instead of fabricating a run failure (5.061617ms)
+✔ claim/running state and daemon stages do not prove provider execution; split marker only counts after agent_start (1.442106ms)
+✔ an early marker stays before the tool when full run history is replayed (0.913745ms)
+✔ a completed tool followed by the task marker proves reply order (1.013764ms)
+✖ terminal handoff tools do not prove execution before a text reply (1.316311ms)
+✖ a previous submit cannot provide the independent tool for a submitted report (0.73506ms)
+✖ the minimum tool count excludes delivery while keeping the successful read and report (0.411068ms)
+✖ a tool error replaces its earlier success in the replay execution count (0.351978ms)
+✔ a successful same-run canonical submit report proves delivery after the completed read (0.411502ms)
+✔ an empty final report cannot borrow a residual error through the real summary selector (1.112036ms)
+✔ canonical delivery cannot borrow another run, a pending or failed result, or an unordered submit (3.46507ms)
+✖ the complete candidate driver rejects submit-only output with valid runtime evidence and cleans up (28.691189ms)
+✔ the complete candidate driver accepts canonical report delivery with all runtime and cleanup gates intact (13.342038ms)
+✔ three real-shaped runs use normal cookies, pinned subscriptions, push reads and strictly owned cleanup (23.467649ms)
+✔ SMOKE chooses the verified team without fixed IDs and accepts checking quota with a new catalogue clone ID (19.466908ms)
+✔ foreign payer, workspace or frozen profile cannot satisfy the shared subscription receipt (46.024874ms)
+✔ wrong or ambiguous sources and sharing revoked during choice fail before dispatch without changing preferences (16.94698ms)
+✔ workspace restore failure is visible but never suppresses profile cleanup or sign-out (11.687054ms)
+✔ startup intervals retain only closed fields and reject foreign run data or unknown phases (1.921791ms)
+✔ prepared_agent_start keeps its actual earlier origin and requires both real initialization boundaries (0.978668ms)
+✔ bootstrap_claude_start keeps its actual earlier origin and requires both real initialization boundaries (0.458676ms)
+✔ bootstrap_codex_initialize keeps its actual earlier origin and requires both real initialization boundaries (0.257687ms)
+✔ prepared_agent_start invalid evidence cannot hide behind an otherwise valid ordinary initialization (1.066682ms)
+✔ bootstrap_claude_start invalid evidence cannot hide behind an otherwise valid ordinary initialization (0.477427ms)
+✔ bootstrap_codex_initialize invalid evidence cannot hide behind an otherwise valid ordinary initialization (0.474533ms)
+✔ ordinary startup evidence stays compatible while missing or failed CLI initialization stays incomplete (0.285839ms)
+✔ the scoped runtime receipt gates direct execution, preserves only closed evidence and does not claim OTLP completeness (1.260437ms)
+✔ an HTTP-only legacy receipt cannot prove child-send coverage (0.306613ms)
+✔ v2 MCP body evidence keeps its own terminal time and sequence while v1 remains readable (0.849082ms)
+✔ child business observations cannot become global coverage or fail solely for a missing lifecycle close (1.251394ms)
+✔ child evidence rejects foreign identity, fake completeness, malformed sequences and unobserved remote MCP scope (2.477455ms)
+✔ direct diagnostics use and delete only this test repository variable, and extra auth fails after cleanup (42.145285ms)
+✔ member candidate diagnostics use the trusted host without reading or writing workspace secrets (25.047228ms)
+✔ trusted candidate timing still refuses missing official CLI or MCP observations (8.434891ms)
+✔ member production acceptance observes its dedicated Bot window without reading or writing workspace secrets (56.440053ms)
+✔ formal prepared Claude acceptance needs the independently bounded initialization receipt and preserves cleanup (36.30029ms)
+✔ trusted cloud timing refuses missing CLI/MCP observations and extra remote authorization (40.094961ms)
+✔ formal cloud diagnostics require the prepared dedicated Bot before creating task fixtures (3.12219ms)
+✔ optional historical baseline reads keep missing detailed diagnostics unavailable (10.314581ms)
+✔ trusted candidate timing cannot claim a host without a pinned device and agent (1.36674ms)
+✔ lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics (179.056854ms)
+✔ member cloud diagnostics fail before creating any variable they cannot delete (2.710728ms)
+✔ admin diagnostics preserve an existing timing variable without replacing or deleting it (1.773272ms)
+✔ candidate gate checks frozen device and marker without representing itself as cloud latency acceptance (4.903878ms)
+✔ candidate finish receipt waits for the same run terminal push before cleanup (9.922913ms)
+✔ candidate failure cleanup waits for actual terminal after an accepted stop request (6.457248ms)
+✔ candidate cleanup deadline retains its fixture when the daemon never confirms terminal (1005.318348ms)
+✔ candidate cleanup stops a queued continuation after its original run failed and waits for the child push (5.510766ms)
+✔ candidate cleanup retains both original and queued continuation IDs when no child terminal arrives (22.039744ms)
+✔ cloud cleanup follows an adopted VM to its live continuation before ending every owned attempt (2.21597ms)
+✔ cloud cleanup retains the issue when owner end fails after the DB row was marked ended (0.740923ms)
+✔ cloud cleanup does not equate end acknowledgements with a still-retained current VM (0.992004ms)
+✔ cleanup retains its fixture when Factory cancellation loses its revision fence (0.481159ms)
+✔ wrong provenance or cleanup failure fails and still signs out; completed stop races are confirmed (35.477444ms)
+✔ an existing non-test Bot is never interrupted (2.053153ms)
+✔ worker configuration is pinned before and after every case and never exposes other environment values (23.263809ms)
+✔ alignment rejects missing, ambiguous and reversed clocks; baseline does not silently become a passing threshold (0.816543ms)
+✔ reused Coordinator workflow aligns only through the owned run server interval (0.460422ms)
+✔ Claude initialization is retained as history but never proves current task acceptance (0.601402ms)
+✔ a fast legacy dispatch body cannot pass the full dispatch-entry acceptance gate (0.634102ms)
+✔ remote authorization after the actual task ACK cannot hide in the preparing phase (0.403486ms)
+✔ failed execution keeps all six version brackets without changing the failed proof (49.784987ms)
+✔ a version change after failed execution stops later dispatches and preserves both failures (28.066311ms)
+✔ candidate bootstrap callback runs once after owner provenance and before any task stream observation (9.608088ms)
+✔ candidate bootstrap refuses provenance failure and retains normal cleanup after a publication failure (12.025657ms)
+✔ repository Git receipt stays independent and closed (1.453666ms)
+ℹ tests 73
+ℹ suites 0
+ℹ pass 68
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2882.078965
+
+✖ failing tests:
+
+test at scripts/acceptance/cloud-startup.test.mjs:425:1
+✖ terminal handoff tools do not prove execution before a text reply (1.316311ms)
+  AssertionError [ERR_ASSERTION]: submit
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-tool-proof/scripts/acceptance/cloud-startup.test.mjs:434:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/cloud-startup.test.mjs:444:1
+✖ a previous submit cannot provide the independent tool for a submitted report (0.73506ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-tool-proof/scripts/acceptance/cloud-startup.test.mjs:451:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/cloud-startup.test.mjs:458:1
+✖ the minimum tool count excludes delivery while keeping the successful read and report (0.411068ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-tool-proof/scripts/acceptance/cloud-startup.test.mjs:461:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/cloud-startup.test.mjs:468:1
+✖ a tool error replaces its earlier success in the replay execution count (0.351978ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-tool-proof/scripts/acceptance/cloud-startup.test.mjs:476:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/cloud-startup.test.mjs:550:1
+✖ the complete candidate driver rejects submit-only output with valid runtime evidence and cleans up (28.691189ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'candidate_subscription_proved'
+  - 'failed'
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/issue1505-tool-proof/scripts/acceptance/cloud-startup.test.mjs:558:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'candidate_subscription_proved',
+    expected: 'failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

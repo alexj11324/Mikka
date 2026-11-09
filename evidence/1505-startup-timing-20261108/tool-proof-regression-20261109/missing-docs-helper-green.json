@@ -1,0 +1,26 @@
+{
+  "label": "green",
+  "exit": 1,
+  "signal": null,
+  "errorCode": null,
+  "ms": 2950,
+  "bytes": 12701,
+  "sha256": "3a7eb6e06aaba31119b72ec07f15a3569f16622dc3ab62e793f09a0480b7533d",
+  "counts": [
+    "ℹ tests 73",
+    "ℹ suites 0",
+    "ℹ pass 71",
+    "ℹ fail 2",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 2886.145234"
+  ],
+  "failed": [
+    "✖ lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics (108.210082ms)",
+    "✖ worker configuration is pinned before and after every case and never exposes other environment values (12.145153ms)",
+    "✖ failing tests:",
+    "✖ lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics (108.210082ms)",
+    "✖ worker configuration is pinned before and after every case and never exposes other environment values (12.145153ms)"
+  ]
+}

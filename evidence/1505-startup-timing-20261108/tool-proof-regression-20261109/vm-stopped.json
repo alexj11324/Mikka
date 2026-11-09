@@ -1,0 +1,32 @@
+{
+  "id": "sbx_bcaBBgSVQnPESl9fLEAyZ0fcNH7F",
+  "runtime": "node24",
+  "architecture": "amd64",
+  "requestedAt": 1794216571158,
+  "startedAt": 1794216571193,
+  "stoppedAt": 1794217471438,
+  "status": "stopped",
+  "duration": 900245,
+  "vcpus": 1,
+  "memory": 2048,
+  "timeout": 900000,
+  "region": "iad1",
+  "cwd": "/vercel/sandbox",
+  "workloadType": "sandbox",
+  "createdAt": 1794216571158,
+  "updatedAt": 1794216571204,
+  "interactivePort": 26661,
+  "activeCpuDurationMs": 34504,
+  "networkTransfer": {
+    "ingress": 12415540,
+    "egress": 295302
+  },
+  "sourceSandboxName": "issue1505-tool-proof-regression-20261109",
+  "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+  "closure": "automatic_timeout",
+  "explicitStopCall": false,
+  "observationUtcRange": [
+    "2026-11-09T09:45:19Z",
+    "2026-11-09T09:47:24Z"
+  ]
+}

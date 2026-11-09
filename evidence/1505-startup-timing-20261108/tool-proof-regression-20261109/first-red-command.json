@@ -1,0 +1,20 @@
+[
+  {
+    "command": {
+      "id": "cmd_70f184b5f8ef4885b68949df2191",
+      "name": "node",
+      "exitCode": null
+    }
+  },
+  {
+    "data": "{\"kind\":\"submit_only_text_counterexample\",\"result\":true,\"record\":{\"sampleId\":\"counterexample\",\"runId\":\"00000000-0000-4000-8000-000000000001\",\"harness\":\"codex\",\"requireReply\":true,\"minToolCalls\":1,\"requireReplyAfterTool\":true,\"requireTerminal\":true,\"stages\":[{\"stage\":\"agent_start\",\"ms\":1,\"ok\":true,\"storedAt\":\"2026-11-09T00:00:00.000Z\"}],\"toolCalls\":[{\"toolCallHash\":\"df9d9a03a7d6266e\",\"startedAt\":\"2026-11-09T00:00:00.001Z\",\"outcome\":\"ok\",\"completedAt\":\"2026-11-09T00:00:00.002Z\"}],\"startupTimingStatus\":\"unavailable\",\"preparationTimingStatus\":\"unavailable\",\"agentStart\":{\"storedAt\":\"2026-11-09T00:00:00.000Z\",\"observedAt\":\"2026-11-09T00:00:00.004Z\"},\"firstProviderChunk\":{\"type\":\"tool-input-available\",\"storedAt\":\"2026-11-09T00:00:00.001Z\",\"observedAt\":\"2026-11-09T00:00:00.004Z\"},\"replyVerified\":true,\"replyVerifiedAfterTool\":true,\"lastStatus\":\"succeeded\"}}\n",
+    "stream": "stdout"
+  },
+  {
+    "command": {
+      "id": "cmd_70f184b5f8ef4885b68949df2191",
+      "name": "node",
+      "exitCode": 1
+    }
+  }
+]
