@@ -35,6 +35,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/history-pg17-1782"
           node --test --test-reporter=tap scripts/ops/domain-history-before-1782.test.mjs scripts/ops/domain-history-after-1782.test.mjs > "$RUNNER_TEMP/history-pg17-1782/unit.tap"
+          node --test --test-reporter=tap scripts/ops/domain-production-readonly-1782.test.mjs > "$RUNNER_TEMP/history-pg17-1782/metadata-unit.tap"
       - name: Install only the bounded disposable PostgreSQL driver
         timeout-minutes: 2
         env:
@@ -52,13 +53,41 @@ jobs:
           DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
           DOMAIN_HISTORY_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_history_1782_fixture
         run: node --test --test-reporter=tap scripts/ops/domain-history-after-1782.db.test.mjs > "$RUNNER_TEMP/history-pg17-1782/after-pg17.tap"
+      - name: Run every APP and WS metadata SQL case on the isolated PG17 service
+        timeout-minutes: 1
+        env:
+          DOMAIN_READONLY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
+          DOMAIN_READONLY_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_metadata_1782_fixture
+        run: |
+          node --input-type=module > "$RUNNER_TEMP/history-pg17-1782/metadata-pg17.tap" <<'NODE'
+          import { createRequire } from 'node:module'
+          import { resolve } from 'node:path'
+          import { spawnSync } from 'node:child_process'
+          if (process.env.MIKKA_DATABASE_URL !== undefined || process.env.DATABASE_URL !== undefined
+            || process.env.DOMAIN_READONLY_TEST_DATABASE_URL !== 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_metadata_1782_fixture') throw Error('fixture_target_refused')
+          const { Client } = createRequire(resolve(process.env.DOMAIN_READONLY_DEPENDENCIES, 'package.json'))('pg')
+          const db = new Client({ connectionString: 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_history_1782_fixture', connectionTimeoutMillis: 5000, query_timeout: 5000 })
+          let created = false
+          try {
+            await db.connect()
+            // Only this newly-created disposable database may be dropped here.
+            // Existing names fail CREATE; the DB test owns its APP/WS children.
+            await db.query('CREATE DATABASE mikka_domain_metadata_1782_fixture')
+            created = true
+            const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', 'scripts/ops/domain-production-readonly-1782.db.test.mjs'], { stdio: 'inherit', timeout: 40000 })
+            if (result.error || result.status !== 0) throw Error('metadata_pg17_failed')
+          } finally {
+            try { if (created) await db.query('DROP DATABASE mikka_domain_metadata_1782_fixture') }
+            finally { await db.end() }
+          }
+          NODE
       - name: Bind actual source and complete test counts
         run: |
           python3 - <<'PY'
           import hashlib, json, os, pathlib, re, subprocess
           root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'history-pg17-1782'
           summaries = {}
-          for name, expected in [('unit', 177), ('before-pg17', 30), ('after-pg17', 31)]:
+          for name, expected in [('unit', 177), ('before-pg17', 30), ('after-pg17', 31), ('metadata-unit', 35), ('metadata-pg17', 16)]:
               content = (root / (name + '.tap')).read_text()
               counts = {}
               for field in ['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo']:
@@ -69,6 +98,8 @@ jobs:
               summaries[name] = {**counts, 'sha256': hashlib.sha256(content.encode()).hexdigest()}
           paths = ['scripts/ops/domain-history-' + phase + '-1782' + suffix for phase in ['before', 'after'] for suffix in ['.mjs', '.test.mjs', '.db.test.mjs']]
           paths += ['.github/workflows/issue1782-domain-history-before.yml', '.github/workflows/issue1782-domain-history-after.yml', '.github/workflows/issue1782-history-pg17.yml']
+          paths += ['scripts/ops/domain-production-readonly-1782' + suffix for suffix in ['.mjs', '-sql.mjs', '.test.mjs', '.db.test.mjs']]
+          paths += ['.github/workflows/issue1782-domain-production-readonly.yml']
           sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
           assert sha == os.environ['GITHUB_SHA']
           receipt = {'version': 1, 'status': 'isolated_pg17_passed', 'source': sha,
