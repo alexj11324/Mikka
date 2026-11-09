@@ -1,0 +1,64 @@
+{
+  "noMatchedValuesPrinted": true,
+  "files": [
+    {
+      "path": "native-1fa3-original/lifecycle.json",
+      "matches": [],
+      "unresolved": 0
+    },
+    {
+      "path": "native-1fa3-original/smoke.json",
+      "matches": [],
+      "unresolved": 0
+    },
+    {
+      "path": "native-1fa3-original/parity/parity.json",
+      "matches": [],
+      "unresolved": 0
+    },
+    {
+      "path": "package-1fa3-original/native-crypto.json",
+      "matches": [],
+      "unresolved": 0
+    },
+    {
+      "path": "package-1fa3-original/mac-acceptance-package.json",
+      "matches": [],
+      "unresolved": 0
+    }
+  ],
+  "logs": [
+    {
+      "path": "native-1fa3/job-128990036435.original.log",
+      "jobId": 128990036435,
+      "kind": "native",
+      "bytes": 252861,
+      "sha256": "cec4ff3abfddf248a0b7d3f4899f908864b56b91998f9bd06afdf69205d67c02",
+      "gitBlobSha1": "a8cb3ff62aa1d45b8bb04eef817f33cf20db4647",
+      "bomPreserved": true,
+      "ansiPresent": true,
+      "logTimestampRange": {
+        "first": "2026-11-09T05:12:06.1250710Z",
+        "last": "2026-11-09T05:29:41.7971730Z"
+      },
+      "privacyFindings": [],
+      "unresolvedFindings": 0
+    },
+    {
+      "path": "native-1fa3/job-128997532878.original.log",
+      "jobId": 128997532878,
+      "kind": "ui-strict",
+      "bytes": 14087,
+      "sha256": "bb65a936df32d61195b0fda4df0a0c05b0b1e40871e4555fb5f37e409335eba0",
+      "gitBlobSha1": "0a3c6067ff7d4882c2447cfa619da9c4eaeff4f9",
+      "bomPreserved": true,
+      "ansiPresent": true,
+      "logTimestampRange": {
+        "first": "2026-11-09T05:29:47.1908060Z",
+        "last": "2026-11-09T05:29:54.3757449Z"
+      },
+      "privacyFindings": [],
+      "unresolvedFindings": 0
+    }
+  ]
+}

@@ -1,0 +1,816 @@
+{
+  "schema": 1,
+  "kind": "nonpg-completion-receipt",
+  "runId": 42564360573,
+  "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+  "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+  "actualTree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+  "state": "source_core_integration_daemon_image_and_all_9_companions_completed_success_native_pending",
+  "sourceGate": {
+    "jobId": 128988113780,
+    "conclusion": "success",
+    "canonicalGeneratorCheckExecuted": true,
+    "typecheck": true,
+    "codeLint": true,
+    "runtimeLint": true,
+    "protocolTypecheck": true,
+    "mobileTypecheck": true
+  },
+  "core": {
+    "jobId": 128988113805,
+    "expected": [
+      "core-2",
+      "core-3",
+      "core-4",
+      "core-5",
+      "core-6",
+      "core-7",
+      "core-8",
+      "core-9",
+      "core-10",
+      "core-11",
+      "core-12",
+      "core-13",
+      "core-14",
+      "core-15",
+      "core-16",
+      "core-17",
+      "core-18",
+      "core-19",
+      "core-20",
+      "core-21",
+      "core-22",
+      "core-23",
+      "core-24",
+      "core-25",
+      "core-26",
+      "core-27",
+      "core-28",
+      "core-29",
+      "core-30",
+      "core-31",
+      "core-32",
+      "core-33",
+      "core-34",
+      "core-35",
+      "core-36",
+      "core-37",
+      "core-38",
+      "core-39",
+      "core-40",
+      "core-41",
+      "core-42",
+      "core-43",
+      "core-44",
+      "core-45",
+      "core-46",
+      "core-47",
+      "core-48",
+      "core-49",
+      "core-50",
+      "core-51",
+      "core-52",
+      "core-53",
+      "core-54",
+      "core-55",
+      "core-56",
+      "core-57",
+      "core-triage"
+    ],
+    "actual": [
+      "core-2",
+      "core-3",
+      "core-4",
+      "core-5",
+      "core-6",
+      "core-7",
+      "core-8",
+      "core-9",
+      "core-10",
+      "core-11",
+      "core-12",
+      "core-13",
+      "core-14",
+      "core-15",
+      "core-16",
+      "core-17",
+      "core-18",
+      "core-19",
+      "core-20",
+      "core-21",
+      "core-22",
+      "core-23",
+      "core-24",
+      "core-25",
+      "core-26",
+      "core-27",
+      "core-28",
+      "core-29",
+      "core-30",
+      "core-31",
+      "core-32",
+      "core-33",
+      "core-34",
+      "core-35",
+      "core-36",
+      "core-37",
+      "core-38",
+      "core-39",
+      "core-40",
+      "core-41",
+      "core-42",
+      "core-43",
+      "core-44",
+      "core-45",
+      "core-46",
+      "core-47",
+      "core-48",
+      "core-49",
+      "core-50",
+      "core-51",
+      "core-52",
+      "core-53",
+      "core-54",
+      "core-55",
+      "core-56",
+      "core-57",
+      "core-triage"
+    ],
+    "missing": [],
+    "extra": [],
+    "conclusion": "success"
+  },
+  "integration": {
+    "jobId": 128988113796,
+    "expected": [
+      "integration-2",
+      "integration-3",
+      "integration-4",
+      "integration-5",
+      "integration-6",
+      "integration-7",
+      "integration-8",
+      "integration-9",
+      "integration-10",
+      "integration-11",
+      "integration-12",
+      "integration-13",
+      "integration-14",
+      "integration-15",
+      "integration-16",
+      "integration-17",
+      "integration-18",
+      "integration-19",
+      "integration-20",
+      "integration-21",
+      "integration-22",
+      "integration-23",
+      "integration-24",
+      "integration-25",
+      "integration-26",
+      "integration-27",
+      "integration-28",
+      "integration-29",
+      "integration-factory-activity"
+    ],
+    "actual": [
+      "integration-2",
+      "integration-3",
+      "integration-4",
+      "integration-5",
+      "integration-6",
+      "integration-7",
+      "integration-8",
+      "integration-9",
+      "integration-10",
+      "integration-11",
+      "integration-12",
+      "integration-13",
+      "integration-14",
+      "integration-15",
+      "integration-16",
+      "integration-17",
+      "integration-18",
+      "integration-19",
+      "integration-20",
+      "integration-21",
+      "integration-22",
+      "integration-23",
+      "integration-24",
+      "integration-25",
+      "integration-26",
+      "integration-27",
+      "integration-28",
+      "integration-29",
+      "integration-factory-activity"
+    ],
+    "missing": [],
+    "extra": [],
+    "conclusion": "success"
+  },
+  "daemon": {
+    "jobId": 128988113782,
+    "conclusion": "success",
+    "testFiles": {
+      "passed": 138,
+      "skipped": 1,
+      "total": 139
+    },
+    "tests": {
+      "passed": 1572,
+      "skipped": 2,
+      "total": 1574
+    },
+    "mcpContextTests": 6,
+    "mcpHttpObservationTests": 18,
+    "claudeGenerationAbortTests": 4,
+    "codexGenerationCompletionTests": 3,
+    "typecheck": true
+  },
+  "image": {
+    "jobId": 128988735822,
+    "conclusion": "success",
+    "isolatedReceipts": [
+      {
+        "kind": "isolated-self-hosted-services",
+        "revision": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+        "origin": "http://localhost:3000",
+        "provider": "synthetic-openai-compatible",
+        "synthetic": true,
+        "productionAcceptance": false,
+        "checks": {
+          "mailpit": {
+            "verificationReceived": true,
+            "passwordResetReceived": true,
+            "configuredSender": true,
+            "verifiedSignIn": true
+          },
+          "officialWeb": {
+            "transport": "actual-http",
+            "protocol": "v1",
+            "discovery": true,
+            "corsPreflight": true,
+            "bearerOnly": true,
+            "explicitSameOriginReturn": true,
+            "independentSession": true,
+            "fragmentCodeOnly": true,
+            "replayRejected": true,
+            "sessionRpc": true,
+            "maliciousOriginRejected": true,
+            "visualAcceptance": false,
+            "workspaceRead": true,
+            "attachmentUploadAndDownload": true,
+            "messageSubmitted": true,
+            "messageReplyRead": true,
+            "replyProvider": "synthetic-openai-compatible",
+            "revokeImmediate": true,
+            "sourceCookieSurvives": true,
+            "bearerBoundLive": true,
+            "liveClosedOnRevoke": true
+          },
+          "live": {
+            "applications": 2,
+            "sharedPostgres": true,
+            "cloudflare": false,
+            "businessMutationReceivedAcrossReplicas": true
+          },
+          "minio": {
+            "applicationUpload": true,
+            "privateObject": true,
+            "presignedDownload": true,
+            "bytesVerified": true
+          },
+          "chat": {
+            "messages": 31,
+            "replies": 31,
+            "provider": "synthetic-openai-compatible",
+            "synthetic": true,
+            "hostedUsageRows": 0,
+            "subscriptionAcceptance": false
+          }
+        },
+        "status": "passed",
+        "stage": "complete",
+        "chatProgress": {
+          "confirmedReplies": 31
+        }
+      },
+      {
+        "kind": "isolated-source-daemon",
+        "revision": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+        "origin": "http://localhost:3000",
+        "status": "passed",
+        "checks": {
+          "target": true,
+          "enrollment": true,
+          "realProcess": true,
+          "heartbeat": true,
+          "builtinGatewayPong": true,
+          "ownerDeviceOnline": true,
+          "builtinPresenceReady": true,
+          "builtinPresenceAck": true
+        },
+        "cleanup": {
+          "credentialRevoked": true,
+          "revokedCredentialRefused": true,
+          "daemonUnregistered": true,
+          "revocationCheckedOnNextSync": true,
+          "deviceRemoved": true,
+          "sessionClosed": true,
+          "privateFilesRemoved": true
+        },
+        "taskCompletion": false,
+        "subscriptionAcceptance": false,
+        "modelRequests": false,
+        "process": {
+          "pid": 27486,
+          "daemonVersion": "0.0.1",
+          "protocolVersion": 3
+        }
+      }
+    ],
+    "removed": {
+      "containers": 6,
+      "volumes": 3,
+      "networks": 1
+    },
+    "removalLines": [
+      " Container mikka-selfhost-ci-app-replica-1  Removed",
+      " Container mikka-selfhost-ci-app-1  Removed",
+      " Container mikka-selfhost-ci-model-1  Removed",
+      " Container mikka-selfhost-ci-postgres-1  Removed",
+      " Container mikka-selfhost-ci-minio-1  Removed",
+      " Container mikka-selfhost-ci-mailpit-1  Removed",
+      " Network mikka-selfhost-ci_default  Removed",
+      " Volume mikka-selfhost-ci_app-data  Removed",
+      " Volume mikka-selfhost-ci_replica-data  Removed",
+      " Volume mikka-selfhost-ci_postgres-data  Removed"
+    ],
+    "productionPublish": "skipped_original_pr_condition",
+    "productionAcceptance": false
+  },
+  "companionRuns": [
+    {
+      "id": 42564360587,
+      "name": "Read cache API acceptance",
+      "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42564360596,
+      "name": "Unattended sandbox acceptance",
+      "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42564360642,
+      "name": "E2B additive runtime release",
+      "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42564360503,
+      "name": "Cloud computer backend",
+      "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42564360510,
+      "name": "E2B subscription custody",
+      "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42564360544,
+      "name": "Browser gate",
+      "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42564360497,
+      "name": "SSH device backend",
+      "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42564360409,
+      "name": "Site search read contract",
+      "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 42564360536,
+      "name": "Local device Node 22",
+      "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "archivedLogs": [
+    {
+      "jobId": 128987521180,
+      "actualCheckout": null,
+      "gitLogFound": false,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128987521180.original.log",
+        "jobId": 128987521180,
+        "bytes": 2200,
+        "sha256": "c6192fc248e3aa7b16c2b0151b44e9ddc52e6dcda88a9a5e612565f9ade0a38b",
+        "gitBlobSha": "ec315cbfa21db36f256f48bc24fd1ee5d6caadf3",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "echo_only_no_browser_tests"
+    },
+    {
+      "jobId": 128987522414,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128987522414.original.log",
+        "jobId": 128987522414,
+        "bytes": 50815,
+        "sha256": "c6b18ed119740ca2bb9a281fc6c379cc5284c406284c4ff4bdf40b42948d3a2c",
+        "gitBlobSha": "cadad5767ec79c6142dd484deeaa2dc4ab7e5589",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128987522337,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128987522337.original.log",
+        "jobId": 128987522337,
+        "bytes": 35587,
+        "sha256": "c46b56350188b2a297ecfb820d647ad9353e36af502c58a2d9aa4140a2c4e8a9",
+        "gitBlobSha": "aec73e965d7ddb86e3803c4ca403d8bdb921266c",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128987522202,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128987522202.original.log",
+        "jobId": 128987522202,
+        "bytes": 71615,
+        "sha256": "01caf7481da25830ebe8d201bcab7faffa34e66941fb4b4cc480737b440a4050",
+        "gitBlobSha": "1ee5bc18146d2de7e4751a544a3872b6c31c6804",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128987522108,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128987522108.original.log",
+        "jobId": 128987522108,
+        "bytes": 562859,
+        "sha256": "2e57719c17084dddc4ef149d519a4d6efbe4b309fc8f0a141edf35d23abc8722",
+        "gitBlobSha": "0f072b800f367ef300c65323039889866ab04d06",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128988113780,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128988113780.original.log",
+        "jobId": 128988113780,
+        "bytes": 133418,
+        "sha256": "f885fafcbb549b63e3f9be99f0437361ff26ddf96432f79202cac2a3898fc334",
+        "gitBlobSha": "914ed0e460eb98d0b9d5912b75cbb220d4858bdc",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128988113805,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128988113805.original.log",
+        "jobId": 128988113805,
+        "bytes": 997471,
+        "sha256": "863853f0c925810df3a481821660b9387c9c861c196104ad7faae32b8fb6340c",
+        "gitBlobSha": "f19773f18c1a47ccd730c828abc444188fdb8160",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128988113796,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128988113796.original.log",
+        "jobId": 128988113796,
+        "bytes": 647658,
+        "sha256": "c95fc97c0e6ade586c4939ccfa70df63de252273c9e790f20c67fc56fba889ad",
+        "gitBlobSha": "baecd3cb81d4c50ed6abd3a4407960138cfc8165",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128988113782,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128988113782.original.log",
+        "jobId": 128988113782,
+        "bytes": 125608,
+        "sha256": "12de0ac2c4ff74d10df3b193833271f1ef4c0dc698f25d7bc97a22e6e9171822",
+        "gitBlobSha": "a9362c12c9ab70855337e19c0248e70a7f59ff5e",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128988531408,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128988531408.capture-key-redacted.log",
+        "jobId": 128988531408,
+        "bytes": 226212,
+        "sha256": "2f2887fcc9ef3bb4af4aaa8691adb18127540a79e8e6128fbca605909745b281",
+        "gitBlobSha": "271df0abfbee7c6e83b75280b76c934a57baba4a",
+        "content": "Decoded log with only 10 fixed public capture-key literals replaced; original hash retained",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 10,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        },
+        "redaction": {
+          "type": "fixed_public_capture_key",
+          "occurrences": 10,
+          "source": {
+            "ref": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+            "path": ".github/workflows/analytics-ssr.yml",
+            "blob": "2a263858b477569d92f1694ed6bfddcd03469c56",
+            "line": 49
+          },
+          "exactSourceLiteralMatch": true,
+          "originalDecodedUtf8Bytes": 226202,
+          "originalDecodedUtf8Sha256": "73ed39d48d71df94b54b7d8bff3f3e4e344a5f262260096f9ad95b368f88b0de",
+          "originalBytesClaimedForPublishedFile": false
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128989924013,
+      "actualCheckout": null,
+      "gitLogFound": false,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128989924013.original.log",
+        "jobId": 128989924013,
+        "bytes": 2939,
+        "sha256": "456f9eb80db850f5b6e9a9c3e2de2b1d92c5977705f51ffcf73211a2c33077f3",
+        "gitBlobSha": "ce4af56404ce6cdc557a75ba21831ba6c46519bc",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "analytics_aggregate_no_checkout"
+    },
+    {
+      "jobId": 128987522069,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128987522069.original.log",
+        "jobId": 128987522069,
+        "bytes": 128335,
+        "sha256": "993112d360cb47341549525af54da662dde838b07ba5e8b707dcdb3b711d3f50",
+        "gitBlobSha": "d4012a006a0c0bee961c2e995fafbaeb4fc8e0f0",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128988272338,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128988272338.original.log",
+        "jobId": 128988272338,
+        "bytes": 40201,
+        "sha256": "5bf3470495f4eb2a35bde1401c728ade9032cedcf3a96265e78519b7eea5077a",
+        "gitBlobSha": "67846d17a0830a057468a99ec01449cec51106eb",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128988272365,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128988272365.original.log",
+        "jobId": 128988272365,
+        "bytes": 42191,
+        "sha256": "76e615c8ae92476e84add168148e77b2e8f74da828c82b43b636cd541f09a601",
+        "gitBlobSha": "3da14dcad4d4b07eaf4096e0ca163abf1f7d76ee",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128987521893,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128987521893.original.log",
+        "jobId": 128987521893,
+        "bytes": 231942,
+        "sha256": "391f53d89d4db97d351fb685c69c9d22a2a541093c3b34e57d154b986c6bae91",
+        "gitBlobSha": "12666bbc38f9d1e5f4182af164ec5b17d3f7d9ae",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128987521257,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128987521257.original.log",
+        "jobId": 128987521257,
+        "bytes": 71003,
+        "sha256": "2bbecd980936265df972c16206066bcf68530dda8d208be968fd62ef3e2d82a8",
+        "gitBlobSha": "94dd91b26e16a4e2855d02cfd5492be2e57a1c5b",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    },
+    {
+      "jobId": 128988735822,
+      "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "gitLogFound": true,
+      "original": {
+        "path": "ci-1fa3-20261109/nonpg/job-128988735822.original.log",
+        "jobId": 128988735822,
+        "bytes": 355447,
+        "sha256": "5d16fa4bc5f21bcbb47573a1bdcfa226ad09a7efca3b01f5841c590d07719638",
+        "gitBlobSha": "4aa2a68d32d62672768a9dcfb17dc208157dad02",
+        "content": "Original decoded UTF-8 log; BOM and ANSI preserved",
+        "scan": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "jwt": 0,
+          "signedUrl": 0,
+          "email": 0
+        }
+      },
+      "scope": "test_or_build_job"
+    }
+  ],
+  "boundaries": [
+    "This is not complete CI until the new Native job and strict UI aggregate finish.",
+    "Core and Integration report successful targets; this is not a claim that every cached target reran from scratch.",
+    "Browser gate is echo-only; analytics aggregate has no checkout. Their names are not actual browser/source execution proof.",
+    "PR release jobs and image publication are original conditional skips, not production release proof.",
+    "Image model replies are synthetic; actual ACME production accepted cases remain zero.",
+    "One analytics log publishes a specifically identified fixed public capture-key redaction with its original decoded-byte hash; other archived logs preserve original BOM/ANSI bytes.",
+    "Current main has advanced to02401458 after this CI started; these results remain bound to f8864eb/0ecc16 and are not a test of that future union."
+  ]
+}

@@ -1,0 +1,355 @@
+{
+  "schemaVersion": 1,
+  "kind": "frozen_production_query_helper_and_main024_interface_handoff",
+  "status": "read_only_source_contract_confirmed",
+  "evidenceCommit": "3555f9d7dfe8383d7a12282dac66bbb2e1e44990",
+  "evidenceTree": "64452604f613cf78a8844e8928f9e6af5a3fcb8d",
+  "discovery": {
+    "scope": "docs/operations/evidence/1512-raw only; metadata paths, then named helper and safe receipt contents",
+    "metadataTree": "baf0b525a79dceb30eba26c1a10cde8599d0cb86",
+    "truncated": false,
+    "latestMatchingBundle": "source85-profile1f-b527-8ff",
+    "historical13TemplateBundleNotSelected": "native-1f548-main1ed-and-posthog-normalizer plus 0d33-native-and-query-preparation"
+  },
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/production-evidence-query-templates.json",
+      "gitBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+      "bytes": 58165,
+      "sha256": "a52df37feff2ef4c304d4bc47960657dc5c5badbde0fba4416f0e9bf4fea4c68"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/normalize-posthog-metadata.mjs",
+      "gitBlob": "8bd8d631b24cb134e1581e48eca86e8f16d3f557",
+      "bytes": 19913,
+      "sha256": "56ce0805aa5e75fece1efcd06ab9c0652ab90037c7e453e7e4fe6b7748b36ae5"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/reconcile-production-evidence.mjs",
+      "gitBlob": "521ef985cd815b19b5220025adbd053879ccb41e",
+      "bytes": 28367,
+      "sha256": "52884757d76555bd8478ec7e3154a0b58746a6c9bbe56e7c15083494526626d2"
+    }
+  ],
+  "documentation": [
+    {
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/normalize-posthog-metadata.md",
+      "gitBlob": "07f2b6ed95a0d004af24abc864368b651db55ebc",
+      "bytes": 8328,
+      "sha256": "08b674f22523094d74397c818be77600ea73eaed64e9386211d78e6c778780d3"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/reconcile-production-evidence.md",
+      "gitBlob": "352be1f9838575ef2b5945da56f4289acee927e0",
+      "bytes": 10635,
+      "sha256": "0f408644e8b8cff18f64605ff89412678ffc0552d17a07c66bc7b7c0506e69fe"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/evidence/posthog-enumeration-independent-count-receipt.json",
+      "gitBlob": "8851177de384d2f2544bfce62eb654ec11bf674c",
+      "bytes": 8490,
+      "sha256": "7495c2c4fc5cad5d7306108ac44032716812031dfb78316591ab54f250669bde"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/post-merge-c04690-m1/production-01a6/posthog-forensics/public/service-version-readback-addendum.safe.json",
+      "gitBlob": "920a4eca097180849fa3994986bae495fe200fe7",
+      "bytes": 2652,
+      "sha256": "198969c4834a46761061f2e2093c505baab1f6b9b5e01e6b5a67e3840de470bd"
+    }
+  ],
+  "queryContract": {
+    "projectId": 670821,
+    "region": "US",
+    "queryNames": [
+      "lookup_trace_by_ids",
+      "lookup_trace_count",
+      "span_timeline",
+      "trace_integrity",
+      "generation_receipts",
+      "tail_error_retention",
+      "safe_native_logs",
+      "source_correlation",
+      "replay_correlation",
+      "capture_summary",
+      "apm_generation_spans",
+      "ai_capture_summary",
+      "apm_session_links",
+      "native_generation_collection"
+    ],
+    "all14SqlStringsMatchPinnedSha256": true,
+    "pagination": {
+      "size": 500,
+      "queries": [
+        "lookup_trace_by_ids",
+        "span_timeline",
+        "generation_receipts",
+        "safe_native_logs",
+        "apm_generation_spans",
+        "native_generation_collection"
+      ],
+      "offsets": "0,500,1000,...",
+      "terminal": "real short page required; a full 500-row final result requires the subsequent empty page",
+      "ordering": "lookup timestamp+trace identity; detail queries retain storage UUID as final ordering key"
+    },
+    "parameters": {
+      "window_start_utc": "actual inclusive UTC YYYY-MM-DD HH:mm:ss",
+      "window_end_utc": "actual exclusive UTC YYYY-MM-DD HH:mm:ss; fixed for both snapshots and all pages",
+      "run_id": "actual UUID or empty; present field",
+      "thread_id": "actual UUID or empty; present field",
+      "task_id": "actual UUID or empty; present field",
+      "trace_id_hex": "each actually discovered nonzero 32-lowercase-hex trace",
+      "session_id": "actual current browser session, for replay query",
+      "row_offset": "nonnegative multiple of500"
+    },
+    "requiredLookupBinding": "at least one real nonempty run/thread/task UUID; no baseline substitute",
+    "clusters": {
+      "Logs": [
+        "lookup_trace_by_ids",
+        "lookup_trace_count",
+        "span_timeline",
+        "trace_integrity",
+        "tail_error_retention",
+        "safe_native_logs",
+        "source_correlation",
+        "capture_summary",
+        "apm_generation_spans",
+        "apm_session_links",
+        "native_generation_collection"
+      ],
+      "Default": [
+        "generation_receipts",
+        "ai_capture_summary",
+        "replay_correlation"
+      ]
+    },
+    "noCrossClusterSqlJoins": true,
+    "rawInput": "exact saved MCP result JSON with content, structuredContent:null,isError:false; one text content containing exact HogQLQuery/query, results and byte-identical __formatted_results_override; optional exact request {query,truncate?,context?}",
+    "normalizerApi": "normalizePosthogMetadata(name, rawResponseText, { requestText } = {})",
+    "normalizerCli": "node normalize-posthog-metadata.mjs --query QUERY_NAME --input RAW_RESPONSE.json --output NEW_PAGE.json [--request RAW_REQUEST.json]",
+    "normalizerOutput": "typed metadata; actual headers/order checked against pinned projection; missing/null/zero preserved; original physical UUIDs retained; page.truncated remains null",
+    "constraints": {
+      "maxInputMiB": 8,
+      "maxFormattedMiB": 2,
+      "maxPageRows": 500,
+      "maxCellKiB": 8,
+      "maxArrayElements": 500,
+      "maxJsonDepth": 12
+    },
+    "sqlMutation": "none; exact reviewed SQL after bounded placeholder substitution only",
+    "countLiveStatus": {
+      "lookupTraceCountLiveValidated": false,
+      "sourceReceipt": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/evidence/posthog-enumeration-live-compile/receipt.json",
+      "sourceBlob": "a28c85764d80ed27bf6d80a86f2ca42a02eb7688",
+      "rule": "first real production binding must retain the actual count request/response; preparation or historical header-only probes are not acceptance"
+    }
+  },
+  "reconciliation": {
+    "api": "reconcile(manifest)",
+    "cli": "node reconcile-production-evidence.mjs MANIFEST.json NEW_REPORT.json",
+    "manifest": {
+      "schemaVersion": 1,
+      "projectId": 670821,
+      "window": "same two UTC parameters",
+      "ids": "all three run_id/thread_id/task_id fields",
+      "snapshots": [
+        "before",
+        "after"
+      ],
+      "eachSnapshot": [
+        "capturedAt (actual completion UTC ISO Z)",
+        "lookup (all lookup_trace_by_ids pages)",
+        "lookupCount (one lookup_trace_count aggregate page)",
+        "traces (every discovered trace -> all eight required tables)"
+      ]
+    },
+    "perTraceTables": [
+      "span_timeline",
+      "trace_integrity",
+      "safe_native_logs",
+      "capture_summary",
+      "apm_generation_spans",
+      "native_generation_collection",
+      "generation_receipts",
+      "ai_capture_summary"
+    ],
+    "proof": "repeat the entire fixed-scope snapshot; compare independent lookup count, all timeline/AI/log counts, bidirectional physical UUID/logical span ID pairing, per-operation/model/harness and full canonical normalized rows; before and after must be stable",
+    "transport": "page.truncated:null remains null; explicit true or missing/invalid declaration fails; transport.rowsetTruncation can remain unknown while databaseEnumeration.status is complete",
+    "reportBoundary": {
+      "overallAcceptance": null,
+      "upstreamCompleteness": "not_proven",
+      "logsPhysicalMultiplicity": "not_proven",
+      "notAtomicSnapshot": true,
+      "futureIngestionNotProven": true
+    },
+    "queriesNotEvaluated": [
+      "tail_error_retention",
+      "source_correlation",
+      "replay_correlation",
+      "apm_session_links"
+    ],
+    "retainedLimits": [
+      "unconfirmed official native flush",
+      "Claude lacks independent upstream count",
+      "unknown/incomplete/rejected native receipts remain unknown/limitations",
+      "Replay playback, retention, scouts, costs and full production acceptance are separate existing gates"
+    ],
+    "exitCodes": {
+      "zero": "sets/counts internally consistent, not production acceptance",
+      "one": "missing/inconsistent/unstable evidence",
+      "two": "local input/output failure"
+    }
+  },
+  "serviceVersions": {
+    "noTemplateVersionPlaceholder": true,
+    "actualTemplate": "source_correlation returns (service,service_version) groups; do not edit pinned query to add an unreviewed full-SHA filter",
+    "web": {
+      "fixedSource": "02401458a7fe26e00ce4caa653084c7f9680696d",
+      "path": "lib/tracing/config.ts",
+      "blob": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "expression": "env.VERCEL_GIT_COMMIT_SHA?.slice(0,12) || undefined",
+      "rule": "bind verified deployed full SHA separately; compare emitted/observed 12-character version"
+    },
+    "daemon": {
+      "configPath": "packages/daemon/src/tracing.ts",
+      "configBlob": "0eed0277c933b0d2457909851bab458a482c184d",
+      "callerPath": "packages/daemon/src/main.ts",
+      "callerBlob": "abe9cf6dc0dd634fb76458b0a192f76258d32b43",
+      "versionPath": "packages/daemon/src/paths.ts",
+      "versionBlob": "3d9a8043e63e63a43044e2517ef03ab359341b9b",
+      "expression": "main configure(tracing,{version:DAEMON_VERSION}); paths DAEMON_VERSION = package.json.version",
+      "rule": "bind actual installed daemon version and its independent release manifest/source; never require it to equal Web SHA"
+    },
+    "controlledFailure": "separate dev runner explicitly emits guarded full GITHUB_SHA; its frozen full-SHA readback contract is not the production Web prefix contract",
+    "versionsObservedByThisTask": false
+  },
+  "execution": {
+    "pureV8DirectImport": false,
+    "reason": "unchanged .mjs imports node:crypto, fs and url; normalizer reads co-located template at module initialization and uses Buffer",
+    "reuse": "restore these exact three files in one directory in an already authorized final temporary Node environment; ordinary Node, no dependency installation required; use exported APIs or CLI without rewriting helpers",
+    "rawEvidenceHashBoundary": "save original request/result JSON bytes and their hashes before normalization; normalized serialization does not replace original bytes",
+    "resourcesCreated": 0,
+    "helperExecutions": 0,
+    "testExecutions": 0,
+    "posthogQueries": 0,
+    "modelCalls": 0,
+    "businessDataReads": 0,
+    "refWrites": 0
+  },
+  "main024Review": {
+    "base": "93e9d5e260cf899b9a40a188cfa34f069903489d",
+    "head": "02401458a7fe26e00ce4caa653084c7f9680696d",
+    "tree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+    "parents": [
+      "93e9d5e260cf899b9a40a188cfa34f069903489d",
+      "b7be7cc15f6b59dd11ae1c286640553432376fe6"
+    ],
+    "completePatchCount": 11,
+    "patchAddDeleteCountsComplete": true,
+    "mainDiffCount": 11,
+    "ownPathsCount": 28,
+    "overlap": [
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-context.mjs",
+        "mainBlob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+        "ownBlob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04"
+      },
+      {
+        "path": "packages/daemon/test/codex-mcp-context.test.ts",
+        "mainBlob": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+        "ownBlob": "b3b755f024c0a1531df3a4b1d849b3b70c145806"
+      },
+      {
+        "path": "packages/daemon/test/mcp-http-observation.test.ts",
+        "mainBlob": "c569b06d61ed84855db3c5921f1a6dba05774477",
+        "ownBlob": "c569b06d61ed84855db3c5921f1a6dba05774477"
+      }
+    ],
+    "nonOverlapMain": [
+      {
+        "path": "lib/agent-kit/tool-defaults-compat.test.ts",
+        "blob": "9bad4eef4e08e3a67bcfd1cf0062969cf4ebe23f",
+        "additions": 69,
+        "deletions": 2
+      },
+      {
+        "path": "lib/factory/run-end-paths.db.test.ts",
+        "blob": "4e56f2101969c5c57403017880aca69dce83aad2",
+        "additions": 7,
+        "deletions": 5
+      },
+      {
+        "path": "packages/daemon/src/subscription-hosted-runner.ts",
+        "blob": "62a2d8edd244293b511a00da618849638a943ac0",
+        "additions": 7,
+        "deletions": 2
+      },
+      {
+        "path": "packages/daemon/src/tracing.test.ts",
+        "blob": "2c1bdc5fc6896cbe1c1fd54054b98d1845535196",
+        "additions": 24,
+        "deletions": 0
+      },
+      {
+        "path": "packages/daemon/src/tracing.ts",
+        "blob": "0eed0277c933b0d2457909851bab458a482c184d",
+        "additions": 8,
+        "deletions": 0
+      },
+      {
+        "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+        "blob": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c",
+        "additions": 41,
+        "deletions": 0
+      },
+      {
+        "path": "workflows/coordinator/factory-tools.ts",
+        "blob": "77a21b83c8060b0dd9e1bcfb76fb9e7d6b7300b5",
+        "additions": 2,
+        "deletions": 2
+      },
+      {
+        "path": "workflows/coordinator/tools.ts",
+        "blob": "9bcf14a127aaa09e8028d2d0040d18aef1142bb6",
+        "additions": 1,
+        "deletions": 1
+      }
+    ],
+    "findings": [
+      {
+        "scope": "startup timing",
+        "result": "no source-level blocker",
+        "reason": "bindStartupTiming carries only startupScope; independent OTel scope, capture/withContext, sampler and span return/error paths remain unchanged; scope closes before detached work can append; first start binding retained and duplicate prepared.start stays consumed"
+      },
+      {
+        "scope": "flush",
+        "result": "unchanged",
+        "reason": "same generationDrains registry; flush still waits closing drains then provider/log/AI flush; shutdown budget and detach logic unchanged"
+      },
+      {
+        "scope": "returned refusal spans",
+        "result": "preserve own steps/factory-steps blobs",
+        "reason": "main changes tool metadata descriptions only; execute functions, strict/scoped vs legacy schema behavior, host binding and withRunSpan/asToolResult error conversion do not intersect"
+      },
+      {
+        "scope": "SQL",
+        "result": "no new production SQL in these eight patches",
+        "reason": "Factory DB test fixture now owns an explicit Bot/workspace/source-event binding, retaining semantic assertions; own authority/poll/count optimizations are on disjoint files"
+      },
+      {
+        "scope": "fixture modes",
+        "result": "preserve owned overlay100755",
+        "reason": "two controlled-generation executable fake paths absent from main diff"
+      },
+      {
+        "scope": "MCP",
+        "result": "three overlaps byte-identical",
+        "reason": "main already carries exact reader/unknown-key/real-producer regression blobs incorporated in own1fa; no second incompatible reader definition"
+      }
+    ],
+    "futureUnion": "024 tree base + exact own25 overlay (including actual90e steps8b7a5b06f3d1a9c0ebae03a434095a33fa552894 and reviewed generated cafa02602d36b04eb80cdb18ea1b54d8a2aa80a8/d7cb3ee93e7de084a4001c0248fc739f00a7414c) preserves all 11 main changes; three MCP already identical in base",
+    "mustFixFound": [],
+    "noHiddenCouplingFoundWithinReviewedInterface": true,
+    "unionRuntimeValidation": "not_executed; separate prior green results do not establish union CI/Native/release success",
+    "branchOrMainMutation": false
+  }
+}

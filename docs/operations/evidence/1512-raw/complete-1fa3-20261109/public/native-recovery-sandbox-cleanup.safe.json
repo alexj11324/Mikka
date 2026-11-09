@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "kind": "owned-native-artifact-recovery-sandbox-cleanup",
+  "sourceHead": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+  "name": "issue1512-native-1fa3-20261109-0532",
+  "sessionId": "sbx_6DgA2lNmfFhNKiksqm2hNPECZlAD",
+  "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+  "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+  "configuration": {
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "architecture": "amd64",
+    "region": "iad1",
+    "runtime": "node22",
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "persistent": false,
+    "ports": [],
+    "timeoutMs": 900000,
+    "extensions": 0,
+    "networkPolicy": {
+      "mode": "custom",
+      "allowedDomains": [
+        "*.blob.core.windows.net",
+        "*.amazonaws.com",
+        "*.oaiusercontent.com",
+        "chatgpt.com"
+      ]
+    }
+  },
+  "actual": {
+    "startedAt": "2026-11-09T05:31:34.320Z",
+    "stoppedAt": "2026-11-09T05:41:43.331Z",
+    "durationMs": 609011,
+    "activeCpuDurationMs": 6942,
+    "networkTransfer": {
+      "ingress": 15006236,
+      "egress": 318552
+    }
+  },
+  "cleanup": {
+    "stopStatus": "stopped",
+    "deleteConfirmed": true,
+    "deleteReadbackAt": "2026-11-09T05:42:04Z",
+    "exactProjectAndName": true,
+    "resume": false,
+    "httpStatus": 404,
+    "code": "not_found",
+    "operation": "GET /v2/sandboxes/{name}",
+    "requestId": "iad1:iad1::5xp6h-1794202924803-ca2fbc1aff38"
+  },
+  "cost": {
+    "actualBilledUsd": null,
+    "zeroCostClaimed": false
+  },
+  "boundaries": [
+    "The sandbox only recovered immutable GitHub CI artifacts and computed checks; no production model, product SQL or public ports.",
+    "All owned Vercel recovery sandboxes are closed at this checkpoint.",
+    "The bounded PNG read probe returned truncated base64 and no ImageContent; it is not a pixel review."
+  ]
+}

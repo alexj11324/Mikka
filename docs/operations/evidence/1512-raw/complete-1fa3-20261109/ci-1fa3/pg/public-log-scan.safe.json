@@ -1,0 +1,48 @@
+{
+  "schema": "mikka.issue1512.ci-log-public-projection-scan.v1",
+  "runId": 42564360573,
+  "source": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+  "logCount": 5,
+  "totalDecodedUtf8Bytes": 4699416,
+  "scanScope": [
+    "GitHub token patterns",
+    "selected provider secret patterns",
+    "private key PEM",
+    "JWT shape",
+    "PostHog token shape",
+    "email addresses",
+    "Bearer value shape"
+  ],
+  "unresolvedCandidates": 0,
+  "explainedCandidates": [
+    {
+      "jobId": 128988113807,
+      "rawLine": 4191,
+      "category": "mail-address",
+      "lineSha256": "4d2844b06d9ac112064b18697839dbe20dabec21dd71201190d0075703757cd8",
+      "fixture": {
+        "path": "lib/abuse/store.db.test.ts",
+        "blob": "04792f1c02a965cabff134f30f938d14c97d62aa",
+        "lines": [
+          386,
+          390
+        ]
+      },
+      "normalization": {
+        "path": "drizzle/20261030230000_hosted_usage.sql",
+        "blob": "41c55d332822f397f51a75eb95bdeafc2abc685a",
+        "lines": [
+          38,
+          39,
+          40,
+          41
+        ]
+      },
+      "explanation": "Both checked-in synthetic normalized-uniqueness fixture literals normalize by the actual SQL rule to the sole logged value. No value is reproduced in this receipt.",
+      "matchedBoth": true
+    }
+  ],
+  "boundary": "Public GitHub Actions decoded logs have platform masking. This targeted scan is not a proof of universal secret detection. Raw strings including BOM, ANSI and intentional database error output remain untouched; only review projections normalize formatting. No production/business data was queried.",
+  "rawLogsUnchanged": true,
+  "publicArchiveCandidatesAccepted": true
+}

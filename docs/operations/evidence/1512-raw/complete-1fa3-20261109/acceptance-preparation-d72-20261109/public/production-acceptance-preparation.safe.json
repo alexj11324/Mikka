@@ -1,0 +1,337 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-production-acceptance-preparation-readonly-review",
+  "observedAtUTC": "2026-11-09T05:02:27.769Z",
+  "fixedMain": {
+    "sha": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+    "tree": "d5ce228157f12aa0d40d25e4640e465cb8054de0"
+  },
+  "candidate": {
+    "sha": "c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+    "tree": "c519f5c169513894048e2f0881b5bf365d170f0c",
+    "publishedToMainByThisReview": false,
+    "productionCasesAccepted": 0
+  },
+  "compatibility": {
+    "compareURL": "https://api.github.com/repos/alexj11324/Mikka/compare/d72a1982bf503b34ad4bc31ab6211cfe018af483...c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+    "base": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+    "mergeBase": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+    "status": "ahead",
+    "aheadBy": 5,
+    "behindBy": 0,
+    "returnedChangedPaths": [
+      "app/v1/devices/[deviceId]/repos/route.ts",
+      "app/v1/devices/[deviceId]/runs/route.ts",
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts",
+      "docs/operations/tracing.md",
+      "lib/coordinator/repository-resolution.test.ts",
+      "lib/coordinator/repository-resolution.ts",
+      "lib/desktop-rpc/read-batch-context.ts",
+      "lib/device-enrollment.db.test.ts",
+      "lib/device-enrollment.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "lib/device-management.ts",
+      "lib/device-unit-fence.db.test.ts",
+      "lib/dispatch-timing.ts",
+      "lib/personal-policy.test.ts",
+      "lib/personal-policy.ts",
+      "lib/tracing/logs.test.ts",
+      "lib/tracing/node.ts",
+      "packages/daemon/src/agents/mikka-mcp-context.mjs",
+      "packages/daemon/test/codex-mcp-context.test.ts",
+      "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "packages/daemon/test/mcp-http-observation.test.ts",
+      "scripts/e2b/validate-template-subscriptions.mjs",
+      "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "tests/cloud-dispatch-startup.test.ts",
+      "workflows/coordinator/factory-steps.ts",
+      "workflows/coordinator/steps.ts"
+    ],
+    "acceptanceRunnerWorkflowExporterBenchmarkIntersection": [],
+    "requiresHarnessChange": false
+  },
+  "laterMainBoundary": {
+    "sha": "93e9d5e260cf899b9a40a188cfa34f069903489d",
+    "tree": "bc928dae72b0c861aa9624552b0c63d3a8f1006f",
+    "parent": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+    "source": "exact commit metadata read; three mobile-screenshots-only changed paths reported by parent, not independently compared here",
+    "doesNotClaimDeploymentReady": true
+  },
+  "sourceFingerprints": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 59415,
+      "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01",
+      "blob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/d72a1982bf503b34ad4bc31ab6211cfe018af483/scripts/acceptance/run-observability.mjs"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "bytes": 11693,
+      "sha256": "811ba05e172f6a896867949d701911b845289db290950339b29a0a8c5463ec6a",
+      "blob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/d72a1982bf503b34ad4bc31ab6211cfe018af483/scripts/acceptance/run-observability-workflow.mjs"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "bytes": 24958,
+      "sha256": "c859d81c3dcac798efee6d9d89dd5a5412d72c1b85b9737568aaac73cefb89cf",
+      "blob": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/d72a1982bf503b34ad4bc31ab6211cfe018af483/scripts/acceptance/run-observability-browser.mjs"
+    },
+    {
+      "path": "scripts/ops/posthog-export-evidence.mjs",
+      "bytes": 11762,
+      "sha256": "94282fae71b089bfe7154b907c1ebd45fc5c352e16c3369e184b64a1374b8045",
+      "blob": "a986e913cc0f5b79386f5bf50cef8fbefae6ac0e",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/d72a1982bf503b34ad4bc31ab6211cfe018af483/scripts/ops/posthog-export-evidence.mjs"
+    },
+    {
+      "path": "scripts/ops/posthog-replay-evidence.mjs",
+      "bytes": 13579,
+      "sha256": "4df87f17ee6175a0b3498652f9af4ac61afec35dea022c116d81050396a0bddf",
+      "blob": "fe28b5927b8df35d42bce2984a95dcfdd50e6965",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/d72a1982bf503b34ad4bc31ab6211cfe018af483/scripts/ops/posthog-replay-evidence.mjs"
+    },
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "bytes": 19846,
+      "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+      "blob": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/d72a1982bf503b34ad4bc31ab6211cfe018af483/scripts/ops/run-trace-benchmark.ts"
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "bytes": 63844,
+      "sha256": "963dd1f41e3f94c31983529db2807a54af77fab11afe41980986154aee9ad75e",
+      "blob": "e75e8377fbcb6f92d3446f5325d6d55cc4b294af",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/d72a1982bf503b34ad4bc31ab6211cfe018af483/docs/operations/tracing.md"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "bytes": 19025,
+      "sha256": "ab6522ff9f964e580af3e66e972f105e21db2eacc499b516d0e3a1c308b8ae69",
+      "blob": "176e3aead0068d801f829dcadaafcd02a61e67a3",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/d72a1982bf503b34ad4bc31ab6211cfe018af483/scripts/acceptance/run-observability.md"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "bytes": 13984,
+      "sha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4",
+      "blob": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/d72a1982bf503b34ad4bc31ab6211cfe018af483/.github/workflows/run-trace-acceptance.yml"
+    },
+    {
+      "path": ".github/workflows/issue1512-git-transport.yml",
+      "bytes": 7630,
+      "sha256": "610dc8cc67aff5e6cb7cd7c778be9fc4cf8d2ab4b69b4ed170ccc79853ad7b8a",
+      "blob": "7429381cee94f6188303ac997cb4e0c89906672a",
+      "revision": "a0dd581c5b573e9809ef7cc362da93f1429dee13",
+      "sourceURL": "https://raw.githubusercontent.com/alexj11324/Mikka/a0dd581c5b573e9809ef7cc362da93f1429dee13/.github/workflows/issue1512-git-transport.yml"
+    }
+  ],
+  "transport": {
+    "ref": "ops/1512-git-transport",
+    "observedSha": "a0dd581c5b573e9809ef7cc362da93f1429dee13",
+    "currentRequest": {
+      "requestId": "ff0c7964-6603-4bb5-8f7d-740cf9e1899d",
+      "inputs": {
+        "mode": "controlled-failure",
+        "expected-deployment-sha": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "model-case": "all",
+        "prepare": "false",
+        "browser-submit": "false",
+        "export-target": "dashboard",
+        "export-id": "",
+        "session-id": "",
+        "trace-id": ""
+      }
+    },
+    "futureEnvelope": {
+      "requestId": "<FRESH_UUID_PER_OPERATION>",
+      "inputs": "Choose exactly one inputs object below after replacing all placeholders"
+    },
+    "futureCommitMessagePrefix": "issue1512:dispatch ",
+    "dispatchRef": "main",
+    "guardSequence": [
+      "main ref equals expected full40 SHA",
+      "public /mikka/api/version build equals expected full40 SHA",
+      "workflow GITHUB_SHA equals expected SHA",
+      "driver repeats public build pin through case; actor checks before login and before submit"
+    ],
+    "futureRequestMustNotReuseCurrentOld1d126Receipt": true,
+    "concurrency": {
+      "group": "run-trace-production-acceptance",
+      "cancelInProgress": false,
+      "queue": "max"
+    },
+    "mutationPerformed": false
+  },
+  "inputTemplates": [
+    {
+      "name": "preflight",
+      "inputs": {
+        "mode": "preflight",
+        "expected-deployment-sha": "<FINAL_RELEASED_MAIN_SHA40>",
+        "model-case": "all",
+        "prepare": "false",
+        "browser-submit": "false",
+        "export-target": "dashboard",
+        "export-id": "",
+        "session-id": "",
+        "trace-id": ""
+      }
+    },
+    {
+      "name": "claude",
+      "inputs": {
+        "mode": "execute",
+        "expected-deployment-sha": "<FINAL_RELEASED_MAIN_SHA40>",
+        "model-case": "claude",
+        "prepare": "true",
+        "browser-submit": "true",
+        "export-target": "dashboard",
+        "export-id": "",
+        "session-id": "",
+        "trace-id": ""
+      }
+    },
+    {
+      "name": "codex",
+      "inputs": {
+        "mode": "execute",
+        "expected-deployment-sha": "<FINAL_RELEASED_MAIN_SHA40>",
+        "model-case": "codex",
+        "prepare": "true",
+        "browser-submit": "true",
+        "export-target": "dashboard",
+        "export-id": "",
+        "session-id": "",
+        "trace-id": ""
+      }
+    },
+    {
+      "name": "native-apm-png",
+      "inputs": {
+        "mode": "export",
+        "expected-deployment-sha": "<FINAL_RELEASED_MAIN_SHA40>",
+        "model-case": "all",
+        "prepare": "false",
+        "browser-submit": "false",
+        "export-target": "insight",
+        "export-id": "<ACTUAL_SAVED_INSIGHT_NUMERIC_ID>",
+        "session-id": "",
+        "trace-id": ""
+      }
+    },
+    {
+      "name": "native-apm-png-and-one-replay-segment",
+      "inputs": {
+        "mode": "export",
+        "expected-deployment-sha": "<FINAL_RELEASED_MAIN_SHA40>",
+        "model-case": "all",
+        "prepare": "false",
+        "browser-submit": "false",
+        "export-target": "insight",
+        "export-id": "<ACTUAL_SAVED_INSIGHT_NUMERIC_ID>",
+        "session-id": "<ACTUAL_BROWSER_SESSION_UUID>",
+        "trace-id": "<APM_CORRELATED_ACTUAL_TRACE_HEX32>"
+      }
+    },
+    {
+      "name": "controlled-failure",
+      "inputs": {
+        "mode": "controlled-failure",
+        "expected-deployment-sha": "<FINAL_RELEASED_MAIN_SHA40>",
+        "model-case": "all",
+        "prepare": "false",
+        "browser-submit": "false",
+        "export-target": "dashboard",
+        "export-id": "",
+        "session-id": "",
+        "trace-id": ""
+      }
+    }
+  ],
+  "semantics": {
+    "credentials": {
+      "acceptance": "GHA OIDC Infisical prod:/ ACME_DEMO_EMAIL + ACME_DEMO_PASSWORD; normal login sessions only",
+      "export": "GHA OIDC Infisical prod:/platform POSTHOG_PERSONAL_API_KEY",
+      "controlledFailure": "GHA OIDC Infisical prod:/vercel NEXT_PUBLIC_POSTHOG_KEY",
+      "secretValuesReadByReview": false
+    },
+    "cases": [
+      {
+        "id": "claude",
+        "model": "claude-haiku-5-5",
+        "harness": "claude_code",
+        "subscriptionRoute": "claude_code_cli"
+      },
+      {
+        "id": "codex",
+        "model": "gpt-6-luna",
+        "harness": "codex",
+        "subscriptionRoute": "codex_cli"
+      }
+    ],
+    "workspace": "The existing ACME account's unique own personal workspace; normal switch on new session when necessary; not shared-team proof.",
+    "factory": "One deterministic m1512-<marker>.txt no-repository deliverable per model/revision. Fixed own official subscription. v2 execute+independent review; legacy v1 additionally verify. Exact downloaded UTF-8 bytes, native identity and current-epoch checks, then one normal Owner acceptance and persisted approval readback.",
+    "noGithubConnectionPreconditionInDriver": true,
+    "paidFallback": "Must be false at case preflight and during run. prepare=true may temporarily disable an existing true value after other fresh gates pass, then compare the acknowledged value before restoring.",
+    "profiles": "prepare=true temporarily disables existing enabled profiles under normal version/digest checks; each case creates one deterministic fixed-model profile and rejects previous_fixture. Full definitions stay in RAM.",
+    "preflight": "No model submission; creates/closes own login session and may switch it to the unique personal workspace. Default preparation is false; fallback/profiles blockers can remain for the later explicitly prepared execute.",
+    "browser": "Fresh GHA Chromium, ordinary login and New task UI, one Create task click, same real session Replay readiness before click; uncertain click never retried. Readiness is not ingestion or playback.",
+    "sourceLimits": "25-minute acceptance job includes setup; per-case observation default 480000ms, supported 60000..600000. Native-attempt fence is stop-on-first-observed-excess, not a synchronous or dollar hard cap.",
+    "cleanup": "Driver reconciles its exact fixture, cancels only its unfinished Factory task, stops only owned runs, ends exact owned machines, archives own profile, restores acknowledged unchanged settings, and signs out. Browser helper owns its separate login/page/context/process and awaits driver cleanup; actor cleanup failure fails workflow.",
+    "recovery": "Hard kill or missing/incomplete receipts do not prove cleanup. Parent operator owns normal-API reconciliation of exact recorded fixture/run/machine/session and any acknowledged settings; never blindly rerun the model case or overwrite concurrent edits. No recovery mode exists among the four workflow modes.",
+    "export": "One native PostHog export POST for a pre-existing actual numeric dashboard/insight ID; does not create/edit the saved view. PNG signature/dimensions/hash are checked. Real pixel inspection and same-trace stage coverage remain separate; it is not automatically a Tracing drawer waterfall screenshot.",
+    "replay": "Optional paired real session+trace inputs only read one recording segment. Receipt explicitly leaves playback_verified=false and trace_correlation=requires_apm_match. Separate authorized official Replay Vision/render proof remains necessary; no scan/model/render performed in this review.",
+    "controlledFailure": "Exactly20 ordinary dev/mikka-web failures, real owned loopback PG, sample0.1/product retention/Safe exporters/OTLP. Full40 service version. Receipt remains backendObserved=false until actual20 IDs and UTC are separately read back. Predicted80/40 are not current-source actual counts. Current-source paired600/condition+warmup100/condition memory-export overhead is separate from network/production latency."
+  },
+  "prerequisiteStatus": {
+    "finalSourceMergedAndFullReleaseComplete": "not asserted by this review; parent owns future Web/daemon/E2B exact-source receipts",
+    "freshAcmeConfiguration": "unknown until normal GHA preflight; no account/credential read here",
+    "actualTwoModelSuccess": "not executed",
+    "nativePngActualTraceAndPixelCheck": "not executed",
+    "replayActualBackendRender": "not executed; prior quota preflight reused without re-query",
+    "controlledFailureFinalSourceBackendReadback": "not executed; historical1d126 result is baseline only",
+    "exportTokenActualScopes": "not exercised here; helper requires existing export:write/read, optional replay additionally session_recording:read; no scope expansion"
+  },
+  "documentationDelta": {
+    "path": "scripts/acceptance/run-observability.md",
+    "fixedSource": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+    "lines": [
+      100,
+      101
+    ],
+    "before": "running. chosen=false remains a blocker because the normal model API cannot\nrestore an inherited choice. Global model order is never changed.",
+    "after": "running. A verified absent composer preference uses a temporary selection receipt\nand restores absence; an existing explicit choice must be restorable. Global model order is never changed.",
+    "basis": "Actual driver preflightCase checks preferenceState=absent with chosen=false; temporary-if-absent returns bindingId/revision, restore-implicit uses that receipt. No requirement for a pre-existing explicit model choice.",
+    "applied": false
+  },
+  "operations": {
+    "githubSourceReadOnly": true,
+    "localExec": false,
+    "workflowDispatch": false,
+    "refChange": false,
+    "posthogRequests": false,
+    "browserAuth": false,
+    "sessionEnumeration": false,
+    "modelCalls": 0,
+    "testsRun": 0,
+    "resourcesCreated": 0,
+    "secretsRead": false
+  },
+  "privacy": "Only code/source IDs, source fingerprints, static workflow inputs and closed contract statements; no account name/email, recipient/user IDs, credential values, business messages, temporary URLs or raw platform envelopes."
+}

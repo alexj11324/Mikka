@@ -1,0 +1,118 @@
+{
+  "schema": "mikka.issue1512.ci-postgres-review-index.v1",
+  "runId": 42564360573,
+  "publicHead": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+  "actualCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+  "sourceTree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+  "conclusion": "PG4shards+database aggregate success;72required suites;3780node tests;0fail/skip/todo/cancel;4containers+4networks removed",
+  "archivePrefix": "ci-1fa3/pg",
+  "files": [
+    {
+      "path": "ci-1fa3/pg/job-128988113807.original.log",
+      "kind": "original GitHub decoded UTF-8 job log",
+      "jobId": 128988113807,
+      "mode": "100644",
+      "bytes": 614246,
+      "sha256": "b28c4a81721b5782de214e517f3970bfa8c99f6a75aab6e0e04c6ae8c3f90a50",
+      "gitBlobSha1": "977189da0e97415b6d694ac3f29b6474dec76978",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "ci-1fa3/pg/job-128988113801.original.log",
+      "kind": "original GitHub decoded UTF-8 job log",
+      "jobId": 128988113801,
+      "mode": "100644",
+      "bytes": 1160443,
+      "sha256": "12a55057337b6b27695b4365b8f1dca2a77cb6c6313986e10bc1d0ce9969df61",
+      "gitBlobSha1": "f83f13dd63da01f86af930ff6792bd8feaf747e4",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "ci-1fa3/pg/job-128988113837.original.log",
+      "kind": "original GitHub decoded UTF-8 job log",
+      "jobId": 128988113837,
+      "mode": "100644",
+      "bytes": 2285445,
+      "sha256": "f799d95550b60c54d866a94063361913d58683f730cbdd77b133e6f807b1f9af",
+      "gitBlobSha1": "6edbce1cd1e032716d60bfcda04f5e36d41b28a2",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "ci-1fa3/pg/job-128988113812.original.log",
+      "kind": "original GitHub decoded UTF-8 job log",
+      "jobId": 128988113812,
+      "mode": "100644",
+      "bytes": 625978,
+      "sha256": "86d368a955663a58a25f13079fad1eedaa6830b25d91b84c793890d248f76d8e",
+      "gitBlobSha1": "de748bef59ca213351bddf86e3e9f18dadb6ffd8",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "ci-1fa3/pg/job-128990215776.original.log",
+      "kind": "original GitHub decoded UTF-8 job log",
+      "jobId": 128990215776,
+      "mode": "100644",
+      "bytes": 13304,
+      "sha256": "35143600a762b945beef474f1f056318c705fe28df94197930382d54971fb477",
+      "gitBlobSha1": "2c79ca9f2a6457e5da0c539cf09456e6220123c0",
+      "remoteConfirmed": true
+    },
+    {
+      "name": "pg-final.safe.json",
+      "path": "ci-1fa3/pg/pg-final.safe.json",
+      "bytes": 63068,
+      "sha256": "0d7464c4d45920f6ec735e569a48a2e61c36a6d1b7e785f571d1f7057abfc48f",
+      "gitBlobSha1": "b3574f51e4d4622e433100b6f8829bba0d5dacd3",
+      "remoteConfirmed": true,
+      "kind": "safe receipt",
+      "mode": "100644"
+    },
+    {
+      "name": "public-log-scan.safe.json",
+      "path": "ci-1fa3/pg/public-log-scan.safe.json",
+      "bytes": 1683,
+      "sha256": "5cfe4b9f3769277c5f19ec5dfeaa02dd1520d219527abfecfe6c84fac606624f",
+      "gitBlobSha1": "5b5d7c4e9401c0fcf75865699a7c7aa4b37fc3d1",
+      "remoteConfirmed": true,
+      "kind": "safe receipt",
+      "mode": "100644"
+    }
+  ],
+  "fileCountExcludingThisIndex": 7,
+  "totalBytesExcludingThisIndex": 4764167,
+  "provenance": {
+    "decodedLogTool": "mcp__codex_apps__github_fetch_workflow_job_logs",
+    "eachJobReadOnce": true,
+    "publicSources": [
+      {
+        "jobId": 128988113807,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42564360573/job/128988113807"
+      },
+      {
+        "jobId": 128988113801,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42564360573/job/128988113801"
+      },
+      {
+        "jobId": 128988113837,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42564360573/job/128988113837"
+      },
+      {
+        "jobId": 128988113812,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42564360573/job/128988113812"
+      },
+      {
+        "jobId": 128990215776,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42564360573/job/128990215776"
+      }
+    ],
+    "sharedSelectionBlob": "7f1b9364532c97bd2b09c4428aba4ff21973a6a4",
+    "privacyScanBlob": "5b5d7c4e9401c0fcf75865699a7c7aa4b37fc3d1",
+    "limitations": "GitHub masking plus targeted privacy scan, one fixture-normalized email explained without reprinting it. Exact returned decoded strings retain BOM/ANSI; no ZIP/raw HTTP wire equality claim."
+  },
+  "persistence": "Every listed Git blob was created and its returned SHA checked. No Git ref/evidence branch was changed by this subagent; root must append these entries normally.",
+  "limits": [
+    "No1788joblogs,Native,nonPG,models,rerun,cancel,newVMorDB.",
+    "Aggregate legacy name is not production-build/browser-run evidence.",
+    "Earlier standalone C timeout and old Native RED receipts remain unchanged."
+  ]
+}

@@ -1,0 +1,48 @@
+﻿2026-11-09T05:04:01.0693798Z Current runner version: '2.338.2'
+2026-11-09T05:04:01.0715109Z ##[group]Runner Image Provisioner
+2026-11-09T05:04:01.0715967Z Hosted Compute Agent
+2026-11-09T05:04:01.0716511Z Version: 20261028.624
+2026-11-09T05:04:01.0717349Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T05:04:01.0717976Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T05:04:01.0718549Z Worker ID: {9e006f44-6439-4fa3-baf5-8a5f7965b9e0}
+2026-11-09T05:04:01.0719214Z Region: westus3
+2026-11-09T05:04:01.0719725Z Cloud: Azure
+2026-11-09T05:04:01.0720210Z ##[endgroup]
+2026-11-09T05:04:01.0721384Z ##[group]Operating System
+2026-11-09T05:04:01.0721928Z Ubuntu
+2026-11-09T05:04:01.0722484Z 24.04.5
+2026-11-09T05:04:01.0722968Z LTS
+2026-11-09T05:04:01.0723435Z ##[endgroup]
+2026-11-09T05:04:01.0723933Z ##[group]Runner Image
+2026-11-09T05:04:01.0724455Z Image: ubuntu-24.04
+2026-11-09T05:04:01.0724989Z Version: 20261101.360.1
+2026-11-09T05:04:01.0726076Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T05:04:01.0727655Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T05:04:01.0728475Z ##[endgroup]
+2026-11-09T05:04:01.0729510Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T05:04:01.0731049Z Contents: read
+2026-11-09T05:04:01.0731626Z Metadata: read
+2026-11-09T05:04:01.0732106Z ##[endgroup]
+2026-11-09T05:04:01.0733783Z Secret source: Actions
+2026-11-09T05:04:01.0734723Z Cache mode: write
+2026-11-09T05:04:01.0735312Z Prepare workflow directory
+2026-11-09T05:04:01.1047808Z Prepare all required actions
+2026-11-09T05:04:01.1101039Z Uses: alexj11324/Mikka/.github/workflows/analytics-ssr.yml@refs/pull/1799/merge (f8864eb83055504ac445e07e8d94a0e8eabedee9)
+2026-11-09T05:04:01.1105149Z Complete job name: analytics-checks / analytics-ssr
+2026-11-09T05:04:01.1987875Z ##[group]Run if [ "$CHANGES_RESULT" != 'success' ]; then exit 1; fi
+2026-11-09T05:04:01.1988836Z [36;1mif [ "$CHANGES_RESULT" != 'success' ]; then exit 1; fi[0m
+2026-11-09T05:04:01.1989650Z [36;1mif [ "$RUN_ANALYTICS" = 'false' ]; then[0m
+2026-11-09T05:04:01.1990368Z [36;1m  test "$FULL_RESULT" = 'skipped'[0m
+2026-11-09T05:04:01.1991017Z [36;1melif [ "$RUN_ANALYTICS" = 'true' ]; then[0m
+2026-11-09T05:04:01.1991620Z [36;1m  test "$FULL_RESULT" = 'success'[0m
+2026-11-09T05:04:01.1992233Z [36;1melse[0m
+2026-11-09T05:04:01.1992687Z [36;1m  exit 1[0m
+2026-11-09T05:04:01.1993274Z [36;1mfi[0m
+2026-11-09T05:04:01.2558268Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:04:01.2559270Z env:
+2026-11-09T05:04:01.2559817Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T05:04:01.2560490Z   CHANGES_RESULT: success
+2026-11-09T05:04:01.2561091Z   RUN_ANALYTICS: true
+2026-11-09T05:04:01.2561656Z   FULL_RESULT: success
+2026-11-09T05:04:01.2562233Z ##[endgroup]
+2026-11-09T05:04:01.2970964Z Cleaning up orphan processes

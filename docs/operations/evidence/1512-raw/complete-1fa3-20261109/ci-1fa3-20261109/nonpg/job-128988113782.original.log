@@ -1,0 +1,1243 @@
+﻿2026-11-09T04:58:19.5691832Z Current runner version: '2.338.2'
+2026-11-09T04:58:19.5718386Z ##[group]Runner Image Provisioner
+2026-11-09T04:58:19.5719381Z Hosted Compute Agent
+2026-11-09T04:58:19.5720462Z Version: 20261028.624
+2026-11-09T04:58:19.5721300Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T04:58:19.5722121Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T04:58:19.5722852Z Worker ID: {c7d4025d-c032-43a1-ab2e-764e88799230}
+2026-11-09T04:58:19.5723658Z Region: eastus
+2026-11-09T04:58:19.5724269Z Cloud: Azure
+2026-11-09T04:58:19.5724943Z ##[endgroup]
+2026-11-09T04:58:19.5726526Z ##[group]Operating System
+2026-11-09T04:58:19.5727212Z Ubuntu
+2026-11-09T04:58:19.5727884Z 22.04.5
+2026-11-09T04:58:19.5728453Z LTS
+2026-11-09T04:58:19.5729076Z ##[endgroup]
+2026-11-09T04:58:19.5729709Z ##[group]Runner Image
+2026-11-09T04:58:19.5730579Z Image: ubuntu-22.04
+2026-11-09T04:58:19.5731292Z Version: 20261101.347.1
+2026-11-09T04:58:19.5732616Z Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261101.347/images/ubuntu/Ubuntu2204-Readme.md
+2026-11-09T04:58:19.5734296Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261101.347
+2026-11-09T04:58:19.5735281Z ##[endgroup]
+2026-11-09T04:58:19.5736570Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T04:58:19.5738461Z Contents: read
+2026-11-09T04:58:19.5739268Z Metadata: read
+2026-11-09T04:58:19.5739925Z ##[endgroup]
+2026-11-09T04:58:19.5742838Z Secret source: Actions
+2026-11-09T04:58:19.5743858Z Cache mode: write
+2026-11-09T04:58:19.5744980Z Prepare workflow directory
+2026-11-09T04:58:19.6145273Z Prepare all required actions
+2026-11-09T04:58:19.6194625Z Getting action download info
+2026-11-09T04:58:19.7677905Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T04:58:19.9582406Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-09T04:58:20.1911813Z Complete job name: Daemon checks
+2026-11-09T04:58:20.2945011Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T04:58:20.2946099Z with:
+2026-11-09T04:58:20.2946561Z   repository: alexj11324/Mikka
+2026-11-09T04:58:20.2950520Z   token: ***
+2026-11-09T04:58:20.2950979Z   ssh-strict: true
+2026-11-09T04:58:20.2951426Z   ssh-user: git
+2026-11-09T04:58:20.2951884Z   persist-credentials: true
+2026-11-09T04:58:20.2952388Z   clean: true
+2026-11-09T04:58:20.2952833Z   sparse-checkout-cone-mode: true
+2026-11-09T04:58:20.2953363Z   fetch-depth: 1
+2026-11-09T04:58:20.2953800Z   fetch-tags: false
+2026-11-09T04:58:20.2954253Z   show-progress: true
+2026-11-09T04:58:20.2954709Z   lfs: false
+2026-11-09T04:58:20.2955128Z   submodules: false
+2026-11-09T04:58:20.2955582Z   set-safe-directory: true
+2026-11-09T04:58:20.2956092Z   allow-unsafe-pr-checkout: false
+2026-11-09T04:58:20.2956873Z env:
+2026-11-09T04:58:20.2957294Z   MIKKA_EDITION: cloud
+2026-11-09T04:58:20.2957784Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T04:58:20.2958382Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T04:58:20.2958899Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:20.2959444Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T04:58:20.2960006Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:20.2960918Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T04:58:20.2961680Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T04:58:20.2962491Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T04:58:20.2963077Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T04:58:20.2963564Z ##[endgroup]
+2026-11-09T04:58:20.5152988Z Syncing repository: alexj11324/Mikka
+2026-11-09T04:58:20.5156268Z ##[group]Getting Git version info
+2026-11-09T04:58:20.5157684Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T04:58:20.5159746Z [command]/usr/bin/git version
+2026-11-09T04:58:20.5228749Z git version 2.56.0
+2026-11-09T04:58:20.5253685Z ##[endgroup]
+2026-11-09T04:58:20.5272136Z Temporarily overriding HOME='/home/runner/work/_temp/6d1894b1-2eff-4174-991a-5d1c3deea3f4' before making global git config changes
+2026-11-09T04:58:20.5275427Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T04:58:20.5281174Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T04:58:20.5370692Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T04:58:20.5386340Z ##[group]Initializing the repository
+2026-11-09T04:58:20.5415551Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T04:58:20.5535215Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T04:58:20.5537466Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T04:58:20.5539497Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T04:58:20.5541502Z hint: call:
+2026-11-09T04:58:20.5542648Z hint:
+2026-11-09T04:58:20.5543491Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T04:58:20.5544295Z hint:
+2026-11-09T04:58:20.5545039Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T04:58:20.5546160Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T04:58:20.5547691Z hint:
+2026-11-09T04:58:20.5548611Z hint: 	git branch -m <name>
+2026-11-09T04:58:20.5549541Z hint:
+2026-11-09T04:58:20.5550958Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T04:58:20.5552805Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T04:58:20.5570532Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T04:58:20.5627059Z ##[endgroup]
+2026-11-09T04:58:20.5628905Z ##[group]Disabling automatic garbage collection
+2026-11-09T04:58:20.5631754Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T04:58:20.5672083Z ##[endgroup]
+2026-11-09T04:58:20.5684744Z ##[group]Setting up auth
+2026-11-09T04:58:20.5712746Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T04:58:20.5776031Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T04:58:20.6226783Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T04:58:20.6273310Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T04:58:20.6563473Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T04:58:20.6611175Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T04:58:20.6891132Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T04:58:20.6968540Z ##[endgroup]
+2026-11-09T04:58:20.6978085Z ##[group]Fetching the repository
+2026-11-09T04:58:20.6979806Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +f8864eb83055504ac445e07e8d94a0e8eabedee9:refs/remotes/pull/1799/merge
+2026-11-09T04:58:21.9139947Z From https://github.com/alexj11324/Mikka
+2026-11-09T04:58:21.9142860Z  * [new ref]         f8864eb83055504ac445e07e8d94a0e8eabedee9 -> pull/1799/merge
+2026-11-09T04:58:21.9147943Z ##[endgroup]
+2026-11-09T04:58:21.9149884Z ##[group]Determining the checkout info
+2026-11-09T04:58:21.9152422Z ##[endgroup]
+2026-11-09T04:58:21.9153686Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T04:58:21.9207665Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T04:58:21.9245324Z ##[group]Checking out the ref
+2026-11-09T04:58:21.9249691Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge
+2026-11-09T04:58:22.6670576Z Note: switching to 'refs/remotes/pull/1799/merge'.
+2026-11-09T04:58:22.6671316Z 
+2026-11-09T04:58:22.6671868Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T04:58:22.6672991Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T04:58:22.6673825Z state without impacting any branches by switching back to a branch.
+2026-11-09T04:58:22.6674216Z 
+2026-11-09T04:58:22.6674500Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T04:58:22.6675091Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T04:58:22.6675454Z 
+2026-11-09T04:58:22.6675608Z   git switch -c <new-branch-name>
+2026-11-09T04:58:22.6675851Z 
+2026-11-09T04:58:22.6676000Z Or undo this operation with:
+2026-11-09T04:58:22.6676220Z 
+2026-11-09T04:58:22.6676347Z   git switch -
+2026-11-09T04:58:22.6676546Z 
+2026-11-09T04:58:22.6676942Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T04:58:22.6681043Z 
+2026-11-09T04:58:22.6681563Z HEAD is now at f8864eb Merge 1fa3becd9b69e27c7a0229762750b6fa7e9497fc into 93e9d5e260cf899b9a40a188cfa34f069903489d
+2026-11-09T04:58:22.6710594Z ##[endgroup]
+2026-11-09T04:58:22.6762222Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T04:58:22.6794455Z f8864eb83055504ac445e07e8d94a0e8eabedee9
+2026-11-09T04:58:22.7220900Z Prepare all required actions
+2026-11-09T04:58:22.7221558Z Getting action download info
+2026-11-09T04:58:22.7984408Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-11-09T04:58:23.0021068Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T04:58:23.1441526Z Download action repository 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-11-09T04:58:23.2739738Z ##[group]Run ./.github/actions/pnpm-install
+2026-11-09T04:58:23.2740321Z env:
+2026-11-09T04:58:23.2740588Z   MIKKA_EDITION: cloud
+2026-11-09T04:58:23.2740824Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T04:58:23.2741082Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T04:58:23.2741330Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:23.2741586Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T04:58:23.2741907Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:23.2742280Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T04:58:23.2742680Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T04:58:23.2743296Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T04:58:23.2743595Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T04:58:23.2743825Z ##[endgroup]
+2026-11-09T04:58:23.2804444Z ##[start-action display=Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1;id=__self.__pnpm_action-setup]
+2026-11-09T04:58:23.2908552Z ##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+2026-11-09T04:58:23.2908953Z with:
+2026-11-09T04:58:23.2909135Z   version: 10.34.3
+2026-11-09T04:58:23.2909338Z   dest: ~/setup-pnpm
+2026-11-09T04:58:23.2909535Z   run_install: null
+2026-11-09T04:58:23.2909730Z   cache: false
+2026-11-09T04:58:23.2909938Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-09T04:58:23.2910424Z   package_json_file: package.json
+2026-11-09T04:58:23.2910687Z   standalone: false
+2026-11-09T04:58:23.2910876Z env:
+2026-11-09T04:58:23.2911049Z   MIKKA_EDITION: cloud
+2026-11-09T04:58:23.2911266Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T04:58:23.2911519Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T04:58:23.2911759Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:23.2912019Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T04:58:23.2912285Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:23.2912651Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T04:58:23.2913065Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T04:58:23.2913773Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T04:58:23.2914062Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T04:58:23.2914284Z ##[endgroup]
+2026-11-09T04:58:23.4573075Z ##[group]Running self-installer...
+2026-11-09T04:58:23.9341626Z (node:2175) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T04:58:23.9342828Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T04:58:24.0597718Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T04:58:24.0688063Z Packages: +1
+2026-11-09T04:58:24.0688558Z +
+2026-11-09T04:58:24.4985927Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-09T04:58:24.5291916Z 
+2026-11-09T04:58:24.5292426Z dependencies:
+2026-11-09T04:58:24.5292887Z + pnpm 10.34.3 (12.18.0 is available)
+2026-11-09T04:58:24.5293231Z 
+2026-11-09T04:58:24.5322132Z Done in 853ms
+2026-11-09T04:58:24.5534778Z ##[endgroup]
+2026-11-09T04:58:24.5535201Z Installation Completed!
+2026-11-09T04:58:24.5638989Z ##[end-action id=__self.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=1283]
+2026-11-09T04:58:24.5643720Z ##[start-action display=Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020;id=__self.__actions_setup-node]
+2026-11-09T04:58:24.5736602Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T04:58:24.5736969Z with:
+2026-11-09T04:58:24.5737148Z   node-version: 24
+2026-11-09T04:58:24.5737343Z   always-auth: false
+2026-11-09T04:58:24.5737549Z   check-latest: false
+2026-11-09T04:58:24.5739912Z   token: ***
+2026-11-09T04:58:24.5740374Z env:
+2026-11-09T04:58:24.5740574Z   MIKKA_EDITION: cloud
+2026-11-09T04:58:24.5740796Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T04:58:24.5741056Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T04:58:24.5741299Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:24.5741585Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T04:58:24.5741864Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:24.5742243Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T04:58:24.5742651Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T04:58:24.5743083Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T04:58:24.5743407Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T04:58:24.5743695Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T04:58:24.5743998Z ##[endgroup]
+2026-11-09T04:58:24.7258778Z (node:2191) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T04:58:24.7259523Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T04:58:24.7261749Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T04:58:24.7262563Z ##[group]Environment details
+2026-11-09T04:58:27.2034769Z node: v24.22.2
+2026-11-09T04:58:27.2035257Z npm: 11.19.1
+2026-11-09T04:58:27.2035650Z yarn: 1.22.22
+2026-11-09T04:58:27.2037037Z ##[endgroup]
+2026-11-09T04:58:27.2148811Z ##[end-action id=__self.__actions_setup-node;outcome=success;conclusion=success;duration_ms=2650]
+2026-11-09T04:58:27.2152054Z ##[start-action display=Run echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT";id=__self.store]
+2026-11-09T04:58:27.2224635Z ##[group]Run echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+2026-11-09T04:58:27.2225196Z [36;1mecho "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"[0m
+2026-11-09T04:58:27.2378442Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T04:58:27.2378835Z env:
+2026-11-09T04:58:27.2379042Z   MIKKA_EDITION: cloud
+2026-11-09T04:58:27.2379302Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T04:58:27.2379587Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T04:58:27.2379852Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:27.2380493Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T04:58:27.2380801Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:27.2381453Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T04:58:27.2381934Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T04:58:27.2382481Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T04:58:27.2382797Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T04:58:27.2383115Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T04:58:27.2383445Z ##[endgroup]
+2026-11-09T04:58:27.8977763Z ##[end-action id=__self.store;outcome=success;conclusion=success;duration_ms=682]
+2026-11-09T04:58:27.8983427Z ##[start-action display=Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830;id=__self.restore]
+2026-11-09T04:58:27.9660992Z ##[group]Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+2026-11-09T04:58:27.9661447Z with:
+2026-11-09T04:58:27.9661744Z   path: /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-09T04:58:27.9662386Z   key: pnpm-store-v1-Linux-X64-26887853ce3297e6708e0c03416269ff2ff7c9a97fdc1198bb5ec2d42546f1ee
+2026-11-09T04:58:27.9663003Z   restore-keys: pnpm-store-v1-Linux-X64-
+
+2026-11-09T04:58:27.9663338Z   enableCrossOsArchive: false
+2026-11-09T04:58:27.9663605Z   fail-on-cache-miss: false
+2026-11-09T04:58:27.9663834Z   lookup-only: false
+2026-11-09T04:58:27.9664032Z env:
+2026-11-09T04:58:27.9664201Z   MIKKA_EDITION: cloud
+2026-11-09T04:58:27.9664732Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T04:58:27.9665001Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T04:58:27.9665239Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:27.9665488Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T04:58:27.9665745Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:27.9666120Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T04:58:27.9666529Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T04:58:27.9667022Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T04:58:27.9667313Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T04:58:27.9667593Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T04:58:27.9667896Z ##[endgroup]
+2026-11-09T04:58:28.0789749Z (node:2254) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T04:58:28.0791588Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T04:58:28.1411241Z Cache hit for: pnpm-store-v1-Linux-X64-26887853ce3297e6708e0c03416269ff2ff7c9a97fdc1198bb5ec2d42546f1ee
+2026-11-09T04:58:28.1530534Z (node:2254) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T04:58:29.1972831Z Received 213909504 of 1283900859 (16.7%), 203.2 MBs/sec
+2026-11-09T04:58:30.2036559Z Received 457179136 of 1283900859 (35.6%), 216.8 MBs/sec
+2026-11-09T04:58:31.2109534Z Received 700448768 of 1283900859 (54.6%), 221.3 MBs/sec
+2026-11-09T04:58:32.2112811Z Received 939524096 of 1283900859 (73.2%), 222.9 MBs/sec
+2026-11-09T04:58:33.3132789Z Received 1207959552 of 1283900859 (94.1%), 225.0 MBs/sec
+2026-11-09T04:58:33.6483836Z Received 1283900859 of 1283900859 (100.0%), 224.4 MBs/sec
+2026-11-09T04:58:33.6486687Z Cache Size: ~1224 MB (1283900859 B)
+2026-11-09T04:58:33.6648174Z [command]/usr/bin/tar -xf /home/runner/work/_temp/f0264a40-5a3e-46e3-a33f-7b738ece115b/cache.tzst -P -C /home/runner/work/Mikka/Mikka --use-compress-program unzstd
+2026-11-09T04:58:48.2672494Z Cache restored successfully
+2026-11-09T04:58:48.5064679Z Cache restored from key: pnpm-store-v1-Linux-X64-26887853ce3297e6708e0c03416269ff2ff7c9a97fdc1198bb5ec2d42546f1ee
+2026-11-09T04:58:48.5230760Z ##[end-action id=__self.restore;outcome=success;conclusion=success;duration_ms=20624]
+2026-11-09T04:58:48.5234070Z ##[start-action display=Run pnpm install --frozen-lockfile;id=__self.__run]
+2026-11-09T04:58:48.5257454Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-09T04:58:48.5257850Z [36;1mpnpm install --frozen-lockfile[0m
+2026-11-09T04:58:48.5325801Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T04:58:48.5326176Z env:
+2026-11-09T04:58:48.5326377Z   MIKKA_EDITION: cloud
+2026-11-09T04:58:48.5326622Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T04:58:48.5326893Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T04:58:48.5327152Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:48.5327450Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T04:58:48.5327735Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T04:58:48.5328126Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T04:58:48.5328531Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T04:58:48.5329046Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T04:58:48.5329343Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T04:58:48.5329646Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T04:58:48.5329959Z ##[endgroup]
+2026-11-09T04:58:48.9227200Z Scope: all 7 workspace projects
+2026-11-09T04:58:49.0360364Z Lockfile is up to date, resolution step is skipped
+2026-11-09T04:58:49.1395392Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T04:58:49.3733322Z Packages: +2184
+2026-11-09T04:58:49.3734081Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-09T04:58:50.1475033Z Progress: resolved 2184, reused 535, downloaded 0, added 0
+2026-11-09T04:58:51.1502562Z Progress: resolved 2184, reused 1976, downloaded 0, added 0
+2026-11-09T04:58:52.1476377Z Progress: resolved 2184, reused 2108, downloaded 0, added 258
+2026-11-09T04:58:53.1482661Z Progress: resolved 2184, reused 2108, downloaded 0, added 524
+2026-11-09T04:58:54.1487998Z Progress: resolved 2184, reused 2108, downloaded 0, added 593
+2026-11-09T04:58:55.1490431Z Progress: resolved 2184, reused 2108, downloaded 0, added 902
+2026-11-09T04:58:56.1494013Z Progress: resolved 2184, reused 2108, downloaded 0, added 948
+2026-11-09T04:58:57.1501411Z Progress: resolved 2184, reused 2108, downloaded 0, added 1179
+2026-11-09T04:58:58.1512221Z Progress: resolved 2184, reused 2108, downloaded 0, added 1361
+2026-11-09T04:58:59.1515198Z Progress: resolved 2184, reused 2108, downloaded 0, added 1851
+2026-11-09T04:59:00.1514226Z Progress: resolved 2184, reused 2108, downloaded 0, added 2053
+2026-11-09T04:59:01.1324998Z Progress: resolved 2184, reused 2108, downloaded 0, added 2184, done
+2026-11-09T04:59:02.6758070Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-09T04:59:03.1251389Z 
+2026-11-09T04:59:03.1251911Z dependencies:
+2026-11-09T04:59:03.1252679Z + @ai-sdk/gateway 4.0.121
+2026-11-09T04:59:03.1253155Z + @ai-sdk/mcp 2.0.81
+2026-11-09T04:59:03.1253580Z + @ai-sdk/openai 4.0.99
+2026-11-09T04:59:03.1254095Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-09T04:59:03.1254545Z + @ai-sdk/react 4.0.152
+2026-11-09T04:59:03.1254937Z + @ai-sdk/workflow 2.0.80
+2026-11-09T04:59:03.1255417Z + @base-ui/react 1.9.0
+2026-11-09T04:59:03.1255811Z + @better-auth/core 1.7.12
+2026-11-09T04:59:03.1256237Z + @better-auth/expo 1.7.12
+2026-11-09T04:59:03.1256744Z + @better-auth/oauth-provider 1.7.12
+2026-11-09T04:59:03.1257206Z + @chat-adapter/slack 4.43.0
+2026-11-09T04:59:03.1257744Z + @chat-adapter/state-pg 4.43.0
+2026-11-09T04:59:03.1258439Z + @chat-adapter/telegram 4.43.0
+2026-11-09T04:59:03.1259088Z + @composio/core 0.26.0
+2026-11-09T04:59:03.1259700Z + @dnd-kit/core 6.3.1
+2026-11-09T04:59:03.1260702Z + @dnd-kit/sortable 10.0.0
+2026-11-09T04:59:03.1261366Z + @dnd-kit/utilities 3.2.2
+2026-11-09T04:59:03.1261905Z + @e965/xlsx 0.20.3
+2026-11-09T04:59:03.1262441Z + @floating-ui/dom 1.8.0
+2026-11-09T04:59:03.1263068Z + @formatjs/intl-localematcher 0.8.14
+2026-11-09T04:59:03.1263751Z + @heroui/react 3.2.6
+2026-11-09T04:59:03.1264338Z + @heroui/styles 3.2.6
+2026-11-09T04:59:03.1264910Z + @internationalized/date 3.12.4
+2026-11-09T04:59:03.1265613Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-09T04:59:03.1266585Z + @modelcontextprotocol/server 2.3.1
+2026-11-09T04:59:03.1266995Z + @norbert_bodziony/bloub 0.4.1
+2026-11-09T04:59:03.1267331Z + @novnc/novnc 1.6.0
+2026-11-09T04:59:03.1267637Z + @opentelemetry/api 1.10.0
+2026-11-09T04:59:03.1268008Z + @opentelemetry/api-logs 0.223.0
+2026-11-09T04:59:03.1268369Z + @opentelemetry/core 2.12.0
+2026-11-09T04:59:03.1268815Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-09T04:59:03.1269349Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-09T04:59:03.1269872Z + @opentelemetry/instrumentation 0.223.0
+2026-11-09T04:59:03.1270786Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-09T04:59:03.1271470Z + @opentelemetry/resources 2.12.0
+2026-11-09T04:59:03.1272060Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-09T04:59:03.1272397Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-09T04:59:03.1272970Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-09T04:59:03.1273341Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-09T04:59:03.1273662Z + @openuidev/lang-core 1.0.1
+2026-11-09T04:59:03.1274179Z + @openuidev/react-lang 1.0.1
+2026-11-09T04:59:03.1274580Z + @openuidev/react-ui 0.18.1
+2026-11-09T04:59:03.1275050Z + @pierre/diffs 1.6.4
+2026-11-09T04:59:03.1275463Z + @shadcn/react 0.3.1
+2026-11-09T04:59:03.1275794Z + @solidjs/web 2.0.0-rc.0
+2026-11-09T04:59:03.1276053Z + @stripe/stripe-js 10.1.0
+2026-11-09T04:59:03.1276860Z + @tanstack/react-virtual 3.14.18
+2026-11-09T04:59:03.1277403Z + @tiptap/core 3.32.0
+2026-11-09T04:59:03.1278064Z + @tiptap/extension-collaboration 3.32.0
+2026-11-09T04:59:03.1278777Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-09T04:59:03.1279462Z + @tiptap/extension-highlight 3.32.0
+2026-11-09T04:59:03.1280303Z + @tiptap/extension-list 3.32.0
+2026-11-09T04:59:03.1280870Z + @tiptap/extension-mention 3.32.0
+2026-11-09T04:59:03.1281431Z + @tiptap/extension-table 3.32.0
+2026-11-09T04:59:03.1281990Z + @tiptap/extension-text-align 3.32.0
+2026-11-09T04:59:03.1282530Z + @tiptap/extensions 3.32.0
+2026-11-09T04:59:03.1282978Z + @tiptap/pm 3.32.0
+2026-11-09T04:59:03.1283400Z + @tiptap/react 3.32.0
+2026-11-09T04:59:03.1283842Z + @tiptap/starter-kit 3.32.0
+2026-11-09T04:59:03.1284309Z + @tiptap/suggestion 3.32.0
+2026-11-09T04:59:03.1284797Z + @tiptap/y-tiptap 3.0.10
+2026-11-09T04:59:03.1285270Z + @vercel/analytics 1.3.1
+2026-11-09T04:59:03.1285754Z + @vercel/functions 3.10.2
+2026-11-09T04:59:03.1286211Z + @vercel/oidc 4.0.2
+2026-11-09T04:59:03.1286679Z + @workflow/serde 5.0.0
+2026-11-09T04:59:03.1287231Z + @workflow/world-local 5.1.2
+2026-11-09T04:59:03.1287676Z + ai 7.0.148
+2026-11-09T04:59:03.1288071Z + aws4fetch 1.0.20
+2026-11-09T04:59:03.1288496Z + beautiful-mermaid 1.1.3
+2026-11-09T04:59:03.1288945Z + better-auth 1.7.12
+2026-11-09T04:59:03.1289318Z + chat 4.43.0
+2026-11-09T04:59:03.1289778Z + class-variance-authority 0.7.1
+2026-11-09T04:59:03.1290582Z + clsx 2.1.1
+2026-11-09T04:59:03.1290911Z + cmdk 1.1.1
+2026-11-09T04:59:03.1291291Z + cn 0.5.0
+2026-11-09T04:59:03.1291614Z + cookie 1.1.1
+2026-11-09T04:59:03.1292039Z + date-fns 4.1.0
+2026-11-09T04:59:03.1292425Z + diff 8.0.2
+2026-11-09T04:59:03.1292793Z + dompurify 3.4.17
+2026-11-09T04:59:03.1293216Z + drizzle-orm 0.45.4
+2026-11-09T04:59:03.1293588Z + e2b 2.61.0
+2026-11-09T04:59:03.1294002Z + embla-carousel-react 8.5.1
+2026-11-09T04:59:03.1294427Z + fflate 0.8.3
+2026-11-09T04:59:03.1294802Z + ffmpeg-static 5.3.0
+2026-11-09T04:59:03.1295192Z + file-type 22.3.0
+2026-11-09T04:59:03.1295549Z + h3 2.0.8
+2026-11-09T04:59:03.1295866Z + hono 4.13.13
+2026-11-09T04:59:03.1296234Z + input-otp 1.4.1
+2026-11-09T04:59:03.1296595Z + katex 0.16.47
+2026-11-09T04:59:03.1296972Z + lucide-react 1.60.0
+2026-11-09T04:59:03.1297369Z + mcp-handler 2.3.0
+2026-11-09T04:59:03.1297726Z + mermaid 12.2.0
+2026-11-09T04:59:03.1298086Z + motion 14.5.0
+2026-11-09T04:59:03.1298499Z + music-metadata 12.3.4
+2026-11-09T04:59:03.1298915Z + negotiator 1.1.0
+2026-11-09T04:59:03.1299269Z + next 16.4.1
+2026-11-09T04:59:03.1299630Z + next-intl 4.14.9
+2026-11-09T04:59:03.1300021Z + next-themes 0.4.6
+2026-11-09T04:59:03.1300697Z + nodemailer 10.3.1
+2026-11-09T04:59:03.1301411Z + officeparser 8.5.0
+2026-11-09T04:59:03.1301814Z + pg 8.23.1
+2026-11-09T04:59:03.1302211Z + posthog-js 1.438.13
+2026-11-09T04:59:03.1302663Z + posthog-node 5.55.2
+2026-11-09T04:59:03.1303066Z + react 19.3.1
+2026-11-09T04:59:03.1303511Z + react-day-picker 9.8.0
+2026-11-09T04:59:03.1303974Z + react-dom 19.3.1
+2026-11-09T04:59:03.1304406Z + react-markdown 10.1.0
+2026-11-09T04:59:03.1304933Z + react-resizable-panels 4.14.7
+2026-11-09T04:59:03.1305524Z + react-syntax-highlighter 16.1.1
+2026-11-09T04:59:03.1306024Z + recharts 3.10.1
+2026-11-09T04:59:03.1306434Z + rehype-katex 7.0.1
+2026-11-09T04:59:03.1306864Z + remark-gfm 4.0.1
+2026-11-09T04:59:03.1307300Z + remark-math 6.0.0
+2026-11-09T04:59:03.1307685Z + shadcn 4.22.1
+2026-11-09T04:59:03.1307996Z + sharp 0.35.5
+2026-11-09T04:59:03.1308269Z + shiki 4.5.0
+2026-11-09T04:59:03.1308649Z + solid-js 2.0.0-rc.0
+2026-11-09T04:59:03.1309018Z + sonner 1.7.4
+2026-11-09T04:59:03.1309384Z + srvx 1.0.8
+2026-11-09T04:59:03.1309719Z + swr 2.5.1
+2026-11-09T04:59:03.1310329Z + tailwind-merge 3.7.0
+2026-11-09T04:59:03.1310775Z + tw-animate-css 1.4.0
+2026-11-09T04:59:03.1311217Z + undici 7.24.5
+2026-11-09T04:59:03.1311650Z + unstorage 2.0.0-beta.0
+2026-11-09T04:59:03.1312066Z + use-intl 4.14.9
+2026-11-09T04:59:03.1312451Z + vaul 1.1.2
+2026-11-09T04:59:03.1312748Z + workflow 5.2.3
+2026-11-09T04:59:03.1313423Z + y-protocols 1.0.7
+2026-11-09T04:59:03.1313855Z + yjs 13.6.33
+2026-11-09T04:59:03.1314200Z + zod 4.6.7
+2026-11-09T04:59:03.1314397Z 
+2026-11-09T04:59:03.1314569Z devDependencies:
+2026-11-09T04:59:03.1314950Z + @playwright/test 1.64.1
+2026-11-09T04:59:03.1315357Z + @tailwindcss/postcss 4.3.3
+2026-11-09T04:59:03.1315739Z + @types/node 25.9.9
+2026-11-09T04:59:03.1316164Z + @types/pg 8.23.1
+2026-11-09T04:59:03.1316542Z + @types/react 19.3.0
+2026-11-09T04:59:03.1316963Z + @types/react-dom 19.3.0
+2026-11-09T04:59:03.1317491Z + @types/react-syntax-highlighter 15.5.13
+2026-11-09T04:59:03.1318242Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-09T04:59:03.1318817Z + esbuild 0.28.2
+2026-11-09T04:59:03.1319217Z + fake-indexeddb 6.2.4
+2026-11-09T04:59:03.1319678Z + happy-dom 15.11.7
+2026-11-09T04:59:03.1320263Z + js-yaml 4.3.2
+2026-11-09T04:59:03.1320604Z + nitro 3.0.261103-rc
+2026-11-09T04:59:03.1321026Z + nx 24.0.5
+2026-11-09T04:59:03.1321377Z + oxlint 1.89.0
+2026-11-09T04:59:03.1321769Z + postcss 8.5.31
+2026-11-09T04:59:03.1322077Z + prettier 3.9.10
+2026-11-09T04:59:03.1322574Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-09T04:59:03.1323132Z + rolldown 1.3.0
+2026-11-09T04:59:03.1323556Z + tailwindcss 4.3.3
+2026-11-09T04:59:03.1323990Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-09T04:59:03.1324374Z + tsx 4.23.15
+2026-11-09T04:59:03.1324791Z + typescript 5.9.3
+2026-11-09T04:59:03.1325205Z + wrangler 4.152.0
+2026-11-09T04:59:03.1325428Z 
+2026-11-09T04:59:03.3967690Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-09T04:59:03.4953847Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T04:59:03.4954608Z │                                                                              │
+2026-11-09T04:59:03.4955395Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T04:59:03.4956284Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-09T04:59:03.4957100Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-09T04:59:03.4957913Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T04:59:03.4958676Z │   to run scripts.                                                            │
+2026-11-09T04:59:03.4959295Z │                                                                              │
+2026-11-09T04:59:03.4959945Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T04:59:03.5108500Z Done in 14.9s using pnpm v10.34.3
+2026-11-09T04:59:03.6062927Z ##[end-action id=__self.__run;outcome=success;conclusion=success;duration_ms=15082]
+2026-11-09T04:59:03.6065990Z ##[start-action display=Save the pnpm store (main only);id=__self.__actions_cache]
+2026-11-09T04:59:03.6076760Z ##[end-action id=__self.__actions_cache;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-09T04:59:03.6115770Z ##[group]Run pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
+2026-11-09T04:59:03.6117171Z [36;1mpnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"[0m
+2026-11-09T04:59:03.6183675Z shell: /usr/bin/bash -e {0}
+2026-11-09T04:59:03.6183943Z env:
+2026-11-09T04:59:03.6184154Z   MIKKA_EDITION: cloud
+2026-11-09T04:59:03.6184401Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T04:59:03.6184703Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T04:59:03.6184971Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T04:59:03.6185259Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T04:59:03.6185550Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T04:59:03.6185940Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T04:59:03.6186394Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T04:59:03.6187088Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T04:59:03.6187414Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T04:59:03.6187722Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T04:59:03.6188043Z ##[endgroup]
+2026-11-09T04:59:04.3274089Z 
+2026-11-09T04:59:04.3279245Z [1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/home/runner/work/Mikka/Mikka/packages/daemon[39m
+2026-11-09T04:59:04.3279988Z 
+2026-11-09T04:59:06.7039842Z  [32m✓[39m test/server-link-http.test.ts [2m([22m[2m40 tests[22m[2m)[22m[32m 228[2mms[22m[39m
+2026-11-09T04:59:07.8783109Z  [32m✓[39m test/commands-polling.test.ts [2m([22m[2m36 tests[22m[2m)[22m[32m 102[2mms[22m[39m
+2026-11-09T04:59:10.7072030Z Switched to a new branch 'mikka/issue-1'
+2026-11-09T04:59:10.7321621Z Switched to branch 'main'
+2026-11-09T04:59:10.7465662Z Cloning into bare repository '/tmp/orvd-DkkdrA/origin.git'...
+2026-11-09T04:59:10.7466291Z done.
+2026-11-09T04:59:13.6232153Z  [32m✓[39m test/agents.test.ts [2m([22m[2m46 tests[22m[2m)[22m[33m 8241[2mms[22m[39m
+2026-11-09T04:59:13.6233652Z    [32m✓[39m run context [2m(17)[22m
+2026-11-09T04:59:13.6235289Z      [33m[2m✓[22m[39m gives a Codex plan fixed repository observations without executing a process filter[33m 313[2mms[22m[39m
+2026-11-09T04:59:13.6237567Z      [33m[2m✓[22m[39m bounds committed change scope and refuses missing, non-commit or non-exact bases[33m 321[2mms[22m[39m
+2026-11-09T04:59:13.6239040Z    [32m✓[39m publish [2m(9)[22m
+2026-11-09T04:59:13.6241345Z      [32m✓[39m to the issue branch [2m(5)[22m
+2026-11-09T04:59:13.6254913Z        [33m[2m✓[22m[39m pushes each run's commit to the same branch, fast-forward[33m 407[2mms[22m[39m
+2026-11-09T04:59:14.6758959Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:14.6761489Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-09T04:59:14.8544708Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:14.9376376Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:14.9380949Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:15.0032721Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:15.0619544Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:15.1335718Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:15.2524422Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:15.4204957Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:15.5697603Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:15.7590751Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:15.9365692Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:16.1392659Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:16.3507310Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:16.4933954Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:16.5604106Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:16.7557779Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:16.9846696Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:17.2720326Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:17.3392387Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:17.3953662Z (node:4866) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:17.4007750Z  [32m✓[39m test/anonymous-claude-spare.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 2813[2mms[22m[39m
+2026-11-09T04:59:17.4011005Z    [33m[2m✓[22m[39m the actual hosted runner adopts one bootstrap process with diagnostics=true and no credential RPC[33m 327[2mms[22m[39m
+2026-11-09T04:59:21.7121586Z  [32m✓[39m test/subscription-question-resume.test.ts [2m([22m[2m46 tests[22m[2m)[22m[33m 12729[2mms[22m[39m
+2026-11-09T04:59:21.7124262Z    [33m[2m✓[22m[39m codex: required subscription answer resumes original native history and session[33m 408[2mms[22m[39m
+2026-11-09T04:59:21.7126316Z    [33m[2m✓[22m[39m codex: daemon supervisor delivers a required question answer to the original subscription session[33m 790[2mms[22m[39m
+2026-11-09T04:59:21.7128442Z    [33m[2m✓[22m[39m claude_code: daemon supervisor delivers a required question answer to the original subscription session[33m 786[2mms[22m[39m
+2026-11-09T04:59:21.7130871Z    [33m[2m✓[22m[39m codex: a real legacy submitted journal accepts an explicitly retained fixture worktree without rewriting history[33m 898[2mms[22m[39m
+2026-11-09T04:59:21.7133065Z    [33m[2m✓[22m[39m codex: explicit recovery of an accepted failed continuation preserves exact SID and scope: latest-history[33m 343[2mms[22m[39m
+2026-11-09T04:59:21.7135341Z    [33m[2m✓[22m[39m codex: explicit recovery of an accepted failed continuation preserves exact SID and scope: missing-latest-history[33m 347[2mms[22m[39m
+2026-11-09T04:59:22.7297883Z  [32m✓[39m src/tracing.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 318[2mms[22m[39m
+2026-11-09T04:59:25.4645918Z  [32m✓[39m test/subscription-worker-client.test.ts [2m([22m[2m23 tests[22m[2m)[22m[33m 2311[2mms[22m[39m
+2026-11-09T04:59:25.4648078Z    [33m[2m✓[22m[39m cancelling during preparation cannot start inference afterward[33m 756[2mms[22m[39m
+2026-11-09T04:59:26.7183599Z (node:8235) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:26.7185991Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-09T04:59:26.8194305Z (node:8235) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:26.9462097Z (node:8235) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:30.8299127Z  [32m✓[39m test/subscription-hosted-runner.test.ts [2m([22m[2m45 tests[22m[2m)[22m[33m 4294[2mms[22m[39m
+2026-11-09T04:59:33.7844013Z  [32m✓[39m test/mcp-http-observation.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 2184[2mms[22m[39m
+2026-11-09T04:59:35.9906867Z  [32m✓[39m test/runs.test.ts [2m([22m[2m56 tests[22m[2m)[22m[33m 29506[2mms[22m[39m
+2026-11-09T04:59:35.9908260Z    [32m✓[39m mock runs [2m(24)[22m
+2026-11-09T04:59:35.9915699Z      [33m[2m✓[22m[39m executes a read-only hosted delivery without desktop authority (late registration: false)[33m 616[2mms[22m[39m
+2026-11-09T04:59:35.9917900Z      [33m[2m✓[22m[39m executes a read-only hosted delivery without desktop authority (late registration: true)[33m 325[2mms[22m[39m
+2026-11-09T04:59:35.9931302Z      [33m[2m✓[22m[39m checks a hosted delivery snapshot during review without interactive computer authority[33m 539[2mms[22m[39m
+2026-11-09T04:59:35.9933684Z      [33m[2m✓[22m[39m checks a hosted delivery snapshot during verify without interactive computer authority[33m 534[2mms[22m[39m
+2026-11-09T04:59:35.9935735Z      [33m[2m✓[22m[39m records the actual fixed snapshot of an unsubmitted review without inventing a verdict (dirty: false)[33m 427[2mms[22m[39m
+2026-11-09T04:59:35.9937904Z      [33m[2m✓[22m[39m records the actual fixed snapshot of an unsubmitted review without inventing a verdict (dirty: true)[33m 485[2mms[22m[39m
+2026-11-09T04:59:35.9943337Z      [33m[2m✓[22m[39m retains actual no-repository delivery files for an independent fixed-snapshot check[33m 431[2mms[22m[39m
+2026-11-09T04:59:35.9945421Z      [33m[2m✓[22m[39m keeps criterion commands and preview branch through daemon reporting without trusting the agent verify[33m 528[2mms[22m[39m
+2026-11-09T04:59:35.9947541Z      [33m[2m✓[22m[39m starts from the issue branch only when the trusted push policy permits it[33m 1550[2mms[22m[39m
+2026-11-09T04:59:35.9949228Z      [33m[2m✓[22m[39m runs a fixture in its own worktree, writes the file change and ends in review[33m 524[2mms[22m[39m
+2026-11-09T04:59:35.9951358Z      [33m[2m✓[22m[39m masks injected secrets (raw + base64, split across deltas) before upload; env vars and unlisted names are left[33m 478[2mms[22m[39m
+2026-11-09T04:59:35.9953196Z      [33m[2m✓[22m[39m accepts an approved repository URL delivered at claim without registering a checkout[33m 576[2mms[22m[39m
+2026-11-09T04:59:35.9954943Z      [33m[2m✓[22m[39m checks the fixed candidate in its cache after the remote default branch advances[33m 559[2mms[22m[39m
+2026-11-09T04:59:35.9956522Z      [33m[2m✓[22m[39m runs approved setup from the cache without copying a user checkout file[33m 2280[2mms[22m[39m
+2026-11-09T04:59:35.9957962Z      [33m[2m✓[22m[39m loses no chunks while the server is unreachable[33m 1252[2mms[22m[39m
+2026-11-09T04:59:35.9959221Z      [33m[2m✓[22m[39m resumes an active run after the daemon restarts[33m 1333[2mms[22m[39m
+2026-11-09T04:59:35.9960575Z      [33m[2m✓[22m[39m cancels a running session[33m 342[2mms[22m[39m
+2026-11-09T04:59:35.9961909Z      [33m[2m✓[22m[39m removes the worktree and branch of a cancelled run that changed nothing[33m 352[2mms[22m[39m
+2026-11-09T04:59:35.9963765Z    [32m✓[39m plan runs [2m(1)[22m
+2026-11-09T04:59:35.9964862Z      [33m[2m✓[22m[39m leaves a spec card and a split card, and changes no file[33m 319[2mms[22m[39m
+2026-11-09T04:59:35.9965886Z    [32m✓[39m follow-up runs [2m(8)[22m
+2026-11-09T04:59:35.9967009Z      [33m[2m✓[22m[39m continues the earlier session with only the follow-up[33m 1406[2mms[22m[39m
+2026-11-09T04:59:35.9968867Z      [33m[2m✓[22m[39m retains a continued delivery at its actual content commit while preserving the original diff baseline[33m 833[2mms[22m[39m
+2026-11-09T04:59:35.9971375Z      [33m[2m✓[22m[39m Factory external blockers retain their empty worktree for a later exact-session answer[33m 306[2mms[22m[39m
+2026-11-09T04:59:35.9973263Z      [33m[2m✓[22m[39m required question continuation rejects a mock harness even with its exact earlier session[33m 439[2mms[22m[39m
+2026-11-09T04:59:35.9975102Z      [33m[2m✓[22m[39m required question continuation cannot use a missing worktree to start a fresh mock session[33m 489[2mms[22m[39m
+2026-11-09T04:59:35.9976991Z      [33m[2m✓[22m[39m required question continuation rejects an unknown mock session before adapter fallback[33m 509[2mms[22m[39m
+2026-11-09T04:59:35.9978653Z      [33m[2m✓[22m[39m starts a new session with the full brief in a fresh worktree[33m 1010[2mms[22m[39m
+2026-11-09T04:59:35.9979973Z      [33m[2m✓[22m[39m starts a new session when the earlier one is gone[33m 933[2mms[22m[39m
+2026-11-09T04:59:35.9982907Z    [32m✓[39m run stops [2m(22)[22m
+2026-11-09T04:59:35.9984232Z      [33m[2m✓[22m[39m retains a clean repository-selection handoff only when it ended blocked (blocked)[33m 432[2mms[22m[39m
+2026-11-09T04:59:35.9986013Z      [33m[2m✓[22m[39m retains a clean repository-selection handoff only when it ended blocked (cancelled)[33m 530[2mms[22m[39m
+2026-11-09T04:59:35.9987662Z      [33m[2m✓[22m[39m preserves a blocked question's empty worktree durably until explicit cancellation[33m 381[2mms[22m[39m
+2026-11-09T04:59:35.9989157Z      [33m[2m✓[22m[39m turn-ended ends stopped with stop reason turn_ended and a next owner[33m 340[2mms[22m[39m
+2026-11-09T04:59:35.9991117Z      [33m[2m✓[22m[39m crash ends failed with stop reason error and a next owner[33m 443[2mms[22m[39m
+2026-11-09T04:59:35.9992463Z      [33m[2m✓[22m[39m failure ends failed with stop reason error and a next owner[33m 407[2mms[22m[39m
+2026-11-09T04:59:35.9994028Z      [33m[2m✓[22m[39m quota ends stopped with stop reason blocked and a next owner[33m 408[2mms[22m[39m
+2026-11-09T04:59:35.9995442Z      [33m[2m✓[22m[39m verify-fails ends failed with stop reason submitted and a next owner[33m 408[2mms[22m[39m
+2026-11-09T04:59:35.9996805Z      [33m[2m✓[22m[39m verify-fails: the submission is kept but verify failed[33m 398[2mms[22m[39m
+2026-11-09T04:59:35.9998046Z      [33m[2m✓[22m[39m asks: the question reaches the server in the report[33m 318[2mms[22m[39m
+2026-11-09T04:59:35.9999317Z      [33m[2m✓[22m[39m stall: the watchdog stops a run with no progress as timeout[33m 687[2mms[22m[39m
+2026-11-09T04:59:36.0001480Z      [33m[2m✓[22m[39m lease: a run whose lease cannot be renewed stops as device_lost[33m 426[2mms[22m[39m
+2026-11-09T04:59:36.0002361Z      [33m[2m✓[22m[39m lease: a run the server took back stops at the next heartbeat[33m 375[2mms[22m[39m
+2026-11-09T04:59:36.0003193Z      [33m[2m✓[22m[39m lease: the retry works on in the lost attempt's worktree[33m 766[2mms[22m[39m
+2026-11-09T04:59:36.0003963Z      [33m[2m✓[22m[39m checkpoint: another machine takes over from the saved work[33m 746[2mms[22m[39m
+2026-11-09T04:59:36.0004687Z      [33m[2m✓[22m[39m hands an issue to a human after the retry cap[33m 1219[2mms[22m[39m
+2026-11-09T04:59:36.5493278Z  [32m✓[39m src/quota/quota.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 81[2mms[22m[39m
+2026-11-09T04:59:39.9971198Z  [32m✓[39m test/repositories.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 5165[2mms[22m[39m
+2026-11-09T04:59:39.9972281Z    [32m✓[39m daemon-owned clone cache [2m(14)[22m
+2026-11-09T04:59:39.9973664Z      [33m[2m✓[22m[39m shallow-clones a fresh machine without losing current files or alternate branches[33m 797[2mms[22m[39m
+2026-11-09T04:59:39.9974989Z      [33m[2m✓[22m[39m prepares and adds worktrees for concurrent runs of one cache without a config lock failure[33m 748[2mms[22m[39m
+2026-11-09T04:59:39.9976475Z      [33m[2m✓[22m[39m serializes concurrent clones, follows origin default branch, and only fetches its cache[33m 675[2mms[22m[39m
+2026-11-09T04:59:39.9977269Z      [32m✓[39m an empty remote (no commit, no branch) [2m(2)[22m
+2026-11-09T04:59:39.9978171Z        [33m[2m✓[22m[39m starts from an empty initial commit on the base branch, pushed without force, and pushes the task branch on top[33m 746[2mms[22m[39m
+2026-11-09T04:59:39.9979234Z        [33m[2m✓[22m[39m a run that may not push works from a local empty commit and leaves the remote untouched[33m 404[2mms[22m[39m
+2026-11-09T04:59:39.9981223Z      [33m[2m✓[22m[39m a real daemon claims a URL-only assignment without registering any repository[33m 512[2mms[22m[39m
+2026-11-09T04:59:41.5651794Z  [32m✓[39m test/initial-run-hint.test.ts [2m([22m[2m27 tests[22m[2m)[22m[33m 3944[2mms[22m[39m
+2026-11-09T04:59:41.5653641Z    [33m[2m✓[22m[39m a real FIFO locator cannot block the optional hint before fstat[33m 812[2mms[22m[39m
+2026-11-09T04:59:41.5661886Z    [33m[2m✓[22m[39m uses the same first-pass RPCs and preserves complete setup/copyFiles (hint=false)[33m 315[2mms[22m[39m
+2026-11-09T04:59:41.5663906Z    [33m[2m✓[22m[39m deduplicates the locator and a concurrent queued command while repository settings are pending[33m 607[2mms[22m[39m
+2026-11-09T04:59:42.8618584Z  [32m✓[39m test/device-gateway-reliability.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 119[2mms[22m[39m
+2026-11-09T04:59:43.4852958Z  [32m✓[39m src/codex-generation-telemetry.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 301[2mms[22m[39m
+2026-11-09T04:59:44.0304503Z  [32m✓[39m src/task-secret-bridge.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 239[2mms[22m[39m
+2026-11-09T04:59:44.1075493Z  [32m✓[39m test/github-runtime.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 3163[2mms[22m[39m
+2026-11-09T04:59:44.1079315Z    [33m[2m✓[22m[39m exchanges fresh credentials through the sandbox HTTP proxy in real helper children[33m 557[2mms[22m[39m
+2026-11-09T04:59:44.1081862Z    [33m[2m✓[22m[39m accepts only an already committed and pushed HEAD with passing PR checks; it never commits or pushes[33m 1573[2mms[22m[39m
+2026-11-09T04:59:45.5401598Z  [32m✓[39m test/mikka-mcp-backend.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 844[2mms[22m[39m
+2026-11-09T04:59:45.8049436Z  [32m✓[39m test/adapters.test.ts [2m([22m[2m39 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m[33m 27417[2mms[22m[39m
+2026-11-09T04:59:45.8051141Z    [32m✓[39m claude_code adapter [2m(3)[22m
+2026-11-09T04:59:45.8052995Z      [33m[2m✓[22m[39m hands in through the MCP tool, then the daemon verifies, commits and pushes[33m 675[2mms[22m[39m
+2026-11-09T04:59:45.8054958Z      [33m[2m✓[22m[39m ends as turn_ended, with nothing committed, when the agent never hands in[33m 432[2mms[22m[39m
+2026-11-09T04:59:45.8066648Z      [33m[2m✓[22m[39m starts the CLI with the model the assignment named, and with none when it named none[33m 728[2mms[22m[39m
+2026-11-09T04:59:45.8085621Z    [32m✓[39m codex adapter [2m(3)[22m
+2026-11-09T04:59:45.8087144Z      [33m[2m✓[22m[39m hands in through the MCP tool, then the daemon verifies, commits and pushes[33m 701[2mms[22m[39m
+2026-11-09T04:59:45.8089386Z      [33m[2m✓[22m[39m ends as turn_ended, with nothing committed, when the agent never hands in[33m 446[2mms[22m[39m
+2026-11-09T04:59:45.8091727Z      [33m[2m✓[22m[39m starts the CLI with the model the assignment named, and with none when it named none[33m 987[2mms[22m[39m
+2026-11-09T04:59:45.8093059Z    [32m✓[39m cursor adapter [2m(3)[22m
+2026-11-09T04:59:45.8094443Z      [33m[2m✓[22m[39m hands in through the MCP tool, then the daemon verifies, commits and pushes[33m 864[2mms[22m[39m
+2026-11-09T04:59:45.8096247Z      [33m[2m✓[22m[39m ends as turn_ended, with nothing committed, when the agent never hands in[33m 502[2mms[22m[39m
+2026-11-09T04:59:45.8098213Z      [33m[2m✓[22m[39m starts the CLI with the model the assignment named, and with none when it named none[33m 1018[2mms[22m[39m
+2026-11-09T04:59:45.8099622Z    [32m✓[39m the issue branch [2m(4)[22m
+2026-11-09T04:59:45.8101501Z      [33m[2m✓[22m[39m hands in unverified changes for a draft PR without inventing a verify pass[33m 676[2mms[22m[39m
+2026-11-09T04:59:45.8103411Z      [33m[2m✓[22m[39m builds on the remote branch, keeping a person's commit, and pushes there[33m 895[2mms[22m[39m
+2026-11-09T04:59:45.8105298Z      [33m[2m✓[22m[39m starts from the base branch when the issue branch cannot be fetched[33m 760[2mms[22m[39m
+2026-11-09T04:59:45.8107264Z      [33m[2m✓[22m[39m continues an existing issue branch when push approval comes only from claim policy[33m 1405[2mms[22m[39m
+2026-11-09T04:59:45.8108928Z    [32m✓[39m workspace agent policy (ADR 0028) [2m(2)[22m
+2026-11-09T04:59:45.8110663Z      [33m[2m✓[22m[39m keeps a verified run local when the workspace turned pushes off[33m 656[2mms[22m[39m
+2026-11-09T04:59:45.8112418Z      [33m[2m✓[22m[39m commits and pushes nothing for a read-only check (ADR 0046)[33m 590[2mms[22m[39m
+2026-11-09T04:59:45.8116570Z    [32m✓[39m verify [2m(1)[22m
+2026-11-09T04:59:45.8117731Z      [33m[2m✓[22m[39m fails a hand-in, and commits nothing, when verify changes the worktree[33m 612[2mms[22m[39m
+2026-11-09T04:59:45.8118797Z    [32m✓[39m interjections and cancel [2m(5)[22m
+2026-11-09T04:59:45.8120005Z      [33m[2m✓[22m[39m claude: a message during the turn reaches the CLI and can lead to a hand-in[33m 697[2mms[22m[39m
+2026-11-09T04:59:45.8121505Z      [33m[2m✓[22m[39m claude: a hand-in read before the last turn ends keeps that turn's last words[33m 734[2mms[22m[39m
+2026-11-09T04:59:45.8122648Z      [33m[2m✓[22m[39m codex: a message during the turn is a turn/steer[33m 707[2mms[22m[39m
+2026-11-09T04:59:45.8123428Z      [33m[2m✓[22m[39m claude_code: cancel stops the CLI and ends the run as cancelled[33m 512[2mms[22m[39m
+2026-11-09T04:59:45.8124379Z      [33m[2m✓[22m[39m cursor: cancel stops the CLI and ends the run as cancelled[33m 717[2mms[22m[39m
+2026-11-09T04:59:45.8124963Z    [32m✓[39m claude_code follow-up run [2m(4)[22m
+2026-11-09T04:59:45.8125564Z      [33m[2m✓[22m[39m continues the earlier session with only the follow-up[33m 779[2mms[22m[39m
+2026-11-09T04:59:45.8126344Z      [33m[2m✓[22m[39m starts a new session with the brief when the earlier one is gone[33m 780[2mms[22m[39m
+2026-11-09T04:59:45.8127232Z      [33m[2m✓[22m[39m question continuation refuses a missing original session without a fresh prompt[33m 699[2mms[22m[39m
+2026-11-09T04:59:45.8128105Z      [33m[2m✓[22m[39m question continuation resumes the exact original session[33m 780[2mms[22m[39m
+2026-11-09T04:59:45.8128661Z    [32m✓[39m codex follow-up run [2m(4)[22m
+2026-11-09T04:59:45.8129244Z      [33m[2m✓[22m[39m continues the earlier session with only the follow-up[33m 729[2mms[22m[39m
+2026-11-09T04:59:45.8130053Z      [33m[2m✓[22m[39m starts a new session with the brief when the earlier one is gone[33m 821[2mms[22m[39m
+2026-11-09T04:59:45.8132618Z      [33m[2m✓[22m[39m question continuation refuses a missing original session without a fresh prompt[33m 734[2mms[22m[39m
+2026-11-09T04:59:45.8133528Z      [33m[2m✓[22m[39m question continuation resumes the exact original session[33m 694[2mms[22m[39m
+2026-11-09T04:59:45.8134109Z    [32m✓[39m cursor follow-up run [2m(4)[22m
+2026-11-09T04:59:45.8134708Z      [33m[2m✓[22m[39m continues the earlier session with only the follow-up[33m 1128[2mms[22m[39m
+2026-11-09T04:59:45.8135522Z      [33m[2m✓[22m[39m starts a new session with the brief when the earlier one is gone[33m 1137[2mms[22m[39m
+2026-11-09T04:59:45.8136114Z    [32m✓[39m resume after a daemon restart [2m(5)[22m
+2026-11-09T04:59:45.8136841Z      [33m[2m✓[22m[39m claude_code: uncertain question delivery fails closed without another CLI turn[33m 497[2mms[22m[39m
+2026-11-09T04:59:45.8137781Z      [33m[2m✓[22m[39m codex: uncertain question delivery fails closed without another CLI turn[33m 587[2mms[22m[39m
+2026-11-09T04:59:45.8138588Z      [33m[2m✓[22m[39m claude_code: the next daemon reopens the same session[33m 785[2mms[22m[39m
+2026-11-09T04:59:45.8139293Z      [33m[2m✓[22m[39m cursor: the next daemon reopens the same session[33m 1047[2mms[22m[39m
+2026-11-09T04:59:45.8140536Z      [33m[2m✓[22m[39m ends at once, without the CLI, when the agent handed in before the restart[33m 761[2mms[22m[39m
+2026-11-09T04:59:46.9782832Z  [32m✓[39m test/auto-update.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+2026-11-09T04:59:47.0592654Z  [32m✓[39m test/skill-mounts.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 2168[2mms[22m[39m
+2026-11-09T04:59:48.8094562Z  [32m✓[39m test/captures.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 765[2mms[22m[39m
+2026-11-09T04:59:48.8095623Z    [32m✓[39m a run's captures [2m(1)[22m
+2026-11-09T04:59:48.8096572Z      [33m[2m✓[22m[39m go up to that run before it reports its end[33m 389[2mms[22m[39m
+2026-11-09T04:59:50.2056420Z  [32m✓[39m test/codex-subscription.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 2280[2mms[22m[39m
+2026-11-09T04:59:51.2661084Z  [32m✓[39m test/policy-repository.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 1761[2mms[22m[39m
+2026-11-09T04:59:52.7256129Z  [32m✓[39m test/anonymous-codex-spare.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 766[2mms[22m[39m
+2026-11-09T04:59:54.1485471Z  [32m✓[39m test/cloud-model-preload.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 534[2mms[22m[39m
+2026-11-09T04:59:56.4292829Z  [32m✓[39m test/local-github.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1582[2mms[22m[39m
+2026-11-09T04:59:56.4294163Z    [33m[2m✓[22m[39m prepares a private native login once and gives every harness only local Git/gh credential reads[33m 614[2mms[22m[39m
+2026-11-09T04:59:57.7883314Z  [32m✓[39m test/provider-failure-runs.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 6700[2mms[22m[39m
+2026-11-09T04:59:57.7885217Z    [33m[2m✓[22m[39m reports balance separately and keeps even an empty worktree for continuation[33m 334[2mms[22m[39m
+2026-11-09T04:59:57.7886983Z    [33m[2m✓[22m[39m does not infer provider failure from ordinary error text or agent reports[33m 368[2mms[22m[39m
+2026-11-09T04:59:57.7888627Z    [33m[2m✓[22m[39m does not infer provider failure from ordinary error text or agent reports[33m 328[2mms[22m[39m
+2026-11-09T04:59:57.7890565Z    [33m[2m✓[22m[39m does not infer provider failure from ordinary error text or agent reports[33m 343[2mms[22m[39m
+2026-11-09T04:59:57.7891858Z    [33m[2m✓[22m[39m keeps cancellation authoritative over a provider event[33m 339[2mms[22m[39m
+2026-11-09T04:59:57.7892834Z    [33m[2m✓[22m[39m marks a failed final upload unavailable and continues only with the retained original worktree[33m 533[2mms[22m[39m
+2026-11-09T04:59:57.7893782Z    [33m[2m✓[22m[39m waits for an in-flight heartbeat before saving the final tree[33m 301[2mms[22m[39m
+2026-11-09T04:59:57.7895597Z    [33m[2m✓[22m[39m keeps repeated cancellation authoritative while the provider_failure checkpoint is uploading[33m 328[2mms[22m[39m
+2026-11-09T04:59:57.7897633Z    [33m[2m✓[22m[39m keeps repeated cancellation authoritative while the quota_exhausted checkpoint is uploading[33m 340[2mms[22m[39m
+2026-11-09T04:59:57.7899498Z    [33m[2m✓[22m[39m records an accepted oversize marker as unavailable instead of recoverable[33m 1424[2mms[22m[39m
+2026-11-09T04:59:58.8288507Z (node:16780) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:58.8290567Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-09T04:59:58.9978275Z (node:16780) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:59.1347252Z  [32m✓[39m test/hardening.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 1885[2mms[22m[39m
+2026-11-09T04:59:59.1348364Z    [32m✓[39m verify is the daemon's, never the agent's [2m(2)[22m
+2026-11-09T04:59:59.1358372Z      [33m[2m✓[22m[39m ignores a self-reported verify; an unverified submit does not succeed[33m 331[2mms[22m[39m
+2026-11-09T04:59:59.1360826Z      [33m[2m✓[22m[39m keeps a forged verify untrusted even when an approved push hands work in for a draft[33m 451[2mms[22m[39m
+2026-11-09T04:59:59.1362283Z    [32m✓[39m data dir lock [2m(3)[22m
+2026-11-09T04:59:59.1363541Z      [33m[2m✓[22m[39m takes over at once from a crashed holder, refuses a live one[33m 541[2mms[22m[39m
+2026-11-09T04:59:59.1691044Z (node:16780) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:59.3574112Z (node:16780) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:59.4561708Z (node:16780) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:59.6006890Z (node:16780) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:59.7324365Z (node:16780) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T04:59:59.8565015Z (node:16780) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:00.0886244Z  [32m✓[39m test/prewarm-preparation.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 1470[2mms[22m[39m
+2026-11-09T05:00:01.1637186Z  [32m✓[39m test/mailbox-preparation.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 1306[2mms[22m[39m
+2026-11-09T05:00:01.1638280Z    [33m[2m✓[22m[39m overlaps the enabled mailbox with clone and joins both when repository finishes first[33m 335[2mms[22m[39m
+2026-11-09T05:00:02.4805416Z  [32m✓[39m test/task-secret-child.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 665[2mms[22m[39m
+2026-11-09T05:00:02.4807724Z    [33m[2m✓[22m[39m a real supervisor child uses renewed opaque grants while native credentials and both journal generations stay protected[33m 449[2mms[22m[39m
+2026-11-09T05:00:03.9761273Z  [32m✓[39m test/git-prepared-token.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 3382[2mms[22m[39m
+2026-11-09T05:00:03.9763285Z    [33m[2m✓[22m[39m uses the already prepared claim token with real Git and preserves caller configuration (parameters=false)[33m 653[2mms[22m[39m
+2026-11-09T05:00:03.9765458Z    [33m[2m✓[22m[39m uses the already prepared claim token with real Git and preserves caller configuration (parameters=true)[33m 641[2mms[22m[39m
+2026-11-09T05:00:03.9767272Z    [33m[2m✓[22m[39m keeps the existing GitHub host credential scope and excludes other hosts[33m 511[2mms[22m[39m
+2026-11-09T05:00:03.9768679Z    [33m[2m✓[22m[39m never forwards the prepared Authorization to a redirect on another host[33m 872[2mms[22m[39m
+2026-11-09T05:00:03.9771190Z    [33m[2m✓[22m[39m preserves normal same-host repository rename redirects with standard Git credentials[33m 418[2mms[22m[39m
+2026-11-09T05:00:05.2050724Z  [32m✓[39m test/model-probe.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 1850[2mms[22m[39m
+2026-11-09T05:00:05.2051424Z    [32m✓[39m probing a CLI [2m(6)[22m
+2026-11-09T05:00:05.2052196Z      [33m[2m✓[22m[39m hands the answer back only once the CLI has exited, so its home is never removed under it[33m 546[2mms[22m[39m
+2026-11-09T05:00:05.2053119Z      [33m[2m✓[22m[39m a CLI that never answers gives no report after the timeout[33m 507[2mms[22m[39m
+2026-11-09T05:00:05.2053683Z    [32m✓[39m the device report [2m(2)[22m
+2026-11-09T05:00:05.2054405Z      [33m[2m✓[22m[39m carries each CLI's models and default to the server, and 重新检测 asks the CLIs again[33m 608[2mms[22m[39m
+2026-11-09T05:00:05.9815602Z  [2m[90m↓[39m[22m test/real-agents.test.ts [2m([22m[2m0 test[22m[2m)[22m
+2026-11-09T05:00:06.7168747Z  [32m✓[39m test/subscription-preflight.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 1905[2mms[22m[39m
+2026-11-09T05:00:06.7169940Z    [32m✓[39m subscription startup preflight [2m(9)[22m
+2026-11-09T05:00:06.7171507Z      [33m[2m✓[22m[39m keeps a safe coded failure for a nonzero exit or timeout and removes the probe home[33m 1050[2mms[22m[39m
+2026-11-09T05:00:06.7172534Z    [32m✓[39m daemon subscription capability [2m(3)[22m
+2026-11-09T05:00:06.7173564Z      [33m[2m✓[22m[39m redetect withdraws a formerly healthy broker and clears the failure after recovery[33m 306[2mms[22m[39m
+2026-11-09T05:00:06.8415888Z  [32m✓[39m src/permissions.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+2026-11-09T05:00:07.3031438Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.3034188Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-09T05:00:07.3989728Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.4332442Z  [32m✓[39m src/run-runtime-timing.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+2026-11-09T05:00:07.4962296Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.5384625Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.5838527Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.6282923Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.6787931Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.7320629Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.7749420Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.8247849Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.8719691Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.9159799Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:07.9614215Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:08.0432758Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:08.0480955Z (node:18006) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:08.0504594Z  [32m✓[39m test/claude-prewarm.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 814[2mms[22m[39m
+2026-11-09T05:00:09.2148605Z  [32m✓[39m test/policy-distribution.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 294[2mms[22m[39m
+2026-11-09T05:00:09.7792678Z  [32m✓[39m test/hosted-cli-prefetch.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 243[2mms[22m[39m
+2026-11-09T05:00:11.5602430Z  [32m✓[39m test/anonymous-codex-hosted.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1062[2mms[22m[39m
+2026-11-09T05:00:12.7316392Z  [32m✓[39m test/mikka-mcp-bridge.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 4538[2mms[22m[39m
+2026-11-09T05:00:12.7323785Z    [33m[2m✓[22m[39m keeps a blocking Git handler outside the daemon loop and kills its owned process group[33m 3105[2mms[22m[39m
+2026-11-09T05:00:14.4915399Z  [32m✓[39m test/project-decisions.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 1279[2mms[22m[39m
+2026-11-09T05:00:15.4683790Z  [32m✓[39m test/terminal-checkpoint.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 3197[2mms[22m[39m
+2026-11-09T05:00:15.6499535Z  [32m✓[39m test/run-control-monitor.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+2026-11-09T05:00:17.0935278Z  [32m✓[39m test/publication-cancel.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1931[2mms[22m[39m
+2026-11-09T05:00:17.0937651Z    [33m[2m✓[22m[39m keeps a late pushed stop authoritative while the successful receipt waits for captures[33m 325[2mms[22m[39m
+2026-11-09T05:00:17.4068158Z  [32m✓[39m src/secret-mask.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 98[2mms[22m[39m
+2026-11-09T05:00:19.3028026Z  [32m✓[39m test/commands.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 2761[2mms[22m[39m
+2026-11-09T05:00:19.3029168Z    [33m[2m✓[22m[39m uninstall waits for active threads, persists and sends its receipt, removes the service and credentials, then exits[33m 400[2mms[22m[39m
+2026-11-09T05:00:19.3029931Z    [32m✓[39m run commands [2m(6)[22m
+2026-11-09T05:00:19.3030928Z      [33m[2m✓[22m[39m hands a person's message to the running agent and acks it once[33m 412[2mms[22m[39m
+2026-11-09T05:00:19.3031738Z      [33m[2m✓[22m[39m cancels the run when a person stops it, and closes its message[33m 596[2mms[22m[39m
+2026-11-09T05:00:19.3032530Z      [33m[2m✓[22m[39m keeps taking messages for other runs while one is being stopped[33m 402[2mms[22m[39m
+2026-11-09T05:00:19.3033435Z      [33m[2m✓[22m[39m ignores commands for runs it does not have, and keeps polling after a network cut[33m 505[2mms[22m[39m
+2026-11-09T05:00:19.7962631Z  [32m✓[39m src/official-cli-timing.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+2026-11-09T05:00:20.3917750Z  [32m✓[39m test/provider-failure-adapters.test.ts [2m([22m[2m25 tests[22m[2m)[22m[33m 2198[2mms[22m[39m
+2026-11-09T05:00:20.8790014Z  [32m✓[39m src/harness-install.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 294[2mms[22m[39m
+2026-11-09T05:00:21.0593454Z  [32m✓[39m test/local-git-origin.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 581[2mms[22m[39m
+2026-11-09T05:00:21.0607468Z    [33m[2m✓[22m[39m prepared native GitHub keeps the owned fixture origin and reads the prepared login through the synthetic CLI[33m 342[2mms[22m[39m
+2026-11-09T05:00:21.3454917Z  [32m✓[39m src/mcp-http-timing.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+2026-11-09T05:00:21.4566590Z  [32m✓[39m test/subscription-native-broker.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 87[2mms[22m[39m
+2026-11-09T05:00:22.0421782Z  [32m✓[39m test/candidate-bootstrap.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+2026-11-09T05:00:22.2618112Z (node:20091) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:22.2619991Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-09T05:00:22.3152052Z (node:20091) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:22.3782940Z (node:20091) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:22.5094296Z (node:20091) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:22.5812951Z (node:20091) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:22.6468068Z (node:20091) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:22.7137559Z (node:20091) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:22.7702849Z (node:20091) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:22.8222184Z (node:20091) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+2026-11-09T05:00:22.8286666Z  [32m✓[39m test/claude-prewarm-adapter.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 669[2mms[22m[39m
+2026-11-09T05:00:23.4591994Z  [32m✓[39m src/subscription-local-runner.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 583[2mms[22m[39m
+2026-11-09T05:00:23.7689128Z  [32m✓[39m test/codex-startup-config.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 696[2mms[22m[39m
+2026-11-09T05:00:24.1005263Z warning: remote HEAD refers to nonexistent ref, unable to checkout
+2026-11-09T05:00:24.2771915Z warning: remote HEAD refers to nonexistent ref, unable to checkout
+2026-11-09T05:00:25.6599041Z  [32m✓[39m test/worktrees.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 1648[2mms[22m[39m
+2026-11-09T05:00:25.6601923Z    [32m✓[39m discarding an empty run [2m(5)[22m
+2026-11-09T05:00:25.6610862Z      [33m[2m✓[22m[39m skips a run whose branch is already gone instead of failing[33m 301[2mms[22m[39m
+2026-11-09T05:00:26.2923447Z  [32m✓[39m test/tool-approval-liveness.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1935[2mms[22m[39m
+2026-11-09T05:00:26.2925276Z    [33m[2m✓[22m[39m ends a running run through an existing stop command without querying remote tool authority[33m 402[2mms[22m[39m
+2026-11-09T05:00:26.2926882Z    [33m[2m✓[22m[39m records heartbeat lease revocation before the native Claude process exits 143[33m 346[2mms[22m[39m
+2026-11-09T05:00:26.2927896Z    [33m[2m✓[22m[39m keeps an unclassified SIGTERM 143 as error instead of inventing lease revocation[33m 400[2mms[22m[39m
+2026-11-09T05:00:26.2928797Z    [33m[2m✓[22m[39m keeps execution independent of an unavailable legacy liveness route[33m 487[2mms[22m[39m
+2026-11-09T05:00:26.8222124Z  [32m✓[39m src/tracing-sampling.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 71[2mms[22m[39m
+2026-11-09T05:00:27.1822225Z  [32m✓[39m test/github-receipt-concurrency.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+2026-11-09T05:00:27.7282857Z  [32m✓[39m test/cloud-model-probe-bundle.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1931[2mms[22m[39m
+2026-11-09T05:00:27.7287721Z    [33m[2m✓[22m[39m only the actual notice-capable worker builder emits its release capability[33m 783[2mms[22m[39m
+2026-11-09T05:00:27.7289566Z    [33m[2m✓[22m[39m rejects a malformed supplied worker identity without publishing a capability[33m 415[2mms[22m[39m
+2026-11-09T05:00:28.3973691Z  [32m✓[39m src/run-isolation.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 239[2mms[22m[39m
+2026-11-09T05:00:29.1095396Z  [32m✓[39m test/run-model-credential.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 510[2mms[22m[39m
+2026-11-09T05:00:29.1096352Z    [33m[2m✓[22m[39m hands the key to the run's Agent in memory and never writes it to the journal[33m 404[2mms[22m[39m
+2026-11-09T05:00:29.9123076Z  [32m✓[39m test/provider-failure.test.ts [2m([22m[2m52 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-11-09T05:00:30.6497895Z  [32m✓[39m test/tool-approval-codex.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 1579[2mms[22m[39m
+2026-11-09T05:00:32.3608113Z  [32m✓[39m test/fs-polling.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1541[2mms[22m[39m
+2026-11-09T05:00:32.3609722Z    [33m[2m✓[22m[39m a started daemon never polls for folder requests: the app adds repositories by path[33m 1514[2mms[22m[39m
+2026-11-09T05:00:32.5189206Z  [32m✓[39m src/subscription-worker-timing.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-11-09T05:00:33.9422909Z  [32m✓[39m src/runs/supervisor.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 829[2mms[22m[39m
+2026-11-09T05:00:34.1271759Z  [32m✓[39m src/adapters/generation-metrics.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-11-09T05:00:34.9782915Z  [32m✓[39m test/cloud-bootstrap.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 65[2mms[22m[39m
+2026-11-09T05:00:35.3483569Z  [32m✓[39m test/prewarm-timing.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+2026-11-09T05:00:36.1449342Z  [32m✓[39m src/coordinator/codex.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 212[2mms[22m[39m
+2026-11-09T05:00:36.9878106Z  [32m✓[39m test/hosted-cli-prefetch-lifecycle.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+2026-11-09T05:00:37.5432718Z  [32m✓[39m src/outbox.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 80[2mms[22m[39m
+2026-11-09T05:00:37.6195979Z  [32m✓[39m test/cli-startup-login.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 6158[2mms[22m[39m
+2026-11-09T05:00:37.6198196Z    [33m[2m✓[22m[39m does not report success when a live holder never opens its RPC socket[33m 6013[2mms[22m[39m
+2026-11-09T05:00:37.9279636Z  [32m✓[39m src/hosted-binaries.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+2026-11-09T05:00:38.4338506Z  [32m✓[39m test/mailbox-catalogue.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 87[2mms[22m[39m
+2026-11-09T05:00:38.6885868Z  [32m✓[39m test/subscription.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 358[2mms[22m[39m
+2026-11-09T05:00:40.0248918Z  [32m✓[39m test/run-diagnostics.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 915[2mms[22m[39m
+2026-11-09T05:00:40.2793788Z  [32m✓[39m src/computer/credential-executor.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-11-09T05:00:40.4459356Z  [32m✓[39m test/service.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+2026-11-09T05:00:40.9161351Z  [32m✓[39m test/factory-check.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1361[2mms[22m[39m
+2026-11-09T05:00:40.9163406Z    [33m[2m✓[22m[39m checks real SHA, blocks dirty/head replacement, and produces actual command/exit evidence across fresh mock sessions[33m 1359[2mms[22m[39m
+2026-11-09T05:00:41.0619434Z  [32m✓[39m test/subscription-access-ready.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-11-09T05:00:41.5282818Z  [32m✓[39m src/computer/web-review-push.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 939[2mms[22m[39m
+2026-11-09T05:00:41.5284113Z    [32m✓[39m web computer review sync [2m(4)[22m
+2026-11-09T05:00:41.5285763Z      [33m[2m✓[22m[39m with push, a pending review is synced when it appears and then only for presence, not on every check[33m 335[2mms[22m[39m
+2026-11-09T05:00:41.5287755Z      [33m[2m✓[22m[39m with push, a person's decision is applied on the push at once; a lost push still lands at the presence refresh[33m 349[2mms[22m[39m
+2026-11-09T05:00:41.5448179Z  [32m✓[39m test/subscription-credentials.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+2026-11-09T05:00:42.9379932Z  [32m✓[39m src/coordinator/runner.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 254[2mms[22m[39m
+2026-11-09T05:00:43.1014225Z  [32m✓[39m src/runs/quota-exhausted.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-11-09T05:00:43.2841933Z  [32m✓[39m test/codex-mcp-context.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1298[2mms[22m[39m
+2026-11-09T05:00:43.2844138Z    [33m[2m✓[22m[39m uses the exact stdio catalogue and supports legal child restart until cleanup[33m 319[2mms[22m[39m
+2026-11-09T05:00:43.2845860Z    [33m[2m✓[22m[39m resolves the late entry beside the real stdio assets after bundling[33m 928[2mms[22m[39m
+2026-11-09T05:00:43.8341410Z  [32m✓[39m test/verify.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 92[2mms[22m[39m
+2026-11-09T05:00:44.3555919Z  [32m✓[39m src/coordinator/claude.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 494[2mms[22m[39m
+2026-11-09T05:00:44.6087916Z  [32m✓[39m test/credential-journal.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 129[2mms[22m[39m
+2026-11-09T05:00:44.8347789Z  [32m✓[39m src/coordinator/contract.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+2026-11-09T05:00:45.7760852Z  [32m✓[39m test/rpc.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 124[2mms[22m[39m
+2026-11-09T05:00:46.2063689Z Preparing worktree (detached HEAD a4f6209)
+2026-11-09T05:00:46.2603160Z Preparing worktree (detached HEAD a4f6209)
+2026-11-09T05:00:46.3078304Z Preparing worktree (detached HEAD a4f6209)
+2026-11-09T05:00:46.3959394Z Preparing worktree (detached HEAD a4f6209)
+2026-11-09T05:00:46.4512750Z Preparing worktree (detached HEAD a4f6209)
+2026-11-09T05:00:47.6008867Z Preparing worktree (detached HEAD e843565)
+2026-11-09T05:00:47.6545197Z Preparing worktree (detached HEAD e843565)
+2026-11-09T05:00:47.6734082Z  [32m✓[39m test/checkpoint-recovery.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1510[2mms[22m[39m
+2026-11-09T05:00:47.6735227Z    [33m[2m✓[22m[39m an actual patch over eight MiB produces a small explicit unavailable snapshot[33m 1134[2mms[22m[39m
+2026-11-09T05:00:47.8065642Z  [32m✓[39m test/hosted-command.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 2663[2mms[22m[39m
+2026-11-09T05:00:47.8067480Z    [33m[2m✓[22m[39m a verification timeout also terminates shell descendants and remains distinct from cancellation[33m 1510[2mms[22m[39m
+2026-11-09T05:00:47.8069241Z    [33m[2m✓[22m[39m does not accept a live child as a stopped verification process[33m 1043[2mms[22m[39m
+2026-11-09T05:00:48.3857137Z  [32m✓[39m test/repository-git-timing.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 226[2mms[22m[39m
+2026-11-09T05:00:49.2144561Z  [32m✓[39m test/claude-generation-abort.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 628[2mms[22m[39m
+2026-11-09T05:00:49.5781463Z  [32m✓[39m test/codex-generation-completion.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 515[2mms[22m[39m
+2026-11-09T05:00:50.3981730Z  [32m✓[39m test/codex-generation-wiring.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 151[2mms[22m[39m
+2026-11-09T05:00:50.4804633Z  [32m✓[39m test/adapter-runtime-model.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 438[2mms[22m[39m
+2026-11-09T05:00:50.6393831Z  [32m✓[39m test/machine-github.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+2026-11-09T05:00:51.0021330Z  [32m✓[39m src/env.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 110[2mms[22m[39m
+2026-11-09T05:00:51.5012371Z  [32m✓[39m test/computer-review-lifecycle.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 155[2mms[22m[39m
+2026-11-09T05:00:51.9102197Z  [32m✓[39m test/cloud-registration.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-11-09T05:00:51.9252134Z  [32m✓[39m test/cloud-anonymous-hint.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+2026-11-09T05:00:52.7095232Z  [32m✓[39m src/coordinator/tool-result-wait.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-11-09T05:00:52.9861676Z  [32m✓[39m test/subscription-launcher.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 256[2mms[22m[39m
+2026-11-09T05:00:53.2907620Z  [32m✓[39m test/skills.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 135[2mms[22m[39m
+2026-11-09T05:00:53.6498088Z  [32m✓[39m src/agents/run-credential.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2026-11-09T05:00:57.2979514Z  [32m✓[39m test/claude-subscription.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 70759[2mms[22m[39m
+2026-11-09T05:00:57.2982171Z    [33m[2m✓[22m[39m the installed official CLI acknowledges an exact SDK user frame without starting a model turn[33m 686[2mms[22m[39m
+2026-11-09T05:00:57.2984693Z    [33m[2m✓[22m[39m bounds hung CLI initialization and closes its process without delivering a prompt[33m 30072[2mms[22m[39m
+2026-11-09T05:00:57.2986791Z    [33m[2m✓[22m[39m keeps the provider/source guard after delayed initialization: fixture-delayed-gateway[33m 12101[2mms[22m[39m
+2026-11-09T05:00:57.2988990Z    [33m[2m✓[22m[39m keeps the provider/source guard after delayed initialization: fixture-delayed-paid[33m 12108[2mms[22m[39m
+2026-11-09T05:00:57.2991323Z    [33m[2m✓[22m[39m keeps the provider/source guard after delayed initialization: fixture-delayed-unknown[33m 12110[2mms[22m[39m
+2026-11-09T05:00:57.2993303Z    [33m[2m✓[22m[39m ends at access expiry without independent refresh or a paid fallback[33m 1534[2mms[22m[39m
+2026-11-09T05:00:58.2361427Z  [32m✓[39m test/chat-files.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 3670[2mms[22m[39m
+2026-11-09T05:00:58.2363615Z    [33m[2m✓[22m[39m the real daemon materializes initial and live-input files before handing their paths to the harness[33m 3665[2mms[22m[39m
+2026-11-09T05:00:58.6768387Z  [32m✓[39m test/fs-browse.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 100[2mms[22m[39m
+2026-11-09T05:00:59.4589504Z  [32m✓[39m test/mailbox-notices.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+2026-11-09T05:01:00.1217718Z  [32m✓[39m test/quota-exhausted-runs.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1663[2mms[22m[39m
+2026-11-09T05:01:00.1219860Z    [33m[2m✓[22m[39m a subscription run reports quota_exhausted with the CLI's reset and keeps its worktree[33m 422[2mms[22m[39m
+2026-11-09T05:01:00.1222260Z    [33m[2m✓[22m[39m an API-key run's rate limit is an ordinary error, not quota_exhausted[33m 441[2mms[22m[39m
+2026-11-09T05:01:00.1223776Z    [33m[2m✓[22m[39m other failures keep their stop reason[33m 799[2mms[22m[39m
+2026-11-09T05:01:01.5961784Z  [32m✓[39m test/claude-resume.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 389[2mms[22m[39m
+2026-11-09T05:01:02.7852177Z  [32m✓[39m test/quota.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 85[2mms[22m[39m
+2026-11-09T05:01:03.0360024Z  [32m✓[39m src/agents/chat-files.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+2026-11-09T05:01:03.3106030Z  [32m✓[39m src/harnesses.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-11-09T05:01:04.2235587Z  [32m✓[39m src/agents/run-apps.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-11-09T05:01:04.7691172Z  [32m✓[39m test/dispatch-link.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+2026-11-09T05:01:05.2913273Z  [32m✓[39m test/repository-cancel.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 65[2mms[22m[39m
+2026-11-09T05:01:05.4417987Z  [32m✓[39m src/task-env.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-11-09T05:01:05.9934721Z  [32m✓[39m test/kill.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 6028[2mms[22m[39m
+2026-11-09T05:01:05.9968007Z    [32m✓[39m daemon crash and resume [2m(1)[22m
+2026-11-09T05:01:06.0011335Z      [33m[2m✓[22m[39m resumes a run after SIGKILL[33m 6026[2mms[22m[39m
+2026-11-09T05:01:06.4796142Z  [32m✓[39m test/tool-approval-claude.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 194[2mms[22m[39m
+2026-11-09T05:01:06.5847046Z  [32m✓[39m test/verify-artifacts.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 265[2mms[22m[39m
+2026-11-09T05:01:06.9236043Z  [32m✓[39m test/native-companion.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 161[2mms[22m[39m
+2026-11-09T05:01:07.0811804Z  [32m✓[39m test/subscription-quota.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-11-09T05:01:07.2739345Z  [32m✓[39m src/agents/tool-approval.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-11-09T05:01:07.5283516Z [90mstdout[2m | test/retain-resources.test.ts[2m > [22m[2mretained acceptance worktrees survive explicit removal, pruning and empty-run discard
+2026-11-09T05:01:07.5285728Z [22m[39mRetained acceptance fixture: /tmp/mikka-retained-worktree-8hcdyc
+2026-11-09T05:01:07.5286668Z 
+2026-11-09T05:01:07.5306163Z  [32m✓[39m test/retain-resources.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-11-09T05:01:07.6879708Z  [32m✓[39m test/tool-approval-admission.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 119[2mms[22m[39m
+2026-11-09T05:01:07.8765920Z  [32m✓[39m src/log.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-11-09T05:01:08.1932288Z  [32m✓[39m test/registration-login.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+2026-11-09T05:01:08.8612016Z  [32m✓[39m test/claude-chunks.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+2026-11-09T05:01:09.0617298Z  [32m✓[39m src/computer/transport.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-11-09T05:01:09.2966701Z  [32m✓[39m test/device-file.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-11-09T05:01:11.7966136Z  [32m✓[39m test/chat-files-http.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 18281[2mms[22m[39m
+2026-11-09T05:01:11.7968110Z    [33m[2m✓[22m[39m large file downloads use the private storage capability without forwarding the device credential[33m 18275[2mms[22m[39m
+2026-11-09T05:01:11.8017488Z 
+2026-11-09T05:01:11.8024090Z [2m Test Files [22m [1m[32m138 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (139)[39m
+2026-11-09T05:01:11.8033611Z [2m      Tests [22m [1m[32m1572 passed[39m[22m[2m | [22m[33m2 skipped[39m[90m (1574)[39m
+2026-11-09T05:01:11.8034822Z [2m   Start at [22m 04:59:04
+2026-11-09T05:01:11.8042116Z [2m   Duration [22m 127.46s[2m (tests 80%, import 19%, transform 1%)[22m
+2026-11-09T05:01:11.8059330Z 
+2026-11-09T05:01:11.8176914Z JSON report written to /home/runner/work/_temp/pr13-daemon-unit-results.json
+2026-11-09T05:01:12.0418346Z ##[group]Run pnpm --filter @mikka/daemon test:mailbox-cli
+2026-11-09T05:01:12.0418808Z [36;1mpnpm --filter @mikka/daemon test:mailbox-cli[0m
+2026-11-09T05:01:12.0482409Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:01:12.0482658Z env:
+2026-11-09T05:01:12.0482853Z   MIKKA_EDITION: cloud
+2026-11-09T05:01:12.0483092Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T05:01:12.0483358Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T05:01:12.0483626Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:12.0483891Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T05:01:12.0484170Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:12.0484554Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T05:01:12.0484965Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T05:01:12.0485476Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T05:01:12.0485771Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T05:01:12.0486095Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T05:01:12.0486401Z ##[endgroup]
+2026-11-09T05:01:12.4379586Z 
+2026-11-09T05:01:12.4380648Z > @mikka/daemon@0.0.1 test:mailbox-cli /home/runner/work/Mikka/Mikka/packages/daemon
+2026-11-09T05:01:12.4381663Z > node --import tsx --test --test-timeout=60000 test/run-mailbox.node-test.ts test/codex-mailbox-resume.node-test.ts
+2026-11-09T05:01:12.4382182Z 
+2026-11-09T05:01:13.9322102Z ✔ Codex mailbox continues the original history in a new run and restarts with only the current transport (338.007078ms)
+2026-11-09T05:01:14.1391085Z ✔ Codex 0.166.0 records its actual version and resumes the same mailbox thread with the current transport (214.496954ms)
+2026-11-09T05:01:14.2602383Z ▶ Codex mailbox resume rejects unverified cross-version history before thread/resume or a native turn
+2026-11-09T05:01:14.2603243Z   ✔ 0.163.0 to 0.166.0 (119.933069ms)
+2026-11-09T05:01:14.3766126Z   ✔ 0.166.0 to 0.163.0 (116.2409ms)
+2026-11-09T05:01:14.3768198Z ✔ Codex mailbox resume rejects unverified cross-version history before thread/resume or a native turn (237.309412ms)
+2026-11-09T05:01:14.4362485Z ▶ Codex mailbox resume rejects missing or changed capability evidence before any native turn
+2026-11-09T05:01:14.4364029Z   ✔ missing-receipt (58.520023ms)
+2026-11-09T05:01:14.4949566Z   ✔ catalogue (60.02868ms)
+2026-11-09T05:01:14.5629511Z   ✔ header-catalogue (66.571812ms)
+2026-11-09T05:01:14.6234954Z   ✔ header-schema (61.37685ms)
+2026-11-09T05:01:14.6951734Z   ✔ header-session (69.610683ms)
+2026-11-09T05:01:14.7549656Z   ✔ missing-history (60.520417ms)
+2026-11-09T05:01:14.8146671Z   ✔ receipt-path (60.190619ms)
+2026-11-09T05:01:14.8759262Z   ✔ receipt-run (59.71649ms)
+2026-11-09T05:01:14.9323143Z   ✔ receipt-session (57.331863ms)
+2026-11-09T05:01:14.9978826Z   ✔ receipt-version (66.182198ms)
+2026-11-09T05:01:15.0626517Z   ✔ history-link (63.327835ms)
+2026-11-09T05:01:15.0642223Z ✔ Codex mailbox resume rejects missing or changed capability evidence before any native turn (685.816899ms)
+2026-11-09T05:01:15.1821339Z ▶ Codex mailbox resume never substitutes a new thread after native refusal or a changed SID
+2026-11-09T05:01:15.1822592Z   ✔ refuseResume (116.765288ms)
+2026-11-09T05:01:15.2956323Z   ✔ differentThread (113.687ms)
+2026-11-09T05:01:15.2958138Z ✔ Codex mailbox resume never substitutes a new thread after native refusal or a changed SID (231.153463ms)
+2026-11-09T05:01:15.4094588Z ✔ a previous-turn callback during native resume cannot use the current run mailbox (116.148579ms)
+2026-11-09T05:01:15.4688531Z ✔ missing native resume evidence does not prevent an otherwise supported fresh mailbox thread (57.740392ms)
+2026-11-09T05:01:15.6355700Z ✔ an unverified native release keeps fresh-thread behavior but cannot resume a mailbox thread (176.906776ms)
+2026-11-09T05:01:15.6649838Z ✔ claim parser preserves only an explicit transport capability and uses the configured MCP endpoint (27.37848ms)
+2026-11-09T05:01:15.6651937Z ✔ actual Supervisor wires the callback and clears custody after stop (56.165673ms)
+2026-11-09T05:01:15.6653905Z ✔ actual Supervisor wires the callback and clears custody after lease-expiry (35.402942ms)
+2026-11-09T05:01:15.6655387Z ✔ actual Supervisor wires the callback and clears custody after default-off (14.406901ms)
+2026-11-09T05:01:15.6656845Z ✔ actual Supervisor wires the callback and clears custody after close-failure (22.127203ms)
+2026-11-09T05:01:15.6658288Z ✔ Supervisor handshake handoff stop closes once without starting a CLI (5.237934ms)
+2026-11-09T05:01:15.6660421Z ✔ Supervisor handshake handoff lease-expiry closes once without starting a CLI (2.417628ms)
+2026-11-09T05:01:15.6661920Z ✔ Supervisor handshake handoff shutdown closes once without starting a CLI (2.293327ms)
+2026-11-09T05:01:15.6663422Z ✔ explicit mailbox close removes its run abort listener without retaining authority (1.47311ms)
+2026-11-09T05:01:15.6664995Z ✔ capability defaults off and arbitrary host/path/credentials never receive a request (1.596019ms)
+2026-11-09T05:01:15.6666955Z ✔ Supervisor admission requires held nonterminal run and a present fresh lease, including the terminal-before-close window (0.480013ms)
+2026-11-09T05:01:15.6668833Z ✔ actual configured HTTP link pins the optional host adapter to its own Mikka endpoint (1.261086ms)
+2026-11-09T05:01:15.6671044Z ✔ claude_code actual fake CLI consumes the run-bound MCP config, strict schemas and shared peer transport (272.010937ms)
+2026-11-09T05:01:15.6672922Z ✔ codex actual fake CLI consumes the run-bound MCP config, strict schemas and shared peer transport (232.258924ms)
+2026-11-09T05:01:15.6674989Z ✔ cancel, revoked bearer and malformed/oversized responses fail closed; uncertain send uses original key without auto-replay (6.947414ms)
+2026-11-09T05:01:15.6676838Z ✔ claude_code actual fake CLI and host catalogue preserve a frozen one-tool subset (227.926958ms)
+2026-11-09T05:01:15.6678329Z ✔ codex actual fake CLI and host catalogue preserve a frozen one-tool subset (294.596112ms)
+2026-11-09T05:01:15.6679780Z ✔ claude_code fake CLI has no mailbox configuration or advertised tools by default (290.959358ms)
+2026-11-09T05:01:15.6681382Z ✔ codex fake CLI has no mailbox configuration or advertised tools by default (275.063933ms)
+2026-11-09T05:01:15.6683141Z ✔ hosted source preserves original socket mounts/network isolation and passes host callbacks only through existing adapters (0.781393ms)
+2026-11-09T05:01:15.6684889Z ✔ stop aborts a genuinely pending host request and prevents another request during CLI grace (2.111458ms)
+2026-11-09T05:01:15.6686445Z ✔ Codex mailbox history without a host receipt fails closed regardless of the reported version (4.838211ms)
+2026-11-09T05:01:15.6687316Z ℹ tests 45
+2026-11-09T05:01:15.6687669Z ℹ suites 0
+2026-11-09T05:01:15.6688010Z ℹ pass 45
+2026-11-09T05:01:15.6688351Z ℹ fail 0
+2026-11-09T05:01:15.6688703Z ℹ cancelled 0
+2026-11-09T05:01:15.6689071Z ℹ skipped 0
+2026-11-09T05:01:15.6689421Z ℹ todo 0
+2026-11-09T05:01:15.6689824Z ℹ duration_ms 3192.735893
+2026-11-09T05:01:15.6897631Z ##[group]Run pnpm --filter @mikka/daemon test:repository-identity
+2026-11-09T05:01:15.6898167Z [36;1mpnpm --filter @mikka/daemon test:repository-identity[0m
+2026-11-09T05:01:15.6898589Z [36;1mpnpm --filter @mikka/daemon test:github-credentials[0m
+2026-11-09T05:01:15.6898981Z [36;1mpnpm --filter @mikka/daemon test:trusted-endpoint[0m
+2026-11-09T05:01:15.6963652Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:01:15.6963905Z env:
+2026-11-09T05:01:15.6964091Z   MIKKA_EDITION: cloud
+2026-11-09T05:01:15.6964345Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T05:01:15.6964605Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T05:01:15.6964859Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:15.6965125Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T05:01:15.6965399Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:15.6965767Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T05:01:15.6966174Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T05:01:15.6966696Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T05:01:15.6966997Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T05:01:15.6967289Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T05:01:15.6967596Z ##[endgroup]
+2026-11-09T05:01:16.0876977Z 
+2026-11-09T05:01:16.0878056Z > @mikka/daemon@0.0.1 test:repository-identity /home/runner/work/Mikka/Mikka/packages/daemon
+2026-11-09T05:01:16.0879139Z > node --experimental-strip-types --test test/repository-identity-pure.node-test.ts
+2026-11-09T05:01:16.0879949Z 
+2026-11-09T05:01:16.2446805Z ✔ GitHub aliases share a v2 identity and legacy bindings are refused (2.070332ms)
+2026-11-09T05:01:16.2448218Z ✔ non-GitHub endpoints retain routing distinctions (0.782896ms)
+2026-11-09T05:01:16.2449405Z ✔ unsupported transports and unsafe test-mode use are rejected (0.544313ms)
+2026-11-09T05:01:16.2451523Z ✔ local test mode enables the daemon test switch only on loopback *_e2e databases (the rule: scripts/test-accounts/local-test-mode.test.mjs) (0.530016ms)
+2026-11-09T05:01:16.2580621Z ℹ tests 4
+2026-11-09T05:01:16.2581190Z ℹ suites 0
+2026-11-09T05:01:16.2589294Z ℹ pass 4
+2026-11-09T05:01:16.2590336Z ℹ fail 0
+2026-11-09T05:01:16.2591143Z ℹ cancelled 0
+2026-11-09T05:01:16.2591888Z ℹ skipped 0
+2026-11-09T05:01:16.2592676Z ℹ todo 0
+2026-11-09T05:01:16.2593439Z ℹ duration_ms 134.334999
+2026-11-09T05:01:16.6697886Z 
+2026-11-09T05:01:16.6698770Z > @mikka/daemon@0.0.1 test:github-credentials /home/runner/work/Mikka/Mikka/packages/daemon
+2026-11-09T05:01:16.6699432Z > node --test test/github-credentials.node-test.mjs
+2026-11-09T05:01:16.6699727Z 
+2026-11-09T05:01:16.7665601Z ✔ git supplies the owner's credential to any HTTPS github.com repository, and to no other host (1.975685ms)
+2026-11-09T05:01:16.7928643Z ✔ cache refreshes after fifty minutes and retains a private file outside the checkout (29.713575ms)
+2026-11-09T05:01:16.7961184Z ✔ a failed refresh never reuses the expired token or discloses a response body (1.378344ms)
+2026-11-09T05:01:16.7963684Z ✔ CI watch renews its token before expiry and preserves native gh watch flags (1.127027ms)
+2026-11-09T05:01:16.7969659Z ✔ failed, pending and malformed CLI invocation exits are never converted to success (0.352355ms)
+2026-11-09T05:01:16.7973200Z ✔ normal gh commands run once without watch timers (0.222194ms)
+2026-11-09T05:01:16.8011321Z ✔ a refused exchange names the reason in English and Chinese, from known codes only (5.062185ms)
+2026-11-09T05:01:16.8119840Z ℹ tests 7
+2026-11-09T05:01:16.8120912Z ℹ suites 0
+2026-11-09T05:01:16.8121333Z ℹ pass 7
+2026-11-09T05:01:16.8121872Z ℹ fail 0
+2026-11-09T05:01:16.8122252Z ℹ cancelled 0
+2026-11-09T05:01:16.8122629Z ℹ skipped 0
+2026-11-09T05:01:16.8122981Z ℹ todo 0
+2026-11-09T05:01:16.8123399Z ℹ duration_ms 107.936712
+2026-11-09T05:01:17.2086768Z 
+2026-11-09T05:01:17.2087824Z > @mikka/daemon@0.0.1 test:trusted-endpoint /home/runner/work/Mikka/Mikka/packages/daemon
+2026-11-09T05:01:17.2089135Z > node --experimental-strip-types --test test/trusted-endpoint.node-test.ts
+2026-11-09T05:01:17.2090515Z 
+2026-11-09T05:01:17.3468197Z ✔ https is trusted on any host (0.977147ms)
+2026-11-09T05:01:17.3471681Z ✔ http is trusted only on loopback (0.243724ms)
+2026-11-09T05:01:17.3472792Z ✔ credentials, query and fragment are refused (0.239495ms)
+2026-11-09T05:01:17.3490942Z ✔ other protocols are refused (0.251187ms)
+2026-11-09T05:01:17.3623837Z ℹ tests 4
+2026-11-09T05:01:17.3624636Z ℹ suites 0
+2026-11-09T05:01:17.3625554Z ℹ pass 4
+2026-11-09T05:01:17.3626417Z ℹ fail 0
+2026-11-09T05:01:17.3628457Z ℹ cancelled 0
+2026-11-09T05:01:17.3629131Z ℹ skipped 0
+2026-11-09T05:01:17.3629678Z ℹ todo 0
+2026-11-09T05:01:17.3630559Z ℹ duration_ms 118.459806
+2026-11-09T05:01:17.3875789Z ##[group]Run pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs
+2026-11-09T05:01:17.3877154Z [36;1mpnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs[0m
+2026-11-09T05:01:17.3942315Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:01:17.3942568Z env:
+2026-11-09T05:01:17.3942773Z   MIKKA_EDITION: cloud
+2026-11-09T05:01:17.3943007Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T05:01:17.3943273Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T05:01:17.3943522Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:17.3943802Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T05:01:17.3944083Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:17.3944668Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T05:01:17.3945110Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T05:01:17.3945672Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T05:01:17.3945981Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T05:01:17.3946282Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T05:01:17.3946595Z   NODE_ENV: test
+2026-11-09T05:01:17.3946792Z   MIKKA_TEST_MODE: 1
+2026-11-09T05:01:17.3947001Z ##[endgroup]
+2026-11-09T05:01:18.0683982Z ✔ actual MCP proxy removes standard transport metadata while keeping action validation strict (100.126796ms)
+2026-11-09T05:01:19.4157756Z Retained local adapter test directory: /tmp/mikka-local-adapter-qpE72S
+2026-11-09T05:01:19.4176340Z ✔ claude_code receives only the per-run proxy supplied by the trusted host (280.862504ms)
+2026-11-09T05:01:19.5587986Z Retained local adapter test directory: /tmp/mikka-local-adapter-DVPUod
+2026-11-09T05:01:19.5596575Z ✔ codex receives only the per-run proxy supplied by the trusted host (142.106524ms)
+2026-11-09T05:01:19.8953949Z Retained local adapter test directory: /tmp/mikka-local-adapter-xcmK8r
+2026-11-09T05:01:19.8960007Z ✔ cursor receives only the per-run proxy supplied by the trusted host (336.418786ms)
+2026-11-09T05:01:20.3989196Z Retained local computer daemon repository: /tmp/orvr-0EV4UN
+2026-11-09T05:01:20.3991737Z {"actualDaemon":true,"actualCodexAdapter":true,"syntheticHarness":true,"localGrantInjected":true,"driverNotExposed":true,"runId":"2f44b12b-9dc9-4506-86c2-e84124fdbfb7"}
+2026-11-09T05:01:20.3993823Z Retained local computer daemon fixture: /tmp/pr161-host-zZB3Wc
+2026-11-09T05:01:20.3995469Z ✔ actual daemon injects local authority and closes its own socket on stop (350.705955ms)
+2026-11-09T05:01:20.4276019Z ℹ tests 5
+2026-11-09T05:01:20.4276439Z ℹ suites 0
+2026-11-09T05:01:20.4276793Z ℹ pass 5
+2026-11-09T05:01:20.4277206Z ℹ fail 0
+2026-11-09T05:01:20.4277570Z ℹ cancelled 0
+2026-11-09T05:01:20.4277949Z ℹ skipped 0
+2026-11-09T05:01:20.4278289Z ℹ todo 0
+2026-11-09T05:01:20.4278537Z ℹ duration_ms 2613.886189
+2026-11-09T05:01:20.4531368Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+2026-11-09T05:01:20.4531803Z with:
+2026-11-09T05:01:20.4532136Z   name: pr13-cli-diagnostics-f8864eb83055504ac445e07e8d94a0e8eabedee9
+2026-11-09T05:01:20.4532597Z   path: /home/runner/work/_temp/pr13-daemon-unit-results.json
+2026-11-09T05:01:20.4532956Z   if-no-files-found: warn
+2026-11-09T05:01:20.4533191Z   compression-level: 6
+2026-11-09T05:01:20.4533408Z   overwrite: false
+2026-11-09T05:01:20.4533628Z   include-hidden-files: false
+2026-11-09T05:01:20.4533870Z env:
+2026-11-09T05:01:20.4534053Z   MIKKA_EDITION: cloud
+2026-11-09T05:01:20.4534271Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T05:01:20.4534527Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T05:01:20.4534770Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:20.4535046Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T05:01:20.4535316Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:20.4535735Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T05:01:20.4536141Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T05:01:20.4536627Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T05:01:20.4536925Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T05:01:20.4537223Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T05:01:20.4537530Z ##[endgroup]
+2026-11-09T05:01:20.6363909Z (node:24418) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T05:01:20.6365398Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T05:01:20.6412953Z With the provided path, there will be 1 file uploaded
+2026-11-09T05:01:20.6441870Z Artifact name is valid!
+2026-11-09T05:01:20.6442748Z Root directory input is valid!
+2026-11-09T05:01:20.8548935Z Beginning upload of artifact content to blob storage
+2026-11-09T05:01:20.8847019Z (node:24418) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T05:01:20.9115130Z Uploaded bytes 70748
+2026-11-09T05:01:20.9259093Z Finished uploading artifact content to blob storage!
+2026-11-09T05:01:20.9260611Z SHA256 digest of uploaded artifact zip is f9c59bb4fe66563be6ac4fa309e86ebd8a590e52b05db711d6df9a80f68b1c4b
+2026-11-09T05:01:20.9262567Z Finalizing artifact upload
+2026-11-09T05:01:21.3483196Z Artifact pr13-cli-diagnostics-f8864eb83055504ac445e07e8d94a0e8eabedee9.zip successfully finalized. Artifact ID 13651256360
+2026-11-09T05:01:21.3485939Z Artifact pr13-cli-diagnostics-f8864eb83055504ac445e07e8d94a0e8eabedee9 has been successfully uploaded! Final size is 70748 bytes. Artifact ID is 13651256360
+2026-11-09T05:01:21.3491603Z Artifact download URL: https://github.com/alexj11324/Mikka/actions/runs/42564360573/artifacts/13651256360
+2026-11-09T05:01:21.3651588Z ##[group]Run pnpm --filter @mikka/daemon typecheck
+2026-11-09T05:01:21.3651985Z [36;1mpnpm --filter @mikka/daemon typecheck[0m
+2026-11-09T05:01:21.3716706Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:01:21.3716962Z env:
+2026-11-09T05:01:21.3717160Z   MIKKA_EDITION: cloud
+2026-11-09T05:01:21.3717406Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T05:01:21.3717677Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T05:01:21.3717944Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:21.3718222Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T05:01:21.3718507Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:21.3718895Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T05:01:21.3719312Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T05:01:21.3719819Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T05:01:21.3720414Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T05:01:21.3720721Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T05:01:21.3721081Z ##[endgroup]
+2026-11-09T05:01:21.7681775Z 
+2026-11-09T05:01:21.7682643Z > @mikka/daemon@0.0.1 typecheck /home/runner/work/Mikka/Mikka/packages/daemon
+2026-11-09T05:01:21.7683262Z > tsgo --noEmit -p tsconfig.json
+2026-11-09T05:01:21.7683470Z 
+2026-11-09T05:01:25.6725163Z ##[group]Run pnpm --filter @mikka/daemon build
+2026-11-09T05:01:25.6725807Z [36;1mpnpm --filter @mikka/daemon build[0m
+2026-11-09T05:01:25.6792911Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:01:25.6793181Z env:
+2026-11-09T05:01:25.6793381Z   MIKKA_EDITION: cloud
+2026-11-09T05:01:25.6793651Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T05:01:25.6793933Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T05:01:25.6794191Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:25.6794464Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T05:01:25.6794757Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:25.6795142Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T05:01:25.6795564Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T05:01:25.6796078Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T05:01:25.6796393Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T05:01:25.6796688Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T05:01:25.6797037Z ##[endgroup]
+2026-11-09T05:01:26.0617239Z 
+2026-11-09T05:01:26.0618054Z > @mikka/daemon@0.0.1 build /home/runner/work/Mikka/Mikka/packages/daemon
+2026-11-09T05:01:26.0618657Z > node scripts/build.mjs
+2026-11-09T05:01:26.0618872Z 
+2026-11-09T05:01:26.0968158Z Retained build directory: /home/runner/work/Mikka/Mikka/packages/daemon/.retained-build-e7c9b1
+2026-11-09T05:01:26.2708273Z Built @aspectlylabs/mikka@0.0.1 in /home/runner/work/Mikka/Mikka/packages/daemon/.retained-build-e7c9b1
+2026-11-09T05:01:26.2951801Z ##[group]Run pnpm --filter @mikka/daemon test:package
+2026-11-09T05:01:26.2952503Z [36;1mpnpm --filter @mikka/daemon test:package[0m
+2026-11-09T05:01:26.3034763Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:01:26.3035045Z env:
+2026-11-09T05:01:26.3035466Z   MIKKA_EDITION: cloud
+2026-11-09T05:01:26.3035716Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T05:01:26.3036002Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T05:01:26.3036261Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:26.3036541Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T05:01:26.3036818Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T05:01:26.3037203Z   BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+2026-11-09T05:01:26.3037630Z   BETTER_AUTH_URL: http://localhost:3000
+2026-11-09T05:01:26.3038336Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka
+2026-11-09T05:01:26.3038859Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T05:01:26.3039361Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T05:01:26.3040576Z   MIKKA_DAEMON_DIST_DIR: /home/runner/work/Mikka/Mikka/packages/daemon/.retained-build-e7c9b1
+2026-11-09T05:01:26.3041417Z ##[endgroup]
+2026-11-09T05:01:26.7095457Z 
+2026-11-09T05:01:26.7096432Z > @mikka/daemon@0.0.1 test:package /home/runner/work/Mikka/Mikka/packages/daemon
+2026-11-09T05:01:26.7097365Z > node --test test/package.test.mjs
+2026-11-09T05:01:26.7097721Z 
+2026-11-09T05:01:26.8054024Z Retained package fixture directory: /home/runner/work/Mikka/Mikka/packages/daemon/.retained-package-test-gla48P
+2026-11-09T05:01:28.0248838Z npm notice
+2026-11-09T05:01:28.0249707Z npm notice New major version of npm available! 11.19.1 -> 12.2.2
+2026-11-09T05:01:28.0252687Z npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+2026-11-09T05:01:28.0253608Z npm notice To update run: npm install -g npm@12.2.2
+2026-11-09T05:01:28.0253995Z npm notice
+2026-11-09T05:01:37.9445308Z npm warn deprecated @opentelemetry/sdk-trace-base@2.12.0: Use @opentelemetry/sdk-trace package
+2026-11-09T05:01:41.9622626Z {"package":"@aspectlylabs/mikka","version":"0.0.1","tarballSha256":"c2af9673d033835d9ed3ca2b5571e34bab3a0c60db7f61e2e851102cb757428d","retained":{"buildDirectory":"/home/runner/work/Mikka/Mikka/packages/daemon/.retained-build-e7c9b1","fixtureDirectory":"/home/runner/work/Mikka/Mikka/packages/daemon/.retained-package-test-gla48P","tarball":"/home/runner/work/Mikka/Mikka/packages/daemon/.retained-package-test-gla48P/aspectlylabs-mikka-0.0.1.tgz","installation":"/home/runner/work/Mikka/Mikka/packages/daemon/.retained-package-test-gla48P/installation","dataDirectory":"/home/runner/work/Mikka/Mikka/packages/daemon/.retained-package-test-gla48P/data"},"installedFrom":"local tarball with fresh public-registry dependencies","runtime":"packaged mock daemon and real local-bare git task","realProvider":false,"published":false}
+2026-11-09T05:01:41.9644325Z ✔ registry-installed tarball runs its CLI and a real mock-daemon git task without workspace dependencies (15161.036213ms)
+2026-11-09T05:01:41.9766903Z ℹ tests 1
+2026-11-09T05:01:41.9767377Z ℹ suites 0
+2026-11-09T05:01:41.9767767Z ℹ pass 1
+2026-11-09T05:01:41.9768165Z ℹ fail 0
+2026-11-09T05:01:41.9768512Z ℹ cancelled 0
+2026-11-09T05:01:41.9768756Z ℹ skipped 0
+2026-11-09T05:01:41.9768979Z ℹ todo 0
+2026-11-09T05:01:41.9769244Z ℹ duration_ms 15229.862992
+2026-11-09T05:01:42.0049045Z Post job cleanup.
+2026-11-09T05:01:42.0053848Z ##[start-action display=Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020;id=__e1b63d61-5fab-43f5-b277-ffd67a9281b1.__actions_setup-node]
+2026-11-09T05:01:42.0096909Z Post job cleanup.
+2026-11-09T05:01:42.1421053Z (node:24724) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T05:01:42.1422076Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T05:01:42.1515031Z ##[end-action id=__e1b63d61-5fab-43f5-b277-ffd67a9281b1.__actions_setup-node;outcome=success;conclusion=success;duration_ms=146]
+2026-11-09T05:01:42.1518126Z ##[start-action display=Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1;id=__e1b63d61-5fab-43f5-b277-ffd67a9281b1.__pnpm_action-setup]
+2026-11-09T05:01:42.1556815Z Post job cleanup.
+2026-11-09T05:01:42.3252486Z Pruning is unnecessary.
+2026-11-09T05:01:42.3347110Z ##[end-action id=__e1b63d61-5fab-43f5-b277-ffd67a9281b1.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=182]
+2026-11-09T05:01:42.3467914Z Post job cleanup.
+2026-11-09T05:01:42.4461155Z [command]/usr/bin/git version
+2026-11-09T05:01:42.4502559Z git version 2.56.0
+2026-11-09T05:01:42.4544191Z Temporarily overriding HOME='/home/runner/work/_temp/9cce1b3c-c167-4074-96c2-de0d3ebf41a8' before making global git config changes
+2026-11-09T05:01:42.4545712Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T05:01:42.4549404Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T05:01:42.4592920Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T05:01:42.4636844Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T05:01:42.4945448Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T05:01:42.4976279Z http.https://github.com/.extraheader
+2026-11-09T05:01:42.4992813Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T05:01:42.5036089Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T05:01:42.5363464Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T05:01:42.5419200Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T05:01:42.5849878Z Cleaning up orphan processes
+2026-11-09T05:01:42.6269284Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -1,0 +1,2346 @@
+{
+  "schema": "mikka.issue1512.ci-postgres-final.v1",
+  "recordedAt": "2026-11-09T05:13:18.192Z",
+  "runId": 42564360573,
+  "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42564360573",
+  "result": "PASS_POSTGRES_AND_DATABASE_AGGREGATE_ONLY",
+  "source": {
+    "eventHead": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "actualJobCheckout": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+    "tree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+    "proof": "Each of the five original job logs contains the checkout action git log -1 result f8864eb. Tree binding is the root's already verified immutable commit mapping, included in the checksum-verified shared actual-selection blob; this reviewer did not repeat that Git commit API read.",
+    "selection": {
+      "blob": "7f1b9364532c97bd2b09c4428aba4ff21973a6a4",
+      "bytes": 17590,
+      "sha256": "70fc7146d1f32fee64b040e9aa7f21e10bc77a8f078ae1cd61ee528a7c5c94e8",
+      "changesJob": 128987522108,
+      "scope": "Selection inventory only, not completion proof"
+    },
+    "canonicalFiles": [
+      {
+        "key": "package",
+        "url": "https://github.com/alexj11324/Mikka/blob/f8864eb83055504ac445e07e8d94a0e8eabedee9/package.json",
+        "bytes": 80325,
+        "sha256": "e677d9ca43c64d5050c38e880a7d4745c838086e0ed16f83990106f4b1f5e39a",
+        "gitBlobSha1": "4d4d856e9f90ea102c4e42cf42114e9d5daad731"
+      },
+      {
+        "key": "dbRunner",
+        "url": "https://github.com/alexj11324/Mikka/blob/f8864eb83055504ac445e07e8d94a0e8eabedee9/scripts/run-db-tests.mjs",
+        "bytes": 37271,
+        "sha256": "7f54e6d9c241f6c60056f2c1c1d2f9b82c398638c4e31713894ce7c8168286f3",
+        "gitBlobSha1": "2d797fb4603f4e668b56439e7dea11d6065dbd46"
+      },
+      {
+        "key": "workflow",
+        "url": "https://github.com/alexj11324/Mikka/blob/f8864eb83055504ac445e07e8d94a0e8eabedee9/.github/workflows/ui-policy.yml",
+        "bytes": 22618,
+        "sha256": "0e62df8a85e4f58a5c790233d7c1a229579db34b137bbc3b644e60f5ae5408d4",
+        "gitBlobSha1": "18e7c54ec507d02b12fd1131b5a8b6112ece2212"
+      }
+    ],
+    "focusedReviewedSourceBlobs": {
+      "lib/device-heartbeat.db.test.ts": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+      "lib/device-unit-fence.db.test.ts": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+    },
+    "sourceLinkBoundary": "The focused file blobs are carried unchanged by the independently reviewed final0ecc tree. Canonical script strings were read directly at f886."
+  },
+  "inventory": {
+    "selectionMatchesInventory": true,
+    "workflowExpectedMatchesInventory": true,
+    "everySelectedScriptExists": true,
+    "suiteCount": 72,
+    "dbFiles": 306,
+    "selectedSuiteCount": 72,
+    "shardSuiteCounts": [
+      18,
+      18,
+      18,
+      18
+    ],
+    "requiredSuites": [
+      "test:abuse-db",
+      "test:account-db",
+      "test:active-agents",
+      "test:activity-actor-db",
+      "test:agent-kit-db",
+      "test:agent-tool-approval-db",
+      "test:approved-writes-db",
+      "test:artifact-migration-db",
+      "test:audit-db",
+      "test:bot-chats-db",
+      "test:bot-threads-db",
+      "test:captures-db",
+      "test:chat-attachments-db",
+      "test:cloud-backend-db",
+      "test:cloud-services-db",
+      "test:computer-db",
+      "test:conversation-reads",
+      "test:coordinator-issue-create-db",
+      "test:coordinator-issue-tools-db",
+      "test:coordinator-native",
+      "test:coordinator-task-binding-db",
+      "test:credentials-db",
+      "test:desktop-auth",
+      "test:device-enrollment-db",
+      "test:device-revocation-db",
+      "test:execution-settings-db",
+      "test:factory",
+      "test:factory-activity-db",
+      "test:factory-activity-http-db",
+      "test:factory-all-dispatch-db",
+      "test:factory-approval-db",
+      "test:factory-check-independence-db",
+      "test:factory-checks-db",
+      "test:factory-monitor-db",
+      "test:factory-routing-db",
+      "test:github-connections-db",
+      "test:group-turns",
+      "test:groups",
+      "test:issue-search-db",
+      "test:live-db",
+      "test:local-repository-migration-db",
+      "test:migration-steps-db",
+      "test:model-admission-db",
+      "test:onboarding-db",
+      "test:ops-db",
+      "test:pat-api-db",
+      "test:pat-db",
+      "test:personal-mailbox-default-off-db",
+      "test:plugins-db",
+      "test:preview-driver",
+      "test:project-decisions-db",
+      "test:relation-cycle",
+      "test:run-dispatch",
+      "test:run-publication-db",
+      "test:run-recovery-db",
+      "test:schedules-db",
+      "test:scope-detachment-db",
+      "test:secrets-db",
+      "test:self-improvement-db",
+      "test:self-improvement-unit",
+      "test:session-mailbox-db",
+      "test:settings-activity-db",
+      "test:settings-prefs-db",
+      "test:skill-semantic-db",
+      "test:suggestion-artifact-db",
+      "test:test-accounts-db",
+      "test:user-facts-db",
+      "test:visibility-db",
+      "test:web-auth-db",
+      "test:worker-authorization-db",
+      "test:workspace-admin-db",
+      "test:workspace-migration-db"
+    ],
+    "expectedModuloDistributionMatches": true,
+    "unionExactAndNoDuplicates": true,
+    "newComparedWithPrior70": [
+      "test:factory-activity-db",
+      "test:factory-activity-http-db"
+    ],
+    "categorizedFiles": 306,
+    "selfManagedInventoryCount": 7,
+    "browserInventoryCount": 2,
+    "offlineGuardedInventoryCount": 4,
+    "boundary": "306 DB inventory files and separate classifications do not mean every repository test ran in this PG job. These receipts establish the complete selected72 required suites."
+  },
+  "summary": {
+    "suites": 72,
+    "nodeReportedTests": 3780,
+    "pass": 3780,
+    "fail": 0,
+    "skipped": 0,
+    "todo": 0,
+    "cancelled": 0,
+    "jobConclusions": [
+      "success",
+      "success",
+      "success",
+      "success"
+    ],
+    "aggregateConclusion": "success",
+    "perShardNodeReportedTests": [
+      741,
+      794,
+      1628,
+      617
+    ],
+    "noReusedOrSkippedRequiredSuites": true,
+    "countingRule": "Only the canonical runner's final ##[group]pnpm suite output is counted. Earlier [db-runner ...] streaming copies are excluded to prevent double counting. Compound commands contribute each actual Node summary segment once.",
+    "mandatoryNodeSummaryGuard": "Current run-db-tests.mjs requires tests>=1, pass==tests, zero fail/skipped/todo/cancelled and process status0 for each suite."
+  },
+  "focusedEvidence": {
+    "deviceRevocation": {
+      "suite": "test:device-revocation-db",
+      "jobId": 128988113807,
+      "tests": 32,
+      "nodeSegments": [
+        16,
+        11,
+        5
+      ],
+      "allPass": true,
+      "canonicalCommand": "node --import ./scripts/server-test.mjs --import tsx --test lib/device-revocation.db.test.ts lib/device-mailbox-notices.db.test.ts lib/device-work.db.test.ts lib/device-presence.db.test.ts lib/demo-device-cleanup.db.test.ts && node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/device-route-fence.db.test.ts lib/device-heartbeat.db.test.ts lib/cloud-subscription-lease-route.db.test.ts && node --test-force-exit --test-concurrency=1 --import ./scripts/server-test.mjs --import tsx --test lib/device-unit-fence.db.test.ts",
+      "behavior": "Current reviewed actual handlers and params-barrier source cover fresh credential revocation/expiry and removed/foreign owner changes. The real current suite passed both poll tests, the original31-route fencing test, and the original ten-concurrent multi-statement unit-fence case. It is not an isolated replacement/prototype of the poll handlers.",
+      "group": {
+        "script": "test:device-revocation-db",
+        "seconds": 70.2,
+        "startLine": 2156,
+        "endLine": 2247,
+        "summary": {
+          "tests": 32,
+          "pass": 32,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "segments": [
+          16,
+          11,
+          5
+        ],
+        "okMarker": true
+      }
+    },
+    "enrollmentAndEmptyPending": {
+      "suite": "test:device-enrollment-db",
+      "jobId": 128988113812,
+      "tests": 13,
+      "allPass": true,
+      "behavior": "Includes one concurrent consumption winner and insertion-failure rollback, then empty completed/failed receipt selection preserving disabled/removed/empty/missing device behavior.",
+      "group": {
+        "script": "test:device-enrollment-db",
+        "seconds": 37,
+        "startLine": 3013,
+        "endLine": 3043,
+        "summary": {
+          "tests": 13,
+          "pass": 13,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "segments": [
+          13
+        ],
+        "okMarker": true
+      }
+    },
+    "liveRevision": {
+      "suite": "test:activity-actor-db",
+      "jobId": 128988113812,
+      "tests": 57,
+      "allPass": true,
+      "canonicalCommandIncludesActualFile": true,
+      "actualPrefetchCasePresent": true,
+      "targetedActualCaseTitles": [
+        "✔ one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows (44.769207ms)",
+        "✔ a revision rises once per publish across its fan-out and a reader sees the latest (14.131507ms)",
+        "✔ prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows (20.687757ms)",
+        "✔ concurrent empty, partial and full snapshots of one owner each receive the rows they need (202.657215ms)"
+      ]
+    },
+    "newlyRequiredFactorySuites": [
+      {
+        "suite": "test:factory-activity-http-db",
+        "jobId": 128988113807,
+        "tests": 7,
+        "pass": 7
+      },
+      {
+        "suite": "test:factory-activity-db",
+        "jobId": 128988113812,
+        "tests": 45,
+        "pass": 45
+      }
+    ],
+    "statementDiagnostics": [
+      {
+        "scenario": "runs-empty-poll",
+        "statements": 2
+      },
+      {
+        "scenario": "repos-empty-poll",
+        "statements": 2
+      },
+      {
+        "scenario": "enrollment-consumption",
+        "statements": 1
+      },
+      {
+        "scenario": "disabled-device",
+        "statements": 1
+      },
+      {
+        "scenario": "removed-device",
+        "statements": 1
+      },
+      {
+        "scenario": "empty-device",
+        "statements": 1
+      },
+      {
+        "scenario": "missing-device",
+        "statements": 1
+      }
+    ],
+    "unitFence": {
+      "perStatement": {
+        "completed": 3,
+        "roundTrips": 11,
+        "explicit": 2
+      },
+      "perUnit": {
+        "completed": 4,
+        "roundTrips": 6,
+        "explicit": 1
+      },
+      "measurement": "backend_command_tags_and_ready_for_query"
+    },
+    "activityTargetTitles": [
+      "✔ one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows (44.769207ms)",
+      "✔ a revision rises once per publish across its fan-out and a reader sees the latest (14.131507ms)",
+      "✔ prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows (20.687757ms)",
+      "✔ concurrent empty, partial and full snapshots of one owner each receive the rows they need (202.657215ms)"
+    ],
+    "scope": "Counts diagnose the tested local PG cases. They are not a prediction or substitute for a Native complete-window budget."
+  },
+  "shards": [
+    {
+      "jobId": 128988113807,
+      "shard": "1/4",
+      "selection": {
+        "shard": "1/4",
+        "total": 72,
+        "scripts": [
+          "test:abuse-db",
+          "test:agent-kit-db",
+          "test:audit-db",
+          "test:chat-attachments-db",
+          "test:conversation-reads",
+          "test:coordinator-task-binding-db",
+          "test:device-revocation-db",
+          "test:factory-activity-http-db",
+          "test:factory-checks-db",
+          "test:group-turns",
+          "test:local-repository-migration-db",
+          "test:ops-db",
+          "test:plugins-db",
+          "test:run-dispatch",
+          "test:scope-detachment-db",
+          "test:session-mailbox-db",
+          "test:suggestion-artifact-db",
+          "test:web-auth-db"
+        ]
+      },
+      "clones": {
+        "template": "mikka_e2e",
+        "clones": 15,
+        "onTemplate": [
+          "test:factory-checks-db",
+          "test:ops-db",
+          "test:run-dispatch"
+        ],
+        "seconds": 3.4
+      },
+      "timings": {
+        "shard": "1/4",
+        "concurrency": 4,
+        "cpus": 4,
+        "suites": [
+          {
+            "script": "test:factory-checks-db",
+            "seconds": 150.2
+          },
+          {
+            "script": "test:device-revocation-db",
+            "seconds": 70.2
+          },
+          {
+            "script": "test:factory-activity-http-db",
+            "seconds": 60.1
+          },
+          {
+            "script": "test:audit-db",
+            "seconds": 48.3
+          },
+          {
+            "script": "test:abuse-db",
+            "seconds": 42.6
+          },
+          {
+            "script": "test:group-turns",
+            "seconds": 34.9
+          },
+          {
+            "script": "test:scope-detachment-db",
+            "seconds": 34.8
+          },
+          {
+            "script": "test:plugins-db",
+            "seconds": 24.6
+          },
+          {
+            "script": "test:local-repository-migration-db",
+            "seconds": 16.2
+          },
+          {
+            "script": "test:conversation-reads",
+            "seconds": 13.8
+          },
+          {
+            "script": "test:coordinator-task-binding-db",
+            "seconds": 10
+          },
+          {
+            "script": "test:suggestion-artifact-db",
+            "seconds": 9.8
+          },
+          {
+            "script": "test:web-auth-db",
+            "seconds": 8.7
+          },
+          {
+            "script": "test:agent-kit-db",
+            "seconds": 5.8
+          },
+          {
+            "script": "test:chat-attachments-db",
+            "seconds": 5.8
+          },
+          {
+            "script": "test:run-dispatch",
+            "seconds": 3.7
+          },
+          {
+            "script": "test:session-mailbox-db",
+            "seconds": 3.2
+          },
+          {
+            "script": "test:ops-db",
+            "seconds": 2.7
+          }
+        ]
+      },
+      "groups": [
+        {
+          "script": "test:group-turns",
+          "seconds": 34.9,
+          "startLine": 1497,
+          "endLine": 1672,
+          "summary": {
+            "tests": 128,
+            "pass": 128,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            123,
+            5
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:audit-db",
+          "seconds": 48.3,
+          "startLine": 1866,
+          "endLine": 1963,
+          "summary": {
+            "tests": 44,
+            "pass": 44,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            44
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:conversation-reads",
+          "seconds": 13.8,
+          "startLine": 2060,
+          "endLine": 2106,
+          "summary": {
+            "tests": 22,
+            "pass": 22,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            22
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:device-revocation-db",
+          "seconds": 70.2,
+          "startLine": 2156,
+          "endLine": 2247,
+          "summary": {
+            "tests": 32,
+            "pass": 32,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            16,
+            11,
+            5
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:abuse-db",
+          "seconds": 42.6,
+          "startLine": 2284,
+          "endLine": 2367,
+          "summary": {
+            "tests": 29,
+            "pass": 29,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            24,
+            5
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:agent-kit-db",
+          "seconds": 5.8,
+          "startLine": 2437,
+          "endLine": 2496,
+          "summary": {
+            "tests": 23,
+            "pass": 23,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            23
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:plugins-db",
+          "seconds": 24.6,
+          "startLine": 2513,
+          "endLine": 2564,
+          "summary": {
+            "tests": 18,
+            "pass": 18,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            18
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:chat-attachments-db",
+          "seconds": 5.8,
+          "startLine": 2597,
+          "endLine": 2613,
+          "summary": {
+            "tests": 6,
+            "pass": 6,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            6
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:coordinator-task-binding-db",
+          "seconds": 10,
+          "startLine": 2672,
+          "endLine": 2683,
+          "summary": {
+            "tests": 1,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            1
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:scope-detachment-db",
+          "seconds": 34.8,
+          "startLine": 2755,
+          "endLine": 2855,
+          "summary": {
+            "tests": 69,
+            "pass": 69,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            69
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:session-mailbox-db",
+          "seconds": 3.2,
+          "startLine": 2878,
+          "endLine": 2893,
+          "summary": {
+            "tests": 5,
+            "pass": 5,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            5
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:local-repository-migration-db",
+          "seconds": 16.2,
+          "startLine": 3009,
+          "endLine": 3020,
+          "summary": {
+            "tests": 1,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            1
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:suggestion-artifact-db",
+          "seconds": 9.8,
+          "startLine": 3106,
+          "endLine": 3123,
+          "summary": {
+            "tests": 4,
+            "pass": 4,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            4
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:web-auth-db",
+          "seconds": 8.7,
+          "startLine": 3144,
+          "endLine": 3161,
+          "summary": {
+            "tests": 5,
+            "pass": 5,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            5
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:factory-activity-http-db",
+          "seconds": 60.1,
+          "startLine": 3307,
+          "endLine": 3325,
+          "summary": {
+            "tests": 7,
+            "pass": 7,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            7
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:factory-checks-db",
+          "seconds": 150.2,
+          "startLine": 3377,
+          "endLine": 3815,
+          "summary": {
+            "tests": 320,
+            "pass": 320,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            320
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:ops-db",
+          "seconds": 2.7,
+          "startLine": 3873,
+          "endLine": 3927,
+          "summary": {
+            "tests": 17,
+            "pass": 17,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            11,
+            6
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:run-dispatch",
+          "seconds": 3.7,
+          "startLine": 3951,
+          "endLine": 3971,
+          "summary": {
+            "tests": 10,
+            "pass": 10,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            10
+          ],
+          "okMarker": true
+        }
+      ],
+      "totalNodeReportedTests": 741
+    },
+    {
+      "jobId": 128988113801,
+      "shard": "2/4",
+      "selection": {
+        "shard": "2/4",
+        "total": 72,
+        "scripts": [
+          "test:account-db",
+          "test:agent-tool-approval-db",
+          "test:bot-chats-db",
+          "test:cloud-backend-db",
+          "test:coordinator-issue-create-db",
+          "test:credentials-db",
+          "test:execution-settings-db",
+          "test:factory-all-dispatch-db",
+          "test:factory-monitor-db",
+          "test:groups",
+          "test:migration-steps-db",
+          "test:pat-api-db",
+          "test:preview-driver",
+          "test:run-publication-db",
+          "test:secrets-db",
+          "test:settings-activity-db",
+          "test:test-accounts-db",
+          "test:worker-authorization-db"
+        ]
+      },
+      "clones": {
+        "template": "mikka_e2e",
+        "clones": 16,
+        "onTemplate": [
+          "test:execution-settings-db",
+          "test:test-accounts-db"
+        ],
+        "seconds": 3.7
+      },
+      "timings": {
+        "shard": "2/4",
+        "concurrency": 4,
+        "cpus": 4,
+        "suites": [
+          {
+            "script": "test:bot-chats-db",
+            "seconds": 90.3
+          },
+          {
+            "script": "test:groups",
+            "seconds": 90.2
+          },
+          {
+            "script": "test:account-db",
+            "seconds": 41.1
+          },
+          {
+            "script": "test:agent-tool-approval-db",
+            "seconds": 35.9
+          },
+          {
+            "script": "test:cloud-backend-db",
+            "seconds": 34.7
+          },
+          {
+            "script": "test:worker-authorization-db",
+            "seconds": 34
+          },
+          {
+            "script": "test:run-publication-db",
+            "seconds": 24.1
+          },
+          {
+            "script": "test:secrets-db",
+            "seconds": 16.4
+          },
+          {
+            "script": "test:pat-api-db",
+            "seconds": 16.3
+          },
+          {
+            "script": "test:execution-settings-db",
+            "seconds": 15.8
+          },
+          {
+            "script": "test:test-accounts-db",
+            "seconds": 14.1
+          },
+          {
+            "script": "test:factory-all-dispatch-db",
+            "seconds": 11.5
+          },
+          {
+            "script": "test:factory-monitor-db",
+            "seconds": 8.1
+          },
+          {
+            "script": "test:settings-activity-db",
+            "seconds": 7.8
+          },
+          {
+            "script": "test:coordinator-issue-create-db",
+            "seconds": 6.4
+          },
+          {
+            "script": "test:credentials-db",
+            "seconds": 3.4
+          },
+          {
+            "script": "test:migration-steps-db",
+            "seconds": 1.7
+          },
+          {
+            "script": "test:preview-driver",
+            "seconds": 1.3
+          }
+        ]
+      },
+      "groups": [
+        {
+          "script": "test:execution-settings-db",
+          "seconds": 15.8,
+          "startLine": 1261,
+          "endLine": 1282,
+          "summary": {
+            "tests": 5,
+            "pass": 5,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            5
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:test-accounts-db",
+          "seconds": 14.1,
+          "startLine": 1328,
+          "endLine": 1355,
+          "summary": {
+            "tests": 17,
+            "pass": 17,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            17
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:account-db",
+          "seconds": 41.1,
+          "startLine": 1420,
+          "endLine": 1477,
+          "summary": {
+            "tests": 40,
+            "pass": 40,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            40
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:worker-authorization-db",
+          "seconds": 34,
+          "startLine": 2398,
+          "endLine": 2540,
+          "summary": {
+            "tests": 76,
+            "pass": 76,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            76
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:cloud-backend-db",
+          "seconds": 34.7,
+          "startLine": 3551,
+          "endLine": 5040,
+          "summary": {
+            "tests": 215,
+            "pass": 215,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            215
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:secrets-db",
+          "seconds": 16.4,
+          "startLine": 5145,
+          "endLine": 5249,
+          "summary": {
+            "tests": 89,
+            "pass": 89,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            89
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:factory-monitor-db",
+          "seconds": 8.1,
+          "startLine": 5269,
+          "endLine": 5315,
+          "summary": {
+            "tests": 12,
+            "pass": 12,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            2,
+            10
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:groups",
+          "seconds": 90.2,
+          "startLine": 5342,
+          "endLine": 5477,
+          "summary": {
+            "tests": 91,
+            "pass": 91,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            12,
+            79
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:bot-chats-db",
+          "seconds": 90.3,
+          "startLine": 5520,
+          "endLine": 5769,
+          "summary": {
+            "tests": 144,
+            "pass": 144,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            144
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:coordinator-issue-create-db",
+          "seconds": 6.4,
+          "startLine": 5857,
+          "endLine": 5877,
+          "summary": {
+            "tests": 10,
+            "pass": 10,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            10
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:pat-api-db",
+          "seconds": 16.3,
+          "startLine": 6013,
+          "endLine": 6162,
+          "summary": {
+            "tests": 38,
+            "pass": 38,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            38
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:credentials-db",
+          "seconds": 3.4,
+          "startLine": 6182,
+          "endLine": 6194,
+          "summary": {
+            "tests": 3,
+            "pass": 3,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            3
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:migration-steps-db",
+          "seconds": 1.7,
+          "startLine": 6225,
+          "endLine": 6238,
+          "summary": {
+            "tests": 1,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            1
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:preview-driver",
+          "seconds": 1.3,
+          "startLine": 6252,
+          "endLine": 6262,
+          "summary": {
+            "tests": 1,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            1
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:run-publication-db",
+          "seconds": 24.1,
+          "startLine": 6318,
+          "endLine": 6399,
+          "summary": {
+            "tests": 25,
+            "pass": 25,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            24,
+            1
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:settings-activity-db",
+          "seconds": 7.8,
+          "startLine": 6476,
+          "endLine": 6497,
+          "summary": {
+            "tests": 6,
+            "pass": 6,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            6
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:factory-all-dispatch-db",
+          "seconds": 11.5,
+          "startLine": 6501,
+          "endLine": 6555,
+          "summary": {
+            "tests": 2,
+            "pass": 2,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            2
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:agent-tool-approval-db",
+          "seconds": 35.9,
+          "startLine": 6568,
+          "endLine": 6622,
+          "summary": {
+            "tests": 19,
+            "pass": 19,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            16,
+            3
+          ],
+          "okMarker": true
+        }
+      ],
+      "totalNodeReportedTests": 794
+    },
+    {
+      "jobId": 128988113837,
+      "shard": "3/4",
+      "selection": {
+        "shard": "3/4",
+        "total": 72,
+        "scripts": [
+          "test:active-agents",
+          "test:approved-writes-db",
+          "test:bot-threads-db",
+          "test:cloud-services-db",
+          "test:coordinator-issue-tools-db",
+          "test:desktop-auth",
+          "test:factory",
+          "test:factory-approval-db",
+          "test:factory-routing-db",
+          "test:issue-search-db",
+          "test:model-admission-db",
+          "test:pat-db",
+          "test:project-decisions-db",
+          "test:run-recovery-db",
+          "test:self-improvement-db",
+          "test:settings-prefs-db",
+          "test:user-facts-db",
+          "test:workspace-admin-db"
+        ]
+      },
+      "clones": {
+        "template": "mikka_e2e",
+        "clones": 17,
+        "onTemplate": [
+          "test:approved-writes-db"
+        ],
+        "seconds": 4.7
+      },
+      "timings": {
+        "shard": "3/4",
+        "concurrency": 4,
+        "cpus": 4,
+        "suites": [
+          {
+            "script": "test:factory-routing-db",
+            "seconds": 216.4
+          },
+          {
+            "script": "test:bot-threads-db",
+            "seconds": 212.4
+          },
+          {
+            "script": "test:factory",
+            "seconds": 171.8
+          },
+          {
+            "script": "test:workspace-admin-db",
+            "seconds": 80.7
+          },
+          {
+            "script": "test:desktop-auth",
+            "seconds": 54
+          },
+          {
+            "script": "test:self-improvement-db",
+            "seconds": 38.5
+          },
+          {
+            "script": "test:factory-approval-db",
+            "seconds": 33.9
+          },
+          {
+            "script": "test:active-agents",
+            "seconds": 27.9
+          },
+          {
+            "script": "test:project-decisions-db",
+            "seconds": 27.3
+          },
+          {
+            "script": "test:run-recovery-db",
+            "seconds": 25.3
+          },
+          {
+            "script": "test:settings-prefs-db",
+            "seconds": 24.8
+          },
+          {
+            "script": "test:issue-search-db",
+            "seconds": 9.4
+          },
+          {
+            "script": "test:approved-writes-db",
+            "seconds": 8.8
+          },
+          {
+            "script": "test:coordinator-issue-tools-db",
+            "seconds": 6.8
+          },
+          {
+            "script": "test:model-admission-db",
+            "seconds": 6.5
+          },
+          {
+            "script": "test:pat-db",
+            "seconds": 4.8
+          },
+          {
+            "script": "test:user-facts-db",
+            "seconds": 2
+          },
+          {
+            "script": "test:cloud-services-db",
+            "seconds": 1.2
+          }
+        ]
+      },
+      "groups": [
+        {
+          "script": "test:desktop-auth",
+          "seconds": 54,
+          "startLine": 2591,
+          "endLine": 2853,
+          "summary": {
+            "tests": 128,
+            "pass": 128,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            70,
+            3,
+            11,
+            44
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:workspace-admin-db",
+          "seconds": 80.7,
+          "startLine": 4170,
+          "endLine": 4318,
+          "summary": {
+            "tests": 109,
+            "pass": 109,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            109
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:factory",
+          "seconds": 171.8,
+          "startLine": 5344,
+          "endLine": 5893,
+          "summary": {
+            "tests": 504,
+            "pass": 504,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            504
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:self-improvement-db",
+          "seconds": 38.5,
+          "startLine": 5915,
+          "endLine": 5960,
+          "summary": {
+            "tests": 28,
+            "pass": 28,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            28
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:project-decisions-db",
+          "seconds": 27.3,
+          "startLine": 7177,
+          "endLine": 7659,
+          "summary": {
+            "tests": 39,
+            "pass": 39,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            39
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:factory-approval-db",
+          "seconds": 33.9,
+          "startLine": 7795,
+          "endLine": 7913,
+          "summary": {
+            "tests": 52,
+            "pass": 52,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            52
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:bot-threads-db",
+          "seconds": 212.4,
+          "startLine": 8143,
+          "endLine": 11056,
+          "summary": {
+            "tests": 338,
+            "pass": 338,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            338
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:approved-writes-db",
+          "seconds": 8.8,
+          "startLine": 11125,
+          "endLine": 11152,
+          "summary": {
+            "tests": 10,
+            "pass": 10,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            10
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:cloud-services-db",
+          "seconds": 1.2,
+          "startLine": 11281,
+          "endLine": 11306,
+          "summary": {
+            "tests": 10,
+            "pass": 10,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            10
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:factory-routing-db",
+          "seconds": 216.4,
+          "startLine": 11423,
+          "endLine": 12039,
+          "summary": {
+            "tests": 287,
+            "pass": 287,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            282,
+            5
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:model-admission-db",
+          "seconds": 6.5,
+          "startLine": 12053,
+          "endLine": 12115,
+          "summary": {
+            "tests": 14,
+            "pass": 14,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            13,
+            1
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:coordinator-issue-tools-db",
+          "seconds": 6.8,
+          "startLine": 12140,
+          "endLine": 12153,
+          "summary": {
+            "tests": 2,
+            "pass": 2,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            2
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:run-recovery-db",
+          "seconds": 25.3,
+          "startLine": 12218,
+          "endLine": 12649,
+          "summary": {
+            "tests": 61,
+            "pass": 61,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            20,
+            9,
+            11,
+            12,
+            9
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:pat-db",
+          "seconds": 4.8,
+          "startLine": 12675,
+          "endLine": 12697,
+          "summary": {
+            "tests": 12,
+            "pass": 12,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            12
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:issue-search-db",
+          "seconds": 9.4,
+          "startLine": 12723,
+          "endLine": 12751,
+          "summary": {
+            "tests": 8,
+            "pass": 8,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            8
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:user-facts-db",
+          "seconds": 2,
+          "startLine": 12771,
+          "endLine": 12781,
+          "summary": {
+            "tests": 1,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            1
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:active-agents",
+          "seconds": 27.9,
+          "startLine": 12801,
+          "endLine": 12825,
+          "summary": {
+            "tests": 14,
+            "pass": 14,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            14
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:settings-prefs-db",
+          "seconds": 24.8,
+          "startLine": 12837,
+          "endLine": 12861,
+          "summary": {
+            "tests": 11,
+            "pass": 11,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            11
+          ],
+          "okMarker": true
+        }
+      ],
+      "totalNodeReportedTests": 1628
+    },
+    {
+      "jobId": 128988113812,
+      "shard": "4/4",
+      "selection": {
+        "shard": "4/4",
+        "total": 72,
+        "scripts": [
+          "test:activity-actor-db",
+          "test:artifact-migration-db",
+          "test:captures-db",
+          "test:computer-db",
+          "test:coordinator-native",
+          "test:device-enrollment-db",
+          "test:factory-activity-db",
+          "test:factory-check-independence-db",
+          "test:github-connections-db",
+          "test:live-db",
+          "test:onboarding-db",
+          "test:personal-mailbox-default-off-db",
+          "test:relation-cycle",
+          "test:schedules-db",
+          "test:self-improvement-unit",
+          "test:skill-semantic-db",
+          "test:visibility-db",
+          "test:workspace-migration-db"
+        ]
+      },
+      "clones": {
+        "template": "mikka_e2e",
+        "clones": 17,
+        "onTemplate": [
+          "test:personal-mailbox-default-off-db"
+        ],
+        "seconds": 5.6
+      },
+      "timings": {
+        "shard": "4/4",
+        "concurrency": 4,
+        "cpus": 4,
+        "suites": [
+          {
+            "script": "test:live-db",
+            "seconds": 140
+          },
+          {
+            "script": "test:activity-actor-db",
+            "seconds": 125.6
+          },
+          {
+            "script": "test:device-enrollment-db",
+            "seconds": 37
+          },
+          {
+            "script": "test:computer-db",
+            "seconds": 36.6
+          },
+          {
+            "script": "test:factory-activity-db",
+            "seconds": 29.6
+          },
+          {
+            "script": "test:captures-db",
+            "seconds": 27.8
+          },
+          {
+            "script": "test:personal-mailbox-default-off-db",
+            "seconds": 23.9
+          },
+          {
+            "script": "test:relation-cycle",
+            "seconds": 23.9
+          },
+          {
+            "script": "test:self-improvement-unit",
+            "seconds": 18.1
+          },
+          {
+            "script": "test:schedules-db",
+            "seconds": 9.4
+          },
+          {
+            "script": "test:visibility-db",
+            "seconds": 7.7
+          },
+          {
+            "script": "test:coordinator-native",
+            "seconds": 7.1
+          },
+          {
+            "script": "test:github-connections-db",
+            "seconds": 4.6
+          },
+          {
+            "script": "test:skill-semantic-db",
+            "seconds": 3.8
+          },
+          {
+            "script": "test:factory-check-independence-db",
+            "seconds": 2.6
+          },
+          {
+            "script": "test:onboarding-db",
+            "seconds": 1.6
+          },
+          {
+            "script": "test:artifact-migration-db",
+            "seconds": 0.9
+          },
+          {
+            "script": "test:workspace-migration-db",
+            "seconds": 0.5
+          }
+        ]
+      },
+      "groups": [
+        {
+          "script": "test:self-improvement-unit",
+          "seconds": 18.1,
+          "startLine": 1406,
+          "endLine": 1545,
+          "summary": {
+            "tests": 100,
+            "pass": 100,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            100
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:coordinator-native",
+          "seconds": 7.1,
+          "startLine": 1622,
+          "endLine": 1673,
+          "summary": {
+            "tests": 36,
+            "pass": 36,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            36
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:computer-db",
+          "seconds": 36.6,
+          "startLine": 1739,
+          "endLine": 1765,
+          "summary": {
+            "tests": 8,
+            "pass": 8,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            8
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:github-connections-db",
+          "seconds": 4.6,
+          "startLine": 1870,
+          "endLine": 1960,
+          "summary": {
+            "tests": 24,
+            "pass": 24,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            24
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:factory-activity-db",
+          "seconds": 29.6,
+          "startLine": 2063,
+          "endLine": 2122,
+          "summary": {
+            "tests": 45,
+            "pass": 45,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            45
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:personal-mailbox-default-off-db",
+          "seconds": 23.9,
+          "startLine": 2190,
+          "endLine": 2249,
+          "summary": {
+            "tests": 42,
+            "pass": 42,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            42
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:schedules-db",
+          "seconds": 9.4,
+          "startLine": 2325,
+          "endLine": 2353,
+          "summary": {
+            "tests": 16,
+            "pass": 16,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            16
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:skill-semantic-db",
+          "seconds": 3.8,
+          "startLine": 2401,
+          "endLine": 2415,
+          "summary": {
+            "tests": 2,
+            "pass": 2,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            2
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:captures-db",
+          "seconds": 27.8,
+          "startLine": 2428,
+          "endLine": 2482,
+          "summary": {
+            "tests": 29,
+            "pass": 29,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            29
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:artifact-migration-db",
+          "seconds": 0.9,
+          "startLine": 2496,
+          "endLine": 2506,
+          "summary": {
+            "tests": 1,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            1
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:visibility-db",
+          "seconds": 7.7,
+          "startLine": 2530,
+          "endLine": 2541,
+          "summary": {
+            "tests": 2,
+            "pass": 2,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            2
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:factory-check-independence-db",
+          "seconds": 2.6,
+          "startLine": 2625,
+          "endLine": 2691,
+          "summary": {
+            "tests": 55,
+            "pass": 55,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            55
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:onboarding-db",
+          "seconds": 1.6,
+          "startLine": 2714,
+          "endLine": 2733,
+          "summary": {
+            "tests": 5,
+            "pass": 5,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            5
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:relation-cycle",
+          "seconds": 23.9,
+          "startLine": 2902,
+          "endLine": 2923,
+          "summary": {
+            "tests": 6,
+            "pass": 6,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            6
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:workspace-migration-db",
+          "seconds": 0.5,
+          "startLine": 2937,
+          "endLine": 2947,
+          "summary": {
+            "tests": 1,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            1
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:device-enrollment-db",
+          "seconds": 37,
+          "startLine": 3013,
+          "endLine": 3043,
+          "summary": {
+            "tests": 13,
+            "pass": 13,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            13
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:activity-actor-db",
+          "seconds": 125.6,
+          "startLine": 3066,
+          "endLine": 3250,
+          "summary": {
+            "tests": 57,
+            "pass": 57,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            57
+          ],
+          "okMarker": true
+        },
+        {
+          "script": "test:live-db",
+          "seconds": 140,
+          "startLine": 3300,
+          "endLine": 3596,
+          "summary": {
+            "tests": 175,
+            "pass": 175,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "segments": [
+            10,
+            165
+          ],
+          "okMarker": true
+        }
+      ],
+      "totalNodeReportedTests": 617
+    }
+  ],
+  "aggregate": {
+    "jobId": 128990215776,
+    "name": "Production build and browser interactions",
+    "conclusion": "success",
+    "actualEnv": {
+      "CHANGES_RESULT": "success",
+      "EXPECT_DB": "true",
+      "DB_RESULT": "success"
+    },
+    "executedGate": "Requires successful changes and all selected database shards, then records job timings.",
+    "excludes": "This aggregate name does not prove a production build or browser-interaction run; neither operation is executed by its current job body."
+  },
+  "jobs": [
+    {
+      "jobId": 128988113807,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T04:57:44Z",
+      "completedAt": "2026-11-09T05:02:21Z",
+      "checkout": {
+        "sha": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+        "gitLogCommandLine": 250,
+        "shaLine": 251
+      },
+      "cleanup": {
+        "containerId": "6e8bf836328cc1f7e6d4d0d4cfa5e6337ad4aabca13e0584ca30456c54232e6b",
+        "network": "github_network_928f5f7f95df4062b90819c3f9c77d41",
+        "containerRemoveCommandLine": 4364,
+        "containerIdEchoLine": 4365,
+        "networkRemoveCommandLine": 4367,
+        "networkIdEchoLine": 4368,
+        "stopStepConclusion": "success"
+      },
+      "log": {
+        "jobId": 128988113807,
+        "key": "ci1fa3.pg.log.128988113807",
+        "characters": 609692,
+        "decodedUtf8Bytes": 614246,
+        "sha256": "b28c4a81721b5782de214e517f3970bfa8c99f6a75aab6e0e04c6ae8c3f90a50",
+        "gitBlobSha1": "977189da0e97415b6d694ac3f29b6474dec76978",
+        "startsWithBom": true,
+        "bomCodepoints": 1,
+        "ansiEscapes": 56
+      },
+      "rawRemoteBlob": "977189da0e97415b6d694ac3f29b6474dec76978"
+    },
+    {
+      "jobId": 128988113801,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T04:57:40Z",
+      "completedAt": "2026-11-09T05:01:00Z",
+      "checkout": {
+        "sha": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+        "gitLogCommandLine": 250,
+        "shaLine": 251
+      },
+      "cleanup": {
+        "containerId": "e35647e314876cedc6c20fe2a275ade96ee9ab95ca35868bb252ec2164d6d347",
+        "network": "github_network_d937b3fc45b84620914b63a384874110",
+        "containerRemoveCommandLine": 7256,
+        "containerIdEchoLine": 7257,
+        "networkRemoveCommandLine": 7259,
+        "networkIdEchoLine": 7260,
+        "stopStepConclusion": "success"
+      },
+      "log": {
+        "jobId": 128988113801,
+        "key": "ci1fa3.pg.log.128988113801",
+        "characters": 1155453,
+        "decodedUtf8Bytes": 1160443,
+        "sha256": "12a55057337b6b27695b4365b8f1dca2a77cb6c6313986e10bc1d0ce9969df61",
+        "gitBlobSha1": "f83f13dd63da01f86af930ff6792bd8feaf747e4",
+        "startsWithBom": true,
+        "bomCodepoints": 1,
+        "ansiEscapes": 52
+      },
+      "rawRemoteBlob": "f83f13dd63da01f86af930ff6792bd8feaf747e4"
+    },
+    {
+      "jobId": 128988113837,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T04:59:08Z",
+      "completedAt": "2026-11-09T05:05:00Z",
+      "checkout": {
+        "sha": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+        "gitLogCommandLine": 248,
+        "shaLine": 249
+      },
+      "cleanup": {
+        "containerId": "d809595d0ce6a9ed09e4bc914a6341c4b736838dadf16bf5ef6261bd5e2aec61",
+        "network": "github_network_1c6875cc1f6c45049147923073c85afc",
+        "containerRemoveCommandLine": 13423,
+        "containerIdEchoLine": 13424,
+        "networkRemoveCommandLine": 13426,
+        "networkIdEchoLine": 13427,
+        "stopStepConclusion": "success"
+      },
+      "log": {
+        "jobId": 128988113837,
+        "key": "ci1fa3.pg.log.128988113837",
+        "characters": 2276601,
+        "decodedUtf8Bytes": 2285445,
+        "sha256": "f799d95550b60c54d866a94063361913d58683f730cbdd77b133e6f807b1f9af",
+        "gitBlobSha1": "6edbce1cd1e032716d60bfcda04f5e36d41b28a2",
+        "startsWithBom": true,
+        "bomCodepoints": 2,
+        "ansiEscapes": 52
+      },
+      "rawRemoteBlob": "6edbce1cd1e032716d60bfcda04f5e36d41b28a2"
+    },
+    {
+      "jobId": 128988113812,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T04:57:57Z",
+      "completedAt": "2026-11-09T05:01:51Z",
+      "checkout": {
+        "sha": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+        "gitLogCommandLine": 249,
+        "shaLine": 250
+      },
+      "cleanup": {
+        "containerId": "31add2c681b3f37d7519f98d549a01c26cc87e27f465ff8ac931da14b3b375c3",
+        "network": "github_network_d3ddf8a214644b518ea5ba4861d7b5c8",
+        "containerRemoveCommandLine": 3982,
+        "containerIdEchoLine": 3983,
+        "networkRemoveCommandLine": 3985,
+        "networkIdEchoLine": 3986,
+        "stopStepConclusion": "success"
+      },
+      "log": {
+        "jobId": 128988113812,
+        "key": "ci1fa3.pg.log.128988113812",
+        "characters": 621844,
+        "decodedUtf8Bytes": 625978,
+        "sha256": "86d368a955663a58a25f13079fad1eedaa6830b25d91b84c793890d248f76d8e",
+        "gitBlobSha1": "de748bef59ca213351bddf86e3e9f18dadb6ffd8",
+        "startsWithBom": true,
+        "bomCodepoints": 1,
+        "ansiEscapes": 52
+      },
+      "rawRemoteBlob": "de748bef59ca213351bddf86e3e9f18dadb6ffd8"
+    },
+    {
+      "jobId": 128990215776,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T05:05:02Z",
+      "completedAt": "2026-11-09T05:05:13Z",
+      "checkout": {
+        "sha": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+        "gitLogCommandLine": 148,
+        "shaLine": 149
+      },
+      "cleanup": null,
+      "log": {
+        "jobId": 128990215776,
+        "key": "ci1fa3.pg.log.128990215776",
+        "characters": 13302,
+        "decodedUtf8Bytes": 13304,
+        "sha256": "35143600a762b945beef474f1f056318c705fe28df94197930382d54971fb477",
+        "gitBlobSha1": "2c79ca9f2a6457e5da0c539cf09456e6220123c0",
+        "startsWithBom": true,
+        "bomCodepoints": 1,
+        "ansiEscapes": 16
+      },
+      "rawRemoteBlob": "2c79ca9f2a6457e5da0c539cf09456e6220123c0"
+    }
+  ],
+  "cleanup": {
+    "postgresImage": "postgres:17",
+    "actualServerVersion": "17.11",
+    "stoppedAndRemovedContainers": 4,
+    "removedNetworks": 4,
+    "proof": "Every shard's Stop containers step completed success; each original log has docker rm --force followed by the exact container ID and docker network rm followed by the exact network name.",
+    "extraComputeCreatedByReviewer": 0,
+    "expectedWorkflowStepSkips": "Main-only cache save and shard1-only ancillary checks are conditionally skipped elsewhere. No selected required DB suite or Node case was skipped."
+  },
+  "preservation": {
+    "logReadsPerJob": 1,
+    "rawLogCount": 5,
+    "totalDecodedUtf8Bytes": 4699416,
+    "rawUnchanged": true,
+    "rawRemoteBlobs": [
+      {
+        "jobId": 128988113807,
+        "blob": "977189da0e97415b6d694ac3f29b6474dec76978",
+        "bytes": 614246,
+        "sha256": "b28c4a81721b5782de214e517f3970bfa8c99f6a75aab6e0e04c6ae8c3f90a50"
+      },
+      {
+        "jobId": 128988113801,
+        "blob": "f83f13dd63da01f86af930ff6792bd8feaf747e4",
+        "bytes": 1160443,
+        "sha256": "12a55057337b6b27695b4365b8f1dca2a77cb6c6313986e10bc1d0ce9969df61"
+      },
+      {
+        "jobId": 128988113837,
+        "blob": "6edbce1cd1e032716d60bfcda04f5e36d41b28a2",
+        "bytes": 2285445,
+        "sha256": "f799d95550b60c54d866a94063361913d58683f730cbdd77b133e6f807b1f9af"
+      },
+      {
+        "jobId": 128988113812,
+        "blob": "de748bef59ca213351bddf86e3e9f18dadb6ffd8",
+        "bytes": 625978,
+        "sha256": "86d368a955663a58a25f13079fad1eedaa6830b25d91b84c793890d248f76d8e"
+      },
+      {
+        "jobId": 128990215776,
+        "blob": "2c79ca9f2a6457e5da0c539cf09456e6220123c0",
+        "bytes": 13304,
+        "sha256": "35143600a762b945beef474f1f056318c705fe28df94197930382d54971fb477"
+      }
+    ],
+    "encodingBoundary": "Exact UTF-8 re-encoding of GitHub MCP decoded log strings, including original BOM and ANSI. Only analysis copies strip timestamp/ANSI/BOM prefixes. No claim about ZIP wire bytes or compressed originals.",
+    "priorFailureBoundary": "The previous standalone C probe42553864534 timeout remains a timeout with candidate not executed; current canonical success is new evidence at f886, not retroactive validation. Existing earlier Native RED receipts remain unchanged.",
+    "rawExpectedErrorsRetained": "Intentionally injected SQL errors, warning lines and child diagnostics remain in original logs. Passing Node summaries are reported separately."
+  },
+  "privacyReviewKey": "ci1fa3.pg.privacyReview",
+  "limitations": [
+    "No1788 failed job log was read, no rerun/cancel/workflow dispatch or model call occurred.",
+    "This report does not establish whole-CI, Native, daemon release, E2B writer, served-version or production acceptance.",
+    "Raw logs are Git blobs awaiting root attachment to the evidence branch; no ref was changed by this reviewer.",
+    "No unresolved missing suite, unknown test count, missing terminal job or unconfirmed PG service cleanup remains within this assigned scope."
+  ],
+  "operations": {
+    "githubRunJobsMetadataReads": 2,
+    "originalJobLogReads": 5,
+    "selectedSourceAndSelectionReads": 6,
+    "testsRunByReviewer": 0,
+    "workflowActions": 0,
+    "refsChanged": 0,
+    "newVMs": 0,
+    "newDBs": 0,
+    "modelCalls": 0
+  }
+}

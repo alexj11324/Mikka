@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "kind": "projected-current-main-union-readiness",
+  "main": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "mainTree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+  "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+  "headTree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+  "projectedUnionTree": "fa800b0e41446e7d479473ee3db8e6a1e22e341c",
+  "ownedDeltaPaths": 25,
+  "identicalMcpSharedPaths": 3,
+  "otherMainPathsPreserved": 8,
+  "refUpdated": false,
+  "unionFullCiExecuted": false,
+  "mainWritten": false,
+  "basis": "Actual Git trees; all 3 MCP paths are byte-identical between the PR and main. The other 8 main paths do not intersect the 25 owned paths.",
+  "notAcceptance": [
+    "The projected tree object is preparation only; no ref or main write occurred.",
+    "CI42564360573 tested tree0ecc at f886; it did not run this union tree.",
+    "A fresh real-main, PR-head and owner-window guard is required before ordinary merge."
+  ]
+}

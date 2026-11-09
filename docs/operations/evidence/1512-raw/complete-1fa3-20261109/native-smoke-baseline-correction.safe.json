@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "kind": "sealed-baseline-description-correction",
+  "supersededDescription": {
+    "artifact": "CP18 native/README.md",
+    "gitBlobSha1": "53e1cefa86604c8f38f817523e853583d77aac11",
+    "claim": "Lifecycle and smoke owner/peer baseline-before=false",
+    "issue": "The smoke part of that sentence was inaccurate; only lifecycle had false before."
+  },
+  "measuredFacts": [
+    {
+      "sourceRevision": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "flow": "smoke",
+      "originalSha256": "2cb6384fe19aa3f84b4642a795199bf1f2226a341189115ac6c39f7e99d5c2d0",
+      "originalGitBlobSha1": "2cdd445ce421481531295b3b17cac2e626d8e477",
+      "owner": {
+        "before": true,
+        "after": true,
+        "changedTableCount": 0
+      },
+      "peer": {
+        "before": true,
+        "after": true,
+        "changedTableCount": 0
+      }
+    },
+    {
+      "sourceRevision": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "flow": "lifecycle",
+      "originalSha256": "1b0e260eba864461cec425d369fa88384f127416dc02f396fe7489f7245f6625",
+      "originalGitBlobSha1": "2312cab42c01a18cda64f5e77189ac4a0f5b6112",
+      "owner": {
+        "before": false,
+        "after": true,
+        "changedTableCount": 1
+      },
+      "peer": {
+        "before": false,
+        "after": true,
+        "changedTableCount": 1
+      }
+    },
+    {
+      "sourceRevision": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+      "flow": "smoke",
+      "originalSha256": "8ddd5913a0b56385582e3b515d2e59fd860e1b9e6a24167b3ac6900bc9a38bb3",
+      "originalGitBlobSha1": "9511205a888a888afd748a7220604695237952cd",
+      "owner": {
+        "before": true,
+        "after": true,
+        "changedTableCount": 0
+      },
+      "peer": {
+        "before": true,
+        "after": true,
+        "changedTableCount": 0
+      }
+    }
+  ],
+  "authoritativeData": "Original JSON and cleanup receipts already contain these correct values and remain byte-identical.",
+  "budgetAndAcceptanceImpact": "No budget, artifact revision, functional result or cleanup-after result changes.",
+  "newRuntimeOrExternalRead": false
+}

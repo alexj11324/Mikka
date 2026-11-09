@@ -1,0 +1,29 @@
+{
+  "original": {
+    "path": "/vercel/sandbox/native-1fa3/native-1fa3-original/parity/light-shared-missing-diff.png",
+    "bytes": 10807,
+    "sha256": "2f6ed73e35d7e0dc738d3feb9ed6eae34a993c530415c42abe07ee19286f8eeb",
+    "pngSignatureVerified": true
+  },
+  "contentBlockTypes": [
+    "text"
+  ],
+  "encoding": "base64",
+  "contentType": "application/octet-stream",
+  "reportedSize": 10807,
+  "returnedBase64Characters": 2014,
+  "truncated": true,
+  "truncation": {
+    "arrays": 0,
+    "omittedArrayItems": 0,
+    "objects": 0,
+    "omittedObjectKeys": 0,
+    "strings": 1,
+    "omittedStringChars": 12412,
+    "depth": 0,
+    "budget": 0
+  },
+  "containsTruncationMarker": true,
+  "imageBlockReturned": false,
+  "probeCalls": 1
+}
