@@ -126,7 +126,7 @@ export async function delegateGroupTask(client:PoolClient, scope:Scope, adapters
     if (!scope.reporter.executionAvailable) return finish({text:copy.notStarted.replace('{remedy}',groupExecutionRemedy(scope.reporter.executionReason ?? 'execution_unavailable',locale)),mentions:[]})
     const execution=await runtime.executionBot(scope);botId=execution.botId;repository=execution.repository
     const intakeId=factoryEventId('group-intake',scope.messageId)
-    await sourceEvent(client,{id:intakeId,userId:scope.userId,botId:null,issueId:null,text:scope.text,conversationId:scope.conversationId,messageId:scope.messageId})
+    await sourceEvent(client,{id:intakeId,userId:scope.userId,botId,issueId:null,text:scope.text,conversationId:scope.conversationId,messageId:scope.messageId})
     issueId=await runtime.create(scope.userId,intakeId,scope.text.trim().slice(0,200))
     await client.query(`INSERT INTO group_task_bindings ("conversationId","issueId","userId","reporterId","reporterOwnerId","reporterType","executionBotId","sourceMessageId","sourceEventId") VALUES($1,$2,$3,$4,$8,'bot',$5,$6,$7) ON CONFLICT DO NOTHING`,[scope.conversationId,issueId,scope.userId,scope.reporter.id,botId,scope.messageId,factoryEventId('group-delegate',scope.messageId),execution.reporterOwnerId])
     await client.query(`UPDATE group_task_receipts SET "issueId"=$2 WHERE "messageId"=$1`,[scope.messageId,issueId])

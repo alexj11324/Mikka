@@ -1,18 +1,19 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { afterDatabaseCommit } from '../db/commit-effects'
+import { afterDatabaseCommit, captureDatabaseQuery } from '../db/commit-effects'
 import { armDueTimerAfterCommit, armDueTimerSoon } from '../due-timer'
 import { ReviewAuthorityError, type TaskReviewAuthority } from './review-authority'
 import { readIssueMetadata } from '../issue-metadata'
 import { THREAD_MACHINE_BUDGET_MS } from '../cloud-computer/thread-lifecycle'
+import { taskThreadRunPredicate } from '../task-thread-run'
 
 export const REVIEW_SESSION_MS = 5 * 60_000
 export type ReviewSessionKind = 'terminal' | 'preview'
 export type ReviewSessionLease = { id: string; expiresAt: string }
 export type ReviewRevokeTarget = { runId: string; ownerId: string; workspaceId: string; sandboxId: string }
 export type ReviewSessionTarget = { runIds: readonly string[] } | { userId: string } | { workspaceId: string; ownerId?: string }
-  | { taskId: string } | { credentialKind: 'session' | 'pat'; credentialId: string } | { deviceTokenId: string }
+  | { taskId: string } | { taskIds: readonly string[] } | { credentialKind: 'session' | 'pat'; credentialId: string } | { deviceTokenId: string }
   | { id: string; bindingId: string; ownerId: string; kind: ReviewSessionKind } | { leaseIds: readonly string[] }
 export type ReviewRevokeReason = 'run_control' | 'run_changed' | 'task_changed' | 'credential_revoked'
   | 'membership_changed' | 'machine_changed' | 'expired'
@@ -107,6 +108,7 @@ function targetWhere(target: ReviewSessionTarget): { where: string; values: unkn
   if ('userId' in target) return { where: 's."ownerId"=$1', values: [target.userId] }
   if ('workspaceId' in target) return { where: 's."workspaceId"=$1 AND ($2::text IS NULL OR s."ownerId"=$2)', values: [target.workspaceId, target.ownerId ?? null] }
   if ('taskId' in target) return { where: 's."taskId"=$1', values: [target.taskId] }
+  if ('taskIds' in target) return { where: 's."taskId"=ANY($1::uuid[])', values: [[...target.taskIds]] }
   if ('deviceTokenId' in target) return { where: 's."deviceTokenId"=$1', values: [target.deviceTokenId] }
   if ('id' in target) return { where: 's.id=$1 AND s."bindingId"=$2 AND s."ownerId"=$3 AND s.kind=$4', values: [target.id, target.bindingId, target.ownerId, target.kind] }
   return { where: 's."credentialKind"=$1 AND s."credentialId"=$2', values: [target.credentialKind, target.credentialId] }
@@ -219,11 +221,14 @@ export async function reconcileReviewSessions(database: Database, target: Review
     LEFT JOIN devices d ON d.id=s."deviceId" LEFT JOIN thread_machines m ON m."runId"=s."runId"
     WHERE (${where}) AND (s."revokedAt" IS NOT NULL OR s."expiresAt"<=clock_timestamp()
       OR r.id IS NULL OR r."userId"<>s."ownerId" OR r."issueId" IS DISTINCT FROM s."taskId"
+      OR NOT (${taskThreadRunPredicate('r')})
+      OR r."workspaceId" IS DISTINCT FROM s."workspaceId"
       OR r."deviceId" IS DISTINCT FROM s."deviceId" OR r."deviceRepoId" IS DISTINCT FROM s."repoId"
       OR r."deviceTokenId" IS DISTINCT FROM s."deviceTokenId" OR r."stopRequestedAt" IS NOT NULL
       OR r.status IN ('stopped','cancelled') OR r."stopReason"='device_lost'
       OR (r.status IN ('preparing','running','waiting_input','finishing') AND (r."leaseExpiresAt" IS NULL OR r."leaseExpiresAt"<=clock_timestamp()))
       OR i.id IS NULL OR i.status IN ('done','canceled','duplicate')
+      OR i."ownershipState" IS DISTINCT FROM 'bound' OR i."workspaceId" IS DISTINCT FROM s."workspaceId"
       OR coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' IS NOT NULL
       OR CASE WHEN coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->'assignee'->>'kind'='member'
         THEN coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->'assignee'->>'id' ELSE i."userId" END IS DISTINCT FROM s."ownerId"
@@ -231,7 +236,8 @@ export async function reconcileReviewSessions(database: Database, target: Review
       OR m."runId" IS NULL OR m.state='ended' OR m."ownerId"<>s."ownerId" OR m."workspaceId"<>s."workspaceId"
       OR m."issueId" IS DISTINCT FROM s."taskId" OR m."deviceId" IS DISTINCT FROM s."deviceId"
       OR m."sandboxId" IS DISTINCT FROM s."sandboxId" OR m.epoch<>s."machineEpoch" OR m."operationId"<>s."machineOperationId"
-      OR EXISTS(SELECT 1 FROM agent_runs newer WHERE newer."issueId"=s."taskId" AND (newer."createdAt",newer.id)>(r."createdAt",r.id))
+      OR EXISTS(SELECT 1 FROM agent_runs newer WHERE newer."issueId"=s."taskId" AND ${taskThreadRunPredicate('newer')}
+        AND (newer."createdAt",newer.id)>(r."createdAt",r.id))
       OR (s."credentialKind"='session' AND NOT EXISTS(SELECT 1 FROM "session" c WHERE c.id=s."credentialId" AND c."userId"=s."ownerId" AND c."expiresAt">clock_timestamp()))
       OR (s."credentialKind"='pat' AND NOT EXISTS(SELECT 1 FROM personal_access_tokens c WHERE c.id::text=s."credentialId" AND c."userId"=s."ownerId"
         AND c."workspaceId"=s."workspaceId" AND c."revokedAt" IS NULL AND (c."expiresAt" IS NULL OR c."expiresAt">clock_timestamp()))))`, values)
@@ -246,13 +252,27 @@ export async function expireReviewSessions(database: Database) {
   return rows.length ? revokeReviewSessions(database, { leaseIds: rows.map(row => row.id) }, 'expired') : { closed: 0, pending: 0 }
 }
 
-export function reviewSessionsChanged(executor: object, target: ReviewSessionTarget) {
+export function reviewSessionsChanged(executor: object, target: ReviewSessionTarget, outerCommit?: object) {
   try {
-    afterDatabaseCommit(executor, `review-authority:${JSON.stringify(target)}`, async () => {
+    const key = `review-authority:${JSON.stringify(target)}`
+    const schedule = async () => {
       const [{ pool, withoutDatabaseClient }, { afterJob }] = await Promise.all([import('../db/request-scope'), import('../background')])
       afterJob('after:device-wake', () => withoutDatabaseClient(() => reconcileReviewSessions(pool, target)), { orRun: true })
+    }
+    afterDatabaseCommit(executor, key, () => {
+      if (outerCommit) afterDatabaseCommit(outerCommit, key, schedule)
+      else return schedule()
     })
   } catch { console.warn('Review reconciliation wake unavailable', { code: 'review_commit_observation_unavailable' }) }
+}
+
+/** Factory binding's SQL trigger already fences this exact checker's leases.
+ * APP rollback sends nothing. If a surrounding Workspace transaction exists,
+ * capture its executor now and schedule remote close only after its COMMIT.
+ * A failed outer transaction leaves the durable row for the existing due timer. */
+export async function reviewRunBecameChecker(executor: object, runId: string) {
+  const { workspacePool } = await import('../workspace-db')
+  reviewSessionsChanged(executor, { runIds: [runId] }, captureDatabaseQuery(workspacePool))
 }
 
 /** Explicit security/control mutations already know they removed authority;
@@ -266,7 +286,7 @@ export function reviewSessionsRevoked(executor: object, target: ReviewSessionTar
   } catch { console.warn('Review revocation wake unavailable', { code: 'review_commit_observation_unavailable' }) }
 }
 
-type ReviewTaskSnapshot = { id: string; userId: string; status: string; scope?: string; content: Parameters<typeof readIssueMetadata>[0] }
+type ReviewTaskSnapshot = { id: string; userId: string; status: string; scope?: string; workspaceId?: string | null; ownershipState?: string; content: Parameters<typeof readIssueMetadata>[0] }
 /** A cheap in-memory comparison at actual task writers, not the live output
  * path. Renaming or editing prose performs no additional review SQL. */
 export function reviewTaskChanged(executor: object, before: ReviewTaskSnapshot, after: ReviewTaskSnapshot) {
@@ -274,6 +294,7 @@ export function reviewTaskChanged(executor: object, before: ReviewTaskSnapshot, 
   const previousOwner = prior.assignee?.kind === 'member' ? prior.assignee.id : before.userId
   const nextOwner = next.assignee?.kind === 'member' ? next.assignee.id : after.userId
   if (previousOwner !== nextOwner || before.userId !== after.userId || before.scope !== after.scope
+    || before.workspaceId !== after.workspaceId || before.ownershipState !== after.ownershipState
     || prior.deletedAt !== next.deletedAt || before.status !== after.status && ['done', 'canceled', 'duplicate'].includes(after.status))
     reviewSessionsRevoked(executor, { taskId: after.id }, 'task_changed')
 }

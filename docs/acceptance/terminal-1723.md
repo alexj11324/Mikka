@@ -154,6 +154,54 @@ The driver-specific fail-closed/redaction tests run with:
 node --import tsx --test scripts/acceptance/task-review-terminal.test.mjs
 ```
 
+### Normal product Task driver
+
+For a fresh product acceptance, use the exclusive manual `workspace-review`
+mode documented in the [workflow reference](../../.github/workflows/README.md#product-terminal-and-preview-acceptance).
+`scripts/acceptance/coding-workspace.mjs` uses the normal shared-account cookie
+client and creates one small repository Task per original official subscription.
+It pins the served application, published worker/template evidence, every actual
+Run's model and shared subscription, and the retained producer's own machine.
+The number of observed execute/review/legacy-verify attempts is bounded; this is
+not a promise of exactly two model calls or a hard spending cap.
+
+The candidate's producing Run must have succeeded. A Factory review/verify Run,
+`repo:none` deliverable, stopped read-only startup run or adopted/ended machine
+cannot substitute for it. Creation explicitly binds the Task to the selected
+stored workspace; it does not change Team membership or promote an already
+bound Task. The existing terminal suite still verifies actual shell output,
+resize, Ctrl+C, deduplicated input, reconnect, preserved expiry and exit code 7.
+
+A second owner PTY installs the checked-in locked framework fixture: Vite for
+Claude, Next for Codex. All uploads and commands use normal terminal input.
+Each PTY retains its five-minute absolute lease; an install or probe that exceeds
+it fails. Preview checks cover no-server 404, owner 400 responses to an arbitrary
+URL, duplicate ports and arbitrary run/sandbox fields, discovery, denied raw
+ports, one-use bootstrap, the isolated cookie, assets and a live HMR update.
+Only the preview cookie is sent to that isolated origin.
+
+Before normal machine end, native Git/gh validates the exact newly created
+repository/PR/author/branch/candidate SHA/Task marker and one committed fixture
+file, then closes that PR and deletes that branch. It does not export a token,
+write the default branch, merge or force-push. Preview HTTP and active WebSockets
+must still work after this cleanup. Only then does the driver request machine
+end, verify ended state with cleared provider references, observe old HTTP/WS
+capability refusal and request terminal GET/input and preview 409 before deleting
+the Task. A lease expiring during this check cannot count as end revocation.
+
+An existing visible non-owner Task supplies GET/input and preview 403 checks;
+a second existing workspace supplies scope-denied checks. If either fixture is
+missing, the report is incomplete. The report separately retains local-machine
+support and two simultaneous actors on the same Task as untested boundaries.
+The failure checkpoint preserves uncertain writes and precise resource IDs.
+Normal `cleanupCase` and the workflow's exact-journal recovery stop only those
+owned fixtures; unresolved publication or cleanup prevents another case.
+
+Local source tests validate driver guards and failure handling. They do not
+establish that a production Task, subscription, terminal or preview passed.
+Attach the immutable CI/deployment/release IDs and the actual sanitized receipt
+to #1723 and #1724 after executing the authorized production run.
+
 ## Merge risk and recovery
 
 **Merge risk: high while integrated CI, Native runtime and production checks remain pending.**

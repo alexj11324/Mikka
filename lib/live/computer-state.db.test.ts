@@ -19,7 +19,12 @@ const scheduled: (() => Promise<void>)[] = []
 mock.module('next/server', { namedExports: { after: (work: () => Promise<void>) => { scheduled.push(work) } } })
 let workspaceDatabase: Pool
 mock.module(new URL('../workspace-db.ts', import.meta.url).href, {
-  namedExports: { workspacePool: { query: (text: string, parameters?: unknown[]) => workspaceDatabase.query(text, parameters) } },
+  namedExports: {
+    workspacePool: { query: (text: string, parameters?: unknown[]) => workspaceDatabase.query(text, parameters) },
+    // Reconciliation imports sandboxGone from thread-machines. It must use
+    // this test's real pool, without starting an unrelated Task admission.
+    workspaceDb: new Proxy({}, { get: () => assert.fail('computer reconciliation must not use the Workspace ORM') }),
+  },
 })
 let ComputerStore: typeof import('../computer/store')['ComputerStore']
 let syncComputerReviews: typeof import('../computer/reviews')['syncComputerReviews']
@@ -106,7 +111,7 @@ test('real PG: computer changes publish committed owner state without heartbeat 
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean NOT NULL DEFAULT true);
       CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,status text,"leaseExpiresAt" timestamptz,
         "stopRequestedAt" timestamptz,"updatedAt" timestamptz,"finishedAt" timestamptz,"resumeStatus" text,"pauseReason" text,
-        "botId" uuid,"machineAuthority" boolean NOT NULL DEFAULT false,cli_policy_hierarchy jsonb);
+        "botId" uuid,"machineAuthority" boolean NOT NULL DEFAULT false,cli_policy_hierarchy jsonb,"workspaceId" uuid);
       CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id),"botId" uuid,"ownerId" text,"workspaceId" uuid,
         "approvedForRun" boolean NOT NULL DEFAULT false,FOREIGN KEY ("botId","workspaceId","ownerId") REFERENCES bots(id,"workspaceId","ownerId"));
       CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"botId" uuid,"ownerId" text,"workspaceId" uuid,"deviceId" uuid,state text,"sandboxId" text,epoch integer);`)

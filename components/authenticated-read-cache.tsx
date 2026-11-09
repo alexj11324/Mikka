@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { useRouter } from '@/i18n/navigation'
 import { APP_BUILD } from '@/lib/app-build'
 import { selectedWebServer } from '@/lib/web-connection/selection'
+import { WorkspaceLoading } from '@/components/workspace/workspace-loading'
 import type { AuthorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 import { clearPersistentReadCaches, PersistentReadCache, readCacheNamespace, type ReadCacheScope, type ReadCacheState } from '@/lib/swr/persistent-cache'
 
@@ -25,7 +26,7 @@ export function AuthenticatedReadCache({ ownerId, workspace, build = APP_BUILD, 
 
 function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { scope: ReadCacheScope | null; unauthorized: boolean; initialReads?: readonly InitialRead[]; children: ReactNode }) {
   const router = useRouter()
-  const [state, setState] = useState<{ cache: Cache; generation: number }>(() => {
+  const [state, setState] = useState<{ cache: Cache; generation: number; retiring?: boolean }>(() => {
     const cache: Cache = scope ? new PersistentReadCache(scope) : new Map()
     // SWR fallback is not necessarily stored in the provider. Put authorized
     // server reads there before the asynchronous disk snapshot can arrive.
@@ -39,7 +40,14 @@ function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { sc
   useEffect(() => { if (unauthorized) void clearPersistentReadCaches() }, [unauthorized])
   useEffect(() => {
     if (!(state.cache instanceof PersistentReadCache)) return
-    return state.cache.connect(() => {
+    return state.cache.connect(reason => {
+      // The workspace selector is already replacing this entire document.
+      // Retire its readers immediately while disk clears; a fresh Map here
+      // would remount them before the replacement document authorizes scope.
+      if (reason === 'document-navigation') {
+        setState(current => ({ ...current, retiring: true }))
+        return
+      }
       // Retire the whole provider, including in-flight requests and component
       // refs. Remounted children use an empty in-memory cache until the server
       // confirms the new account/workspace. An old fetch cannot refill it.
@@ -47,6 +55,7 @@ function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { sc
       router.refresh()
     })
   }, [state.cache, router])
+  if (state.retiring) return <WorkspaceLoading />
   return <SWRConfig key={state.generation} value={config}><HydrateReadCache />{children}</SWRConfig>
 }
 

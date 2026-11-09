@@ -283,6 +283,73 @@ class Candidates(unittest.TestCase):
         self.assertEqual(len(log.value['events']), candidates.MAX_LOG_EVENTS)
         self.assertTrue(log.value['truncated'])
 
+    def test_actual_guard_failure_receipt_survives_provider_envelope_without_private_fields(self):
+        path = Path(__file__).resolve().parents[2] / 'packages/daemon/scripts/workspace-ingress.py'
+        spec = importlib.util.spec_from_file_location('guard_diagnostic', path)
+        guard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(guard)
+        error = guard.IngressCommandError('ipv6', 'provider_rule', 'exit', 2,
+                                         (PRIVATE + ' Warning: Extension multiport revision 1 not supported; operation not permitted').encode())
+        receipt = guard.failure_receipt(error)
+        expected = deepcopy(receipt['command'])
+        receipt['command'].update(argv=[PRIVATE], stderr=PRIVATE, path=PRIVATE)
+        receipt['command']['unsupportedExtensions'][0]['stderr'] = PRIVATE
+        log = candidates.BuildDiagnostics({}, self.output, 'claude')
+        log(SimpleNamespace(level='error', message='[start] [stderr]: ' + json.dumps(receipt)))
+        self.assertEqual(log.value['events'], [{'phase': 'ingress', 'detail': 'command', 'command': expected}])
+        self.assertTrue(expected['permissionDenied'])
+        self.assertEqual((expected['extension'], expected['revision']), ('multiport', 1))
+        self.assertNotIn(PRIVATE, json.dumps(log.value))
+        for kind, code in (('timeout', None), ('output_limit', 0), ('execution', None)):
+            receipt['command'].update(failureKind=kind, returnCode=code)
+            log(SimpleNamespace(level='error', message='[ready] [stderr]: ' + json.dumps(receipt)))
+            self.assertEqual(log.value['events'][-1]['command']['failureKind'], kind)
+            self.assertEqual(log.value['events'][-1]['command']['returnCode'], code)
+        for operation in ('install_policy', 'list_table', 'list_ruleset', 'create_table', 'new_chain',
+                          'base_chain', 'provider_rule', 'reply_rule', 'output_jump'):
+            failure = guard.failure_receipt(guard.IngressCommandError('inet', operation, 'exit', 4,
+                                                                     (PRIVATE + ' Operation not supported').encode()))
+            expected = deepcopy(failure['command'])
+            failure['command']['stderr'] = PRIVATE
+            log(SimpleNamespace(level='error', message='[start] [stderr]: ' + json.dumps(failure)))
+            self.assertEqual(log.value['events'][-1], {'phase': 'ingress', 'detail': 'command', 'command': expected})
+        self.assertNotIn(PRIVATE, json.dumps(log.value))
+
+    def test_malformed_command_observations_cannot_be_reported_as_real_ingress_evidence(self):
+        command = {'family': 'ipv4', 'operation': 'new_chain', 'failureKind': 'exit', 'returnCode': 1,
+                   **dict.fromkeys(candidates.INGRESS_COMMAND_FLAGS, False)}
+        log = candidates.BuildDiagnostics({}, self.output, 'claude')
+        changes = [{'family': PRIVATE}, {'operation': PRIVATE}, {'failureKind': PRIVATE}, {'returnCode': PRIVATE},
+                   {'returnCode': True}, {'returnCode': 256}, {'returnCode': -256}, {'permissionDenied': PRIVATE},
+                   {'operation': {PRIVATE: PRIVATE}}]
+        for change in changes:
+            log(SimpleNamespace(level='error', message=json.dumps({'ok': False, 'detail': 'command',
+                                                                   'command': {**command, **change}})))
+            self.assertEqual(log.value['events'][-1], {'phase': 'ingress', 'detail': 'command'})
+        for key in command:
+            incomplete = {name: value for name, value in command.items() if name != key}
+            self.assertIsNone(candidates.ingress_command(incomplete))
+        legacy = candidates.ingress_command(command)
+        self.assertEqual((legacy['extension'], legacy['revision']), ('unknown', None))
+        self.assertEqual(legacy['unsupportedExtensions'], [])
+        for extension, revision, expected in ((PRIVATE, 1, ('unknown', None)), ('owner', PRIVATE, ('owner', None)),
+                                             ('owner', True, ('owner', None)), ('owner', 256, ('owner', None))):
+            value = candidates.ingress_command({**command, 'extension': extension, 'revision': revision})
+            self.assertEqual((value['extension'], value['revision']), expected)
+            self.assertEqual(value['operation'], 'new_chain')
+            self.assertNotIn(PRIVATE, json.dumps(value))
+        warnings = [{'extension': 'owner', 'revision': 1, 'stderr': PRIVATE}, {'extension': 'multiport', 'revision': 1},
+                    {'extension': 'owner', 'revision': 1}, {'extension': PRIVATE, 'revision': 1},
+                    {'extension': 'mark', 'revision': PRIVATE}, {'extension': 'conntrack', 'revision': 256}]
+        value = candidates.ingress_command({**command, 'unsupportedExtensions': warnings + [{'extension': 'tcp', 'revision': 0}] * 20})
+        self.assertEqual(value['unsupportedExtensions'], [{'extension': 'conntrack', 'revision': None}, {'extension': 'mark', 'revision': None},
+                                                        {'extension': 'multiport', 'revision': 1}, {'extension': 'owner', 'revision': 1}])
+        self.assertNotIn(PRIVATE, json.dumps(value))
+        before = len(log.value['events'])
+        log(SimpleNamespace(level='error', message=json.dumps({'ok': True, 'detail': 'command', 'command': command})))
+        self.assertEqual(len(log.value['events']), before, 'success output cannot manufacture a failed command')
+        self.assertNotIn(PRIVATE, json.dumps(log.value))
+
     def test_exception_projection_is_bounded_and_preserves_numeric_causes_only(self):
         failure = type('BuildException', (Exception,), {})(PRIVATE)
         failure.__cause__ = HTTPError('https://provider.invalid/' + PRIVATE, HTTPStatus.TOO_MANY_REQUESTS, PRIVATE, {'X-API-Key': PRIVATE}, None)

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import {randomUUID} from 'node:crypto'
 import test from 'node:test'
 import {Pool} from 'pg'
+import {bindFixtureWorkspaceDatabase,createFixtureWorkspaceTables} from '../../tests/helpers/workspace-database'
+import {seedFixtureWorkspace} from '../../tests/helpers/task-workspace'
 import {claimCloudRun,claimLocalRun} from '../computer/claim'
 import {createExecutionClaimGuard} from '../factory/execution-claim'
 import {projectionTestTarget} from './testing/projection-target'
@@ -11,14 +13,18 @@ import {projectionTestTarget} from './testing/projection-target'
 test('retained PG claim composition: Factory terminal/lineage fence and native binding share the CAS transaction',{timeout:30000},async t=>{
  const target=projectionTestTarget(process.env),schema=`skill_claim_composition_${randomUUID().replaceAll('-','')}`
  const admin=new Pool({connectionString:target.toString(),max:1}),pools:Pool[]=[]
- t.after(async()=>{await Promise.all(pools.map(pool=>pool.end()));await admin.end()})
+ let closeWorkspace:(()=>Promise<void>)|undefined
+ t.after(async()=>{await closeWorkspace?.();await Promise.all(pools.map(pool=>pool.end()));await admin.end()})
  await admin.query(`CREATE SCHEMA "${schema}"`)
  console.info(JSON.stringify({retainedSchema:schema,phase:'created',historicalSqlReplay:false,realProviderCalls:0}))
  target.searchParams.set('options',`-c search_path=${schema}`)
  const applicationName=`skill-claim-${randomUUID()}`
  const pool=new Pool({connectionString:target.toString(),max:3,application_name:applicationName});pools.push(pool)
+ closeWorkspace=await bindFixtureWorkspaceDatabase(pool)
+ await createFixtureWorkspaceTables(pool)
  for(const sql of [
-  'CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"issueId" uuid,"agentId" uuid,"botId" uuid,"agentDefinition" jsonb,"retryOf" uuid,status text,"stopRequestedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz)',
+  'CREATE TABLE devices(id uuid PRIMARY KEY,"ownerId" text NOT NULL)',
+  'CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"issueId" uuid,"agentId" uuid,"botId" uuid,"agentDefinition" jsonb,"retryOf" uuid,"workspaceId" uuid,status text,"stopRequestedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz)',
   'CREATE TABLE factory_tasks(id uuid PRIMARY KEY,"userId" text,"issueId" uuid,status text,stage text,"attemptId" uuid)',
   'CREATE TABLE factory_attempts(id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid,stage text,status text)',
   'CREATE TABLE computer_run_bindings("runId" uuid PRIMARY KEY)',
@@ -26,10 +32,12 @@ test('retained PG claim composition: Factory terminal/lineage fence and native b
   'CREATE TABLE workspace_computer_policies("workspaceId" text PRIMARY KEY,permission text,version integer)',
  ])await pool.query(sql)
  const owner='synthetic-owner',device=randomUUID(),issue=randomUUID(),binding=randomUUID(),workspace=randomUUID()
+ await seedFixtureWorkspace(pool,owner,'team',workspace)
+ await pool.query('INSERT INTO devices(id,"ownerId") VALUES($1,$2)',[device,owner])
  async function run(mode:'ordinary'|'current'|'cancelled'|'retry-unadopted'|'stopped'|'computer'){
   const id=randomUUID(),parent=mode==='retry-unadopted'?randomUUID():null
-  await pool.query('INSERT INTO agent_runs(id,"userId","deviceId","issueId","agentId","retryOf",status,"stopRequestedAt") VALUES($1,$2,$3,$4,$5,$6,\'queued\',$7)',[id,owner,device,issue,randomUUID(),parent,mode==='stopped'?new Date():null])
-  if(parent)await pool.query('INSERT INTO agent_runs(id,"userId","deviceId","issueId",status) VALUES($1,$2,$3,$4,\'failed\')',[parent,owner,device,issue])
+  await pool.query('INSERT INTO agent_runs(id,"userId","deviceId","issueId","agentId","retryOf",status,"stopRequestedAt","workspaceId") VALUES($1,$2,$3,$4,$5,$6,\'queued\',$7,$8)',[id,owner,device,issue,randomUUID(),parent,mode==='stopped'?new Date():null,workspace])
+  if(parent)await pool.query('INSERT INTO agent_runs(id,"userId","deviceId","issueId",status,"workspaceId") VALUES($1,$2,$3,$4,\'failed\',$5)',[parent,owner,device,issue,workspace])
   if(['current','cancelled','retry-unadopted'].includes(mode)){
    const task=randomUUID(),attempt=randomUUID()
    await pool.query('INSERT INTO factory_tasks(id,"userId","issueId",status,stage,"attemptId") VALUES($1,$2,$3,$4,\'execute\',$5)',[task,owner,issue,mode==='cancelled'?'cancelled':'running',attempt])
@@ -49,6 +57,14 @@ test('retained PG claim composition: Factory terminal/lineage fence and native b
   const claimed=mode==='ordinary'||mode==='current'
   assert.equal(record.status,claimed?'preparing':'queued');assert.equal(rowCount,claimed?1:0)
  }
+ // The new Workspace boundary is the real database guard, not a test callback.
+ const revokedId=await run('ordinary')
+ await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[workspace,owner])
+ try {
+  assert.equal(await claimLocalRun(pool,revokedId,device,lease,binding,tx=>guard(tx,owner,revokedId)),'unavailable')
+  assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[revokedId])).rows[0].status,'queued')
+  assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1',[revokedId])).rowCount,0)
+ }finally {await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',[workspace,owner])}
  // Callback failure after real row locking must not commit a CAS/native binding.
  const rollbackId=await run('current')
  await assert.rejects(claimLocalRun(pool,rollbackId,device,lease,binding,async tx=>{await guard(tx,owner,rollbackId);throw Error('Synthetic fenced failure')}),/Synthetic fenced failure/)

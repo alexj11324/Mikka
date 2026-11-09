@@ -14,14 +14,12 @@ const PAGE = 100
  * neither a private source nor a title crosses a live channel. */
 export async function projectMapTargets(workspace: Database, reference: { projectId: string } | { issueId: string }, after?: Cursor) {
   const { rows } = await workspace.query<Cursor>(`SELECT DISTINCT p.id AS "projectId",m."userId" AS "ownerId",w.id AS "workspaceId"
-    FROM workspace_projects p JOIN mikka_workspaces w ON
-      (EXISTS (SELECT 1 FROM mikka_team_projects t WHERE t."projectId"=p.id AND t."workspaceId"=w.id)
-       AND NOT EXISTS (SELECT 1 FROM mikka_team_projects t WHERE t."projectId"=p.id AND t."workspaceId"<>w.id))
-      OR (w.kind='personal' AND w."userId"=p."userId"
-        AND NOT EXISTS (SELECT 1 FROM mikka_team_projects t WHERE t."projectId"=p.id))
+    FROM workspace_projects p JOIN mikka_workspaces w ON w.id=p."workspaceId"
     JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m.status='active'
-      AND (w.kind<>'personal' OR m."userId"=p."userId")
-    WHERE ($1::uuid IS NULL OR p.id=$1) AND ($2::uuid IS NULL OR p."issueIds" @> jsonb_build_array($2::text))
+      AND (w.kind<>'personal' OR m."userId"=w."userId")
+    WHERE ($1::uuid IS NULL OR p.id=$1) AND ($2::uuid IS NULL OR EXISTS (
+      SELECT 1 FROM workspace_project_tasks relation WHERE relation."projectId"=p.id
+        AND relation."workspaceId"=p."workspaceId" AND relation."issueId"=$2))
       AND ($3::uuid IS NULL OR (p.id,m."userId",w.id)>($3::uuid,$4::text,$5::uuid))
     ORDER BY p.id,m."userId",w.id LIMIT 101`,
     ['projectId' in reference ? reference.projectId : null, 'issueId' in reference ? reference.issueId : null,

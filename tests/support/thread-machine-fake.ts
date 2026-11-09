@@ -7,7 +7,7 @@ import { templateModelsFixture } from './template-models'
 // and its repository, and moves the queued run onto that device. The fake
 // sandbox's worker "registers" when its start command consumes the bootstrap, reporting
 // the given harnesses (a task machine reports no computer broker).
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 
 type Harness = Record<string, unknown>
 
@@ -25,10 +25,10 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
   factoryAutomaticRuntime.enqueue = async (database, actor, previousRunId, runId) => {
     await (await import('../../lib/factory/cloud-stage-handoff')).handoffFactoryCloudStage(database, actor, previousRunId, runId)
   }
-  const park = (database: Pool, actor: { userId: string; workspaceId: string }, runId: string) => machines.parkThreadMachine(database, actor, runId, async () => {}, async () => null)
-  factoryAutomaticRuntime.park = async (database, actor, runId, nextRunId) => {
-    if (nextRunId && await machines.retainThreadMachineForHandoff(database, actor, runId, nextRunId)) return
-    await park(database, actor, runId)
+  const park = (database: Pool, actor: { userId: string; workspaceId: string }, runId: string, existing?: PoolClient) => machines.parkThreadMachine(database, actor, runId, async () => {}, async () => null, existing)
+  factoryAutomaticRuntime.park = async (database, actor, runId, nextRunId, existing) => {
+    if (nextRunId && await machines.retainThreadMachineForHandoff(database, actor, runId, nextRunId, existing)) return
+    await park(database, actor, runId, existing)
   }
   const real = { ...machines.threadMachineProvider }
   const credentials = new Map<string, string>()

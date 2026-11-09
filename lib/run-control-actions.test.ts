@@ -1,25 +1,29 @@
 import assert from 'node:assert/strict'
-import { before, mock, test } from 'node:test'
+import { afterEach, before, mock, test } from 'node:test'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
 import { ActionFailureError } from './action-error'
 import { agentRuns, issueMembers, runChunks, runMessages } from './db/schema'
+import { workspaceMembers, workspaces } from './db/workspace-schema'
 import { factoryEventId } from './factory/event-id'
 import { FactoryError } from './factory/contract'
 
 const runId = '31300000-0000-4000-8000-000000000001'
 const issueId = '31300000-0000-4000-8000-000000000002'
 const botId = '31300000-0000-4000-8000-000000000003'
+const workspaceId = '31300000-0000-4000-8000-000000000004'
 const dialect = new PgDialect()
 let viewer: string | null = 'owner'
 let requestHeaders = new Headers({cookie: 'synthetic-session'})
 let sessionUser: string | null = null
 let freshSession = true
 function fixture() {
-  const run = { id: runId, issueId, deviceRepoId:undefined as string|undefined, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', report: null, error: null as string | null, questionContinuation: null as (typeof agentRuns.$inferSelect)['questionContinuation'], createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
+  const run = { id: runId, issueId, workspaceId, deviceRepoId:undefined as string|undefined, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', report: null, error: null as string | null, questionContinuation: null as (typeof agentRuns.$inferSelect)['questionContinuation'], createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
   return { factoryStages: new Map<string, string>(), controlReads: [] as unknown[][], questions: new Map<string, string>(), questionOwners: new Map<string, string>(), questionReads: [] as unknown[][], epochReads: [] as unknown[][], run, continuation: null as typeof run | null, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, ordinaryDispatches: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined, recovery: null as Record<string,unknown> | null, recoveryReads: 0, recoveryCalls: [] as Array<{actor:unknown;input:unknown}> }
 }
 let current = fixture()
+const revisionFailures: unknown[] = []
+afterEach(() => assert.deepEqual(revisionFailures.splice(0), [], 'Live revision SQL cannot fail silently in a source-only action test'))
 class Selection {
   table: unknown
   condition?: SQL
@@ -36,8 +40,11 @@ class Selection {
       if (query.sql.includes('"agent_runs"."issueId"')) {
         assert.ok(query.params.includes(issueId), 'readable thread must bind the requested issue')
       } else {
+        assert.match(query.sql, /"agent_runs"\."userId"/, 'owned-run reads bind the authenticated owner')
+        if (!query.params.includes('owner')) return []
         assert.ok(query.sql.includes('"agent_runs"."userId"') && query.params.includes('owner') && [current.run, current.continuation].some(run => run && query.params.includes(run.id)), 'message snapshot must bind owner and run')
       }
+      if (query.sql.includes('"agent_runs"."workspaceId"')) assert.ok(query.params.includes(workspaceId), 'thread reads bind the current tenant')
       if (current.continuation && query.params.includes(current.continuation.id)) {
         assert.ok(query.sql.includes('"agent_runs"."userId"') && query.params.includes('owner'), 'latest failure stays scoped to its owner')
         return [{ ...current.continuation }]
@@ -150,7 +157,40 @@ before(async () => {
       && (!questionOwner || (current.questionOwners.get(id) ?? current.run.userId) === viewerId)
       && (!taskOwner || current.run.userId === viewerId)).map(id => ({ runId: id, status: current.questions.get(id) })) }
   } } } })
-  mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) } } })
+  // revision-read intentionally uses the request executor directly. Keep its
+  // real key normalization/batching while replacing this otherwise live pool.
+  mock.module('@/lib/db/request-scope', { namedExports: {
+    inDatabaseTransaction: () => false,
+    withoutDatabaseClient: (work: () => unknown) => work(),
+    pool: { async query(sql: string, params: [string[], string[]]) {
+      try {
+        assert.equal(sql.replace(/\s+/g, ' ').trim(), 'SELECT r.kind, r.id::text AS id, r.revision FROM live_revisions r JOIN unnest($1::text[], $2::uuid[]) AS t(k, i) ON r.kind = t.k AND r.id = t.i')
+        assert.deepEqual(params[0], ['run', 'thread'])
+        assert.equal(params[1].length, 2); assert.equal(params[1][0], params[1][1])
+        return { rows: params[0].flatMap((kind, index) => [current.run.id, current.continuation?.id].includes(params[1][index])
+          ? [{ kind, id: params[1][index], revision: '7' }] : []) }
+      } catch (error) { revisionFailures.push(error); throw error }
+    } },
+  } })
+  mock.module('@/lib/workspace-db', { namedExports: {
+    workspacePool: { query: () => { throw new Error('Unexpected raw workspace read') } },
+    workspaceDb: { select: () => ({ from: (table: unknown) => {
+      const query = { innerJoin: () => query, where: (condition: SQL) => {
+        const sql = dialect.sqlToQuery(condition)
+        assert.ok(sql.params.includes(workspaceId)); assert.ok(sql.params.includes('active'))
+        assert.ok(table === workspaceMembers || table === workspaces)
+        const rows = table === workspaceMembers ? [...current.members].map(id => ({ id }))
+          : current.members.has(String(sql.params[0])) ? [{ id: workspaceId, kind: 'team' }] : []
+        const result = Promise.resolve(rows)
+        return Object.assign(result, { orderBy: () => result })
+      } }
+      return query
+    } }) },
+  } })
+  mock.module('@/lib/workspace-access', { namedExports: { loadWorkspaceContext: async (requestedId: string | undefined, user: { id: string }) => {
+    assert.equal(requestedId, undefined); assert.ok(current.members.has(user.id))
+    return { workspace: { id: workspaceId, kind: 'team' } }
+  } } })
   // Scope SQL and post-COMMIT delivery have real-PG coverage in live/panels.db.test.ts.
   // This action fixture retains the original ownership/chain checks before resolving keys.
   mock.module('@/lib/live/panels', { namedExports: {
@@ -168,7 +208,7 @@ before(async () => {
     requireIssueAccess: async (id: string) => {
       if (!viewer) throw new ActionFailureError('authRequired')
       if (id !== issueId || !current.members.has(viewer)) throw new ActionFailureError('issueNotFound')
-      return { issue: { id: issueId, userId: 'owner' }, user: { id: viewer } }
+      return { issue: { id: issueId, userId: 'owner', workspaceId }, user: { id: viewer } }
     },
     issueForUser: () => { throw new Error('queue path outside test') },
   } })
@@ -192,6 +232,7 @@ test('actual thread actions preserve owner detail/Bot display and attribute an a
   current = fixture(); viewer = 'owner'
   const detail = await actions.getIssueThread(issueId, runId)
   assert.equal(detail.thread.detail?.agentName, 'Owned Bot')
+  assert.deepEqual(detail.live?.revisions, { [`run:${runId}`]: 7, [`thread:${runId}`]: 7 })
   await actions.sendIssueThreadMessage({ issueId, runId, text: '  continue  ' })
   assert.deepEqual(current.messages.map(({ runId: run, userId, text }) => ({ run, userId, text })), [{ run: runId, userId: 'owner', text: 'continue' }])
   assert.equal(current.transactions, 1)

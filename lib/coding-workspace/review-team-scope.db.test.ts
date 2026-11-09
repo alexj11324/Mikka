@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import type { ApiSession } from '../api-auth'
+import { tokenWorkspace } from '../tokens/principal'
 import { dbUrl, seedUser, seedWorkspace, seedBot, seedAgent, seedTeam } from '../../tests/support/workspace-admin-db'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
@@ -50,7 +51,7 @@ test('review capabilities follow real team relation changes and their transactio
   const fixture = async (linked = false, home = { workspaceId: workspaceA, botId, teamId: teamA }) => {
     const taskId = randomUUID(), runId = randomUUID(), deviceId = randomUUID(), repoId = randomUUID(), tokenId = randomUUID()
     const sandboxId = `synthetic-review-${randomUUID()}`, remoteKey = 'v2/github.com/mikka-ci/review-team-fixture'
-    await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Review team fixture\',\'{"type":"doc"}\',\'doing\',\'normal\',\'personal\')', [taskId, owner])
+    await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Review team fixture\',\'{"type":"doc"}\',\'doing\',\'normal\',\'personal\')', [taskId, owner, home.workspaceId])
     if (linked) await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [taskId, home.teamId, home.workspaceId, owner])
     await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES($1,$2,\'Review fixture\',\'cloud\',true,now())', [deviceId, owner])
     await pool.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,$4,\'https://github.com/mikka-ci/review-team-fixture.git\')', [repoId, deviceId, owner, remoteKey])
@@ -65,7 +66,7 @@ test('review capabilities follow real team relation changes and their transactio
     await pool.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,$4)', [runId, home.botId, home.workspaceId, owner])
     await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","sandboxId","snapshotId","operationId",state,"deviceId","issueId","repoId","botId",epoch,lifecycle)
       VALUES($1,$2,$3,$4,'synthetic',$5,'running',$6,$7,$8,$9,1,'{"phase":"review_resumed"}')`, [runId, home.workspaceId, owner, sandboxId, randomUUID(), deviceId, taskId, repoId, home.botId])
-    return { taskId, runId, sandboxId }
+    return { taskId, runId, sandboxId, workspaceId: home.workspaceId }
   }
   type Fixture = Awaited<ReturnType<typeof fixture>>
   const grant = (f: Fixture) => resolve(pool, workspacePool!, session, f.taskId, {}, async (authority, client) => ({ authority,
@@ -101,15 +102,25 @@ test('review capabilities follow real team relation changes and their transactio
     if (ids.some(id => failClose.has(id))) throw new Error('synthetic close acknowledgement unavailable')
     closeIds.push(...ids)
   })
-  const change = (f: Fixture, teamId: string | null, expectedTeamId: string | null) => actAs(owner,
+  const change = (f: Fixture, teamId: string | null, expectedTeamId: string | null) => actAs({ id: owner, [tokenWorkspace]: f.workspaceId },
     () => setIssueTeam({ issueId: f.taskId, teamId, expectedTeamId }))
 
-  await t.test('attaching another Workspace closes a completed Run capability before the action returns', async () => {
+  await t.test('attaching a foreign Workspace is rejected without changing Task tenancy or its existing capability', async () => {
     const f = await fixture(), current = await grant(f)
-    expectedLinks.set(f.taskId, workspaceB)
-    assert.equal((await change(f, teamB, null)).ok, true)
+    assert.equal((await change(f, teamB, null)).ok, false)
+    assert.equal((await pool.query('SELECT "workspaceId" FROM issues WHERE id=$1', [f.taskId])).rows[0].workspaceId, workspaceA)
+    assert.equal((await pool.query('SELECT 1 FROM mikka_team_issues WHERE "issueId"=$1', [f.taskId])).rowCount, 0)
+    assert.equal(closeIds.includes(current.lease.id), false)
+    assert.deepEqual(await readReviewSession(current.authority, { kind: 'terminal' }, pool), current.lease)
+    assert.equal((await resolve(pool, workspacePool!, session, f.taskId)).workspaceId, workspaceA)
+  })
+  await t.test('attaching a Team in the stored Workspace closes the completed Run capability before returning', async () => {
+    const f = await fixture(), current = await grant(f)
+    expectedLinks.set(f.taskId, workspaceA)
+    assert.equal((await change(f, teamA, null)).ok, true)
     assert.ok(closeIds.includes(current.lease.id)); assert.equal(await leaseRow(current.lease.id), undefined)
-    await assert.rejects(resolve(pool, workspacePool!, session, f.taskId), error => error instanceof ReviewAuthorityError && error.status === 403)
+    assert.equal((await pool.query('SELECT "workspaceId" FROM issues WHERE id=$1', [f.taskId])).rows[0].workspaceId, workspaceA)
+    assert.equal((await resolve(pool, workspacePool!, session, f.taskId)).workspaceId, workspaceA)
   })
   await t.test('a no-op relation preserves review, while actual detach closes only its captured lease', async () => {
     const f = await fixture(true), current = await grant(f)
@@ -127,7 +138,7 @@ test('review capabilities follow real team relation changes and their transactio
   })
   for (const linked of [false, true]) await t.test(`a concurrent ${linked ? 'detach' : 'empty-link attach'} waits for the real grant and then revokes it`, async () => {
     const f = await fixture(linked)
-    expectedLinks.set(f.taskId, linked ? null : workspaceB)
+    expectedLinks.set(f.taskId, linked ? null : workspaceA)
     let changed: ReturnType<typeof change> | undefined
     const current = await resolve(pool, workspacePool!, session, f.taskId, {}, async (authority, client) => {
       const lease = await beginReviewSession(authority, { kind: 'terminal' }, client)
@@ -137,7 +148,7 @@ test('review capabilities follow real team relation changes and their transactio
         assert.equal((await writer.query("SELECT pg_try_advisory_xact_lock(hashtextextended('mikka-team-relations',0)) AS acquired")).rows[0].acquired, false,
           'even an absent link is covered by the grant shared lock')
       } finally { await writer.query('ROLLBACK'); writer.release() }
-      changed = change(f, linked ? null : teamB, linked ? teamA : null)
+      changed = change(f, linked ? null : teamA, linked ? teamA : null)
       // Start the actual writer while the grant retains both databases' locks.
       // The writer cannot commit before this callback releases the shared fence.
       const outcome = await Promise.race([changed.then(() => 'committed'), new Promise<'blocked'>(resolve => setTimeout(() => resolve('blocked'), 25))])
@@ -154,14 +165,14 @@ test('review capabilities follow real team relation changes and their transactio
     RETURN NEW; END $$`)
   await pool.query('CREATE TRIGGER review_reject_link BEFORE INSERT OR UPDATE ON mikka_team_issues FOR EACH ROW EXECUTE FUNCTION review_reject_link()')
   await pool.query(`CREATE FUNCTION review_reject_scope() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
-    IF NEW.scope='workspace' AND EXISTS(SELECT 1 FROM review_scope_faults WHERE "taskId"=NEW.id AND "rejectScope") THEN RAISE EXCEPTION 'synthetic promotion failure'; END IF;
+    IF NEW.revision>OLD.revision AND EXISTS(SELECT 1 FROM review_scope_faults WHERE "taskId"=NEW.id AND "rejectScope") THEN RAISE EXCEPTION 'synthetic promotion failure'; END IF;
     RETURN NEW; END $$`)
   await pool.query('CREATE TRIGGER review_reject_scope BEFORE UPDATE ON issues FOR EACH ROW EXECUTE FUNCTION review_reject_scope()')
   await t.test('a failed relation write still drains its durable fence outside the rolled-back transaction', async () => {
     const f = await fixture(), current = await grant(f)
     await pool.query('INSERT INTO review_scope_faults("taskId","rejectLink") VALUES($1,true)', [f.taskId])
     expectedLinks.set(f.taskId, null)
-    assert.equal((await change(f, teamB, null)).ok, false)
+    assert.equal((await change(f, teamA, null)).ok, false)
     assert.ok(closeIds.includes(current.lease.id)); assert.equal(await leaseRow(current.lease.id), undefined)
     const later = await grant(f)
     await closeReviewSession(later.authority, { kind: 'terminal', id: later.lease.id }, pool)
@@ -169,12 +180,17 @@ test('review capabilities follow real team relation changes and their transactio
   await t.test('a two-stage promotion closes old review even when the second APP write fails', async () => {
     const f = await fixture(), current = await grant(f)
     await pool.query('INSERT INTO review_scope_faults("taskId","rejectScope") VALUES($1,true)', [f.taskId])
-    expectedLinks.set(f.taskId, workspaceB)
-    const result = await promoteExistingIssueForUser(owner, { requestId: randomUUID(), issueId: f.taskId, revision: 1, teamId: teamB, expectedTeamId: null })
+    expectedLinks.set(f.taskId, workspaceA)
+    const result = await promoteExistingIssueForUser(owner, { requestId: randomUUID(), issueId: f.taskId, revision: 1, teamId: teamA, expectedTeamId: null })
     assert.equal('error' in result ? result.error : null, 'teamIssueOutcomeUnknown')
     assert.equal((await pool.query('SELECT scope FROM issues WHERE id=$1', [f.taskId])).rows[0].scope, 'personal')
     assert.ok(closeIds.includes(current.lease.id)); assert.equal(await leaseRow(current.lease.id), undefined)
-    await assert.rejects(resolve(pool, workspacePool!, session, f.taskId), error => error instanceof ReviewAuthorityError && error.status === 403)
+    // A grouping write does not move the immutable tenant. Its old lease was
+    // closed, but the still-authorized owner may explicitly open a fresh one.
+    assert.equal((await resolve(pool, workspacePool!, session, f.taskId)).workspaceId, workspaceA)
+    const later = await grant(f)
+    assert.notEqual(later.lease.id, current.lease.id)
+    await closeReviewSession(later.authority, { kind: 'terminal', id: later.lease.id }, pool)
   })
   const administrativeFixture = async (linked = false) => {
     const adminId = await seedUser(pool, 'review-admin')
@@ -190,7 +206,7 @@ test('review capabilities follow real team relation changes and their transactio
     expectedMembers.set(f.workspace.id, null)
     assert.equal((await removeMember(f.adminId, f.workspace.id, owner)).removed, true)
     assert.ok(closeIds.includes(current.lease.id)); assert.equal(await leaseRow(current.lease.id), undefined)
-    await assert.rejects(resolve(pool, workspacePool!, session, f.taskId), error => error instanceof ReviewAuthorityError && error.status === 403)
+    await assert.rejects(resolve(pool, workspacePool!, session, f.taskId), error => error instanceof ReviewAuthorityError && error.status === 404)
     assert.equal((await pool.query('SELECT status FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceA, owner])).rows[0].status, 'active')
   })
   await t.test('the real suspension action closes review after the membership change commits', async () => {
@@ -200,15 +216,21 @@ test('review capabilities follow real team relation changes and their transactio
     const result = await actAs(f.adminId, () => updateWorkspaceMember({ workspaceId: f.workspace.id, userId: owner, role: 'member', status: 'suspended' }))
     assert.equal(result.ok, true)
     assert.ok(closeIds.includes(current.lease.id)); assert.equal(await leaseRow(current.lease.id), undefined)
-    await assert.rejects(resolve(pool, workspacePool!, session, f.taskId), error => error instanceof ReviewAuthorityError && error.status === 403)
+    await assert.rejects(resolve(pool, workspacePool!, session, f.taskId), error => error instanceof ReviewAuthorityError && error.status === 404)
   })
-  await t.test('team deletion keeps lock order and drains the deleted Task capability after both commits', async () => {
-    const { deleteTeamData } = await import('../workspace-admin/teams')
+  await t.test('referenced Team deletion is refused; explicit grouping removal drains its capability and preserves Task history', async () => {
+    const { deleteTeamData, removeTeamGroupingData } = await import('../workspace-admin/teams')
+    const { WorkspaceError } = await import('../workspace-access')
     const f = await administrativeFixture(true), current = await grant(f)
+    await assert.rejects(deleteTeamData(f.adminId, f.team.id, f.team.name), error => error instanceof WorkspaceError && error.message === 'teamDeleteReferenced')
+    assert.equal(closeIds.includes(current.lease.id), false)
+    assert.deepEqual(await readReviewSession(current.authority, { kind: 'terminal' }, pool), current.lease)
     expectedLinks.set(f.taskId, null)
-    assert.equal((await deleteTeamData(f.adminId, f.team.id, f.team.name)).deleted.tasks, 1)
+    assert.equal((await removeTeamGroupingData(f.adminId, f.team.id, f.team.name)).removed.tasks, 1)
     assert.ok(closeIds.includes(current.lease.id)); assert.equal(await leaseRow(current.lease.id), undefined)
-    assert.equal((await pool.query('SELECT id FROM issues WHERE id=$1', [f.taskId])).rowCount, 0)
+    assert.equal((await pool.query('SELECT "workspaceId" FROM issues WHERE id=$1', [f.taskId])).rows[0].workspaceId, f.workspace.id)
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=$1 AND "issueId"=$2', [f.runId, f.taskId])).rowCount, 1)
+    assert.equal((await resolve(pool, workspacePool!, session, f.taskId)).workspaceId, f.workspace.id)
   })
   await t.test('workspace deletion retains a failed close target through generic row deletion until exact ACK', async () => {
     const { deleteWorkspaceData } = await import('../workspace-admin/general')
@@ -217,7 +239,7 @@ test('review capabilities follow real team relation changes and their transactio
     const { threadMachineProvider } = await import('../cloud-computer/thread-machines')
     const f = await administrativeFixture(true), current = await grant(f), killed: string[] = []
     assert.equal((await workspaceDeletionStatements(pool, f.workspace.id)).some(row => row.table === 'coding_review_sessions'), false)
-    assert.equal((await deletionStatements(pool, owner, { shared: [f.workspace.id], keptIssueIds: [] })).some(row => row.table === 'coding_review_sessions'), false)
+    assert.equal((await deletionStatements(pool, owner, { shared: [f.workspace.id], solo: [], keptIssueIds: [] })).some(row => row.table === 'coding_review_sessions'), false)
     const kill = t.mock.method(threadMachineProvider, 'kill', async (sandboxId: string) => { killed.push(sandboxId); throw new Error('synthetic kill acknowledgement unavailable') })
     failClose.add(current.lease.id); expectedLinks.set(f.taskId, null); expectedMembers.set(f.workspace.id, null)
     try {

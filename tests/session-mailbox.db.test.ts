@@ -38,7 +38,7 @@ test('session mailbox schema and store', { skip: !dbUrl }, async t => {
     const device = randomUUID(), agent = randomUUID(), runId = randomUUID()
     await pool.query(`insert into devices (id,name,"ownerId",kind,enabled) values ($1,'cloud',$2,'cloud',true)`, [device, owner])
     await pool.query(`insert into agents (id,"userId",harness,name) values ($1,$2,'codex','a')`, [agent, owner])
-    await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId",status,"leaseExpiresAt") values ($1,$2,$3,$4,'running',now()+interval '10 minutes')`, [runId, agent, owner, device])
+    await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,'running',now()+interval '10 minutes')`, [runId, agent, owner, device, ws.id])
     const mailbox = new SessionMailbox(pool, ws.id)
     const sender = await mailbox.run(owner, runId)
     const coordinator = await mailbox.conversation(owner, 'coordinator')

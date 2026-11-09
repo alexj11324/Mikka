@@ -1,7 +1,7 @@
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 import { mobileThreads } from '@/lib/mobile-threads'
-import { runsOutsideToken } from '@/lib/tokens/scope'
+import { effectiveRequestWorkspace } from '@/lib/request-workspace'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 
 export const dynamic = 'force-dynamic'
@@ -13,9 +13,8 @@ async function handleGET(request: Request) {
   if (!user) return unauthorized()
   // This optional proof routes presence only; PATs retain their ordinary scoped data read.
   const homeScope = user[tokenWorkspace] ? undefined : request.headers.get('x-mikka-presence-scope') ?? undefined
-  const listed = await mobileThreads(user.id, 60, homeScope)
-  const outside = await runsOutsideToken(user, listed.threads.map(thread => thread.id))
-  return json({ ...listed, threads: listed.threads.filter(thread => !outside.has(thread.id)) })
+  const workspaceId = await effectiveRequestWorkspace(user)
+  return json(await mobileThreads(user.id, 60, homeScope, workspaceId))
 }
 
 export const GET = withRequestLog('/api/mobile/threads', handleGET)

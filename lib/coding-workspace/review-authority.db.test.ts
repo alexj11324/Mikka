@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 import type { ApiSession } from '../api-auth'
 import { tokenWorkspace } from '../tokens/principal'
 import { dbUrl, seedUser, seedWorkspace, seedBot, seedAgent, seedTeam } from '../../tests/support/workspace-admin-db'
@@ -44,7 +44,7 @@ test('task review: current owner, session, tenant and immutable physical checkou
     const { id: teamId } = await seedTeam(pool, workspaceId, userId)
     await pool.query('INSERT INTO mikka_team_members("teamId","userId",role) VALUES($1,$2,\'member\')', [teamId, peerId])
     const taskId = randomUUID()
-    await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Review fixture\',\'{"type":"doc"}\',\'doing\',\'normal\',\'workspace\')', [taskId, userId])
+    await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Review fixture\',\'{"type":"doc"}\',\'doing\',\'normal\',\'workspace\')', [taskId, userId, workspaceId])
     await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [taskId, teamId, workspaceId, userId])
     const botId = await seedBot(pool, workspaceId, userId), agentId = await seedAgent(pool, userId)
     const deviceId = randomUUID(), repoId = randomUUID(), deviceTokenId = randomUUID(), runId = randomUUID()
@@ -60,12 +60,27 @@ test('task review: current owner, session, tenant and immutable physical checkou
     await pool.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,$4)', [runId, botId, workspaceId, userId])
     await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","sandboxId","snapshotId","operationId",state,"deviceId","issueId","repoId","botId",epoch)
       VALUES($1,$2,$3,$4,'synthetic', $5,'running',$6,$7,$8,$9,1)`, [runId, workspaceId, userId, sandboxId, randomUUID(), deviceId, taskId, repoId, botId])
-    return { userId, peerId, strangerId, workspaceId, otherWorkspaceId, taskId, botId, agentId, deviceId, repoId, deviceTokenId, runId, remoteKey, sandboxId, worktreePath,
+    return { userId, peerId, strangerId, workspaceId, otherWorkspaceId, teamId, taskId, botId, agentId, deviceId, repoId, deviceTokenId, runId, remoteKey, sandboxId, worktreePath,
       session: await account(userId), peer: await account(peerId), stranger: await account(strangerId) }
   }
   type Fixture = Awaited<ReturnType<typeof fixture>>
   const read = (f: Fixture, session = f.session, expected = {}) => resolve(pool, pool, session, f.taskId, expected)
   const refused = (operation: Promise<unknown>, status: number, code?: string) => assert.rejects(operation, error => error instanceof ReviewAuthorityError && error.status === status && (!code || error.code === code))
+  // Model inconsistent historical rows that predate immutable stored tenancy.
+  // Only that write-time trigger is suspended in this owned throwaway DB;
+  // review source fences, SQL reads/locks and every authorization check remain
+  // real. Ordinary production writes are separately asserted to reject drift.
+  const legacyWrite = async (table: 'issues' | 'agent_runs', query: string, values: unknown[]) => {
+    const trigger = table === 'issues' ? 'preserve_task_workspace' : 'require_run_task_workspace'
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query(`ALTER TABLE ${table} DISABLE TRIGGER ${trigger}`)
+      await client.query(query, values)
+      await client.query(`ALTER TABLE ${table} ENABLE TRIGGER ${trigger}`)
+      await client.query('COMMIT')
+    } finally { await client.query('ROLLBACK'); client.release() }
+  }
 
   await t.test('owner gets the actual latest Run, never a caller-provided sandbox', async () => {
     const f = await fixture(), authority = await read(f)
@@ -102,6 +117,30 @@ test('task review: current owner, session, tenant and immutable physical checkou
     assert.equal((await read(f, f.session, { workspaceId: f.workspaceId })).workspaceId, f.workspaceId)
     await refused(read(f, f.session, { workspaceId: f.otherWorkspaceId }), 403, 'review_scope_denied')
   })
+  await t.test('stored Task tenancy authorizes an ungrouped task and refuses immutable transfer', async () => {
+    const f = await fixture()
+    await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [f.taskId])
+    assert.equal((await read(f)).workspaceId, f.workspaceId)
+    await assert.rejects(pool.query('UPDATE issues SET "workspaceId"=$2 WHERE id=$1', [f.taskId, f.otherWorkspaceId]),
+      (error: unknown) => error instanceof Error && 'code' in error && error.code === '23514')
+    assert.equal((await read(f)).workspaceId, f.workspaceId)
+  })
+  await t.test('a historical cross-workspace Task cannot borrow its old Run or machine authority', async () => {
+    const f = await fixture()
+    await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [f.taskId])
+    await legacyWrite('issues', 'UPDATE issues SET "workspaceId"=$2 WHERE id=$1', [f.taskId, f.otherWorkspaceId])
+    await refused(read(f), 403, 'review_scope_denied')
+  })
+  await t.test('quarantined pending Task ownership is unavailable even with a retained physical checkout', async () => {
+    const f = await fixture()
+    await legacyWrite('issues', 'UPDATE issues SET "workspaceId"=NULL,"ownershipState"=\'pending\' WHERE id=$1', [f.taskId])
+    await refused(read(f), 404, 'review_not_found')
+  })
+  for (const missing of [false, true]) await t.test(`a ${missing ? 'missing' : 'foreign'} stored Run workspace cannot fall back to its frozen claim`, async () => {
+    const f = await fixture()
+    await legacyWrite('agent_runs', 'UPDATE agent_runs SET "workspaceId"=$2 WHERE id=$1', [f.runId, missing ? null : f.otherWorkspaceId])
+    await refused(read(f), 403, 'review_scope_denied')
+  })
   await t.test('workspace PAT cannot switch tenant and revocation is fresh', async () => {
     const f = await fixture(), id = randomUUID()
     await pool.query('INSERT INTO personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint) VALUES($1,$2,$3,\'Review fixture\',$4,\'test\')', [id, f.userId, f.workspaceId, id.replaceAll('-', '').repeat(2)])
@@ -115,13 +154,13 @@ test('task review: current owner, session, tenant and immutable physical checkou
   await t.test('suspension and a moved Team link revoke both transports', async () => {
     const f = await fixture(); await read(f)
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [f.workspaceId, f.userId])
-    await refused(read(f), 403)
+    await refused(read(f), 404, 'review_not_found')
     await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [f.workspaceId, f.userId])
     await pool.query('UPDATE mikka_team_issues SET "workspaceId"=$2 WHERE "issueId"=$1', [f.taskId, f.otherWorkspaceId])
     await refused(read(f), 403)
   })
   const mutations: Array<[string, (f: Fixture) => Promise<unknown>, number]> = [
-    ['frozen Workspace mismatch', f => pool.query('UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",\'{executionIdentity,workspaceId}\',to_jsonb($2::text)) WHERE id=$1', [f.runId, f.otherWorkspaceId]), 403],
+    ['frozen Workspace mismatch', f => legacyWrite('agent_runs', 'UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",\'{executionIdentity,workspaceId}\',to_jsonb($2::text)) WHERE id=$1', [f.runId, f.otherWorkspaceId]), 403],
     ['token Workspace mismatch', f => pool.query('UPDATE device_tokens SET "boundWorkspaceId"=$2 WHERE id=$1', [f.deviceTokenId, f.otherWorkspaceId]), 403],
     ['device owner mismatch', f => pool.query('UPDATE devices SET "ownerId"=$2 WHERE id=$1', [f.deviceId, f.peerId]), 403],
     ['repository owner mismatch', f => pool.query('UPDATE device_repos SET "userId"=$2 WHERE id=$1', [f.repoId, f.peerId]), 403],
@@ -227,16 +266,18 @@ test('task review: current owner, session, tenant and immutable physical checkou
   })
 
   const { beginReviewSession, readReviewSession, closeReviewSession, revokeReviewSession,
-    revokeReviewSessions, expireReviewSessions, reviewSessionTransport } = await import('./review-sessions')
+    revokeReviewSessions, reconcileReviewSessions, expireReviewSessions, reviewSessionTransport } = await import('./review-sessions')
   const { resumeReviewMachine } = await import('./review-machine')
   const { TerminalError } = await import('@mikka/protocol/coding-terminal')
   type Kind = 'terminal' | 'preview'
   const closeCalls: Array<{ kind: Kind; ids: string[]; sandboxId: string; expiresAt: string }> = []
   const failingKinds = new Set<Kind>()
+  let beforeClose: (() => Promise<void>) | undefined
   t.mock.method(reviewSessionTransport, 'close', async (...[target, ids, expiresAt, kind]: Parameters<typeof reviewSessionTransport.close>) => {
     const pending = await pool.query('SELECT "revokedAt" FROM coding_review_sessions WHERE id=ANY($1::uuid[])', [ids])
     assert.equal(pending.rowCount, ids.length)
     assert.ok(pending.rows.every(row => row.revokedAt), 'durable fence precedes any network operation')
+    await beforeClose?.()
     closeCalls.push({ kind, ids, sandboxId: target.sandboxId, expiresAt })
     if (failingKinds.has(kind)) throw new Error('synthetic close acknowledgement unavailable')
   })
@@ -247,8 +288,337 @@ test('task review: current owner, session, tenant and immutable physical checkou
   const leaseTest = async (name: string, operation: () => Promise<void>) => t.test(name, async () => {
     // Every row belongs to this suite's throwaway database; no real gateway is issued.
     await pool.query('DELETE FROM coding_review_sessions')
-    closeCalls.length = 0; failingKinds.clear()
+    closeCalls.length = 0; failingKinds.clear(); beforeClose = undefined
     await operation()
+  })
+  const waitForBlockedGrant = async (writerPid: number) => {
+    const deadline = Date.now() + 3_000
+    while (Date.now() < deadline) {
+      const { rows: [state] } = await pool.query<{ blocked: boolean }>(`SELECT EXISTS(
+        SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))) AS blocked`, [writerPid])
+      if (state?.blocked) return
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    assert.fail('the real review operation did not reach the held database row lock')
+  }
+
+  const { latestTaskRun } = await import('../thread-dispatch')
+  type FactoryStage = 'spec' | 'execute' | 'review' | 'verify' | 'monitor'
+  // The real persisted queue/configure/bind order, with no provider or model.
+  // Actual Store.bind_run authorization and its commit notification have
+  // additional coverage below; this helper isolates the SQL source trigger.
+  const pendingRun = async (client: PoolClient, f: Fixture, options: {
+    stage?: FactoryStage; kind?: string; createdAt?: Date; readOnly?: boolean;
+  } = {}) => {
+    const id = randomUUID(), taskId = randomUUID(), attemptId = randomUUID()
+    if (options.stage) {
+      await client.query(`INSERT INTO factory_tasks(id,"userId","issueId","sourceEventId",route,stage,status,"attemptId",reason)
+        VALUES($1,$2,$3,$4,'{}',$5,'pending',$6,'Review selection fixture')`,
+      [taskId, f.userId, f.taskId, randomUUID(), options.stage, attemptId])
+      await client.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,reason)
+        VALUES($1,$2,$3,1,1,'pending','Review selection fixture')`, [attemptId, taskId, options.stage])
+    }
+    await client.query(`INSERT INTO agent_runs(id,"userId","agentId","issueId",status,kind,"createdAt","agentDefinition")
+      VALUES($1,$2,$3,$4,'queued',$5,$6,$7)`,
+    [id, f.userId, f.agentId, f.taskId, options.kind ?? 'implement', options.createdAt ?? new Date(Date.now() + 1_000),
+      JSON.stringify({ readOnly: options.readOnly ?? false })])
+    return { id, taskId, attemptId, bind: async () => {
+      if (!options.stage) return
+      await client.query('UPDATE agent_runs SET kind=$2 WHERE id=$1', [id,
+        options.stage === 'spec' ? 'plan' : options.stage === 'execute' ? 'implement' : 'acceptance'])
+      await client.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1', [attemptId, id])
+    } }
+  }
+  for (const stage of ['review', 'verify', 'monitor'] as const) await leaseTest(`a committed Factory ${stage} never replaces or revokes the Task executor`, async () => {
+    const f = await fixture(), current = await grant(f), preview = await grant(f, 'preview'), client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const check = await pendingRun(client, f, { stage })
+      assert.equal((await client.query('SELECT "revokedAt" FROM coding_review_sessions WHERE id=$1', [current.lease.id])).rows[0].revokedAt, null,
+        'INSERT alone cannot classify a run before its Factory binding')
+      await check.bind()
+      await client.query('COMMIT')
+      assert.equal((await latestTaskRun(pool, f.userId, f.taskId))?.id, f.runId)
+      assert.equal((await read(f)).runId, f.runId)
+      assert.equal((await leaseRow(current.lease.id)).revokedAt, null)
+      assert.equal((await leaseRow(preview.lease.id)).revokedAt, null)
+      assert.deepEqual(await reconcileReviewSessions(pool, { taskId: f.taskId }), { closed: 0, pending: 0 })
+      assert.equal(closeCalls.length, 0)
+    } finally { await client.query('ROLLBACK'); client.release() }
+  })
+  await leaseTest('a group chat is outside the Task review surface', async () => {
+    const f = await fixture(), current = await grant(f), client = await pool.connect()
+    try {
+      await client.query('BEGIN'); await pendingRun(client, f, { kind: 'group_chat' }); await client.query('COMMIT')
+      assert.equal((await latestTaskRun(pool, f.userId, f.taskId))?.id, f.runId)
+      assert.equal((await read(f)).runId, f.runId)
+      assert.equal((await leaseRow(current.lease.id)).revokedAt, null)
+      assert.deepEqual(await reconcileReviewSessions(pool, { taskId: f.taskId }), { closed: 0, pending: 0 })
+    } finally { await client.query('ROLLBACK'); client.release() }
+  })
+  for (const stage of ['spec', 'execute', undefined] as const) await leaseTest(`a real ${stage ?? 'unbound read-only'} Task run fences the old surface at COMMIT`, async () => {
+    const f = await fixture(), current = await grant(f), client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const next = await pendingRun(client, f, { stage, readOnly: true })
+      await next.bind()
+      assert.equal((await client.query('SELECT "revokedAt" FROM coding_review_sessions WHERE id=$1', [current.lease.id])).rows[0].revokedAt, null,
+        'the deferred fence does not publish a transaction that might roll back')
+      assert.equal((await latestTaskRun(pool, f.userId, f.taskId))?.id, f.runId)
+      await client.query('COMMIT')
+      assert.ok((await leaseRow(current.lease.id)).revokedAt)
+      assert.equal((await latestTaskRun(pool, f.userId, f.taskId))?.id, next.id)
+      await refused(read(f, f.session, { runId: f.runId }), 409, 'review_binding_changed')
+      await refused(read(f), 404, 'review_checkout_unavailable')
+    } finally { await client.query('ROLLBACK'); client.release() }
+  })
+  await leaseTest('multiple inserts use final Factory bindings and the final Task ordering', async () => {
+    const f = await fixture(), current = await grant(f), client = await pool.connect(), base = Date.now()
+    try {
+      await client.query('BEGIN')
+      const review = await pendingRun(client, f, { stage: 'review', createdAt: new Date(base + 1_000) })
+      const execute = await pendingRun(client, f, { stage: 'execute', createdAt: new Date(base + 2_000) })
+      const monitor = await pendingRun(client, f, { stage: 'monitor', createdAt: new Date(base + 3_000) })
+      await review.bind(); await execute.bind(); await monitor.bind()
+      assert.equal((await client.query('SELECT "revokedAt" FROM coding_review_sessions WHERE id=$1', [current.lease.id])).rows[0].revokedAt, null)
+      await client.query('COMMIT')
+      assert.ok((await leaseRow(current.lease.id)).revokedAt)
+      assert.equal((await latestTaskRun(pool, f.userId, f.taskId))?.id, execute.id)
+    } finally { await client.query('ROLLBACK'); client.release() }
+  })
+  await leaseTest('a rolled-back queue and bind leave the original lease and selection intact', async () => {
+    const f = await fixture(), current = await grant(f), client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const next = await pendingRun(client, f, { stage: 'execute' }); await next.bind()
+      await client.query('ROLLBACK')
+      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=$1', [next.id])).rowCount, 0)
+      assert.equal((await leaseRow(current.lease.id)).revokedAt, null)
+      assert.equal((await read(f)).runId, f.runId)
+    } finally { await client.query('ROLLBACK'); client.release() }
+  })
+  await leaseTest('older history and an insert deleted before COMMIT do not replace the executor', async () => {
+    const f = await fixture(), current = await grant(f), client = await pool.connect()
+    const created = (await pool.query<{ createdAt: Date }>('SELECT "createdAt" FROM agent_runs WHERE id=$1', [f.runId])).rows[0]!.createdAt
+    try {
+      await client.query('BEGIN')
+      const old = await pendingRun(client, f, { stage: 'execute', createdAt: new Date(created.getTime() - 60_000) }); await old.bind()
+      const removed = await pendingRun(client, f)
+      await client.query('DELETE FROM agent_runs WHERE id=$1', [removed.id])
+      await client.query('COMMIT')
+      assert.equal((await leaseRow(current.lease.id)).revokedAt, null)
+      assert.equal((await read(f)).runId, f.runId)
+    } finally { await client.query('ROLLBACK'); client.release() }
+  })
+
+  // Exercise the actual Store, current membership, source and Run ownership.
+  // Only the request scheduler and remote close ACK are replaced. No model,
+  // provider, mock authorization or SQL fixture answers participate.
+  const { observePoolCommits } = await import('../db/commit-effects')
+  observePoolCommits(pool)
+  const { createFactoryStore } = await import('../factory/store')
+  const { factoryAuthorize } = await import('../factory/authorize')
+  const { actAs } = await import('../acting-user')
+  const { withTaskWorkspace } = await import('../task-workspace')
+  const background = await import('../background')
+  const reviewJobs: Array<() => unknown> = []
+  t.mock.module(new URL('../background.ts', import.meta.url).href, { namedExports: { ...background,
+    afterJob: (...[label, work]: Parameters<typeof background.afterJob>) => {
+      if (label === 'after:device-wake') reviewJobs.push(work)
+    },
+  } })
+  const queuedReviewJob = async () => {
+    const deadline = Date.now() + 3_000
+    while (reviewJobs.length === 0 && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
+    assert.equal(reviewJobs.length, 1, 'one exact-run wake follows the committed binding')
+    await reviewJobs.shift()!()
+  }
+  const checkerBinding = async (f: Fixture, stage: 'review' | 'verify' | 'monitor') => {
+    const taskId = randomUUID(), attemptId = randomUUID(), eventId = randomUUID(), client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+        VALUES($1,$2,$3,$4,'user_message',$1,'{"text":"Review binding fixture"}')`, [eventId, f.userId, f.botId, f.taskId])
+      await client.query(`INSERT INTO factory_tasks(id,"userId","botId","issueId","sourceEventId",route,stage,status,"attemptId",reason,"scopeVersion")
+        SELECT $1,$2,$3,id,$4,'{}',$5,'pending',$6,'Review binding fixture',"scopeVersion" FROM issues WHERE id=$7`,
+      [taskId, f.userId, f.botId, eventId, stage, attemptId, f.taskId])
+      await client.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,reason)
+        VALUES($1,$2,$3,1,1,'pending','Review binding fixture')`, [attemptId, taskId, stage])
+      await client.query('COMMIT')
+    } finally { await client.query('ROLLBACK'); client.release() }
+    const store = createFactoryStore(pool, factoryAuthorize, f.botId)
+    return { taskId, attemptId, bind: (tx: PoolClient) => actAs({ id: f.userId, [tokenWorkspace]: f.workspaceId }, () =>
+      store.apply(f.userId, { taskId, revision: 1 }, randomUUID(), { action: 'bind_run', runId: f.runId }, tx)) }
+  }
+  await leaseTest('late Store.bind_run fences only its checker and schedules close outside APP and Workspace locks', async () => {
+    const f = await fixture(), unrelated = await fixture()
+    await pool.query('UPDATE agent_runs SET kind=\'acceptance\' WHERE id=$1', [f.runId])
+    const current = await grant(f, 'preview'), other = await grant(unrelated, 'preview'), binding = await checkerBinding(f, 'review')
+    const reader = { id: f.userId, [tokenWorkspace]: f.workspaceId }
+    reviewJobs.length = 0
+    beforeClose = async () => {
+      const probe = await pool.connect()
+      try {
+        await probe.query('BEGIN')
+        await probe.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR UPDATE NOWAIT', [f.workspaceId])
+        await probe.query('SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT', [f.workspaceId, f.userId])
+        await probe.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 FOR UPDATE NOWAIT', [f.runId])
+      } finally { await probe.query('ROLLBACK'); probe.release() }
+    }
+    await withTaskWorkspace(reader, f.workspaceId, async () => {
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        await client.query('UPDATE factory_attempts SET output=\'{"ordinary":"progress"}\',status=\'running\' WHERE id=$1', [binding.attemptId])
+        assert.equal((await leaseRow(current.lease.id)).revokedAt, null, 'ordinary checker progress adds no source fence')
+        const result = await binding.bind(client)
+        assert.equal(result.task.status, 'running')
+        assert.ok((await client.query('SELECT "revokedAt" FROM coding_review_sessions WHERE id=$1', [current.lease.id])).rows[0].revokedAt)
+        assert.equal((await leaseRow(current.lease.id)).revokedAt, null, 'uncommitted fence is not externally published')
+        assert.equal(reviewJobs.length, 0)
+        await client.query('COMMIT')
+        await new Promise(resolve => setImmediate(resolve))
+        assert.equal(reviewJobs.length, 0, 'APP commit must still wait for the captured outer Workspace executor')
+        assert.equal(closeCalls.length, 0)
+      } finally { await client.query('ROLLBACK'); client.release() }
+    })
+    await queuedReviewJob()
+    assert.deepEqual(closeCalls.map(call => call.ids), [[current.lease.id]])
+    assert.equal(await leaseRow(current.lease.id), undefined)
+    assert.equal((await leaseRow(other.lease.id)).revokedAt, null)
+    assert.equal(await latestTaskRun(pool, f.userId, f.taskId), null)
+    await refused(read(f), 404, 'review_not_found')
+  })
+  await leaseTest('a rolled-back late Store binding retains the lease and emits no close', async () => {
+    const f = await fixture()
+    await pool.query('UPDATE agent_runs SET kind=\'acceptance\' WHERE id=$1', [f.runId])
+    const current = await grant(f, 'preview'), binding = await checkerBinding(f, 'verify'), client = await pool.connect()
+    reviewJobs.length = 0
+    try {
+      await client.query('BEGIN'); await binding.bind(client)
+      assert.ok((await client.query('SELECT "revokedAt" FROM coding_review_sessions WHERE id=$1', [current.lease.id])).rows[0].revokedAt)
+      await client.query('ROLLBACK')
+      await new Promise(resolve => setImmediate(resolve))
+      assert.equal(reviewJobs.length, 0); assert.equal(closeCalls.length, 0)
+      assert.equal((await leaseRow(current.lease.id)).revokedAt, null)
+      assert.equal((await pool.query('SELECT "runId" FROM factory_attempts WHERE id=$1', [binding.attemptId])).rows[0].runId, null)
+      assert.equal((await read(f)).runId, f.runId)
+    } finally { await client.query('ROLLBACK'); client.release() }
+  })
+  await leaseTest('an outer Workspace rollback leaves a committed checker fence for the existing due owner', async () => {
+    const f = await fixture()
+    await pool.query('UPDATE agent_runs SET kind=\'acceptance\' WHERE id=$1', [f.runId])
+    const current = await grant(f, 'preview'), binding = await checkerBinding(f, 'review'), failure = new Error('fixture outer rollback')
+    reviewJobs.length = 0
+    await assert.rejects(withTaskWorkspace({ id: f.userId, [tokenWorkspace]: f.workspaceId }, f.workspaceId, async () => {
+      const client = await pool.connect()
+      try { await client.query('BEGIN'); await binding.bind(client); await client.query('COMMIT') }
+      finally { await client.query('ROLLBACK'); client.release() }
+      throw failure
+    }), error => error === failure)
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(reviewJobs.length, 0); assert.equal(closeCalls.length, 0)
+    assert.ok((await leaseRow(current.lease.id)).revokedAt)
+    assert.ok((await pool.query('SELECT "lifecycleAt"<=clock_timestamp() AS due FROM thread_machines WHERE "runId"=$1', [f.runId])).rows[0].due)
+    assert.deepEqual(await expireReviewSessions(pool), { closed: 1, pending: 0 })
+    assert.deepEqual(closeCalls.map(call => call.ids), [[current.lease.id]])
+  })
+  await leaseTest('late binding waits for a real concurrent grant then fences that committed capability', async () => {
+    const f = await fixture()
+    await pool.query('UPDATE agent_runs SET kind=\'acceptance\' WHERE id=$1', [f.runId])
+    const binding = await checkerBinding(f, 'verify'), entered = Promise.withResolvers<number>(), finish = Promise.withResolvers<void>()
+    reviewJobs.length = 0
+    const granting = resolve(pool, pool, f.session, f.taskId, {}, async (authority, client) => {
+      entered.resolve((await client.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!.pid)
+      await finish.promise
+      return beginReviewSession(authority, { kind: 'preview' }, client)
+    })
+    void granting.catch(error => entered.reject(error))
+    // Join failures immediately so a failed fixture cannot leave a hidden
+    // rejection or a client waiting for a gate that its owner never releases.
+    const granted = Promise.allSettled([granting])
+    let bindingResult: Promise<PromiseSettledResult<unknown>[]> | undefined
+    try {
+      const grantPid = await entered.promise
+      bindingResult = Promise.allSettled([withTaskWorkspace({ id: f.userId, [tokenWorkspace]: f.workspaceId }, f.workspaceId, async () => {
+        const client = await pool.connect()
+        try { await client.query('BEGIN'); await binding.bind(client); await client.query('COMMIT') }
+        finally { await client.query('ROLLBACK'); client.release() }
+      })])
+      await waitForBlockedGrant(grantPid)
+      finish.resolve()
+      const [issued] = await granted, [bound] = await bindingResult
+      assert.equal(issued.status, 'fulfilled'); assert.equal(bound.status, 'fulfilled')
+      if (issued.status !== 'fulfilled') return
+      assert.ok((await leaseRow(issued.value.id)).revokedAt)
+      await queuedReviewJob()
+      assert.deepEqual(closeCalls.map(call => call.ids), [[issued.value.id]])
+      assert.equal(await leaseRow(issued.value.id), undefined)
+    } finally { finish.resolve(); await granted; if (bindingResult) await bindingResult }
+  })
+  await leaseTest('a reader waiting on Run SHARE rechecks a committed late checker binding after the lock', async () => {
+    const f = await fixture()
+    await pool.query('UPDATE agent_runs SET kind=\'acceptance\' WHERE id=$1', [f.runId])
+    const binding = await checkerBinding(f, 'monitor'), writer = await pool.connect()
+    let pending: Promise<PromiseSettledResult<Awaited<ReturnType<typeof read>>>[]> | undefined
+    reviewJobs.length = 0
+    try {
+      await writer.query('BEGIN')
+      const pid = (await writer.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!.pid
+      await writer.query('SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE', [f.runId])
+      pending = Promise.allSettled([read(f)])
+      await waitForBlockedGrant(pid)
+      await binding.bind(writer)
+      await writer.query('COMMIT')
+      const [result] = await pending
+      assert.equal(result.status, 'rejected')
+      if (result.status === 'rejected') assert.ok(result.reason instanceof ReviewAuthorityError && result.reason.status === 409
+        && result.reason.code === 'review_binding_changed', 'the pre-lock statement snapshot cannot admit the newly classified checker')
+      await queuedReviewJob()
+      assert.equal(closeCalls.length, 0)
+      assert.equal((await pool.query('SELECT 1 FROM coding_review_sessions WHERE "runId"=$1', [f.runId])).rowCount, 0)
+    } finally { await writer.query('ROLLBACK'); writer.release(); if (pending) await pending }
+  })
+
+  await leaseTest('Workspace/member precede the shared relation fence when a real grant waits for an admin writer', async () => {
+    const f = await fixture(), writer = await pool.connect()
+    await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [f.taskId])
+    let pending: Promise<PromiseSettledResult<Awaited<ReturnType<typeof grant>>>[]> | undefined
+    try {
+      await writer.query('BEGIN')
+      await writer.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR UPDATE', [f.workspaceId])
+      await writer.query('SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE', [f.workspaceId, f.userId])
+      const pid = (await writer.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!.pid
+      pending = Promise.allSettled([grant(f)])
+      await waitForBlockedGrant(pid)
+      assert.equal((await writer.query("SELECT pg_try_advisory_xact_lock(hashtextextended('mikka-team-relations',0)) AS acquired")).rows[0].acquired, true,
+        'a grant waiting for Workspace cannot already own the relation lock')
+      await writer.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [f.taskId, f.teamId, f.workspaceId, f.userId])
+      await writer.query('COMMIT')
+    } finally { await writer.query('ROLLBACK'); writer.release() }
+    const [result] = await pending!
+    assert.equal(result!.status, 'fulfilled')
+    if (result!.status === 'fulfilled') {
+      assert.equal(result.value.authority.workspaceId, f.workspaceId)
+      assert.equal((await leaseRow(result.value.lease.id)).revokedAt, null)
+    }
+  })
+  for (const quarantine of [false, true]) await leaseTest(`the final Task lock refuses ${quarantine ? 'quarantine' : 'a stored tenant change'} committed while admission waits`, async () => {
+    const f = await fixture(), writer = await pool.connect()
+    let pending: Promise<PromiseSettledResult<Awaited<ReturnType<typeof grant>>>[]> | undefined
+    try {
+      await writer.query('BEGIN')
+      await writer.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR UPDATE', [f.workspaceId])
+      const pid = (await writer.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!.pid
+      pending = Promise.allSettled([grant(f)])
+      await waitForBlockedGrant(pid)
+      await legacyWrite('issues', 'UPDATE issues SET "workspaceId"=$2,"ownershipState"=$3 WHERE id=$1',
+        [f.taskId, quarantine ? null : f.otherWorkspaceId, quarantine ? 'pending' : 'bound'])
+    } finally { await writer.query('ROLLBACK'); writer.release() }
+    const [result] = await pending!
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') assert.ok(result.reason instanceof ReviewAuthorityError && result.reason.code === 'review_scope_denied')
+    assert.equal((await pool.query('SELECT 1 FROM coding_review_sessions WHERE "taskId"=$1', [f.taskId])).rowCount, 0)
   })
 
   await leaseTest('review lease is bounded, credential-bound, and reconnect never slides its deadline', async () => {
@@ -315,6 +685,8 @@ test('task review: current owner, session, tenant and immutable physical checkou
   })
   await leaseTest('title, output, success and automatic parking do not revoke a review lease', async () => {
     const f = await fixture(), current = await grant(f)
+    await pool.query('UPDATE issues SET "workspaceId"="workspaceId","ownershipState"=\'bound\',"linearSyncPolicy"=\'disabled\' WHERE id=$1', [f.taskId])
+    await pool.query('UPDATE agent_runs SET "workspaceId"="workspaceId" WHERE id=$1', [f.runId])
     await pool.query('UPDATE issues SET title=\'Updated fixture\',content=\'{"type":"doc","content":[]}\',"updatedAt"=now() WHERE id=$1', [f.taskId])
     await pool.query('UPDATE agent_runs SET "updatedAt"=now(),report=\'{"syntheticOutput":"ordinary update"}\' WHERE id=$1', [f.runId])
     await pool.query('UPDATE agent_runs SET status=\'succeeded\',"leaseExpiresAt"=NULL,"finishedAt"=now(),report=$2 WHERE id=$1',
@@ -329,6 +701,9 @@ test('task review: current owner, session, tenant and immutable physical checkou
     ['session delete', f => pool.query('DELETE FROM "session" WHERE id=$1', [f.session.session.id])],
     ['session expiry shortening', f => pool.query('UPDATE "session" SET "expiresAt"=now()-interval \'1 second\' WHERE id=$1', [f.session.session.id])],
     ['task closure', f => pool.query('UPDATE issues SET status=\'done\' WHERE id=$1', [f.taskId])],
+    ['historical stored Task workspace change', f => legacyWrite('issues', 'UPDATE issues SET "workspaceId"=$2 WHERE id=$1', [f.taskId, f.otherWorkspaceId])],
+    ['Task ownership quarantine', f => legacyWrite('issues', 'UPDATE issues SET "workspaceId"=NULL,"ownershipState"=\'pending\' WHERE id=$1', [f.taskId])],
+    ['historical stored Run workspace change', f => legacyWrite('agent_runs', 'UPDATE agent_runs SET "workspaceId"=$2 WHERE id=$1', [f.runId, f.otherWorkspaceId])],
     ['effective owner handoff', f => pool.query('UPDATE issues SET content=$2 WHERE id=$1', [f.taskId, JSON.stringify({ type: 'doc', attrs: { mikka: { assignee: { kind: 'member', id: f.peerId } } } })])],
     ['run stop', f => pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [f.runId])],
     ['machine epoch change', f => pool.query('UPDATE thread_machines SET epoch=epoch+1 WHERE "runId"=$1', [f.runId])],

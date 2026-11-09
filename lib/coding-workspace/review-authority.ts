@@ -9,6 +9,7 @@ import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import type { ApiSession } from '../api-auth'
 import { readIssueMetadata } from '../issue-metadata'
 import { tokenWorkspace } from '../tokens/principal'
+import { taskThreadRunPredicate } from '../task-thread-run'
 
 export type ReviewAuthorityCode = 'review_auth_required' | 'review_not_found' | 'not_owner_terminal'
   | 'review_scope_denied' | 'review_machine_gone' | 'review_binding_changed' | 'review_checkout_unavailable'
@@ -44,7 +45,7 @@ type Run = {
   deviceTokenId: string | null; worktreePath: string | null; status: string; pauseReason: string | null
   leaseExpiresAt: Date | null; stopRequestedAt: Date | null; startedAt: Date | null; finishedAt: Date | null
   sessionId: string | null; attempt: number; machineAuthority: boolean
-  frozenWorkspace: string | null; admissionWorkspace: string | null; admissionDevice: string | null
+  storedWorkspace: string | null; frozenWorkspace: string | null; admissionWorkspace: string | null; admissionDevice: string | null
   admissionOwner: string | null; admissionTask: string | null
   frozenKey: string | null; botWorkspace: string | null
   bindingWorkspace: string | null; bindingOwner: string | null
@@ -62,6 +63,7 @@ const denied = () => new ReviewAuthorityError('review_scope_denied')
 
 const RUN_COLUMNS = `r.id,r."userId",r."issueId",r."deviceId",r."deviceRepoId",r."deviceTokenId",r."worktreePath",
   r.status,r."pauseReason",r."leaseExpiresAt",r."stopRequestedAt",r."startedAt",r."finishedAt",r."sessionId",r.attempt,r."machineAuthority",
+  r."workspaceId" AS "storedWorkspace",
   r."agentDefinition"#>>'{executionIdentity,workspaceId}' AS "frozenWorkspace",
   r."agentDefinition"#>>'{repositoryAdmission,workspaceId}' AS "admissionWorkspace",
   r."agentDefinition"#>>'{repositoryAdmission,deviceId}' AS "admissionDevice",
@@ -115,32 +117,35 @@ export async function resolveTaskReviewAuthority<T>(database: Pool, membership: 
   taskId: string, expected: ReviewAuthorityExpectation = {}, work?: ReviewAuthorityWork<T>): Promise<T | TaskReviewAuthority> {
   if (!z.uuid().safeParse(taskId).success) throw new ReviewAuthorityError('review_not_found')
   const credential = credentialOf(session)
-  await taskForActor(database, session, taskId)
-  // Match the task's newest execution. Filtering by owner or machine here
-  // would silently fall back to an older checkout after a handoff/retry.
+  const initialTask = await taskForActor(database, session, taskId)
+  // Task tenancy is authoritative even without a Team link. Legacy pending
+  // rows cannot borrow a workspace from a Bot, Run or retained machine.
+  const workspaceId = initialTask.workspaceId
+  if (initialTask.ownershipState !== 'bound' || !workspaceId || !z.uuid().safeParse(workspaceId).success
+    || session.tokenWorkspaceId && session.tokenWorkspaceId !== workspaceId) throw denied()
+  if (expected.workspaceId !== undefined && expected.workspaceId !== workspaceId) throw denied()
+  // Match the same Task execution category as review context / latestTaskRun.
+  // Factory checkers and group chats never replace the person's checkout.
+  // Filtering by owner or machine here would silently fall back after handoff.
   const { rows: [initial] } = await database.query<Run>(`SELECT ${RUN_COLUMNS} FROM agent_runs r ${RUN_JOINS}
-    WHERE r."issueId"=$1 ORDER BY r."createdAt" DESC,r.id DESC LIMIT 1`, [taskId])
+    WHERE r."issueId"=$1 AND ${taskThreadRunPredicate('r')} ORDER BY r."createdAt" DESC,r.id DESC LIMIT 1`, [taskId])
   if (!initial) throw new ReviewAuthorityError('review_not_found')
   if (initial.userId !== session.user.id) throw new ReviewAuthorityError('not_owner_terminal')
   if (expected.runId && expected.runId !== initial.id) throw new ReviewAuthorityError('review_binding_changed')
   if (initial.status === 'stopped' || initial.status === 'cancelled') throw new ReviewAuthorityError('review_machine_gone')
   if (!ACTIVE.has(initial.status) && !ENDED.has(initial.status)) throw new ReviewAuthorityError('review_checkout_unavailable')
-  const { rows: [initialMachine] } = await database.query<Machine>(`SELECT ${MACHINE_COLUMNS} FROM thread_machines WHERE "runId"=$1`, [initial.id])
-  const workspaceId = initial.frozenWorkspace ?? initialMachine?.workspaceId ?? initial.bindingWorkspace ?? initial.admissionWorkspace
-  if (!workspaceId || !z.uuid().safeParse(workspaceId).success || session.tokenWorkspaceId && session.tokenWorkspaceId !== workspaceId) throw denied()
-  if (expected.workspaceId !== undefined && expected.workspaceId !== workspaceId) throw denied()
-
   const workspace = await membership.connect()
   let client: PoolClient | undefined, workspaceOpen = false, appOpen = false
   try {
     await workspace.query('BEGIN'); workspaceOpen = true
     await workspace.query("SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='5s'; SET LOCAL idle_in_transaction_session_timeout='20s'")
-    // Relation writers take the same exclusive lock before workspace rows.
-    // The shared lock also fences insertion when this task has no Team link.
-    await workspace.query("SELECT pg_advisory_xact_lock_shared(hashtextextended('mikka-team-relations',0))")
-    const home = await workspace.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR SHARE', [workspaceId])
+    // All admissions and grouping writers lock Workspace/member first. Taking
+    // the relation lock earlier would deadlock a tenant admin waiting on us.
+    const home = await workspace.query<{ kind: string; userId: string }>('SELECT kind,"userId" FROM mikka_workspaces WHERE id=$1 FOR SHARE', [workspaceId])
     const member = await workspace.query(`SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`, [workspaceId, session.user.id])
-    if (!home.rowCount || !member.rowCount) throw denied()
+    if (!home.rowCount || !member.rowCount || home.rows[0]!.kind === 'personal' && home.rows[0]!.userId !== session.user.id) throw denied()
+    // The shared lock still fences insertion when this task has no Team link.
+    await workspace.query("SELECT pg_advisory_xact_lock_shared(hashtextextended('mikka-team-relations',0))")
     const links = await workspace.query<{ workspaceId: string; teamId: string }>('SELECT "workspaceId","teamId" FROM mikka_team_issues WHERE "issueId"=$1 FOR SHARE', [taskId])
     if (links.rows.some(link => link.workspaceId !== workspaceId)) throw denied()
     for (const link of links.rows) if (!(await workspace.query('SELECT id FROM mikka_teams WHERE id=$1 AND "workspaceId"=$2 FOR SHARE', [link.teamId, workspaceId])).rowCount) throw denied()
@@ -150,12 +155,21 @@ export async function resolveTaskReviewAuthority<T>(database: Pool, membership: 
     const credentialExpiresAt = await lockCredential(client, session, credential)
     // A grant serializes with a new Run's FK KEY SHARE on this Task. A plain
     // SHARE lock would let its revocation trigger run before our lease INSERT.
-    if (!(await client.query(`SELECT id FROM issues WHERE id=$1 FOR ${work ? 'UPDATE' : 'SHARE'}`, [taskId])).rowCount) throw new ReviewAuthorityError('review_not_found')
+    const { rows: [lockedTask] } = await client.query<{ workspaceId: string | null; ownershipState: string }>(
+      `SELECT "workspaceId","ownershipState" FROM issues WHERE id=$1 FOR ${work ? 'UPDATE' : 'SHARE'}`, [taskId])
+    if (!lockedTask) throw new ReviewAuthorityError('review_not_found')
+    if (lockedTask.ownershipState !== 'bound' || lockedTask.workspaceId !== workspaceId) throw denied()
     await taskForActor(client, session, taskId)
     if ((await client.query('SELECT 1 FROM workspace_deletions WHERE id=$1', [workspaceId])).rowCount) throw denied()
     const { rows: [run] } = await client.query<Run>(`SELECT ${RUN_COLUMNS} FROM agent_runs r ${RUN_JOINS}
-      WHERE r."issueId"=$1 ORDER BY r."createdAt" DESC,r.id DESC LIMIT 1 FOR SHARE OF r`, [taskId])
+      WHERE r."issueId"=$1 AND ${taskThreadRunPredicate('r')} ORDER BY r."createdAt" DESC,r.id DESC LIMIT 1 FOR SHARE OF r`, [taskId])
     if (!run || run.id !== initial.id) throw new ReviewAuthorityError('review_binding_changed')
+    // A Factory bind can hold Run UPDATE while the SELECT above waits with an
+    // earlier snapshot. Re-read classification after obtaining Run SHARE;
+    // that lock now prevents another bind before our capability commits.
+    const { rows: [currentThread] } = await client.query<{ id: string }>(`SELECT r.id FROM agent_runs r
+      WHERE r."issueId"=$1 AND ${taskThreadRunPredicate('r')} ORDER BY r."createdAt" DESC,r.id DESC LIMIT 1`, [taskId])
+    if (currentThread?.id !== run.id) throw new ReviewAuthorityError('review_binding_changed')
     if (run.userId !== session.user.id) throw new ReviewAuthorityError('not_owner_terminal')
     if (!run.deviceId || !run.deviceRepoId || !run.deviceTokenId) throw new ReviewAuthorityError('review_machine_gone')
     const { rows: [device] } = await client.query<Device>('SELECT id,"ownerId",kind,enabled,"removedAt" FROM devices WHERE id=$1 FOR SHARE', [run.deviceId])
@@ -187,7 +201,7 @@ export async function resolveTaskReviewAuthority<T>(database: Pool, membership: 
       || run.admissionDevice && run.admissionDevice !== device.id || run.admissionOwner && run.admissionOwner !== session.user.id
       || run.admissionTask && run.admissionTask !== taskId) throw denied()
     const scopes = [run.frozenWorkspace, run.admissionWorkspace, run.botWorkspace, run.bindingWorkspace, token.boundWorkspaceId, machine?.workspaceId]
-    if (!scopes.some(Boolean) || scopes.some(scope => scope && scope !== workspaceId)
+    if (run.storedWorkspace !== workspaceId || scopes.some(scope => scope && scope !== workspaceId)
       || run.bindingOwner && run.bindingOwner !== session.user.id) throw denied()
     if (machine && (machine.ownerId !== session.user.id || machine.deviceId !== device.id || machine.issueId !== taskId || machine.repoId !== repo.id)) throw denied()
     if (device.kind === 'cloud' && (!run.machineAuthority || !machine || !machine.sandboxId || !['running', 'paused'].includes(machine.state))) throw new ReviewAuthorityError('review_machine_gone')

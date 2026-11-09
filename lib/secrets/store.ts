@@ -237,7 +237,7 @@ export async function importWorkspaceSecrets(userId: string, workspaceId: string
         await tx.insert(workspaceSecrets).values({ id, ...columns, note: entry.note, ...seal(entry.value, columns), createdBy: userId, updatedBy: userId })
         await audit(tx, { workspaceId, actorId: userId, action: kind === 'secret' ? 'secret.created' : 'env.created', target: { type: kind, id, label: entry.name }, metadata: { scope: scoped.scopeType, role, bulk: true, ...(scoped.scopeRef ? { repository: scoped.scopeRef } : {}) } })
         result.created.push(entry.name)
-        changes.push(columns)
+        changes.push({ id, ...columns })
       } else if (onConflict === 'replace' && secretActionAllowed(role, 'secret.replace', [current], current.createdBy === userId)) {
         await tx.update(workspaceSecrets).set({ ...seal(entry.value, current), ...(entry.note ? { note: entry.note } : {}), updatedBy: userId, updatedAt: now }).where(eq(workspaceSecrets.id, current.id))
         await audit(tx, { workspaceId, actorId: userId, action: current.kind === 'secret' ? 'secret.replaced' : 'env.updated', target: { type: current.kind, id: current.id, label: current.name }, metadata: { role, bulk: true } })

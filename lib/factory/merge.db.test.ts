@@ -157,8 +157,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
     });
 
     async function successor(task: Awaited<ReturnType<typeof prepared>>['task']) {
-      await pool.query(`INSERT INTO factory_tasks (id,"userId","issueId","attemptId",revision,stage,status,"createdAt")
-        SELECT $2,"userId","issueId",$3,1,'execute','pending',"createdAt"+interval '1 second' FROM factory_tasks WHERE id=$1`,
+      await pool.query(`INSERT INTO factory_tasks (id,"userId","issueId","workspaceId","attemptId",revision,stage,status,"createdAt")
+        SELECT $2,"userId","issueId","workspaceId",$3,1,'execute','pending',"createdAt"+interval '1 second' FROM factory_tasks WHERE id=$1`,
       [task.id, randomUUID(), randomUUID()]);
     }
 
@@ -186,17 +186,24 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
           CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
           CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
           CREATE TABLE mikka_team_issues ("issueId" uuid,"workspaceId" uuid);
-          CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,"issueIds" jsonb NOT NULL DEFAULT '[]'::jsonb);
+          CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,
+            "workspaceId" uuid NOT NULL REFERENCES mikka_workspaces(id),"issueIds" jsonb NOT NULL DEFAULT '[]'::jsonb,
+            UNIQUE(id,"workspaceId"));
+          CREATE TABLE workspace_project_tasks ("projectId" uuid NOT NULL,"issueId" uuid NOT NULL UNIQUE,"workspaceId" uuid NOT NULL,
+            PRIMARY KEY("projectId","issueId"),FOREIGN KEY("projectId","workspaceId") REFERENCES workspace_projects(id,"workspaceId"));
           CREATE TABLE mikka_team_projects ("projectId" uuid NOT NULL,"workspaceId" uuid NOT NULL,PRIMARY KEY("projectId","workspaceId"));
         `);
-        const home = randomUUID();
+        const home = f.workspaceId;
         await pool.query(`INSERT INTO mikka_workspaces VALUES ($1,$2,'personal')`, [home, actor.userId]);
         await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,$2,'active')`, [home, actor.userId]);
         const x = await preparedDeliverable();
+        const projectId = randomUUID();
+        await pool.query('INSERT INTO workspace_projects (id,"userId","workspaceId") VALUES ($1,$2,$3)', [projectId, actor.userId, home]);
+        await pool.query('INSERT INTO workspace_project_tasks ("projectId","issueId","workspaceId") VALUES ($1,$2,$3)', [projectId, x.task.issueId, home]);
         const parent = randomUUID(), blocked = randomUUID();
         for (const [id, metadata] of [[parent, {}], [blocked, { blockedByIds: [x.task.issueId] }]] as const) {
-          await pool.query(`INSERT INTO issues(id,"userId",title,content,revision) VALUES($1,$2,'Connected fixture',$3,1)`,
-            [id, actor.userId, JSON.stringify({ type: 'doc', attrs: { mikka: metadata }, content: [] })]);
+          await pool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,revision) VALUES($1,$2,$4,'bound','Connected fixture',$3,1)`,
+            [id, actor.userId, JSON.stringify({ type: 'doc', attrs: { mikka: metadata }, content: [] }), home]);
         }
         await pool.query(`UPDATE issues SET content=$2 WHERE id=$1`, [x.task.issueId,
           JSON.stringify({ type: 'doc', attrs: { mikka: { parentId: parent } }, content: [] })]);
@@ -208,6 +215,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         await drain();
         const relations = sent.flatMap(value => value.events.filter(event => event.kind === 'issue_relations').map(event => event.id)).sort();
         assert.deepEqual(relations, [x.task.issueId, parent, blocked].sort(), 'the accepted child, parent progress and blocked task all refresh');
+        assert.ok(sent.some(value => value.events.some(event => event.kind === 'project_map' && event.id === projectId)), 'the canonical Project relation refreshes after COMMIT even with an empty legacy issueIds cache');
         assert.ok(sent.every(value => value.scope.ownerId === actor.userId && value.scope.workspaceId === home));
         const delivered = sent.length;
         assert.deepEqual(await x.accept(eventId, null), accepted);
@@ -407,22 +415,29 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         CREATE TABLE IF NOT EXISTS mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
         CREATE TABLE IF NOT EXISTS mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
         CREATE TABLE IF NOT EXISTS mikka_team_issues ("issueId" uuid,"workspaceId" uuid);
-        CREATE TABLE IF NOT EXISTS workspace_projects (id uuid PRIMARY KEY,"userId" text,"issueIds" jsonb NOT NULL DEFAULT '[]');
+        CREATE TABLE IF NOT EXISTS workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,
+          "workspaceId" uuid NOT NULL REFERENCES mikka_workspaces(id),"issueIds" jsonb NOT NULL DEFAULT '[]'::jsonb,
+          UNIQUE(id,"workspaceId"));
+        CREATE TABLE IF NOT EXISTS workspace_project_tasks ("projectId" uuid NOT NULL,"issueId" uuid NOT NULL UNIQUE,"workspaceId" uuid NOT NULL,
+          PRIMARY KEY("projectId","issueId"),FOREIGN KEY("projectId","workspaceId") REFERENCES workspace_projects(id,"workspaceId"));
         CREATE TABLE IF NOT EXISTS mikka_team_projects ("projectId" uuid,"workspaceId" uuid,PRIMARY KEY("projectId","workspaceId"));
       `);
       // Install the actual review control schema and source fences. The legacy
       // Factory fixture supplies only its unrelated source-table columns above.
-      for (const name of ['20261025013400_run_checkpoints.sql', '20261031002607_checkpoint_recovery_availability.sql', '20261108230400_coding_review_sessions.sql'])
+      for (const name of ['20261025013400_run_checkpoints.sql', '20261031002607_checkpoint_recovery_availability.sql', '20261108230400_coding_review_sessions.sql', '20261108230500_coding_review_task_workspace.sql', '20261108230600_coding_review_task_thread.sql'])
         await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'));
       const x = await prepared();
       const { rows: [producer] } = await pool.query('SELECT "runId" FROM factory_attempts WHERE "taskId"=$1 AND stage=\'execute\'', [x.task.id]);
       const runId = producer.runId as string, deviceId = randomUUID(), tokenId = randomUUID(), sandboxId = `fixture-pr-${runId}`;
-      const { rows: [home] } = await pool.query('SELECT id FROM mikka_workspaces WHERE "userId"=$1 AND kind=\'personal\' LIMIT 1', [actor.userId]);
-      const workspaceId = home?.id ?? randomUUID(), machineActor = { userId: actor.userId, workspaceId };
+      const workspaceId = f.workspaceId, machineActor = { userId: actor.userId, workspaceId };
+      const { rows: [home] } = await pool.query('SELECT id FROM mikka_workspaces WHERE id=$1 AND "userId"=$2 AND kind=\'personal\'', [workspaceId, actor.userId]);
       if (!home) {
         await pool.query('INSERT INTO mikka_workspaces VALUES ($1,$2,\'personal\')', [workspaceId, actor.userId]);
         await pool.query('INSERT INTO mikka_workspace_members VALUES ($1,$2,\'active\')', [workspaceId, actor.userId]);
       }
+      const projectId = randomUUID();
+      await pool.query('INSERT INTO workspace_projects (id,"userId","workspaceId") VALUES ($1,$2,$3)', [projectId, actor.userId, workspaceId]);
+      await pool.query('INSERT INTO workspace_project_tasks ("projectId","issueId","workspaceId") VALUES ($1,$2,$3)', [projectId, x.task.issueId, workspaceId]);
       await pool.query('UPDATE issues SET status=\'review\' WHERE id=$1', [x.task.issueId]);
       await pool.query('UPDATE factory_candidates SET "runId"=$2 WHERE id=$1', [x.task.candidateId, runId]);
       await pool.query('UPDATE run_publications SET "runId"=$2,"issueId"=$3 WHERE "pullRequest"->>\'url\'=$1', [x.pr, runId, x.task.issueId]);
@@ -501,6 +516,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         assert.deepEqual(await x.taskState(), { stage: 'approval', status: 'pending' });
         await drain();
         assert.ok(sent.some(value => value.events.some(event => event.kind === 'pull_request_status' && event.id === x.task.issueId)));
+        assert.ok(sent.some(value => value.events.some(event => event.kind === 'project_map' && event.id === projectId)), 'the committed publication refreshes its canonical Project');
         sent.length = 0;
         assert.deepEqual(await x.merges.pullRequestMerged(event), { completed: 1 });
         assert.deepEqual(await x.taskState(), { stage: 'publish', status: 'passed' });

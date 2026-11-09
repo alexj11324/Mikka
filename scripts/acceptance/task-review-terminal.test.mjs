@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { terminalAcceptanceFailure, verifyExistingTaskTerminal, verifyTerminalRefusal } from './task-review-terminal.mjs'
+import { terminalAcceptanceFailure, verifyExistingTaskTerminal, verifyTerminalRefusal, withPreviewTerminal } from './task-review-terminal.mjs'
 
 const id = digit => `00000000-0000-4000-8000-${String(digit).padStart(12, '0')}`
 const ownerId = 'synthetic-smoke-owner', privateText = 'PRIVATE_COOKIE_OR_NATIVE_OUTPUT_DO_NOT_REPORT'
@@ -108,5 +108,73 @@ test('negative evidence only accepts the exact status and a closed response code
     Response.json({ error: privateText }, { status: 403 })]) {
     await assert.rejects(verifyTerminalRefusal({ client: { request: async () => response }, taskId, status: 403,
       codes: ['not_owner_terminal'] }), { message: 'terminal_acceptance_response' })
+  }
+})
+
+function previewFixture({ exitCode = 0, closeStatus = 204, errorCode = 'review_machine_gone', machineState = 'ended', runState = 'succeeded' } = {}) {
+  const base = fixture({ state: runState }), requests = [], encoder = new TextEncoder()
+  let controller, endedReadbacks = 0
+  const client = { ...base.client,
+    async request(path, init = {}) {
+      requests.push({ path, method: init.method ?? 'GET', body: init.body })
+      if (init.method === 'DELETE') return closeStatus === 204 ? new Response(null, { status: 204 })
+        : Response.json({ error: errorCode, raw: privateText }, { status: closeStatus })
+      if (init.method === 'POST') {
+        const { data, requestId } = JSON.parse(init.body)
+        const marker = /MIKKA_PREVIEW_COMMAND_[a-f0-9]+/.exec(data)?.[0]
+        if (marker) controller.enqueue(encoder.encode(frame('output', { text: `${privateText}\n${marker}:${exitCode}\r\n` })))
+        return new Response(null, { status: 204, headers: { 'x-terminal-request-id': requestId } })
+      }
+      return new Response(new ReadableStream({ start(value) {
+        controller = value
+        value.enqueue(encoder.encode(frame('output', { text: '' }) + frame('session', { terminalSessionId: sessionId,
+          runId, ownerId, expiresAt: Date.now() + 60000 })))
+      } }), { headers: { 'content-type': 'text/event-stream', 'x-terminal-session-id': sessionId } })
+    },
+    async rpc(action, args) {
+      endedReadbacks++; assert.equal(action, 'agents.getThreadMachine'); assert.deepEqual(args, [taskId, runId])
+      return { kind: 'cloud', state: machineState, cloud: null }
+    },
+  }
+  return { client, requests, readbacks: () => endedReadbacks }
+}
+
+test('the second PTY uses normal authenticated input with unique IDs and keeps all command output private', async () => {
+  const f = previewFixture()
+  const report = await withPreviewTerminal({ ...options, client: f.client }, async control => {
+    assert.ok(Object.isFrozen(control)); assert.ok(control.remaining() > 0 && control.remaining() <= 60000)
+    assert.deepEqual(await control.run('test -d .'), { exitCode: 0 })
+    assert.deepEqual(await control.run('true'), { exitCode: 0 })
+    return { completed: true }
+  })
+  assert.equal(report.status, 'passed'); assert.equal(report.cleanup.status, 'closed')
+  assert.equal(JSON.stringify(report).includes(privateText), false)
+  const inputs = f.requests.filter(request => request.method === 'POST').map(request => JSON.parse(request.body))
+  assert.equal(inputs.length, 3); assert.equal(new Set(inputs.map(value => value.requestId)).size, 3)
+  assert.ok(f.requests.every(request => request.path.startsWith(`/api/tasks/${taskId}/review/terminal`)))
+})
+
+test('nonzero native exit is failure and an active/stopped run cannot open the second PTY', async () => {
+  const failing = previewFixture({ exitCode: 7 })
+  const result = await withPreviewTerminal({ ...options, client: failing.client }, control => control.run('false'))
+  assert.equal(result.status, 'failed'); assert.equal(result.failure.code, 'terminal_acceptance_command')
+  assert.equal(result.cleanup.status, 'closed')
+  for (const runState of ['running', 'stopped', 'cancelled', 'failed']) {
+    const f = previewFixture({ runState })
+    const refused = await withPreviewTerminal({ ...options, client: f.client }, () => assert.fail('must not open'))
+    assert.equal(refused.status, 'failed'); assert.deepEqual(f.requests, [])
+  }
+})
+
+test('409 cleanup requires the exact reclaimed code and an ended machine with cleared resources', async () => {
+  const good = previewFixture({ closeStatus: 409 })
+  const result = await withPreviewTerminal({ ...options, client: good.client }, async () => ({ completed: true }))
+  assert.equal(result.status, 'passed'); assert.deepEqual(result.cleanup, { status: 'machine_ended', httpStatus: 409, endReadback: true })
+  assert.equal(good.readbacks(), 1)
+  for (const change of [{ closeStatus: 409, errorCode: 'terminal_ended' }, { closeStatus: 409, machineState: 'paused' }, { closeStatus: 500 }]) {
+    const f = previewFixture(change)
+    const failed = await withPreviewTerminal({ ...options, client: f.client }, async () => ({ completed: true }))
+    assert.equal(failed.status, 'failed'); assert.equal(failed.cleanup.status, 'unconfirmed')
+    assert.equal(JSON.stringify(failed).includes(privateText), false)
   }
 })

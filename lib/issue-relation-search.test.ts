@@ -7,15 +7,22 @@ import { collectRelationPages, relationCandidates, relationSearchParams, relatio
 const A = '00000000-0000-4000-8000-00000000000a'
 const item = (patch: Partial<SearchResultItem>): SearchResultItem => ({ id: A, identifier: 'MIK-1', title: 't', status: 'todo', priority: 'medium', ownerId: A, ownerName: null, parentId: null, revision: 1, updatedAt: '', existingRelation: null, canRelate: true, ...patch })
 
-test('query: numbers and server prefixes pass through, other prefixes search the number', () => {
+test('query: every issued identifier reaches the server with its full namespace', () => {
   assert.deepEqual(relationSearchQuery(''), { q: '', identifier: null })
   assert.deepEqual(relationSearchQuery('  42 '), { q: '42', identifier: null })
   assert.deepEqual(relationSearchQuery('5'), { q: '5', identifier: null })
   assert.deepEqual(relationSearchQuery('mik-7'), { q: 'mik-7', identifier: null })
   assert.deepEqual(relationSearchQuery('ORV-123'), { q: 'ORV-123', identifier: null })
-  assert.deepEqual(relationSearchQuery('alex-12'), { q: '12', identifier: 'ALEX-12' })
-  assert.deepEqual(relationSearchQuery('COLLAB-3'), { q: '3', identifier: 'COLLAB-3' })
+  assert.deepEqual(relationSearchQuery('alex-12'), { q: 'alex-12', identifier: null })
+  assert.deepEqual(relationSearchQuery('COLLAB-3'), { q: 'COLLAB-3', identifier: null })
+  assert.deepEqual(relationSearchQuery('WABC123DEF456-9007199254740991'), { q: 'WABC123DEF456-9007199254740991', identifier: null })
   assert.deepEqual(relationSearchQuery('#12'), { q: '12', identifier: null })
+})
+
+test('a resolved historical alias is not discarded because the canonical identifier differs', () => {
+  const query = relationSearchQuery('OLD-12')
+  assert.equal(query.q, 'OLD-12')
+  assert.deepEqual(relationCandidates([item({ id: 'target', identifier: 'FROZEN-7' })], { kind: 'related', identifier: query.identifier }).map(row => row.id), ['target'])
 })
 
 test('query: one non-CJK character shows recent, one CJK character searches, titles are capped', () => {

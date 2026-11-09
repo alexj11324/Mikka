@@ -119,7 +119,7 @@ class TerminalProbe {
  * separate verifyTerminalRefusal calls with explicitly supplied fixtures.
  */
 export async function verifyExistingTaskTerminal({ client, taskId, runId, ownerId, workspaceId, expectedBuild,
-  peerClient, otherWorkspaceId, timeoutMs = 20000 }) {
+  peerClient, otherWorkspaceId, timeoutMs = 20000, signal }) {
   const report = { version: 1, issue: 1723, scope: 'existing_cloud_terminal', status: 'running', checks: {}, cleanup: { status: 'not_opened' } }
   let stream, opened = false
   let phase = 'scope'
@@ -128,7 +128,7 @@ export async function verifyExistingTaskTerminal({ client, taskId, runId, ownerI
   const open = async () => {
     const abort = new AbortController()
     try {
-      const response = await client.request(path, { headers: { accept: 'text/event-stream' }, signal: AbortSignal.any([abort.signal, AbortSignal.timeout(240000)]) })
+      const response = await client.request(path, { headers: { accept: 'text/event-stream' }, signal: AbortSignal.any([abort.signal, AbortSignal.timeout(240000), ...(signal ? [signal] : [])]) })
       opened = response.status === 200 || opened
       if (response.status !== 200) { await response.body?.cancel(); fail('stream') }
       return new TerminalProbe(response, abort, timeoutMs)
@@ -217,5 +217,99 @@ export async function verifyExistingTaskTerminal({ client, taskId, runId, ownerI
   }
   report.controls = controls
   report.remaining = [!peerClient && 'non_owner_session', !otherWorkspaceId && 'different_workspace', 'reclaimed_after_owned_fixture_end', 'local_machine_target'].filter(Boolean)
+  return report
+}
+
+/** A second short owner PTY for the checked-in preview acceptance helper.
+ * This is not a host/sandbox command API: there is no provider or address
+ * parameter, no credential export and no raw output returned to the caller.
+ * Every control uses the ordinary, freshly authorized task terminal endpoints.
+ * The first verifyExistingTaskTerminal call still proves exit/reconnect/etc.
+ */
+export async function withPreviewTerminal({ client, taskId, runId, ownerId, workspaceId, expectedBuild, timeoutMs = 20000, signal }, probe) {
+  requireValue(UUID.test(taskId ?? '') && UUID.test(runId ?? '') && UUID.test(workspaceId ?? '')
+    && SHA.test(expectedBuild ?? '') && typeof ownerId === 'string' && ownerId.length > 0
+    && typeof probe === 'function' && Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 30000, 'scope')
+  const path = `/api/tasks/${taskId}/review/terminal`
+  const report = { status: 'running', cleanup: { status: 'not_opened' } }
+  let stream, opened = false
+  const abort = new AbortController()
+  try {
+    requireValue((await client.json('/api/version')).build === expectedBuild, 'version')
+    const [identity, workspace, evidence] = await Promise.all([
+      client.json('/api/auth/get-session'), client.json('/api/workspace'), client.json(`/api/runs/${runId}/evidence`),
+    ])
+    requireValue(identity.user?.id === ownerId && isSmokeAccountEmail(identity.user.email)
+      && workspace.currentUserId === ownerId && workspace.workspace?.id === workspaceId, 'identity')
+    const run = evidence.run
+    requireValue(run?.id === runId && run.issueId === taskId && run.status === 'succeeded'
+      && run.executionIdentity?.workspaceId === workspaceId && run.executionIdentity.requester === ownerId
+      && run.executionIdentity.executionPrincipal === ownerId && run.executionIdentity.billingAccount?.runtime?.kind === 'e2b', 'run')
+    const response = await client.request(path, { headers: { accept: 'text/event-stream' },
+      signal: AbortSignal.any([abort.signal, AbortSignal.timeout(300000), ...(signal ? [signal] : [])]) })
+    opened = response.status === 200
+    if (!opened) { await response.body?.cancel(); fail('stream') }
+    stream = new TerminalProbe(response, abort, timeoutMs)
+    await stream.waitFor(() => stream.session !== null && stream.initialOutput)
+    const session = stream.session
+    requireValue(session.terminalSessionId === stream.id && session.runId === runId && session.ownerId === ownerId
+      && Number.isSafeInteger(session.expiresAt) && session.expiresAt > Date.now()
+      && session.expiresAt <= Date.now() + 300000, 'session')
+    const remaining = () => {
+      const ms = session.expiresAt - Date.now()
+      requireValue(ms > 0, 'timeout'); return ms
+    }
+    const send = async data => {
+      remaining()
+      requireValue(typeof data === 'string' && Buffer.byteLength(data) <= 16384 && !data.includes('\0'), 'command')
+      const requestId = randomUUID()
+      const result = await client.request(`${path}/input`, post({ data, requestId }))
+      await result.body?.cancel()
+      requireValue(result.status === 204 && result.headers.get('x-terminal-request-id') === requestId, 'command')
+    }
+    const wait = async (predicate, ms) => {
+      requireValue(Number.isSafeInteger(ms) && ms > 0 && ms <= 180000, 'timeout')
+      stream.timeoutMs = Math.min(ms, remaining())
+      await stream.waitFor(predicate)
+    }
+    await send("stty -echo; PS1=''\n")
+    const controls = Object.freeze({
+      expiresAt: session.expiresAt,
+      remaining,
+      async run(script, { timeoutMs: ms = timeoutMs } = {}) {
+        requireValue(typeof script === 'string' && script.length > 0 && Buffer.byteLength(script) <= 14000, 'command')
+        const marker = `MIKKA_PREVIEW_COMMAND_${randomUUID().replaceAll('-', '')}`
+        const pattern = new RegExp(`(?:^|\\n)${marker}:(\\d{1,3})\\r?(?:\\n|$)`)
+        await send(`(set -eu; ${script}); MIKKA_PREVIEW_EXIT=$?; printf '\\n${marker}:%s\\n' "$MIKKA_PREVIEW_EXIT"\n`)
+        await wait(() => pattern.test(stream.text), ms)
+        const exitCode = Number(pattern.exec(stream.text)[1])
+        requireValue(exitCode === 0, 'command')
+        return { exitCode }
+      },
+      async expectText(text, { timeoutMs: ms = timeoutMs } = {}) {
+        requireValue(typeof text === 'string' && text.length > 0 && text.length <= 256, 'command')
+        await wait(() => stream.text.includes(text), ms)
+      },
+    })
+    report.value = await probe(controls)
+    requireValue((await client.json('/api/version')).build === expectedBuild, 'version')
+    report.status = 'passed'
+  } catch (error) { report.status = 'failed'; report.failure = terminalAcceptanceFailure(error) }
+  finally {
+    if (opened) {
+      try {
+        const closed = await client.request(path, { method: 'DELETE' })
+        if (closed.status === 204) { await closed.body?.cancel(); report.cleanup = { status: 'closed', httpStatus: 204 } }
+        else {
+          requireValue(closed.status === 409 && (await limitedJson(closed)).error === 'review_machine_gone', 'cleanup')
+          const machine = await client.rpc('agents.getThreadMachine', [taskId, runId])
+          requireValue(machine?.kind === 'cloud' && machine.state === 'ended' && machine.cloud === null, 'cleanup')
+          report.cleanup = { status: 'machine_ended', httpStatus: 409, endReadback: true }
+        }
+      } catch (error) { report.cleanup = { status: 'unconfirmed', ...terminalAcceptanceFailure(error) }; report.status = 'failed' }
+    }
+    abort.abort()
+    if (stream) await stream.cancel().catch(() => {})
+  }
   return report
 }

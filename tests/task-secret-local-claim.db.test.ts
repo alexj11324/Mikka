@@ -211,7 +211,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   owners.push(owner, outsider)
   const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
   ownedWorkspaces.push(workspace.id)
-  const botId = await seedBot(pool, workspace.id, owner), issueId = await seedIssue(pool, owner)
+  const botId = await seedBot(pool, workspace.id, owner), issueId = await seedIssue(pool, owner, workspace.id)
   await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1 } } })])
   const repository = `mikka-ci/secret-local-${randomUUID()}`
   const remote = `https://github.com/${repository}.git`
@@ -351,7 +351,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   // workspace. No run identity, Secret grant or capability is patched by SQL.
   let taskNumber = 1
   const freshClaim = async () => {
-    const taskId = await seedIssue(pool, owner)
+    const taskId = await seedIssue(pool, owner, workspace.id)
     await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [taskId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: ++taskNumber } } })])
     const next = await queueRun(owner, { issueId: taskId, agentId: b.agentId, repo: remote, model: 'fixture-model',
       modelDispatch: { mode: 'preference', routing: { version: 1, difficulty: 'hard', model: 'fixture-model', harness: 'claude_code', tier: 'standard', effort: 'high', reason: 'difficulty_fit' } } }, botId)

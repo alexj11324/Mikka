@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -6,8 +7,9 @@ import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { createFactoryStore } from './store'
-import { createFactoryDispatch, factoryBinding } from './dispatch'
-import { createFactoryReconciler } from './reconcile'
+import { createFactoryDispatch as rawDispatch, factoryBinding } from './dispatch'
+import { createFactoryReconciler as rawReconciler } from './reconcile'
+import { resourceBoundFactoryDispatch, factoryResourceWorkspace } from '../../tests/helpers/factory-resource-boundary'
 import { freezeWorkerDefinition } from '../agent-kit/worker'
 import { repositorySelectionRuntime } from './repository-selection'
 import { factoryCheckIndependent } from './check-independence'
@@ -34,6 +36,7 @@ test('Agent repository selection creates an authorized new execution, retaining 
     const dir = new URL('../../drizzle/', import.meta.url)
     for (const file of orderMigrations((await readdir(dir)).filter(file => file.endsWith('.sql')))) await pool.query(await readFile(new URL(file, dir), 'utf8'))
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','repository-selection@example.invalid',true,now(),now())`)
+    const personalWorkspace = await seedFixtureWorkspace(pool, 'owner')
     const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
     await pool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Fixture',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
     await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Fixture','codex',$2)`, [agentId, deviceId])
@@ -55,11 +58,11 @@ test('Agent repository selection creates an authorized new execution, retaining 
       assert.equal(user, 'owner')
       return { repositories: [{ fullName: 'example/correct', id: '2', installationId: '1', htmlUrl: 'https://github.com/example/correct', private: true }] } as Awaited<ReturnType<typeof repositorySelectionRuntime.list>>
     }
-    const dispatch = createFactoryDispatch(pool, store, queue)
-    const sweep = createFactoryReconciler(pool, store)
-    async function fixture(repository = 'example/correct') {
+    const dispatch = resourceBoundFactoryDispatch(pool, rawDispatch(pool, store, queue))
+    const sweep = rawReconciler(pool, store, undefined, {}, null, undefined, factoryResourceWorkspace(pool))
+    async function fixture(repository = 'example/correct', workspaceId = personalWorkspace) {
       const issueId = randomUUID(), sourceEventId = randomUUID()
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Task names example/correct','{"type":"doc","content":[]}','todo','normal')`, [issueId])
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Task names example/correct','{"type":"doc","content":[]}','todo','normal',$2,'bound',$3)`, [issueId, workspaceId, workspaceId === personalWorkspace ? 'personal' : 'workspace'])
       await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"Inspect example/correct"}')`, [sourceEventId, sourceEventId])
       const route = await store.route('owner', { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Explicit request' })
       const queued = await dispatch('owner', { binding: factoryBinding(route.task), agentId, deviceRepoId: repoId })
@@ -142,7 +145,7 @@ test('Agent repository selection creates an authorized new execution, retaining 
       await pool.query(`INSERT INTO bot_cloud_runtimes("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES ($1,$2,'owner','codex',$3,$4)`, [botId, workspaceId, agentId, repoId])
       await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") VALUES ($1,'owner',$2,'codex','connected',1,'synthetic-no-credential',$3,'fixture-provider-subject')`, [connectionId, workspaceId, 'a'.repeat(64)])
       await pool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,'owner',$2,$3,$4,1,'codex_cli',$5)`, [subscription.id, workspaceId, agentId, connectionId, subscription.modelId])
-      const f = await fixture()
+      const f = await fixture('example/correct', workspaceId)
       await pool.query(`INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,'owner')`, [f.runId, botId, workspaceId])
       const handoffs: string[] = []
       repositorySelectionRuntime.enqueue = async (_pool, actor, previousRun, nextRun) => {

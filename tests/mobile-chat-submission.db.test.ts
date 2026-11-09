@@ -5,6 +5,8 @@ import { tokenWorkspace } from '../lib/tokens/principal'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { marked, queued, sendFailureState, submissionBody, unsettled } from '../apps/mobile/lib/outbox'
 
+mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+
 test('mobile chat response-loss retries use the real immutable submission ledger', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
@@ -15,7 +17,7 @@ test('mobile chat response-loss retries use the real immutable submission ledger
   const callbacks: (() => unknown)[] = []
   let actionHeaders = new Headers()
   mock.module('next/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
-  mock.module('next/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: () => undefined }) } })
+  mock.module('next/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' ? { value: workspace.id } : undefined }) } })
   mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async () => ({ user: principal, session: { id: 'fixture-session' } }) } } } })
   mock.module(new URL('../lib/mobile-api.ts', import.meta.url).href, { namedExports: {
     json: (body: unknown, status = 200) => Response.json(body, { status }), mobileUser: async () => principal,

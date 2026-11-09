@@ -12,11 +12,14 @@ export const pullRequestSchema = z.object({
   deletions: z.number().int().nonnegative().optional(),
 })
 export const assigneeSchema = z.object({ kind: z.enum(['member', 'agent']), id: z.string().min(1).max(128), name: z.string().max(200), image: z.string().nullable() })
+/** Execution delegation never grants task access or changes the human assignee. */
+export const delegateSchema = z.object({ kind: z.enum(['agent', 'bot', 'profile']), id: z.string().min(1).max(128), name: z.string().max(200), image: z.string().nullable() })
 /** The person's say on 受阻 (lib/task-blocked.ts): flagged, or cleared for the thread `runId`. */
 export const blockFlagSchema = z.object({ blocked: z.boolean(), runId: z.string().max(128).nullable() })
 export const metadataSchema = z.object({
   number: z.number().int().positive().optional(),
   assignee: assigneeSchema.nullable().default(null),
+  delegate: delegateSchema.nullable().default(null),
   project: z.string().trim().max(100).nullable().default(null),
   labels: z.array(labelSchema).max(12).default([]),
   pullRequests: z.array(pullRequestSchema).max(10).default([]),
@@ -34,16 +37,27 @@ export const metadataSchema = z.object({
 export type IssueMetadata = z.infer<typeof metadataSchema>
 export type IssueLabel = z.infer<typeof labelSchema>
 export type IssuePullRequest = z.infer<typeof pullRequestSchema>
+export type IssueDelegate = z.infer<typeof delegateSchema>
+
+/** Preserve old assignments without continuing to present an Agent as a person.
+ * A deliberate modern delegate (including null) takes precedence over history. */
+function canonicalMetadata(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  const metadata = value as Record<string, unknown>
+  const assignee = assigneeSchema.safeParse(metadata.assignee)
+  if (!assignee.success || assignee.data.kind !== 'agent') return value
+  return { ...metadata, assignee: null, delegate: Object.hasOwn(metadata, 'delegate') ? metadata.delegate : assignee.data }
+}
 
 export function readIssueMetadata(content: JSONContent): IssueMetadata {
   // `orvilo` is the pre-rename key; drizzle/0005 moves stored issues to `mikka`.
-  const parsed = metadataSchema.safeParse(content.attrs?.mikka ?? content.attrs?.orvilo)
+  const parsed = metadataSchema.safeParse(canonicalMetadata(content.attrs?.mikka ?? content.attrs?.orvilo))
   return parsed.success ? parsed.data : metadataSchema.parse({})
 }
 
 export function withIssueMetadata(content: JSONContent, metadata: IssueMetadata): JSONContent {
   const { orvilo: _legacy, ...attrs } = content.attrs ?? {}
-  return { ...content, attrs: { ...attrs, mikka: metadata } }
+  return { ...content, attrs: { ...attrs, mikka: canonicalMetadata(metadata) } }
 }
 
 export function issueWithMetadata<T extends { content: JSONContent }>(issue: T) {

@@ -11,7 +11,6 @@ import os
 from pathlib import Path
 import pwd
 import re
-import shlex
 import shutil
 import socket
 import stat
@@ -21,7 +20,9 @@ import time
 
 VERSION = 1
 SOCKET_MARK = 0x4D4B5056
-CHAIN = 'MIKKA_REVIEW_REPLY_V1'
+TABLE = 'mikka_review_v1'
+CHAIN = 'guard'
+LEGACY_CHAIN = 'MIKKA_REVIEW_REPLY_V1'
 ROOT = Path('/run/mikka-workspace-ingress')
 RECEIPT = ROOT / 'receipt.json'
 TOOL_PATH = '/opt/mikka/runtime/netfilter/sbin:/opt/mikka/runtime/netfilter/bin:/usr/sbin:/sbin:/usr/bin:/bin'
@@ -31,15 +32,56 @@ WORKER = '/opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js'
 FIELDS = {'version', 'sourceSha256', 'bootId', 'installedTicks', 'providerPorts', 'preparedBeforeWorker'}
 FAILURES = frozenset(('listener', 'boot', 'identity', 'state', 'receipt', 'provider', 'command', 'tool',
                       'backend', 'rule_order', 'late_install', 'worker', 'worker_order', 'operation', 'runtime'))
+COMMAND_OPERATIONS = frozenset(('new_chain', 'provider_rule', 'reply_rule', 'output_jump', 'check_output',
+                                'check_provider', 'check_reply', 'list_output', 'list_chain',
+                                'create_table', 'base_chain', 'install_policy', 'list_ruleset', 'list_table'))
+INSTALL_OPERATIONS = ('create_table', 'new_chain', 'base_chain', 'provider_rule', 'reply_rule', 'output_jump')
 
 
 class IngressError(Exception):
     pass
 
 
+class IngressCommandError(IngressError):
+    """Retain closed observations only, never process arguments or output."""
+    def __init__(self, family, operation, failure_kind, returncode=None, stderr=b''):
+        if (family not in ('ipv4', 'ipv6', 'inet') or not isinstance(operation, str) or operation not in COMMAND_OPERATIONS
+                or failure_kind not in ('exit', 'timeout', 'output_limit', 'execution')):
+            raise IngressError('runtime')
+        super().__init__('command')
+        text = stderr[:16384].lower() if isinstance(stderr, bytes) else b''
+        warnings = re.findall(rb'\bextension (owner|multiport|conntrack|mark|tcp) revision ([0-9]{1,3}) not supported\b', text)
+        extensions = {name.decode('ascii') for name, _revision in warnings}
+        extension = next(iter(extensions)) if len(extensions) == 1 else 'unknown'
+        revisions = {int(revision) for _name, revision in warnings}
+        revision = next(iter(revisions)) if extension != 'unknown' and len(revisions) == 1 and max(revisions) <= 255 else None
+        observed = {(name.decode('ascii'), int(value) if int(value) <= 255 else None) for name, value in warnings}
+        unsupported = [{'extension': name, 'revision': value} for name, value in sorted(observed,
+                       key=lambda item: (item[0], -1 if item[1] is None else item[1]))[:6]]
+        self.diagnostic = {
+            'family': family, 'operation': operation, 'failureKind': failure_kind,
+            'returnCode': returncode if type(returncode) is int and -255 <= returncode <= 255 else None,
+            'extension': extension, 'revision': revision,
+            'unsupportedExtensions': unsupported,
+            'unsupportedRevision': bool(re.search(rb'revision [0-9]+ not supported', text)),
+            'missingKernelModule': b'missing kernel module' in text,
+            'missingExtension': b"couldn't load match" in text or b'could not load match' in text,
+            'operationNotSupported': b'operation not supported' in text,
+            'permissionDenied': b'permission denied' in text or b'operation not permitted' in text,
+            'invalidArgument': b'invalid argument' in text,
+        }
+
+
 def failure_detail(error):
     value = str(error) if isinstance(error, IngressError) else 'runtime'
     return value if value in FAILURES else 'runtime'
+
+
+def failure_receipt(error):
+    value = {'ok': False, 'detail': failure_detail(error)}
+    if isinstance(error, IngressCommandError):
+        value['command'] = error.diagnostic
+    return value
 
 
 def refuse(condition, reason):
@@ -124,59 +166,128 @@ def provider_ports():
     return [port for port, uids in owners.items() if uids == {0}]
 
 
-def execute(program, arguments, *, check=True):
-    result = subprocess.run([program, '--wait', '5', *arguments], stdin=subprocess.DEVNULL,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=7, check=False)
-    refuse(len(result.stdout) <= 65536 and len(result.stderr) <= 65536, 'command')
-    if check:
-        refuse(result.returncode == 0, 'command')
+def execute(program, arguments, *, family, operation, check=True, script=None):
+    refuse(family in ('ipv4', 'ipv6', 'inet') and operation in COMMAND_OPERATIONS, 'runtime')
+    try:
+        source = {'input': script} if script is not None else {'stdin': subprocess.DEVNULL}
+        result = subprocess.run([program, *arguments], **source,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=7, check=False)
+    except subprocess.TimeoutExpired as error:
+        raise IngressCommandError(family, operation, 'timeout', stderr=error.stderr) from error
+    except OSError as error:
+        raise IngressCommandError(family, operation, 'execution') from error
+    if len(result.stdout) > 65536 or len(result.stderr) > 65536:
+        raise IngressCommandError(family, operation, 'output_limit', result.returncode, result.stderr)
+    if check and result.returncode != 0:
+        if family == 'inet' and operation == 'install_policy':
+            # Only locations in our fixed six-line stdin script may refine the
+            # operation. No source line, arbitrary path or tool text escapes.
+            lines = re.findall(rb'(?m)^(?:/dev/stdin|<stdin>|stdin|-):([1-6]):[0-9]{1,6}(?:-[0-9]{1,6})?:[ \t]*Error:',
+                               result.stderr[:16384])
+            operations = {INSTALL_OPERATIONS[int(line) - 1] for line in lines}
+            if len(operations) == 1:
+                operation = next(iter(operations))
+        raise IngressCommandError(family, operation, 'exit', result.returncode, result.stderr)
     return result
 
 
-def programs():
-    result = []
-    for name in ('iptables', 'ip6tables'):
-        program = shutil.which(name, path=TOOL_PATH)
-        refuse(program is not None, 'tool')
-        version = subprocess.run([program, '--version'], stdin=subprocess.DEVNULL,
-                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5, check=False)
-        refuse(version.returncode == 0 and b'(nf_tables)' in version.stdout, 'backend')
-        result.append(program)
-    return result
+def program():
+    executable = shutil.which('nft', path=TOOL_PATH)
+    refuse(executable is not None, 'tool')
+    version = subprocess.run([executable, '--version'], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5, check=False)
+    parsed = re.match(rb'nftables v([0-9]+)\.([0-9]+)\.([0-9]+)(?:[ .(]|$)', version.stdout[:128])
+    refuse(version.returncode == 0 and parsed is not None
+           and tuple(int(part) for part in parsed.groups()) >= (1, 0, 6), 'backend')
+    return executable
 
 
 def policy(ports):
     refuse(ports in ([49983], [49983, 50005]), 'provider')
-    # The provider exception includes UID 0, so an ordinary task process cannot
-    # inherit an exception if the original provider listener goes away.
-    provider = ['-p', 'tcp', '-m', 'owner', '--uid-owner', '0', '-m', 'multiport',
-                '--sports', ','.join(str(port) for port in ports), '-j', 'RETURN']
-    blocked = ['-p', 'tcp', '-m', 'conntrack', '--ctdir', 'REPLY', '-m', 'mark', '!', '--mark', str(SOCKET_MARK),
-               '-j', 'REJECT', '--reject-with', 'tcp-reset']
-    jump = ['!', '-o', 'lo', '-p', 'tcp', '-j', CHAIN]
-    return provider, blocked, jump
+    source_ports = str(ports[0]) if len(ports) == 1 else '{ ' + ', '.join(str(port) for port in ports) + ' }'
+    # Native socket UID matching avoids the unavailable xt_owner extension.
+    # Priority -1 is after conntrack (-200), before the usual filter (0).
+    # Returning to this base chain's accept policy still visits later hooks.
+    # Keep this six-line order aligned with INSTALL_OPERATIONS diagnostics.
+    return '\n'.join((
+        f'create table inet {TABLE}',
+        f'add chain inet {TABLE} {CHAIN}',
+        f'add chain inet {TABLE} output {{ type filter hook output priority -1; policy accept; }}',
+        f'add rule inet {TABLE} {CHAIN} meta l4proto tcp meta skuid 0 tcp sport {source_ports} return',
+        f'add rule inet {TABLE} {CHAIN} meta l4proto tcp ct direction reply meta mark != {SOCKET_MARK} reject with tcp reset',
+        f'add rule inet {TABLE} output oifname != "lo" meta l4proto tcp jump {CHAIN}',
+    )) + '\n'
 
 
-def check_rules(program, ports):
-    provider, blocked, jump = policy(ports)
-    execute(program, ['--check', 'OUTPUT', *jump])
-    execute(program, ['--check', CHAIN, *provider])
-    execute(program, ['--check', CHAIN, *blocked])
-    output = [shlex.split(line) for line in execute(program, ['--list-rules', 'OUTPUT']).stdout.decode('ascii').splitlines()]
-    output = [row for row in output if row[:2] == ['-A', 'OUTPUT']]
-    refuse(output and output[0] == ['-A', 'OUTPUT', *jump], 'rule_order')
-    rules = [shlex.split(line) for line in execute(program, ['--list-rules', CHAIN]).stdout.decode('ascii').splitlines()]
-    rules = [row for row in rules if row[:2] == ['-A', CHAIN]]
-    # -C above verifies each complete rule. Count/order reject an inserted
-    # broad ACCEPT or another rule before the guarded reply decision.
-    refuse(len(rules) == 2 and all('-j' in row for row in rules)
-           and [row[row.index('-j') + 1] for row in rules] == ['RETURN', 'REJECT'], 'rule_order')
+def ruleset_rows(raw):
+    try:
+        value = json.loads(raw)
+    except (ValueError, UnicodeError) as error:
+        raise IngressError('rule_order') from error
+    refuse(isinstance(value, dict) and set(value) == {'nftables'} and isinstance(value['nftables'], list), 'rule_order')
+    refuse(all(isinstance(row, dict) and len(row) == 1 and isinstance(next(iter(row.values())), dict)
+               for row in value['nftables']), 'rule_order')
+    return value['nftables']
+
+
+def check_absent(executable):
+    rows = ruleset_rows(execute(executable, ['-j', '-n', 'list', 'ruleset'],
+                               family='inet', operation='list_ruleset').stdout)
+    refuse(not any(row.get('table', {}).get('name') == TABLE
+                   or row.get('chain', {}).get('name') == LEGACY_CHAIN for row in rows), 'state')
+
+
+def check_rules(executable, ports):
+    refuse(ports in ([49983], [49983, 50005]), 'provider')
+    rows = ruleset_rows(execute(executable, ['-j', '-n', 'list', 'table', 'inet', TABLE],
+                               family='inet', operation='list_table').stdout)
+    objects = {'table': [], 'chain': [], 'rule': [], 'metainfo': []}
+    for row in rows:
+        kind, value = next(iter(row.items()))
+        refuse(kind in objects, 'rule_order')
+        value = dict(value)
+        if kind != 'metainfo' and 'handle' in value:
+            refuse(type(value['handle']) is int and 0 < value['handle'] < 2 ** 64, 'rule_order')
+            del value['handle']
+        if kind == 'table' and value.get('flags') == []:
+            del value['flags']
+        objects[kind].append(value)
+    refuse(len(objects['metainfo']) == 1, 'rule_order')
+    metadata = objects['metainfo'][0]
+    refuse(set(metadata) == {'version', 'release_name', 'json_schema_version'}
+           and type(metadata['json_schema_version']) is int and metadata['json_schema_version'] == 1
+           and isinstance(metadata['version'], str) and isinstance(metadata['release_name'], str), 'rule_order')
+    binding = {'family': 'inet', 'table': TABLE}
+    chains = [{**binding, 'name': CHAIN},
+              {**binding, 'name': 'output', 'type': 'filter', 'hook': 'output', 'prio': -1, 'policy': 'accept'}]
+    tcp = {'match': {'op': '==', 'left': {'meta': {'key': 'l4proto'}}, 'right': 6}}
+    provider = [
+        {'match': {'op': '==', 'left': {'meta': {'key': 'skuid'}}, 'right': 0}},
+        {'match': {'op': '==', 'left': {'payload': {'protocol': 'tcp', 'field': 'sport'}},
+                   'right': ports[0] if len(ports) == 1 else {'set': ports}}},
+        {'return': None},
+    ]
+    reply = [tcp, {'match': {'op': '==', 'left': {'ct': {'key': 'direction'}}, 'right': 1}},
+             {'match': {'op': '!=', 'left': {'meta': {'key': 'mark'}}, 'right': SOCKET_MARK}},
+             {'reject': {'type': 'tcp reset'}}]
+    jump = [{'match': {'op': '!=', 'left': {'meta': {'key': 'oifname'}}, 'right': 'lo'}},
+            tcp, {'jump': {'target': CHAIN}}]
+    canonical = lambda value: json.dumps(value, sort_keys=True, separators=(',', ':'))
+    refuse(canonical(objects['table']) == canonical([{'family': 'inet', 'name': TABLE}])
+           and sorted(map(canonical, objects['chain'])) == sorted(map(canonical, chains))
+           and len(objects['rule']) == 3, 'rule_order')
+    actual = {name: [row for row in objects['rule'] if row.get('chain') == name] for name in (CHAIN, 'output')}
+    expected = lambda name, expr: {**binding, 'chain': name, 'expr': expr}
+    # nft 1.0.6/1.0.9 may omit a protocol dependency already implied by the
+    # complete TCP sport payload. Accept only these two exact safe forms.
+    refuse(canonical(actual[CHAIN]) in (canonical([expected(CHAIN, provider), expected(CHAIN, reply)]),
+                                       canonical([expected(CHAIN, [tcp, *provider]), expected(CHAIN, reply)]))
+           and canonical(actual['output']) == canonical([expected('output', jump)]), 'rule_order')
 
 
 def verify():
     value = read_receipt()
-    for program in programs():
-        check_rules(program, value['providerPorts'])
+    check_rules(program(), value['providerPorts'])
     return {**value, 'rulesVerified': {'ipv4': True, 'ipv6': True}}
 
 
@@ -194,16 +305,12 @@ def prepare():
             return verify()
         refuse(not any(path.exists() or path.is_symlink() for path in MACHINE_FILES), 'late_install')
         ports = provider_ports()
-        executables = programs()
-        provider, blocked, jump = policy(ports)
-        for program in executables:
-            # Unknown/partial installations fail closed. Do not flush or adopt
-            # a pre-existing chain without its original root-owned receipt.
-            execute(program, ['--new-chain', CHAIN])
-            execute(program, ['--append', CHAIN, *provider])
-            execute(program, ['--append', CHAIN, *blocked])
-            execute(program, ['--insert', 'OUTPUT', '1', *jump])
-            check_rules(program, ports)
+        executable = program()
+        check_absent(executable)
+        # One atomic native transaction. Exclusive table creation rejects an
+        # unknown/partial installation; never flush, adopt or repair it.
+        execute(executable, ['-f', '-'], family='inet', operation='install_policy', script=policy(ports).encode('ascii'))
+        check_rules(executable, ports)
         value = {'version': VERSION, 'sourceSha256': source_hash(), 'bootId': boot_id(),
                  'installedTicks': ticks(), 'providerPorts': ports, 'preparedBeforeWorker': True}
         temporary = ROOT / 'receipt.next'
@@ -249,7 +356,7 @@ if __name__ == '__main__':
     except Exception as error:
         # Kernel/tool errors can include arbitrary rule comments. Expose only
         # a closed diagnosis, never raw stderr, command output or credentials.
-        receipt = json.dumps({'ok': False, 'detail': failure_detail(error)})
+        receipt = json.dumps(failure_receipt(error))
         print(receipt)
         # Startup suppresses success stdout. Preserve the same closed failure
         # diagnosis in builder logs without raw tool stderr, paths or data.

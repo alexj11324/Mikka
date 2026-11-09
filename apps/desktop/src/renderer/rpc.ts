@@ -20,11 +20,11 @@ export function callAction<T = unknown>(action: string, args: unknown[], isCurre
   }, (action, args, context) => callRemoteAction(action, args, { ...nativeTransport, ...context }))
 }
 
-export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: () => boolean; locale?: Locale }): Promise<T> {
+export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: (response?: Response) => boolean; locale?: Locale }): Promise<T> {
   // Web supplies its existing SDK owner generation; bootstrap also fences
   // retired page phases. Native identity authorization remains in main.
-  const assertCurrent = (cause?: unknown) => {
-    if (transport.isCurrent?.() === false) throw new DesktopTransportError('desktop_session_changed', { status: 409, cause })
+  const assertCurrent = (cause?: unknown, response?: Response) => {
+    if (transport.isCurrent?.(response) === false) throw new DesktopTransportError('desktop_session_changed', { status: 409, cause })
   }
   const encoded = await encodeArgs(args)
   assertCurrent()
@@ -45,7 +45,7 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
     setTransportState('offline')
     throw new DesktopTransportError('desktop_backend_unreachable', { cause })
   }
-  assertCurrent()
+  assertCurrent(undefined, response)
   if (response.status === 401) {
     setTransportState('unauthenticated')
     throw new DesktopTransportError('desktop_session_expired', { status: response.status })
@@ -59,7 +59,7 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
     throw new DesktopTransportError('desktop_backend_unreachable', { status: response.status })
   }
   const value = await response.json().catch(() => null) as { version: number; ok: boolean; result?: unknown; error?: { code: string } } | null
-  assertCurrent()
+  assertCurrent(undefined, response)
   if (!value || value.version !== DESKTOP_RPC_VERSION || typeof value.ok !== 'boolean') throw new DesktopTransportError('desktop_rpc_response_invalid', { status: response.status })
   if (!value.ok) throw new DesktopTransportError(value.error?.code ?? 'desktop_rpc_response_invalid', { status: response.status })
   if (!response.ok) throw new DesktopTransportError('desktop_rpc_request_rejected', { status: response.status })

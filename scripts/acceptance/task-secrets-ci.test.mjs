@@ -252,8 +252,8 @@ test('every OIDC read is directly preceded by source/attempt/public-build attest
   }
   const database = credentials.find(({ step }) => step.includes('secret-name: MIKKA_DATABASE_URL'))
   assert.ok(database)
-  assert.match(database.step, /if: env.PRODUCTION_CANARY == 'true'/)
-  assert.match(steps[database.index - 1], /if: env.PRODUCTION_CANARY == 'true'/)
+  assert.match(database.step, /if: env.ACCEPTANCE_MODE == 'execute' && env.PRODUCTION_CANARY == 'true'/)
+  assert.match(steps[database.index - 1], /if: env.ACCEPTANCE_MODE == 'execute' && env.PRODUCTION_CANARY == 'true'/)
   assert.match(workflowText, /PRODUCTION_CANARY: \$\{\{ github.event_name == 'workflow_dispatch' && inputs.production_canary && 'true' \|\| 'false' \}\}/)
   assert.match(workflowText, /group: production-smoke-owner-acceptance/)
   assert.ok(!JSON.stringify(safeCIFailure(Error('PRIVATE_SECRET_URL'))).includes('PRIVATE'))

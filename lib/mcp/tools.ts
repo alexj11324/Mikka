@@ -17,16 +17,22 @@ import { logReplyCompletion } from './reply-completion'
 import { coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
+import { taskReaderScope } from '@/lib/task-workspace'
+import { ActionFailureError } from '@/lib/action-error'
 
 // What the MCP tools read and write, scoped to one person. The Coordinator's
 // own tools (workflows/coordinator/steps.ts) read the same tables.
 
-/** The person's Coordinator chat: its bot row (lib/coordinator/coordinator-bot.ts). An MCP client's OAuth grant names
- * no workspace, so it is the personal workspace's Coordinator. */
-const coordinatorChat = (userId: string) => chatBotId(userId, null, null)
+/** MCP chat operations use the same verified tenant as its task tools. */
+const coordinatorChat = (userId: string) => {
+  const workspaceId = taskReaderScope(userId).workspaceId
+  if (!workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  return chatBotId(userId, null, workspaceId)
+}
 
 async function lastPosition(userId: string): Promise<number> {
   const [row] = await db.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
@@ -126,33 +132,38 @@ export async function readCoordinatorMessages(userId: string, input: { after?: n
 }
 
 export async function listIssues(userId: string, input: { status?: string }) {
-  const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
+  if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)
-  return rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50).map(({ content, updatedAt, ...row }) => ({
-    ...row, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
+  const page = rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50)
+  const identifiers = await taskIdentifiers(page)
+  return page.map(({ content, updatedAt, ownerId: _ownerId, scope: _scope, ...row }) => ({
+    ...row, identifier: identifiers.get(row.id) ?? null, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
   }))
 }
 
 export async function getIssue(userId: string, issueId: string) {
+  if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   const issue = await issueForUser(userId, issueId)
   if (!issue) return null
   const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
-  const metadata = readIssueMetadata(issue.content)
+  const view = await issueView(issue)
+  const metadata = view.metadata
   // Children and the issues this one blocks point at it, so they are found by looking the other way.
   const siblings = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issueAttrsContent }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(eq(issues.userId, issue.userId), (await issueVisibility(userId)).predicate))
+    .where(and(eq(issues.userId, issue.userId), (await issueVisibility(userId, false, issue.workspaceId!)).predicate))
   const linked = new Map(siblings.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => [row.id, { id: row.id, title: row.title, status: row.status, parentId: readIssueMetadata(row.content).parentId, blockedByIds: readIssueMetadata(row.content).blockedByIds }]))
   const pick = (ids: (string | null)[]) => ids.flatMap(id => {
     const row = id ? linked.get(id) : undefined
     return row ? [{ id: row.id, title: row.title, status: row.status }] : []
   })
   return {
-    id: issue.id, number: metadata.number ?? null, title: issue.title,
+    id: issue.id, identifier: view.identifier, projectId: view.projectId, number: metadata.number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
-    project: metadata.project, labels: metadata.labels.map(label => label.name), assignee: metadata.assignee ? { kind: metadata.assignee.kind, id: metadata.assignee.id, name: metadata.assignee.name } : null,
+    project: metadata.project, delegate: metadata.delegate, labels: metadata.labels.map(label => label.name), assignee: metadata.assignee ? { kind: metadata.assignee.kind, id: metadata.assignee.id, name: metadata.assignee.name } : null,
     dueDate: metadata.dueDate, pullRequests: metadata.pullRequests,
     relations: {
       parent: pick([metadata.parentId])[0] ?? null,

@@ -3,10 +3,10 @@
 The separate fixed-source E2B acceptance proves real kernel/provider behavior.
 """
 import importlib.util
+from copy import deepcopy
 import json
 import os
 from pathlib import Path
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -19,39 +19,64 @@ guard = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guard)
 
 
+def native_table(ports=(49983,)):
+    """Documented nft 1.0.6/1.0.9 numeric listing; no product policy reuse."""
+    return {'nftables': [
+        {'metainfo': {'version': '1.0.6', 'release_name': 'fixture', 'json_schema_version': 1}},
+        {'table': {'family': 'inet', 'name': 'mikka_review_v1', 'handle': 1}},
+        {'chain': {'family': 'inet', 'table': 'mikka_review_v1', 'name': 'guard', 'handle': 2}},
+        {'rule': {'family': 'inet', 'table': 'mikka_review_v1', 'chain': 'guard', 'handle': 4, 'expr': [
+            {'match': {'op': '==', 'left': {'meta': {'key': 'skuid'}}, 'right': 0}},
+            {'match': {'op': '==', 'left': {'payload': {'protocol': 'tcp', 'field': 'sport'}},
+                       'right': ports[0] if len(ports) == 1 else {'set': list(ports)}}},
+            {'return': None}]}},
+        {'rule': {'family': 'inet', 'table': 'mikka_review_v1', 'chain': 'guard', 'handle': 5, 'expr': [
+            {'match': {'op': '==', 'left': {'meta': {'key': 'l4proto'}}, 'right': 6}},
+            {'match': {'op': '==', 'left': {'ct': {'key': 'direction'}}, 'right': 1}},
+            {'match': {'op': '!=', 'left': {'meta': {'key': 'mark'}}, 'right': 1296781398}},
+            {'reject': {'type': 'tcp reset'}}]}},
+        {'chain': {'family': 'inet', 'table': 'mikka_review_v1', 'name': 'output', 'handle': 3,
+                   'type': 'filter', 'hook': 'output', 'prio': -1, 'policy': 'accept'}},
+        {'rule': {'family': 'inet', 'table': 'mikka_review_v1', 'chain': 'output', 'handle': 6, 'expr': [
+            {'match': {'op': '!=', 'left': {'meta': {'key': 'oifname'}}, 'right': 'lo'}},
+            {'match': {'op': '==', 'left': {'meta': {'key': 'l4proto'}}, 'right': 6}},
+            {'jump': {'target': 'guard'}}]}},
+    ]}
+
+
 class Netfilter:
     def __init__(self):
-        self.rules = {family: {'OUTPUT': []} for family in ('iptables', 'ip6tables')}
+        self.value = None
+        self.foreign = [{'table': {'family': 'ip', 'name': 'provider', 'handle': 100}}]
         self.calls = []
-        self.fail = None
+        self.scripts = []
+        self.fail_exact = None
+        self.raw = None
 
     def run(self, args, **options):
         self.calls.append(args)
-        family, tail = args[0], args[1:]
+        assert args[0] == 'nft'
+        tail = args[1:]
         if tail == ['--version']:
-            return SimpleNamespace(returncode=0, stdout=b'iptables v1.8.9 (nf_tables)', stderr=b'')
-        assert tail[:2] == ['--wait', '5']
-        action, chain, *rule = tail[2:]
-        table = self.rules[family]
-        status, output = 0, b''
-        if self.fail == (family, action):
-            status = 1
-        elif action == '--new-chain':
-            if chain in table:
-                status = 1
-            else:
-                table[chain] = []
-        elif action == '--append':
-            table[chain].append(rule)
-        elif action == '--insert':
-            table[chain].insert(int(rule[0]) - 1, rule[1:])
-        elif action == '--check':
-            status = 0 if rule in table.get(chain, []) else 1
-        elif action == '--list-rules':
-            output = '\n'.join(shlex.join(['-A', chain, *row]) for row in table.get(chain, [])).encode()
+            return SimpleNamespace(returncode=0, stdout=b'nftables v1.0.6 (fixture)', stderr=b'')
+        if self.fail_exact == tuple(args):
+            return SimpleNamespace(returncode=1, stdout=b'', stderr=b'Operation not supported')
+        if tail == ['-j', '-n', 'list', 'ruleset']:
+            output = {'nftables': deepcopy(self.foreign) + (self.value['nftables'] if self.value else [])}
+        elif tail == ['-f', '-']:
+            assert self.value is None
+            script = options['input'].decode('ascii')
+            self.scripts.append(script)
+            self.value = native_table((49983, 50005) if 'tcp sport { 49983, 50005 }' in script else (49983,))
+            output = None
+        elif tail == ['-j', '-n', 'list', 'table', 'inet', 'mikka_review_v1']:
+            assert self.value is not None
+            if self.raw is not None:
+                return SimpleNamespace(returncode=0, stdout=self.raw, stderr=b'')
+            output = self.value
         else:
-            raise AssertionError(action)
-        return SimpleNamespace(returncode=status, stdout=output, stderr=b'')
+            raise AssertionError(args)
+        return SimpleNamespace(returncode=0, stdout=json.dumps(output).encode() if output is not None else b'', stderr=b'')
 
 
 class IngressPolicy(unittest.TestCase):
@@ -77,22 +102,56 @@ class IngressPolicy(unittest.TestCase):
             self.addCleanup(installed.stop)
 
     def test_fresh_policy_is_global_dual_stack_and_preserves_only_observed_root_provider(self):
+        foreign = deepcopy(self.filter.foreign)
         proof = guard.prepare()
         self.assertTrue(proof['preparedBeforeWorker'])
         self.assertEqual(proof['rulesVerified'], {'ipv4': True, 'ipv6': True})
         self.assertEqual(proof['providerPorts'], [49983])
-        for table in self.filter.rules.values():
-            self.assertEqual(table['OUTPUT'], [['!', '-o', 'lo', '-p', 'tcp', '-j', guard.CHAIN]])
-            provider, reply = table[guard.CHAIN]
-            self.assertIn('--uid-owner', provider)
-            self.assertEqual(provider[provider.index('--uid-owner') + 1], '0')
-            self.assertEqual(provider[provider.index('--sports') + 1], '49983')
-            self.assertNotIn('50005', provider)
-            self.assertNotIn('--sports', reply, 'the rule must precede arbitrary future dev listeners')
-            self.assertIn('REPLY', reply)
-            self.assertIn(str(guard.SOCKET_MARK), reply)
-            self.assertIn('REJECT', reply)
-            self.assertNotIn('INPUT', table)
+        self.assertEqual(self.filter.foreign, foreign)
+        self.assertEqual(len(self.filter.scripts), 1)
+        self.assertNotIn('50005', self.filter.scripts[0])
+        self.assertNotIn('flush', self.filter.scripts[0])
+        self.assertTrue(all(args[0] == 'nft' for args in self.filter.calls))
+
+    def test_finalizer_without_xt_owner_uses_one_native_inet_transaction(self):
+        calls = []
+        # Native output schema comes from nftables 1.0.6 src/json.c and its
+        # inet/tcp + inet/reject fixtures, with numeric output enabled.
+        native = native_table()
+
+        def run(args, **options):
+            calls.append((args, options.get('input')))
+            if args[0] != 'nft':
+                if '--uid-owner' in args:
+                    return SimpleNamespace(returncode=4, stdout=b'',
+                                           stderr=b'Warning: Extension owner revision 0 not supported, missing kernel module?')
+                return SimpleNamespace(returncode=0, stdout=b'iptables v1.8.9 (nf_tables)', stderr=b'')
+            if args[1:] == ['--version']:
+                return SimpleNamespace(returncode=0, stdout=b'nftables v1.0.6 (fixture)', stderr=b'')
+            if args[1:] == ['-j', '-n', 'list', 'ruleset']:
+                output = {'nftables': []}
+            elif args[1:] == ['-f', '-']:
+                output = None
+            elif args[1:] == ['-j', '-n', 'list', 'table', 'inet', 'mikka_review_v1']:
+                output = native
+            else:
+                raise AssertionError(args)
+            return SimpleNamespace(returncode=0, stdout=json.dumps(output).encode() if output else b'', stderr=b'')
+
+        with patch.object(guard.subprocess, 'run', side_effect=run):
+            proof = guard.prepare()
+        self.assertEqual(proof['rulesVerified'], {'ipv4': True, 'ipv6': True})
+        self.assertTrue(all(args[0] == 'nft' for args, _ in calls))
+        scripts = [value.decode() for args, value in calls if args[1:] == ['-f', '-']]
+        self.assertEqual(len(scripts), 1)
+        self.assertEqual(scripts[0].splitlines(), [
+            'create table inet mikka_review_v1',
+            'add chain inet mikka_review_v1 guard',
+            'add chain inet mikka_review_v1 output { type filter hook output priority -1; policy accept; }',
+            'add rule inet mikka_review_v1 guard meta l4proto tcp meta skuid 0 tcp sport 49983 return',
+            'add rule inet mikka_review_v1 guard meta l4proto tcp ct direction reply meta mark != 1296781398 reject with tcp reset',
+            'add rule inet mikka_review_v1 output oifname != "lo" meta l4proto tcp jump guard',
+        ])
 
     def test_repeated_prepare_only_verifies_original_receipt_and_never_repairs_rules(self):
         proof = guard.prepare()
@@ -101,37 +160,121 @@ class IngressPolicy(unittest.TestCase):
         self.filter.calls.clear()
         self.assertEqual(guard.prepare(), proof)
         self.assertEqual(guard.RECEIPT.read_bytes(), original)
-        self.assertTrue(all(args[1:] == ['--version'] or args[3] in ('--check', '--list-rules') for args in self.filter.calls))
-        self.filter.rules['ip6tables'][guard.CHAIN].pop()
+        self.assertTrue(all(args[1:] == ['--version'] or args[1:] == ['-j', '-n', 'list', 'table', 'inet', 'mikka_review_v1']
+                            for args in self.filter.calls))
+        self.filter.value['nftables'].pop(4)
         with self.assertRaises(guard.IngressError):
             guard.prepare()
         self.assertEqual(guard.RECEIPT.read_bytes(), original)
-        self.assertEqual(len(self.filter.rules['ip6tables'][guard.CHAIN]), 1)
+        self.assertEqual(len(self.filter.scripts), 1)
 
-    def test_late_install_or_partial_family_failure_never_creates_a_receipt(self):
+    def test_late_install_or_unknown_partial_table_never_creates_a_receipt(self):
         (self.root / 'preloaded.pid').write_text('123')
         with self.assertRaisesRegex(guard.IngressError, 'late_install'):
             guard.prepare()
         self.assertFalse(self.filter.calls)
         (self.root / 'preloaded.pid').unlink()
-        self.filter.fail = ('ip6tables', '--append')
+        self.filter.fail_exact = ('nft', '-f', '-')
         with self.assertRaises(guard.IngressError):
             guard.prepare()
         self.assertFalse(guard.RECEIPT.exists())
-        self.filter.fail = None
+        self.assertIsNone(self.filter.value)
+        self.filter.fail_exact = None
+        self.filter.value = {'nftables': [{'table': {'family': 'inet', 'name': 'mikka_review_v1', 'handle': 1}}]}
         with self.assertRaises(guard.IngressError):
             guard.prepare()
         self.assertFalse(guard.RECEIPT.exists(), 'a later request cannot adopt a partially installed chain')
+        self.assertFalse(self.filter.scripts)
+        self.filter.value = None
+        self.filter.foreign.append({'chain': {'family': 'ip6', 'table': 'filter', 'name': 'MIKKA_REVIEW_REPLY_V1'}})
+        with self.assertRaisesRegex(guard.IngressError, 'state'):
+            guard.prepare()
+        self.assertFalse(self.filter.scripts, 'legacy rules without their receipt must not be adopted')
+
+    def test_each_native_boundary_reports_the_actual_failing_call(self):
+        operations = {
+            'install_policy': ['-f', '-'],
+            'list_ruleset': ['-j', '-n', 'list', 'ruleset'],
+            'list_table': ['-j', '-n', 'list', 'table', 'inet', 'mikka_review_v1'],
+        }
+        for operation, arguments in operations.items():
+            with self.subTest(operation=operation):
+                self.filter.value = None
+                self.filter.fail_exact = tuple(['nft', *arguments])
+                directory = self.root / operation
+                with patch.object(guard, 'ROOT', directory), patch.object(guard, 'RECEIPT', directory / 'receipt.json'):
+                    with self.assertRaises(guard.IngressCommandError) as failed:
+                        guard.prepare()
+                    receipt = guard.failure_receipt(failed.exception)
+                    self.assertEqual(receipt['detail'], 'command')
+                    self.assertEqual({key: receipt['command'][key] for key in ('family', 'operation', 'failureKind', 'returnCode')},
+                                     {'family': 'inet', 'operation': operation, 'failureKind': 'exit', 'returnCode': 1})
+                    self.assertFalse(guard.RECEIPT.exists(), 'failure must not grant a readiness receipt')
 
     def test_rule_precedence_and_added_broad_allow_fail_verification(self):
         guard.prepare()
-        self.filter.rules['iptables']['OUTPUT'].insert(0, ['-j', 'ACCEPT'])
+        original = deepcopy(self.filter.value)
+        self.filter.value['nftables'][5]['chain']['prio'] = 0
         with self.assertRaisesRegex(guard.IngressError, 'rule_order'):
             guard.verify()
-        self.filter.rules['iptables']['OUTPUT'].pop(0)
-        self.filter.rules['ip6tables'][guard.CHAIN].insert(1, ['-j', 'ACCEPT'])
+        self.filter.value = deepcopy(original)
+        self.filter.value['nftables'][3]['rule']['expr'].insert(0, {'accept': None})
         with self.assertRaisesRegex(guard.IngressError, 'rule_order'):
             guard.verify()
+        self.filter.value = deepcopy(original)
+        self.filter.value['nftables'][3:5] = reversed(self.filter.value['nftables'][3:5])
+        with self.assertRaisesRegex(guard.IngressError, 'rule_order'):
+            guard.verify()
+
+    def test_complete_native_conditions_and_unknown_objects_cannot_be_weakened(self):
+        guard.prepare()
+        original = deepcopy(self.filter.value)
+        changes = (
+            lambda rows: rows[0]['metainfo'].update(handle=1),
+            lambda rows: rows[1]['table'].update(flags=['dormant']),
+            lambda rows: rows[1]['table'].update(flags=['owner']),
+            lambda rows: rows[1]['table'].update(family='ip'),
+            lambda rows: rows[2]['chain'].update(comment='unexpected'),
+            lambda rows: rows[3]['rule']['expr'].pop(0),
+            lambda rows: rows[3]['rule']['expr'][0]['match'].update(right=False),
+            lambda rows: rows[3]['rule']['expr'][1]['match'].update(right=50005),
+            lambda rows: rows[3]['rule']['expr'][-1].update(accept=None),
+            lambda rows: rows[4]['rule']['expr'][0]['match'].update(right=17),
+            lambda rows: rows[4]['rule']['expr'][1]['match'].update(right=0),
+            lambda rows: rows[4]['rule']['expr'][2]['match'].update(left={'ct': {'key': 'mark'}}),
+            lambda rows: rows[4]['rule']['expr'][2]['match'].update(op='=='),
+            lambda rows: rows[5]['chain'].update(prio=-200),
+            lambda rows: rows[5]['chain'].update(hook='input'),
+            lambda rows: rows[6]['rule']['expr'][0]['match'].update(right='eth0'),
+            lambda rows: rows.append({'set': {'family': 'inet', 'table': 'mikka_review_v1', 'name': 'dynamic'}}),
+            lambda rows: rows.append(deepcopy(rows[2])),
+            lambda rows: rows.append(deepcopy(rows[6])),
+        )
+        for index, change in enumerate(changes):
+            with self.subTest(index=index):
+                self.filter.value = deepcopy(original)
+                change(self.filter.value['nftables'])
+                with self.assertRaisesRegex(guard.IngressError, 'rule_order'):
+                    guard.verify()
+        self.assertEqual(len(self.filter.scripts), 1, 'verification must never repair a bad policy')
+
+    def test_known_native_output_forms_keep_all_conditions_and_actual_provider_set(self):
+        with patch.object(guard, 'provider_ports', return_value=[49983, 50005]):
+            proof = guard.prepare()
+        self.assertEqual(proof['providerPorts'], [49983, 50005])
+        self.assertIn('meta skuid 0 tcp sport { 49983, 50005 } return', self.filter.scripts[0])
+        rows = self.filter.value['nftables']
+        rows[3]['rule']['expr'].insert(0, deepcopy(rows[4]['rule']['expr'][0]))
+        rows[1]['table']['flags'] = []
+        self.assertEqual(guard.verify()['rulesVerified'], {'ipv4': True, 'ipv6': True})
+
+    def test_malformed_native_listing_never_grants_readiness_or_leaks_its_contents(self):
+        guard.prepare()
+        for value in (b'private-untrusted-output', b'{"nftables":[null]}', b'{"nftables":{},"private":true}'):
+            self.filter.raw = value
+            with self.assertRaises(guard.IngressError) as failed:
+                guard.verify()
+            self.assertEqual(guard.failure_receipt(failed.exception), {'ok': False, 'detail': 'rule_order'})
 
     def test_receipt_is_root_private_same_source_and_same_boot(self):
         guard.prepare()
@@ -157,6 +300,122 @@ class IngressPolicy(unittest.TestCase):
                 guard.prepare()
         self.assertFalse(guard.RECEIPT.exists())
         self.assertFalse(self.filter.calls)
+
+
+class CommandDiagnostics(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix='mikka-command-diagnostic-')
+        self.addCleanup(temporary.cleanup)
+        self.program = Path(temporary.name) / 'fixture'
+        self.private = 'synthetic-private-command-value'
+        self.program.write_text(f'''#!{sys.executable}
+import sys,time
+mode=sys.argv[-1]
+private={self.private!r}
+if mode=='success':
+    sys.stdout.write('safe-result')
+elif mode=='failure':
+    sys.stdout.write(private)
+    sys.stderr.write(private+' Warning: Extension owner revision 1 not supported, missing kernel module? could not load match; operation not supported; permission denied; invalid argument')
+    sys.exit(23)
+elif mode=='oversized':
+    sys.stderr.write(private*3000)
+elif mode=='timeout':
+    sys.stderr.write(private+' operation not permitted'); sys.stderr.flush(); time.sleep(30)
+elif mode=='native':
+    sys.stderr.write(private+'\\n'+sys.stdin.read()); sys.exit(4)
+''')
+        self.program.chmod(0o700)
+
+    def test_real_child_failure_emits_only_closed_fields_and_six_independent_flags(self):
+        with self.assertRaises(guard.IngressCommandError) as failed:
+            guard.execute(str(self.program), ['failure'], family='ipv6', operation='provider_rule')
+        value = guard.failure_receipt(failed.exception)
+        command = value['command']
+        self.assertEqual({key: command[key] for key in ('family', 'operation', 'failureKind', 'returnCode')},
+                         {'family': 'ipv6', 'operation': 'provider_rule', 'failureKind': 'exit', 'returnCode': 23})
+        flags = {'unsupportedRevision', 'missingKernelModule', 'missingExtension',
+                 'operationNotSupported', 'permissionDenied', 'invalidArgument'}
+        self.assertEqual(set(command), flags | {'family', 'operation', 'failureKind', 'returnCode', 'extension', 'revision', 'unsupportedExtensions'})
+        self.assertEqual((command['extension'], command['revision']), ('owner', 1))
+        self.assertEqual(command['unsupportedExtensions'], [{'extension': 'owner', 'revision': 1}])
+        self.assertTrue(all(command[key] is True for key in flags))
+        self.assertNotIn(self.private, json.dumps(value))
+        self.assertNotIn(str(self.program), json.dumps(value))
+        success = guard.execute(str(self.program), ['success'], family='ipv4', operation='list_output')
+        self.assertEqual((success.returncode, success.stdout), (0, b'safe-result'))
+
+    def test_real_oversized_timeout_and_execution_errors_remain_closed_and_fail(self):
+        with self.assertRaises(guard.IngressCommandError) as failed:
+            guard.execute(str(self.program), ['oversized'], family='ipv4', operation='list_chain')
+        oversized = guard.failure_receipt(failed.exception)
+        self.assertEqual((oversized['command']['failureKind'], oversized['command']['returnCode']), ('output_limit', 0))
+        run = subprocess.run
+        with patch.object(guard.subprocess, 'run', side_effect=lambda *args, **kwargs: run(*args, **{**kwargs, 'timeout': 0.05})):
+            with self.assertRaises(guard.IngressCommandError) as failed:
+                guard.execute(str(self.program), ['timeout'], family='ipv4', operation='new_chain')
+        timed_out = guard.failure_receipt(failed.exception)
+        self.assertIsInstance(failed.exception.__cause__, subprocess.TimeoutExpired)
+        self.assertEqual((timed_out['command']['failureKind'], timed_out['command']['returnCode']), ('timeout', None))
+        with self.assertRaises(guard.IngressCommandError) as failed:
+            guard.execute(str(self.program.parent / self.private), [], family='ipv6', operation='new_chain')
+        unavailable = guard.failure_receipt(failed.exception)
+        self.assertIsInstance(failed.exception.__cause__, FileNotFoundError)
+        self.assertEqual((unavailable['command']['failureKind'], unavailable['command']['returnCode']), ('execution', None))
+        for value in (oversized, timed_out, unavailable):
+            self.assertEqual(value['detail'], 'command')
+            self.assertNotIn(self.private, json.dumps(value))
+            self.assertNotIn(str(self.program.parent), json.dumps(value))
+
+    def test_real_native_error_locations_map_only_fixed_stdin_lines_to_closed_operations(self):
+        expected = ('create_table', 'new_chain', 'base_chain', 'provider_rule', 'reply_rule', 'output_jump')
+        for number, operation in enumerate(expected, 1):
+            location = f'/dev/stdin:{number}:1-99: Error: Operation not supported; {self.private}\n'
+            with self.assertRaises(guard.IngressCommandError) as failed:
+                guard.execute(str(self.program), ['native'], family='inet', operation='install_policy', script=location.encode())
+            command = guard.failure_receipt(failed.exception)['command']
+            self.assertEqual((command['family'], command['operation'], command['returnCode']), ('inet', operation, 4))
+            self.assertTrue(command['operationNotSupported'])
+            self.assertNotIn(self.private, json.dumps(command))
+            self.assertNotIn('stdin', json.dumps(command))
+        for location in (f'/private/{self.private}:4:1: Error: Operation not supported\n',
+                         'stdin:7:1: Error: Operation not supported\n',
+                         'stdin:4:1: Error: a\nstdin:5:1: Error: b\n',
+                         'prefix stdin:4:1: Error: Operation not supported\n'):
+            with self.assertRaises(guard.IngressCommandError) as failed:
+                guard.execute(str(self.program), ['native'], family='inet', operation='install_policy', script=location.encode())
+            self.assertEqual(failed.exception.diagnostic['operation'], 'install_policy')
+            self.assertNotIn(self.private, json.dumps(guard.failure_receipt(failed.exception)))
+
+    def test_invalid_context_and_unbounded_returncodes_cannot_escape_the_closed_schema(self):
+        for family, operation, kind in ((self.private, 'new_chain', 'exit'), ('ipv4', self.private, 'exit'),
+                                        ('ipv4', 'new_chain', self.private)):
+            with self.assertRaises(guard.IngressError) as failed:
+                guard.IngressCommandError(family, operation, kind)
+            self.assertEqual(guard.failure_receipt(failed.exception), {'ok': False, 'detail': 'runtime'})
+        for code in (self.private, True, 256, -256):
+            failure = guard.IngressCommandError('ipv4', 'new_chain', 'exit', code)
+            self.assertIsNone(guard.failure_receipt(failure)['command']['returnCode'])
+        for extension in ('owner', 'multiport', 'conntrack', 'mark', 'tcp'):
+            stderr = f'Warning: Extension {extension} revision 255 not supported, missing kernel module?'.encode()
+            value = guard.IngressCommandError('ipv4', 'provider_rule', 'exit', 4, stderr).diagnostic
+            self.assertEqual((value['extension'], value['revision']), (extension, 255))
+            self.assertEqual(value['unsupportedExtensions'], [{'extension': extension, 'revision': 255}])
+        for warning, extension, revision in (
+                (f'Extension {self.private} revision 1 not supported', 'unknown', None),
+                ('Extension owner revision 256 not supported', 'owner', None),
+                ('Extension owner revision -1 not supported', 'unknown', None),
+                ('Extension owner revision 1 not supported; Extension owner revision 2 not supported', 'owner', None),
+                ('Extension owner revision 1 not supported; Extension mark revision 1 not supported', 'unknown', None),
+                ('Extension owner revision 0 not supported; Extension owner revision 0 not supported', 'owner', 0)):
+            value = guard.IngressCommandError('ipv4', 'provider_rule', 'exit', 4, warning.encode()).diagnostic
+            self.assertEqual((value['extension'], value['revision']), (extension, revision))
+            self.assertNotIn(self.private, json.dumps(value))
+        warnings = '; '.join(f'Warning: Extension owner revision {value} not supported' for value in range(8))
+        warnings += '; Warning: Extension multiport revision 1 not supported; Warning: Extension owner revision 0 not supported'
+        value = guard.IngressCommandError('ipv4', 'provider_rule', 'exit', 4, warnings.encode()).diagnostic
+        self.assertEqual(value['unsupportedExtensions'], [{'extension': 'multiport', 'revision': 1}]
+                         + [{'extension': 'owner', 'revision': revision} for revision in range(5)])
 
 
 class ProviderAndWorkerProof(unittest.TestCase):

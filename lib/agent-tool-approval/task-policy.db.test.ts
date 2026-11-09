@@ -1,3 +1,5 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
+import { seedProjectTasks } from '../../tests/support/workspace-admin-db'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -5,7 +7,7 @@ import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import { transpileModule, ModuleKind } from 'typescript'
 import { z } from 'zod'
-import test from 'node:test'
+import test, { after } from 'node:test'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { Pool } from 'pg'
 import { observePoolCommits } from '../db/commit-effects'
@@ -32,13 +34,17 @@ if (target) {
 }
 if (!target && process.env.REQUIRE_DB === '1') throw Error('An isolated task policy database is required')
 
-test('task workspace policy applies to Coordinator and cross-workspace Bot runs', { skip: !target }, async t => {
+after(async () => {
+  if (!target) return
+  const [{ pool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
+  await Promise.all([pool.end(), workspacePool.end()])
+})
+
+test('task workspace policy applies to Coordinator and tenant-bound Bot runs', { skip: !target }, async t => {
   const priorSecret = process.env.BETTER_AUTH_SECRET
   process.env.BETTER_AUTH_SECRET = 'isolated-policy-distribution-test-fixture-only'
   const pool = new Pool({ connectionString: target })
   observePoolCommits(pool)
-  const { workspacePool } = await import('../workspace-db')
-  const { pool: appPool } = await import('../db')
   const tokenId = randomUUID(), token = randomUUID()
   let server: ReturnType<typeof createServer> | undefined
   t.after(async () => {
@@ -48,10 +54,10 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
         await new Promise<void>(resolve => server!.close(() => resolve()))
       }
       await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [tokenId])
-    } finally { if(priorSecret===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=priorSecret; await Promise.all([pool.end(), workspacePool.end(), appPool.end()]) }
+    } finally { if(priorSecret===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=priorSecret; await pool.end() }
   })
   const owner = `policy230-${randomUUID()}`, device = randomUUID(), agent = randomUUID()
-  const workspaceA = randomUUID(), workspaceB = randomUUID(), botB = randomUUID()
+  const workspaceA = randomUUID(), workspaceB = randomUUID(), botA = randomUUID(), botB = randomUUID()
   await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [owner, `${owner}@example.invalid`])
   await pool.query('INSERT INTO devices (id,"ownerId",name) VALUES ($1,$2,\'Task policy fixture\')', [device, owner])
   await pool.query('INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,\'codex\',\'Task policy fixture\',$3)', [agent, owner, device])
@@ -60,13 +66,15 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'admin\',\'active\')', [id, owner, `${owner}@example.invalid`])
   }
   await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,\'Task policy fixture\')', [botB, owner, workspaceB])
+  await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,\'Task policy fixture\')', [botA, owner, workspaceA])
   const workspacePolicyA = { permissions: { install_dependency: 'deny' } }
   await pool.query('INSERT INTO workspace_computer_policies ("workspaceId",cli_run_policy) VALUES ($1,$2),($3,$4)', [workspaceA, workspacePolicyA, workspaceB, { permissions: { git_push: 'deny' } }])
-  async function fixture(workspaceId: string | null, botId: string | null = null) {
+  const personalWorkspace = await seedFixtureWorkspace(pool, owner)
+  async function fixture(workspaceId: string | null, botId: string | null = null, grouped = true) {
     const issue = randomUUID(), run = randomUUID()
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Task policy fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',$3)', [issue, owner, workspaceId ? 'workspace' : 'personal'])
+    await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope) VALUES ($1,$2,$4,\'Task policy fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',$3)', [issue, owner, workspaceId ? 'workspace' : 'personal', workspaceId ?? personalWorkspace])
     let team: string | null = null
-    if (workspaceId) {
+    if (workspaceId && grouped) {
       team = randomUUID()
       await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,\'Task policy fixture\',$4)', [team, workspaceId, owner, `T${team.slice(0, 8)}`])
       await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [issue, team, workspaceId, owner])
@@ -74,9 +82,10 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","botId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$5,$6,\'running\',now()+interval \'5 minutes\')', [run, owner, issue, agent, device, botId])
     return { issue, run, team }
   }
-  const a = await fixture(workspaceA), b = await fixture(workspaceB), personal = await fixture(null), cross = await fixture(workspaceA, botB)
+  const a = await fixture(workspaceA), b = await fixture(workspaceB), personal = await fixture(null), cross = await fixture(workspaceB, botB)
   const project = randomUUID()
-  await pool.query(`INSERT INTO workspace_projects(id,"userId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) VALUES($1,$2,'Policy project','','','started','none','','','','',$3,1)`,[project,owner,JSON.stringify([a.issue])])
+  await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) VALUES($1,$2,$3,'Policy project','','','started','none','','','','','[]',1)`,[project,owner,workspaceA])
+  await seedProjectTasks(pool, project, [a.issue])
   await pool.query(`INSERT INTO mikka_team_projects("projectId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)`,[project,a.team,workspaceA,owner])
   const read = (run: string) => readCliRunPolicy(pool, run, owner)
   await pool.query('INSERT INTO device_tokens (id,"userId","tokenHash") VALUES ($1,$2,$3)', [tokenId, owner, createHash('sha256').update(token).digest('hex')])
@@ -255,14 +264,16 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     assert.equal(policyA.policy.permissions.install_dependency, 'deny')
     assert.equal(policyB.policy.permissions.git_push, 'deny')
     assert.equal(policyB.policy.permissions.install_dependency, 'allow')
-    assert.equal(privatePolicy.workspaceId, null)
+    assert.equal(privatePolicy.workspaceId, personalWorkspace)
     assert.equal(privatePolicy.policy.permissions.install_dependency, 'allow')
     const head = (await pool.query('SELECT workspace_id FROM agent_kit_heads WHERE owner_id=$1 AND bot_key=\'coordinator\'', [owner])).rows[0]
     assert.equal(head.workspace_id, null)
   })
-  await t.test('a Bot in another workspace keeps both ceilings and both memberships', async () => {
+  await t.test('a Bot cannot cross the frozen task tenant and its own membership is rechecked', async () => {
+    await assert.rejects(pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [cross.run, a.issue]), /taskWorkspaceMismatch/)
+    assert.equal((await pool.query('SELECT "issueId" FROM agent_runs WHERE id=$1', [cross.run])).rows[0].issueId, cross.issue)
     const current = await read(cross.run)
-    assert.equal(current.policy.permissions.install_dependency, 'deny')
+    assert.equal(current.policy.permissions.install_dependency, 'allow')
     assert.equal(current.policy.permissions.git_push, 'deny')
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceB, owner])
     await assert.rejects(read(cross.run))
@@ -303,20 +314,49 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     const rolledBack = await setCliPolicy(pool,owner,a.run,'project',changed.revision,lower.layers.project)
     assert.notEqual(rolledBack.revision,lower.revision)
   })
+  await t.test('an ungrouped workspace Task inherits its canonical Project policy without a Team', async () => {
+    const subject = await fixture(workspaceA, null, false), projectId = randomUUID()
+    await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+      VALUES($1,$2,$3,'Ungrouped policy project','','','started','none','','','','','[]',1)`, [projectId, owner, workspaceA])
+    await seedProjectTasks(pool, projectId, [subject.issue])
+    const initial = await read(subject.run)
+    assert.deepEqual(initial.hierarchy, { workspaceId: workspaceA, teamId: null, projectId })
+    assert.equal(initial.layers.team, undefined)
+    const changed = await setCliPolicy(pool, owner, subject.run, 'project', initial.revision, { permissions: { git_push: 'deny' } })
+    assert.equal(changed.policy.permissions.git_push, 'deny')
+    await assert.rejects(setCliPolicy(pool, owner, subject.run, 'team', changed.revision, { permissions: { network: 'deny' } }))
+    await assert.rejects(pool.query('UPDATE workspace_project_tasks SET "workspaceId"=$2 WHERE "issueId"=$1', [subject.issue, workspaceB]),
+      (error: unknown) => (error as { code?: string }).code === '23503')
+    const frozen = (await pool.query('SELECT cli_policy_hierarchy FROM agent_runs WHERE id=$1', [subject.run])).rows[0].cli_policy_hierarchy
+    await seedProjectTasks(pool, projectId, [])
+    await assert.rejects(read(subject.run), /agentPolicyChanged/)
+    assert.equal((await checkHTTP(changed.revision, subject.run)).status, 409)
+    assert.deepEqual((await pool.query('SELECT cli_policy_hierarchy FROM agent_runs WHERE id=$1', [subject.run])).rows[0].cli_policy_hierarchy, frozen)
+    const fresh = randomUUID()
+    await pool.query(`INSERT INTO agent_runs(id,"userId","workspaceId","issueId","agentId","deviceId",status,"leaseExpiresAt")
+      VALUES($1,$2,$3,$4,$5,$6,'running',now()+interval '5 minutes')`, [fresh, owner, workspaceA, subject.issue, agent, device])
+    assert.equal((await read(fresh)).hierarchy, undefined)
+  })
   await t.test('only a current workspace admin can change team or project ceilings', async () => {
     const before = await read(a.run)
+    const policyAudits = async () => (await pool.query(`SELECT id,metadata FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='agent.policy_changed' AND metadata->>'scope' IN ('team','project') ORDER BY id`,[workspaceA])).rows
+    const beforeAudits = await policyAudits()
     await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])
-    for (const target of ['team','project'] as const) await assert.rejects(setCliPolicy(pool,owner,a.run,target,before.revision,{permissions:{network:'allow'}}))
-    assert.equal((await read(a.run)).revision,before.revision)
-    const audits = (await pool.query(`SELECT metadata FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='agent.policy_changed' AND metadata->>'scope' IN ('team','project')`,[workspaceA])).rows
-    assert.equal(audits.length,4,'failed non-admin changes leave neither policy nor audit effects')
-    assert.ok(audits.every(row => Object.keys(row.metadata).sort().join(',') === 'revision,scope'))
-    await pool.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])
+    try {
+      for (const target of ['team','project'] as const) await assert.rejects(setCliPolicy(pool,owner,a.run,target,before.revision,{permissions:{network:'allow'}}))
+      assert.equal((await read(a.run)).revision,before.revision)
+      const audits = await policyAudits()
+      assert.deepEqual(audits,beforeAudits,'failed non-admin changes leave neither policy nor audit effects')
+      assert.ok(audits.every(row => Object.keys(row.metadata).sort().join(',') === 'revision,scope'))
+    } finally {
+      await pool.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])
+    }
   })
   await t.test('organization defaults inherit by specificity, explicit Agent values override, forced ceilings and revisions remain binding', async () => {
-    const subject=await fixture(workspaceA),crossSubject=await fixture(workspaceA,botB),defaultProject=randomUUID()
+    const subject=await fixture(workspaceA),crossSubject=await fixture(workspaceA,botA),defaultProject=randomUUID()
     await pool.query('UPDATE mikka_team_issues SET "teamId"=$2 WHERE "issueId"=$1',[crossSubject.issue,subject.team])
-    await pool.query(`INSERT INTO workspace_projects(id,"userId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) VALUES($1,$2,'Defaults project','','','started','none','','','','',$3,1)`,[defaultProject,owner,JSON.stringify([subject.issue,crossSubject.issue])])
+    await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) VALUES($1,$2,$3,'Defaults project','','','started','none','','','','','[]',1)`,[defaultProject,owner,workspaceA])
+    await seedProjectTasks(pool, defaultProject, [subject.issue, crossSubject.issue])
     await pool.query(`INSERT INTO mikka_team_projects("projectId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)`,[defaultProject,subject.team,workspaceA,owner])
     const original=await read(subject.run),botOriginal=await read(b.run),origin=`http://127.0.0.1:${address.port}`
     const settings=async(runId:string,target:string,policy:unknown,cookie='owner=1')=>fetch(`${origin}/api/agent-cli-policy`,{method:'POST',headers:{cookie,origin,'content-type':'application/json'},body:JSON.stringify({operation:'set',runId,target,expectedRevision:(await read(runId)).revision,policy})})
@@ -334,8 +374,10 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
       assert.equal(projectPolicy.policy.readOnly,undefined);assert.equal(projectPolicy.policy.permissions.install_dependency,'deny')
       assert.deepEqual(projectPolicy.policy.networkAllow,['project-default.invalid'])
       const inherited=await read(crossSubject.run)
-      assert.deepEqual(inherited.defaultSources.map(source=>[source.scope,source.scopeId]),[['workspace',workspaceB],['workspace',workspaceA],['team',subject.team],['project',defaultProject]])
-      assert.equal(inherited.policy.permissions.network,'allow');assert.equal(inherited.policy.permissions.git_push,'deny','Bot workspace forced denial survives task/project defaults')
+      assert.deepEqual(inherited.defaultSources.map(source=>[source.scope,source.scopeId]),[['workspace',workspaceA],['team',subject.team],['project',defaultProject]])
+      assert.equal(inherited.policy.permissions.network,'allow');assert.equal(inherited.policy.permissions.git_push,'allow','another workspace cannot contribute defaults or ceilings to this task')
+      assert.equal(inherited.policy.permissions.install_dependency,'deny','the actual task workspace ceiling remains binding')
+      assert.equal((await read(b.run)).policy.permissions.git_push,'deny','the other workspace retains its own forced ceiling')
       assert.deepEqual(inherited.policy.networkAllow,['project-default.invalid']);assert.equal(inherited.policy.readOnly,undefined)
       const explicit=await publish(subject.run,'agent',{permissions:{network:'ask',git_push:'deny'},networkAllow:['explicit.invalid'],approvalMode:'ask'})
       assert.equal(explicit.policy.permissions.network,'ask');assert.equal(explicit.policy.permissions.git_push,'deny');assert.deepEqual(explicit.policy.networkAllow,['explicit.invalid'])
@@ -375,14 +417,16 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
   await t.test('joining a stricter project invalidates an already admitted run', async () => {
     const control = await fixture(workspaceA), candidate = await fixture(workspaceA), scopedProject = randomUUID()
     await pool.query(`UPDATE mikka_team_issues SET "teamId"=$2 WHERE "issueId"=$1`,[candidate.issue,control.team])
-    await pool.query(`INSERT INTO workspace_projects(id,"userId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) VALUES($1,$2,'Stricter policy project','','','started','none','','','','',$3,1)`,[scopedProject,owner,JSON.stringify([control.issue])])
+    await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) VALUES($1,$2,$3,'Stricter policy project','','','started','none','','','','','[]',1)`,[scopedProject,owner,workspaceA])
+    await seedProjectTasks(pool, scopedProject, [control.issue])
     await pool.query(`INSERT INTO mikka_team_projects("projectId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)`,[scopedProject,control.team,workspaceA,owner])
     const controlPolicy = await read(control.run)
     await setCliPolicy(pool,owner,control.run,'project',controlPolicy.revision,{permissions:{git_push:'deny'}})
     const old = await read(candidate.run)
     // The default before the stricter layer: push is the GitHub App grant (allow), never ask.
     assert.equal(old.policy.permissions.git_push,'allow')
-    await pool.query(`UPDATE workspace_projects SET "issueIds"=$2,revision=revision+1 WHERE id=$1`,[scopedProject,JSON.stringify([control.issue,candidate.issue])])
+    await seedProjectTasks(pool, scopedProject, [control.issue, candidate.issue])
+    await pool.query('UPDATE workspace_projects SET revision=revision+1 WHERE id=$1', [scopedProject])
     await assert.rejects(read(candidate.run),/agentPolicyChanged/)
     assert.equal((await checkHTTP(old.revision,candidate.run)).status,409)
     const fresh = randomUUID()
@@ -405,7 +449,7 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
   })
   await t.test('leaving a project rejects an admitted run instead of widening it; new runs resolve current relations', async () => {
     const admitted = await read(a.run)
-    await pool.query(`UPDATE workspace_projects SET "issueIds"='[]'::jsonb WHERE id=$1`,[project])
+    await seedProjectTasks(pool, project, [])
     await assert.rejects(read(a.run),/agentPolicyChanged/)
     assert.equal((await checkHTTP(admitted.revision)).status,409)
     const fresh = randomUUID()
@@ -420,7 +464,8 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     await pool.query(`UPDATE mikka_team_issues SET "workspaceId"=$2,"teamId"=$3 WHERE "issueId"=$1`,[a.issue,workspaceB,b.team])
     await assert.rejects(read(a.run))
     await pool.query(`UPDATE mikka_team_issues SET "workspaceId"=$2,"teamId"=$3 WHERE "issueId"=$1`,[a.issue,workspaceA,a.team])
-    await pool.query(`UPDATE workspace_projects SET "issueIds"=$2,revision=revision+1 WHERE id=$1`,[project,JSON.stringify([a.issue])])
+    await seedProjectTasks(pool, project, [a.issue])
+    await pool.query('UPDATE workspace_projects SET revision=revision+1 WHERE id=$1', [project])
   })
   await t.test('task membership revocation denies the next live check and policy read', async () => {
     const store = new AgentToolApprovalStore(pool), current = await read(a.run)
@@ -429,7 +474,7 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     await assert.rejects(store.check({ userId: owner, deviceId: device }, a.run, current.revision))
     assert.equal((await checkHTTP(current.revision)).status, 409)
     assert.equal((await read(b.run)).policy.permissions.git_push, 'deny')
-    assert.equal((await read(personal.run)).workspaceId, null)
+    assert.equal((await read(personal.run)).workspaceId, personalWorkspace)
   })
 })
 
@@ -437,14 +482,15 @@ test('task policy transfers metadata without document bodies and retains complet
   const admin = new Pool({ connectionString: target })
   const schema = `policy_projection_${randomUUID().replaceAll('-', '')}`
   await admin.query(`CREATE SCHEMA "${schema}"`)
-  await admin.query(`CREATE TABLE "${schema}".issues (id uuid PRIMARY KEY,"userId" text,scope text,"scopeVersion" int,content jsonb)`)
+  await admin.query(`CREATE TABLE "${schema}".issues (id uuid PRIMARY KEY,"userId" text,scope text,"scopeVersion" int,content jsonb,"workspaceId" uuid,"ownershipState" text)`)
   const database = new Pool({ connectionString: target, options: `-c search_path=${schema}` })
   t.after(async () => { client.release(); await database.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
   const id = randomUUID(), owner = randomUUID()
+  const workspaceId = await seedFixtureWorkspace(admin, owner)
   const client = await database.connect()
   const marker = 'SYNTHETIC_DOCUMENT_BODY_'
   const document = { type: 'doc', attrs: { mikka: { labels: [{ name: 'fixture', color: 'blue' }] } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: marker.repeat(50000) }] }] }
-  await client.query('INSERT INTO issues VALUES($1,$2,\'personal\',1,$3)', [id,owner,document])
+  await client.query('INSERT INTO issues VALUES($1,$2,\'personal\',1,$3,$4,\'bound\')', [id,owner,document,workspaceId])
   const original = client.query.bind(client)
   let returned: { content: unknown }[] = []
   const measured = new Proxy(client, { get(object, key) {
@@ -459,7 +505,7 @@ test('task policy transfers metadata without document bodies and retains complet
   await client.query('SELECT "userId",scope,"scopeVersion",content FROM issues WHERE id=$1',[id])
   const fullBytes = stream.bytesRead-fullStart
   const projectedStart = stream.bytesRead
-  assert.deepEqual(await lockCliTaskScope(measured,owner,id), { issueId:id,scopeVersion:1,workspaceId:null })
+  assert.deepEqual(await lockCliTaskScope(measured,owner,id), { issueId:id,scopeVersion:1,workspaceId })
   const projectedBytes = stream.bytesRead-projectedStart
   assert.equal(JSON.stringify(returned).includes(marker),false,'policy authorization must not fetch a document body')
   assert.ok(projectedBytes < fullBytes/100, 'large synthetic documents must not cross the policy connection')
@@ -499,7 +545,7 @@ test('direct machine policy changes stop exactly their admitted scope in the sam
   t.after(async () => { await database.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
   await database.query(`CREATE TABLE bots (id uuid PRIMARY KEY,"workspaceId" uuid);
     CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"botId" uuid,"issueId" uuid,"deviceId" uuid,
-      "machineAuthority" boolean,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz,cli_policy_hierarchy jsonb)`)
+      "machineAuthority" boolean,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz,cli_policy_hierarchy jsonb,"workspaceId" uuid)`)
   const [wa, wb, ba, bb, aa, ab, ia, ib, ic, ta, tb, pa, pb, device] = Array.from({ length: 14 }, () => randomUUID())
   await database.query('INSERT INTO bots VALUES($1,$2),($3,$4)', [ba, wa, bb, wb])
   const rows = [
@@ -510,8 +556,8 @@ test('direct machine policy changes stop exactly their admitted scope in the sam
     { owner: 'a', agent: aa, bot: ba, issue: ia, workspace: wa, team: ta, project: pa, direct: false, status: 'running' },
     { owner: 'a', agent: aa, bot: ba, issue: ia, workspace: wa, team: ta, project: pa, direct: true, status: 'completed' },
   ].map(row => ({ ...row, id: randomUUID() }))
-  for (const row of rows) await database.query(`INSERT INTO agent_runs VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULL,now()+interval '5 minutes',now(),$9)`,
-    [row.id, row.owner, row.agent, row.bot, row.issue, device, row.direct, row.status, { workspaceId: row.workspace, teamId: row.team, projectId: row.project }])
+  for (const row of rows) await database.query(`INSERT INTO agent_runs VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULL,now()+interval '5 minutes',now(),$9,$10)`,
+    [row.id, row.owner, row.agent, row.bot, row.issue, device, row.direct, row.status, { workspaceId: row.workspace, teamId: row.team, projectId: row.project }, row.workspace])
   const cases: [RunPolicyStopScope, number[]][] = [
     [{ kind: 'worker', ownerId: 'a', agentId: aa }, [0, 1]],
     [{ kind: 'agent', ownerId: 'a', botId: ba }, [0]],

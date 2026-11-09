@@ -9,6 +9,7 @@ export const readCacheNamespace = (scope: ReadCacheScope) => JSON.stringify(scop
   : [1, scope.userId, scope.workspaceId, scope.build, scope.role])
 type Restore = (key: string, data: unknown) => Promise<unknown>
 type RevalidateHydratedRead = () => Promise<unknown>
+export type ReadCacheInvalidation = 'refresh' | 'document-navigation'
 const activeCaches = new Set<PersistentReadCache>()
 const issueResourceId = (key: unknown): string | undefined => Array.isArray(key) && ['issue', 'issue-activity-versions', 'versions'].includes(key[0]) && typeof key[1] === 'string' ? key[1] : undefined
 
@@ -39,7 +40,7 @@ export class PersistentReadCache extends Map<string, ReadCacheState> {
   private freshData = new Set<string>()
   private startupReads = new Map<string | RevalidateHydratedRead, Set<RevalidateHydratedRead>>()
   private pending: Promise<unknown> = Promise.resolve()
-  private invalidated?: () => void
+  private invalidated?: (reason: ReadCacheInvalidation) => void
   private channel?: BroadcastChannel
 
   constructor(scope: ReadCacheScope | null, private storage: ReadStorage = new IndexedReadStorage()) {
@@ -144,7 +145,7 @@ export class PersistentReadCache extends Map<string, ReadCacheState> {
     } finally { this.hydrationComplete = true; this.finishHydration() }
   }
 
-  connect(onInvalidated: () => void) {
+  connect(onInvalidated: (reason: ReadCacheInvalidation) => void) {
     this.invalidated = onInvalidated
     activeCaches.add(this)
     if (typeof BroadcastChannel !== 'undefined' && this.namespace) {
@@ -171,7 +172,7 @@ export class PersistentReadCache extends Map<string, ReadCacheState> {
     }
   }
 
-  invalidate(broadcast = true) {
+  invalidate(broadcast = true, reason: ReadCacheInvalidation = 'refresh') {
     if (!this.enabled) return
     this.enabled = false
     super.clear()
@@ -181,7 +182,7 @@ export class PersistentReadCache extends Map<string, ReadCacheState> {
     // Retiring an old tab must not clear a newly activated account's namespace.
     void this.enqueue(() => this.storage.clear(this.namespace ?? undefined)).catch(() => undefined)
     if (broadcast) this.channel?.postMessage({ type: 'clear', scope: this.namespace })
-    this.invalidated?.()
+    this.invalidated?.(reason)
   }
 
   async flushed() { await this.pending }
@@ -198,12 +199,14 @@ export function readCacheShareNamespace(cache: object, ownerId: string): string 
 }
 
 /** Successful logout, account deletion and workspace/account switches share
- * this path. No token, account content or credential is broadcast. */
-export async function clearPersistentReadCaches() {
+ * this path. An imminent full navigation retires local readers until the new
+ * document reauthorizes; other tabs still refresh normally. No token, account
+ * content or credential is broadcast. */
+export async function clearPersistentReadCaches(options: { navigation?: 'document' } = {}) {
   // Invalidating calls React subscribers, which may unregister or create a
   // provider. Work on one snapshot so none of its pending writes escape the wait.
   const caches = [...activeCaches]
-  for (const cache of caches) cache.invalidate(false)
+  for (const cache of caches) cache.invalidate(false, options.navigation === 'document' ? 'document-navigation' : 'refresh')
   if (typeof BroadcastChannel !== 'undefined') {
     const channel = new BroadcastChannel('mikka-read-cache')
     channel.postMessage({ type: 'clear' }); channel.close()

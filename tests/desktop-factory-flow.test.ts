@@ -8,6 +8,7 @@ test('Factory flow routes accept only a freshly verified native or browser human
   const token = 'a'.repeat(32)
   let authReads = 0, readTasks = 0, approvals = 0
   const observed: Headers[] = []
+  const verifiedUsers = new WeakSet<object>()
   const tx = { query: async () => ({ rows: [] }), release: () => {} }
   const mocks = [
     mock.module(new URL('../lib/api-auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async (input: { headers: Headers; query: { disableCookieCache: boolean } }) => {
@@ -16,8 +17,19 @@ test('Factory flow routes accept only a freshly verified native or browser human
       observed.push(input.headers)
       const native = input.headers.get('authorization') === `Bearer ${token}`
       const browser = !input.headers.has('authorization') && input.headers.get('cookie') === 'fixture-browser=owner'
-      return native || browser ? { user: { id: 'owner' }, session: { id: native ? 'native-session' : 'browser-session' } } : null
+      if (!native && !browser) return null
+      const user = { id: 'owner' }
+      verifiedUsers.add(user)
+      return { user, session: { id: native ? 'native-session' : 'browser-session' } }
     } } } } }),
+    // This unit retains the actual human credential/origin/core adapters.
+    // Real Workspace/APP admission and tenant refusals have a separate PG suite.
+    mock.module(new URL('../lib/factory/workspace-http.ts', import.meta.url).href, { namedExports: {
+      factoryHumanWorkspaceResponse: async (user: { id: string } | null | undefined, work: () => Promise<Response>) => {
+        if (user) assert.equal(verifiedUsers.has(user), true, 'the route preserves the full verified user instead of reconstructing an id-only actor')
+        return work()
+      },
+    } }),
     mock.module(new URL('../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: { connect: async () => tx } } }),
     mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_name: string, handler: unknown) => handler, noteLogUser: () => {} } }),
     mock.module(new URL('../lib/factory/server.ts', import.meta.url).href, { namedExports: {
@@ -34,6 +46,12 @@ test('Factory flow routes accept only a freshly verified native or browser human
         assert.equal(input.binding.taskId, taskId)
         return { binding: input.binding, stage: 'implement' }
       },
+    } }),
+    // The real approval schema imports a dispatch helper, but this adapter unit
+    // supplies its own approval port above. Loading device execution is outside
+    // its boundary; an unexpected dispatch remains a hard failure.
+    mock.module(new URL('../lib/factory/dispatch.ts', import.meta.url).href, { namedExports: {
+      factoryBinding: () => assert.fail('the HTTP adapter unit must not dispatch a real run'),
     } }),
     mock.module(new URL('../lib/factory/public-flow.ts', import.meta.url).href, { namedExports: { readFactoryFlow: async (_client: unknown, task: { id: string }) => ({ version: 2, id: task.id }) } }),
   ]

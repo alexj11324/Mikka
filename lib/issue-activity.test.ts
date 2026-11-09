@@ -63,6 +63,59 @@ test('records clearing an assignee and ignores subtasks created before the paren
   assert.deepEqual(events.map(event => event.kind), ['created', 'unassigned'])
 })
 
+function responsibilityVersions(contents: JSONContent[]) {
+  return contents.map((value, index) => ({
+    id: `responsibility-${index + 1}`, revision: index + 1, title: 'A', status: 'todo', priority: 'normal', content: value,
+    actorType: 'user' as const, actorId: 'owner', createdAt: `2026-11-07T10:${String(index).padStart(2, '0')}:00.000Z`,
+  }))
+}
+
+test('legacy Agent assignee history remains visible as independent delegation events', () => {
+  const agent = (id: string, name: string, legacy = false): JSONContent => ({
+    type: 'doc', attrs: { [legacy ? 'orvilo' : 'mikka']: { assignee: { kind: 'agent', id, name, image: null } } },
+  })
+  const events = deriveIssueActivity(responsibilityVersions([
+    content(null), agent('a', 'Old Agent', true), agent('b', 'Next Agent'), content(null),
+  ]), [])
+  assert.deepEqual(events.slice(1).map(event => [event.kind, event.assignmentTarget, event.assigneeName]), [
+    ['assigned', 'delegate', 'Old Agent'], ['assigned', 'delegate', 'Next Agent'], ['unassigned', 'delegate', 'Next Agent'],
+  ])
+  assert.ok(events.every(event => event.actorKey === 'user:owner'))
+})
+
+test('moving a legacy Agent or Bot reference into delegate does not manufacture a change', () => {
+  const legacy: JSONContent = { type: 'doc', attrs: { mikka: { assignee: { kind: 'agent', id: 'old', name: 'Executor', image: null } } } }
+  for (const kind of ['agent', 'bot'] as const) {
+    const migrated: JSONContent = { type: 'doc', attrs: { mikka: { assignee: null, delegate: { kind, id: 'old', name: 'Executor', image: null } } } }
+    const contents = [content(null), legacy, migrated]
+    const historical = structuredClone(contents)
+    const events = deriveIssueActivity(responsibilityVersions(contents), [])
+    assert.deepEqual(events.map(event => event.id), ['created-responsibility-1', 'delegate-assign-responsibility-2'])
+    assert.deepEqual(contents, historical, 'deriving history never rewrites stored versions')
+  }
+})
+
+test('human and Delegate changes in one version produce separate events and clearing delegation preserves the human', () => {
+  const assigned = content({ id: 'person', name: 'Ada' })
+  assigned.attrs!.mikka.delegate = { kind: 'profile', id: 'profile', name: 'Review profile', image: null }
+  const cleared = content({ id: 'person', name: 'Ada' })
+  cleared.attrs!.mikka.delegate = null
+  const events = deriveIssueActivity(responsibilityVersions([content(null), assigned, cleared]), [])
+  assert.deepEqual(events.slice(1).map(event => [event.id, event.kind, event.assignmentTarget, event.assigneeName]), [
+    ['assign-responsibility-2', 'assigned', undefined, 'Ada'],
+    ['delegate-assign-responsibility-2', 'assigned', 'delegate', 'Review profile'],
+    ['delegate-unassign-responsibility-3', 'unassigned', 'delegate', 'Review profile'],
+  ])
+})
+
+test('modern Delegate kind changes are real changes, while an explicit null overrides legacy history', () => {
+  const reference = { id: 'same-id', name: 'Executor', image: null }
+  const modern = (kind: 'agent' | 'bot'): JSONContent => ({ type: 'doc', attrs: { mikka: { assignee: null, delegate: { ...reference, kind } } } })
+  const explicitlyCleared: JSONContent = { type: 'doc', attrs: { mikka: { assignee: { ...reference, kind: 'agent' }, delegate: null } } }
+  const events = deriveIssueActivity(responsibilityVersions([modern('agent'), modern('bot'), explicitlyCleared]), [])
+  assert.deepEqual(events.slice(1).map(event => [event.kind, event.assignmentTarget]), [['assigned', 'delegate'], ['unassigned', 'delegate']])
+})
+
 test('joins events in the same minute into one row', () => {
   const groups = groupActivityByMinute([
     { id: 'a', at: '2026-10-22T10:00:05.000Z', kind: 'created' },

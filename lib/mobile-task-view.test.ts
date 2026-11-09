@@ -1,38 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mobileTaskActivity, mobileTaskGroup, type MobileTaskGroup, type MobileTaskAttempt } from './mobile-task-view'
+import { mobileTaskActivity, mobileTaskGroup, type MobileTaskAttempt } from './mobile-task-view'
 import type { ThreadOutcome } from './thread-groups'
 
 const task = (status = 'todo', states: ('open' | 'draft' | 'merged' | 'closed')[] = []) => ({ status, metadata: { pullRequests: states.map(state => ({ url: 'https://github.com/acme/app/pull/1', state })) } })
 const run = (status: string, outcome: ThreadOutcome | null = null) => ({ runId: 'run', status, outcome })
 
-test('task groups cover every R-52 branch, including PR metadata and closed-task precedence', () => {
-  const cases: [string, ThreadOutcome | null, MobileTaskGroup][] = [
-    ...['queued', 'preparing', 'running', 'finishing'].map(status => [status, null, 'running'] as [string, null, MobileTaskGroup]),
-    ['waiting_input', null, 'pending'], ['paused', null, 'pending'],
-    ['succeeded', 'blocked', 'pending'], ['succeeded', 'failed', 'pending'], ['succeeded', 'needs_input', 'pending'],
-    ['succeeded', 'idle', 'todo'], ['succeeded', 'done', 'done'], ['succeeded', null, 'pending'], ['failed', null, 'pending'],
-  ]
-  for (const [status, outcome, expected] of cases) assert.equal(mobileTaskGroup(task(), run(status, outcome)), expected, `${status}/${outcome}`)
-  assert.equal(mobileTaskGroup(task()), 'todo')
-  for (const status of ['done', 'canceled', 'duplicate']) {
-    assert.equal(mobileTaskGroup(task(status), run('running')), 'done')
-    assert.equal(mobileTaskGroup(task(status)), 'done')
-  }
-  for (const state of ['open', 'draft'] as const) assert.equal(mobileTaskGroup(task('todo', [state]), run('succeeded', 'idle')), 'pending')
-  assert.equal(mobileTaskGroup(task('review'), run('succeeded', 'done')), 'pending')
-  assert.equal(mobileTaskGroup(task('todo', ['merged']), run('succeeded')), 'done')
-  assert.equal(mobileTaskGroup(task('todo', ['closed']), run('succeeded', 'idle')), 'todo')
-  assert.equal(mobileTaskGroup(task('todo', ['merged']), run('running')), 'running')
-  assert.equal(mobileTaskGroup(task('review'), run('succeeded', 'blocked')), 'pending')
-})
-
-test('a task without a thread is pending when the board blocks it; closed tasks still win', () => {
-  assert.equal(mobileTaskGroup(task(), undefined, true), 'pending')
-  assert.equal(mobileTaskGroup(task(), undefined, false), 'todo')
-  assert.equal(mobileTaskGroup(task(), run('running'), true), 'pending')
-  assert.equal(mobileTaskGroup(task(), run('succeeded', 'idle'), true), 'pending')
-  for (const status of ['done', 'canceled', 'duplicate']) assert.equal(mobileTaskGroup(task(status), undefined, true), 'done')
+test('compatibility group entry point delegates to task state', () => {
+  assert.equal(mobileTaskGroup(task(), run('failed')), 'pending')
+  assert.equal(mobileTaskGroup(task(), undefined, { block: { reason: 'flagged' } }), 'todo')
+  assert.equal(mobileTaskGroup(task(), run('succeeded', 'done')), 'todo')
 })
 
 test('activity numbers chronologically, sorts newest first, and keeps same-time replacements stable', () => {
@@ -58,4 +35,12 @@ test('attempt groups preserve the R-52 vocabulary expected by the iOS attempt st
     .map((item, index) => ({ ...item, runId: String(index), harness: 'codex', createdAt: new Date(index + 1), threadReplacedBy: null }))
   const activity = mobileTaskActivity(task(), runs, { by: null, createdAt: new Date(0) })
   assert.deepEqual(activity.filter(row => row.kind === 'attempt').toReversed().map(row => row.group), expected)
+})
+
+ test('activity PRs belong to the exact publication, never the task metadata', () => {
+  const rows = ['https://github.com/acme/app/pull/42', null, 'invalid'].map((url, index) => ({ ...run('succeeded', 'done'), runId: String(index), harness: 'codex', createdAt: new Date(index + 1), threadReplacedBy: null, pullRequest: url ? { url } : null }))
+  const activity = mobileTaskActivity(task('review', ['open']), rows, { by: null, createdAt: new Date(0) })
+  const attempts = activity.filter(row => row.kind === 'attempt').toReversed()
+  assert.deepEqual(attempts.map(row => row.pullRequest), [{ number: 42, url: rows[0].pullRequest!.url }, null, null])
+  assert.deepEqual(attempts.map(row => row.state), ['done', 'done', 'done'])
 })
