@@ -37,7 +37,7 @@ const COMMAND_STATUSES = new Set(['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', '
 const SIGN_IN_SELECTORS = new Set(['signin-email', 'signin-password', 'signin-submit'])
 
 export function nativeDriverFlow() {
-  return 'appId: com.apple.Preferences\n---\n- launchApp\n'
+  return 'appId: com.apple.Preferences\n---\n- launchApp\n- assertVisible: Settings\n'
 }
 
 export function nativeFlowDiagnostics(privateDir, name) {

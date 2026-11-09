@@ -151,7 +151,7 @@ test('build phase diagnostics retain only the exit status while command output s
 })
 
 test('stock native driver preflight runs before compilation and reviewer credential reads', () => {
-  assert.equal(nativeDriverFlow(), 'appId: com.apple.Preferences\n---\n- launchApp\n')
+  assert.equal(nativeDriverFlow(), 'appId: com.apple.Preferences\n---\n- launchApp\n- assertVisible: Settings\n')
   const build = readFileSync(new URL('./mobile-screenshots-build.sh', import.meta.url), 'utf8')
   const preflight = build.indexOf('node scripts/release/mobile-screenshots.mjs driver-preflight')
   assert.ok(preflight > build.indexOf("screenshotPhase('simulator-boot-localized'"))
