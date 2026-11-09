@@ -675,7 +675,7 @@ jobs:
 
   self-hosted-cloud-services:
     if: >-
-      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      false && github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
       startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final services')
@@ -783,5 +783,84 @@ jobs:
         with:
           name: self-hosted-cloud-services
           path: artifacts/self-hosted-cloud-services.json
+          if-no-files-found: error
+          retention-days: 7
+
+
+  self-hosted-services-diagnostic-recovery:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
+      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final services diagnostic recovery')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    concurrency:
+      group: production-smoke-owner-acceptance
+      queue: max
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - name: Guard exact zero-model recovery source before credentials
+        run: node scripts/ops/self-hosted-services-diagnostic-recovery.mjs
+        env:
+          MIKKA_RECOVERY_PREFLIGHT: '1'
+      - name: Prepare the existing source helpers only
+        run: |
+          git fetch --depth=1 origin 9bcdefc5fe0c047393d581eea867ffa801f53dbe
+          git worktree add --detach "$RUNNER_TEMP/mikka-services-source" 9bcdefc5fe0c047393d581eea867ffa801f53dbe
+          pnpm --dir "$RUNNER_TEMP/mikka-services-source" install --frozen-lockfile --ignore-scripts
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - name: Diagnose existing receipts and delete only the verified owned empty workspace
+        run: node scripts/ops/self-hosted-services-diagnostic-recovery.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: self-hosted-services-diagnostic-recovery
+          path: artifacts/self-hosted-services-diagnostic-recovery.json
           if-no-files-found: error
           retention-days: 7
