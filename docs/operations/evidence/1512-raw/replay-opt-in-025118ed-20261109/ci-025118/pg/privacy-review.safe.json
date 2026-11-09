@@ -1,0 +1,78 @@
+{
+  "method": "Pattern-assisted source-log review; candidates are not proof of real secrets or real people. Matching values are retained only in the original already-public GitHub log, not this receipt.",
+  "rawLogOrigin": "Public GitHub Actions decoded logs; GitHub masking already applied by platform. Original decoded UTF-8 strings preserved including BOM/ANSI.",
+  "patterns": [
+    "private-key-header",
+    "provider-token-shaped",
+    "aws-key-shaped",
+    "email-shaped",
+    "authorization-bearer-shaped",
+    "credential-url-shaped"
+  ],
+  "findings": [
+    {
+      "jobId": 129016429667,
+      "line": 4194,
+      "category": "email-shaped",
+      "matchSha256": "fdb0d7655db963926cc4efe3326475516ec97dcbd6959766918e03ff45edb225",
+      "length": 19,
+      "isPassingTitle": false,
+      "resolution": "synthetic fixture, not an unresolved real-person value",
+      "source": {
+        "commit": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+        "testPath": "lib/abuse/store.db.test.ts",
+        "testBlob": "04792f1c02a965cabff134f30f938d14c97d62aa",
+        "testLines": [
+          386,
+          390
+        ],
+        "normalizerPath": "drizzle/20261030230000_hosted_usage.sql",
+        "normalizerBlob": "41c55d332822f397f51a75eb95bdeafc2abc685a"
+      },
+      "evidence": "Two deliberately colliding fixture emails normalize to this PostgreSQL duplicate-key value under the actual SQL normalization function. Exact equality was checked in RAM; no matched value is included here."
+    }
+  ],
+  "broaderBoundary": "Temporary isolated Postgres17 fixture execution; no production/business-data query was performed by this reviewer. Automated patterns cannot prove universal absence of personal data.",
+  "unresolvedCandidates": 0,
+  "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+  "sourceEvidence": [
+    {
+      "commit": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+      "testPath": "lib/abuse/store.db.test.ts",
+      "testBlob": "04792f1c02a965cabff134f30f938d14c97d62aa",
+      "testLines": [
+        386,
+        390
+      ],
+      "normalizerPath": "drizzle/20261030230000_hosted_usage.sql",
+      "normalizerBlob": "41c55d332822f397f51a75eb95bdeafc2abc685a"
+    }
+  ],
+  "downloadAccounting": [
+    {
+      "jobId": 129016429667,
+      "reviewerDownloadCount": 1,
+      "wholeTeamDownloadCount": 1
+    },
+    {
+      "jobId": 129016429745,
+      "reviewerDownloadCount": 1,
+      "wholeTeamDownloadCount": 1
+    },
+    {
+      "jobId": 129016429772,
+      "reviewerDownloadCount": 1,
+      "wholeTeamDownloadCount": 1
+    },
+    {
+      "jobId": 129016429700,
+      "reviewerDownloadCount": 1,
+      "wholeTeamDownloadCount": 1
+    },
+    {
+      "jobId": 129018515769,
+      "reviewerDownloadCount": 1,
+      "wholeTeamDownloadCount": 2
+    }
+  ]
+}

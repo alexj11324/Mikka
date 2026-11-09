@@ -1,0 +1,3993 @@
+{
+  "schemaVersion": 1,
+  "kind": "source-bound-postgres-ci-terminal-review",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "runId": 42573554116,
+  "runAttempt": 1,
+  "event": "pull_request",
+  "source": {
+    "prHead": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+    "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+    "tree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+    "checkoutProof": "Each of four shard originals and the aggregate original contains its own git log -1 --format=%H output. All five equal actualCheckout.",
+    "treeProof": "Tree and PR-head equivalence are taken from root's remotely checked source binding preserved in the independently hash-verified selection blob; this reviewer did not repeat that Git commit API request.",
+    "selectionEvidence": {
+      "bytes": 130135,
+      "sha256": "fcdd46be6b33804415b5f5032e0c12de71829a264feead2b43f118de10a0f926",
+      "gitBlob": "981090e57913693c7dcd610e4ff24e2418043c0a",
+      "jobId": 129016131517,
+      "sourceOriginal": {
+        "bytes": 563713,
+        "sha256": "989576b859a3214f44ed84dc08eb819cd441ce7fa32ab24e4618ff1f268516d5",
+        "lines": 5571
+      },
+      "full": true,
+      "docsOnly": false,
+      "unitTaskCount": 86,
+      "dbSuiteCount": 72
+    },
+    "exactPackage": {
+      "path": "package.json",
+      "gitBlob": "4d4d856e9f90ea102c4e42cf42114e9d5daad731",
+      "nodeVersion": "24.x"
+    },
+    "supportingSources": [
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530"
+      },
+      {
+        "path": "lib/device-route-fence.db.test.ts",
+        "gitBlob": "85ad4273e1f1f533b2dd361005a3b46719d0c667"
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "gitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+      }
+    ]
+  },
+  "jobs": [
+    {
+      "id": 129016429667,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:32:26Z",
+      "completedAt": "2026-11-09T06:37:04Z",
+      "checkout": [
+        {
+          "line": 252,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "original": {
+        "bytes": 614209,
+        "sha256": "9a15797902b323024cf093efa0d6c9a4b328853f17419aae481b761a4f84cb49",
+        "gitBlob": "7324627f9abc3a380cf8a061c45456d1df557ed8",
+        "format": "original decoded GitHub job log; UTF-8 including original BOM/ANSI; no text normalization for archival identity"
+      },
+      "reviewerDownloadCount": 1,
+      "teamDownloadCount": 1,
+      "duplicateReadDisclosure": null,
+      "requiredSteps": [
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 129016429745,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:32:26Z",
+      "completedAt": "2026-11-09T06:35:25Z",
+      "checkout": [
+        {
+          "line": 250,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "original": {
+        "bytes": 1160760,
+        "sha256": "191c1470bd1723c601f880b642e5b72799a62ad0b920a761c5d214676146942c",
+        "gitBlob": "1a96ff983601fa7d378d527ecf0faef608b7f635",
+        "format": "original decoded GitHub job log; UTF-8 including original BOM/ANSI; no text normalization for archival identity"
+      },
+      "reviewerDownloadCount": 1,
+      "teamDownloadCount": 1,
+      "duplicateReadDisclosure": null,
+      "requiredSteps": [
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 129016429772,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:32:26Z",
+      "completedAt": "2026-11-09T06:38:53Z",
+      "checkout": [
+        {
+          "line": 248,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "original": {
+        "bytes": 2283936,
+        "sha256": "2795cf89190df5cab2aa69d81c14371687c2374a09a401fe516a45ea3d06c187",
+        "gitBlob": "e0b92fd7fb71c1eecef76124122b61c75f9a7d04",
+        "format": "original decoded GitHub job log; UTF-8 including original BOM/ANSI; no text normalization for archival identity"
+      },
+      "reviewerDownloadCount": 1,
+      "teamDownloadCount": 1,
+      "duplicateReadDisclosure": null,
+      "requiredSteps": [
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 129016429700,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:32:26Z",
+      "completedAt": "2026-11-09T06:36:17Z",
+      "checkout": [
+        {
+          "line": 249,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "original": {
+        "bytes": 625389,
+        "sha256": "3928b4eca3de9f6747218b47e1a4f0135aaa2a928a12f792271c90a89170c41b",
+        "gitBlob": "3403b80d57b1e622d07eca4df683401f560683bc",
+        "format": "original decoded GitHub job log; UTF-8 including original BOM/ANSI; no text normalization for archival identity"
+      },
+      "reviewerDownloadCount": 1,
+      "teamDownloadCount": 1,
+      "duplicateReadDisclosure": null,
+      "requiredSteps": [
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 129018515769,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:38:55Z",
+      "completedAt": "2026-11-09T06:39:08Z",
+      "checkout": [
+        {
+          "line": 149,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "original": {
+        "bytes": 13304,
+        "sha256": "6a2cc7ac6398baea792635ded7533f2214b93415815bf84b94d901d4fb294e0b",
+        "gitBlob": "01ab56f822f82425d9f585ad423ee295d9f6701d",
+        "format": "original decoded GitHub job log; UTF-8 including original BOM/ANSI; no text normalization for archival identity"
+      },
+      "reviewerDownloadCount": 1,
+      "teamDownloadCount": 2,
+      "duplicateReadDisclosure": "Root reported an additional independent metadata-misclassified aggregate log fetch at 2026-11-09 06:41 UTC (13304 bytes). This reviewer's original is the archival copy; no re-fetch performed.",
+      "requiredSteps": [
+        {
+          "number": 2,
+          "name": "Require every selected database shard",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "reconciliation": {
+    "runId": 42573554116,
+    "head": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+    "checkout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+    "tree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+    "full": true,
+    "docs_only": false,
+    "expectedSuites": 72,
+    "observedSuites": 72,
+    "missing": [],
+    "extra": [],
+    "duplicates": [],
+    "everyShardSelectionExact": true,
+    "everyCheckoutExact": true,
+    "allSuiteOk": true,
+    "allCountsComplete": true,
+    "totals": {
+      "tests": 3787,
+      "suites": 1,
+      "pass": 3787,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "executionSummaries": 91,
+    "aggregateGate": {
+      "changesSuccess": true,
+      "expectsDb": true,
+      "dbSuccess": true,
+      "meaning": "database aggregate; job title does not establish a production build/browser run"
+    },
+    "shardEvidence": [
+      {
+        "jobId": 129016429667,
+        "shard": 1,
+        "suiteCount": 18,
+        "totals": {
+          "tests": 741,
+          "suites": 0,
+          "pass": 741,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "timingsMatchSuites": true,
+        "allLifecycleCloseSuccess": true
+      },
+      {
+        "jobId": 129016429745,
+        "shard": 2,
+        "suiteCount": 18,
+        "totals": {
+          "tests": 794,
+          "suites": 0,
+          "pass": 794,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "timingsMatchSuites": true,
+        "allLifecycleCloseSuccess": true
+      },
+      {
+        "jobId": 129016429772,
+        "shard": 3,
+        "suiteCount": 18,
+        "totals": {
+          "tests": 1635,
+          "suites": 1,
+          "pass": 1635,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "timingsMatchSuites": true,
+        "allLifecycleCloseSuccess": true
+      },
+      {
+        "jobId": 129016429700,
+        "shard": 4,
+        "suiteCount": 18,
+        "totals": {
+          "tests": 617,
+          "suites": 0,
+          "pass": 617,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "timingsMatchSuites": true,
+        "allLifecycleCloseSuccess": true
+      }
+    ]
+  },
+  "countingMethod": {
+    "authoritative": "For each completed pnpm test:* output group, count each unprefixed Node summary exactly once. Ignore earlier [db-runner ... stdout] streaming copies.",
+    "checks": [
+      "72 selected suite names exactly equal the unique completed suite-name union",
+      "Each shard has 18 groups, 18 timing entries and 18 successful lifecycle close events",
+      "All groups close and have their own script: OK",
+      "Every summary has tests/pass/fail/cancelled/skipped/todo values",
+      "Every shard repeats one consistent formal 72-suite selection",
+      "The aggregate explicitly expects database checks and receives success"
+    ],
+    "nodeDescribeSuiteCountIsNotSelectedScriptCount": true,
+    "summaryCount": 91,
+    "selectedScriptCount": 72
+  },
+  "suiteLedger": [
+    {
+      "script": "test:group-turns",
+      "jobId": 129016429667,
+      "startLine": 1500,
+      "endLine": 1675,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          123,
+          5
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          123,
+          5
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 128,
+        "suites": 0,
+        "pass": 128,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:audit-db",
+      "jobId": 129016429667,
+      "startLine": 1803,
+      "endLine": 1900,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          44
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          44
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 44,
+        "suites": 0,
+        "pass": 44,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:conversation-reads",
+      "jobId": 129016429667,
+      "startLine": 2054,
+      "endLine": 2100,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          22
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          22
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 22,
+        "suites": 0,
+        "pass": 22,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:device-revocation-db",
+      "jobId": 129016429667,
+      "startLine": 2166,
+      "endLine": 2256,
+      "summaryCount": 3,
+      "counts": {
+        "tests": [
+          16,
+          11,
+          5
+        ],
+        "suites": [
+          0,
+          0,
+          0
+        ],
+        "pass": [
+          16,
+          11,
+          5
+        ],
+        "fail": [
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 32,
+        "suites": 0,
+        "pass": 32,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:abuse-db",
+      "jobId": 129016429667,
+      "startLine": 2283,
+      "endLine": 2366,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          24,
+          5
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          24,
+          5
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 29,
+        "suites": 0,
+        "pass": 29,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:plugins-db",
+      "jobId": 129016429667,
+      "startLine": 2382,
+      "endLine": 2433,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          18
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          18
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 18,
+        "suites": 0,
+        "pass": 18,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:agent-kit-db",
+      "jobId": 129016429667,
+      "startLine": 2500,
+      "endLine": 2559,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          23
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          23
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 23,
+        "suites": 0,
+        "pass": 23,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:chat-attachments-db",
+      "jobId": 129016429667,
+      "startLine": 2586,
+      "endLine": 2602,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          6
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          6
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 6,
+        "suites": 0,
+        "pass": 6,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:coordinator-task-binding-db",
+      "jobId": 129016429667,
+      "startLine": 2667,
+      "endLine": 2678,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:scope-detachment-db",
+      "jobId": 129016429667,
+      "startLine": 2750,
+      "endLine": 2850,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          69
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          69
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 69,
+        "suites": 0,
+        "pass": 69,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:session-mailbox-db",
+      "jobId": 129016429667,
+      "startLine": 2872,
+      "endLine": 2887,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          5
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          5
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:local-repository-migration-db",
+      "jobId": 129016429667,
+      "startLine": 3004,
+      "endLine": 3015,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:suggestion-artifact-db",
+      "jobId": 129016429667,
+      "startLine": 3100,
+      "endLine": 3117,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          4
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          4
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 4,
+        "suites": 0,
+        "pass": 4,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:web-auth-db",
+      "jobId": 129016429667,
+      "startLine": 3138,
+      "endLine": 3155,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          5
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          5
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:factory-activity-http-db",
+      "jobId": 129016429667,
+      "startLine": 3302,
+      "endLine": 3320,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          7
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          7
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 7,
+        "suites": 0,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:factory-checks-db",
+      "jobId": 129016429667,
+      "startLine": 3372,
+      "endLine": 3810,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          320
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          320
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 320,
+        "suites": 0,
+        "pass": 320,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:ops-db",
+      "jobId": 129016429667,
+      "startLine": 3868,
+      "endLine": 3922,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          11,
+          6
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          11,
+          6
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 17,
+        "suites": 0,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:run-dispatch",
+      "jobId": 129016429667,
+      "startLine": 3946,
+      "endLine": 3966,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          10
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          10
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:execution-settings-db",
+      "jobId": 129016429745,
+      "startLine": 1266,
+      "endLine": 1287,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          5
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          5
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:test-accounts-db",
+      "jobId": 129016429745,
+      "startLine": 1354,
+      "endLine": 1381,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          17
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          17
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 17,
+        "suites": 0,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:account-db",
+      "jobId": 129016429745,
+      "startLine": 1424,
+      "endLine": 1481,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          40
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          40
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 40,
+        "suites": 0,
+        "pass": 40,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:cloud-backend-db",
+      "jobId": 129016429745,
+      "startLine": 3129,
+      "endLine": 4618,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          215
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          215
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 215,
+        "suites": 0,
+        "pass": 215,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:worker-authorization-db",
+      "jobId": 129016429745,
+      "startLine": 4807,
+      "endLine": 4949,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          76
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          76
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 76,
+        "suites": 0,
+        "pass": 76,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:factory-monitor-db",
+      "jobId": 129016429745,
+      "startLine": 5091,
+      "endLine": 5137,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          2,
+          10
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          2,
+          10
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 12,
+        "suites": 0,
+        "pass": 12,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:secrets-db",
+      "jobId": 129016429745,
+      "startLine": 5222,
+      "endLine": 5327,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          89
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          89
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 89,
+        "suites": 0,
+        "pass": 89,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:groups",
+      "jobId": 129016429745,
+      "startLine": 5382,
+      "endLine": 5517,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          12,
+          79
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          12,
+          79
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 91,
+        "suites": 0,
+        "pass": 91,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:pat-api-db",
+      "jobId": 129016429745,
+      "startLine": 5626,
+      "endLine": 5775,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          38
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          38
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 38,
+        "suites": 0,
+        "pass": 38,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:bot-chats-db",
+      "jobId": 129016429745,
+      "startLine": 5850,
+      "endLine": 6101,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          144
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          144
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 144,
+        "suites": 0,
+        "pass": 144,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:coordinator-issue-create-db",
+      "jobId": 129016429745,
+      "startLine": 6129,
+      "endLine": 6149,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          10
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          10
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:credentials-db",
+      "jobId": 129016429745,
+      "startLine": 6190,
+      "endLine": 6202,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          3
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          3
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 3,
+        "suites": 0,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:migration-steps-db",
+      "jobId": 129016429745,
+      "startLine": 6235,
+      "endLine": 6248,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:preview-driver",
+      "jobId": 129016429745,
+      "startLine": 6262,
+      "endLine": 6272,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:run-publication-db",
+      "jobId": 129016429745,
+      "startLine": 6328,
+      "endLine": 6408,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          24,
+          1
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          24,
+          1
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 25,
+        "suites": 0,
+        "pass": 25,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:factory-all-dispatch-db",
+      "jobId": 129016429745,
+      "startLine": 6465,
+      "endLine": 6519,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          2
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:settings-activity-db",
+      "jobId": 129016429745,
+      "startLine": 6542,
+      "endLine": 6562,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          6
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          6
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 6,
+        "suites": 0,
+        "pass": 6,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:agent-tool-approval-db",
+      "jobId": 129016429745,
+      "startLine": 6575,
+      "endLine": 6629,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          16,
+          3
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          16,
+          3
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 19,
+        "suites": 0,
+        "pass": 19,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:desktop-auth",
+      "jobId": 129016429772,
+      "startLine": 2450,
+      "endLine": 2712,
+      "summaryCount": 4,
+      "counts": {
+        "tests": [
+          70,
+          3,
+          11,
+          44
+        ],
+        "suites": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "pass": [
+          70,
+          3,
+          11,
+          44
+        ],
+        "fail": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 128,
+        "suites": 0,
+        "pass": 128,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:workspace-admin-db",
+      "jobId": 129016429772,
+      "startLine": 4124,
+      "endLine": 4270,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          109
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          109
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 109,
+        "suites": 0,
+        "pass": 109,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:factory",
+      "jobId": 129016429772,
+      "startLine": 5385,
+      "endLine": 5943,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          511
+        ],
+        "suites": [
+          1
+        ],
+        "pass": [
+          511
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 511,
+        "suites": 1,
+        "pass": 511,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:self-improvement-db",
+      "jobId": 129016429772,
+      "startLine": 5975,
+      "endLine": 6020,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          28
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          28
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 28,
+        "suites": 0,
+        "pass": 28,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:factory-approval-db",
+      "jobId": 129016429772,
+      "startLine": 7164,
+      "endLine": 7282,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          52
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          52
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 52,
+        "suites": 0,
+        "pass": 52,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:project-decisions-db",
+      "jobId": 129016429772,
+      "startLine": 7395,
+      "endLine": 7877,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          39
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          39
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 39,
+        "suites": 0,
+        "pass": 39,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:factory-routing-db",
+      "jobId": 129016429772,
+      "startLine": 7915,
+      "endLine": 8529,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          282,
+          5
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          282,
+          5
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 287,
+        "suites": 0,
+        "pass": 287,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:approved-writes-db",
+      "jobId": 129016429772,
+      "startLine": 8580,
+      "endLine": 8607,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          10
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          10
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:cloud-services-db",
+      "jobId": 129016429772,
+      "startLine": 8734,
+      "endLine": 8759,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          10
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          10
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:model-admission-db",
+      "jobId": 129016429772,
+      "startLine": 8877,
+      "endLine": 8939,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          13,
+          1
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          13,
+          1
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 14,
+        "suites": 0,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:bot-threads-db",
+      "jobId": 129016429772,
+      "startLine": 9007,
+      "endLine": 11916,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          338
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          338
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 338,
+        "suites": 0,
+        "pass": 338,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:coordinator-issue-tools-db",
+      "jobId": 129016429772,
+      "startLine": 11981,
+      "endLine": 11994,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          2
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:pat-db",
+      "jobId": 129016429772,
+      "startLine": 12178,
+      "endLine": 12200,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          12
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          12
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 12,
+        "suites": 0,
+        "pass": 12,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:issue-search-db",
+      "jobId": 129016429772,
+      "startLine": 12268,
+      "endLine": 12296,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          8
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          8
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 8,
+        "suites": 0,
+        "pass": 8,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:run-recovery-db",
+      "jobId": 129016429772,
+      "startLine": 12320,
+      "endLine": 12751,
+      "summaryCount": 5,
+      "counts": {
+        "tests": [
+          20,
+          9,
+          11,
+          12,
+          9
+        ],
+        "suites": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "pass": [
+          20,
+          9,
+          11,
+          12,
+          9
+        ],
+        "fail": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 61,
+        "suites": 0,
+        "pass": 61,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:user-facts-db",
+      "jobId": 129016429772,
+      "startLine": 12771,
+      "endLine": 12781,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:active-agents",
+      "jobId": 129016429772,
+      "startLine": 12793,
+      "endLine": 12817,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          14
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          14
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 14,
+        "suites": 0,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:settings-prefs-db",
+      "jobId": 129016429772,
+      "startLine": 12829,
+      "endLine": 12853,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          11
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          11
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 11,
+        "suites": 0,
+        "pass": 11,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:self-improvement-unit",
+      "jobId": 129016429700,
+      "startLine": 1412,
+      "endLine": 1551,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          100
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          100
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 100,
+        "suites": 0,
+        "pass": 100,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:coordinator-native",
+      "jobId": 129016429700,
+      "startLine": 1623,
+      "endLine": 1674,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          36
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          36
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 36,
+        "suites": 0,
+        "pass": 36,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:computer-db",
+      "jobId": 129016429700,
+      "startLine": 1722,
+      "endLine": 1748,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          8
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          8
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 8,
+        "suites": 0,
+        "pass": 8,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:github-connections-db",
+      "jobId": 129016429700,
+      "startLine": 1862,
+      "endLine": 1952,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          24
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          24
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 24,
+        "suites": 0,
+        "pass": 24,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:factory-activity-db",
+      "jobId": 129016429700,
+      "startLine": 2055,
+      "endLine": 2114,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          45
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          45
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 45,
+        "suites": 0,
+        "pass": 45,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:personal-mailbox-default-off-db",
+      "jobId": 129016429700,
+      "startLine": 2197,
+      "endLine": 2256,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          42
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          42
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 42,
+        "suites": 0,
+        "pass": 42,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:schedules-db",
+      "jobId": 129016429700,
+      "startLine": 2357,
+      "endLine": 2385,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          16
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          16
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 16,
+        "suites": 0,
+        "pass": 16,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:skill-semantic-db",
+      "jobId": 129016429700,
+      "startLine": 2405,
+      "endLine": 2419,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          2
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:captures-db",
+      "jobId": 129016429700,
+      "startLine": 2432,
+      "endLine": 2486,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          29
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          29
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 29,
+        "suites": 0,
+        "pass": 29,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:artifact-migration-db",
+      "jobId": 129016429700,
+      "startLine": 2500,
+      "endLine": 2510,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:visibility-db",
+      "jobId": 129016429700,
+      "startLine": 2536,
+      "endLine": 2547,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          2
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:factory-check-independence-db",
+      "jobId": 129016429700,
+      "startLine": 2617,
+      "endLine": 2683,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          55
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          55
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 55,
+        "suites": 0,
+        "pass": 55,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:onboarding-db",
+      "jobId": 129016429700,
+      "startLine": 2715,
+      "endLine": 2734,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          5
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          5
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:relation-cycle",
+      "jobId": 129016429700,
+      "startLine": 2894,
+      "endLine": 2915,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          6
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          6
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 6,
+        "suites": 0,
+        "pass": 6,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:workspace-migration-db",
+      "jobId": 129016429700,
+      "startLine": 2929,
+      "endLine": 2939,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:activity-actor-db",
+      "jobId": 129016429700,
+      "startLine": 3016,
+      "endLine": 3200,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          57
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          57
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 57,
+        "suites": 0,
+        "pass": 57,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:device-enrollment-db",
+      "jobId": 129016429700,
+      "startLine": 3212,
+      "endLine": 3242,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          13
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          13
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 13,
+        "suites": 0,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    },
+    {
+      "script": "test:live-db",
+      "jobId": 129016429700,
+      "startLine": 3292,
+      "endLine": 3588,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          10,
+          165
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          10,
+          165
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 175,
+        "suites": 0,
+        "pass": 175,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "ok": true
+    }
+  ],
+  "targetedEvidence": {
+    "deviceSuites": [
+      {
+        "script": "test:device-revocation-db",
+        "jobId": 129016429667,
+        "startLine": 2166,
+        "endLine": 2256,
+        "counts": {
+          "tests": [
+            16,
+            11,
+            5
+          ],
+          "suites": [
+            0,
+            0,
+            0
+          ],
+          "pass": [
+            16,
+            11,
+            5
+          ],
+          "fail": [
+            0,
+            0,
+            0
+          ],
+          "cancelled": [
+            0,
+            0,
+            0
+          ],
+          "skipped": [
+            0,
+            0,
+            0
+          ],
+          "todo": [
+            0,
+            0,
+            0
+          ]
+        },
+        "metrics": [
+          {
+            "line": 2188,
+            "value": {
+              "queuedRunsRequestDbBytes": 433
+            }
+          },
+          {
+            "line": 2214,
+            "value": {
+              "scenario": "runs-empty-poll",
+              "statements": 2
+            }
+          },
+          {
+            "line": 2216,
+            "value": {
+              "scenario": "repos-empty-poll",
+              "statements": 2
+            }
+          },
+          {
+            "line": 2218,
+            "value": {
+              "metric": "initial_repository_task_delta",
+              "scenario": "missing",
+              "unchangedTaskPrefixSuffixExcluded": true,
+              "protocol": "PostgreSQL messages, excluding TCP/TLS/connect; HTTP JSON bodies separately",
+              "original": {
+                "queries": 8,
+                "sqlBytes": 1520,
+                "resultRows": 4,
+                "sentBytes": 2562,
+                "receivedBytes": 1242
+              },
+              "candidate": {
+                "queries": 1,
+                "sqlBytes": 214,
+                "resultRows": 0,
+                "sentBytes": 366,
+                "receivedBytes": 228
+              },
+              "oldResponseBytes": 331,
+              "nextResponseBytes": 327,
+              "sqlDelta": -7,
+              "rowDelta": -4,
+              "wireDelta": -3210,
+              "responseBodyDelta": -4
+            }
+          },
+          {
+            "line": 2219,
+            "value": {
+              "metric": "initial_repository_task_delta",
+              "scenario": "complete",
+              "unchangedTaskPrefixSuffixExcluded": true,
+              "protocol": "PostgreSQL messages, excluding TCP/TLS/connect; HTTP JSON bodies separately",
+              "original": {
+                "queries": 8,
+                "sqlBytes": 1520,
+                "resultRows": 6,
+                "sentBytes": 2562,
+                "receivedBytes": 1587
+              },
+              "candidate": {
+                "queries": 1,
+                "sqlBytes": 214,
+                "resultRows": 1,
+                "sentBytes": 366,
+                "receivedBytes": 468
+              },
+              "oldResponseBytes": 441,
+              "nextResponseBytes": 437,
+              "sqlDelta": -7,
+              "rowDelta": -5,
+              "wireDelta": -3315,
+              "responseBodyDelta": -4
+            }
+          },
+          {
+            "line": 2220,
+            "value": {
+              "metric": "initial_repository_task_delta",
+              "scenario": "unicode",
+              "unchangedTaskPrefixSuffixExcluded": true,
+              "protocol": "PostgreSQL messages, excluding TCP/TLS/connect; HTTP JSON bodies separately",
+              "original": {
+                "queries": 8,
+                "sqlBytes": 1520,
+                "resultRows": 6,
+                "sentBytes": 2562,
+                "receivedBytes": 5186
+              },
+              "candidate": {
+                "queries": 1,
+                "sqlBytes": 214,
+                "resultRows": 1,
+                "sentBytes": 366,
+                "receivedBytes": 2268
+              },
+              "oldResponseBytes": 2240,
+              "nextResponseBytes": 2236,
+              "sqlDelta": -7,
+              "rowDelta": -5,
+              "wireDelta": -5114,
+              "responseBodyDelta": -4
+            }
+          },
+          {
+            "line": 2233,
+            "value": {
+              "routes": 31
+            }
+          },
+          {
+            "line": 2247,
+            "value": {
+              "perStatement": {
+                "completed": 3,
+                "roundTrips": 11,
+                "explicit": 2
+              },
+              "perUnit": {
+                "completed": 4,
+                "roundTrips": 6,
+                "explicit": 1
+              },
+              "measurement": "backend_command_tags_and_ready_for_query"
+            }
+          }
+        ],
+        "titles": [
+          {
+            "line": 2168,
+            "text": "✔ normal demo cleanup stops active runs, preserves history and excludes prefix/version lookalikes (18970.427398ms)"
+          },
+          {
+            "line": 2169,
+            "text": "✔ committed messages push addresses, notification receipts preserve read and ACK semantics (289.694562ms)"
+          },
+          {
+            "line": 2170,
+            "text": "✔ stopped, terminal, expired, disabled and cross-owner runs never receive notifications (104.343266ms)"
+          },
+          {
+            "line": 2171,
+            "text": "✔ real Postgres: idle gateway presence drives dispatch, device selection and post-commit uninstall (6923.233298ms)"
+          },
+          {
+            "line": 2172,
+            "text": "✔ owner revoke stops attributed work, revokes worker access, records once and preserves sibling credentials (265.595143ms)"
+          },
+          {
+            "line": 2173,
+            "text": "✔ a receipt write fault rolls token, stop, lease and worker revocation back atomically (26.742987ms)"
+          },
+          {
+            "line": 2174,
+            "text": "✔ a revocation waits for the admitted writer transaction, and later raw/ORM admissions all refuse (163.937763ms)"
+          },
+          {
+            "line": 2175,
+            "text": "✔ the actual event route accepts before revoke and rejects the old token after a fresh request scope (199.599931ms)"
+          },
+          {
+            "line": 2176,
+            "text": "✔ revocation while the real event handler waits for its body prevents the later write (1053.41649ms)"
+          },
+          {
+            "line": 2177,
+            "text": "✔ terminating an admitted write connection rolls back both the write and authority lock (61.225232ms)"
+          },
+          {
+            "line": 2180,
+            "text": "✔ a long poll loses token authority within its five-second database polling interval (2072.801542ms)"
+          },
+          {
+            "line": 2185,
+            "text": "✔ with push, revocation ends a waiting long poll on its NOTIFY, long before any timer; a lost NOTIFY still fails it at the deadline (4158.189019ms)"
+          },
+          {
+            "line": 2186,
+            "text": "✔ existing device removal still refuses live work, then records revocation without deleting history (80.537544ms)"
+          },
+          {
+            "line": 2187,
+            "text": "✔ a device request is fenced by its first statement, with no check up front, and reads no device report it does not use (69.002753ms)"
+          },
+          {
+            "line": 2189,
+            "text": "✔ one read of a device's runs finds its stops, messages and queued runs (4644.242088ms)"
+          },
+          {
+            "line": 2190,
+            "text": "✔ the idle check answers in one statement, finds the same work and pending device commands, and refuses a revoked credential (471.131679ms)"
+          },
+          {
+            "line": 2208,
+            "text": "✔ a bound cloud device can renew its own subscription lease through the actual route (5158.595443ms)"
+          },
+          {
+            "line": 2212,
+            "text": "✔ a heartbeat re-checks execution identities only when the harnesses change or the device comes back, and renews the leases of the runs it reports (17191.4972ms)"
+          },
+          {
+            "line": 2213,
+            "text": "✔ runs poll reads current authority, ownership and results in one snapshot (333.563366ms)"
+          },
+          {
+            "line": 2215,
+            "text": "✔ repos poll reads current authority, ownership and results in one snapshot (241.891425ms)"
+          },
+          {
+            "line": 2217,
+            "text": "✔ initial claim repository handoff removes a real cloud repos request without increasing SQL, rows or response bytes (426.227694ms)"
+          },
+          {
+            "line": 2232,
+            "text": "✔ every device route refuses a token revoked after authentication before it calls out or issues anything (19841.155154ms)"
+          },
+          {
+            "line": 2242,
+            "text": "✔ a revocation waits for the burst in flight; the next burst answers 401 (3134.250642ms)"
+          },
+          {
+            "line": 2243,
+            "text": "✔ between bursts (a wait, network IO) the fence is not held: a revocation goes through at once (1342.805346ms)"
+          },
+          {
+            "line": 2244,
+            "text": "✔ a hung unit loses its fence after 10 s; the revocation then completes and the unit fails closed (4020.27681ms)"
+          },
+          {
+            "line": 2245,
+            "text": "✔ when no fence connection can be had the request is refused with 503, never run unfenced (2396.651792ms)"
+          },
+          {
+            "line": 2246,
+            "text": "✔ ten concurrent multi-statement device requests complete with three fence connections; fewer authorization transactions and round trips than one fence per statement (92.800438ms)"
+          }
+        ]
+      },
+      {
+        "script": "test:device-enrollment-db",
+        "jobId": 129016429700,
+        "startLine": 3212,
+        "endLine": 3242,
+        "counts": {
+          "tests": [
+            13
+          ],
+          "suites": [
+            0
+          ],
+          "pass": [
+            13
+          ],
+          "fail": [
+            0
+          ],
+          "cancelled": [
+            0
+          ],
+          "skipped": [
+            0
+          ],
+          "todo": [
+            0
+          ]
+        },
+        "metrics": [
+          {
+            "line": 3221,
+            "value": {
+              "scenario": "enrollment-consumption",
+              "statements": 1
+            }
+          },
+          {
+            "line": 3228,
+            "value": {
+              "scenario": "disabled-device",
+              "statements": 1
+            }
+          },
+          {
+            "line": 3229,
+            "value": {
+              "scenario": "removed-device",
+              "statements": 1
+            }
+          },
+          {
+            "line": 3230,
+            "value": {
+              "scenario": "empty-device",
+              "statements": 1
+            }
+          },
+          {
+            "line": 3231,
+            "value": {
+              "scenario": "missing-device",
+              "statements": 1
+            }
+          }
+        ],
+        "titles": [
+          {
+            "line": 3216,
+            "text": "✔ desktop account context reads only the current browser owner's active local devices (362.528016ms)"
+          },
+          {
+            "line": 3217,
+            "text": "✔ local setup owner view retains fresh session checks without reading unused devices (7.935107ms)"
+          },
+          {
+            "line": 3218,
+            "text": "✔ owner token pagination preserves microsecond ordering and rejects foreign or malformed anchors (58.865908ms)"
+          },
+          {
+            "line": 3219,
+            "text": "✔ registration grant is user-bound, expires, and has one concurrent winner (22.617944ms)"
+          },
+          {
+            "line": 3220,
+            "text": "✔ registration grant consumption uses one PostgreSQL statement (3.965062ms)"
+          },
+          {
+            "line": 3222,
+            "text": "✔ a failed credential insertion does not consume the enrollment grant (12.380866ms)"
+          },
+          {
+            "line": 3223,
+            "text": "✔ daemon acceptance follows real local enrollment and owner routes without a cloud token binding (26.534516ms)"
+          },
+          {
+            "line": 3224,
+            "text": "✔ online removal offers only uninstall, and its own receipt revokes credentials (14651.492343ms)"
+          },
+          {
+            "line": 3225,
+            "text": "✔ unacknowledged uninstall expires after ten minutes; offline removal revokes immediately (21.428148ms)"
+          },
+          {
+            "line": 3226,
+            "text": "✔ management queue is owner-scoped, serial and acknowledges only its device (21.678373ms)"
+          },
+          {
+            "line": 3227,
+            "text": "✔ pending commands without receipts are one read and preserve current device removal state (9.568095ms)"
+          },
+          {
+            "line": 3232,
+            "text": "✔ a fresh login cannot admit an old daemon, and updating cannot revive a revoked credential (46.389557ms)"
+          },
+          {
+            "line": 3233,
+            "text": "✔ registration metadata cannot disguise an old daemon behind a current header (23.538984ms)"
+          }
+        ]
+      }
+    ],
+    "cRaceSource": {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+      "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+      "tests": [
+        "runs poll reads current authority, ownership and results in one snapshot",
+        "repos poll reads current authority, ownership and results in one snapshot"
+      ],
+      "sourceScope": "Both route variants traverse real initial route authentication before an awaited params getter barrier. Four changes are applied before the read: revoked credential, expired credential, removed device, and owner changed. Revoked/expired returns 401; removed/foreign-owner returns 404 without runIds/repos. Disabled runs are separately tested to return no queued work; nonempty runs and repos results are also asserted.",
+      "executionScope": "Both enclosing tests passed in this run. Four cases per route are an in-test loop, not four separately named Node tests; their assertions execute as part of the passing parent test.",
+      "noNewTestRun": true
+    },
+    "nestedCloudLeaseTitles": [
+      {
+        "line": 2203,
+        "text": "  ✔ the same credential remains valid for its established heartbeat route (221.085704ms)"
+      },
+      {
+        "line": 2204,
+        "text": "  ✔ own run renewal passes route authentication and reaches issuance once (98.204026ms)"
+      },
+      {
+        "line": 2205,
+        "text": "  ✔ another device and another run remain refused before issuance (48.792933ms)"
+      },
+      {
+        "line": 2206,
+        "text": "  ✔ an ended machine cannot obtain a new lease (15.454946ms)"
+      },
+      {
+        "line": 2207,
+        "text": "  ✔ revoked cloud credentials remain refused (8.227427ms)"
+      }
+    ],
+    "cEmptyPollMeasurements": {
+      "runsStatements": 2,
+      "reposStatements": 2,
+      "boundary": "Fresh route authentication plus one authority/owner/results snapshot in the actual canonical fixture; not a prediction of a full Native login window."
+    },
+    "atomicEnrollmentAndPendingCommands": {
+      "enrollmentConsumptionStatements": 1,
+      "commandScenarios": [
+        "disabled-device",
+        "removed-device",
+        "empty-device",
+        "missing-device"
+      ],
+      "eachStatements": 1,
+      "testsPassed": 13,
+      "concurrentWinnerAndInsertionRollbackTitlesPresent": true
+    },
+    "queryFence": {
+      "sourceBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "tenConcurrentRequestsWithThreeFenceConnections": true,
+      "strictRoundTripAndExplicitTransactionAssertionsRetained": true,
+      "observed": {
+        "line": 2247,
+        "value": {
+          "perStatement": {
+            "completed": 3,
+            "roundTrips": 11,
+            "explicit": 2
+          },
+          "perUnit": {
+            "completed": 4,
+            "roundTrips": 6,
+            "explicit": 1
+          },
+          "measurement": "backend_command_tags_and_ready_for_query"
+        }
+      },
+      "revocationWaitBurstBetweenBurstsTimeoutAndCapacityRefusalTestsPassed": true
+    },
+    "liveRevisionRead": {
+      "jobId": 129016429700,
+      "script": "test:activity-actor-db",
+      "tests": 57,
+      "skipped": 0,
+      "canonicalCommandIncludes": "tests/live-revision-reads.db.test.ts",
+      "title": {
+        "line": 3081,
+        "text": "✔ prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows (19.559911ms)"
+      },
+      "measurements": [
+        {
+          "line": 3082,
+          "value": {
+            "scope": "personal",
+            "before": [
+              {
+                "refs": 3,
+                "rows": 3,
+                "rowJsonBytes": 251
+              },
+              {
+                "refs": 1,
+                "rows": 1,
+                "rowJsonBytes": 82
+              }
+            ],
+            "after": [
+              {
+                "refs": 4,
+                "rows": 4,
+                "rowJsonBytes": 332
+              }
+            ],
+            "byteMeaning": "UTF-8 JSON of actual pg result rows, not transport/TLS bytes"
+          }
+        },
+        {
+          "line": 3083,
+          "value": {
+            "scope": "team-key",
+            "before": [
+              {
+                "refs": 3,
+                "rows": 3,
+                "rowJsonBytes": 251
+              },
+              {
+                "refs": 2,
+                "rows": 2,
+                "rowJsonBytes": 163
+              }
+            ],
+            "after": [
+              {
+                "refs": 4,
+                "rows": 4,
+                "rowJsonBytes": 332
+              },
+              {
+                "refs": 1,
+                "rows": 1,
+                "rowJsonBytes": 82
+              }
+            ],
+            "byteMeaning": "UTF-8 JSON of actual pg result rows, not transport/TLS bytes"
+          }
+        }
+      ]
+    }
+  },
+  "cleanup": {
+    "services": "Four workflow-owned temporary Postgres 17 containers",
+    "entries": [
+      {
+        "jobId": 129016429667,
+        "containerId": "94c58b257a9e591487dc57a7c705fa9969ae22e3dee9e3485dc0a877dee788c9",
+        "containerCommandLine": 4362,
+        "containerRemoved": true,
+        "containerOutputLine": 4363,
+        "networkId": "github_network_7b81307c18e843ab8672692e0605c8af",
+        "networkCommandLine": 4365,
+        "networkRemoved": true,
+        "networkOutputLine": 4366
+      },
+      {
+        "jobId": 129016429745,
+        "containerId": "e7144e171852ab3c4cd8eee39fd56067b09f41e20a1b79db5de46ad59f840888",
+        "containerCommandLine": 7264,
+        "containerRemoved": true,
+        "containerOutputLine": 7265,
+        "networkId": "github_network_1c2e22860cb449f6a6fd08f925860977",
+        "networkCommandLine": 7267,
+        "networkRemoved": true,
+        "networkOutputLine": 7268
+      },
+      {
+        "jobId": 129016429772,
+        "containerId": "302f460f4d29ae720adc592173b6a01651fb4eff36a2f789499244c9a74106b3",
+        "containerCommandLine": 13407,
+        "containerRemoved": true,
+        "containerOutputLine": 13408,
+        "networkId": "github_network_8d10102143b14dd6843e413cfb0e79a7",
+        "networkCommandLine": 13410,
+        "networkRemoved": true,
+        "networkOutputLine": 13411
+      },
+      {
+        "jobId": 129016429700,
+        "containerId": "9c007c882d415af7514bd9be062ab2828fdf4b928eea94130cf149ba5e143d05",
+        "containerCommandLine": 3974,
+        "containerRemoved": true,
+        "containerOutputLine": 3975,
+        "networkId": "github_network_00f03d7703744cf3b793323c6ab37614",
+        "networkCommandLine": 3977,
+        "networkRemoved": true,
+        "networkOutputLine": 3978
+      }
+    ],
+    "containersRemoved": 4,
+    "networksRemoved": 4,
+    "allStopContainerStepsSucceeded": true
+  },
+  "earlySourceGate": {
+    "jobId": 129016429612,
+    "status": "completed",
+    "conclusion": "success",
+    "evidence": "job metadata only; root owns its original log",
+    "sourceLogReadByThisReviewer": false
+  },
+  "limitations": [
+    "This receipt proves the actual selected PostgreSQL CI suites for this checkout. It does not establish Native full-window SQL acceptance, Replay ingestion, browser interaction or production acceptance.",
+    "The aggregate job is named Production build and browser interactions but only enforces the database aggregate plus timing summary here.",
+    "Previous f886 green results are not reused as this source's execution.",
+    "Prior failed Native and isolated C-probe timeout receipts remain unchanged; this completed canonical run does not relabel those earlier executions.",
+    "Initial repository handoff diagnostics in the canonical device suite are source-bound fixture measurements, not measured production or full Native savings."
+  ],
+  "privacy": {
+    "receiptFile": "privacy-review.safe.json",
+    "patternCandidates": 1,
+    "unresolvedCandidates": 0,
+    "disposition": "One email-shaped PostgreSQL collision value is proven to derive from the exact-source synthetic fixture; values are not copied into this receipt. Original platform-masked public logs are preserved without edits."
+  },
+  "resources": {
+    "newReviewerVMs": 0,
+    "newReviewerDatabases": 0,
+    "newModels": 0,
+    "workflowsTriggered": 0,
+    "reruns": 0,
+    "cancels": 0,
+    "refsChanged": 0,
+    "activeOwnedReviewerResources": 0
+  }
+}

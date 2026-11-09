@@ -12,8 +12,8 @@
     "mainAtPublication": "927260894305e066e15a4ad50114abce433e6001"
   },
   "prefix": "docs/operations/evidence/1512-raw/replay-opt-in-025118ed-20261109",
-  "fileCountExcludingIndex": 20,
-  "decodedBytesExcludingIndex": 3370675,
+  "fileCountExcludingIndex": 28,
+  "decodedBytesExcludingIndex": 8159502,
   "verification": {
     "newSourceFiles": 9,
     "strictEightFilePatchReplay": "author and independent reviewer",
@@ -27,6 +27,26 @@
       "core": 57,
       "integration": 29,
       "dbSuites": 72
+    },
+    "postgres": {
+      "databaseGate": "passed",
+      "selectedSuites": 72,
+      "completedUniqueSuites": 72,
+      "tests": 3787,
+      "pass": 3787,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "perShardTests": [
+        741,
+        794,
+        1635,
+        617
+      ],
+      "fourServicesAndNetworksRemoved": true,
+      "rootLedgerArithmeticVerified": true,
+      "rootSelectionSetVerified": true
     }
   },
   "production": {
@@ -199,10 +219,66 @@
       "mode": "100644"
     },
     {
+      "path": "ci-025118/pg/pg-1.original.log",
+      "bytes": 614209,
+      "sha256": "9a15797902b323024cf093efa0d6c9a4b328853f17419aae481b761a4f84cb49",
+      "gitBlobSha": "7324627f9abc3a380cf8a061c45456d1df557ed8",
+      "mode": "100644"
+    },
+    {
+      "path": "ci-025118/pg/pg-2.original.log",
+      "bytes": 1160760,
+      "sha256": "191c1470bd1723c601f880b642e5b72799a62ad0b920a761c5d214676146942c",
+      "gitBlobSha": "1a96ff983601fa7d378d527ecf0faef608b7f635",
+      "mode": "100644"
+    },
+    {
+      "path": "ci-025118/pg/pg-3.original.log",
+      "bytes": 2283936,
+      "sha256": "2795cf89190df5cab2aa69d81c14371687c2374a09a401fe516a45ea3d06c187",
+      "gitBlobSha": "e0b92fd7fb71c1eecef76124122b61c75f9a7d04",
+      "mode": "100644"
+    },
+    {
+      "path": "ci-025118/pg/pg-4.original.log",
+      "bytes": 625389,
+      "sha256": "3928b4eca3de9f6747218b47e1a4f0135aaa2a928a12f792271c90a89170c41b",
+      "gitBlobSha": "3403b80d57b1e622d07eca4df683401f560683bc",
+      "mode": "100644"
+    },
+    {
+      "path": "ci-025118/pg/pg-aggregate.original.log",
+      "bytes": 13304,
+      "sha256": "6a2cc7ac6398baea792635ded7533f2214b93415815bf84b94d901d4fb294e0b",
+      "gitBlobSha": "01ab56f822f82425d9f585ad423ee295d9f6701d",
+      "mode": "100644"
+    },
+    {
+      "path": "ci-025118/pg/postgres-terminal-review.safe.json",
+      "bytes": 83011,
+      "sha256": "2f04acca9a9898134ff6075fcad60b8f2d72decd69ef2c36352e42f9af6aa978",
+      "gitBlobSha": "ccce4c2b4e0ca8a696d2ef4ebdadeb4d4ccc302e",
+      "mode": "100644"
+    },
+    {
+      "path": "ci-025118/pg/privacy-review.safe.json",
+      "bytes": 2791,
+      "sha256": "9b8fb7975f164e98d8ab8276afdfe0dfb76668aa4fdf86ebce46897ec977f476",
+      "gitBlobSha": "3a3ec5a9fc774dca376328b942383fcfc4cf2260",
+      "mode": "100644"
+    },
+    {
+      "path": "ci-025118/pg/index.safe.json",
+      "bytes": 5044,
+      "sha256": "2b68d3a9c54ac4dbbbba00e6923da284620f18ef8456db5da76426d76625abb9",
+      "gitBlobSha": "14aa2e6f055e5f6fd6b10308add4947e56f9eaca",
+      "mode": "100644"
+    },
+    {
       "path": "README.md",
-      "bytes": 5052,
-      "sha256": "b0434307e4d73533c911300eddf28e699f5a3f6ca589a20f9943627a8283bfa7",
-      "gitBlobSha": "c58a1bad6092241338df43452f663943faaf1ad4",
+      "bytes": 5435,
+      "sha256": "c375e79a8fbaf23fadd6c7d58356858b712eda718c4438aeb9f7bea5acf2f226",
+      "gitBlobSha": "8bc22e510884e816efd85df2cb5b48d8c104f23d",
       "mode": "100644"
     }
   ]

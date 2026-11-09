@@ -36,6 +36,6 @@ production-preparation-source-update.safe.json 将已有正式 GHA 配方绑定�
 
 本包保留 selection/source/Core 等原始 UTF-8 日志（包括 BOM/ANSI）。Analytics SSR 公共副本精确替换 10 次 PostHog public capture key，明确以 redacted 命名；原始字节长度和 SHA256 单列，不称为原件。没有上传凭据、cookie、SAS URL 或生产 prompt/output。
 
-四个 PG 的详细原件与最新 Native/UIstrict 原件由各自唯一职责的读取者继续收口。aggregate job 129018515769 曾被根代理误按名字重复读取一次，实际全队读取 2 次；不把它的“Production build and browser interactions”名称当成真实浏览器或生产构建证明。
+四个 PG 的五份日志及详细执行、隐私回执已收入 ci-025118/pg：72 个选中脚本与 72 个唯一完成脚本完全相等，741+794+1635+617=3,787 tests 全部 pass，0 fail/skip/cancel/todo。根代理另对 72 行执行台账重算并与正式 selection 双向对账。四个临时容器与各自网络全部移除。C 16+11+5=32、A+B enrollment 13、unit fence 的 11→6 round trips 等实际明细保留；最新 Native/UIstrict 原件仍由职责读取者收口。aggregate job 129018515769 曾被根代理误按名字重复读取一次，实际全队读取 2 次；不把它的“Production build and browser interactions”名称当成真实浏览器或生产构建证明。
 
 本 checkpoint 不关闭 issue，不声明生产版本已发布，不复用旧模型案例，不重试已由用户中止的 PostHog 登录。前序 checkpoint、失败、清理限制和账单 unknown 全部保留。

@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "kind": "postgres-ci-originals-and-safe-receipts-index",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "workflowRunId": 42573554116,
+  "prHead": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+  "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+  "tree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+  "suggestedPrefix": "ci-025118/pg",
+  "files": [
+    {
+      "path": "ci-025118/pg/pg-1.original.log",
+      "bytes": 614209,
+      "sha256": "9a15797902b323024cf093efa0d6c9a4b328853f17419aae481b761a4f84cb49",
+      "gitBlob": "7324627f9abc3a380cf8a061c45456d1df557ed8",
+      "kind": "original-decoded-job-log",
+      "jobId": 129016429667,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "path": "ci-025118/pg/pg-2.original.log",
+      "bytes": 1160760,
+      "sha256": "191c1470bd1723c601f880b642e5b72799a62ad0b920a761c5d214676146942c",
+      "gitBlob": "1a96ff983601fa7d378d527ecf0faef608b7f635",
+      "kind": "original-decoded-job-log",
+      "jobId": 129016429745,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "path": "ci-025118/pg/pg-3.original.log",
+      "bytes": 2283936,
+      "sha256": "2795cf89190df5cab2aa69d81c14371687c2374a09a401fe516a45ea3d06c187",
+      "gitBlob": "e0b92fd7fb71c1eecef76124122b61c75f9a7d04",
+      "kind": "original-decoded-job-log",
+      "jobId": 129016429772,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "path": "ci-025118/pg/pg-4.original.log",
+      "bytes": 625389,
+      "sha256": "3928b4eca3de9f6747218b47e1a4f0135aaa2a928a12f792271c90a89170c41b",
+      "gitBlob": "3403b80d57b1e622d07eca4df683401f560683bc",
+      "kind": "original-decoded-job-log",
+      "jobId": 129016429700,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "path": "ci-025118/pg/pg-aggregate.original.log",
+      "bytes": 13304,
+      "sha256": "6a2cc7ac6398baea792635ded7533f2214b93415815bf84b94d901d4fb294e0b",
+      "gitBlob": "01ab56f822f82425d9f585ad423ee295d9f6701d",
+      "kind": "original-decoded-job-log",
+      "jobId": 129018515769,
+      "reviewerDownloads": 1,
+      "teamDownloads": 2
+    },
+    {
+      "path": "ci-025118/pg/postgres-terminal-review.safe.json",
+      "bytes": 83011,
+      "sha256": "2f04acca9a9898134ff6075fcad60b8f2d72decd69ef2c36352e42f9af6aa978",
+      "gitBlob": "ccce4c2b4e0ca8a696d2ef4ebdadeb4d4ccc302e",
+      "kind": "safe-review-receipt"
+    },
+    {
+      "path": "ci-025118/pg/privacy-review.safe.json",
+      "bytes": 2791,
+      "sha256": "9b8fb7975f164e98d8ab8276afdfe0dfb76668aa4fdf86ebce46897ec977f476",
+      "gitBlob": "3a3ec5a9fc774dca376328b942383fcfc4cf2260",
+      "kind": "safe-review-receipt"
+    }
+  ],
+  "filesExcludingThisIndex": 7,
+  "bytesExcludingThisIndex": 4783400,
+  "sharedSelection": {
+    "gitBlob": "981090e57913693c7dcd610e4ff24e2418043c0a",
+    "bytes": 130135,
+    "sha256": "fcdd46be6b33804415b5f5032e0c12de71829a264feead2b43f118de10a0f926",
+    "includedHere": false,
+    "reason": "Already frozen by root as the shared authoritative selection/source receipt; read once and hash verified by this reviewer."
+  },
+  "verdict": {
+    "databaseGate": "passed",
+    "selectedSuites": 72,
+    "completedUniqueSuites": 72,
+    "tests": 3787,
+    "pass": 3787,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "perShardTests": [
+      741,
+      794,
+      1635,
+      617
+    ],
+    "fourServicesAndNetworksRemoved": true
+  },
+  "readAccounting": {
+    "fourShardLogs": "Exactly one fetch each, this reviewer is sole team reader.",
+    "aggregateLog": "One fetch by this reviewer plus one root fetch at 06:41 UTC, whole-team count 2; this reviewer's preserved original is the archival copy.",
+    "nonPgLogsReadByReviewer": 0,
+    "nativeLogsReadByReviewer": 0
+  },
+  "publicBoundary": "Only already-public GitHub Actions decoded logs and safe source/count receipts are included. GitHub masking is preserved. A single email-shaped hit was independently matched to the exact-source synthetic signup normalization fixture; no unresolved pattern candidate remains. No raw API envelope or signed download URL is included.",
+  "fidelity": "Original log strings are archived exactly as supplied by the decoded-log MCP endpoint, retaining BOM and ANSI; hashes are of their UTF-8 encoding. This is not a downloaded raw ZIP, and no binary ZIP fidelity or compression claim is made.",
+  "limitations": [
+    "This is PG execution for this source, not full CI/Native/production acceptance.",
+    "The aggregate's display name is not evidence of browser or production-build execution.",
+    "No previous-source green or old failed run is relabeled.",
+    "All blobs have been remotely created and SHA-confirmed; adding them to a persistent evidence-branch commit is performed by root, not this reviewer."
+  ],
+  "resources": {
+    "newVMs": 0,
+    "newDatabases": 0,
+    "modelRuns": 0,
+    "workflowTriggers": 0,
+    "refsChanged": 0,
+    "activeOwnedResources": 0
+  }
+}
