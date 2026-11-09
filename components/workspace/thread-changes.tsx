@@ -102,13 +102,21 @@ export function Counts({ additions, deletions }: { additions: number; deletions:
   </span>
 }
 
+/**
+ * The file card sits on the page surface in both themes, not the syntax theme's near-black (UI audit task-06): the theme
+ * sets --diffs-bg inside the diff's shadow root, so the override goes there. The official build's token comes first,
+ * this repository's after it; the hosted review page does the same (hosted#45).
+ */
+export const DIFF_SURFACE_CSS = ':host, * { --diffs-bg: var(--color-background-primary-default, var(--background)) !important; }'
+
 /** One changed file as its diff, folded or open; the 改动 tab and the acceptance report draw each file with it. */
 export function FileSection({ file, open, wrap, onOpenChange, ref }: { file: ChangedFile; open: boolean; wrap: DiffWrap; onOpenChange: (open: boolean) => void; ref: (node: HTMLElement | null) => void }) {
   const t = useTranslations('IssueThreads')
   const { name } = splitPath(file.path)
   const fileDiff = useMemo(() => getSingularPatch(filePatch(file)), [file])
   // Binary files have no lines to draw: just the header, then the note.
-  const options = useDiffOptions({ overflow: wrap, collapsed: !open || file.binary, stickyHeader: true })
+  const base = useDiffOptions({ overflow: wrap, collapsed: !open || file.binary, stickyHeader: true })
+  const options = useMemo(() => ({ ...base, unsafeCSS: DIFF_SURFACE_CSS }), [base])
   return <section ref={ref} aria-label={file.path} data-slot="thread-changes-file" className="shrink-0">
     <FileDiff fileDiff={fileDiff} options={options} disableWorkerPool
       renderHeaderPrefix={() => <Button variant="ghost" size="icon-xs" className="text-muted-foreground" aria-expanded={open} aria-label={t(open ? 'changesCollapseFile' : 'changesExpandFile', { name })} onClick={() => onOpenChange(!open)}>
