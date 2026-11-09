@@ -1,4 +1,5 @@
 import { capturePendingReadDispatch, captureReadDispatch } from '@/lib/swr/read-observer'
+import { observeReadDiagnostic } from '@/lib/swr/read-diagnostics'
 import { withBasePath } from '@/lib/base-path'
 import { decode, encodeArgs, DESKTOP_RPC_VERSION } from '@/lib/desktop-rpc/wire'
 import { isBatchReadAction } from '@/lib/desktop-rpc/read-batch-contract'
@@ -22,7 +23,7 @@ export function callAction<T = unknown>(action: string, args: unknown[], isCurre
   }, (action, args, context) => callRemoteAction(action, args, { ...nativeTransport, ...context }))
 }
 
-export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: (response?: Response) => boolean; locale?: Locale; onDispatch?: () => void }): Promise<T> {
+export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: (response?: Response) => boolean; locale?: Locale; onDispatch?: () => void; diagnosticItems?: readonly object[]; diagnosticActions?: readonly string[] }): Promise<T> {
   // Web supplies its existing SDK owner generation; bootstrap also fences
   // retired page phases. Native identity authorization remains in main.
   const assertCurrent = (cause?: unknown, response?: Response) => {
@@ -37,6 +38,9 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
   // A pending snapshot may cover the live gap before its response arrives.
   // Completion still requires that response's existing dispatch proof.
   if (prove) transport.onDispatch?.()
+  const diagnosticRequest = {}
+  observeReadDiagnostic('rpc_dispatch', { request: diagnosticRequest, action, actions: transport.diagnosticActions, proof: prove !== undefined })
+  for (let index = 0; index < (transport.diagnosticItems?.length ?? 0); index++) observeReadDiagnostic('rpc_dispatch', { request: diagnosticRequest, item: transport.diagnosticItems![index], action: transport.diagnosticActions?.[index] })
   try {
     response = await fetch(withBasePath(transport.endpoint), {
       method: 'POST',
@@ -46,10 +50,12 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
       body: JSON.stringify({ version: DESKTOP_RPC_VERSION, action, args: encoded }),
     })
   } catch (cause) {
+    observeReadDiagnostic('rpc_failed', { request: diagnosticRequest, action })
     assertCurrent(cause)
     setTransportState('offline')
     throw new DesktopTransportError('desktop_backend_unreachable', { cause })
   }
+  observeReadDiagnostic('rpc_headers', { request: diagnosticRequest, action })
   assertCurrent(undefined, response)
   if (response.status === 401) {
     setTransportState('unauthenticated')
@@ -70,5 +76,6 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
   if (!response.ok) throw new DesktopTransportError('desktop_rpc_request_rejected', { status: response.status })
   setTransportState('ready')
   const result = decode(value.result) as T
+  observeReadDiagnostic('rpc_decoded', { request: diagnosticRequest, action, proof: prove !== undefined })
   return prove ? prove(result) : result
 }

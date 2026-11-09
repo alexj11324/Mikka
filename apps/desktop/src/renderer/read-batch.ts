@@ -1,4 +1,5 @@
 import { carryReadDispatch } from '@/lib/swr/read-observer'
+import { observeReadDiagnostic } from '@/lib/swr/read-diagnostics'
 import { MAX_READ_BATCH, READ_BATCH_ACTION, type BatchReadAction, type ReadBatchItem } from '@/lib/desktop-rpc/read-batch-contract'
 import type { Locale } from './location'
 
@@ -20,7 +21,7 @@ export class DesktopTransportError extends Error {
 }
 
 type ReadContext = { locale: Locale; workspace: string | null; currentWorkspace: () => string | null; isCurrent?: () => boolean; onDispatch?: () => void }
-type Send = (action: string, args: unknown[], context: { locale: Locale; isCurrent: () => boolean; onDispatch?: () => void }) => Promise<unknown>
+type Send = (action: string, args: unknown[], context: { locale: Locale; isCurrent: () => boolean; onDispatch?: () => void; diagnosticItems?: readonly object[]; diagnosticActions?: readonly string[] }) => Promise<unknown>
 type Pending = ReadContext & {
   action: BatchReadAction; args: unknown[]; generation: number; send: Send
   resolve: (result: unknown) => void; reject: (error: unknown) => void
@@ -45,7 +46,8 @@ export function resetReadBatchScope() {
 
 async function single(item: Pending) {
   try {
-    const result = await item.send(item.action, item.args, { locale: item.locale, isCurrent: () => current(item),
+    observeReadDiagnostic('batch_send', { item, action: item.action, generation: item.generation, count: 1 })
+    const result = await item.send(item.action, item.args, { locale: item.locale, isCurrent: () => current(item), diagnosticItems: [item], diagnosticActions: [item.action],
       ...(item.onDispatch ? { onDispatch: item.onDispatch } : {}),
     })
     if (!current(item)) throw changed()
@@ -67,7 +69,7 @@ async function batch(items: Pending[]) {
     // Keep arguments raw: callRemoteAction encodes the entire envelope once,
     // and its decoded item results must not pass through the codec again.
     const result = await items[0].send(READ_BATCH_ACTION, [items.map(({ action, args }) => ({ action, args }))], {
-      locale: items[0].locale, isCurrent: () => items.every(current),
+      locale: items[0].locale, isCurrent: () => items.every(current), diagnosticItems: items, diagnosticActions: items.map(item => item.action),
       ...(items.some(item => item.onDispatch) ? { onDispatch: () => { for (const item of items) item.onDispatch?.() } } : {}),
     })
     if (!validItems(result, items.length)) throw new DesktopTransportError('desktop_rpc_response_invalid', { status: 200 })
@@ -81,6 +83,7 @@ async function batch(items: Pending[]) {
     // Only this explicit capability response proves none of the reads ran.
     // Network/server failures must never silently duplicate work.
     if (items.every(current) && cause instanceof DesktopTransportError && cause.status === 404 && cause.code === 'desktop_rpc_action_unknown') {
+      observeReadDiagnostic('batch_fallback', { count: items.length, actions: items.map(item => item.action) })
       unavailable = true
       await Promise.all(items.map(single))
     } else for (const item of items) reject(item, cause)
@@ -125,6 +128,7 @@ function scheduleFlush() {
 export function enqueueRead<T>(action: BatchReadAction, args: unknown[], context: ReadContext, send: Send): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const item: Pending = { ...context, action, args, generation, send, resolve: result => resolve(result as T), reject }
+    observeReadDiagnostic('batch_enqueue', { item, action, generation, scope: context.workspace })
     if (unavailable) { void single(item); return }
     pending.push(item)
     if (!scheduled) scheduleFlush()

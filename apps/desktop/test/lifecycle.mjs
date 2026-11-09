@@ -28,12 +28,14 @@ import { continueInSystemBrowser } from './browser-handoff.mjs'
 import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledDocument } from './native-document.mjs'
 import { createLifecycleQueryCounter, queryCountDelta } from './lifecycle-query-counts.mjs'
 import { selectWorkspaceMenuItem } from './parity-page-ready.mjs'
+import { createReadDiagnostics } from './read-diagnostics.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
 assert.equal(environment.deploymentSha, revision, 'Lifecycle acceptance must test the attested application revision')
 const output = resolve(process.env.MIKKA_DESKTOP_EVIDENCE ?? '.cache/desktop-evidence')
+const readDiagnostics = createReadDiagnostics({ revision })
 const pairs = Number(process.env.MIKKA_DESKTOP_COLD_PAIRS ?? 5)
 if (!Number.isInteger(pairs) || pairs < 5 || pairs > 20) throw new Error('LIFECYCLE_REQUIRES_5_TO_20_COLD_PAIRS')
 await mkdir(output, { recursive: true })
@@ -66,6 +68,7 @@ const evidence = {
 const check = name => { evidence.checks.push({ name, result: 'passed' }); console.log(`PASS ${name}`) }
 let scope, browser, fixtures, nativeResources, application, ownerEmail, releaseObserver, generatedWorkspaceName, queryCounter
 let passed = false
+let diagnosticNativeAttached = false
 let cleanupFailure
 const active = new Set()
 const appProfiles = new WeakMap()
@@ -107,6 +110,10 @@ async function launch(mode, extraArgs = []) {
   appProfiles.set(app, profiles[mode])
   const page = await app.firstWindow({ timeout: 90_000 })
   const firstWindowMs = performance.now() - started
+  if (mode === 'bundled' && !diagnosticNativeAttached) {
+    diagnosticNativeAttached = true
+    await readDiagnostics.attach(page, 'nativeLogin', { late: true })
+  }
   page.setDefaultTimeout(60_000)
   const navigation = { mode, launch: evidence.nativeViewports.length + 1, events: [], overflow: false }
   evidence.navigation.push(navigation)
@@ -337,10 +344,12 @@ try {
   try {
     const webPage = await webContext.newPage()
     webPage.setDefaultTimeout(60_000)
+    await readDiagnostics.attach(webPage, 'webLogin')
     await webPage.goto(`${environment.origin}/mikka`, { waitUntil: 'domcontentloaded' })
     await checkpointQueryWindow(webLogin, 'web-navigation-to-dom-content-loaded')
     assert.equal(await selectFixture(webPage), 'zh-CN')
     await checkpointQueryWindow(webLogin, 'workspace-selection-to-usable', true)
+    await readDiagnostics.snapshot(webPage)
   } finally { await webContext.close() }
 
   let run = await launch('bundled')
@@ -354,6 +363,7 @@ try {
   mark('prepare-bundled-workspace')
   assert.equal(await selectFixture(run.page), 'zh-CN')
   await checkpointQueryWindow(nativeLogin, 'workspace-selection-to-usable', true)
+  await readDiagnostics.snapshot(run.page)
   evidence.queryCounts.login.comparable = true
   await prepareNativeDevice(run, 'bundled')
   await recordNativeState(run.page, 'authenticated-profile', 'bundled')
@@ -514,6 +524,8 @@ try {
   evidence.accountObservation = releaseObserver?.read() ?? { observed: false }
   releaseObserver?.restore()
   if (queryCounter && evidence.queryCounts) evidence.queryCounts.rpcActions = await queryCounter.rpcActions(evidence.queryCounts.windows)
+  try { evidence.readDiagnostics = await readDiagnostics.write(join(output, 'read-diagnostics.json'), evidence.queryCounts?.windows) }
+  catch { evidence.readDiagnostics = { status: 'unavailable', code: 'READ_DIAGNOSTIC_WRITE_FAILED' } }
   evidence.finishedAt = new Date().toISOString()
   evidence.result = passed ? 'passed' : 'failed'
   await writeFile(join(output, 'lifecycle.json'), `${JSON.stringify(evidence, null, 2)}\n`)

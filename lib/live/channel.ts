@@ -2,6 +2,7 @@ import { liveInvalidation, liveReadiness, LIVE_ID, LIVE_REVISION_PARAM, type Liv
 import { liveRevisionKey, type LiveRevisions } from './revisions'
 import { LIVE_PRESENCE_PARAM, PRESENCE_MAX_TOKEN_BYTES, PRESENCE_MAX_WATCHES_PER_SOCKET, presenceReply, type PresenceCommand, type PresenceProof } from './presence'
 import { readBoundary } from '../swr/read-observer'
+import { observeReadDiagnostic } from '../swr/read-diagnostics'
 
 export const LIVE_FALLBACK_MS = 60_000
 const HEARTBEAT_MS = 30_000
@@ -73,6 +74,7 @@ export class LiveChannel {
   constructor(private runtime: LiveRuntime) {}
 
   private observe(observation: LiveObservation) {
+    observeReadDiagnostic('live_observe', { channel: this, generation: this.generation, event: observation.event, state: observation.state, reason: observation.reason, kind: observation.kind, entity: observation.id, revision: observation.rev, key: observation.key })
     try { this.runtime.observe?.(observation) } catch { /* analytics never changes a read */ }
   }
 
@@ -90,18 +92,20 @@ export class LiveChannel {
       deadlineObservation: Number.isFinite(options.deadline?.observation) ? options.deadline!.observation! : null,
       timer: `deadline:${++this.nextDeadline}`, revisions: heldRevisions(options.revisions), presence: options.presence }
     this.subscriptions.add(subscription)
+    observeReadDiagnostic('live_subscribe', { channel: this, item: subscription, kind, entity: id, count: keys.length, generation: this.generation })
     if (this.subscriptions.size === 1) {
       this.unwatch = this.runtime.watchVisibility(() => this.visibilityChanged())
       if (this.runtime.visible()) { this.fallback(); void this.connect() }
     }
     if (this.connected && this.runtime.visible()) this.invalidate(kind, id, true, false, undefined,
       this.supported(subscription) && this.coverageAfter !== null
-        ? Math.max(this.coverageAfter, this.invalidationAfter.get(kind) ?? 0) : undefined)
+        ? Math.max(this.coverageAfter, this.invalidationAfter.get(kind) ?? 0) : undefined, 'late_subscribe')
     this.syncPresence()
     this.fallback()
     this.scheduleDeadline(subscription)
     const stop = () => {
       this.subscriptions.delete(subscription)
+      observeReadDiagnostic('live_unsubscribe', { channel: this, item: subscription, kind, entity: id, generation: this.generation })
       this.clear(subscription.timer)
       this.syncPresence()
       if (this.allSupported()) this.clear('fallback')
@@ -188,7 +192,7 @@ export class LiveChannel {
       // A real hidden/offline interval has closed the socket and always reads.
       // Duplicate visible/online events on a healthy channel leave supported
       // keys to SWR's age-based focus check; unsupported kinds still catch up.
-      this.invalidate(undefined, undefined, false, true)
+      this.invalidate(undefined, undefined, false, true, undefined, undefined, 'visibility')
       for (const subscription of this.subscriptions) {
         if (subscription.deadlineAt !== null && subscription.deadlineAt <= this.localNow()) subscription.deadlineAt = null
         this.scheduleDeadline(subscription)
@@ -205,11 +209,12 @@ export class LiveChannel {
       if (!this.subscriptions.has(subscription) || subscription.deadlineAt === null) return
       if (subscription.deadlineAt > this.localNow()) { this.scheduleDeadline(subscription); return }
       subscription.deadlineAt = null
-      this.invalidate(subscription.kind, subscription.id, true)
+      this.invalidate(subscription.kind, subscription.id, true, false, undefined, undefined, 'deadline')
     })
   }
 
-  private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false, rev?: number, after = readBoundary()) {
+  private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false, rev?: number, after = readBoundary(), diagnosticReason = 'push') {
+    observeReadDiagnostic('live_invalidate', { channel: this, generation: this.generation, kind, entity: id, revision: rev, after, reason: diagnosticReason })
     if (!this.runtime.visible()) { this.observe({ event: 'skipped', reason: 'hidden', kind, id, rev }); return }
     for (const subscription of this.subscriptions) {
       if (kind && (subscription.kind !== kind || subscription.id !== id)) continue
@@ -220,6 +225,7 @@ export class LiveChannel {
         const at = kind && !immediate ? Math.max(this.localNow(), (this.lastRead.get(key) ?? -Infinity) + subscription.minIntervalMs) : this.localNow()
         const previous = this.pending.get(key)
         const waits = [...previous?.waits ?? [], ...rev === undefined ? [] : [{ subscription, key, rev }]]
+        observeReadDiagnostic('live_invalidate', { channel: this, item: subscription, key, kind: subscription.kind, entity: subscription.id, revision: rev, after, reason: diagnosticReason })
         this.pending.set(key, { at: Math.min(at, previous?.at ?? Infinity), after: Math.max(after, previous?.after ?? after),
           unconditional: rev === undefined || previous?.unconditional === true, waits })
       }
@@ -256,6 +262,7 @@ export class LiveChannel {
       this.lastRead.set(key, this.localNow())
       const request = Symbol()
       this.inFlight.set(key, request)
+      observeReadDiagnostic('live_flush', { channel: this, item: entity, key, after: read.after, unconditional: read.unconditional, kind: entity.kind, generation: this.generation })
       this.observe({ event: 'read', key, kind: entity.kind, id: entity.id })
       const settled = () => {
         if (this.inFlight.get(key) !== request) return
@@ -348,6 +355,7 @@ export class LiveChannel {
       } else if (!watch.unavailable && reply.expiresAt > this.runtime.now() && reply.expiresAt <= watch.proof.expiresAt) {
         watch.coveredUntil = this.localNow() + reply.expiresAt - this.runtime.now()
         this.coverageAfter = readBoundary()
+        observeReadDiagnostic('live_observe', { channel: this, after: this.coverageAfter, reason: 'presence', generation: this.generation })
         this.expirePresence(watch, reply.expiresAt)
       }
     }
@@ -357,7 +365,7 @@ export class LiveChannel {
 
   private fallback() {
     if (this.allSupported() || !this.runtime.visible() || !this.subscriptions.size || this.timers.has('fallback')) return
-    this.later('fallback', LIVE_FALLBACK_MS, () => { this.invalidate(undefined, undefined, false, true); this.fallback() })
+    this.later('fallback', LIVE_FALLBACK_MS, () => { this.invalidate(undefined, undefined, false, true, undefined, undefined, 'fallback'); this.fallback() })
   }
 
   private disconnected(generation: number, delay = this.retryMs) {
@@ -401,7 +409,7 @@ export class LiveChannel {
         this.observe({ event: 'socket', state: 'open' })
         // An open socket/pong is not evidence that this Worker supports a new kind.
         this.fallback()
-        this.invalidate() // Covers changes committed while the connection was opening.
+        this.invalidate(undefined, undefined, false, false, undefined, undefined, 'socket_open') // Covers changes committed while the connection was opening.
         this.heartbeat(generation)
         this.later('renew', Math.max(1, ticket.expiresAt - this.runtime.now()), () => this.disconnected(generation, 0))
       }
@@ -416,6 +424,7 @@ export class LiveChannel {
           if (readiness) {
             this.observe({ event: 'socket', state: 'ready' })
             this.coverageAfter = readBoundary()
+            observeReadDiagnostic('live_observe', { channel: this, after: this.coverageAfter, reason: 'capabilities', generation: this.generation })
             this.capabilities = new Set(readiness.kinds)
             this.revisionKinds = new Set(readiness.revisions)
             if (this.allSupported()) this.clear('fallback'); else this.fallback()

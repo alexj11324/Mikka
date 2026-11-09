@@ -11,6 +11,7 @@ import type { LiveKind } from '@/lib/live/events'
 import { registerLiveKeyConnection } from '@/lib/swr/live-focus'
 import { PersistentReadCache, readCacheShareNamespace } from '@/lib/swr/persistent-cache'
 import { readBoundary, readFresh } from '@/lib/swr/read-observer'
+import { observeReadDiagnostic } from '@/lib/swr/read-diagnostics'
 
 const LiveContext = createContext<{ channels: LiveChannels; ownerId: string; workspaceId?: string; namespace: string | null; share?: (scope: string | null) => TabShare | null } | null>(null)
 
@@ -93,6 +94,7 @@ export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly stri
     const subscriptions = (JSON.parse(references) as LiveEntity[]).map(({ kind, id, workspaceId: entityScope }, index) => {
       const channelScope = entityScope === undefined ? scope : entityScope
       const refresh: LiveRefresh = (key, requiredRevisions, reuseCompleted, after = readBoundary()) => {
+        observeReadDiagnostic('live_refresh', { cache, key, scope: channelScope, after, reuse: reuseCompleted, kind })
         if (!current()) return
         const authorized = () => ownerId && namespace && readCacheShareNamespace(cache, ownerId) === namespace
         const heldAtStart = { ...cache.get(key)?.data?.live?.revisions }

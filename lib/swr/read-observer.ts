@@ -1,3 +1,5 @@
+import { observeReadDiagnostic } from './read-diagnostics'
+
 type Cache = { get(key: string): { data?: unknown; error?: unknown } | undefined }
 type Outcome = { status: 'committed' | 'discarded' } | { status: 'failed'; error: unknown }
 type Read = {
@@ -37,10 +39,12 @@ export function capturePendingReadDispatch(): (() => void) | undefined {
   const observation = synchronousRead
   if (!observation || !observation.current()) return
   const { read } = observation
+  observeReadDiagnostic('pending_capture', { read, began: read.began })
   if (read.dispatchCaptured) {
     read.dispatchAmbiguous = true
     read.pendingDispatchAt = undefined
     read.revokePending?.()
+    observeReadDiagnostic('pending_revoke', { read, reason: 'revoked', began: read.began })
     return
   }
   read.dispatchCaptured = true
@@ -51,10 +55,12 @@ export function capturePendingReadDispatch(): (() => void) | undefined {
       read.dispatchAmbiguous = true
       read.pendingDispatchAt = undefined
       read.revokePending?.()
+      observeReadDiagnostic('pending_revoke', { read, reason: 'revoked', began: read.began })
       return
     }
     read.dispatchNotified = true
     read.pendingDispatchAt = readBoundary()
+    observeReadDiagnostic('pending_dispatch', { read, began: read.began, pending: read.pendingDispatchAt })
   }
 }
 
@@ -110,6 +116,7 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: (withDispa
     },
   }
   reads.set(key, read)
+  observeReadDiagnostic('read_entry', { cache, key, read, began: read.began })
   // Return this exact promise to SWR. Its continuation runs onSuccess and then
   // commits the cache synchronously; the following microtask checks both.
   const withDispatch = <Result>(run: () => Result): Result => {
@@ -119,6 +126,7 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: (withDispa
   }
   const promise = (async () => fetcher(withDispatch))()
   const complete = (outcome: Outcome) => {
+    observeReadDiagnostic('read_complete', { cache, key, read, began: read.began, outcome: outcome.status, accepted: read.accepted, received: read.received, superseded: read.superseded })
     if (outcome.status === 'committed' && read.value !== null && typeof read.value === 'object') {
       read.committedValue = new WeakRef(read.value)
       read.value = undefined
@@ -129,6 +137,7 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: (withDispa
     read.received = true; read.value = value
     const sent = value !== null && typeof value === 'object' ? dispatched.get(value) : undefined
     if (sent !== undefined && sent > read.began) read.began = sent
+    observeReadDiagnostic('read_received', { cache, key, read, began: read.began, sent, proof: sent !== undefined })
     queueMicrotask(() => {
       // Only this read's original callback failure belongs to it. A retained
       // cache.error can instead be from an older, unrelated request.
@@ -157,25 +166,35 @@ export function failSWRRead(cache: Cache, key: string, value: unknown, error: un
 export async function readFresh(cache: Cache, key: string, after: number, revalidate: () => Promise<unknown>, accepts: (data: unknown) => boolean, current: () => boolean): Promise<unknown> {
   while (current()) {
     const read = latest.get(cache)?.get(key)
-    if (!read || read.began <= after && (read.pendingDispatchAt ?? 0) <= after) return revalidate()
+    if (!read || read.began <= after && (read.pendingDispatchAt ?? 0) <= after) {
+      observeReadDiagnostic('read_fresh', { cache, key, read, after, began: read?.began, pending: read?.pendingDispatchAt, reason: read ? 'before_boundary' : 'no_read', outcome: 'revalidate' })
+      return revalidate()
+    }
+    observeReadDiagnostic('read_fresh', { cache, key, read, after, began: read.began, pending: read.pendingDispatchAt, reason: read.began > after ? 'wait_settled' : 'wait_pending' })
     const outcome = await (read.began > after ? read.settled : Promise.race([
       read.settled,
       read.pendingRevoked!.then(() => ({ status: 'revoked' as const })),
     ]))
-    if (!current()) return
+    if (!current()) { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'retired' }); return }
     if (outcome.status === 'revoked') {
       const next = latest.get(cache)?.get(key)
-      if (next && next !== read) continue
+      if (next && next !== read) { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'newer_read' }); continue }
+      observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'revoked', outcome: 'revalidate' })
       return revalidate()
     }
-    if (outcome.status === 'failed') throw outcome.error
+    if (outcome.status === 'failed') { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'failed' }); throw outcome.error }
     if (outcome.status === 'committed' && read.began > after && read.applied()) {
       const data = cache.get(key)?.data
-      if (accepts(data)) return data
+      if (accepts(data)) { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'covers' }); return data }
+      observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'revision_uncovered' })
     }
     // A later read can itself cover this obligation; never return the old
     // result or let its completion erase the newer read's observation.
     const next = latest.get(cache)?.get(key)
-    if (!next || next === read) return revalidate()
+    if (!next || next === read) {
+      observeReadDiagnostic('read_fresh', { cache, key, read, after, began: read.began, outcome: outcome.status, reason: 'not_returned' })
+      return revalidate()
+    }
+    observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'newer_read' })
   }
 }
