@@ -1,0 +1,409 @@
+{
+  "schemaVersion": 1,
+  "issue": 1593,
+  "runId": 42557474917,
+  "jobId": 128966309161,
+  "attempt": 1,
+  "driverRevision": "54b3570c0a9381aacdbe24a7cc19c78a531e56ee",
+  "applicationAtStart": "0a355918330f6dac04d2b0ee4716cd056c263162",
+  "observedNextPublicApplication": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "nextWebDeploymentRun": 42556435874,
+  "nextWebJobCompletedAt": "2026-11-09T03:50:21Z",
+  "originalReportStatus": "failed",
+  "originalIssueAcceptance": "incomplete",
+  "additionalBoundsPassed": true,
+  "fixedApplicationWholeRunPassed": false,
+  "startedAt": "2026-11-09T03:38:51.242Z",
+  "finishedAt": "2026-11-09T03:51:24.023Z",
+  "cleanup": {
+    "status": "passed",
+    "errors": [],
+    "workspaceRestored": true
+  },
+  "approvedRuntime": {
+    "configuration": {
+      "workerSha": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+      "sourceCommit": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "templates": {
+        "desktop": "254vai4zmh475r5hppcj",
+        "claude": "0zd73b9wo0mv4pkk80mm",
+        "codex": "zlsft5zfm3rbeginw6d8"
+      }
+    },
+    "runId": 42516906256,
+    "status": "passed",
+    "observedDefaultAfter": {
+      "workerSha": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+      "sourceCommit": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "templates": {
+        "desktop": "254vai4zmh475r5hppcj",
+        "claude": "0zd73b9wo0mv4pkk80mm",
+        "codex": "zlsft5zfm3rbeginw6d8"
+      }
+    },
+    "defaultUnchanged": true
+  },
+  "cases": [
+    {
+      "harness": "claude_code",
+      "model": "claude-haiku-5-5",
+      "originalCaseStatus": "passed",
+      "originalCaseError": null,
+      "runId": "322dc195-93f6-48c7-8a62-47b2be9ee1c2",
+      "continuationRunId": "bf3b8c68-efdd-422d-9582-7df147d6af08",
+      "sameVmAndSession": true,
+      "deliveryValidation": {
+        "text": true,
+        "bytes": true,
+        "digest": true,
+        "issue": true,
+        "source": true,
+        "ownerChoice": true,
+        "evidence": true,
+        "risks": true,
+        "limits": true
+      },
+      "additionalBounds": {
+        "harness": "claude_code",
+        "caseId": "87458bdf-b4d8-4177-b8b7-a0236eb01f44",
+        "status": "passed",
+        "databaseSnapshots": 3,
+        "startup": {
+          "limitMs": 60000,
+          "clock": "driver_monotonic_observation_upper_bound",
+          "underFiveSecondTargetAsserted": false,
+          "nativeInitialization": {
+            "proved": false,
+            "daemonMs": null,
+            "preparationMs": null,
+            "phases": []
+          },
+          "observedUpperBoundMs": 32288
+        },
+        "leases": {
+          "before": {
+            "live": true,
+            "runTokenLive": true,
+            "expiresAt": "2026-11-09 03:41:05.074+00",
+            "status": "running"
+          },
+          "after": {
+            "live": true,
+            "runTokenLive": true,
+            "expiresAt": "2026-11-09 03:43:55.851+00",
+            "status": "running"
+          }
+        },
+        "endRequests": [
+          {
+            "requestedAt": "2026-11-09T03:44:07.038Z",
+            "clock": "driver_monotonic_elapsed",
+            "acknowledgedAt": "2026-11-09T03:44:07.150Z",
+            "elapsedMs": 112,
+            "runId": "322dc195-93f6-48c7-8a62-47b2be9ee1c2",
+            "state": "ended"
+          },
+          {
+            "requestedAt": "2026-11-09T03:44:07.281Z",
+            "clock": "driver_monotonic_elapsed",
+            "acknowledgedAt": "2026-11-09T03:44:07.851Z",
+            "elapsedMs": 571,
+            "runId": "bf3b8c68-efdd-422d-9582-7df147d6af08",
+            "state": "ended"
+          }
+        ],
+        "activeCommand": {
+          "elapsedMs": 160072,
+          "wallMs": 160073,
+          "toolCallHash": "80e7fe9e11b712b2",
+          "commandSha256": "cd05474fd5f7e5cc569f82197a906514e09aae85f73246fcde3f26afd9dfefb4"
+        },
+        "observationMargin": {
+          "elapsedMs": 30003,
+          "wallMs": 30004,
+          "toolCallHash": "65720e7720da49d4",
+          "commandSha256": "df10ea80326108d4584cc1a0eef78b16afde78c6d24486228098496a7c805ed8"
+        },
+        "factoryCancellation": {
+          "requestedAt": "2026-11-09T03:44:06.729Z",
+          "clock": "driver_monotonic_elapsed",
+          "acknowledgedAt": "2026-11-09T03:44:06.876Z",
+          "elapsedMs": 147
+        },
+        "normalRunExit": {
+          "kind": "native_question_safe_exit",
+          "origin": {
+            "runId": "322dc195-93f6-48c7-8a62-47b2be9ee1c2",
+            "status": "stopped",
+            "finishedAt": "2026-11-09T03:43:11.712Z",
+            "observedAt": "2026-11-09T03:43:14.249Z",
+            "source": "normal_owner_thread_attempt"
+          },
+          "continuation": {
+            "runId": "bf3b8c68-efdd-422d-9582-7df147d6af08",
+            "status": "stopped",
+            "finishedAt": "2026-11-09T03:44:02.722Z",
+            "observedAt": "2026-11-09T03:44:05.374Z",
+            "source": "normal_owner_thread_attempt"
+          },
+          "providerPausedBeforeAnswer": true,
+          "providerPausedAfterDelivery": true,
+          "pauseObservedUpperBounds": {
+            "origin": {
+              "finishedAt": "2026-11-09T03:43:11.712Z",
+              "pausedObservedAt": "2026-11-09T03:43:14.852Z",
+              "elapsedUpperBoundMs": 3140,
+              "clock": "server_finished_at_and_driver_utc_observation",
+              "exactProviderTransition": false
+            },
+            "continuation": {
+              "finishedAt": "2026-11-09T03:44:02.722Z",
+              "pausedObservedAt": "2026-11-09T03:44:06.139Z",
+              "elapsedUpperBoundMs": 3417,
+              "clock": "server_finished_at_and_driver_utc_observation",
+              "exactProviderTransition": false
+            }
+          }
+        },
+        "cancelEnd": {
+          "ownerEndReceipts": [
+            {
+              "runId": "322dc195-93f6-48c7-8a62-47b2be9ee1c2",
+              "state": "ended",
+              "observedAt": "2026-11-09T03:44:07.150Z"
+            },
+            {
+              "runId": "bf3b8c68-efdd-422d-9582-7df147d6af08",
+              "state": "ended",
+              "observedAt": "2026-11-09T03:44:07.851Z"
+            }
+          ],
+          "runTokensInvalid": true,
+          "initialDeviceTokenInvalid": true,
+          "providerMissingConfirmed": true,
+          "cancelToProviderMissingUpperBoundMs": 1264,
+          "exactProviderTransition": false
+        }
+      },
+      "cleanup": {
+        "status": "passed",
+        "errors": [],
+        "history": "retained",
+        "machineReceipts": [
+          {
+            "runId": "322dc195-93f6-48c7-8a62-47b2be9ee1c2",
+            "state": "ended",
+            "observedAt": "2026-11-09T03:44:07.150Z"
+          },
+          {
+            "runId": "bf3b8c68-efdd-422d-9582-7df147d6af08",
+            "state": "ended",
+            "observedAt": "2026-11-09T03:44:07.851Z"
+          }
+        ],
+        "databaseEndedAt": "2026-11-09T03:44:07.927Z",
+        "provider": {
+          "requestedAt": "2026-11-09T03:44:07.927Z",
+          "vmHash": "2ead54c8d08d",
+          "observedAt": "2026-11-09T03:44:07.993Z",
+          "status": "observed",
+          "state": "missing",
+          "ownershipVerified": true
+        },
+        "runIds": [
+          "322dc195-93f6-48c7-8a62-47b2be9ee1c2",
+          "bf3b8c68-efdd-422d-9582-7df147d6af08"
+        ]
+      }
+    },
+    {
+      "harness": "codex",
+      "model": "gpt-6-luna",
+      "originalCaseStatus": "failed",
+      "originalCaseError": "lifecycle_production_source_mismatch",
+      "runId": "98ada475-02aa-44c4-8489-73d80be30b23",
+      "continuationRunId": "0f5e7914-df3f-4175-8845-1276fd8e338a",
+      "sameVmAndSession": true,
+      "deliveryValidation": {
+        "text": true,
+        "bytes": true,
+        "digest": true,
+        "issue": true,
+        "source": true,
+        "ownerChoice": true,
+        "evidence": true,
+        "risks": true,
+        "limits": true
+      },
+      "additionalBounds": {
+        "harness": "codex",
+        "caseId": "9ea8a1d7-eb4a-4e3d-a5a6-2eeeefa3d138",
+        "status": "passed",
+        "databaseSnapshots": 3,
+        "startup": {
+          "limitMs": 60000,
+          "clock": "driver_monotonic_observation_upper_bound",
+          "underFiveSecondTargetAsserted": false,
+          "nativeInitialization": {
+            "proved": false,
+            "daemonMs": null,
+            "preparationMs": null,
+            "phases": []
+          },
+          "observedUpperBoundMs": 39164
+        },
+        "leases": {
+          "before": {
+            "live": true,
+            "runTokenLive": true,
+            "expiresAt": "2026-11-09 03:47:04.536+00",
+            "status": "running"
+          },
+          "after": {
+            "live": true,
+            "runTokenLive": true,
+            "expiresAt": "2026-11-09 03:49:40.475+00",
+            "status": "running"
+          }
+        },
+        "endRequests": [
+          {
+            "requestedAt": "2026-11-09T03:51:03.995Z",
+            "clock": "driver_monotonic_elapsed",
+            "acknowledgedAt": "2026-11-09T03:51:04.178Z",
+            "elapsedMs": 183,
+            "runId": "98ada475-02aa-44c4-8489-73d80be30b23",
+            "state": "ended"
+          },
+          {
+            "requestedAt": "2026-11-09T03:51:04.416Z",
+            "clock": "driver_monotonic_elapsed",
+            "acknowledgedAt": "2026-11-09T03:51:04.708Z",
+            "elapsedMs": 292,
+            "runId": "0f5e7914-df3f-4175-8845-1276fd8e338a",
+            "state": "ended"
+          }
+        ],
+        "activeCommand": {
+          "elapsedMs": 160087,
+          "wallMs": 160087,
+          "toolCallHash": "85abe518069e6b61",
+          "commandSha256": "089ea23bc41aefa3a4a9b98e00fa14d7e08c6c4624ce770d9cf3a4d694d0d9b9"
+        },
+        "observationMargin": {
+          "elapsedMs": 30030,
+          "wallMs": 30031,
+          "toolCallHash": "eb83753a7d9c89d1",
+          "commandSha256": "6ddddb6b09ae1420bfe1e597dd3d5779af8eec53a14c933ac1106bb489222e40"
+        },
+        "factoryCancellation": {
+          "requestedAt": "2026-11-09T03:51:03.561Z",
+          "clock": "driver_monotonic_elapsed",
+          "acknowledgedAt": "2026-11-09T03:51:03.718Z",
+          "elapsedMs": 158
+        },
+        "normalRunExit": {
+          "kind": "native_question_safe_exit",
+          "origin": {
+            "runId": "98ada475-02aa-44c4-8489-73d80be30b23",
+            "status": "stopped",
+            "finishedAt": "2026-11-09T03:49:20.407Z",
+            "observedAt": "2026-11-09T03:49:23.801Z",
+            "source": "normal_owner_thread_attempt"
+          },
+          "continuation": {
+            "runId": "0f5e7914-df3f-4175-8845-1276fd8e338a",
+            "status": "stopped",
+            "finishedAt": "2026-11-09T03:50:59.546Z",
+            "observedAt": "2026-11-09T03:51:02.415Z",
+            "source": "normal_owner_thread_attempt"
+          },
+          "providerPausedBeforeAnswer": true,
+          "providerPausedAfterDelivery": true,
+          "pauseObservedUpperBounds": {
+            "origin": {
+              "finishedAt": "2026-11-09T03:49:20.407Z",
+              "pausedObservedAt": "2026-11-09T03:49:24.591Z",
+              "elapsedUpperBoundMs": 4184,
+              "clock": "server_finished_at_and_driver_utc_observation",
+              "exactProviderTransition": false
+            },
+            "continuation": {
+              "finishedAt": "2026-11-09T03:50:59.546Z",
+              "pausedObservedAt": "2026-11-09T03:51:02.889Z",
+              "elapsedUpperBoundMs": 3343,
+              "clock": "server_finished_at_and_driver_utc_observation",
+              "exactProviderTransition": false
+            }
+          }
+        },
+        "cancelEnd": {
+          "ownerEndReceipts": [
+            {
+              "runId": "98ada475-02aa-44c4-8489-73d80be30b23",
+              "state": "ended",
+              "observedAt": "2026-11-09T03:51:04.178Z"
+            },
+            {
+              "runId": "0f5e7914-df3f-4175-8845-1276fd8e338a",
+              "state": "ended",
+              "observedAt": "2026-11-09T03:51:04.708Z"
+            }
+          ],
+          "runTokensInvalid": true,
+          "initialDeviceTokenInvalid": true,
+          "providerMissingConfirmed": true,
+          "cancelToProviderMissingUpperBoundMs": 1386,
+          "exactProviderTransition": false
+        }
+      },
+      "cleanup": {
+        "status": "passed",
+        "errors": [],
+        "history": "retained",
+        "machineReceipts": [
+          {
+            "runId": "98ada475-02aa-44c4-8489-73d80be30b23",
+            "state": "ended",
+            "observedAt": "2026-11-09T03:51:04.178Z"
+          },
+          {
+            "runId": "0f5e7914-df3f-4175-8845-1276fd8e338a",
+            "state": "ended",
+            "observedAt": "2026-11-09T03:51:04.708Z"
+          }
+        ],
+        "databaseEndedAt": "2026-11-09T03:51:04.880Z",
+        "provider": {
+          "requestedAt": "2026-11-09T03:51:04.880Z",
+          "vmHash": "84f0555e6442",
+          "observedAt": "2026-11-09T03:51:04.947Z",
+          "status": "observed",
+          "state": "missing",
+          "ownershipVerified": true
+        },
+        "runIds": [
+          "98ada475-02aa-44c4-8489-73d80be30b23",
+          "0f5e7914-df3f-4175-8845-1276fd8e338a"
+        ]
+      }
+    }
+  ],
+  "limits": [
+    "source_changed_during_codex_continuation",
+    "not_a_fixed_application_whole_run_pass",
+    "no_under_five_second_startup_proof",
+    "no_independent_native_initialization_telemetry",
+    "normal_exit_is_native_question_safe_exit_not_factory_final_stage",
+    "no_12_hour_real_wait_or_fault_injection",
+    "no_natural_timeout_or_retention_expiry_measurement"
+  ],
+  "artifact": {
+    "id": 13648064418,
+    "bytes": 8711,
+    "sha256": "98990e308040a5d8ba16215fe89c9c7d718f0427ced601de10a8c5b49ba4ded5",
+    "reportBytes": 35727,
+    "reportSha256": "f6b2a43b6a883876c40e6a3477005b09cca91587078ad1006f3dcb36e06b5d25",
+    "downloadCount": 1
+  }
+}
