@@ -43,6 +43,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
 
       - name: Run the original and explicit-target offline guards before credentials
         run: pnpm test:read-cache

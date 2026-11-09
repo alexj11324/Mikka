@@ -97,6 +97,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Run selected core tasks through Nx Core
         run: node scripts/ci/run-units.mjs core
         env:
@@ -117,6 +119,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Run selected integration tasks through Nx Core
         run: node scripts/ci/run-units.mjs integration
         env:
@@ -137,6 +141,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Shadow selection against full baseline scenarios
         run: node scripts/ci/shadow.mjs
       - run: pnpm check:cloud-boundary
@@ -200,6 +206,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Daemon unit and transport regression tests
         run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
       - name: Existing mailbox CLI integration tests
@@ -339,6 +347,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       # The .deb files apt downloads for the packages below, keyed on the package
       # list and the runner image (a new image can carry newer dependencies).
       # Read-only except on pushes to main, like the pnpm store.
