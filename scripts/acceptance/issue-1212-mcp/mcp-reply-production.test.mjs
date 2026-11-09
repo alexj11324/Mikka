@@ -7,6 +7,8 @@ const APP = 'a'.repeat(40), DRIVER = 'b'.repeat(40), OTHER = 'c'.repeat(40)
 const OWNER = 'synthetic-smoke-owner', EMAIL = 'synthetic+mikka-smoke@example.invalid', PASSWORD = 'SYNTHETIC_PASSWORD_NOT_A_CREDENTIAL'
 const COOKIE = 'SYNTHETIC_PRIVATE_SESSION', CLIENT = 'synthetic_this_run_client', BEFORE = 'synthetic_existing_client'
 const TOKEN = 'mka_SYNTHETIC_PRIVATE_ACCESS', HISTORY = 'PRIVATE_HISTORY_SHOULD_NEVER_REACH_A_REPORT_中文'
+const WORKSPACE = '00000000-0000-4000-8000-000000000099'
+const WORKSPACE_HASH = createHash('sha256').update('team-workspace\0' + WORKSPACE).digest('hex')
 const nativeFetch = globalThis.fetch
 globalThis.fetch = () => { throw new Error('offline_network_forbidden') }
 after(() => { globalThis.fetch = nativeFetch })
@@ -24,7 +26,7 @@ function fixture(options = {}) {
   let signedIn = false, client, registration = 0, deleted = false, revoked = false, authorization
   let wall = Date.parse('2026-11-06T12:00:00Z'), mono = 0, versionReads = 0, calls = 0
   let scheduler, responseCancelled = 0, transportAborted = 0
-  const timers = new Map(), requests = [], privateValues = [EMAIL, PASSWORD, COOKIE, CLIENT, BEFORE, TOKEN, HISTORY, 'private_tool_name']
+  const timers = new Map(), requests = [], privateValues = [EMAIL, PASSWORD, COOKIE, CLIENT, BEFORE, TOKEN, HISTORY, WORKSPACE, 'private_tool_name']
   const advance = milliseconds => { wall += milliseconds; mono += milliseconds }
   const later = (callback, milliseconds) => {
     assert.equal(milliseconds, 5_000)
@@ -57,6 +59,15 @@ function fixture(options = {}) {
     }
     if (url.pathname === '/mikka/api/auth/get-session') return json(signedIn ? {
       user: { id: options.wrongOwner ? 'another-person' : OWNER, email: EMAIL }, session: {} } : null)
+    if (url.pathname === '/mikka/api/workspace') {
+      assert.equal(method, 'GET'); assert.ok(signedIn)
+      assert.ok(headers.get('cookie')?.includes('better-auth.session_token=' + COOKIE))
+      if (!url.search) return json({ currentUserId: OWNER, choices: [{ id: options.workspaceId, kind: 'team' }] })
+      assert.equal(url.searchParams.get('workspace'), options.workspaceId)
+      return json({ currentUserId: OWNER, role: 'member',
+        workspace: { id: options.workspaceId, kind: 'team', ...options.workspacePatch },
+        choices: [{ id: options.workspaceId, kind: 'team' }] })
+    }
     if (url.pathname === '/mikka/api/auth/sign-out') {
       assert.equal(method, 'POST')
       signedIn = false
@@ -142,13 +153,16 @@ function fixture(options = {}) {
     assert.equal(body.params.name, 'read_coordinator_messages')
     assert.ok(++calls <= 3)
     if (calls === 1) {
-      assert.deepEqual(body.params.arguments, { limit: 1, waitSeconds: 0 })
+      assert.deepEqual(body.params.arguments, { limit: 1, waitSeconds: 0,
+        ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}) })
       return json(result(body.id, options.latest ?? latest()))
     }
-    assert.deepEqual(body.params.arguments, { after: 27, limit: 1, waitSeconds: 90 })
+    const cursor = (options.latest ?? latest()).last
+    assert.deepEqual(body.params.arguments, { after: cursor, limit: 1, waitSeconds: 90,
+      ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}) })
     if (calls === 2) {
       advance(options.shortWait ? 20_000 : options.naturalReply ? 700 : 90_000)
-      const value = options.naturalReply ? reading([{ position: 28, role: 'assistant', text: HISTORY }], 28) : reading()
+      const value = options.naturalReply ? reading([{ position: 28, role: 'assistant', text: HISTORY }], 28) : reading([], cursor)
       const bytes = new TextEncoder().encode(': keepalive\r\n\r\ndata: ' + JSON.stringify(result(body.id, value)) + '\r\n\r\n')
       const stream = new ReadableStream({ start(controller) {
         for (let at = 0; at < bytes.length; at += 13) controller.enqueue(bytes.slice(at, at + 13))
@@ -180,7 +194,8 @@ function fixture(options = {}) {
     } }
 }
 async function run(options = {}, environment = env()) {
-  const f = fixture(options)
+  const f = fixture({ ...options, workspaceId: environment.MIKKA_MCP_WORKSPACE_ID
+    ?? (environment.MIKKA_MCP_WORKSPACE_HASH ? WORKSPACE : undefined) })
   const report = await runMcpReplyProof({ env: environment, event, ...f })
   f.assertPrivate(report)
   return { f, report }
@@ -188,7 +203,9 @@ async function run(options = {}, environment = env()) {
 const used = (f, ending) => f.requests.filter(row => row.path.endsWith(ending))
 
 test('exact workflow/build guard rejects before credentials or network, and wrong deployed version never reads credentials', async () => {
-  for (const changes of [{ GITHUB_REF: 'refs/heads/main' }, { MIKKA_ACCEPTANCE_SHA: '' }, { GITHUB_WORKFLOW_REF: 'other' }]) {
+  for (const changes of [{ GITHUB_REF: 'refs/heads/main' }, { MIKKA_ACCEPTANCE_SHA: '' }, { GITHUB_WORKFLOW_REF: 'other' },
+    { MIKKA_MCP_WORKSPACE_ID: 'invalid' }, { MIKKA_MCP_WORKSPACE_HASH: 'invalid' },
+    { MIKKA_MCP_WORKSPACE_ID: WORKSPACE, MIKKA_MCP_WORKSPACE_HASH: WORKSPACE_HASH }]) {
     const e = { ...env(), ...changes }
     Object.defineProperty(e, 'SMOKE_OWNER_PASSWORD', { get() { assert.fail('credentials were read') } })
     const { f, report } = await run({}, e)
@@ -218,8 +235,8 @@ test('actual copied PKCE helper, one managed client, three genuine-shaped readon
   assert.equal(used(f, '/oauth2/register').length, 0)
 })
 
-test('empty/filtered-tail, mismatched last and active personal chat stop after one read without invented cursors', async () => {
-  for (const [value, reason] of [[reading([], 0), 'cursor_unavailable'], [latest(), 'cursor_unavailable'],
+test('filtered-tail, mismatched last and active chat stop after one read without invented cursors', async () => {
+  for (const [value, reason] of [[reading([], 27), 'cursor_unavailable'], [latest(), 'cursor_unavailable'],
     [reading([{ position: 27, role: 'user', text: HISTORY }], 27, { working: true }), 'personal_chat_active']]) {
     if (reason === 'cursor_unavailable' && value.messages.length) value.last = 99
     const { f, report } = await run({ latest: value })
@@ -227,6 +244,48 @@ test('empty/filtered-tail, mismatched last and active personal chat stop after o
     assert.equal(f.state().calls, 1); assert.equal(report.cleanup.clientAbsent, true)
     assert.equal(report.cleanup.sessionAbsent, true); assert.equal(f.state().timers, 0)
   }
+})
+
+test('an actual empty initial read supplies cursor zero without a new message or fabricated future position', async () => {
+  const { f, report } = await run({ latest: reading([], 0) })
+  assert.equal(report.status, 'observed'); assert.equal(report.toolsCalls, 3)
+  assert.equal(report.observations.latest.last, 0)
+  assert.equal(report.coordinatorWriteCalls, 0); assert.equal(report.modelCalls, 0)
+  assert.equal(report.cleanup.clientAbsent, true); assert.equal(report.cleanup.sessionAbsent, true)
+  assert.equal(f.state().calls, 3)
+})
+
+test('an explicit authorized team is read before OAuth setup and pinned to all three MCP calls', async () => {
+  const { f, report } = await run({}, { ...env(), MIKKA_MCP_WORKSPACE_ID: WORKSPACE })
+  assert.equal(report.status, 'observed'); assert.equal(report.toolsCalls, 3)
+  const reads = used(f, '/workspace')
+  assert.equal(reads.length, 1); assert.equal(reads[0].method, 'GET')
+  assert.ok(f.requests.indexOf(reads[0]) < f.requests.indexOf(used(f, '/oauth2/create-client')[0]))
+  assert.equal(report.workspace.teamMembershipVerified, true)
+  assert.match(report.workspace.idHash, /^[a-f0-9]{64}$/)
+  assert.equal(report.cleanup.clientAbsent, true)
+})
+
+test('a mismatched or personal workspace fails before OAuth registration and still closes its own session', async () => {
+  for (const workspacePatch of [{ id: '00000000-0000-4000-8000-000000000098' }, { kind: 'personal' }]) {
+    const { f, report } = await run({ workspacePatch }, { ...env(), MIKKA_MCP_WORKSPACE_ID: WORKSPACE })
+    assert.equal(report.status, 'failed'); assert.equal(report.error, 'workspace_scope_invalid')
+    assert.equal(report.toolsCalls, 0); assert.equal(f.state().registration, 0)
+    assert.equal(report.cleanup.sessionAbsent, true)
+  }
+})
+
+test('the prior verified team hash resolves only a current authorized choice, without switching workspaces', async () => {
+  const { f, report } = await run({}, { ...env(), MIKKA_MCP_WORKSPACE_HASH: WORKSPACE_HASH })
+  assert.equal(report.status, 'observed'); assert.equal(report.toolsCalls, 3)
+  const reads = used(f, '/workspace')
+  assert.equal(reads.length, 2); assert.ok(reads.every(row => row.method === 'GET'))
+  assert.equal(report.workspace.teamMembershipVerified, true)
+  assert.equal(report.workspace.idHash, WORKSPACE_HASH)
+  const missing = await run({}, { ...env(), MIKKA_MCP_WORKSPACE_HASH: 'a'.repeat(64) })
+  assert.equal(missing.report.error, 'workspace_scope_invalid')
+  assert.equal(missing.f.state().registration, 0)
+  assert.equal(missing.report.cleanup.sessionAbsent, true)
 })
 
 test('natural activity and an early empty result cannot masquerade as a 90-second healthy idle observation', async () => {

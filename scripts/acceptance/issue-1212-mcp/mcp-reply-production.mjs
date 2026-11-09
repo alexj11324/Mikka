@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Normal shared-smoke OAuth plus at most three read-only MCP calls. No Coordinator
 // writes, models, Stop, notification cancellation, fake cursors, or retries.
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { authorizeMcpSession } from './pkce-session.mjs'
@@ -12,12 +12,14 @@ export const WORKFLOW = '.github/workflows/issue-1212-mcp-reply.yml'
 const BASE = '/mikka', AUTH = BASE + '/api/auth', MCP = BASE + '/api/mcp'
 const CALLBACK = 'http://127.0.0.1:45123/callback', REPOSITORY = 'alexj11324/Mikka'
 const SHA = /^[0-9a-f]{40}$/, CLIENT = /^[A-Za-z0-9_-]{1,200}$/
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+const HASH = /^[0-9a-f]{64}$/
 const METHODS = new Set(['initialize', 'notifications/initialized'])
 const CODES = new Set(['configuration_invalid', 'version_mismatch', 'credentials_missing', 'identity_mismatch',
   'request_denied', 'request_failed', 'response_invalid', 'oauth_protocol_failed', 'client_ownership',
   'registration_ambiguous', 'intent_collision', 'token_policy', 'mcp_protocol_failed', 'mcp_read_limit',
   'mcp_response_invalid', 'cursor_unavailable', 'personal_chat_active', 'natural_activity_observed',
-  'bounded_wait_unobserved', 'client_cancel_unobserved', 'cleanup_failed', 'report_rejected'])
+  'bounded_wait_unobserved', 'client_cancel_unobserved', 'cleanup_failed', 'report_rejected', 'workspace_scope_invalid'])
 const NOT_COVERED = new Set(['cursor_unavailable', 'personal_chat_active', 'natural_activity_observed',
   'bounded_wait_unobserved', 'client_cancel_unobserved'])
 class ProofError extends Error {
@@ -35,11 +37,16 @@ export function configuration(env, event) {
   need(env.GITHUB_REPOSITORY === REPOSITORY && env.GITHUB_EVENT_NAME === 'push'
     && env.GITHUB_REF === REF && env.GITHUB_WORKFLOW_REF === `${REPOSITORY}/${WORKFLOW}@${REF}`
     && SHA.test(env.GITHUB_SHA ?? '') && SHA.test(env.MIKKA_ACCEPTANCE_SHA ?? '')
+    && (env.MIKKA_MCP_WORKSPACE_ID === undefined || UUID.test(env.MIKKA_MCP_WORKSPACE_ID))
+    && (env.MIKKA_MCP_WORKSPACE_HASH === undefined || HASH.test(env.MIKKA_MCP_WORKSPACE_HASH))
+    && !(env.MIKKA_MCP_WORKSPACE_ID && env.MIKKA_MCP_WORKSPACE_HASH)
     && /^[1-9][0-9]*$/.test(env.GITHUB_RUN_ID ?? '') && /^[1-9][0-9]*$/.test(env.GITHUB_RUN_ATTEMPT ?? '')
     && event?.ref === REF && event?.after === env.GITHUB_SHA
     && event?.repository?.full_name === REPOSITORY, 'configuration_invalid')
   return { applicationSha: env.MIKKA_ACCEPTANCE_SHA, driverRevision: env.GITHUB_SHA,
-    runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT }
+    runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT,
+    ...(env.MIKKA_MCP_WORKSPACE_ID ? { workspaceId: env.MIKKA_MCP_WORKSPACE_ID } : {}),
+    ...(env.MIKKA_MCP_WORKSPACE_HASH ? { workspaceHash: env.MIKKA_MCP_WORKSPACE_HASH } : {}) }
 }
 
 function ownedClient(row, { clientId, ownerId, name, before }) {
@@ -140,7 +147,7 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
   }
   const close = async response => { await response.body?.cancel().catch(() => {}) }
   const deadline = now() + 240_000
-  let binding, ownerId, clientId, name, token, protocol, before = new Set(), registrationStarted = false
+  let binding, workspaceId, ownerId, clientId, name, token, protocol, before = new Set(), registrationStarted = false
   let registrationSettled = false, signInStarted = false, sessionObserved = false, complete = false
   let versionVerified = false, activeController, timer, serial = 30, evidenceRejected = false
   const oauthCalls = new Set(), helperCalls = new Set()
@@ -201,7 +208,8 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
       headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json',
         accept: 'application/json, text/event-stream', 'mcp-protocol-version': protocol },
       body: JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call',
-        params: { name: 'read_coordinator_messages', arguments: args } }) }, { timeoutMs: args.waitSeconds ? 110_000 : 20_000 })
+        params: { name: 'read_coordinator_messages', arguments: { ...args,
+          ...(workspaceId ? { workspaceId } : {}) } } }) }, { timeoutMs: args.waitSeconds ? 110_000 : 20_000 })
     const observed = { requestedWaitSeconds: args.waitSeconds, transportTimeoutMs: args.waitSeconds ? 110_000 : 20_000,
       headersMs: ms(monotonic() - began), requestId: requestId(response.headers.get('x-vercel-id')) }
     report.observations[phase] = observed
@@ -229,7 +237,11 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
   }
 
   try {
-    binding = configuration(env, event); report.binding = binding
+    binding = configuration(env, event)
+    const { workspaceId: pinnedWorkspace, workspaceHash, ...publicBinding } = binding
+    workspaceId = pinnedWorkspace
+    report.binding = publicBinding
+    if (workspaceId) remember([workspaceId])
     report.phase = 'version-before'; await version(); versionVerified = true; report.version.beforeMatches = true
     const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
     need(/^[^@\s]+\+mikka-smoke(?:-[a-z0-9]+)*@[^@\s]+$/i.test(email ?? '') && typeof password === 'string' && password.length > 0, 'credentials_missing')
@@ -244,6 +256,29 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
     need(session.status === 200 && session.value?.user?.id === ownerId
       && session.value.user.email?.toLowerCase() === email.toLowerCase(), 'identity_mismatch')
     sessionObserved = true; report.identityMatched = true
+    if (workspaceHash) {
+      report.phase = 'workspace-choices'
+      const available = await ownRead(BASE + '/api/workspace')
+      need(available.status === 200 && available.value?.currentUserId === ownerId
+        && Array.isArray(available.value.choices) && available.value.choices.length <= 64, 'workspace_scope_invalid')
+      const matches = available.value.choices.filter(choice => choice?.kind === 'team' && UUID.test(choice.id ?? '')
+        && createHash('sha256').update('team-workspace\0' + choice.id).digest('hex') === workspaceHash)
+      need(matches.length === 1, 'workspace_scope_invalid')
+      workspaceId = matches[0].id
+      remember([workspaceId])
+    }
+    if (workspaceId) {
+      report.phase = 'workspace-read'
+      const selected = await ownRead(BASE + '/api/workspace?workspace=' + workspaceId)
+      const value = selected.value
+      need(selected.status === 200 && value?.currentUserId === ownerId
+        && value.workspace?.id === workspaceId && value.workspace.kind === 'team'
+        && ['member', 'admin'].includes(value.role) && Array.isArray(value.choices)
+        && value.choices.filter(choice => choice?.id === workspaceId && choice.kind === 'team').length === 1,
+      'workspace_scope_invalid')
+      report.workspace = { selection: 'explicit_read_only', teamMembershipVerified: true,
+        idHash: createHash('sha256').update('team-workspace\0' + workspaceId).digest('hex') }
+    }
     report.phase = 'oauth-register'
     const original = await clients()
     before = new Set(original.map(row => row.client_id)); remember([...before])
@@ -326,7 +361,8 @@ export async function runMcpReplyProof({ env = process.env, event, fetchImpl = g
     report.phase = 'latest'
     const latest = await read({ limit: 1, waitSeconds: 0 }, 'latest')
     need(!latest.working, 'personal_chat_active')
-    need(latest.count === 1 && positive(latest.last) && latest.last === latest.positions[0], 'cursor_unavailable')
+    need(latest.count === 0 && latest.last === 0 && !latest.replied
+      || latest.count === 1 && positive(latest.last) && latest.last === latest.positions[0], 'cursor_unavailable')
     const cursor = latest.last
     report.phase = 'bounded-wait'
     const waited = await read({ after: cursor, limit: 1, waitSeconds: 90 }, 'boundedWait')
