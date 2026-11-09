@@ -11,7 +11,7 @@
 
 import { z } from 'zod'
 import type { UserFactEvidence } from '@/lib/db/schema'
-import { USER_FACT_KINDS, type UserFactKind, type UserFactState } from './kinds'
+import { USER_FACT_KINDS, type UserFactKind, type UserFactState, type MemorySourceKind } from './kinds'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import type { DecisionAnswer, DecisionQuestion } from '@/lib/coordinator/decision'
 
@@ -133,6 +133,8 @@ export interface FactInput {
   confidence: number
   seenAt: Date
   expiresAt: Date | null
+  /** Trusted internal provenance only. External notification sources cannot be relabelled as a thread or file. */
+  source?: { kind: MemorySourceKind; id: string | null; url: string | null }
 }
 
 /** One extracted fact as a row to upsert; evidence names the notification by reference only. */

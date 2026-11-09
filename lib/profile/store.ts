@@ -2,7 +2,7 @@ import 'server-only'
 import { and, asc, desc, eq, lt, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { db } from '@/lib/db'
-import { proactiveUsage, userFactConsolidations, userFacts, userPreferences, userTimeZones } from '@/lib/db/schema'
+import { proactiveUsage, userFactConsolidations, userFactUndo, userFacts, userPreferences, userTimeZones } from '@/lib/db/schema'
 import { personLocale } from '@/lib/suggestions/action-title-server'
 import { localClock, safeTimeZone } from '@/lib/suggestions/briefing'
 import type { UserFactKind } from './kinds'
@@ -60,8 +60,18 @@ export async function recordFacts(userId: string, facts: readonly FactInput[], {
     const [inserted] = await db.insert(userFacts).values({
       id: randomUUID(), userId, kind: fact.kind, subject, subjectKey: key, value: fact.value, evidence: fact.evidence,
       confidence: fact.confidence, firstSeenAt: fact.seenAt, lastSeenAt: fact.seenAt, expiresAt: fact.expiresAt,
+      reviewStatus: 'pending', sourceKind: fact.source?.kind ?? null, sourceId: fact.source?.id ?? null, sourceUrl: fact.source?.url ?? null,
     }).onConflictDoNothing().returning({ id: userFacts.id })
-    if (inserted) { written++; continue }
+    if (inserted) {
+      written++
+      // Facts in the same semantic slot may contradict an earlier approval.
+      // Queue both for human review, rather than silently choosing the latest.
+      if (typeof fact.value.slot === 'string') await db.update(userFacts).set({ reviewStatus: 'pending', updatedAt: new Date() }).where(and(
+        eq(userFacts.userId, userId), eq(userFacts.kind, fact.kind), eq(userFacts.state, 'active'),
+        sql`${userFacts.value} ->> 'slot' = ${fact.value.slot}`,
+      ))
+      continue
+    }
     written += await db.transaction(async tx => {
       const [current] = await tx.select().from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.kind, fact.kind), eq(userFacts.subjectKey, key))).for('update').limit(1)
       if (!current || current.state === 'deleted' || current.state === 'dismissed') return 0
@@ -116,6 +126,7 @@ export async function countFacts(userId: string): Promise<number> {
 export async function clearFacts(userId: string): Promise<number> {
   return db.transaction(async tx => {
     const active = await tx.select({ id: userFacts.id }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'))).for('update')
+    await tx.delete(userFactUndo).where(eq(userFactUndo.userId, userId))
     await tx.update(userFacts).set({ state: 'deleted', value: {}, evidence: [], updatedAt: new Date() })
       .where(and(eq(userFacts.userId, userId), ne(userFacts.state, 'deleted')))
     return active.length
@@ -137,7 +148,7 @@ export async function correctFact(userId: string, id: string, subjectText: strin
       .where(and(eq(userFacts.id, id), eq(userFacts.userId, userId), ne(userFacts.state, 'deleted'))).for('update').limit(1)
     if (!fact) return false
     const now = new Date()
-    const corrected = { subject, subjectKey: key, state: 'active' as const, userEdited: true, confidence: 1, lastSeenAt: now, updatedAt: now }
+    const corrected = { subject, subjectKey: key, state: 'active' as const, reviewStatus: 'approved' as const, userEdited: true, confidence: 1, lastSeenAt: now, updatedAt: now }
     const [other] = await tx.select({ id: userFacts.id }).from(userFacts)
       .where(and(eq(userFacts.userId, userId), eq(userFacts.kind, fact.kind), eq(userFacts.subjectKey, key), ne(userFacts.id, id))).for('update').limit(1)
     if (!other) {
