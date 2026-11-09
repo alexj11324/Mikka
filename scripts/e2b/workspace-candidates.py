@@ -199,6 +199,37 @@ def official_change_diagnostic(message):
         return None
 
 
+def conservation_event(detail, kind):
+    """Keep a fresh-instance rejection even while raw SDK output is discarded."""
+    stages = {'preload_receipts', 'preload_validation', 'fresh_scan', 'fresh_receipt', 'fresh_validation', 'unknown'}
+    codes = {'official_manifest_invalid', 'official_conservation_invalid', 'official_conservation_missing',
+             'official_files_removed', 'official_files_changed', 'e2b_certificate_target_invalid',
+             'conservation_failed', 'conservation_diagnostic_too_large', 'conservation_metadata_invalid'}
+    invalid = {'phase': 'conservation_failed', 'detail': 'conservation_diagnostic_invalid', 'stage': 'unknown'}
+    if (not isinstance(detail, dict) or detail.get('kind') != kind
+            or not isinstance(detail.get('stage'), str) or detail['stage'] not in stages
+            or not isinstance(detail.get('code'), str) or detail['code'] not in codes):
+        return invalid
+    event = {'phase': 'conservation_failed', 'detail': detail['code'], 'stage': detail['stage']}
+    if type(detail.get('exitCode')) is int and -255 <= detail['exitCode'] <= 255:
+        event['exitCode'] = detail['exitCode']
+    if isinstance(detail.get('check'), str) and detail['check'] in {'pid_file', 'pid_read', 'pid_alive', 'worker_waiting', 'official_files'}:
+        event['check'] = detail['check']
+    if detail['code'] == 'official_files_changed':
+        try:
+            message = 'RuntimeError: official_files_changed ' + json.dumps(detail.get('changes'))
+            projected = official_change_diagnostic(message) if len(message) <= MAX_LOG_MESSAGE else None
+            if projected is not None:
+                event['conservation'] = projected
+        except (ValueError, TypeError, RecursionError):
+            pass
+    if detail['code'] == 'official_files_removed' and isinstance(detail.get('missing'), dict):
+        path = detail['missing'].get('path')
+        if isinstance(path, str):
+            event['removedPathCode'] = CONSERVATION_PATH_CODES.get(path, 'redacted')
+    return event
+
+
 class BuildDiagnostics:
     """Consume the pinned SDK's public callback; retain no raw log messages.
 
@@ -899,7 +930,8 @@ def build_candidates(scope, output, api_key, sdk, request=None):
                 entry['models'] = builder.probe_models(row['templateId'], kind, api_key, scope['sourceCommit'], scope['workerSha'], factory)
             stage = 'conservation_' + kind
             with quiet_sdk():
-                entry['conservation'] = builder.probe_conservation(row['templateId'], api_key, kind, factory)
+                entry['conservation'] = builder.probe_conservation(row['templateId'], api_key, kind, factory,
+                    on_diagnostic=lambda detail: logs[kind].event(conservation_event(detail, kind)))
             private_ready(row, api_key, request)
             entry['privateVerified'] = True
             templates[kind] = entry

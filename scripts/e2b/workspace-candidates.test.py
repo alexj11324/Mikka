@@ -19,6 +19,7 @@ from urllib.error import HTTPError
 spec = importlib.util.spec_from_file_location('candidates', Path(__file__).with_name('workspace-candidates.py'))
 candidates = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(candidates)
+REAL_CONSERVATION_PROBE = candidates.builder.probe_conservation
 ENV = {'GITHUB_REPOSITORY': 'alexj11324/Mikka', 'GITHUB_SHA': 'b' * 40, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '2'}
 SCOPE = {'sourceCommit': 'a' * 40, 'workerSha': 'c' * 40, 'workflowCommit': ENV['GITHUB_SHA'], 'runId': '123', 'runAttempt': '2'}
 PRIVATE = 'synthetic-private-sdk-response-and-key'
@@ -128,7 +129,7 @@ class Fixture:
         sandbox.kill()
         return {'validated': True, 'sourceCommit': source, 'workerSha': worker}
 
-    def conservation(self, template_id, api_key, kind, factory):
+    def conservation(self, template_id, api_key, kind, factory, **_diagnostics):
         sandbox = factory(template_id, api_key=api_key, timeout=600, metadata=candidates.builder.release_metadata())
         self.probes.append('conservation-' + kind)
         sandbox.kill()
@@ -348,6 +349,69 @@ class Candidates(unittest.TestCase):
                         'fields': ['mode'], 'before': {'mode': 0o755}, 'after': {'mode': 0o777},
                         'contentChanged': False, 'targetChanged': False}]})
                 self.assertNotIn(original['path'], json.dumps(log.value))
+
+    def test_fresh_conservation_failure_survives_quiet_sdk_and_keeps_cleanup(self):
+        guard = candidates.builder.official_files_guard()
+        original = {'path': '/usr/local/share/e2b', 'kind': 'directory', 'mode': 0o755, 'uid': 0, 'gid': 0}
+        with patch.object(guard, 'entry', return_value={**original, 'mode': 0o700}):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed') as refused:
+                guard.verify({'version': 1, 'entries': [original]}, e2b_finalization='claude')
+        failure = RuntimeError(PRIVATE)
+        failure.exit_code = 1
+        failure.stdout = PRIVATE
+        failure.stderr = ('RuntimeError: ' + str(refused.exception)
+                          + '\nmikka-conservation-check-failed official_files 1\n' + PRIVATE)
+        digest = {'entries': 1, 'sha256': 'f' * 64}
+        final = {'kind': 'claude', 'policySha256': guard.finalization_policy('claude')[1],
+                 'before': digest, 'after': digest, 'originalBefore': digest, 'originalAfter': digest, 'providerChanges': []}
+        create = self.fixture.sdk[0].create
+        def probe(*args, **kwargs):
+            sandbox = create(*args, **kwargs)
+            sandbox.files = SimpleNamespace(read=lambda path, **_: json.dumps(final if path.endswith('ready.json') else {'before': digest, 'after': digest}))
+            def run(command, **options):
+                self.assertIn('fresh-conservation.json', command)
+                self.assertEqual((options['user'], options['timeout'], options['request_timeout']), ('root', 300, 310))
+                raise failure
+            sandbox.commands = SimpleNamespace(run=run)
+            return sandbox
+        output = io.StringIO()
+        with patch.object(self.fixture.sdk[0], 'create', probe), \
+             patch.object(candidates.builder, 'probe_conservation', REAL_CONSERVATION_PROBE), \
+             redirect_stdout(output), redirect_stderr(output), self.assertRaises(candidates.CandidateError) as raised:
+            self.build()
+        self.assertIs(raised.exception.__cause__, failure)
+        report = json.loads((self.output / 'build-report.json').read_text())
+        self.assertEqual((report['status'], report['stage']), ('failed', 'conservation_claude'))
+        rows = [row for row in report['diagnostic']['buildLogs']['claude']['events'] if row['phase'] == 'conservation_failed']
+        self.assertEqual(len(rows), 1)
+        self.assertEqual({key: rows[0][key] for key in ('detail', 'stage', 'check', 'exitCode')},
+                         {'detail': 'official_files_changed', 'stage': 'fresh_scan', 'check': 'official_files', 'exitCode': 1})
+        self.assertEqual(rows[0]['conservation']['changes'][0]['pathCode'], 'provider_shared_directory')
+        self.assertEqual(rows[0]['conservation']['changes'][0]['after'], {'mode': 0o700})
+        self.assertEqual(self.fixture.builds, ['claude'])
+        self.assertFalse(self.fixture.sandboxes)
+        self.assertFalse(self.fixture.templates)
+        self.assertTrue(json.loads((self.output / 'cleanup.json').read_text())['confirmed'])
+        for forbidden in (PRIVATE, original['path']):
+            self.assertNotIn(forbidden, output.getvalue() + json.dumps(report))
+
+    def test_fresh_conservation_callback_keeps_only_closed_metadata(self):
+        known = {'path': '/usr/local/share/e2b', 'kind': 'directory', 'before': {'mode': 0o755}, 'after': {'mode': 0o700}}
+        detail = {'kind': 'claude', 'stage': 'fresh_scan', 'code': 'official_files_changed',
+                  'check': 'official_files', 'exitCode': 1, 'stdout': PRIVATE, 'changes': [known, {**known, 'path': '/' + PRIVATE}]}
+        result = candidates.conservation_event(detail, 'claude')
+        self.assertEqual(result['conservation']['redactedChanges'], 1)
+        self.assertNotIn(PRIVATE, json.dumps(result))
+        self.assertNotIn(known['path'], json.dumps(result))
+        for patch_value in [{'kind': 'codex'}, {'stage': PRIVATE}, {'code': PRIVATE}, {'stage': {}}, {'code': []}]:
+            result = candidates.conservation_event({**detail, **patch_value}, 'claude')
+            self.assertEqual(result, {'phase': 'conservation_failed', 'detail': 'conservation_diagnostic_invalid', 'stage': 'unknown'})
+        result = candidates.conservation_event({**detail, 'check': PRIVATE, 'exitCode': True}, 'claude')
+        self.assertNotIn('check', result)
+        self.assertNotIn('exitCode', result)
+        result = candidates.conservation_event({**detail, 'code': 'official_files_removed', 'missing': {'path': '/' + PRIVATE}}, 'claude')
+        self.assertEqual(result['removedPathCode'], 'redacted')
+        self.assertNotIn(PRIVATE, json.dumps(result))
 
     def test_conservation_diagnostics_redact_paths_targets_hashes_and_bound_changes(self):
         known = {'path': '/usr/local/share/ca-certificates/e2b-ca.crt', 'kind': 'file',

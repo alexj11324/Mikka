@@ -604,6 +604,19 @@ CONSERVATION_DIAGNOSTIC_MAX_BYTES = 262144
 CONSERVATION_DIAGNOSTIC_MAX_CHANGES = 512
 
 
+def fresh_conservation_command(kind):
+    """Keep the fresh-create predicates, order and exit status; name a failure."""
+    if kind not in KINDS:
+        raise ValueError('e2b_finalization_policy_invalid')
+    checks = [*ANONYMOUS_WORKER_CHECKS, ('official_files',
+        f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null')]
+    command = ' && '.join(f'mikka_conservation_check={phase} && {predicate}' for phase, predicate in checks)
+    return (command + '; mikka_conservation_status=$?; '
+            'if [ "$mikka_conservation_status" -ne 0 ]; then '
+            'printf "mikka-conservation-check-failed %s %s\\n" "$mikka_conservation_check" "$mikka_conservation_status" >&2; fi; '
+            'exit "$mikka_conservation_status"')
+
+
 def conservation_diagnostic(error, kind, stage):
     """Only the guard's bounded metadata may cross the SDK error boundary."""
     stages = {'preload_receipts', 'preload_validation', 'fresh_scan', 'fresh_receipt', 'fresh_validation'}
@@ -620,6 +633,13 @@ def conservation_diagnostic(error, kind, stage):
         return detail
     if len(stderr) > CONSERVATION_DIAGNOSTIC_MAX_BYTES or len(stderr.encode('utf-8', errors='replace')) > CONSERVATION_DIAGNOSTIC_MAX_BYTES:
         return {**detail, 'code': 'conservation_diagnostic_too_large'}
+    checks = []
+    for line in stderr.splitlines():
+        match = re.fullmatch(r'mikka-conservation-check-failed (pid_file|pid_read|pid_alive|worker_waiting|official_files) ([1-9][0-9]{0,2})', line)
+        if match and 1 <= int(match[2]) <= 255:
+            checks.append((match[1], int(match[2])))
+    if len(checks) == 1 and type(exit_code) is int and checks[0][1] == exit_code:
+        detail['check'] = checks[0][0]
     kinds = {'file', 'link', 'directory', 'special'}
     fields = {'kind', 'sha256', 'mode', 'uid', 'gid', 'target', 'type', 'device'}
     def path(value, absolute=False):
@@ -662,7 +682,7 @@ def conservation_diagnostic(error, kind, stage):
     return detail
 
 
-def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
+def probe_conservation(template_id, api_key, kind, sandbox_factory=None, *, on_diagnostic=None):
     """Check the final image on a disposable instance, never a timed instance.
 
     E2B also performs provider setup after its start/ready command. Keep the
@@ -688,7 +708,7 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
         guard = official_files_guard()
         guard.validate_receipt(conservation, kind)
         phase = 'fresh_scan'
-        result = sandbox.commands.run(ANONYMOUS_WORKER_READY + f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null',
+        result = sandbox.commands.run(fresh_conservation_command(kind),
                                       user='root', timeout=300, request_timeout=310)
         if result.exit_code != 0:
             raise RuntimeError('official_conservation_missing')
@@ -702,7 +722,14 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
     except Exception as error:
         # Emit before finally destroys the disposable instance. Never print
         # SDK stdout/stderr or exception messages; keep the original failure.
-        print('mikka-conservation-failed ' + json.dumps(conservation_diagnostic(error, kind, phase), separators=(',', ':')),
+        detail = conservation_diagnostic(error, kind, phase)
+        if on_diagnostic is not None:
+            try:
+                on_diagnostic(detail)
+            except BaseException:
+                # Observation cannot replace the original failure or its cleanup.
+                error.add_note('conservation_diagnostic_callback_failed')
+        print('mikka-conservation-failed ' + json.dumps(detail, separators=(',', ':')),
               file=sys.stderr, flush=True)
         raise
     finally:

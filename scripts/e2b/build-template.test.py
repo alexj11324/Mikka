@@ -92,6 +92,56 @@ class ModelSandbox:
     def kill(self): self.calls.append(('kill',))
 
 class Publish(unittest.TestCase):
+    def test_fresh_conservation_command_preserves_order_status_and_closed_failure_phase(self):
+        phases = [name for name, _ in bt.ANONYMOUS_WORKER_CHECKS] + ['official_files']
+        for failed in [*phases, None]:
+            with self.subTest(failed=failed), tempfile.TemporaryDirectory() as directory:
+                order = Path(directory) / 'order'
+                checks = tuple((phase, '(printf "%s\\n" ' + phase + ' >> "$MIKKA_TEST_ORDER"; exit '
+                                + ('23' if failed == phase else '0') + ')') for phase in phases[:-1])
+                with patch.object(bt, 'ANONYMOUS_WORKER_CHECKS', checks):
+                    command = bt.fresh_conservation_command('claude')
+                function = 'python3() { printf "%s\\n" official_files >> "$MIKKA_TEST_ORDER"; return ' + ('23' if failed == 'official_files' else '0') + '; }; '
+                result = subprocess.run(['bash', '-c', function + command], capture_output=True, text=True,
+                                        env={**os.environ, 'MIKKA_TEST_ORDER': str(order)}, timeout=5)
+                self.assertEqual(result.returncode, 23 if failed else 0)
+                self.assertEqual(order.read_text().splitlines(), phases[:phases.index(failed) + 1] if failed else phases)
+                self.assertEqual(result.stderr, f'mikka-conservation-check-failed {failed} 23\n' if failed else '')
+        original = bt.fresh_conservation_command('codex')
+        positions = [original.index(command) for _, command in bt.ANONYMOUS_WORKER_CHECKS]
+        self.assertEqual(positions, sorted(positions))
+        self.assertTrue(all(original.count(command) == 1 for _, command in bt.ANONYMOUS_WORKER_CHECKS))
+
+    def test_conservation_callback_precedes_cleanup_without_replacing_the_error(self):
+        observed, killed = [], []
+        class Probe:
+            def __init__(self): self.files = self.commands = self
+            def read(self, *_args, **_options): return '{}'
+            def kill(self): killed.append(list(observed))
+        def failed_callback(value):
+            observed.append(value)
+            raise RuntimeError('DO-NOT-LOG-CALLBACK-CONTENT')
+        output = io.StringIO()
+        with redirect_stderr(output), self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+            bt.probe_conservation('candidate', 'fixture-key', 'desktop', lambda *_, **__: Probe(), on_diagnostic=failed_callback)
+        self.assertEqual(observed, [{'kind': 'desktop', 'stage': 'preload_validation', 'code': 'official_conservation_invalid'}])
+        self.assertEqual(killed, [observed])
+        self.assertNotIn('DO-NOT-LOG-CALLBACK-CONTENT', output.getvalue())
+
+    def test_conservation_check_diagnostic_accepts_only_one_known_phase_and_original_status(self):
+        failure = RuntimeError('private-provider-error')
+        failure.exit_code = 1
+        for suffix, expected in [('pid_alive 1', 'pid_alive'), ('official_files 1', 'official_files'),
+                                 ('private-value 1', None), ('pid_alive 2', None), ('pid_alive 256', None),
+                                 ('pid_alive 1\nmikka-conservation-check-failed official_files 1', None)]:
+            failure.stderr = 'mikka-conservation-check-failed ' + suffix
+            actual = bt.conservation_diagnostic(failure, 'claude', 'fresh_scan')
+            self.assertEqual(actual.get('check'), expected)
+            self.assertNotIn('private-', json.dumps(actual))
+        failure.exit_code = True
+        failure.stderr = 'mikka-conservation-check-failed pid_alive 1'
+        self.assertNotIn('check', bt.conservation_diagnostic(failure, 'claude', 'fresh_scan'))
+
     def test_conservation_failure_logs_safe_metadata_before_kill_and_keeps_the_original_exception(self):
         digest = {'entries': 5, 'sha256': 'f' * 64}
         final = {'kind': 'codex', 'policySha256': bt.official_files_guard().finalization_policy('codex')[1],
