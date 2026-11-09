@@ -7,7 +7,9 @@
 
 # Mikka
 
-**AI agent coordination across your computers and the cloud.**
+### The AI lead for ambitious work.
+
+Every agent, from laptop to cloud, working as one team.
 
 Mikka organizes work for Claude Code, Codex and supported Cursor runners, with bots that coordinate tasks and agents that execute them.
 
@@ -23,7 +25,7 @@ Describe a task to a bot. Mikka dispatches coding work to agents on your Mac, Li
 
 ## Get started
 
-**Mikka Cloud (early access).** [Open the app](https://app.aspectlylabs.com/mikka). If you need access, email [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com), then follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
+**Mikka Cloud.** [Open the app](https://app.aspectlylabs.com/mikka), create an account and start using Mikka. Follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart) to get set up.
 
 **Self-hosted server.** Mikka can run on your own Linux host with Docker and PostgreSQL. Follow the [self-hosting guide](docs/self-hosting.md) to configure credentials, download the matching Compose file and start the server:
 
