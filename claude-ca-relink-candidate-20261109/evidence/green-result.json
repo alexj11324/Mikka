@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "scripts/e2b/official-files.test.py",
+    "-v"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/claude-ca-relink-candidate-1505/candidate",
+  "startedAt": "2026-11-09T16:58:27.800399+00:00",
+  "endedAt": "2026-11-09T16:58:28.305648+00:00",
+  "elapsedSeconds": 0.5052267490009399,
+  "exitCode": 0,
+  "logBytes": 6284,
+  "logSha256": "fc20dbf3d8120b95f0d44b0ca47e3f6c6a31de629fa584d083f403e0eba10e16",
+  "testSourceSha256": "f494a8253ea8ef380ab0000664d9f8f4859cdb4f5f0a275b159e09bc7f5e1486",
+  "testSummary": [
+    "Ran 34 tests in 0.395s",
+    "OK"
+  ],
+  "originalTests": 29,
+  "newTestMethods": 5,
+  "originalTestMaintenance": "one Claude correct-shape rejection parameter changed to Claude legacy Codex-digest rejection"
+}

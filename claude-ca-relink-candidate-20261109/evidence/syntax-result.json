@@ -1,0 +1,27 @@
+{
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-c",
+        "import ast,pathlib; [ast.parse(pathlib.Path(p).read_text(), filename=p) for p in ['scripts/e2b/official-files.py','scripts/e2b/official-files.test.py']]; print('2 Python sources parsed')"
+      ],
+      "cwd": "/workspace/scratch/263e36984c81/claude-ca-relink-candidate-1505/candidate",
+      "exitCode": 0,
+      "output": "2 Python sources parsed\n"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-c",
+        "import json,pathlib; [json.loads(pathlib.Path(p).read_text()) for p in ['scripts/e2b/e2b-certificate-relinks.json','scripts/e2b/e2b-finalization-files.json']]; print('2 JSON sources parsed')"
+      ],
+      "cwd": "/workspace/scratch/263e36984c81/claude-ca-relink-candidate-1505/candidate",
+      "exitCode": 0,
+      "output": "2 JSON sources parsed\n"
+    }
+  ]
+}

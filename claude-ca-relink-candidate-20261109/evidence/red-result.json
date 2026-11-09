@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "scripts/e2b/official-files.test.py",
+    "-v"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/claude-ca-relink-candidate-1505/candidate",
+  "startedAt": "2026-11-09T16:57:48.254703+00:00",
+  "endedAt": "2026-11-09T16:57:48.805685+00:00",
+  "elapsedSeconds": 0.5509798500006582,
+  "exitCode": 1,
+  "logBytes": 20350,
+  "logSha256": "f3e61d9d20d27945dcf98aa5baf026d5a90fbca0322a73b70971d0e11f5991d3",
+  "testSourceSha256": "2e8a971eb34381ce4e9d35d23079d7b824743d304cef17524dce8f2a0522163e",
+  "product": "unchanged exact8db policy+matcher",
+  "expectedFailure": "new Claude exact relink positive cases are not covered by the current policy",
+  "testSummary": [
+    "Ran 34 tests in 0.443s",
+    "FAILED (failures=6, errors=2)"
+  ]
+}

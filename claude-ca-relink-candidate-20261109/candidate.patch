@@ -1,0 +1,166 @@
+--- a/scripts/e2b/e2b-certificate-relinks.json
++++ b/scripts/e2b/e2b-certificate-relinks.json
+@@ -4286,5 +4286,23 @@
+     "templates": [
+       "desktop"
+     ]
++  },
++  {
++    "path": "/etc/ssl/certs/1560546e.0",
++    "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
++    "target": "e2b-ca.pem",
++    "providerRoot": true,
++    "templates": [
++      "claude"
++    ]
++  },
++  {
++    "path": "/etc/ssl/certs/e2b-ca.pem",
++    "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
++    "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
++    "providerRoot": true,
++    "templates": [
++      "claude"
++    ]
+   }
+ ]
+--- a/scripts/e2b/e2b-finalization-files.json
++++ b/scripts/e2b/e2b-finalization-files.json
+@@ -139,5 +139,5 @@
+       }
+     }
+   },
+-  "certificateRelinksSha256": "a28165d7a9de3bed0b78af59c728004e82dc4d7815a14f97c2779c1eb090a845"
++  "certificateRelinksSha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52"
+ }
+--- a/scripts/e2b/official-files.test.py
++++ b/scripts/e2b/official-files.test.py
+@@ -692,7 +692,7 @@
+                 ('group', 'desktop', 'after', {'gid': 1000}),
+                 ('type', 'desktop', 'after', {'kind': 'directory'}),
+                 ('codex scope', 'codex', 'after', {}),
+-                ('claude scope', 'claude', 'after', {}),
++                ('claude wrong baseline digest', 'claude', 'before', {'sha256': self.CODEX_SHA}),
+             ]
+             for label, kind, side, update in mutations:
+                 before, after = self.rows()
+@@ -751,5 +751,119 @@
+                     files.validate_receipt(invalid, 'desktop')
+ 
+ 
++class ClaudeCertificateRelinks(unittest.TestCase):
++    # Candidate regression for the published R8db fresh-scan failure. These
++    # metadata fixtures are not an official-only control or release acceptance.
++    PATHS = DesktopCertificateRelinks.PATHS
++    TARGETS = DesktopCertificateRelinks.TARGETS
++
++    def proof(self):
++        return DesktopCertificateRelinks().proof('claude')
++
++    def test_claude_relinks_require_finalization_and_preserve_strict_installation(self):
++        # proof() checks unchanged installation, rejects these links during
++        # strict verification, then invokes the real finalization verifier.
++        proof = self.proof()
++        self.assertIs(files.validate_receipt(proof, 'claude'), proof)
++        final = proof['finalization']
++        self.assertEqual(proof['before'], proof['after'])
++        self.assertEqual(final['before'], final['after'])
++        self.assertNotEqual(final['originalBefore'], final['originalAfter'])
++        changes = {row['path']: row for row in final['providerChanges']}
++        for path, target in zip(self.PATHS, self.TARGETS):
++            self.assertEqual(changes[path], {
++                'path': path, 'kind': 'file',
++                'before': {'kind': 'file', 'sha256': DesktopCertificateRelinks.DESKTOP_SHA, 'target': None},
++                'after': {'kind': 'link', 'sha256': None, 'target': target},
++                'resolvedSha256': DesktopCertificateRelinks.ROOT_FRESH_SHA,
++            })
++        # Provider-root renewal remains the existing per-boot behavior; the
++        # packaged aliases are still bound to their measured source bytes.
++        self.assertNotEqual(DesktopCertificateRelinks.ROOT_FRESH_SHA,
++                            DesktopCertificateRelinks.DESKTOP_SHA)
++
++    def test_claude_relinks_reject_wrong_digest_target_kind_mode_and_owner(self):
++        defects = [
++            ('legacy Codex digest', 'before', {'sha256': DesktopCertificateRelinks.CODEX_SHA}),
++            ('unmeasured digest', 'before', {'sha256': 'a' * 64}),
++            ('raw target', 'after', {'target': '/opt/mikka/replaced.crt'}),
++            ('original kind', 'before', {'kind': 'link'}),
++            ('result kind', 'after', {'kind': 'directory'}),
++            ('changed old mode', 'before', {'mode': 0o644}),
++            ('changed new mode', 'after', {'mode': 0o775}),
++            ('owner', 'after', {'uid': 1000}),
++            ('group', 'after', {'gid': 1000}),
++        ]
++        for path in self.PATHS:
++            for label, side, update in defects:
++                before, after = DesktopCertificateRelinks().rows()
++                (before if side == 'before' else after)[path].update(update)
++                with self.subTest(path=path, defect=label), \
++                        patch.object(files, 'entry', side_effect=lambda p: deepcopy(after[str(p)])), \
++                        patch.object(files.Path, 'resolve', return_value=Path(ROOT_CA)):
++                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed ') as raised:
++                        files.verify({'version': 1, 'entries': list(before.values())}, 'claude')
++                changes = json.loads(str(raised.exception).removeprefix('official_files_changed '))
++                self.assertIn(path, [change['path'] for change in changes])
++
++    def test_claude_relinks_require_the_exact_regular_provider_root_terminal(self):
++        for path in self.PATHS:
++            before, after = DesktopCertificateRelinks().rows()
++            for label, terminal_path, terminal in [
++                ('wrong terminal', '/opt/mikka/e2b-ca.crt', after[ROOT_CA]),
++                ('directory terminal', ROOT_CA, {**after[ROOT_CA], 'kind': 'directory'}),
++                ('link terminal', ROOT_CA, {**after[ROOT_CA], 'kind': 'link', 'target': '/opt/mikka/replaced.crt'}),
++            ]:
++                def actual_entry(requested):
++                    return deepcopy(after[path] if str(requested) == path else terminal)
++                with self.subTest(path=path, defect=label), \
++                        patch.object(files, 'entry', side_effect=actual_entry), \
++                        patch.object(files.Path, 'resolve', return_value=Path(terminal_path)):
++                    with self.assertRaisesRegex(RuntimeError, '^e2b_certificate_target_invalid$'):
++                        files.verify({'version': 1, 'entries': [before[path]]}, 'claude')
++
++    def test_claude_relinks_do_not_exempt_original_clis_or_unlisted_certificates(self):
++        before, after = DesktopCertificateRelinks().rows()
++        for path in ('/usr/local/bin/claude', '/usr/local/bin/codex',
++                     '/etc/ssl/certs/unobserved-provider-root.pem',
++                     '/etc/ssl/certs/e2b-ca.pem.backup'):
++            original = {**before[self.PATHS[0]], 'path': path}
++            updated = {**after[self.PATHS[0]], 'path': path}
++            for change in (updated, {**original, 'sha256': DesktopCertificateRelinks.ROOT_FRESH_SHA}):
++                with self.subTest(path=path, kind=change['kind']), patch.object(files, 'entry', return_value=change):
++                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
++                        files.verify({'version': 1, 'entries': [original]}, 'claude')
++
++    def test_claude_relink_receipts_reject_tampering_and_installation_substitution(self):
++        proof = self.proof()
++        for defect in ('missing resolved hash', 'invalid resolved hash', 'wrong raw target',
++                       'wrong baseline', 'missing original kind', 'duplicate path',
++                       'wrong finalization kind', 'wrong policy', 'replaced installation'):
++            invalid = deepcopy(proof)
++            final = invalid['finalization']
++            change = next(row for row in final['providerChanges'] if row['path'] == self.PATHS[0])
++            if defect == 'missing resolved hash':
++                change.pop('resolvedSha256')
++            elif defect == 'invalid resolved hash':
++                change['resolvedSha256'] = 'not-a-digest'
++            elif defect == 'wrong raw target':
++                change['after']['target'] = '/opt/mikka/replaced.crt'
++            elif defect == 'wrong baseline':
++                change['before']['sha256'] = DesktopCertificateRelinks.CODEX_SHA
++            elif defect == 'missing original kind':
++                change.pop('kind')
++            elif defect == 'duplicate path':
++                final['providerChanges'].append(deepcopy(change))
++            elif defect == 'wrong finalization kind':
++                final['kind'] = 'desktop'
++            elif defect == 'wrong policy':
++                final['policySha256'] = '0' * 64
++            else:
++                invalid['after'] = final['originalAfter']
++            with self.subTest(defect=defect):
++                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
++                    files.validate_receipt(invalid, 'claude')
++
++
+ if __name__ == '__main__':
+     unittest.main()

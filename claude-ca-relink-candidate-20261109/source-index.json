@@ -1,0 +1,34 @@
+[
+  {
+    "source": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+    "path": "scripts/e2b/e2b-certificate-relinks.json",
+    "mode": "100644",
+    "bytes": 106048,
+    "sha256": "a28165d7a9de3bed0b78af59c728004e82dc4d7815a14f97c2779c1eb090a845",
+    "gitBlob": "335540475a9d8aaae8f34915e087b5a862699b95"
+  },
+  {
+    "source": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+    "path": "scripts/e2b/e2b-finalization-files.json",
+    "mode": "100644",
+    "bytes": 4355,
+    "sha256": "835046e60c08e44595df509ad5911ece52f151896e5272ca53d41cec376c6c8b",
+    "gitBlob": "16d858b40d2948ac8c4ce18188843c02960bc40e"
+  },
+  {
+    "source": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+    "path": "scripts/e2b/official-files.py",
+    "mode": "100644",
+    "bytes": 21445,
+    "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5",
+    "gitBlob": "ea0819bf3e2d4ff83e64482b6336567050376591"
+  },
+  {
+    "source": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+    "path": "scripts/e2b/official-files.test.py",
+    "mode": "100644",
+    "bytes": 47201,
+    "sha256": "a02db5389d866cadcbfa743bad6eaecaefb6b1effbfb0bc863a9287d59849b84",
+    "gitBlob": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21"
+  }
+]

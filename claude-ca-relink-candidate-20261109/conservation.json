@@ -1,0 +1,94 @@
+{
+  "fixedSource": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+  "oldRuleCount": 320,
+  "newRuleCount": 322,
+  "old320RowsEqual": true,
+  "addedRows": [
+    {
+      "path": "/etc/ssl/certs/1560546e.0",
+      "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "target": "e2b-ca.pem",
+      "providerRoot": true,
+      "templates": [
+        "claude"
+      ]
+    },
+    {
+      "path": "/etc/ssl/certs/e2b-ca.pem",
+      "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "providerRoot": true,
+      "templates": [
+        "claude"
+      ]
+    }
+  ],
+  "existingDesktopCodexRulesUnchanged": true,
+  "modeExceptionAdded": false,
+  "finalizationJsonOnlyChangedField": "certificateRelinksSha256",
+  "oldCertificateHash": "a28165d7a9de3bed0b78af59c728004e82dc4d7815a14f97c2779c1eb090a845",
+  "newCertificateHash": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+  "matcherBytesIdentical": true,
+  "matcherSha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5",
+  "originalTestCount": 29,
+  "finalTestCount": 34,
+  "originalTestsInInitialRedAllPassed": 29,
+  "newTests": [
+    "ClaudeCertificateRelinks.test_claude_relinks_require_finalization_and_preserve_strict_installation",
+    "ClaudeCertificateRelinks.test_claude_relinks_reject_wrong_digest_target_kind_mode_and_owner",
+    "ClaudeCertificateRelinks.test_claude_relinks_require_the_exact_regular_provider_root_terminal",
+    "ClaudeCertificateRelinks.test_claude_relinks_do_not_exempt_original_clis_or_unlisted_certificates",
+    "ClaudeCertificateRelinks.test_claude_relink_receipts_reject_tampering_and_installation_substitution"
+  ],
+  "oldTestMaintenance": {
+    "path": "scripts/e2b/official-files.test.py",
+    "oldLine": 695,
+    "before": "('claude scope', 'claude', 'after', {}),",
+    "after": "('claude wrong baseline digest', 'claude', 'before', {'sha256': self.CODEX_SHA}),",
+    "reason": "The newly allowed Claude exact shape cannot remain a refusal expectation; retain a Claude refusal using the existing Codex source digest instead."
+  },
+  "reverseTestTransformationRestoresOriginalBytes": true,
+  "changedFiles": [
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "old": {
+        "bytes": 106048,
+        "sha256": "a28165d7a9de3bed0b78af59c728004e82dc4d7815a14f97c2779c1eb090a845",
+        "gitBlob": "335540475a9d8aaae8f34915e087b5a862699b95"
+      },
+      "new": {
+        "bytes": 106533,
+        "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+        "gitBlob": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+      }
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "old": {
+        "bytes": 4355,
+        "sha256": "835046e60c08e44595df509ad5911ece52f151896e5272ca53d41cec376c6c8b",
+        "gitBlob": "16d858b40d2948ac8c4ce18188843c02960bc40e"
+      },
+      "new": {
+        "bytes": 4355,
+        "sha256": "929fe8392a6ae9f22eed7b36180d3bdce6324a136bd71d0d2b0cf1f5ee96496d",
+        "gitBlob": "34324f43a29b3ad9a6cba88602782e8a3ccf30f3"
+      }
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "old": {
+        "bytes": 47201,
+        "sha256": "a02db5389d866cadcbfa743bad6eaecaefb6b1effbfb0bc863a9287d59849b84",
+        "gitBlob": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21"
+      },
+      "new": {
+        "bytes": 54158,
+        "sha256": "f494a8253ea8ef380ab0000664d9f8f4859cdb4f5f0a275b159e09bc7f5e1486",
+        "gitBlob": "ce4fbffa210c3e3670cc9c8fbe51c6c11da7a7f4"
+      }
+    }
+  ],
+  "controlEvidence": "pending; no official-only control artifacts read by this agent",
+  "noRootCheckoutOrRefsChanged": true
+}

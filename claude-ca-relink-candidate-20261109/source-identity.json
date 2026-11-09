@@ -1,0 +1,13 @@
+{
+  "source": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+  "tree": "18b539c3541594cfa540d1e178985f00d03ab4fc",
+  "parents": [
+    "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+    "8c423db291f8121980267cd48a24e428c992f618"
+  ],
+  "repository": "alexj11324/Mikka",
+  "sourceAcquisition": "Fixed immutable GitHub source; original checkout and all refs untouched",
+  "candidateDirectory": "/workspace/scratch/263e36984c81/claude-ca-relink-candidate-1505/candidate",
+  "candidateCommit": null,
+  "controlEvidenceReceived": false
+}
