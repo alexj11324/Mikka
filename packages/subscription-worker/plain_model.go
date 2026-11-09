@@ -11,6 +11,7 @@ import (
 	compat "github.com/router-for-me/CLIProxyAPI/v8/sdk/mikkaadapter"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"os"
 	"strings"
 	"time"
@@ -209,9 +210,15 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	conversionDone()
 	httpStarted := time.Now()
+	if trace := requestHTTPTrace(ctx, httpStarted); trace != nil {
+		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+	}
 	headersDone := timingSpan(ctx, timingHTTPHeaders)
 	response, err := client.Do(req)
 	headersDone()
+	if response != nil {
+		recordHTTPHeaders(ctx)
+	}
 	if err != nil {
 		upstreamFailure(e.Provider, "transport", 0, "network")
 		kind := "network_error"

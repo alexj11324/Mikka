@@ -135,7 +135,8 @@ export function startAnonymousCodex(input: {
       untilReady(child!, rpc!.sendRequest<{ userAgent?: string }>('initialize', {
         clientInfo: { name: 'mikka', title: 'Mikka', version: DAEMON_VERSION }, capabilities: { experimentalApi: true },
       }), 'anonymous codex initialize', input.initializeTimeoutMs ?? 30000))
-    if (!/^[A-Za-z0-9._-]+\/0\.166\.0(?:\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')
+    // Keep the versions explicit: anonymous initialization and late thread config are verified together.
+    if (!/^[A-Za-z0-9._-]+\/0\.(?:166|167)\.0(?:\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')
     await rpc.sendNotification('initialized')
     systemSkills = await captureCodexSystemSkills(input.env)
     lifetime.signal.throwIfAborted()
@@ -186,7 +187,7 @@ export function startAnonymousCodex(input: {
         state = 'adopted'; adopted = true; clearTimeout(timer)
         measurement?.finish('ok')
         return { child, rpc, initialized, nativeGenerations,
-          threadConfig: { mcp_servers: { mikka: context.server } } }
+          threadConfig: { mcp_servers: { mikka: { ...context.server, required: true } } } }
       } catch (cause) { await close(); throw cause }
     },
   }
