@@ -14,6 +14,7 @@ import { DeployedTargetError, deployedTargetGuard, assertDeployedTarget, publicT
 import { TeamWorkspaceError, selectTeamWorkspace, isTeamWorkspaceReadPath, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure } from '../acceptance/team-workspace.mjs'
 import { CORE_MODE, CoreProductionError, coreProductionGuard, assertCoreProductionTarget, coreTargetFailure } from '../acceptance/self-hosted-production-target.mjs'
 import { CORE_RPC_ACTIONS, CoreProbeError, readCoreCapabilities, coreLiveSocket, coreDeviceSocket } from '../acceptance/self-hosted-production-probes.mjs'
+import { recoverCoreCleanup } from './production-mobile-daemon-recovery.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com'
 const BASE = '/mikka'
@@ -27,7 +28,7 @@ const CODES = new Set(['configuration_invalid', 'deployment_mismatch', 'client_c
   'mobile_home_failed', 'manifest_unavailable', 'resource_baseline_invalid', 'credential_ambiguous',
   'enrollment_failed', 'registration_failed', 'device_identity', 'device_disable_failed',
   'heartbeat_failed', 'token_revoke_failed', 'credential_still_admitted', 'offline_not_observed',
-  'device_remove_failed', 'cleanup_failed', 'session_close_failed', 'proof_failed'])
+  'device_remove_failed', 'cleanup_failed', 'historical_cleanup_failed', 'session_close_failed', 'proof_failed'])
 class ProofError extends Error {
   constructor(code) { super(CODES.has(code) ? code : 'proof_failed'); this.code = this.message }
 }
@@ -127,7 +128,7 @@ async function normalDeploymentGate({ env, fetchImpl }) {
 }
 
 export async function runMobileDaemonProof({ env = process.env, event, attestation, fetchImpl = fetch, now = Date.now,
-  wait = delay, clientLoader = repositoryClient, deploymentGate = normalDeploymentGate, socketFactory } = {}) {
+  wait = delay, clientLoader = repositoryClient, deploymentGate = normalDeploymentGate, socketFactory, recoveryAnchor } = {}) {
   const core = env.MIKKA_ACCEPTANCE_TARGET_MODE === CORE_MODE
   const report = { version: 1, scope: 'production-mobile-and-source-daemon-http', status: 'fail',
     applicationSha: SHA.test(env.APPLICATION_SHA ?? '') ? env.APPLICATION_SHA : null,
@@ -158,7 +159,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   let phase = 'configuration', ownerId, teamWorkspaceId, teamRole, ownerLiveWorkspaceId, tokenId, credential, deviceId, client, contract
   let liveSocket, deviceSocket
   let beforeTokens, beforeDevices, registrationAttempted = false, signInStarted = false, signedIn = false, primaryPassed = false
-  let cleanupResponse
+  let cleanupResponse, recoveryTokenId
   let targetProof = attestation
   const error = cause => {
     if (cause instanceof DeployedTargetError) report.targetFailure = publicTargetFailure(cause)
@@ -207,7 +208,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       || (method === 'GET' && body === undefined && isTeamWorkspaceReadPath(BASE + path))
       || (method === 'GET' && body === undefined && path.startsWith('/api/device-tokens?cursor=')
         && isUuid(path.slice('/api/device-tokens?cursor='.length)))
-      || (tokenId && path === '/api/device-tokens/' + tokenId + '/revoke'),
+      || ([tokenId, recoveryTokenId].some(id => id && path === '/api/device-tokens/' + id + '/revoke')),
       'request_rejected')
     const url = new URL(BASE + path, ORIGIN)
     const cookie = cookieOverride ?? jar.header(url)
@@ -339,6 +340,22 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       && session.body.user.email?.toLowerCase() === env.SMOKE_OWNER_EMAIL.toLowerCase(), 'session_identity')
     ownerId = session.body.user.id
     report.checks.sessionOwner = true
+    if (core && targetProof.openIssues.includes(1826)) {
+      phase = 'cleanup-historical'
+      report.historicalCleanup = await recoverCoreCleanup({ ownerId, listTokens: tokens, listDevices: devices, now,
+        ...(recoveryAnchor ? { anchor: recoveryAnchor } : {}),
+        verifyTarget: async () => { cleanupResponse = undefined; await verifyDeployment() },
+        revokeToken: async id => {
+          recoveryTokenId = id
+          const response = await owner('/api/device-tokens/' + id + '/revoke', 'POST')
+          check(response.status === 200, 'token_revoke_failed')
+          return response.body
+        },
+        removeDevice: id => rpc('agents.removeDevice', [id]),
+      })
+      recoveryTokenId = undefined
+      check(report.historicalCleanup.status === 'pass', 'historical_cleanup_failed')
+    }
     phase = 'team-workspace'
     Object.assign(report, await selectTeamWorkspace({ ownerId, json: async (path, body) => {
       check(body === undefined
