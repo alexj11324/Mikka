@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { waitUntil } from '@vercel/functions'
 import { context } from '@opentelemetry/api'
 import { runJob, type JobKind } from '@/lib/tracing/jobs'
+import { withBackgroundDeviceAuthority } from '@/lib/db/device-scope'
 
 // Work that outlives its request, labelled as its own job for tracing and the
 // db_sample log (docs/operations/tracing.md, "Background work").
@@ -42,7 +43,7 @@ const kindOf = (label: JobLabel): JobKind => (label.startsWith('cron:') ? 'cron'
  */
 export function afterJob(label: JobLabel, task: () => unknown, { orRun = false, retainContext = false, schedule = after }: AfterJobOptions = {}): void {
   const parent = context.active()
-  const job = () => context.with(parent, () => runJob(label, kindOf(label), task, { detach: true }))
+  const job = () => context.with(parent, () => runJob(label, kindOf(label), () => withBackgroundDeviceAuthority(task), { detach: true }))
   const run = retainContext ? AsyncLocalStorage.bind(job) : job
   try { schedule(run) } catch (error) {
     if (!orRun) throw error
