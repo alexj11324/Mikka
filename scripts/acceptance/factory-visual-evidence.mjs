@@ -27,6 +27,7 @@ import { isExactNativeCommand } from './thread-lifecycle.mjs'
 
 export const WORKFLOW = '.github/workflows/factory-visual-evidence-acceptance.yml'
 export const WORKFLOW_NAME = 'Factory visual evidence production acceptance'
+export const HANDOFF_REPOSITORY = 'alexj11324/Mikka-handoff'
 export const CASE_STEPS = Object.freeze({ claude: 'Run real Claude Factory task and verify stored evidence',
   codex: 'Run real Codex Factory task and verify stored evidence' })
 const ROOT = resolve(import.meta.dirname, '../..')
@@ -43,7 +44,7 @@ const codes = new Set(['context', 'checkout', 'github', 'trigger', 'pull_request
   'profile_conflict', 'subscription_unavailable', 'bot', 'issue', 'dispatch', 'response', 'scope', 'run_failed',
   'task_timeout', 'attempt_budget_exceeded', 'negative_host_gate_missing', 'negative_capture_present', 'submit_receipt',
   'bypass_not_refused', 'positive_candidate', 'independent_checks', 'activity', 'media_origin', 'media_bytes', 'media_decode',
-  'report_binding', 'report_content', 'artifact_content', 'runtime_template', 'native_linux', 'native_visual', 'cleanup', 'incomplete'])
+  'report_binding', 'report_content', 'artifact_content', 'runtime_template', 'native_linux', 'native_visual', 'repository_scope', 'repository_access', 'credit_share', 'publication', 'cleanup', 'incomplete'])
 class AcceptanceError extends Error {
   constructor(code, cause) { super(`factory_visual_acceptance:${code}`, cause === undefined ? undefined : { cause }); this.code = code }
 }
@@ -243,6 +244,9 @@ export async function attestAcceptance(env, event, dependencies = {}) {
   }).trim()
   const bytes = await downloadReleaseReport(proof, { token: env.GITHUB_TOKEN, fetchImpl: dependencies.fetchImpl ?? fetch })
   const pins = releasePins(bytes, proof.upstream, workerSha)
+  // releasePins validates all three published templates. A no-repository Bot
+  // computer actually uses desktop, even when its agent harness is Claude.
+  pins.templates.desktop = JSON.parse(bytes).templates.desktop.templateId
   return { ...proof, pins, attestedAt: new Date().toISOString() }
 }
 
@@ -306,22 +310,29 @@ function toolOutput(value, depth = 0) {
   return { error: true, text: '' }
 }
 
-export function submitProof(detail, runId) {
-  const inputs = new Set(), completed = new Set()
+export function submitProof(detail, runId, { captureIds } = {}) {
+  const inputs = new Map(), completed = new Set()
   const chain = detail?.thread?.attempts
   check(Array.isArray(chain) && chain.some(value => value.runId === runId && value.status === 'succeeded'), 'submit_receipt')
   for (const item of detail.chunks ?? []) {
     const chunk = item.chunk, id = chunk?.toolCallId
     if (!scopedToolId(detail, id, runId)) continue
     check(!(chunk.type === 'tool-input-available' && chunk.toolName === 'mcp__mikka__report_blocked'), 'submit_receipt')
-    if (chunk.type === 'tool-input-available' && chunk.toolName === 'mcp__mikka__submit') inputs.add(id)
+    if (chunk.type === 'tool-input-available' && chunk.toolName === 'mcp__mikka__submit') inputs.set(id, chunk.input)
     if (chunk.type === 'tool-output-available' && inputs.has(id)) {
       const output = toolOutput(chunk.output)
       if (!output.error && output.text.trim() === 'Handed in. End your turn now.') completed.add(id)
     }
   }
   check(inputs.size === 1 && completed.size === 1, 'submit_receipt')
-  return { runId, ordinarySubmit: true, toolCallHash: hash([...completed][0]), nativeSucceeded: true }
+  if (captureIds) {
+    const declarations = inputs.get([...completed][0])?.visualEvidence
+    check(Array.isArray(declarations) && declarations.length === captureIds.length && new Set(captureIds).size === captureIds.length
+      && declarations.every(value => value.publicSafe === true && captureIds.includes(value.captureId))
+      && new Set(declarations.map(value => value.captureId)).size === captureIds.length, 'submit_receipt')
+  }
+  return { runId, ordinarySubmit: true, toolCallHash: hash([...completed][0]), nativeSucceeded: true,
+    ...(captureIds ? { visualEvidence: captureIds.map(captureId => ({ captureId, publicSafe: true })) } : {}) }
 }
 
 export function linuxProof(detail, runId) {
@@ -368,6 +379,11 @@ export function positiveProof(state, negative, proofs) {
     && task.botId === negative.botId && candidate?.kind === 'deliverable' && candidate.sha === null
     && candidate.repository === `/home/user/.mikka/bot-workspaces/${task.botId}` && candidate.taskId === task.id && candidate.scope === `issue:${task.issueId}`
     && UUID.test(candidate.runId ?? '') && candidate.runId !== negative.runId && candidate.id !== negative.candidateId, 'positive_candidate')
+  return checkedCandidate(state, candidate, proofs)
+}
+
+function checkedCandidate(state, candidate, proofs) {
+  const task = state.task
   const stages = task.route?.flowVersion === 2 ? ['execute', 'review'] : ['execute', 'review', 'verify']
   const attempts = state.attempts.filter(value => value.output?.requestEpoch === task.sourceEventId && stages.includes(value.stage))
   check(attempts.length === stages.length && stages.every(stage => attempts.filter(value => value.stage === stage).length === 1)
@@ -378,6 +394,30 @@ export function positiveProof(state, negative, proofs) {
   return { taskId: task.id, issueId: task.issueId, candidateId: candidate.id, runId: candidate.runId, sourceEventId: task.sourceEventId,
     revision: task.revision, flowVersion: task.route?.flowVersion === 2 ? 2 : 1,
     checks: attempts.map(value => ({ stage: value.stage, runId: value.runId, attemptId: value.id, status: value.status })) }
+}
+
+export function repositoryPositiveProof(state, { issueId, botId }, proofs) {
+  const task = state?.task, candidate = currentCandidate(state)
+  check(task?.issueId === issueId && task.botId === botId && UUID.test(task.id ?? '') && UUID.test(task.sourceEventId ?? '')
+    && task.stage === 'approval' && ['pending', 'waiting'].includes(task.status)
+    && candidate?.kind === 'repository' && SHA.test(candidate.sha ?? '') && candidate.taskId === task.id
+    && [`https://github.com/${HANDOFF_REPOSITORY}`, `https://github.com/${HANDOFF_REPOSITORY}.git`].includes(candidate.repository)
+    && candidate.scope === `issue:${issueId}` && UUID.test(candidate.runId ?? ''), 'positive_candidate')
+  return { ...checkedCandidate(state, candidate, proofs), repository: HANDOFF_REPOSITORY, candidateSha: candidate.sha }
+}
+
+export function publicationProof(activity, positive, identifier) {
+  const publications = activity?.artifacts?.filter(value => value.kind === 'pull_request' && value.runId === positive.runId
+    && value.candidateId === positive.candidateId) ?? []
+  check(publications.length === 1 && /^[A-Za-z][A-Za-z0-9]*-[1-9][0-9]*$/.test(identifier ?? ''), 'publication')
+  const publication = publications[0]
+  check(new RegExp(`^https://github\\.com/${HANDOFF_REPOSITORY}/pull/[1-9][0-9]*$`).test(publication.url ?? '')
+    && ['open', 'draft'].includes(publication.state) && activity.task?.pullRequest?.url === publication.url
+    && ['open', 'draft'].includes(activity.task.pullRequest.state), 'publication')
+  return { repository: HANDOFF_REPOSITORY, url: publication.url, state: publication.state, runId: positive.runId,
+    candidateId: positive.candidateId, candidateSha: positive.candidateSha, branch: `mikka/${identifier.toLowerCase()}`,
+    issueId: positive.issueId, source: 'host_published_run_activity', directGitHubRead: 'pending_operator_connector_verification',
+    merged: false }
 }
 
 /** Only fixed same-origin host routes are allowed to receive session cookies. */
@@ -489,34 +529,135 @@ export async function readActivityEvidence(client, activity, positive, { directo
       downloadUrl: report.downloadUrl, bytes: bytes.length, sha256: hash(bytes), file: reportFile }, media: receipts }
 }
 
+export function retainedEvidenceProof(snapshot, positive, before, after) {
+  const task = snapshot?.task
+  check(task?.id === positive.taskId && task.issueId === positive.issueId && task.candidateId === positive.candidateId
+    && task.stage === 'approval' && task.status === 'cancelled' && positiveInteger(task.revision) && task.revision > positive.revision, 'cleanup')
+  const report = value => Object.fromEntries(['artifactId', 'version', 'runId', 'candidateId', 'downloadUrl', 'bytes', 'sha256'].map(key => [key, value?.[key]]))
+  const media = value => value.map(item => ({ captureId: item.captureId, runId: item.runId, kind: item.kind, source: item.source,
+    url: item.url, reportUrl: item.reportUrl, bytes: item.bytes, sha256: item.sha256, decoded: item.decoded,
+    ...(item.poster ? { poster: { url: item.poster.url, bytes: item.poster.bytes, sha256: item.poster.sha256, decoded: item.poster.decoded } } : {}) }))
+    .sort((a, b) => a.captureId.localeCompare(b.captureId))
+  check(isDeepStrictEqual(report(before.report), report(after.report)) && isDeepStrictEqual(media(before.media), media(after.media)), 'report_binding')
+  return { handoffVerifiedBeforeCleanup: true, normalCancellationAfterVerification: true,
+    taskId: task.id, issueId: task.issueId, candidateId: task.candidateId, revision: task.revision, stage: task.stage, status: task.status,
+    immutableReportUnchanged: true, allMediaUnchanged: true, evidence: after }
+}
+
 const definition = value => Object.fromEntries(['name', 'description', 'roles', 'enabled', 'harness', 'model', 'effort', 'instructions', 'skills']
   .filter(key => value[key] !== undefined).map(key => [key, structuredClone(value[key])]))
 const profilePath = (workspaceId, id = '') => `/api/factory/agent-profiles${id ? '/' + id : ''}?workspaceId=${workspaceId}`
+
+/** The normal team action can only change the signed-in member's own share.
+ * It exposes no revision/CAS field: the shared acceptance queue plus exact
+ * own-state readbacks scope this temporary opt-in, including lost responses. */
+export function ownCreditShare(client, workspaceId, write) {
+  const state = { initial: null, writeAttempted: false, observed: null, restored: false }
+  const read = async () => {
+    const value = await client.rpc('personal-policy.getCreditShare', [workspaceId])
+    check(value?.canShare === true && typeof value.mine === 'boolean', 'credit_share')
+    return value.mine
+  }
+  return { state,
+    async prepare() {
+      state.initial = await read()
+      if (!state.initial) {
+        await write(async () => {
+          check(await read() === false, 'credit_share')
+          state.writeAttempted = true
+          const changed = await client.rpc('personal-policy.updateCreditShare', [true, workspaceId])
+          check(changed?.mine === true && changed.canShare === true, 'credit_share')
+        })
+      }
+      state.observed = await read(); check(state.observed === true, 'credit_share')
+    },
+    async restore() {
+      if (state.initial !== false || !state.writeAttempted) return
+      if (await read() === true) {
+        const changed = await client.rpc('personal-policy.updateCreditShare', [false, workspaceId])
+        check(changed?.mine === false && changed.canShare === true, 'credit_share')
+      }
+      check(await read() === false, 'credit_share'); state.restored = true
+    },
+  }
+}
+
+/** Check the actual delivered Git tree. Temporary tools/media must never ride
+ * along in snapshotTree's git add --all or the human's acceptance PR. This
+ * self-contained function is also embedded in the native browser command. */
+export function repositorySnapshot(repository, relativeFile, cwd = process.cwd()) {
+  const git = args => execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 30_000, maxBuffer: 100_000,
+    stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  const origin = git(['remote', 'get-url', 'origin'])
+  const head = git(['rev-parse', 'HEAD']), base = git(['rev-parse', 'refs/remotes/origin/main'])
+  if (![`https://github.com/${repository}`, `https://github.com/${repository}.git`].includes(origin)
+    || !/^[a-f0-9]{40}$/.test(head) || !/^[a-f0-9]{40}$/.test(base) || head === base
+    || git(['status', '--porcelain=v1', '--untracked-files=all']) !== ''
+    || git(['rev-list', '--count', `${base}..${head}`]) !== '1'
+    || git(['diff', '--no-ext-diff', '--name-status', `${base}...${head}`]) !== `A\t${relativeFile}`) throw new Error('repository_scope')
+  git(['merge-base', '--is-ancestor', base, head])
+  return { repository, head, base, changedFiles: [relativeFile], clean: true, singleCommit: true }
+}
+
+// Official cloud-worker.ts fixes dataDir at /home/user/.mikka/worker. Hosted
+// machineEnvironment deliberately preserves the native environment rather
+// than setting TMPDIR; the supervisor does bind MIKKA_RUN_ID. runPaths and
+// RunContext create this exact existing tmp root and authorize submit_capture
+// to it. Check its realpath before creating any marker-owned children.
+const temporaryRootProgram = [
+  "const runId = process.env.MIKKA_RUN_ID",
+  "assert.match(runId ?? '', /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i)",
+  "const allowedTemporary = '/home/user/.mikka/worker/adapters/runs/' + runId + '/tmp'",
+  "const temporary = await realpath(allowedTemporary), root = await realpath(process.cwd())",
+  "assert.equal(temporary, allowedTemporary)",
+  "assert.ok(temporary !== root && !temporary.startsWith(root + '/'))",
+]
+
+export function visualSetupCommand(marker) {
+  check(/^[a-z0-9-]+$/.test(marker), 'context')
+  return ["node --input-type=module <<'MIKKA_1783_TOOLS'", "import assert from 'node:assert/strict'",
+    "import { mkdir, realpath } from 'node:fs/promises'", "import { join } from 'node:path'", "import { execFileSync } from 'node:child_process'",
+    ...temporaryRootProgram, `const directory = join(temporary, ${JSON.stringify(marker)}), tools = join(directory, 'tools')`,
+    "await mkdir(tools, { recursive: true, mode: 0o700 })",
+    "execFileSync('npm', ['install', '--prefix', tools, '--ignore-scripts', '--no-package-lock', '@playwright/test@1.64.1'], { stdio: 'inherit' })",
+    "execFileSync(process.execPath, [join(tools, 'node_modules/playwright/cli.js'), 'install', '--with-deps', 'chromium'], { stdio: 'inherit', env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: join(directory, 'browsers') } })",
+    'MIKKA_1783_TOOLS'].join('\n')
+}
 
 /** A real browser opens and reloads the on-disk deliverable. This exact native
  * program is matched against stored shell input/output, then its files against
  * submit_capture receipts and the downloaded captures. The same released
  * FFmpeg processor computes the expected encoded video before normal upload;
  * original WebM and encoded MP4 have deliberately different byte identities. */
-export function visualCommand({ marker, title, content }, sourceCommit, workerSha) {
-  check(/^[a-z0-9-]+$/.test(marker) && title === marker + '.txt' && SHA.test(sourceCommit) && SHA.test(workerSha), 'context')
+export function visualCommand({ marker, title, content, repository = null, relativeFile = title }, sourceCommit, workerSha) {
+  check(/^[a-z0-9-]+$/.test(marker) && title === marker + '.txt' && SHA.test(sourceCommit) && SHA.test(workerSha)
+    && (repository === null && relativeFile === title || repository === HANDOFF_REPOSITORY && relativeFile === `docs/issue-1783/${title}`), 'context')
   return ["node --input-type=module <<'MIKKA_1783_VISUAL'",
     "import assert from 'node:assert/strict'",
     "import { readFile, mkdir, realpath } from 'node:fs/promises'",
     "import { resolve, join } from 'node:path'",
     "import { createServer } from 'node:http'",
     "import { createHash } from 'node:crypto'",
-    "import { chromium } from '@playwright/test'",
+    "import { createRequire } from 'node:module'",
+    "import { execFileSync } from 'node:child_process'",
     "import { processCaptureVideo } from '/opt/mikka/worker/packages/daemon/src/agents/capture-video.mjs'",
-    `const spec = ${JSON.stringify({ marker, title, content, sourceCommit, workerSha })}`,
+    `const spec = ${JSON.stringify({ marker, title, content, sourceCommit, workerSha, repository, relativeFile })}`,
     "assert.equal(process.platform, 'linux')",
     "assert.equal((await readFile('/opt/mikka/worker-source-sha', 'utf8')).trim(), spec.workerSha)",
     "assert.equal(await realpath('/opt/mikka/worker'), '/opt/mikka/releases/' + spec.sourceCommit + '/source')",
     "const sha = bytes => createHash('sha256').update(bytes).digest('hex')",
-    "const file = resolve(spec.title), bytes = await readFile(file)",
+    "const file = resolve(spec.relativeFile), bytes = await readFile(file)",
     "assert.equal(bytes.toString('utf8'), spec.content)",
-    "const directory = resolve('.' + spec.marker + '-visual')",
+    ...temporaryRootProgram,
+    "const tools = join(temporary, spec.marker, 'tools'), require = createRequire(join(tools, 'package.json'))",
+    "assert.equal(require('@playwright/test/package.json').version, '1.64.1')",
+    "process.env.PLAYWRIGHT_BROWSERS_PATH = join(temporary, spec.marker, 'browsers')",
+    "const { chromium } = require('@playwright/test')",
+    "const directory = join(temporary, spec.marker, 'visual')",
     "await mkdir(directory, { mode: 0o700 })",
+    `const repositorySnapshot = ${repositorySnapshot.toString()}`,
+    "const repositoryProof = spec.repository ? repositorySnapshot(spec.repository, spec.relativeFile) : null",
+    "if (repositoryProof) { execFileSync('node', ['--test', 'scripts/validate-factory-files.test.mjs'], { timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] }); execFileSync('node', ['scripts/validate-factory-files.mjs'], { timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] }); repositoryProof.existingTestsPassed = true }",
     "const escape = text => text.replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[char])",
     "const server = createServer(async (_request, response) => {",
     "  try { const current = await readFile(file); assert.ok(current.equals(bytes)); response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }); response.end('<!doctype html><meta charset=utf-8><title>Factory verification</title><style>body{font:22px monospace;margin:48px;color:#14283c}pre{white-space:pre-wrap}</style><h1>Factory verification</h1><pre>' + escape(current.toString('utf8')) + '</pre><p>SHA-256: ' + sha(current) + '</p><p>Platform: ' + process.platform + '</p>') }",
@@ -537,12 +678,13 @@ export function visualCommand({ marker, title, content }, sourceCommit, workerSh
     "const processed = await processCaptureVideo(rawVideo, encodedPath)",
     "const image = await readFile(imagePath), original = await readFile(rawVideo), encoded = await readFile(encodedPath)",
     "assert.equal(processed.processing.originalSha256, sha(original)); assert.equal(processed.size, encoded.length)",
-    "console.log('MIKKA_1783_VISUAL ' + JSON.stringify({ version: 1, marker: spec.marker, sourceCommit: spec.sourceCommit, workerSha: spec.workerSha, platform: process.platform, pageMatched: true, reloadMatched: true, fileSha256: sha(bytes), image: { path: imagePath, bytes: image.length, sha256: sha(image) }, video: { path: rawVideo, originalSha256: sha(original), encodedBytes: encoded.length, encodedSha256: sha(encoded), durationMs: processed.durationMs } }))",
+    "if (repositoryProof) assert.deepEqual({ ...repositorySnapshot(spec.repository, spec.relativeFile), existingTestsPassed: true }, repositoryProof)",
+    "console.log('MIKKA_1783_VISUAL ' + JSON.stringify({ version: 1, marker: spec.marker, sourceCommit: spec.sourceCommit, workerSha: spec.workerSha, runId, temporaryRootVerified: true, temporaryOutsideWorktree: true, platform: process.platform, pageMatched: true, reloadMatched: true, fileSha256: sha(bytes), repository: repositoryProof, image: { path: imagePath, bytes: image.length, sha256: sha(image) }, video: { path: rawVideo, originalSha256: sha(original), encodedBytes: encoded.length, encodedSha256: sha(encoded), durationMs: processed.durationMs } }))",
     'MIKKA_1783_VISUAL',
   ].join('\n')
 }
 
-export function nativeVisualProof(detail, runId, command, fixtureData, sourceCommit, workerSha, evidence) {
+export function nativeVisualProof(detail, runId, command, fixtureData, sourceCommit, workerSha, evidence, candidateSha) {
   const shell = new Set(), captures = new Map(), receipts = [], linked = []
   for (const item of detail.chunks ?? []) {
     const chunk = item.chunk, id = chunk?.toolCallId
@@ -566,9 +708,14 @@ export function nativeVisualProof(detail, runId, command, fixtureData, sourceCom
   check(shell.size === 1 && receipts.length === 1 && linked.length === 2 && evidence.media.length === 2, 'native_visual')
   const receipt = receipts[0]
   check(receipt.version === 1 && receipt.marker === fixtureData.marker && receipt.sourceCommit === sourceCommit && receipt.workerSha === workerSha && receipt.platform === 'linux'
+    && receipt.runId === runId && receipt.temporaryRootVerified === true && receipt.temporaryOutsideWorktree === true
     && receipt.pageMatched === true && receipt.reloadMatched === true && receipt.fileSha256 === hash(fixtureData.content)
     && DIGEST.test(receipt.image?.sha256 ?? '') && DIGEST.test(receipt.video?.originalSha256 ?? '')
     && DIGEST.test(receipt.video?.encodedSha256 ?? '') && positive(receipt.video?.durationMs), 'native_visual')
+  if (fixtureData.repository) check(receipt.repository?.repository === HANDOFF_REPOSITORY && receipt.repository.head === candidateSha
+    && SHA.test(candidateSha ?? '') && SHA.test(receipt.repository.base ?? '') && receipt.repository.base !== candidateSha
+    && isDeepStrictEqual(receipt.repository.changedFiles, [fixtureData.relativeFile]) && receipt.repository.clean === true
+    && receipt.repository.singleCommit === true && receipt.repository.existingTestsPassed === true, 'repository_scope')
   for (const media of evidence.media) {
     const native = media.kind === 'image' ? receipt.image : receipt.video
     check(media.runId === runId && media.source === 'local' && linked.filter(value => value.captureId === media.captureId && value.path === native.path).length === 1
@@ -576,22 +723,37 @@ export function nativeVisualProof(detail, runId, command, fixtureData, sourceCom
       && media.bytes === (media.kind === 'image' ? native.bytes : native.encodedBytes), 'native_visual')
   }
   return { runId, platform: 'linux', workerSourceCommit: sourceCommit, workerSha, exactNativeCommandSha256: hash(command),
+    temporaryRootVerified: true, temporaryOutsideWorktree: true,
     pageMatched: true, reloadMatched: true, fileSha256: receipt.fileSha256,
     imageSha256: receipt.image.sha256, videoOriginalSha256: receipt.video.originalSha256,
-    videoEncodedSha256: receipt.video.encodedSha256, captureIds: linked.map(value => value.captureId) }
+    videoEncodedSha256: receipt.video.encodedSha256, captureIds: linked.map(value => value.captureId),
+    ...(fixtureData.repository ? { repository: receipt.repository } : {}) }
 }
 
-function fixture(sourceCommit, workerSha, item, driver) {
+export function fixture(sourceCommit, workerSha, item, driver) {
   const marker = `m1783-${sourceCommit.slice(0, 10)}-${item.id}-${driver.runId}-${driver.runAttempt}`
   const title = `${marker}.txt`, content = `Factory visual evidence #1783\nrevision=${sourceCommit}\nharness=${item.harness}\nstatus=verified\n`
-  const shared = `Use only the selected official subscription ${item.model} and cloud Linux. Deliver the text Artifact ${title}; its UTF-8 bytes must equal ${JSON.stringify(content)}. Read the actual file back. This is a no-repository deliverable: no GitHub push, PR, merge, external message, account/configuration change, subagent, model switch, paid API key or retry. `
+  const repository = item.id === 'codex' ? HANDOFF_REPOSITORY : null, relativeFile = repository ? `docs/issue-1783/${title}` : title
+  const shared = `Use only the selected official subscription ${item.model} and cloud Linux. Create ${relativeFile} and deliver its text Artifact titled ${title}; its UTF-8 bytes must equal ${JSON.stringify(content)}. Read the actual file back. No merge, external message, account/configuration change, subagent, model switch or paid API key. `
   const negative = shared + 'This first run is an authorized negative acceptance of the host visual-evidence gate. Create and submit that ordinary Artifact, then call the ordinary Mikka submit MCP tool exactly once, with truthful passing file criteria, but without taking/uploading any screenshot or recording and without visualEvidence. The product host must refuse the handoff after this real submit. A prose assertion, report_blocked, fabricated report/capture, editing host state or skipping submit does not exercise this test and is a failure. Do not claim that the host allowed the handoff. Stop after the one submit.'
-  const captureCommand = visualCommand({ marker, title, content }, sourceCommit, workerSha)
-  const followup = shared + 'This follow-up replaces the earlier deliberate omission: now complete the same deliverable with real visual evidence in THIS continuation run. Prepare and submit the text Artifact first. Execute exactly uname -s as one shell tool call. In your own worktree only, install @playwright/test@1.64.1 and its Chromium if absent. Then execute the complete command below unchanged as ONE ordinary shell tool call; it actually reads the file, opens/reloads it in Chromium, takes a screenshot, records real video, verifies the released worker source and runs the released FFmpeg processor. No synthesized image/video, substituted program or invented receipt. After it succeeds, use normal Mikka submit_capture twice: the exact image.path and RAW video.path from its native JSON receipt, with no steps argument. Never upload expected.mp4 (that is only the independent encoded-byte comparison). Do not modify these files after the command. Finally call ordinary Mikka submit once with truthful criteria and both actual capture IDs; let Factory run independent review and stop at Owner acceptance. No retry or new issue.\n\n' + captureCommand
-  return { marker, title, content, negative, followup, captureCommand }
+  const captureCommand = visualCommand({ marker, title, content, repository, relativeFile }, sourceCommit, workerSha)
+  const setupCommand = visualSetupCommand(marker)
+  const visual = 'Prepare and submit the text Artifact first. Execute exactly uname -s as one shell tool call. Run the setup command below in this task VM; it installs pinned Playwright and actual Chromium system dependencies only here, using the existing run-private capture temporary directory. A missing package, denied sudo or browser dependency is a real failure; never substitute an invented screenshot or video. After setup has fully finished, execute the complete browser command below unchanged as ONE ordinary shell tool call; it actually reads the file, opens/reloads it in Chromium, takes a screenshot, records real video, verifies the released worker source and runs the released FFmpeg processor. No synthesized image/video, substituted program or invented receipt. After it succeeds, use normal Mikka submit_capture twice: the exact image.path and RAW video.path from its native JSON receipt, with no steps argument. Never upload expected.mp4 (that is only the independent encoded-byte comparison). Do not modify these files after the command. Finally call ordinary Mikka submit once with truthful criteria and visualEvidence containing BOTH actual capture IDs with publicSafe:true; these fixture bytes contain no private account data. Let Factory run independent review and stop at Owner acceptance. No new issue or model execution retry.\n\nSetup command:\n' + setupCommand + '\n\nBrowser command:\n' + captureCommand
+  const followup = shared + 'This is a no-repository deliverable: no GitHub push or PR. This follow-up replaces the earlier deliberate omission: complete the same deliverable with real visual evidence in THIS continuation run. ' + visual
+  const initial = repository ? shared + `Use only the existing authorized repository ${repository}. Add ONLY ${relativeFile}; do not touch existing files, fixtures, workflows or configuration. Keep dependencies, browser cache and media in the existing run-private temporary directory, outside the checkout. Keep the current local branch. Make exactly one commit, push only HEAD to the server-assigned mikka/<issue-identifier> branch without force, and create this task's own pull request using normal gh with the required final issue marker. Do not reuse someone else's PR. Run all existing repository tests and gh pr checks --watch until every actual final-head check succeeds. The browser command verifies the clean Git tree and that the complete diff from origin/main contains only this one newly added file; run it AFTER the final commit and successful PR CI. Do not merge, close or delete the PR/branch; the human owner retains that decision. ` + visual : negative
+  return { marker, title, content, repository, relativeFile, negative, followup, initial, setupCommand, captureCommand }
 }
 
-/** One normal initial request and one normal thread continuation. No endpoint
+export function initialRequest(fixtureData, { issueId, botId, profileId, item }) {
+  check([issueId, botId, profileId].every(value => UUID.test(value ?? '')), 'context')
+  const tool = fixtureData.repository ? 'dispatch_run' : 'dispatch_bot_computer'
+  const input = fixtureData.repository ? { issueId, profileId, repo: HANDOFF_REPOSITORY, target: 'cloud', model: { harness: item.harness, model: item.model } }
+    : { issueId, botId, profileId, harness: item.harness, model: item.model }
+  return `Read existing task ${issueId} (${fixtureData.marker}) with get_issue, then dispatch it exactly once through the normal ${tool} tool with ${JSON.stringify(input)}. This normal tool already binds Factory, independent review and Owner acceptance. Its saved issue content contains the complete instructions and exact native commands; the host passes that content to the producer, so no duplicate note is needed. Do not create another issue, invoke legacy device-repository dispatch_factory_task, select another repository/model or start another execution.`
+}
+
+/** Claude uses one normal initial request and one thread continuation. Codex
+ * uses one normal repository request. No endpoint
  * accepts a synthetic finish/report/capture, and no database client is used. */
 export async function runProductionCase(proof, item, { env = process.env, fetchImpl = fetch, now = Date.now,
   openLiveImpl = openLive, directory, timeoutMs = 12 * 60_000 } = {}) {
@@ -600,9 +762,10 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
   const client = createSessionClient(ORIGIN, fetchImpl), fixtureData = fixture(proof.sourceCommit, proof.pins.workerSha, item, proof.driver)
   const result = { version: 1, issue: 1783, sourceCommit: proof.sourceCommit, case: item.id, harness: item.harness, model: item.model,
     driver: proof.driver, window: proof.window, runtime: proof.pins, status: 'running', startedAt: iso(now),
-    budget: { initialRequests: 1, followups: 1, maximumNativeRuns: 4, timeoutMs }, cleanup: { status: 'running', errors: [] } }
+    scenario: fixtureData.repository ? 'repository_publication' : 'missing_evidence_then_deliverable',
+    budget: { initialRequests: 1, followups: fixtureData.repository ? 0 : 1, maximumNativeRuns: fixtureData.repository ? 3 : 4, timeoutMs }, cleanup: { status: 'running', errors: [] } }
   const account = smokeAcceptanceAccount(env), disabled = []
-  let loggedIn = false, ownerId, scope, originalWorkspaceId, profile, botId, live, prepared = false
+  let loggedIn = false, ownerId, scope, originalWorkspaceId, profile, botId, live, prepared = false, creditShare
   const record = { title: fixtureData.marker, cleanup: { status: 'running', errors: [] } }
   const lease = productionWindowGuard(proof.window, path => github(path, { token: env.GITHUB_TOKEN, fetchImpl }), { now })
   const pin = async () => { lease.current(); const version = await client.json('/api/version'); check(version.build === proof.sourceCommit, 'build_changed'); lease.current(); return version.build }
@@ -625,14 +788,14 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
         if (!machineProofs.has(attempt.runId)) {
           const machine = await client.rpc('agents.getThreadMachine', [record.issueId, attempt.runId])
           if (machine?.cloud) {
-            check(machine.kind === 'cloud' && machine.cloud.template === proof.pins.templates[item.harness], 'runtime_template')
+            check(machine.kind === 'cloud' && machine.cloud.template === proof.pins.templates[fixtureData.repository ? item.harness : 'desktop'], 'runtime_template')
             machineProofs.set(attempt.runId, { runId: attempt.runId, kind: 'cloud', templateId: machine.cloud.template,
               sandboxHash: hash(machine.cloud.sandboxId).slice(0, 16) })
           }
         }
       }
     }
-    check(runs.size <= 4, 'attempt_budget_exceeded')
+    check(runs.size <= result.budget.maximumNativeRuns, 'attempt_budget_exceeded')
     const active = (await client.json(profilePath(scope.workspaceId))).profiles.filter(value => value.enabled && !value.archivedAt)
     check(active.length === 1 && active[0].id === profile.id && active[0].version === profile.version && active[0].digest === profile.digest, 'profile_conflict')
     check((await client.json(`/api/settings/api-keys?workspace=${scope.workspaceId}`)).apiKeyAfterQuota === false, 'fallback_enabled')
@@ -650,7 +813,9 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
       check(now() < deadline, 'task_timeout')
       const before = live.revision
       await pin()
-      const observed = await currentState(), value = await readiness(observed)
+      const observed = await currentState()
+      if (record.runId && !result.coordinatorStopped) { await client.rpc('coordinator.stopCoordinatorTurn', [botId]); result.coordinatorStopped = true }
+      const value = await readiness(observed)
       if (value) return value
       check(![...proofs.values()].some(value => ['failed', 'stopped', 'cancelled', 'paused'].includes(value.status)), 'run_failed')
       try { await live.wait(before, Math.min(deadline, Date.parse(proof.window.expiresAt))) }
@@ -670,9 +835,20 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
       client.json(profilePath(scope.workspaceId))])
     check(Array.isArray(threads.items) && Array.isArray(tasks.items) && [...threads.items, ...tasks.items].every(value => TERMINAL.has(value.status)), 'owner_busy')
     check(keys.apiKeyAfterQuota === false, 'fallback_enabled')
+    if (fixtureData.repository) {
+      try {
+        const integration = await client.json('/api/integrations/github')
+        check(integration.viewerId === ownerId && integration.connected === true && integration.installed === true
+          && integration.repositories?.filter(value => value.fullName === HANDOFF_REPOSITORY).length === 1, 'repository_access')
+      } catch (cause) { throw new AcceptanceError('repository_access', cause) }
+      result.repositoryAccess = { repository: HANDOFF_REPOSITORY, source: 'current_owner_authorized_repositories', authorized: true }
+    }
     const candidates = (order.candidates ?? []).filter(value => value.harness === item.harness && value.model === item.model
       && value.source?.kind === 'subscription' && UUID.test(value.source.connectionId ?? '') && value.credentialOwnerId === scope.adminId)
     check(candidates.length === 1 && Array.isArray(profiles.profiles), 'subscription_unavailable')
+    creditShare = ownCreditShare(client, scope.workspaceId, operation => lease.write(operation))
+    result.creditShare = creditShare.state
+    await creditShare.prepare()
     // Shared test account, exclusive shared queue, version/digest CAS. Preserve
     // full definitions in memory only and restore even after a rejected write.
     for (const existing of profiles.profiles.filter(value => value.enabled && !value.archivedAt)) {
@@ -695,90 +871,104 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
     check(UUID.test(profile?.id ?? '') && positive(profile.version) && DIGEST.test(profile.digest ?? '')
       && profile.harness === item.harness && profile.model?.model === item.model
       && profile.model.source?.connectionId === candidates[0].source.connectionId, 'profile')
-    const bot = await lease.write(() => client.rpc('bots.createBot', [{ name: fixtureData.marker, color: 'gris', shape: 'cercle', model: null, repository: null }]))
+    const bot = await lease.write(() => client.rpc('bots.createBot', [{ name: fixtureData.marker, color: 'gris', shape: 'cercle', model: null, repository: fixtureData.repository }]))
     check(UUID.test(bot?.id ?? ''), 'bot'); botId = bot.id; scope.botId = botId
     const observedBot = await client.json(`/api/bots/${botId}`)
     check(observedBot.id === botId && observedBot.name === fixtureData.marker, 'bot')
     result.botId = botId; result.profileId = profile.id
     await lease.write(() => chooseSharedChatModel(client, botId, item.harness))
     const issue = await lease.write(() => client.rpc('issues.saveIssue', [{ title: fixtureData.marker, status: 'todo', priority: 'low', content: { type: 'doc', content: [
-      { type: 'paragraph', content: [{ type: 'text', text: fixtureData.negative }] },
+      { type: 'paragraph', content: [{ type: 'text', text: fixtureData.initial }] },
     ] } }]))
     check(UUID.test(issue.issue?.id ?? ''), 'issue'); record.issueId = issue.issue.id; result.issueId = record.issueId
+    record.identifier = issue.issue.identifier
     live = await openLiveImpl(path => client.json(path), scope.workspaceId, { now })
     const trace = sampledRequestTrace()
-    const input = `Use the existing task ${record.issueId} (${fixtureData.marker}) exactly once through ordinary Factory dispatch (dispatch_factory_task), on cloud with selected Profile ${profile.id}. Do not create another issue or bypass Factory with dispatch_run. The task is a deliberately missing-evidence first phase; pass its exact instructions through to the producer. ${fixtureData.negative}`
+    const input = initialRequest(fixtureData, { issueId: record.issueId, botId, profileId: profile.id, item })
     const queued = await lease.write(() => client.rpc('coordinator.sendCoordinatorMessage', [input, null, botId, randomUUID(), { kind: 'cloud' }, null, [], { $mikka: 'undefined' }, profile.id],
       { headers: { traceparent: trace.traceparent } }))
     check(queued.queued === true, 'dispatch'); result.initialRequestSent = true
     const deadline = now() + timeoutMs
-    const negativeState = await waitFor(async observed => {
-      const state = observed.find(value => value.task.stage === 'execute' && value.task.status === 'blocked')
-      if (state) return state
-      check(!observed.some(value => ['review', 'verify', 'approval', 'publish'].includes(value.task.stage)), 'negative_host_gate_missing')
-      return null
-    }, deadline)
-    const negativeCandidate = currentCandidate(negativeState)
-    const negativeRunId = negativeCandidate?.runId ?? negativeState.attempts.find(value => value.id === negativeState.task.attemptId)?.runId
-    check(UUID.test(negativeRunId ?? ''), 'negative_host_gate_missing')
-    const negativeDetail = await client.rpc('agents.getIssueThread', [record.issueId, negativeRunId])
-    try {
-      result.negative = { ...negativeProof(negativeState, runs.get(negativeRunId), negativeDetail), rootRunId: negativeDetail.thread.rootRunId,
-        // Retain the persisted task status separately from the test result.
-        testStatus: 'passed' }
-      check(machineProofs.has(result.negative.runId), 'runtime_template')
-    } catch (error) {
-      result.negative = { testStatus: 'failed', failure: safeFailure(error), taskId: negativeState.task.id, issueId: record.issueId, botId,
-        runId: negativeRunId, candidateId: negativeCandidate?.id ?? null, sourceEventId: negativeState.task.sourceEventId,
-        rootRunId: negativeDetail.thread.rootRunId,
-        stage: negativeState.task.stage, status: negativeState.task.status,
-        nativeStatus: runs.get(negativeRunId)?.run?.status ?? null,
-        readyCaptureCount: runs.get(negativeRunId)?.captures?.length ?? null,
-        ordinarySubmitInputs: (negativeDetail.chunks ?? []).filter(value => value.chunk?.type === 'tool-input-available' && value.chunk.toolName === 'mcp__mikka__submit').length,
-        reportBlockedInputs: (negativeDetail.chunks ?? []).filter(value => value.chunk?.type === 'tool-input-available' && value.chunk.toolName === 'mcp__mikka__report_blocked').length }
-      // A model choosing report_blocked is a failed negative test. Still run
-      // its ordinary follow-up and the other subscription to collect the
-      // remaining real evidence; neither can turn this negative into a pass.
+    let positiveState
+    if (!fixtureData.repository) {
+      const negativeState = await waitFor(async observed => {
+        const state = observed.find(value => value.task.stage === 'execute' && value.task.status === 'blocked')
+        if (state) return state
+        check(!observed.some(value => ['review', 'verify', 'approval', 'publish'].includes(value.task.stage)), 'negative_host_gate_missing')
+        return null
+      }, deadline)
+      const negativeCandidate = currentCandidate(negativeState)
+      const negativeRunId = negativeCandidate?.runId ?? negativeState.attempts.find(value => value.id === negativeState.task.attemptId)?.runId
+      check(UUID.test(negativeRunId ?? ''), 'negative_host_gate_missing')
+      const negativeDetail = await client.rpc('agents.getIssueThread', [record.issueId, negativeRunId])
+      try {
+        result.negative = { ...negativeProof(negativeState, runs.get(negativeRunId), negativeDetail), rootRunId: negativeDetail.thread.rootRunId,
+          // Retain the persisted task status separately from the test result.
+          testStatus: 'passed' }
+        check(machineProofs.has(result.negative.runId), 'runtime_template')
+      } catch (error) {
+        result.negative = { testStatus: 'failed', failure: safeFailure(error), taskId: negativeState.task.id, issueId: record.issueId, botId,
+          runId: negativeRunId, candidateId: negativeCandidate?.id ?? null, sourceEventId: negativeState.task.sourceEventId,
+          rootRunId: negativeDetail.thread.rootRunId,
+          stage: negativeState.task.stage, status: negativeState.task.status,
+          nativeStatus: runs.get(negativeRunId)?.run?.status ?? null,
+          readyCaptureCount: runs.get(negativeRunId)?.captures?.length ?? null,
+          ordinarySubmitInputs: (negativeDetail.chunks ?? []).filter(value => value.chunk?.type === 'tool-input-available' && value.chunk.toolName === 'mcp__mikka__submit').length,
+          reportBlockedInputs: (negativeDetail.chunks ?? []).filter(value => value.chunk?.type === 'tool-input-available' && value.chunk.toolName === 'mcp__mikka__report_blocked').length }
+        // A model choosing report_blocked is a failed negative test. Still run
+        // its ordinary follow-up and the other subscription to collect the
+        // remaining real evidence; neither can turn this negative into a pass.
+      }
+      // Try the real human accept entry once. Its rejection and unchanged
+      // persisted revision demonstrate that the owner UI cannot bypass the gate.
+      const binding = { taskId: negativeState.task.id, issueId: record.issueId, attemptId: negativeState.task.attemptId,
+        candidateId: negativeCandidate?.id ?? null, revision: negativeState.task.revision }
+      if (result.negative.testStatus === 'passed') {
+        const activity = await client.json(`/api/factory/tasks/${binding.taskId}/activity`)
+        check(activity.task?.id === binding.taskId && activity.task.issueId === record.issueId && activity.task.revision === binding.revision
+          && activity.task.needsYou?.kind === 'blocked' && activity.task.acceptance === null
+          && !activity.artifacts.some(value => ['image', 'video'].includes(value.kind) && value.runId === negativeRunId), 'negative_host_gate_missing')
+        result.negative.activity = { observed: true, revision: activity.task.revision, needsYou: 'blocked', acceptance: null, readyProducerMedia: 0 }
+        const refused = await lease.write(() => client.request(`/api/factory/tasks/${binding.taskId}/approval`, post({ operation: 'accept', input: { binding, eventId: randomUUID() } })))
+        const refusal = await refused.json().catch(() => null)
+        check(refused.status === 409 && refusal?.error === 'factoryTransition', 'bypass_not_refused')
+        const unchanged = await client.json(`/api/factory/tasks/${binding.taskId}`)
+        check(unchanged.task.revision === binding.revision && unchanged.task.status === 'blocked' && unchanged.task.stage === 'execute', 'bypass_not_refused')
+        result.negative.ownerAcceptRefused = { status: refused.status, code: 'factoryTransition', unchangedRevision: binding.revision }
+      }
+      await client.rpc('coordinator.stopCoordinatorTurn', [botId]); result.coordinatorStopped = true
+      const followed = await lease.write(() => client.request(`/api/mobile/threads/${result.negative.runId}`, post({ text: fixtureData.followup })))
+      check(followed.status === 202 && (await followed.json()).queued === true, 'dispatch'); result.followupSent = true
+      positiveState = await waitFor(async observed => {
+        const current = observed.filter(value => value.task.sourceEventId !== result.negative.sourceEventId)
+        check(current.length <= 1, 'positive_candidate')
+        const state = current[0]
+        if (!state) return null
+        check(!['blocked', 'failed', 'cancelled', 'revoked'].includes(state.task.status), 'run_failed')
+        if (state.task.stage !== 'approval') return null
+        result.positive = positiveProof(state, result.negative, proofs)
+        return state
+      }, deadline)
+    } else {
+      positiveState = await waitFor(async observed => {
+        check(observed.length <= 1, 'positive_candidate')
+        const state = observed[0]
+        if (!state) return null
+        check(!['blocked', 'failed', 'cancelled', 'revoked'].includes(state.task.status), 'run_failed')
+        if (state.task.stage !== 'approval') return null
+        result.positive = repositoryPositiveProof(state, { issueId: record.issueId, botId }, proofs)
+        return state
+      }, deadline)
     }
-    // Try the real human accept entry once. Its rejection and unchanged
-    // persisted revision demonstrate that the owner UI cannot bypass the gate.
-    const binding = { taskId: negativeState.task.id, issueId: record.issueId, attemptId: negativeState.task.attemptId,
-      candidateId: negativeCandidate?.id ?? null, revision: negativeState.task.revision }
-    if (result.negative.testStatus === 'passed') {
-      const activity = await client.json(`/api/factory/tasks/${binding.taskId}/activity`)
-      check(activity.task?.id === binding.taskId && activity.task.issueId === record.issueId && activity.task.revision === binding.revision
-        && activity.task.needsYou?.kind === 'blocked' && activity.task.acceptance === null
-        && !activity.artifacts.some(value => ['image', 'video'].includes(value.kind) && value.runId === negativeRunId), 'negative_host_gate_missing')
-      result.negative.activity = { observed: true, revision: activity.task.revision, needsYou: 'blocked', acceptance: null, readyProducerMedia: 0 }
-      const refused = await lease.write(() => client.request(`/api/factory/tasks/${binding.taskId}/approval`, post({ operation: 'accept', input: { binding, eventId: randomUUID() } })))
-      const refusal = await refused.json().catch(() => null)
-      check(refused.status === 409 && refusal?.error === 'factoryTransition', 'bypass_not_refused')
-      const unchanged = await client.json(`/api/factory/tasks/${binding.taskId}`)
-      check(unchanged.task.revision === binding.revision && unchanged.task.status === 'blocked' && unchanged.task.stage === 'execute', 'bypass_not_refused')
-      result.negative.ownerAcceptRefused = { status: refused.status, code: 'factoryTransition', unchangedRevision: binding.revision }
-    }
-    await client.rpc('coordinator.stopCoordinatorTurn', [botId]); result.coordinatorStopped = true
-    const followed = await lease.write(() => client.request(`/api/mobile/threads/${result.negative.runId}`, post({ text: fixtureData.followup })))
-    check(followed.status === 202 && (await followed.json()).queued === true, 'dispatch'); result.followupSent = true
-    const positiveState = await waitFor(async observed => {
-      const current = observed.filter(value => value.task.sourceEventId !== result.negative.sourceEventId)
-      check(current.length <= 1, 'positive_candidate')
-      const state = current[0]
-      if (!state) return null
-      check(!['blocked', 'failed', 'cancelled', 'revoked'].includes(state.task.status), 'run_failed')
-      if (state.task.stage !== 'approval') return null
-      result.positive = positiveProof(state, result.negative, proofs)
-      return state
-    }, deadline)
     check(machineProofs.has(result.positive.runId), 'runtime_template')
     const positiveDetail = await client.rpc('agents.getIssueThread', [record.issueId, result.positive.runId])
-    check(positiveDetail.thread?.rootRunId === result.negative.rootRunId
+    if (!fixtureData.repository) check(positiveDetail.thread?.rootRunId === result.negative.rootRunId
       && positiveDetail.thread.attempts.some(value => value.runId === result.negative.runId), 'positive_candidate')
-    result.positive.submit = submitProof(positiveDetail, result.positive.runId)
     result.positive.linux = linuxProof(positiveDetail, result.positive.runId)
     const activity = await client.json(`/api/factory/tasks/${result.positive.taskId}/activity`)
     result.evidence = await readActivityEvidence(client, activity, result.positive, { directory, caseId: item.id })
-    result.positive.nativeVisual = nativeVisualProof(positiveDetail, result.positive.runId, fixtureData.captureCommand, fixtureData, proof.sourceCommit, proof.pins.workerSha, result.evidence)
+    result.positive.submit = submitProof(positiveDetail, result.positive.runId, { captureIds: result.evidence.media.map(value => value.captureId) })
+    result.positive.nativeVisual = nativeVisualProof(positiveDetail, result.positive.runId, fixtureData.captureCommand, fixtureData, proof.sourceCommit, proof.pins.workerSha, result.evidence, result.positive.candidateSha)
     const documents = activity.artifacts.filter(value => value.kind === 'document' && value.title === fixtureData.title && value.runId === result.positive.runId)
     check(documents.length === 1 && UUID.test(documents[0].artifactId ?? '') && positive(documents[0].version), 'artifact_content')
     const document = documents[0], exact = await boundedDownload(client, mediaPath(document.downloadUrl,
@@ -787,17 +977,23 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
     result.deliverable = { artifactId: document.artifactId, version: document.version, runId: document.runId, bytes: exact.length, sha256: hash(exact) }
     const task = positiveState.task, acceptedBinding = { taskId: task.id, issueId: task.issueId, attemptId: task.attemptId,
       candidateId: task.candidateId, revision: task.revision }
-    const accepted = await lease.write(() => client.json(`/api/factory/tasks/${task.id}/approval`, post({ operation: 'accept', input: { binding: acceptedBinding, eventId: randomUUID() } })))
-    check(accepted.status === 'accepted' && UUID.test(accepted.acceptanceId ?? '')
-      && isDeepStrictEqual(accepted.binding, { ...acceptedBinding, revision: acceptedBinding.revision + 1 }), 'positive_candidate')
-    const acceptedState = await client.json(`/api/factory/tasks/${task.id}`)
-    check(acceptedState.task.status === 'passed' && acceptedState.task.stage === 'approval'
-      && positiveProof(acceptedState, result.negative, proofs).candidateId === result.positive.candidateId, 'positive_candidate')
-    result.positive.ownerAcceptanceId = accepted.acceptanceId
-    const retainedActivity = await client.json(`/api/factory/tasks/${task.id}/activity`)
-    check(activityProof(retainedActivity, { ...result.positive, revision: acceptedState.task.revision }).report.version === result.evidence.report.version, 'report_binding')
-    result.buildAfter = await pin(); result.status = result.negative.testStatus === 'passed' ? 'passed' : 'failed'
-    if (result.negative.testStatus !== 'passed') result.failure = result.negative.failure
+    if (fixtureData.repository) {
+      result.publication = publicationProof(activity, result.positive, record.identifier)
+      result.positive.handoff = { binding: { taskId: task.id, issueId: task.issueId, candidateId: task.candidateId, revision: task.revision }, stage: task.stage, status: task.status,
+        ownerDecision: 'pending', pullRequestMerged: false }
+    } else {
+      const accepted = await lease.write(() => client.json(`/api/factory/tasks/${task.id}/approval`, post({ operation: 'accept', input: { binding: acceptedBinding, eventId: randomUUID() } })))
+      check(accepted.status === 'accepted' && UUID.test(accepted.acceptanceId ?? '')
+        && isDeepStrictEqual(accepted.binding, { ...acceptedBinding, revision: acceptedBinding.revision + 1 }), 'positive_candidate')
+      const acceptedState = await client.json(`/api/factory/tasks/${task.id}`)
+      check(acceptedState.task.status === 'passed' && acceptedState.task.stage === 'approval'
+        && positiveProof(acceptedState, result.negative, proofs).candidateId === result.positive.candidateId, 'positive_candidate')
+      result.positive.ownerAcceptanceId = accepted.acceptanceId
+      const retainedActivity = await client.json(`/api/factory/tasks/${task.id}/activity`)
+      check(activityProof(retainedActivity, { ...result.positive, revision: acceptedState.task.revision }).report.version === result.evidence.report.version, 'report_binding')
+    }
+    result.buildAfter = await pin(); result.status = fixtureData.repository || result.negative.testStatus === 'passed' ? 'passed' : 'failed'
+    if (!fixtureData.repository && result.negative.testStatus !== 'passed') result.failure = result.negative.failure
   } catch (error) { result.status = 'failed'; result.failure = safeFailure(error) }
   finally {
     live?.close()
@@ -808,6 +1004,13 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
       await cleanup('ownTaskCleaned', () => cleanupCase(client, record, 'cloud', { timeoutMs: 60_000, now, preserveIssue: true }))
       result.cleanup.task = record.cleanup
       if (record.cleanup.status !== 'passed') result.cleanup.errors.push({ step: 'ownTaskCleaned', code: 'cleanup' })
+      if (fixtureData.repository && result.positive?.handoff && result.evidence && record.cleanup.status === 'passed') await cleanup('retainedEvidenceReadable', async () => {
+        const snapshot = await client.json(`/api/factory/tasks/${result.positive.taskId}`)
+        const activity = await client.json(`/api/factory/tasks/${result.positive.taskId}/activity`)
+        const after = await readActivityEvidence(client, activity, { ...result.positive, revision: snapshot.task.revision },
+          { directory, caseId: `${item.id}-after-cleanup` })
+        result.retention = retainedEvidenceProof(snapshot, result.positive, result.evidence, after)
+      })
     }
     if (profile && (!record.issueId || record.cleanup.status === 'passed')) await cleanup('profileArchived', async () => {
       const current = (await client.json(profilePath(scope.workspaceId, profile.id))).profile
@@ -827,6 +1030,11 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
       check(restored?.version === current.version + 1 && isDeepStrictEqual(definition(restored), entry.before), 'profile_conflict')
     })
     result.cleanup.temporaryProfilesDisabled = disabled.length; result.cleanup.preparationCompleted = prepared
+    if (creditShare) await cleanup('creditShareRestored', () => creditShare.restore())
+    if (result.buildBefore) await cleanup('productionVersionRetained', async () => {
+      result.buildAfterCleanup = (await client.json('/api/version')).build
+      check(result.buildAfterCleanup === proof.sourceCommit, 'build_changed')
+    })
     if (originalWorkspaceId && ownerId) await cleanup('workspaceRestored', () => restoreAcceptanceWorkspace(client, ownerId, originalWorkspaceId))
     if (loggedIn) await cleanup('sessionClosed', async () => {
       const signedOut = await client.request('/api/auth/sign-out', post({})); check(signedOut.ok, 'cleanup'); await signedOut.body?.cancel()
@@ -857,7 +1065,7 @@ async function finishReport(env, proof) {
     upstream: proof.upstream, cases, finishedAt: new Date().toISOString() }
   await saveJson(directory, 'report.json', report)
   const sections = cases.map(value => value.reused ? `<section><h2>${escapeHtml(value.case)}</h2><p>Verified in GitHub run ${value.reused.runId}, attempt ${value.reused.runAttempt}; exact source ${proof.sourceCommit}.</p></section>`
-    : `<section><h2>${escapeHtml(value.case)}</h2><p>Host refused missing evidence: ${escapeHtml(value.negative.hostGate.code)}. Current candidate: ${escapeHtml(value.positive.candidateId)}.</p><p><a href="${escapeHtml(value.evidence.activityUrl)}">Authenticated task activity</a> · <a href="${escapeHtml(value.evidence.report.file)}">Downloaded immutable acceptance report</a></p>${value.evidence.media.map(media => media.kind === 'video'
+    : `<section><h2>${escapeHtml(value.case)}</h2><p>${value.negative ? `Host refused missing evidence: ${escapeHtml(value.negative.hostGate.code)}.` : 'Repository handoff was verified, then the test task was normally cancelled and its media/report re-read unchanged. The PR remains unmerged; direct GitHub verification is pending the operator.'} Current candidate: ${escapeHtml(value.positive.candidateId)}.</p><p><a href="${escapeHtml(value.evidence.activityUrl)}">Authenticated task activity</a> · <a href="${escapeHtml(value.evidence.report.file)}">Downloaded immutable acceptance report</a></p>${value.evidence.media.map(media => media.kind === 'video'
       ? `<video controls preload="metadata" src="${escapeHtml(media.file)}" poster="${escapeHtml(media.poster.file)}"></video>`
       : `<img src="${escapeHtml(media.file)}" alt="Actual cloud Linux verification screenshot">`).join('')}<pre>${escapeHtml(JSON.stringify({ negative: value.negative, positive: value.positive, evidence: value.evidence }, null, 2))}</pre></section>`).join('')
   await writeFile(join(directory, 'index.html'), `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Factory visual evidence #1783</title><style>body{font:16px system-ui;max-width:1100px;margin:40px auto;padding:0 24px;color:#17202a;background:#f7f9fb}section{background:white;padding:24px;margin:24px 0;border:1px solid #d9e0e6;border-radius:12px}video,img{display:block;width:100%;height:auto;margin:20px 0}pre{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>Factory visual evidence #1783</h1><p>Source ${escapeHtml(proof.sourceCommit)}. Downloads below are the actual task activity and immutable report media, verified byte for byte and decoded with FFmpeg.</p>${sections}</html>`, { mode: 0o600 })

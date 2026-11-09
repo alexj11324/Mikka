@@ -1,12 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { windowProof, readWindow, productionWindowGuard, selectAcceptance, previousCaseProof, CASE_STEPS, executionProof, submitProof, linuxProof,
-  negativeProof, positiveProof, activityProof, mediaPath, readActivityEvidence, visualCommand, nativeVisualProof, safeFailure } from './factory-visual-evidence.mjs'
+  negativeProof, positiveProof, repositoryPositiveProof, publicationProof, activityProof, mediaPath, readActivityEvidence, retainedEvidenceProof,
+  fixture, initialRequest, ownCreditShare, repositorySnapshot, HANDOFF_REPOSITORY, visualCommand, nativeVisualProof, safeFailure } from './factory-visual-evidence.mjs'
 import { processCaptureVideo } from '../../packages/daemon/src/agents/capture-video.mjs'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -166,6 +167,83 @@ test('continuation tool attribution uses actual cursor scope, not the full histo
   assert.equal(submitProof(properlyScoped, next).runId, next)
 })
 
+test('positive stored submit must explicitly name every actual capture once and authorize its safe publication', () => {
+  const value = detail(), captureIds = [id(31), id(32)]
+  value.chunks[0].chunk.input.visualEvidence = captureIds.map(captureId => ({ captureId, publicSafe: true }))
+  assert.deepEqual(submitProof(value, id(4), { captureIds }).visualEvidence, value.chunks[0].chunk.input.visualEvidence)
+  for (const declarations of [[], [{ captureId: id(31), publicSafe: true }, { captureId: id(31), publicSafe: true }],
+    [{ captureId: id(31), publicSafe: true }, { captureId: id(32), publicSafe: false }],
+    [{ captureId: id(31), publicSafe: true }, { captureId: id(99), publicSafe: true }]]) {
+    value.chunks[0].chunk.input.visualEvidence = declarations
+    rejects(() => submitProof(value, id(4), { captureIds }), 'submit_receipt')
+  }
+})
+
+test('the two real cases select normal Bot-computer and repository dispatch with task-private tools and media', () => {
+  const driver = { runId: 42, runAttempt: 1 }, claude = { id: 'claude', harness: 'claude_code', model: 'claude-haiku-5-5' }
+  const negative = fixture(source, head, claude, driver), repository = fixture(source, head, item, driver)
+  const binding = { issueId: id(5), botId: scope.botId, profileId: profile.id }
+  assert.match(initialRequest(negative, { ...binding, item: claude }), /normal dispatch_bot_computer tool/)
+  assert.match(initialRequest(repository, { ...binding, item }), /normal dispatch_run tool/)
+  assert.equal(negative.repository, null); assert.equal(repository.repository, HANDOFF_REPOSITORY)
+  assert.equal(repository.relativeFile, `docs/issue-1783/${repository.title}`)
+  assert.match(negative.initial, /without visualEvidence/)
+  assert.doesNotMatch(repository.initial, /deliberate.*omission|without visualEvidence/)
+  for (const value of [negative, repository]) {
+    assert.match(value.setupCommand, /'--prefix', tools/)
+    assert.match(value.setupCommand, /'install', '--with-deps', 'chromium'/)
+    assert.match(value.setupCommand, /process.env.MIKKA_RUN_ID/)
+    assert.match(value.setupCommand, /await realpath\(allowedTemporary\)/)
+    assert.match(value.captureCommand, /temporary !== root && !temporary.startsWith/)
+    assert.match(value.captureCommand, /join\(temporary, spec.marker, 'visual'\)/)
+    assert.ok(value.followup.length < 10_000, 'normal mobile follow-up limit')
+    assert.ok(initialRequest(value, { ...binding, item }).length < 1000, 'dispatch reads saved issue content without duplicating a long tool note')
+  }
+})
+
+test('temporary credit share changes only this member and restores false even after a lost update response', async () => {
+  for (const scenario of ['already_shared', 'temporary', 'lost_response']) {
+    let mine = scenario === 'already_shared', writes = 0, guarded = 0
+    const client = { rpc: async (action, args) => {
+      if (action === 'personal-policy.getCreditShare') { assert.deepEqual(args, [scope.workspaceId]); return { mine, canShare: true } }
+      assert.equal(action, 'personal-policy.updateCreditShare'); assert.equal(args[1], scope.workspaceId)
+      mine = args[0]; writes++
+      if (scenario === 'lost_response' && mine) throw Error('response lost after ordinary update committed')
+      return { mine, canShare: true }
+    } }
+    const share = ownCreditShare(client, scope.workspaceId, async operation => { guarded++; return operation() })
+    if (scenario === 'lost_response') await assert.rejects(share.prepare(), /response lost/)
+    else await share.prepare()
+    await share.restore()
+    assert.equal(mine, scenario === 'already_shared')
+    assert.equal(writes, scenario === 'already_shared' ? 0 : 2)
+    assert.equal(guarded, scenario === 'already_shared' ? 0 : 1, 'cleanup remains possible after lease expiry')
+    assert.equal(share.state.restored, scenario !== 'already_shared')
+  }
+})
+
+test('actual Git delivery rejects an untracked dependency/media file, extra committed file or an altered existing fixture', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-visual-repository-')), relativeFile = 'docs/issue-1783/m1783-fixture.txt'
+  const git = args => execFileSync('git', args, { cwd: directory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  try {
+    git(['init', '-b', 'main']); git(['config', 'user.name', 'Acceptance fixture']); git(['config', 'user.email', 'fixture@example.invalid'])
+    git(['remote', 'add', 'origin', `https://github.com/${HANDOFF_REPOSITORY}.git`])
+    await writeFile(join(directory, 'README.md'), 'existing\n'); git(['add', 'README.md']); git(['commit', '-m', 'fixture baseline'])
+    const base = git(['rev-parse', 'HEAD']); git(['update-ref', 'refs/remotes/origin/main', base])
+    await mkdir(join(directory, 'docs/issue-1783'), { recursive: true }); await writeFile(join(directory, relativeFile), 'actual\n')
+    git(['add', relativeFile]); git(['commit', '-m', 'own text'])
+    const good = git(['rev-parse', 'HEAD']), proof = repositorySnapshot(HANDOFF_REPOSITORY, relativeFile, directory)
+    assert.equal(proof.head, good); assert.equal(proof.base, base); assert.deepEqual(proof.changedFiles, [relativeFile])
+    await writeFile(join(directory, 'package-lock.json'), '{}\n')
+    assert.throws(() => repositorySnapshot(HANDOFF_REPOSITORY, relativeFile, directory), /repository_scope/)
+    git(['add', 'package-lock.json']); git(['commit', '--amend', '--no-edit'])
+    assert.throws(() => repositorySnapshot(HANDOFF_REPOSITORY, relativeFile, directory), /repository_scope/)
+    git(['reset', '--hard', good]); await writeFile(join(directory, 'README.md'), 'changed someone else\n')
+    git(['add', 'README.md']); git(['commit', '--amend', '--no-edit'])
+    assert.throws(() => repositorySnapshot(HANDOFF_REPOSITORY, relativeFile, directory), /repository_scope/)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test('Linux evidence requires native uname input and actual output from the same run', () => {
   const value = detail(); value.chunks = [
     { chunk: { type: 'tool-input-available', toolName: 'shell', toolCallId: 'uname', input: { command: 'uname -s' } } },
@@ -180,7 +258,8 @@ test('Linux evidence requires native uname input and actual output from the same
 test('native visual proof binds the entire browser program, actual queued capture IDs and downloaded encoded bytes', () => {
   const fixture = { marker: 'm1783-fixture', title: 'm1783-fixture.txt', content: 'actual file\n' }
   const workerSha = 'f'.repeat(40), command = visualCommand(fixture, source, workerSha), runId = id(14), value = detail(runId)
-  const receipt = { version: 1, marker: fixture.marker, sourceCommit: source, workerSha, platform: 'linux', pageMatched: true, reloadMatched: true,
+  const receipt = { version: 1, marker: fixture.marker, sourceCommit: source, workerSha, runId, temporaryRootVerified: true, temporaryOutsideWorktree: true,
+    platform: 'linux', pageMatched: true, reloadMatched: true,
     fileSha256: hash(fixture.content), image: { path: '/own-worktree/verification.png', bytes: 10, sha256: digest },
     video: { path: '/own-worktree/recorded.webm', originalSha256: 'd'.repeat(64), encodedBytes: 20, encodedSha256: 'e'.repeat(64), durationMs: 2000 } }
   value.chunks = [
@@ -202,6 +281,10 @@ test('native visual proof binds the entire browser program, actual queued captur
   rejects(() => nativeVisualProof(value, runId, command, fixture, source, workerSha, rawInsteadOfProcessed), 'native_visual')
   rejects(() => nativeVisualProof(value, runId, command, fixture, head, workerSha, evidence), 'native_visual')
   rejects(() => nativeVisualProof(value, runId, command, fixture, source, source, evidence), 'native_visual')
+  for (const changed of [{ runId: id(99) }, { temporaryRootVerified: false }, { temporaryOutsideWorktree: false }]) {
+    const bad = copy(value); bad.chunks[1].chunk.output.output = 'MIKKA_1783_VISUAL ' + JSON.stringify({ ...receipt, ...changed })
+    rejects(() => nativeVisualProof(bad, runId, command, fixture, source, workerSha, evidence), 'native_visual')
+  }
 })
 
 test('released real FFmpeg processing is byte-deterministic for the native expected-output versus normal uploader comparison', async () => {
@@ -258,6 +341,34 @@ test('positive continuation can use a new task, but cannot reuse the old epoch, 
   rejects(() => positiveProof(state, negative(), passedRuns()), 'independent_checks')
 })
 
+test('repository positive proof binds the actual commit and independent checks without pretending a negative continuation ran', () => {
+  const state = reviewedState(); state.candidates[0] = { ...state.candidates[0], kind: 'repository', sha: head,
+    repository: `https://github.com/${HANDOFF_REPOSITORY}.git` }
+  const expected = { issueId: id(5), botId: scope.botId }, proof = repositoryPositiveProof(state, expected, passedRuns())
+  assert.equal(proof.candidateSha, head); assert.equal(proof.repository, HANDOFF_REPOSITORY)
+  for (const change of [value => { value.candidates[0].repository = 'https://github.com/someone/another.git' },
+    value => { value.candidates[0].kind = 'deliverable' }, value => { value.candidates[0].sha = null },
+    value => { value.task.status = 'passed' }, value => { value.task.botId = id(99) }]) {
+    const changed = copy(state); change(changed); rejects(() => repositoryPositiveProof(changed, expected, passedRuns()), 'positive_candidate')
+  }
+  state.attempts[1].runId = state.attempts[0].runId
+  rejects(() => repositoryPositiveProof(state, expected, passedRuns()), 'independent_checks')
+})
+
+test('host publication projection requires the same producer, candidate and authorized repository while leaving direct GitHub proof pending', () => {
+  const positive = { ...positiveProof(reviewedState(), negative(), passedRuns()), candidateSha: head }, url = `https://github.com/${HANDOFF_REPOSITORY}/pull/12`
+  const view = { task: { pullRequest: { url, state: 'open' } }, artifacts: [
+    { kind: 'pull_request', url, state: 'open', runId: positive.runId, candidateId: positive.candidateId },
+  ] }
+  const proof = publicationProof(view, positive, 'AC-42')
+  assert.equal(proof.branch, 'mikka/ac-42'); assert.equal(proof.directGitHubRead, 'pending_operator_connector_verification')
+  for (const change of [value => { value.artifacts[0].runId = id(99) }, value => { value.artifacts[0].candidateId = id(99) },
+    value => { value.artifacts[0].state = 'merged' }, value => { value.task.pullRequest.url += '3' },
+    value => { value.artifacts[0].url = 'https://github.com/someone/another/pull/12' }]) {
+    const changed = copy(view); change(changed); rejects(() => publicationProof(changed, positive, 'AC-42'), 'publication')
+  }
+})
+
 function activity() {
   const p = positive(), reportId = id(30)
   const media = ['video', 'image'].map((kind, i) => ({ captureId: id(31 + i), runId: p.runId, candidateId: p.candidateId,
@@ -303,6 +414,16 @@ test('actual GET bytes through activity and immutable report links must match; e
     } })
     assert.equal(evidence.media[0].sha256, hash(video)); assert.equal(decoded.length, 3)
     assert.equal((await readFile(join(directory, evidence.report.file), 'utf8')), content)
+    const snapshot = { task: { id: p.taskId, issueId: p.issueId, candidateId: p.candidateId, stage: 'approval', status: 'cancelled', revision: p.revision + 1 } }
+    view.task.revision++
+    const retained = await readActivityEvidence(client, view, { ...p, revision: view.task.revision }, { directory, caseId: 'codex-after-cleanup', decode: () => ({ decoded: true, codec: 'fixture', width: 16, height: 16 }) })
+    assert.equal(retainedEvidenceProof(snapshot, p, evidence, retained).normalCancellationAfterVerification, true)
+    const wrongCandidate = copy(snapshot); wrongCandidate.task.candidateId = id(99)
+    rejects(() => retainedEvidenceProof(wrongCandidate, p, evidence, retained), 'cleanup')
+    for (const change of [value => { value.report.version++ }, value => { value.report.sha256 = digest }, value => { value.media[0].sha256 = digest }]) {
+      const wrong = copy(retained); change(wrong); rejects(() => retainedEvidenceProof(snapshot, p, evidence, wrong), 'report_binding')
+    }
+    view.task.revision--
     tamper = true
     await assert.rejects(readActivityEvidence(client, view, p, { directory, caseId: 'codex', decode: () => ({ decoded: true }) }), /:media_bytes/)
   } finally { await rm(directory, { recursive: true, force: true }) }
