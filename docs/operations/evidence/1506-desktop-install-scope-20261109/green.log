@@ -1,0 +1,34 @@
+✔ the exact native pnpm installed by CI needs no Corepack (1.785793ms)
+✔ an absent native executable falls back to the explicit cached Corepack pin (0.351605ms)
+✔ a native version mismatch does not pass and can use the cached exact pin (0.170061ms)
+✔ both candidates must actually report the exact version (0.592018ms)
+✔ an unavailable cached Corepack version remains a failure with its cause (0.232722ms)
+✔ version-only probes disable manager downloads and retain only local cache selectors (0.246907ms)
+✔ an integrity suffix is retained for Corepack while actual version output is still checked (0.184636ms)
+✔ unpinned managers fail before any command runs (0.234713ms)
+▶ shared install defaults to no credential and overrides ambient legacy tokens in real lifecycle scripts
+  ✔ no input stays empty (662.807513ms)
+  ✔ ambient token is cleared (660.120294ms)
+✔ shared install defaults to no credential and overrides ambient legacy tokens in real lifecycle scripts (1328.287021ms)
+✔ a verified API-read-only caller explicitly delivers its token to the real install process (666.64427ms)
+✔ the actual composite input and all workflow opt-ins preserve the process credential boundary (24.495886ms)
+▶ credential opt-ins honor job overrides and reject unknown or API-write permissions
+  ✔ workflow read overridden by job write (1.072829ms)
+  ✔ workflow write overridden by job read (0.110764ms)
+  ✔ unknown inherited permissions (0.159655ms)
+  ✔ write-all (0.130785ms)
+  ✔ read-all (0.055791ms)
+  ✔ OIDC is separate from the API token (0.053407ms)
+  ✔ package publication token (0.114425ms)
+  ✔ explicit empty permissions (0.108605ms)
+✔ credential opt-ins honor job overrides and reject unknown or API-write permissions (2.556228ms)
+✔ the actual Apple direct install passes its read-only token to real lifecycle scripts (751.556322ms)
+✔ all three desktop direct installs explicitly opt in under API-read-only permissions (0.827335ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2843.277641

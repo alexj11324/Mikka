@@ -1,0 +1,88 @@
+{
+  "task": "Desktop direct-install credential scope independent review",
+  "sourceBaseTree": "dc3c4be21dd018eb3dfef13ba2fb274bc3629a49",
+  "decision": "no source blocker found; suitable for publication into existing CI",
+  "files": {
+    ".github/workflows/desktop.yml": "188e917d7142c9f04462749dbf8e64f35ba7e6573bd14e06e718ae4edc1f5126",
+    "tests/mvp/pinned-pnpm.test.mjs": "0a1d47cd00245e0f4530f89c34034e1c8d47034fcad54143b6014669cf5a5a38"
+  },
+  "scope": {
+    "jobs": [
+      "checks",
+      "smoke",
+      "native-arm64"
+    ],
+    "workflowPermission": {
+      "contents": "read"
+    },
+    "reusableCaller": {
+      "workflow": ".github/workflows/ui-policy.yml",
+      "job": "desktop-checks",
+      "permissions": {
+        "contents": "read"
+      },
+      "secrets": "not provided"
+    },
+    "dispatch": "workflow_dispatch inherits contents:read",
+    "writesRemainWithoutGrant": [
+      "self-hosted-image/image",
+      "self-hosting-ui/screenshots",
+      "desktop-release/macos"
+    ]
+  },
+  "preservation": {
+    "inverseThreeTokenEnvAdditionsEqualsBeforeBytes": true,
+    "beforeMatchesUnionGit": true,
+    "electronSkipRetained": true,
+    "permissionsIfPublishingUnchanged": true,
+    "existingTestsBodiesUnchanged": true,
+    "oldCount": 22,
+    "newCount": 24
+  },
+  "testsEvidence": {
+    "reviewerReranTests": false,
+    "realLifecycle": "Actual workflow native install run/env parsed; pinned pnpm executes temporary package postinstall offline; only fictional-token Boolean presence retained",
+    "red": {
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "exit": 1,
+      "logSha256": "44713e77aed3aec96921ed3d780e3083d9287600e726d8e51ddf1fcb77ba54c2",
+      "actualNativePresence": false,
+      "sourceBinding": "Before workflow source hash and executed write sequence reconstructed from retained original; no claim of contemporaneous runner input hashes"
+    },
+    "green": {
+      "tests": 24,
+      "pass": 24,
+      "fail": 0,
+      "skip": 0,
+      "exit": 0,
+      "logSha256": "4001d940ddf6fc4b18bbf0fb46740613eba7cfde41bcf510d74129e9923da854",
+      "beforeAfterInputsIdentical": true
+    },
+    "lint": {
+      "exit": 0,
+      "logSha256": "2778ef56d6034dbe1e96a90fb1684d21cd7369545245a5c3a7b03c3cb56f0494"
+    },
+    "allReadLogHashesMatchTheirResultMetadata": true
+  },
+  "trees": [
+    {
+      "tree": "6a868e2706524ad0984bd9c5a33b21b2ec505636",
+      "base": "2fa4d7e09a90e7a75151e9ae4065245b391ea366",
+      "onlyFrozenTwoPaths": true
+    },
+    {
+      "tree": "beace867309e3e9d02bc5ce21adc5a5d4db61e44",
+      "base": "dc3c4be21dd018eb3dfef13ba2fb274bc3629a49",
+      "onlyFrozenTwoPaths": true
+    }
+  ],
+  "limits": [
+    "No production, browser acceptance or CI success inferred",
+    "No additional tests or network performed by this reviewer",
+    "Future P0 preparation remains unapplied",
+    "New actual main a219 test:groups change to be bound by root at actual synthetic checkout"
+  ],
+  "exportExpectedSha256": "e0e624c7076e43d01e88c419e566165c0a8909c071016a5d6148759ef184b50e"
+}

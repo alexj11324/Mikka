@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "desktop-direct-install-credential-scope",
+  "sourceBindings": {
+    "pureCommit": "8852021fa5cdb3361b6dda09df6243d9e320d369",
+    "pureTree": "6a868e2706524ad0984bd9c5a33b21b2ec505636",
+    "batchCommit": "bf4833c9010e7adff6dded6c348824d5e99554c0",
+    "batchTree": "beace867309e3e9d02bc5ce21adc5a5d4db61e44",
+    "commitPublicationVerification": "Publisher reported GitHub API parent/tree readback and successful branch CAS/fast-forward readback. This evidence packaging did not fetch CI or rerun tests.",
+    "previousCredentialScopeEvidence": "https://github.com/alexj11324/Mikka/blob/07381085c27941b206f28343aeaeffb9e5e6ff6f/docs/operations/evidence/1506-credential-scope-20261109/index.json"
+  },
+  "localResults": {
+    "red": {
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "skip": 0,
+      "exitCode": 1
+    },
+    "green": {
+      "tests": 24,
+      "pass": 24,
+      "fail": 0,
+      "skip": 0,
+      "exitCode": 0
+    }
+  },
+  "remoteCiPassClaim": false,
+  "redInputHashBoundary": "Reconstructed from retained fixed originals/write sequence; not contemporaneous RED runner hashing.",
+  "files": [
+    {
+      "path": "source-review.json",
+      "bytes": 40158,
+      "sha256": "e0e624c7076e43d01e88c419e566165c0a8909c071016a5d6148759ef184b50e"
+    },
+    {
+      "path": "independent-review.json",
+      "bytes": 3046,
+      "sha256": "705e25eae560b087c55e1c0932e64b69bedb7db7ea37e0c580b515c5b3a9b015"
+    },
+    {
+      "path": "changes.patch",
+      "bytes": 3970,
+      "sha256": "089a87b0c87f2297c447c2072a8ec45fb7289849d97511d9e89d68efb64c8609"
+    },
+    {
+      "path": "red.log",
+      "bytes": 2070,
+      "sha256": "44713e77aed3aec96921ed3d780e3083d9287600e726d8e51ddf1fcb77ba54c2"
+    },
+    {
+      "path": "green.log",
+      "bytes": 2101,
+      "sha256": "4001d940ddf6fc4b18bbf0fb46740613eba7cfde41bcf510d74129e9923da854"
+    },
+    {
+      "path": "execution-receipts.json",
+      "bytes": 4260,
+      "sha256": "b79e1ebd4445eefe5200c702fb19a0c2468220d3d3b14b6c56adc06519aae3e0"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2666,
+      "sha256": "8b55fb1deca76b67dfb92f8462687f9f91e74a494ebb70325b0ab406721f7093"
+    }
+  ],
+  "indexDoesNotHashItself": true,
+  "productParentAllowed": false
+}

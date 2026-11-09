@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "packagedAtUtc": "2026-11-09T10:35:13.447420+00:00",
+  "sourceBindings": {
+    "pureCommit": "8852021fa5cdb3361b6dda09df6243d9e320d369",
+    "pureTree": "6a868e2706524ad0984bd9c5a33b21b2ec505636",
+    "batchCommit": "bf4833c9010e7adff6dded6c348824d5e99554c0",
+    "batchTree": "beace867309e3e9d02bc5ce21adc5a5d4db61e44",
+    "commitPublicationVerification": "Publisher reported GitHub API parent/tree readback and successful branch CAS/fast-forward readback. This evidence packaging did not fetch CI or rerun tests.",
+    "previousCredentialScopeEvidence": "https://github.com/alexj11324/Mikka/blob/07381085c27941b206f28343aeaeffb9e5e6ff6f/docs/operations/evidence/1506-credential-scope-20261109/index.json"
+  },
+  "results": {
+    "red": {
+      "command": [
+        "node",
+        "--test",
+        "--test-name-pattern",
+        "actual Apple direct install|all three desktop direct installs",
+        "tests/mvp/pinned-pnpm.test.mjs"
+      ],
+      "exitCode": 1,
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "skip": 0,
+      "nativePostinstallTokenPresent": false,
+      "log": "red.log",
+      "logSha256": "44713e77aed3aec96921ed3d780e3083d9287600e726d8e51ddf1fcb77ba54c2"
+    },
+    "green": {
+      "command": [
+        "node",
+        "--test",
+        "tests/mvp/pinned-pnpm.test.mjs"
+      ],
+      "exitCode": 0,
+      "tests": 24,
+      "pass": 24,
+      "fail": 0,
+      "skip": 0,
+      "nativePostinstallTokenPresent": true,
+      "original22Retained": true,
+      "log": "green.log",
+      "logSha256": "4001d940ddf6fc4b18bbf0fb46740613eba7cfde41bcf510d74129e9923da854",
+      "before": {
+        ".github/workflows/desktop.yml": "188e917d7142c9f04462749dbf8e64f35ba7e6573bd14e06e718ae4edc1f5126",
+        "tests/mvp/pinned-pnpm.test.mjs": "0a1d47cd00245e0f4530f89c34034e1c8d47034fcad54143b6014669cf5a5a38"
+      },
+      "after": {
+        ".github/workflows/desktop.yml": "188e917d7142c9f04462749dbf8e64f35ba7e6573bd14e06e718ae4edc1f5126",
+        "tests/mvp/pinned-pnpm.test.mjs": "0a1d47cd00245e0f4530f89c34034e1c8d47034fcad54143b6014669cf5a5a38"
+      },
+      "sourceUnchanged": true
+    },
+    "lint": {
+      "command": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "--deny-warnings",
+        "tests/mvp/pinned-pnpm.test.mjs"
+      ],
+      "exitCode": 0,
+      "logSha256": "2778ef56d6034dbe1e96a90fb1684d21cd7369545245a5c3a7b03c3cb56f0494"
+    },
+    "treeDiffCheck": {
+      "command": [
+        "git",
+        "--git-dir=/vercel/recovery/issue1506-integration.git",
+        "diff",
+        "--check",
+        "2fa4d7e09a90e7a75151e9ae4065245b391ea366",
+        "6a868e2706524ad0984bd9c5a33b21b2ec505636",
+        "--",
+        ".github/workflows/desktop.yml",
+        "tests/mvp/pinned-pnpm.test.mjs"
+      ],
+      "exitCode": 0,
+      "output": ""
+    }
+  },
+  "redInputBinding": {
+    "workflowSha256": "17c5837075328e66c7236cb9533602107b1317b8a21ae862e923492669f25977",
+    "testSha256": "0a1d47cd00245e0f4530f89c34034e1c8d47034fcad54143b6014669cf5a5a38",
+    "provenance": "Reconstructed from the immutable archived before workflow and the exact test write immediately preceding RED. The test stayed unchanged through GREEN; the workflow mutation occurred only after RED. Hashes were not captured contemporaneously by the RED runner."
+  },
+  "executionBoundary": {
+    "testEnvironment": "Dependency-free temporary package; actual normal pnpm install --frozen-lockfile and actual postinstall; existing pnpm10.34.3 selected via explicit PATH and version probe.",
+    "syntheticCredential": "Only fictional token presence Boolean was retained by the lifecycle script.",
+    "productionRequests": 0,
+    "realCredentialUse": false,
+    "databaseOrModelUse": false,
+    "newDependencyOrAssetDownloads": false,
+    "newTestsDuringEvidencePackaging": 0,
+    "rawCiLogsOrPrivateApiResponsesIncluded": false
+  },
+  "remoteCiAtPackaging": {
+    "runId": 42601454393,
+    "attempt": 1,
+    "statusReportedByPublisher": "in_progress",
+    "syntheticCommit": "d56efbd5e76455a7991234d4b763c4acf8fa3025",
+    "passedClaim": false,
+    "notFetchedByPackager": true
+  },
+  "publicationBoundary": "Evidence-only documentation commit; never use the evidence commit as a product parent."
+}

@@ -1,0 +1,54 @@
+✖ the actual Apple direct install passes its read-only token to real lifecycle scripts (718.826974ms)
+✖ all three desktop direct installs explicitly opt in under API-read-only permissions (2.589141ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 788.591704
+
+✖ failing tests:
+
+test at tests/mvp/pinned-pnpm.test.mjs:236:1
+✖ the actual Apple direct install passes its read-only token to real lifecycle scripts (718.826974ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///vercel/recovery/issue1506-desktop-install-scope/tests/mvp/pinned-pnpm.test.mjs:242:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/mvp/pinned-pnpm.test.mjs:245:1
+✖ all three desktop direct installs explicitly opt in under API-read-only permissions (2.589141ms)
+  AssertionError [ERR_ASSERTION]: checks
+  + actual - expected
+  
+  + undefined
+  - '${{ github.token }}'
+  
+      at TestContext.<anonymous> (file:///vercel/recovery/issue1506-desktop-install-scope/tests/mvp/pinned-pnpm.test.mjs:253:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: '${{ github.token }}',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
