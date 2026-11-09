@@ -5755,6 +5755,15 @@
     "decisionsWaiting": "{count, plural, one {# decision waiting} other {# decisions waiting}}",
     "pager": "{index} of {count}"
   },
+  "HostedUsage": {
+    "onTrack": "On track for {amount} by {date}",
+    "vsLast": "vs last month",
+    "biggest": "Most runs",
+    "noGroup": "Nothing open",
+    "share": "of {month}",
+    "open": "Open",
+    "runsCount": "{count, plural, one {# run} other {{formatted} runs}}"
+  },
   "HostedSettings": {
     "back": "Back",
     "general": {

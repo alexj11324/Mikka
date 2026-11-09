@@ -5755,6 +5755,15 @@
     "decisionsWaiting": "{count} 个决定在等你",
     "pager": "{index} / {count}"
   },
+  "HostedUsage": {
+    "onTrack": "按这个速度，到 {date} 约 {amount}",
+    "vsLast": "比上月",
+    "biggest": "运行最多的任务",
+    "noGroup": "没有选中",
+    "share": "占{month}",
+    "open": "打开",
+    "runsCount": "{count, plural, other {{formatted} 次}}"
+  },
   "HostedSettings": {
     "back": "返回",
     "general": {
