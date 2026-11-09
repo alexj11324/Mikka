@@ -18,13 +18,12 @@ import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
 import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
 import { wakeCoordinatorSoon } from './wake-after-commit'
 import { COORDINATOR_LEASE_CHANNEL } from '@/lib/db/listen'
-import { agentRuns, coordinatorEvents, devices, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
 import { attentionQuestionsFromEvents, type AttentionQuestion } from './question-attention'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
-import type { RunMachine } from '@/lib/run-info-view'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { threadGroup, type ThreadOutcome } from '@/lib/thread-groups'
@@ -518,16 +517,13 @@ export async function citationSources(userId: string, texts: readonly string[], 
   // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
   const ownIds = runs.filter(row => row.agentId).map(row => row.id)
   const runIssueIds = [...new Set(runs.flatMap(row => row.issueId ? [row.issueId] : []))]
-  const [prompts, steps, tasks, machines] = await Promise.all([
+  const [prompts, steps, tasks] = await Promise.all([
     ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt }).from(agentRuns)
       .where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))).then(rows => new Map(rows.map(row => [row.id, row.prompt]))) : new Map<string, string>(),
     ownIds.length ? db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
       .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId)
       .then(rows => new Map(rows.map(row => [row.runId, Number(row.count)]))) : new Map<string, number>(),
     issuesForUser(userId, runIssueIds, false, db, { withoutBody: true, teams, identifierTeams }),
-    // Where each of the person's own runs was sent: a card names its machine (a teammate's stays with its owner).
-    ownIds.length ? db.select({ id: agentRuns.id, kind: devices.kind, name: devices.name }).from(agentRuns).innerJoin(devices, eq(devices.id, agentRuns.deviceId))
-      .where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))).then(rows => new Map(rows.map(row => [row.id, row.kind === 'cloud' ? { kind: 'cloud' as const } : { kind: 'device' as const, name: row.name }]))) : new Map<string, RunMachine>(),
   ])
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
@@ -543,11 +539,10 @@ export async function citationSources(userId: string, texts: readonly string[], 
     // The short title travels only when there is one, so a citation carries nothing new otherwise.
     const shortTitle = task && task.shortTitleFrom === task.title ? task.shortTitle : null
     const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status } : null
-    const machine = machines.get(row.id)
     const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
     const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
     sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, group, issue,
-      pullRequests, ...(machine ? { machine } : {}),
+      pullRequests,
       name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
       createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
   }
