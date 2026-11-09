@@ -10,8 +10,19 @@ import { withNativeSessionCache } from './desktop-rpc/session-cache-context.ts'
 
 export type RequestLogOutcome = 'empty' | 'work' | 'ignored'
 type RequestMetadata = { requestId: string; userIdHash?: string; rpcAction?: string }
-type Store = { userId?: string; outcome?: RequestLogOutcome; metadata: RequestMetadata; sink?: LogSink; route?: string; method?: string; rpcItemCount?: number }
+type Store = { userId?: string; outcome?: RequestLogOutcome; metadata: RequestMetadata; sink?: LogSink; route?: string; method?: string; rpcItemCount?: number; invocationId?: string }
 const requestScope = new AsyncLocalStorage<Store>()
+// Metadata-only readers for in-process diagnostics. Each module copy keeps its
+// own ALS reader: replacing one would silently attribute another copy's work.
+// Nothing calls these in production; no query, event or I/O is added here.
+const diagnosticKey = Symbol.for('mikka.requestDiagnosticReaders')
+const diagnosticGlobals = globalThis as Record<symbol, unknown>
+const diagnosticReaders = diagnosticGlobals[diagnosticKey] ??= new Set<() => unknown>()
+if (diagnosticReaders instanceof Set) diagnosticReaders.add(() => {
+  const store = requestScope.getStore()
+  return store ? { httpInvocationId: store.metadata.requestId, invocationId: store.invocationId ?? store.metadata.requestId,
+    route: store.route, method: store.method, rpcAction: store.metadata.rpcAction ?? null } : undefined
+})
 const requestClientChannel = channel('mikka.request.client')
 const requestErrorChannel = channel('mikka.request.error')
 const requestMetadataChannel = channel('mikka.request.metadata')
@@ -112,6 +123,7 @@ export async function withRpcActionLog<T>(action: string, work: () => Promise<T>
   parent.rpcItemCount = (parent.rpcItemCount ?? 0) + 1
   const store: Store = { ...parent, outcome: undefined, metadata: { ...parent.metadata, rpcAction: action } }
   const invocationId = randomUUID(), started = performance.now()
+  store.invocationId = invocationId
   const span = trace.getTracer('mikka.rpc').startSpan('rpc.action', { attributes: { 'mikka.rpc.action': action } })
   const write = (completed?: number, error?: unknown) => {
     const level = completed === undefined ? 'info' : levelFor(completed)
