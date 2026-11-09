@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "repository": "alexj11324/Mikka",
+  "observedAt": "2026-11-09 08:00:35 UTC",
+  "originalOrder": [
+    "1692 merge commit and complete release",
+    "1688 ready, merge commit and complete release"
+  ],
+  "productionWeb": {
+    "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "checkedAt": "2026-11-09T07:49:29.502068Z",
+    "httpStatus": 200,
+    "workflow": 42579093885,
+    "conclusion": "success",
+    "containsViewerMerge": "88b144d52d091d7ff566c63fce6e902e33edc59e"
+  },
+  "currentRuntimePublication": {
+    "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "workflow": 42579094044,
+    "status": "failure; new runtime not published",
+    "subscriptionsJob": 129040806019,
+    "subscriptionConclusion": "failure",
+    "publishConclusion": "skipped",
+    "cleanupJob": 129043491976,
+    "cleanupConclusion": "success",
+    "cleanupEvidenceComment": 6735084100,
+    "privateCandidatesDeleted": 3,
+    "sandboxes": [],
+    "cleanupErrors": [],
+    "preservesPreviousValidRuntime": true,
+    "failureDiagnosticOwner": "1503; original log/artifact already claimed; Root did not duplicate"
+  },
+  "acceptance": [
+    {
+      "issue": 1560,
+      "state": "completed",
+      "evidenceComment": 6734218250,
+      "scope": "real self-hosted official dual subscription clone/push/PR and cloud services"
+    },
+    {
+      "issue": 1561,
+      "state": "completed",
+      "evidenceComment": 6726787501,
+      "scope": "original idle-budget 10/10 plus real builtin live/daemon/replica flow; fake clock scope disclosed"
+    },
+    {
+      "issue": 1562,
+      "state": "completed",
+      "evidenceComment": 6734477378,
+      "workflow": 42577701252,
+      "scope": "real final-image vault 16/16 business and 11/11 cleanup; one VM, zero models"
+    },
+    {
+      "issue": 1565,
+      "state": "completed",
+      "evidenceComment": 6734840772,
+      "workflows": [
+        42561752062,
+        42579532129,
+        42580384120
+      ],
+      "scope": "dual native delivery; real webhook/suggestion/merge writeback; direct native Git trace; provider revocation and forwarding stopped; startup observation limitations disclosed"
+    },
+    {
+      "issue": 1567,
+      "state": "completed",
+      "evidenceComment": 6734218057,
+      "workflow": 42573690128,
+      "scope": "real self-hosted/direct default reply, settled usage/billing rows and genuine empty-wallet code/copy/topup target"
+    },
+    {
+      "issue": 1212,
+      "state": "completed",
+      "evidenceComment": 6730449629,
+      "scope": "real OAuth MCP cancellation with independent server correlation plus original dual subscription group stop"
+    },
+    {
+      "issue": 1593,
+      "state": "completed",
+      "evidenceComment": 6731830847,
+      "scope": "actual original lifecycle fix/9-of-9 plus bounded startup, 160-second keepalive, end/cancel evidence; supplementary whole failure retained"
+    },
+    {
+      "issue": 956,
+      "state": "completed",
+      "evidenceComment": 6731833889
+    },
+    {
+      "issue": 957,
+      "state": "completed",
+      "evidenceComment": 6731834039
+    },
+    {
+      "issue": 1556,
+      "state": "email_chat_live_passed_google_configuration_missing",
+      "evidenceComment": 6734613959,
+      "issueState": "open",
+      "missing": [
+        "instance-owned GOOGLE_CLIENT_ID",
+        "instance-owned GOOGLE_CLIENT_SECRET",
+        "stable HTTPS origin and authorized callback URI",
+        "matching BETTER_AUTH_URL",
+        "real Google browser consent receipt"
+      ],
+      "scope": "packaged desktop connects to real self-hosted instance; model fixture scope disclosed"
+    },
+    {
+      "issue": 1563,
+      "state": "not_executed_missing_authenticated_browser_control",
+      "evidenceComment": 6734607971,
+      "issueState": "closed_by_prior_Alex_instruction",
+      "realNewAppCreated": false,
+      "required": "controllable browser already signed in to GitHub; requested asynchronously"
+    },
+    {
+      "issue": 1566,
+      "state": "not_run_user_exempt_real_iPhone",
+      "evidenceComment": 6734614185,
+      "issueState": "closed_by_prior_Alex_instruction",
+      "handoff": "Alex has complete physical-device checklist"
+    },
+    {
+      "issue": 1568,
+      "state": "not_run_user_exempt_real_iPhone",
+      "evidenceComment": 6734614389,
+      "issueState": "closed_by_prior_Alex_instruction",
+      "handoff": "Alex has complete TestFlight self-hosted login/account-switch checklist"
+    }
+  ],
+  "followupInstaller": {
+    "supersededPr": 1807,
+    "supersededHead": "9035485a29b117419e18238870c89ae3275094c0",
+    "adoptedPr": 1810,
+    "adoptedHead": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+    "rootReviewComment": 6734893824,
+    "rootIndependentVerification": {
+      "officialAssetMetadataMatched": 28,
+      "sourceGuardTestsPassed": 20,
+      "binaryDownloads": 0
+    },
+    "status": "combined CI failed; Apple initial install and image source-dependency install end in HTTP403; original owner investigates; no rerun or deployment"
+  },
+  "rootResources": {
+    "virtualMachinesActive": 0,
+    "modelThreadsActive": 0,
+    "smokeMutexHeld": false,
+    "mainWindowHeld": false,
+    "oneUseActionsClosedCommit": "6c086290fa63276733dd522218995d44fdd27159"
+  },
+  "evidenceBranch": "evidence/root-1688-1692-20261109",
+  "evidenceCommit": "f6f4b4ca2e5d42f4c44bd4f43721734872b0b9e3",
+  "notes": [
+    "Original failed Actions reports remain failed and are preserved.",
+    "Issue closure alone is not evidence of real GitHub App or physical-iPhone acceptance."
+  ],
+  "originalPullRequests": [
+    {
+      "number": 1692,
+      "mergedAt": "2026-11-08T06:44:59Z",
+      "head": "93165f4ad0cc5b375e1e49ecafa267209729fb0e",
+      "mergeCommit": "d576b51c5c1ea80e6a2da3b0353d00952e742668",
+      "draft": false
+    },
+    {
+      "number": 1688,
+      "mergedAt": "2026-11-08T07:53:45Z",
+      "head": "ec332cb34678e6638931e9b4ad1e9f893b3b303c",
+      "mergeCommit": "263e7ea37013bd22aa197799a26f1d2e0d1abbf1",
+      "draft": false
+    }
+  ],
+  "browserCapability": {
+    "observationsCurrent": true,
+    "environmentRunning": true,
+    "remoteDesktopEnabled": true,
+    "remoteDesktopState": "unknown",
+    "nodeReplJsCallable": false,
+    "desktopViewerControlsCallable": false,
+    "authenticatedGitHubBrowserObserved": false
+  },
+  "originalMergeCommitVerification": [
+    {
+      "sha": "d576b51c5c1ea80e6a2da3b0353d00952e742668",
+      "parents": [
+        "908947db683f2ef0c2d7ba384d9da173f4cca1d0",
+        "93165f4ad0cc5b375e1e49ecafa267209729fb0e"
+      ],
+      "tree": "3d3a9f2f91902ff7cf9b1725956ef19a8a95b233"
+    },
+    {
+      "sha": "263e7ea37013bd22aa197799a26f1d2e0d1abbf1",
+      "parents": [
+        "7e34d869aa80266494cb2e2eefeee5d8e7ff7d4d",
+        "ec332cb34678e6638931e9b4ad1e9f893b3b303c"
+      ],
+      "tree": "268afb421c4f547cc9d92ca046408f177706b654"
+    }
+  ]
+}
