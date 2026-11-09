@@ -145,9 +145,14 @@ test('detail and activity revalidate current access while returning only changed
       const id = sharedId
       const identifier = createdShared.issue.identifier
       assert.ok(identifier)
-      const { ActionFailureError } = await import('../lib/action-error')
+      const { runAction } = await import('../lib/action-error')
       const { listIssueConnections } = await import('../app/actions/issue-operations')
       const { citationSources } = await import('../lib/coordinator/store')
+      // Team links only group this already-bound shared task. The Personal task
+      // above remains a separate control; unlinking never transfers ownership.
+      // Its owner-allocated metadata number is separate from its immutable ID.
+      const sharedNumber = successful(await readWorkspace(() => getIssue(id))).issue.metadata.number
+      assert.equal(sharedNumber, 2, 'the shared task keeps its owner-allocated number')
       const warmCitationPool = async (teamState: 'linked' | 'unlinked' | 'revoked') => {
         // A single shape read can finish one concurrent query before the next
         // acquires its client. It does not guarantee a fully warm pool: a later
@@ -359,21 +364,18 @@ test('detail and activity revalidate current access while returning only changed
       t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'revoked',
         scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(revokedDirectWarm),
         runOnlyCitation: readMetrics(revokedRunWarm) }))
-      const revokedConnections = await measured(async () => {
-        await assert.rejects(() => readWorkspace(() => listIssueConnections(id)), error => error instanceof ActionFailureError && error.code === 'issueNotFound')
-        return { error: 'issueNotFound' }
-      })
+      const revokedConnections = await measured(() => readWorkspace(() => runAction(() => listIssueConnections(id))))
       const revokedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
       const revokedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
-      await t.test('revoked owners lose connections and both citation readers without rewriting history', () => {
+      await t.test('revoked owners lose cached connections and both citation readers without rewriting history', () => {
         t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'revoked-owner-identifier-readers',
           scope: 'data-read-path_not_page_http', connections: readMetrics(revokedConnections),
           directCitation: readMetrics(revokedCitation), runOnlyCitation: readMetrics(revokedRunCitation) }))
-        assert.deepEqual(revokedConnections.value, { error: 'issueNotFound' })
+        assert.deepEqual(revokedConnections.value, { error: 'issueNotFound', params: undefined })
         assert.deepEqual(revokedCitation.value, {})
         assert.deepEqual(revokedRunCitation.value, {})
         assert.doesNotMatch(JSON.stringify([revokedConnections.value, revokedCitation.value, revokedRunCitation.value]),
-          /prefixInput|__mikkaIdentifierPrefix|identifierTeams?|@example\.invalid/)
+          /CACHE-|prefixInput|__mikkaIdentifierPrefix|identifierTeams?|@example\.invalid/)
       })
       assert.deepEqual((await pool.query('select "issuedIdentifier",content from issues where id=$1', [id])).rows[0], beforeRevocation)
       // Captured on the same fixture against old main 3c32675c; these are

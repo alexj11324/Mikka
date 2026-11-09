@@ -411,7 +411,7 @@ test('artifact HTML still requires the rendered iframe document', { timeout: 100
   assert.equal(state.completed, true)
 })
 
-const taskFixture = { issueTitle: 'Review the desktop workspace' }
+const taskFixture = { issueTitle: 'Review the desktop workspace', agentLabel: 'Codex' }
 const taskMessages = {
   Workspace: { detail: { createdTask: 'Created the task' } },
   IssueThreads: { open: 'Open thread {name}', conversation: 'Thread conversation' },
@@ -455,7 +455,7 @@ function taskReadiness(pending) {
     getByText: text,
     getByRole(role, options) {
       if (role === 'button') {
-        assert.deepEqual(options, { name: 'Open thread Review the desktop workspace', exact: true, pressed: true })
+        assert.deepEqual(options, { name: 'Open thread Codex', exact: true, pressed: true })
         return { waitFor: () => wait('thread-row') }
       }
       assert.equal(role, 'list')

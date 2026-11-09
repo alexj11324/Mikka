@@ -28,6 +28,10 @@ const ensureThreadMachine = async (...args: Parameters<typeof import('./thread-m
   (await runtime).ensureThreadMachine(...args)
 
 const id = (n: number) => `41600000-0000-4000-8000-${String(n).padStart(12, '0')}`
+// Keep unexpected SQL rejected while the real registration locks its parent run.
+const sandboxRegistrationSql = `WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 FOR KEY SHARE)
+  UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp())
+  FROM parent WHERE m."runId"=parent.id AND m."workerLeaseId"=$3 AND m.state<>'ended' RETURNING m."runId"`.replace(/\s+/g, ' ').trim()
 function fixture() {
   const actor = { userId: 'fixture-owner', workspaceId: id(2) }
   const run = { id: id(1), userId: actor.userId, workspaceId: actor.workspaceId, issueId: id(3), agentId: id(16), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
@@ -82,7 +86,7 @@ function fixture() {
       }))
     }
     if (sql.startsWith('INSERT INTO device_tokens')) return result([{ now: new Date() }])
-    if (sql.startsWith('UPDATE thread_machines') || sql.startsWith('WITH locked_run')) {
+    if (sql.startsWith('UPDATE thread_machines') || sql.startsWith('WITH locked_run') || sql.replace(/\s+/g, ' ').trim() === sandboxRegistrationSql) {
       if (sql.startsWith('UPDATE thread_machines SET "workerLeaseId"=$2')) {
         machine.workerLeaseId = values[1] as string; machine.workerLeaseUntil = new Date(Date.now() + 60_000)
       }

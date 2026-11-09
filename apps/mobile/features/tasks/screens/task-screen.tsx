@@ -7,6 +7,7 @@ import { CalendarClock, ChevronRight, Sparkles } from 'lucide-react-native'
 import { BotAvatar, MachineIcon, Spinner } from '@/components/icons'
 import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
+import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Text } from '@/components/Text'
 import { GlassButton } from '@/components/GlassButton'
@@ -20,6 +21,7 @@ import { shortWhen } from '@/lib/clock'
 import { colors, LIST_INSET, SPACE } from '@/lib/theme'
 import { AttemptIcon, BOARD_LABEL, PriorityIcon, priorityLabel, STATE_LABEL, TaskStateIcon } from '../components/task-icons'
 import { ATTEMPT_WORD, attemptState, rowState } from '../model/task-groups'
+import { activityEntries, agentRunTitle, type ActivityEntry } from '../model/task-conversation'
 import { ReviewSummaryRow } from '@/features/review/components/review-summary-row'
 import { reviewHref } from '@/features/review/model/routes'
 
@@ -37,13 +39,14 @@ export function TaskScreen() {
   const { id, attempt } = useLocalSearchParams<{ id: string; attempt?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const bar = useScrolledUnderBar()
   const home = useHome().data
   const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`, () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
   const task = data?.task
   // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
   const shown = task ? rowState(task) : null
   // 活动 runs oldest first, from the task's creation down (Alex 2026-11-07); the server sends it newest first.
-  const activity = data ? [...data.activity].reverse() : []
+  const activity = data ? activityEntries(data.activity) : []
 
   // A push opens the task, then the attempt it was about, once.
   const opened = useRef(false)
@@ -56,8 +59,8 @@ export function TaskScreen() {
 
   return (
     <View style={styles.screen}>
-      <NavBar />
-      <ScrollView {...underBar} contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 96 }]}>
+      <NavBar scrolled={bar.scrolled} />
+      <ScrollView {...underBar} onScroll={bar.onScroll} scrollEventThrottle={16} contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 96 }]}>
         <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />
         {loading && !data ? <View style={styles.center}><Spinner /></View> : null}
         {task ? (
@@ -79,7 +82,7 @@ export function TaskScreen() {
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>{mobileMessages.MobileCore.activity}</Text> : null}
             {activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} first={index === 0} last={index === activity.length - 1}
 
-              onOpen={item.kind === 'attempt' ? () => router.push(conversationHref(task.id, item.runId)) : undefined} />)}
+              onOpen={item.kind === 'agent' ? () => router.push(conversationHref(task.id, item.run.attempts[0]!.runId)) : undefined} />)}
           </>
         ) : null}
       </ScrollView>
@@ -103,12 +106,15 @@ function Chip({ icon, label }: { icon: ReactNode; label: string }) {
 }
 
 /**
- * One entry of 活动 on the timeline: an attempt carries its own result's icon and word (2026-11-07-2230) and opens
- * its thread; a replaced thread and the creation are lines.
+ * One entry of 活动 on the timeline (Alex 2026-11-08: a task is one conversation). An Agent's runs in a row are one
+ * row, 「Codex」 with its latest run's result (2026-11-07-2230) and date; a switch to another Agent starts a row
+ * 「换 Claude Code」. A row opens the task's conversation at its first run; a replaced thread and the creation are lines.
  */
-function ActivityRow({ item, first, last, onOpen }: { item: TaskActivity; first: boolean; last: boolean; onOpen?: () => void }) {
-  // Its own run's result, never the task's reason: an attempt that finished and opened a PR is 完成; only the task waits.
-  const result = item.kind === 'attempt' ? attemptState(item) : null
+function ActivityRow({ item, first, last, onOpen }: { item: ActivityEntry; first: boolean; last: boolean; onOpen?: () => void }) {
+  const latest = item.kind === 'agent' ? item.run.attempts.at(-1)! : null
+  // Its own run's result, never the task's reason: a run that finished and opened a PR is 完成; only the task waits.
+  const result = latest ? attemptState(latest) : null
+  const pullRequest = item.kind === 'agent' ? [...item.run.attempts].reverse().find(attempt => attempt.pullRequest)?.pullRequest : null
   const body = (
     <>
       {/* The timeline: each item draws the line through its own height (none above the first, none below the last), so
@@ -121,10 +127,10 @@ function ActivityRow({ item, first, last, onOpen }: { item: TaskActivity; first:
       </View>
       <View style={styles.activityText}>
         <Text style={styles.activityTitle} numberOfLines={1}>
-          {item.kind === 'attempt' ? mobileMessages.MobileCore.attemptNumber.replace('{number}', String(item.n)) : item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
+          {item.kind === 'agent' ? agentRunTitle(item) : item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
         </Text>
         <Text style={styles.activityMeta} numberOfLines={2}>
-          {result && item.kind === 'attempt' ? [ATTEMPT_WORD[result], result === 'done' && item.pullRequest ? mobileMessages.MobileCore.openedPullRequest.replace('{number}', String(item.pullRequest.number)) : null, HARNESS[item.harness] ?? item.harness, shortWhen(item.createdAt)].filter(Boolean).join(' · ') : shortWhen(item.createdAt)}
+          {result && latest ? [ATTEMPT_WORD[result], result === 'done' && pullRequest ? mobileMessages.MobileCore.openedPullRequest.replace('{number}', String(pullRequest.number)) : null, shortWhen(latest.createdAt)].filter(Boolean).join(' · ') : item.kind === 'agent' ? null : shortWhen(item.createdAt)}
         </Text>
       </View>
       {onOpen ? <ChevronRight size={18} color={colors.tertiary} strokeWidth={2} /> : null}

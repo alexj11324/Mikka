@@ -1,5 +1,5 @@
 import 'server-only'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { attentionSettings, PUSH_WHEN, userPreferences } from '@/lib/db/schema'
@@ -56,6 +56,20 @@ export function parsePreferencesPatch(input: unknown): PreferencesPatch {
   if (parsed.success) return parsed.data
   const tooLong = parsed.error.issues.some(issue => issue.path[0] === 'personalInstructions' && issue.message === 'personalInstructionsTooLong')
   throw new ActionFailureError(tooLong ? 'personalInstructionsTooLong' : 'validationGeneric')
+}
+
+export type CoordinatorPromptPreferences = Pick<Preferences, 'memoryEnabled' | 'personalInstructions'>
+
+/** Fresh prompt input only; notification and attention settings are not part of a model prompt. */
+export async function readCoordinatorPromptPreferences(userId: string): Promise<CoordinatorPromptPreferences> {
+  const [row] = await db.select({
+    memoryEnabled: userPreferences.memoryEnabled,
+    personalInstructions: userPreferences.personalInstructions,
+  }).from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1)
+  return row ?? {
+    memoryEnabled: DEFAULT_PREFERENCES.memoryEnabled,
+    personalInstructions: DEFAULT_PREFERENCES.personalInstructions,
+  }
 }
 
 /** The person's settings; the defaults when they never changed one. */

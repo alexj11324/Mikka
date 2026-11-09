@@ -32,7 +32,7 @@ mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => tr
 mock.module('@/app/actions/agents', { namedExports: { listAgents: async () => [] } })
 mock.module('@/app/actions/link-preview', { namedExports: { getLinkPreview: async () => null } })
 mock.module('@/components/nav/conversation-pill', { namedExports: { ConversationPill: empty } })
-mock.module('@/components/nav/group-avatar', { namedExports: { GroupAvatar: empty, groupMembersKey: (id: string) => ['group-members', id], useGroupMembers: () => ({ data: [] }) } })
+mock.module('@/components/nav/group-avatar', { namedExports: { GroupAvatar: empty, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: [] }) } })
 mock.module('@/components/nav/letter-avatar', { namedExports: { LetterAvatar: empty } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty } })
 mock.module('@/components/workspace/agent-markdown', { namedExports: { AgentMarkdown: ({ text }: { text: string }) => <p>{text}</p> } })

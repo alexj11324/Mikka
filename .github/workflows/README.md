@@ -172,10 +172,15 @@ CI source changes are not classified as documentation-only.
 
 ## Official UI overlay
 
+There is one UI ([decision](../../docs/design/decisions/2026-11-08-2133-one-ui.md)).
+Public and fork PRs build without the private repository, and that build only
+has to compile; no workflow screenshots it. (`community-settings-ui.yml`,
+which captured that build's settings pages, was removed on 2026-11-08.)
+
 `web-deploy.yml` and `desktop-release.yml` alone read the private UI through
 Infisical OIDC and `HOSTED_UI_READ_KEY` (`prod:/platform`, GitHub read-only deploy key on
 `alexj11324/mikka-hosted-ui` only). They set `MIKKA_UI_OVERLAY_DIR` and record
-`MIKKA_UI_OVERLAY_SHA`; public and fork PRs still build the default public UI
+`MIKKA_UI_OVERLAY_SHA`; public and fork PRs still build with the default slots
 without either variable or any private secret. The production Web job checks
 public main plus private main on each main update, including docs-only pushes. Private main pushes dispatch
 the official Web job again with `overlay-refresh: true`, so docs-only changes

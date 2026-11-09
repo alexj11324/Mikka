@@ -944,6 +944,15 @@
       "sourceHash": "d01a4cded6bc27856402eb63ef90c2514150111149ea150a2efe779f91efe9e6"
     },
     {
+      "path": "/mikka/api/factory/tasks/[taskId]/activity",
+      "template": "/api/factory/tasks/[taskId]/activity",
+      "source": "app/api/factory/tasks/[taskId]/activity/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "534334f4e4f55d9b0510c98a71799626991d11c2a1a9f459668e1d8c4ebb0dbe"
+    },
+    {
       "path": "/mikka/api/factory/tasks/[taskId]/approval",
       "template": "/api/factory/tasks/[taskId]/approval",
       "source": "app/api/factory/tasks/[taskId]/approval/route.ts",
@@ -989,6 +998,25 @@
         "POST"
       ],
       "sourceHash": "cbe2821ef8c5c476592edf7ea5fb244e11d58ee3b5ef559676f5d4ae3a57c51c"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/[taskId]/media/[captureId]",
+      "template": "/api/factory/tasks/[taskId]/media/[captureId]",
+      "source": "app/api/factory/tasks/[taskId]/media/[captureId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "a0600f48f5d8b9fa5d81c75df7e20808c8a7b255efa8e031e9faf3675d3369c2"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/[taskId]/media/[captureId]/poster",
+      "template": "/api/factory/tasks/[taskId]/media/[captureId]/poster",
+      "source": "app/api/factory/tasks/[taskId]/media/[captureId]/poster/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "c3f4a50167504fd641299c32261c24c1da80fc4a75466b9116527717aba8be67"
     },
     {
       "path": "/mikka/api/frontend/oauth-consent",
@@ -2150,7 +2178,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "ec71fb037453c409b6e16cca45db2a7dc013b674e83aec347657ef620008ac6a"
+      "sourceHash": "67027eaff496a1ed2e659924b13e8eef0253186646b1a2c36ba508de987769c5"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
@@ -2270,7 +2298,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "905447199d1dcf030fe3ee67227dd47532adfe23dc57ea43979c841830c8aa85"
+      "sourceHash": "0a1326bfdb882a5627d075e6e789f0ea3f2d39edc07d323ad431b62c6efe7c6c"
     },
     {
       "path": "/mikka/v1/runs/[runId]/policy-snapshot",

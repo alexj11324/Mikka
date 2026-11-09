@@ -59,7 +59,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
       CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"workspaceId" uuid NOT NULL REFERENCES mikka_workspaces(id),revision integer NOT NULL DEFAULT 1,"archivedAt" timestamptz,UNIQUE(id,"workspaceId"));
       CREATE TABLE workspace_project_tasks ("issueId" uuid PRIMARY KEY,"projectId" uuid NOT NULL,"workspaceId" uuid NOT NULL,
         FOREIGN KEY ("projectId","workspaceId") REFERENCES workspace_projects(id,"workspaceId"));`)
-    await pool.query(await readFile(new URL('../../drizzle/20261108120304_project_resources.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261109143004_project_resources.sql', import.meta.url), 'utf8'))
     const queueTask = async () => {
       const id = randomUUID()
       await pool.query(`INSERT INTO issues (id,"userId","workspaceId","ownershipState") VALUES ($1,$2,$3,'bound')`, [id, actor.userId, actor.workspaceId])

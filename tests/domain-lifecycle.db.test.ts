@@ -32,7 +32,7 @@ test('account and workspace deletion preserve the canonical Project history boun
   await connection.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,"appliedAt" timestamptz NOT NULL DEFAULT now())')
   const directory = new URL('../drizzle/', import.meta.url)
   const names = orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))
-  const boundary = '20261108120308_project_writer_fence.sql'
+  const boundary = '20261109143008_project_writer_fence.sql'
   const migrate = async (files: string[]) => {
     for (const name of files) {
       const source = await readFile(new URL(name, directory), 'utf8')

@@ -74,7 +74,7 @@ for (const [path, exports] of [
   ['./triage', { eventsForInbox: unused, isolateTaskRequest: unused }],
   ['@/lib/task-identifier-server', { taskIdentifiers: unused }],
   ['@/lib/artifacts/store', { artifactSummaries: async () => ({}) }],
-  ['@/lib/preferences', { readPreferences: unused }],
+  ['@/lib/preferences', { readPreferences: unused, readCoordinatorPromptPreferences: unused }],
   ['./triage-batch', { TRIAGE_RETRY_COOLDOWN_MS: 60_000 }],
   ['@/lib/schedules/store', { scheduledInbox: unused }],
   ['../live/chats', { botChatChanged: unused }],

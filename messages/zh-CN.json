@@ -105,6 +105,7 @@
       "privateHint": "初始仅自己可见，创建后可邀请成员协作"
     },
     "list": {
+      "clearFilters": "清除筛选",
       "label": "任务列表",
       "noResults": "没有找到匹配的任务",
       "emptyTitle": "这里还没有任务",
@@ -181,6 +182,12 @@
     "cardPreview": "[卡片]"
   },
   "Plugins": {
+    "ownDescription": {
+      "github": "仓库、PR 和 issue",
+      "linear": "任务和项目",
+      "telegram": "在 Telegram 里和你的 Bot 对话"
+    },
+    "unavailable": "不可用",
     "title": "插件",
     "appsTab": "应用",
     "skillsTab": "技能",
@@ -778,6 +785,7 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
+    "scheduledOffline": "已排期 · 上线后运行",
     "otherDevices": "服务器",
     "menu": "{name} 的更多操作",
     "add": {
@@ -981,6 +989,7 @@
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
+    "loading": "正在加载…",
     "loadingCreate": "正在加载新建任务…",
     "signOutFailed": "退出失败，请稍后重试。",
     "allIssues": "全部任务",
@@ -1216,7 +1225,7 @@
     "taskWorkspaceTransferDenied": "任务创建后工作区归属固定，不支持跨工作区转移。",
     "workspaceNotFound": "没有可访问的工作区。",
     "workspacePaymentTaken": "这个团队已经由另一位成员的卡支付。",
-    "workspacePersonal": "个人工作区只有你一人。要邀请成员，请新建团队工作区。",
+    "workspacePersonal": "个人工作区只有你一人。要邀请成员，请新建共享工作区。",
     "workspacePersonalDelete": "个人工作区不能删除。",
     "workspaceMemberExists": "其中一个邮箱已经是工作区成员，请在成员列表中管理或恢复。",
     "workspaceMemberNotFound": "成员不存在。",
@@ -1284,7 +1293,7 @@
     "dataExportRateLimited": "每小时只能导出一次，{minutes} 分钟后可再次导出。",
     "accountEmailMismatch": "输入的邮箱与当前账户不一致。",
     "accountSoleAdmin": "你是工作区「{workspaces}」唯一的管理员。先把管理员身份转给其他成员，再删除账户。",
-    "runChainEnded": "此线程的所有尝试都已结束，没有可停止的运行。",
+    "runChainEnded": "这个任务已经停了，没有可停止的运行。",
     "threadStopping": "线程正在停止",
     "secretNotFound": "该密钥或环境变量已不存在。",
     "secretNameReserved": "该名称为运行环境保留（例如 PATH、HOME、代理、TLS、加载器、git、E2B 或 MIKKA 相关变量），请换一个名称。",
@@ -1740,6 +1749,8 @@
     }
   },
   "Settings": {
+    "teamOnlyNotice": "成员、团队、团队权限和审计日志只在共享工作区中",
+    "unavailableTitle": "{title}暂时不可用",
     "title": "设置",
     "searchLabel": "搜索设置",
     "searchPlaceholder": "搜索设置…",
@@ -1854,6 +1865,7 @@
       "account": "此账户"
     },
     "memory": {
+      "emptyBody": "Mikka 会从对话和已连接的应用中记下要点，并显示在这里。",
       "enabled": "使用记忆",
       "learn": "从已连接的 App 中学习",
       "error": "无法更新记忆",
@@ -2585,6 +2597,9 @@
       }
     },
     "billing": {
+      "notConfiguredTitle": "此服务器未设置计费",
+      "notConfiguredBody": "套餐、席位和点数需要支付服务，由部署此服务器的人开启。",
+      "notConfiguredAction": "如何设置计费",
       "loading": "正在加载计费",
       "loadFailed": "读不到计费信息",
       "plan": "方案",
@@ -2675,6 +2690,7 @@
       "afterQuotaSection": "额度用完时"
     },
     "modelOrder": {
+      "fallbackNeedsKey": "需先添加 API 密钥并连接订阅。",
       "placesLabel": "派发顺序",
       "placeServers": "服务器",
       "placeComputers": "电脑",
@@ -3108,7 +3124,7 @@
     "c_6dfc6360": "关联未保存，请检查权限并刷新后重试。",
     "c_b8e346ef": "切换未完成，请重试。",
     "c_cb11190c": "创建团队",
-    "c_d92d1b8d": "创建团队工作区",
+    "c_d92d1b8d": "创建共享工作区",
     "c_63373890": "创建工作区 · Mikka",
     "c_4eec1ff7": "创建新团队",
     "c_4598f1cb": "创建新的 Mikka 工作区，设置名称与专属网址，邀请团队协作。",
@@ -3423,6 +3439,12 @@
       "checking": "待检查"
     },
     "empty": "告诉 {name} 你要做什么",
+    "starters": {
+      "fixBug": "修复我仓库里的一个 bug",
+      "reviewPullRequests": "审阅我未合并的 PR",
+      "summarizeToday": "总结今天需要我处理的事",
+      "dailyBriefing": "设置每日简报"
+    },
     "events": {
       "aThread": "一个线程",
       "aTask": "一个任务",
@@ -3835,12 +3857,12 @@
     "loadingWorkspace": "正在加载工作区…",
     "switchWorkspace": "切换工作区",
     "reloadWorkspace": "重新加载工作区",
-    "newWorkspace": "新建团队工作区",
+    "newWorkspace": "新建共享工作区",
     "workspaceName": "工作区名称",
     "forExampleProductTeam": "例如：产品团队",
     "cancel": "取消",
     "creating": "正在创建…",
-    "createWorkspace": "创建团队工作区",
+    "createWorkspace": "创建共享工作区",
     "sendingChoice": "发送中",
     "cloudKeySetup": "去设置 E2B 密钥",
     "dispatchWait": "等它上线",
@@ -3897,6 +3919,7 @@
     "states": {
       "online": "在线",
       "offline": "离线",
+      "never": "从未上线",
       "starting": "启动中",
       "running": "运行中",
       "paused": "休眠",
@@ -3930,7 +3953,9 @@
     "loadFailed": "线程加载失败",
     "retry": "重试",
     "started": "开始于 {time}",
-    "steps": "交给 {harness} · 执行了 {count} 步",
+    "steps": "执行了 {count} 步",
+    "stepsCommands": "已运行 {count} 条命令",
+    "stepsTools": "调用了 {count} 个工具",
     "composer": "告诉 {agent} 下一步做什么…",
     "checkEnded": "独立检查已结束，请在验收中处理结果。",
     "sendFailed": "发送结果未确认，草稿已保留",
@@ -4138,6 +4163,7 @@
       "failed": "未送达，请重试。"
     },
     "addE2BKey": "添加 E2B API Key",
+    "e2bKeyNeeded": "Mikka Cloud 使用你自己的 E2B Key 运行",
     "loading": "正在连接电脑"
   },
   "Shell": {
@@ -4299,17 +4325,9 @@
         "description": "描述",
         "noDescription": "没有描述",
         "activity": "活动",
-        "attempt": "第 {n} 次尝试",
         "created": "创建了任务",
         "createdBy": "{name} 创建了任务",
         "dispatchedTask": "{bot} 派出了这个任务 · {time}",
-        "divider": "第 {n} 次尝试{outcome} · 换 {agent} 再试",
-        "dividerOutcome": {
-          "failed": "失败",
-          "blocked": "受阻",
-          "other": "结束"
-        },
-        "replaced": "换了新线程",
         "openPage": "打开任务页",
         "more": "更多",
         "comment": "评论",
@@ -4351,12 +4369,13 @@
           "merged": "PR 已合并"
         },
         "result": {
-          "running": "进行中",
+          "running": "运行中",
+          "queued": "排队中",
+          "waiting": "等你回复",
           "needsReply": "等你回复",
           "paused": "已暂停",
           "failed": "失败",
           "blocked": "受阻",
-          "replaced": "已替换",
           "done": "完成",
           "idle": "暂不处理",
           "ended": "已结束"
@@ -4933,6 +4952,10 @@
     "mergeConfirm": "合并"
   },
   "ArtifactReview": {
+    "checksRatio": "{passed}/{total} 项通过",
+    "checksFailedNote": "{count} 项失败",
+    "checksPendingNote": "{count} 项进行中",
+    "evidenceRatio": "{passed}/{total} 项有证据",
     "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · 线程完成后生成",
@@ -5766,7 +5789,7 @@
     "replySelection": "回复选中的文字",
     "messageTask": "给这个任务发消息",
     "noTasks": "没有任务",
-    "noAttempts": "还没有尝试",
+    "notStarted": "还没开始",
     "allTasks": "全部任务",
     "info": "资料",
     "all": "全部",
@@ -5814,12 +5837,34 @@
     "noPriority": "无",
     "activity": "活动",
     "comment": "+ 评论",
-    "attemptNumber": "第 {number} 次尝试",
+    "conversation": {
+      "switched": "换 {agent} 继续",
+      "switchedAfterFailure": "{previous} 没跑通 · 换 {agent} 继续",
+      "switchedTo": "换 {agent}",
+      "fix": "修复",
+      "needsYou": "需要你：{what}",
+      "verdicts": {
+        "passed": "通过",
+        "changes_requested": "需要修改",
+        "needs_judgment": "需要你判断"
+      }
+    },
     "threadReplaced": "换了新线程",
     "taskCreatedBy": "{name} 创建了任务",
     "taskCreated": "创建了任务",
     "openedPullRequest": "开了 PR #{number}",
-    "steps": "{count} 步",
+    "steps": "执行了 {count} 步",
+    "threadSteps": {
+      "commands": "已运行 {count} 条命令",
+      "command": "已运行 1 条命令",
+      "tools": "调用了 {count} 个工具",
+      "tool": "调用了 1 个工具",
+      "showMore": "显示更多",
+      "showLess": "收起",
+      "milliseconds": "{count} 毫秒",
+      "seconds": "{count} 秒",
+      "minutes": "{minutes} 分 {seconds} 秒"
+    },
     "yesterday": "昨天",
     "tomorrow": "明天",
     "content": "内容",

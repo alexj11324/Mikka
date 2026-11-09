@@ -12,6 +12,7 @@ import type { BotView } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/reui/badge'
 import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from '@/components/ui/command'
+import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import { Spinner } from '@/components/ui/spinner'
 import { statusTone, type StatusTone } from '@/lib/status-appearance'
 import { ShortcutKeys } from '@/components/shortcut-keys'
@@ -22,12 +23,16 @@ import type { ChatTarget } from './bot-list'
 import { LetterAvatar } from './letter-avatar'
 import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 import { FieldError } from '@/components/ui/field'
+import { localTaskState, type TaskState } from '@/hooks/use-bot-tasks'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Project = Awaited<ReturnType<typeof listProjects>>[number]
 type TaskHit = Extract<SiteSearchItem, { type: 'task' }>
 type GroupHit = Extract<SiteSearchItem, { type: 'group' }>
 type HistoryHit = Extract<SiteSearchItem, { type: 'history' }>
+
+/** A task state's badge tone: waiting is the person's turn, blocked and failed need help, the rest are calm. */
+const TASK_STATE_TONE = { waiting: 'warning', blocked: 'destructive', failed: 'destructive', running: 'info', queued: 'neutral', todo: 'neutral', idle: 'neutral', done: 'success', canceled: 'neutral', duplicate: 'neutral' } as const satisfies Record<TaskState, StatusTone>
 
 const STATUS_BADGES = { neutral: 'outline', warning: 'warning-light', info: 'info-light', success: 'success-light', destructive: 'destructive-light', focus: 'focus-light' } as const satisfies Record<StatusTone, string>
 
@@ -37,7 +42,8 @@ export function SearchPill({ onSearch }: { onSearch: () => void }) {
   return <Button variant="outline" size="sm" aria-label={t('searchLabel')} aria-keyshortcuts="Control+k Meta+k" onClick={onSearch} className="h-7 w-full min-w-0 justify-center gap-2 rounded-full px-3 text-xs font-normal text-muted-foreground hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring">
     <Search data-icon="inline-start" />
     <span className="truncate">{t('searchPlaceholder')}</span>
-    <ShortcutKeys keys={['mod', 'K']} />
+    {/* Keycaps a step off the pill, so Ctrl and K read as keys in light mode too (chat-12, work-15). */}
+    <ShortcutKeys keys={['mod', 'K']} className="*:data-[slot=kbd]:bg-muted" />
   </Button>
 }
 
@@ -79,6 +85,8 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
   const t = useTranslations('Shell')
   const tNav = useTranslations('Nav')
   const tIssue = useTranslations('Issue')
+  const tCopy = useTranslations('FeatureCopy')
+  const tCommon = useTranslations('Common')
   const [query, setQuery] = useState('')
   const search = useSiteSearch(query, workspaceId)
   const text = query.trim()
@@ -99,7 +107,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
     issues.filter(issue => shown(`${issue.identifier ?? ''} ${issue.title}`)),
     search.state.tasks.items.filter((item): item is TaskHit => item.type === 'task'),
   )
-  const threadRows = onThread ? threadSearchHits(threads, text, thread => threadName(thread, issues, tNav('untitledConversation'))) : []
+  const threadRows = onThread ? threadSearchHits(threads, text, thread => threadName(thread, issues, tNav('untitledConversation')), new Set(taskRows.map(row => row.id))) : []
   const projectRows = projects.filter(project => shown(`${project.name} ${project.summary}`))
   const actions = [
     // i18n-ignore: bilingual search keywords, not rendered
@@ -128,13 +136,20 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
     return <>{loading ? <Spinner role="presentation" aria-hidden="true" /> : <Plus />}{loading ? t('search.loadingMore') : t('search.more')}</>
   }
 
-  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-[max(1rem,calc(50svh-15rem))] translate-y-0 sm:max-w-xl">
+  const quickActions = (actions.length > 0 || reviewRows.length > 0) && <CommandGroup heading={t('groups.actions')}>
+    {reviewRows.map(row => <CommandItem key={row.value} value={row.value} onSelect={() => pick(() => onReview?.(row.id))}><FileDiff />{row.label}</CommandItem>)}
+    {actions.map(action => <CommandItem key={action.value} value={action.value} onSelect={() => pick(action.run)}><action.icon />{action.label}</CommandItem>)}
+  </CommandGroup>
+
+  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-[max(1rem,calc(50svh-15rem))] translate-y-0 max-md:top-[max(1rem,env(safe-area-inset-top))] sm:max-w-xl">
     {/* Filtering is ours: server hits must not be dropped by cmdk's client-side match. */}
-    <Command shouldFilter={false} className="**:data-[selected=true]:bg-muted">
-      <CommandInput className="text-base md:text-sm" aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={setQuery} maxLength={400} />
+    {/* The active row is a step of the text colour, so it reads on white and on the dark popover alike (bg-muted equals the dark popover). */}
+    <Command shouldFilter={false} className="**:data-[selected=true]:bg-foreground/[0.08]">
+      <CommandInput className="text-base text-ellipsis md:text-sm" aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={setQuery} maxLength={400} />
       <p role="status" aria-live="polite" className="sr-only">{text ? announce : ''}</p>
       {/* The dialog's top edge stays put and its height follows the results (Linear, Raycast): no blank block under one empty line. */}
-      <CommandList aria-busy={search.searching} className="max-h-[min(26rem,60svh)]">
+      <CommandList aria-busy={search.searching} className="max-h-[min(26rem,60svh)] scroll-fade-y">
+        {text && quickActions}
         {(coordinatorShown || botRows.length > 0) && <CommandGroup heading={t('groups.bots')}>
           {coordinatorShown && <CommandItem value={coordinatorValue} onSelect={() => pick(() => onChat({ kind: 'coordinator' }))} className="gap-3 py-2">
             <CoordinatorAvatar size="search" />
@@ -172,7 +187,15 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
                 <span className="truncate font-medium">{row.identifier && <><span className="text-muted-foreground tabular-nums">{row.identifier}</span> </>}{row.title}</span>
                 {assignee && <span className="truncate text-xs text-muted-foreground">{assignee}</span>}
               </span>
-              <CommandShortcut className="tracking-normal"><Badge variant={STATUS_BADGES[statusTone(row.status)]} size="sm">{statusLabel(row.status)}</Badge></CommandShortcut>
+              <CommandShortcut className="tracking-normal">{(() => {
+                // The task's one state, as its card, panel row and board read it (localTaskState), not the bare board
+                // status: a done run whose PR waits says Needs review here too (UI audit work-04). A server hit without
+                // its metadata keeps the board status.
+                const task = 'metadata' in row ? localTaskState(row, threads.find(thread => thread.issueId === row.id)) : null
+                return task
+                  ? <Badge variant={STATUS_BADGES[TASK_STATE_TONE[task.state]]} size="sm">{task.reason ? t(`panel.task.reason.${task.reason}`) : t(`panel.task.state.${task.state}`)}</Badge>
+                  : <Badge variant={STATUS_BADGES[statusTone(row.status)]} size="sm">{statusLabel(row.status)}</Badge>
+              })()}</CommandShortcut>
             </CommandItem>
           })}
           {search.state.tasks.nextCursor && <CommandItem value="more tasks" disabled={search.state.tasks.loadingMore} onSelect={() => search.more('tasks')} className="text-muted-foreground">{moreLabel('tasks')}</CommandItem>}
@@ -189,10 +212,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
             <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{project.name}</span>{project.summary && <span className="truncate text-xs text-muted-foreground">{project.summary}</span>}</span>
           </CommandItem>)}
         </CommandGroup>}
-        {(actions.length > 0 || reviewRows.length > 0) && <CommandGroup heading={t('groups.actions')}>
-          {reviewRows.map(row => <CommandItem key={row.value} value={row.value} onSelect={() => pick(() => onReview?.(row.id))}><FileDiff />{row.label}</CommandItem>)}
-          {actions.map(action => <CommandItem key={action.value} value={action.value} onSelect={() => pick(action.run)}><action.icon />{action.label}</CommandItem>)}
-        </CommandGroup>}
+        {!text && quickActions}
         {/* Both lines are announced by the status region above, so the listbox stays options only for screen readers. */}
         {search.searching && <div aria-hidden="true" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><Spinner role="presentation" aria-hidden="true" className="size-3.5" />{t('search.searching')}</div>}
         {!search.searching && resultCount === 0 && <p aria-hidden="true" className="py-6 text-center text-sm">{search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')}</p>}
@@ -205,6 +225,8 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
             </CommandItem>
           </CommandGroup>)}
       </CommandList>
+      {/* The list ends on this bar, not mid-row; the keys are the ones issue-search names. */}
+      <div aria-hidden="true" className="flex items-center gap-4 bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground max-md:hidden"><span className="flex items-center gap-1.5"><KbdGroup><Kbd>↑</Kbd><Kbd>↓</Kbd></KbdGroup>{tCopy('c_70b20820')}</span><span className="flex items-center gap-1.5"><Kbd>Enter</Kbd>{tCopy('c_65fc81e1')}</span><span className="ml-auto flex items-center gap-1.5"><Kbd>Esc</Kbd>{tCommon('close')}</span></div>
     </Command>
   </CommandDialog>
 }

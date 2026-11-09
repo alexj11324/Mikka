@@ -428,7 +428,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       `);
       // Install the actual review control schema and source fences. The legacy
       // Factory fixture supplies only its unrelated source-table columns above.
-      for (const name of ['20261025013400_run_checkpoints.sql', '20261031002607_checkpoint_recovery_availability.sql', '20261108230400_coding_review_sessions.sql', '20261108230500_coding_review_task_workspace.sql', '20261108230600_coding_review_task_thread.sql'])
+      for (const name of ['20261025013400_run_checkpoints.sql', '20261031002607_checkpoint_recovery_availability.sql', '20261109143100_coding_review_sessions.sql', '20261109143101_coding_review_task_workspace.sql', '20261109143102_coding_review_task_thread.sql'])
         await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'));
       const x = await prepared();
       const { rows: [producer] } = await pool.query('SELECT "runId" FROM factory_attempts WHERE "taskId"=$1 AND stage=\'execute\'', [x.task.id]);

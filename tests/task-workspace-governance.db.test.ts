@@ -41,7 +41,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     const migrations = orderMigrations((await readdir(directory)).filter(file => file.endsWith('.sql')))
-    const boundary = '20261108120200_task_workspace_ownership.sql'
+    const boundary = '20261109035000_task_workspace_ownership.sql'
     for (const pool of [app, workspace]) await pool.query('CREATE TABLE schema_migrations (name text PRIMARY KEY,"appliedAt" timestamptz NOT NULL DEFAULT now())')
     const migrate = async (names: string[]) => {
       for (const name of names) {

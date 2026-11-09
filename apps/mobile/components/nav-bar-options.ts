@@ -26,3 +26,10 @@ export function navBarOptions({ title, titleView, large, topTitle }: {
 
 /** iOS before 26 has no soft scroll edge, so the bar draws a short fade from the page colour itself. */
 export const needsTopFade = (os: string, version: string | number) => os === 'ios' && Number.parseInt(String(version), 10) < 26
+
+/**
+ * Whether content at `offsetY` is under an iOS bar `barHeight` tall that floats over it: a scroll view under a
+ * transparent bar starts at minus the bar's height (BarBackdrop). An offset reported from zero reads as scrolled, so
+ * the backdrop shows rather than letting text meet the title.
+ */
+export const scrolledUnderBar = (offsetY: number, barHeight: number) => offsetY + barHeight > 2

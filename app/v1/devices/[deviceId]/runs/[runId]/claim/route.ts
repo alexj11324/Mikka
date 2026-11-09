@@ -1,3 +1,4 @@
+import { withFactoryQuestionDeliveryContext } from '@/lib/factory/questions/continuation-delivery-context'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { CodedError, causeFields, logCodedError } from '@mikka/protocol/coded-error'
 import { serverRunFailure } from '@/lib/run-failure-details'
@@ -525,7 +526,12 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...(taskSecrets ? { taskSecrets } : {}),
     ...threadContinuation,
     ...retry,
-    ...factoryClaim,
+    ...withFactoryQuestionDeliveryContext(factoryClaim, {
+      issueId: run.issueId, kind: current.kind, readOnly: assignmentPolicy.readOnly,
+      gitPush: assignmentPolicy.permissions.git_push,
+      repository: githubConnected && githubRepository ? repo.repoPath.slice('v2/github.com/'.length) : undefined,
+      branch: publication?.pushBranch, baseBranch: run.baseBranch ?? undefined,
+    }),
     ...skillAssignment,
     ...benchmarkAssignment,
     policy: assignmentPolicy,

@@ -23,8 +23,8 @@ route_factory_task: tool({
       inputSchema: routeSchema.omit({ eventId: true }), execute: ( input) => steps.routeFactoryTask(userId, input, scope),
     }),
 get_factory_task: tool({
-      description: 'Read the task, current operation binding, reasons, candidates and retained execution evidence. V2 exposes one public stage with optional needsYou and bounded clarification context; use binding for controls. Older tasks keep their legacy contract.',
-      inputSchema: z.object({ taskId: id }), execute: ( input) => steps.getFactoryTask(userId, input, scope),
+      description: 'Read Factory state/evidence and control binding (V2 stage/needsYou; legacy unchanged). Use Issue IDs with get_issue/dispatch_run.',
+      inputSchema: z.object({ taskId: id.describe('Factory receipt: readTask.input.taskId or binding.taskId; legacy task.id. Not an Issue ID.') }), execute: ( input) => steps.getFactoryTask(userId, input, scope),
     }),
 list_factory_questions: tool({
       description:

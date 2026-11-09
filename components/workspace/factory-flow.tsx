@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { Ban, Check, CircleAlert, CircleX, ClipboardList, ExternalLink, FileCheck, GitMerge, GitPullRequest, MessageCircleQuestion, RefreshCw, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -73,11 +73,12 @@ function StageList({ flow }: { flow: FactoryFlow }) {
   const active = flow.stages.indexOf(flow.stage) + 1
   const done = flow.stage === 'completed'
   return <Stepper value={active} role="list" aria-label={t('card.stageList')} indicators={{ completed: <Check aria-hidden="true" /> }}>
-    <StepperNav className="flex-wrap gap-y-2">
+    {/* A phone can wrap the stages: there they go without connectors, so none is left pointing at nothing (UI audit task-24). */}
+    <StepperNav className="flex-wrap gap-x-3 gap-y-2 sm:gap-x-0">
       {flow.stages.map((stage: FlowStage, index) => <StepperItem key={stage} step={index + 1} completed={done} role="listitem" aria-current={index + 1 === active ? 'step' : undefined} className="gap-1.5 not-last:flex-none">
         <StepperIndicator className="size-4">{index + 1 === active && !done ? <span className="size-1.5 rounded-full bg-current" /> : null}</StepperIndicator>
-        <StepperTitle className="text-xs font-normal text-muted-foreground data-[state=active]:font-medium data-[state=active]:text-foreground">{stage === 'completed' && flow.completion === 'accepted' ? acceptance('state.accepted') : t(`stages.${stage}`)}</StepperTitle>
-        {index < flow.stages.length - 1 && <StepperSeparator className="mx-1 w-6 group-data-[orientation=horizontal]/stepper-nav:flex-none" />}
+        <StepperTitle className="text-xs font-normal whitespace-nowrap text-muted-foreground data-[state=active]:font-medium data-[state=active]:text-foreground">{stage === 'completed' && flow.completion === 'accepted' ? acceptance('state.accepted') : t(`stages.${stage}`)}</StepperTitle>
+        {index < flow.stages.length - 1 && <StepperSeparator className="mx-1 w-6 group-data-[orientation=horizontal]/stepper-nav:flex-none max-sm:hidden" />}
       </StepperItem>)}
     </StepperNav>
   </Stepper>
@@ -95,6 +96,8 @@ type Approval = { busy: boolean; error: (ApproveSpecFailure & { revision: number
  */
 export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryTask; detail: FactoryTaskDetail | undefined; onOpenThread: (runId: string) => void }) {
   const t = useTranslations('FactoryFlow')
+  const format = useFormatter()
+  const now = useNow()
   const key = flowKey(task.id)
   const { flow, error, mutate, isValidating } = useFactoryFlow(task.id, detail)
   const { mutate: revalidate } = useSWRConfig()
@@ -140,6 +143,8 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
       <ItemContent className="min-w-0 basis-64 gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <FactoryFlowBadge flow={flow} />
+          {/* How long it has waited for the person (decision 2026-11-04-2200, rule 7), beside the 需要你 kind it waits on. */}
+          {flow.needsYou?.since && <time dateTime={flow.needsYou.since} className="text-xs text-muted-foreground tabular-nums">{format.relativeTime(new Date(flow.needsYou.since), now)}</time>}
           {flow.acceptance && <CountBadges counts={flow.acceptance.counts} />}
         </div>
         <StageList flow={flow} />

@@ -6,11 +6,13 @@ import { chmod, mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { gzipSync } from 'node:zlib'
 import { frontendRuntimeSource } from '../apps/frontend/scripts/frontend-runtime.mjs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
 import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, proactiveFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 import { analyticsEnvironment, analyticsKey, analyticsPaths, inspectAnalyticsBuild, localAnalyticsRequest, requiredRuntimeResources, syntheticPostHogRequest, verifyRuntimeResources } from '../scripts/check-analytics-ssr.mjs'
 import { analyticsBrowserProfile } from '../scripts/analytics-browser-sandbox.mjs'
+import { POSTER_BINARY_ARCHIVE, POSTER_BINARY_MANIFEST, POSTER_LICENSE_FILES, POSTER_RUNTIME_DIRECTORY } from '../lib/captures/poster-binary.mjs'
 
 test('pageviews strip query strings, hashes, document identifiers and unapproved properties', () => {
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: {
@@ -186,6 +188,63 @@ test('artifact verification rejects escaping and symlinked files instead of acce
   await rm(join(root, '.output', source))
   await symlink(join(root, source), join(root, '.output', source))
   await assert.rejects(verifyRuntimeResources(root, built), /symlinks/)
+})
+
+test('generated FFmpeg evidence verifies the pinned pnpm source, real decompression and unchanged symlink boundaries', async t => {
+  const { root, built, write } = await analyticsBuildFixture(t)
+  const digest = bytes => createHash('sha256').update(bytes).digest('hex')
+  const packageDirectory = 'node_modules/.pnpm/ffmpeg-static@5.3.0/node_modules/ffmpeg-static'
+  await write('package.json', JSON.stringify({ dependencies: { 'ffmpeg-static': '5.3.0' } }))
+  await write(`${packageDirectory}/package.json`, JSON.stringify({ name: 'ffmpeg-static', version: '5.3.0' }))
+  const original = Buffer.from('locked executable fixture\n'), archive = gzipSync(original)
+  await write(`${packageDirectory}/ffmpeg`, original)
+  await symlink(join(root, packageDirectory), join(root, 'node_modules/ffmpeg-static'), 'dir')
+  const manifest = { version: 1, bytes: original.length, sha256: digest(original), gzipBytes: archive.length, gzipSha256: digest(archive) }
+  const packed = async (path, bytes) => {
+    await write(`.output/${path}`, bytes)
+    const resource = { path, bytes: Buffer.byteLength(bytes), sha256: digest(bytes) }
+    const previous = built.resources.findIndex(value => value.path === path)
+    if (previous === -1) built.resources.push(resource)
+    else built.resources[previous] = resource
+  }
+  for (const name of POSTER_LICENSE_FILES) {
+    const bytes = `pinned upstream ${name}\n`
+    await write(`${packageDirectory}/${name}`, bytes)
+    await packed(`${POSTER_RUNTIME_DIRECTORY}/${name}`, bytes)
+  }
+  await packed(POSTER_BINARY_ARCHIVE, archive)
+  await packed(POSTER_BINARY_MANIFEST, JSON.stringify(manifest))
+  built.posterBinary = manifest
+  assert.equal((await verifyRuntimeResources(root, built)).count, requiredRuntimeResources.length + 6)
+  await assert.rejects(verifyRuntimeResources(root, { ...built,
+    resources: built.resources.filter(resource => resource.path !== POSTER_BINARY_ARCHIVE) }), /Required FFmpeg runtime/)
+
+  // Only the one public pnpm link is allowed. Packaged files and files inside
+  // the resolved pinned package retain the original no-symlink invariant.
+  await write('archive-source.gz', archive)
+  await rm(join(root, '.output', POSTER_BINARY_ARCHIVE))
+  await symlink(join(root, 'archive-source.gz'), join(root, '.output', POSTER_BINARY_ARCHIVE))
+  await assert.rejects(verifyRuntimeResources(root, built), /symlinks/)
+  await rm(join(root, '.output', POSTER_BINARY_ARCHIVE)); await packed(POSTER_BINARY_ARCHIVE, archive)
+  await write(`${packageDirectory}/alternate`, original)
+  await rm(join(root, packageDirectory, 'ffmpeg'))
+  await symlink(join(root, packageDirectory, 'alternate'), join(root, packageDirectory, 'ffmpeg'))
+  await assert.rejects(verifyRuntimeResources(root, built), /symlinks/)
+  await rm(join(root, packageDirectory, 'ffmpeg')); await write(`${packageDirectory}/ffmpeg`, original)
+  await rm(join(root, 'node_modules/ffmpeg-static'))
+  await symlink(join(root, packageDirectory, '..'), join(root, 'node_modules/ffmpeg-static'), 'dir')
+  await assert.rejects(verifyRuntimeResources(root, built), /exact pinned pnpm package/)
+  await rm(join(root, 'node_modules/ffmpeg-static'))
+  await symlink(join(root, packageDirectory), join(root, 'node_modules/ffmpeg-static'), 'dir')
+
+  // Updating both compressed-file hashes cannot disguise different expanded
+  // bytes: the checker independently compares the installed pinned executable.
+  const changed = gzipSync(Buffer.alloc(original.length, 65))
+  const forged = { ...manifest, gzipBytes: changed.length, gzipSha256: digest(changed) }
+  await packed(POSTER_BINARY_ARCHIVE, changed)
+  await packed(POSTER_BINARY_MANIFEST, JSON.stringify(forged))
+  built.posterBinary = forged
+  await assert.rejects(verifyRuntimeResources(root, built), /exact pinned executable/)
 })
 
 test('runtime separates the desktop shell and still drops other client details', () => {

@@ -175,9 +175,10 @@ export async function pageReady(page, name, fixture, messages, _observed = {}) {
     // The fixture's creation event must finish rendering before comparison.
     await task.getByText(messages.Workspace.detail.createdTask, { exact: true }).waitFor()
     if (name === 'task-thread') {
-      // The task's thread list has no loading placeholder. The selected row
-      // proves that read is rendered; the scoped reply proves the right pane.
-      await task.getByRole('button', { name: messages.IssueThreads.open.replace('{name}', fixture.issueTitle), exact: true, pressed: true }).waitFor()
+      // 活动's Agent rows have no loading placeholder. The selected row, named
+      // after its Agent (one row per Agent stretch), proves that read is
+      // rendered; the scoped reply proves the right pane.
+      await task.getByRole('button', { name: messages.IssueThreads.open.replace('{name}', fixture.agentLabel), exact: true, pressed: true }).waitFor()
       await task.getByRole('list', { name: messages.IssueThreads.conversation, exact: true }).getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: true }).waitFor()
     }
   } else if (name === 'new-task') {

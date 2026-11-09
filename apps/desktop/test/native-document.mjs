@@ -34,6 +34,21 @@ export async function selectWorkspaceMenuItem(page, item) {
   await Promise.all([page.waitForEvent('domcontentloaded'), item.click()])
 }
 
+/** A server change can replace its originating document before evaluate replies.
+ * Arm the next main-frame DOMContentLoaded before selecting once, then verify
+ * the completed bundled document's immutable preload target. */
+export async function selectBundledServer(page, selection, expectedServerUrl, { timeout = 30_000 } = {}) {
+  assert.ok(Number.isFinite(timeout) && timeout > 0)
+  await page.waitForURL(bundledDocument, { waitUntil: 'domcontentloaded', timeout })
+  const document = page.waitForEvent('domcontentloaded', { timeout })
+  const selected = page.evaluate(url => window.mikka.bundled.server.select(url), selection).catch(error => {
+    if (error?.message !== 'page.evaluate: Execution context was destroyed, most likely because of a navigation.') throw error
+  })
+  await Promise.all([document, selected])
+  assert.ok(bundledDocument(new URL(page.url())), 'server selection must load a bundled application document')
+  assert.equal(await page.evaluate(() => window.mikka?.app.serverUrl), expectedServerUrl)
+}
+
 const route = value => {
   if (value === 'about:blank') return 'blank'
   try {

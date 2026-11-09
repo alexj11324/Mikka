@@ -6,6 +6,7 @@ import type { RunCompleteRequest } from '@mikka/protocol/run'
 import { FactoryError } from './factory/contract'
 import { lockSkillScope } from './self-improvement/registry'
 import { armDueTimerSoon } from '@/lib/due-timer'
+import { taskActivityChanged } from './factory/activity-live'
 
 type RunIdentity = { id: string; userId: string; botId: string | null }
 type RunScope = { issueId: string | null; deviceRepoId: string | null }
@@ -77,6 +78,8 @@ export async function settleRunCompletionEffects(client: PoolClient, run: RunIde
     : factoryQuestions
   await optionalFactoryEffect(client, 'completion_question_settle', () => questions.settle(run.userId, run.id, client))
   if (!report?.repositorySelection && (stopReason === 'asked_human' || stopReason === 'blocked')) await optionalFactoryEffect(client, 'completion_question_record', () => questions.record(run.userId, run.id, client))
+  // A cancelled task no longer reconciles, but its worker can still finish.
+  taskActivityChanged(client, run.id)
 }
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }

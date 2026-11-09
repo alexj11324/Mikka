@@ -1,6 +1,8 @@
 import { anonymousCodexStartupHint } from '../computer/codex-startup-hint'
 import { anonymousClaudeStartupHint, firstAnonymousClaudeTask } from '../computer/claude-startup-hint'
 import { runChanged } from '../live/panels'
+import { taskActivityChanged } from '../factory/activity-live'
+import { recordCancelledThreadSessionEnd } from './thread-machine-sessions'
 import { cloudStartupSpan, cloudStartupPhases, cloudStartupRunAttributes } from '@/lib/computer/startup-tracing'
 import { captureTraceContext, withRunSpan } from '@/lib/tracing/context'
 import { daemonTraceSettings } from '@/lib/tracing/config'
@@ -45,10 +47,20 @@ async function options(ownerId: string) {
 }
 /** Register only while this provisioning lease still owns a non-ended row. */
 export async function recordThreadSandbox(pool: Pick<Pool, 'query'>, runId: string, sandboxId: string, leaseId: string) {
-  return Boolean((await pool.query('UPDATE thread_machines SET "sandboxId"=$2,"runningSince"=COALESCE("runningSince",clock_timestamp()) WHERE "runId"=$1 AND "workerLeaseId"=$3 AND state<>\'ended\' RETURNING "runId"', [runId, sandboxId, leaseId])).rowCount)
+  // The history INSERT checks its run FK. Acquire that parent lock before the
+  // machine, matching park/ensure even when this is one autocommitted query.
+  const recorded = Boolean((await pool.query(`WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 FOR KEY SHARE)
+    UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp())
+    FROM parent WHERE m."runId"=parent.id AND m."workerLeaseId"=$3 AND m.state<>'ended' RETURNING m."runId"`, [runId, sandboxId, leaseId])).rowCount)
+  if (recorded) taskActivityChanged(pool, runId)
+  return recorded
 }
 export async function recordCancelledSandbox(pool: Pick<Pool, 'query'>, runId: string, sandboxId: string, operationId: string) {
-  return Boolean((await pool.query('UPDATE thread_machines SET "sandboxId"=$2,"workerLeaseUntil"=NULL,"lifecycleAt"=now() WHERE "runId"=$1 AND state=\'ended\' AND "operationId"=$3 AND "sandboxId" IS NULL RETURNING "runId"', [runId, sandboxId, operationId])).rowCount)
+  const recorded = Boolean((await pool.query(`WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 FOR KEY SHARE)
+    UPDATE thread_machines m SET "sandboxId"=$2,"workerLeaseUntil"=NULL,"lifecycleAt"=now()
+    FROM parent WHERE m."runId"=parent.id AND m.state='ended' AND m."operationId"=$3 AND m."sandboxId" IS NULL RETURNING m."runId"`, [runId, sandboxId, operationId])).rowCount)
+  if (recorded) taskActivityChanged(pool, runId)
+  return recorded
 }
 /** The provider no longer has this sandbox (deleted, expired or killed outside Mikka). */
 export function sandboxGone(error: unknown) {
@@ -78,9 +90,11 @@ export function threadMachineStartFailure(error: unknown): FailedThreadStart | n
  * With a lease, only that lease's row is reset.
  */
 async function replaceGoneSandbox(query: Pick<Pool, 'query'>, runId: string, template: string, leaseId?: string) {
-  return (await query.query(`UPDATE thread_machines SET "sandboxId"=NULL,"operationId"=$2,"snapshotId"=$4,"templateKind"=$5,state='starting',
+  const replaced = (await query.query(`UPDATE thread_machines SET "sandboxId"=NULL,"operationId"=$2,"snapshotId"=$4,"templateKind"=$5,state='starting',
       "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL
     WHERE "runId"=$1 AND state<>'ended' AND ($3::uuid IS NULL OR "workerLeaseId"=$3) RETURNING *`, [runId, randomUUID(), leaseId ?? null, template, cloudTemplateOrigin(template)?.kind ?? null])).rows[0]
+  if (replaced) taskActivityChanged(query, runId)
+  return replaced
 }
 
 // Prepare the owner's key before a stop holds an APP client. The existing key
@@ -128,6 +142,7 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
     await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [m.deviceId])
     await client.query('UPDATE devices SET "removedAt"=COALESCE("removedAt",now()) WHERE id=$1 AND "ownerId"=$2 AND kind=\'cloud\'', [m.deviceId, actor.userId])
   }
+  if (m?.sandboxId && m.sandboxId === confirmedKilledSandboxId) taskActivityChanged(client, runId)
   armDueTimerAfterCommit(client, 'run-recovery')
   await client.query('COMMIT')
   return (m?.sandboxId as string | null) ?? null
@@ -277,13 +292,16 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
     if (busy.rowCount) throw new ComputerError(409,'Task runtime maintenance in progress')
     return null
   }
-  await client.query(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL,"lifecycleAt"=NULL,
+  const { rows: [transfer] } = await client.query<{ transferredAt: string }>(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL,"lifecycleAt"=NULL,
     "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL,
-    lifecycle=lifecycle||jsonb_build_object('phase','transferred') WHERE "runId"=$1`, [previous.runId])
+    lifecycle=lifecycle||jsonb_build_object('phase','transferred','transferredAt',GREATEST(clock_timestamp(),"runningSince"))
+    WHERE "runId"=$1 RETURNING lifecycle->>'transferredAt' AS "transferredAt"`, [previous.runId])
+  taskActivityChanged(client, previous.runId)
+  taskActivityChanged(client, runId)
   return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId","templateKind",epoch,"runningSince")
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$12,$8,$9,$10,$11,$13,CASE WHEN $12='running' THEN now() ELSE NULL END)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$12,$8,$9,$10,$11,$13,CASE WHEN $12='running' THEN $14::timestamptz ELSE NULL END)
     ON CONFLICT ("runId") DO UPDATE SET "issueId"=EXCLUDED."issueId","snapshotId"=EXCLUDED."snapshotId","templateKind"=EXCLUDED."templateKind",state=EXCLUDED.state,"sandboxId"=EXCLUDED."sandboxId","deviceId"=EXCLUDED."deviceId","repoId"=EXCLUDED."repoId",epoch=EXCLUDED.epoch,"runningSince"=EXCLUDED."runningSince","lifecycleAt"=now(),lifecycle='{}'::jsonb
-    RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId, previous.snapshotId, randomUUID(), previous.sandboxId, previous.deviceId, previous.repoId, threadMachineTemplateKind(previous), previous.state, previous.epoch + 1])).rows[0]
+    RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId, previous.snapshotId, randomUUID(), previous.sandboxId, previous.deviceId, previous.repoId, threadMachineTemplateKind(previous), previous.state, previous.epoch + 1, transfer.transferredAt])).rows[0]
 }
 
 /** An already admitted next run gets a short transfer window.
@@ -432,6 +450,7 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
         ||CASE WHEN $4::boolean THEN '{"requiresNativeExit":true}'::jsonb ELSE '{}'::jsonb END,
       "lifecycleAt"=COALESCE(to_timestamp((lifecycle->>'pausedAt')::double precision/1000),now())+interval '7 days'
       WHERE "runId"=$1 AND "sandboxId"=$2 AND epoch=$3 AND state<>'ended' RETURNING "computeSeconds","lifecycleAt"`, [runId, intent.sandboxId, intent.epoch, machine.requiresNativeExit])
+    if (parked.rowCount) taskActivityChanged(client, runId)
     await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [machine.deviceId])
     await runChanged(client, runId)
     armDueTimerAfterCommit(client, 'run-recovery')
@@ -701,7 +720,10 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       if (!await canAcknowledgeQueuedThreadStop(client, actor, run, machine)) throw new ComputerError(409, 'Task runtime is busy')
       const stale = await endStopRequestedRun(client, actor, runId)
       await afterRunEnded(actor.userId, runId)
-      if (stale) await provider.kill(stale, actor.userId)
+      if (stale) {
+        await provider.kill(stale, actor.userId)
+        await recordCancelledThreadSessionEnd(pool, { runId, ownerId: actor.userId, workspaceId: actor.workspaceId, sandboxId: stale, operationId: machine.operationId })
+      }
       throw new ComputerError(409, 'Thread stopped')
     }
     // connect resumes provider-paused native execution before local worker
@@ -781,6 +803,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       // The provider paused this sandbox on its own timeout. E2B stops billing
       // at pause, so persist the end of the running interval before resuming.
       await client.query(`UPDATE thread_machines SET "computeSeconds"="computeSeconds"+GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,"runningSince"=NULL,state='paused' WHERE "runId"=$1 AND "runningSince" IS NOT NULL`, [runId])
+      taskActivityChanged(client, runId)
       machine.state = 'paused'
     }
     if (machine?.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now() && machine.state !== 'paused') throw new ComputerError(409, 'Thread provisioning in progress')
@@ -863,7 +886,10 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       if (!machine.sandboxId) {
         // Record it even after end so a failed kill remains retryable. A newer
         // lease may share the idempotent sandbox and must not have it killed.
-        if (await recordCancelledSandbox(pool, runId, sandbox.sandboxId, machine.operationId)) await provider.kill(sandbox.sandboxId, actor.userId)
+        if (await recordCancelledSandbox(pool, runId, sandbox.sandboxId, machine.operationId)) {
+          await provider.kill(sandbox.sandboxId, actor.userId)
+          await recordCancelledThreadSessionEnd(pool, { runId, ownerId: actor.userId, workspaceId: actor.workspaceId, sandboxId: sandbox.sandboxId, operationId: machine.operationId })
+        }
       }
       throw new ComputerError(409, 'Thread provisioning cancelled')
     }
@@ -882,7 +908,10 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     if (again?.status === 'queued' && again.stopRequestedAt) {
       const stale = await endStopRequestedRun(client, actor, runId)
       await afterRunEnded(actor.userId, runId)
-      if (stale) await provider.kill(stale, actor.userId)
+      if (stale) {
+        await provider.kill(stale, actor.userId)
+        await recordCancelledThreadSessionEnd(pool, { runId, ownerId: actor.userId, workspaceId: actor.workspaceId, sandboxId: stale, operationId: machine.operationId })
+      }
       throw new ComputerError(409, 'Thread stopped')
     }
     await client.query('COMMIT')
@@ -1167,6 +1196,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       createHash('sha256').update(credential).digest('hex'), handoffStartedAt,
       refreshRuntime ? { status: current.status, stopRequestedAt: current.registrationStopRequestedAt } : undefined)
     if (!finished.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
+    taskActivityChanged(pool, runId)
     await runChanged(pool, runId)
     logThreadLifecycle(finished.rows[0], { phase: finished.rows[0].lifecycle.phase, reason: finished.rows[0].lifecycle.phase, provider: 'running', deadline: Date.now(), computeSeconds: finished.rows[0].computeSeconds })
     return { runId, state: 'running' }
@@ -1282,6 +1312,7 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
         lifecycle=(lifecycle-'reconcileId'-'reconcileUntil')||jsonb_build_object('phase','retired','owner','run-recovery','failures',0)
         WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND state='ended'
           AND "sandboxId" IS NOT DISTINCT FROM $5::text RETURNING "computeSeconds"`, [runId, actor.userId, actor.workspaceId, epoch, sandboxId])
+      if (retired.rowCount) taskActivityChanged(pool, runId)
       if (retired.rowCount) logThreadLifecycle({ runId, issueId: machine.issueId, sandboxId, epoch }, { phase: 'retired', provider: sandboxId ? 'kill_ack' : 'not_observed', deadline: null, computeSeconds: retired.rows[0].computeSeconds })
     } catch (error) {
       await pool.query(`UPDATE thread_machines SET "lifecycleAt"=now()+interval '30 seconds',

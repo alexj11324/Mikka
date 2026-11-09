@@ -40,20 +40,22 @@ migrate: projects bound=<本轮绑定数> tasks=<本轮建关系数> pending=<�
 
 本次迁移文件的目标如下；以后若新增修复迁移，保留原记录，在发布证据中追加新文件。
 
-本次集成版本将尚未发布的 P0 四个文件按原有顺序改名为 `20261108120200`–`20261108120203`，本 Epic 九个文件改名为 `20261108120300`–`20261108120308`，排在先行的 Secret delivery 与 enabled-models 迁移之后。所有 SQL 内容逐字不变；P0 ownership 外层 guard、下游回填入口与历史 fixture 边界同时使用新文件名，避免改名后静默跳过回填。这是本 PR 的合流兼容，P0 原 PR 仍由其负责人完成源码对齐并自行合并。上述区间是当前公开协调候选，不表示原 owner 已确认；若 P0 以另一组名称先进入 main 或部署账本，本 PR 必须继承实际已发布的名称，不能把同一 SQL 再次作为新迁移执行。已进入 main 或部署账本的迁移不参与改名。
+P0 已通过 #1636 进入 main，保留其 `20261109035000`–`20261109035003` 文件名和 SQL 字节。本批尚未进入 main 的九份 Epic 迁移使用 `20261109143000`–`20261109143008`，三份 Coding review 迁移使用 `20261109143100`–`20261109143102`；它们在 P0 结构之后按原有顺序执行。ownership 外层 guard、下游回填入口与历史 fixture 边界使用对应的 canonical 文件名。
+
+`scripts/migration-order.mjs` 为上述十六份 SQL 保留旧候选名称的精确 SHA256 alias。旧候选已记录的同字节迁移不再执行，也不插入替代账本行；不匹配的 SQL 必须失败。目录中每个逻辑迁移只保留一个 canonical 文件。已进入 main 的迁移不参与改名，新的迁移继续满足晚于 main 最新时间戳的检查。上述源码合同不证明某个生产数据库的实际账本；发布回执仍须记录正常迁移与只读证据。
 
 | 文件 | 目标 |
 | --- | --- |
-| `20261108120200_task_workspace_ownership.sql`（P0 前置） | APP |
-| `20261108120300_project_v2.sql` | WS |
-| `20261108120301_task_identity.sql` | APP |
-| `20261108120302_task_identity_aliases.sql` | WS |
-| `20261108120303_team_lifecycle.sql` | WS |
-| `20261108120304_project_resources.sql` | WS |
-| `20261108120305_project_lifecycle.sql` | WS |
-| `20261108120306_project_history_retention.sql` | APP |
-| `20261108120307_task_alias_tenant.sql` | APP |
-| `20261108120308_project_writer_fence.sql` | WS |
+| `20261109035000_task_workspace_ownership.sql`（P0 前置） | APP |
+| `20261109143000_project_v2.sql` | WS |
+| `20261109143001_task_identity.sql` | APP |
+| `20261109143002_task_identity_aliases.sql` | WS |
+| `20261109143003_team_lifecycle.sql` | WS |
+| `20261109143004_project_resources.sql` | WS |
+| `20261109143005_project_lifecycle.sql` | WS |
+| `20261109143006_project_history_retention.sql` | APP |
+| `20261109143007_task_alias_tenant.sql` | APP |
+| `20261109143008_project_writer_fence.sql` | WS |
 
 ### 1.1 新旧服务交叠期间的 Project 写入
 
@@ -83,17 +85,17 @@ Project 待修复原因包括 `invalid_task_ids`、`conflicting_task_projects`�
 
 ### 3.1 迁移账本和隔离存量
 
-迁移完成后，在 APP 执行：
+迁移完成后，在 APP 执行。查询同时接受 canonical 名称和已记录的旧候选名称；alias 不要求重写 `name` 或 `appliedAt`：
 
 ```sh
 PGDATABASE="$MIKKA_DATABASE_URL" PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=60000' \
   psql -X --set=ON_ERROR_STOP=1 <<'SQL'
 SELECT name, "appliedAt" FROM schema_migrations
 WHERE name IN (
-  '20261108120200_task_workspace_ownership.sql',
-  '20261108120301_task_identity.sql',
-  '20261108120306_project_history_retention.sql',
-  '20261108120307_task_alias_tenant.sql'
+  '20261109035000_task_workspace_ownership.sql', '20261108120200_task_workspace_ownership.sql',
+  '20261109143001_task_identity.sql', '20261108120301_task_identity.sql',
+  '20261109143006_project_history_retention.sql', '20261108120306_project_history_retention.sql',
+  '20261109143007_task_alias_tenant.sql', '20261108120307_task_alias_tenant.sql'
 ) ORDER BY name;
 
 SELECT "ownershipState", count(*) AS tasks FROM issues GROUP BY "ownershipState" ORDER BY 1;
@@ -148,9 +150,12 @@ PGDATABASE="$DATABASE_URL" PGOPTIONS='-c default_transaction_read_only=on -c sta
   psql -X --set=ON_ERROR_STOP=1 <<'SQL'
 SELECT name, "appliedAt" FROM schema_migrations
 WHERE name IN (
-  '20261108120300_project_v2.sql', '20261108120302_task_identity_aliases.sql',
-  '20261108120303_team_lifecycle.sql', '20261108120304_project_resources.sql',
-  '20261108120305_project_lifecycle.sql', '20261108120308_project_writer_fence.sql'
+  '20261109143000_project_v2.sql', '20261108120300_project_v2.sql',
+  '20261109143002_task_identity_aliases.sql', '20261108120302_task_identity_aliases.sql',
+  '20261109143003_team_lifecycle.sql', '20261108120303_team_lifecycle.sql',
+  '20261109143004_project_resources.sql', '20261108120304_project_resources.sql',
+  '20261109143005_project_lifecycle.sql', '20261108120305_project_lifecycle.sql',
+  '20261109143008_project_writer_fence.sql', '20261108120308_project_writer_fence.sql'
 ) ORDER BY name;
 
 SELECT count(*) FILTER (WHERE "workspaceId" IS NOT NULL) AS bound_projects,

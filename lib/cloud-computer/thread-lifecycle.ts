@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg'
 import type { ThreadMachineFence } from './thread-machines'
 import { threadLifecycleProvider, type ThreadProviderInfo } from './thread-lifecycle-provider'
 import { logThreadLifecycle, threadLifecycleErrorKind } from './thread-lifecycle-log'
+import { taskActivityChanged } from '../factory/activity-live'
 
 export const THREAD_MACHINE_IDLE_MS = 2 * 60_000
 export const THREAD_MACHINE_PROVIDER_MS = 15 * 60_000
@@ -22,7 +23,9 @@ export type ThreadLifecycleMetadata = {
   observedStatus?: string; observedStop?: boolean; observedClosed?: boolean
   reconcileId?: string; reconcileUntil?: number; reconcileVersion?: number
   handoffRunId?: string; handoffUntil?: number
+  transferredAt?: string
   providerMissingAt?: number
+  providerMissingReceipt?: string
   creationMissingAt?: number
   requiresNativeExit?: boolean
   computeSource?: 'database_estimate' | 'provider_started_at_estimate' | 'unconfirmed_creation_interval'
@@ -314,12 +317,13 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
       // Discovery proves the allocation identity, not that this callback still
       // owns it. Clear the expired bootstrap token only with the same operation
       // and claim so a late create response cannot finish a replacement epoch.
-      const restored = await pool.query(`UPDATE thread_machines SET "sandboxId"=$7,
+      const restored = await pool.query(`WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR KEY SHARE)
+        UPDATE thread_machines m SET "sandboxId"=$7,
           state=CASE WHEN state='ended' THEN state ELSE $8::text END,
           "runningSince"=CASE WHEN $8::text='running' THEN COALESCE("runningSince",to_timestamp($9::double precision/1000)) ELSE NULL END,
           "workerLeaseId"=NULL,"workerLeaseUntil"=NULL,
           lifecycle=(lifecycle-'creationMissingAt')||$10::jsonb||CASE WHEN state='ended' THEN '{"phase":"retire_requested"}'::jsonb ELSE '{}'::jsonb END
-        WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND lifecycle->>'reconcileId'=$5
+        FROM parent WHERE m."runId"=parent.id AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND lifecycle->>'reconcileId'=$5
           AND "operationId"=$6 AND "sandboxId" IS NULL
           AND ("workerLeaseUntil" IS NULL OR "workerLeaseUntil"<=to_timestamp($11::double precision/1000))
         RETURNING state,"runningSince","computeSeconds",lifecycle`,
@@ -328,6 +332,7 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
       if (!restored.rowCount) return now + 1
       row.sandboxId = created.sandboxId
       Object.assign(row, restored.rows[0], { workerLeaseId: null, workerLeaseUntil: null })
+      taskActivityChanged(pool, runId)
       provider = { state: created.state, endAt: created.endAt }
       logThreadLifecycle(row, { phase: row.lifecycle.phase, reason: 'creation_recovered', provider: created.state, deadline: claimUntil,
         computeSeconds: row.computeSeconds, computeSource: row.lifecycle.computeSource })
@@ -342,16 +347,18 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
     if (provider && provider.state !== 'missing' && !live(row.workerLeaseUntil, now) && row.state !== 'ended' && row.state !== provider.state) {
       // Resume/pause may have succeeded before the response or DB commit was
       // lost. Observe control-plane state without connect or identity changes.
-      const updated = await pool.query(`UPDATE thread_machines SET state=$5,
+      const updated = await pool.query(`WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$6 FOR KEY SHARE)
+        UPDATE thread_machines m SET state=$5,
           "computeSeconds"="computeSeconds"+CASE WHEN $5='paused' THEN COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0) ELSE 0 END,
           "runningSince"=CASE WHEN $5='paused' THEN NULL ELSE COALESCE("runningSince",now()) END,
           lifecycle=CASE WHEN $5='running' THEN lifecycle-'pausedAt' ELSE lifecycle END
-        WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$3 AND lifecycle->>'reconcileId'=$4 AND state<>'ended' RETURNING "runningSince","computeSeconds"`,
-      [runId, row.epoch, row.sandboxId, token, provider.state])
+        FROM parent WHERE m."runId"=parent.id AND epoch=$2 AND "sandboxId"=$3 AND lifecycle->>'reconcileId'=$4 AND state<>'ended' RETURNING "runningSince","computeSeconds"`,
+      [runId, row.epoch, row.sandboxId, token, provider.state, actor.userId])
       if (!updated.rowCount) return now + 1
       row.state = provider.state
       row.runningSince = updated.rows[0].runningSince
       row.computeSeconds = updated.rows[0].computeSeconds
+      taskActivityChanged(pool, runId)
       if (provider.state === 'running') delete row.lifecycle.pausedAt
       await (await import('@/lib/live/panels')).runChanged(pool, runId)
       if (provider.state === 'paused' && (TERMINAL.has(row.status) || (row.status === 'queued' && !live(row.leaseExpiresAt, now))
@@ -393,9 +400,14 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
     if (decision.action === 'keep') return await keepAlive(decision.at!, decision.reason)
     if (decision.action === 'missing') {
       const missing = await pool.query(`UPDATE thread_machines SET state='error',"runningSince"=NULL,
+          lifecycle=lifecycle||jsonb_build_object('providerMissingReceipt',$4::text),
           "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0)
-        WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$3 AND lifecycle->>'reconcileId'=$4 AND state<>'ended'`, [runId, row.epoch, row.sandboxId, token])
-      if (missing.rowCount) await (await import('@/lib/live/panels')).runChanged(pool, runId)
+        WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$3 AND lifecycle->>'reconcileId'=$4 AND state<>'ended'
+          AND "ownerId"=$5 AND "workspaceId"=$6`, [runId, row.epoch, row.sandboxId, token, actor.userId, actor.workspaceId])
+      if (missing.rowCount) {
+        taskActivityChanged(pool, runId)
+        await (await import('@/lib/live/panels')).runChanged(pool, runId)
+      }
     }
     return await finish({ phase: decision.reason === 'stage_handoff' ? 'handoff' : decision.reason === 'paused_retention' ? 'paused'
       : decision.reason === 'provisioning' ? 'provisioning' : decision.reason === 'retirement' && !row.sandboxId ? 'retired' : 'needs_reconciliation', reason: decision.reason, failures: 0,

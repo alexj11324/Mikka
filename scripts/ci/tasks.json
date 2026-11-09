@@ -430,5 +430,10 @@
     "command": "pnpm test:coding-review-unit",
     "kind": "core",
     "env": {}
+  },
+  "integration-factory-activity": {
+    "command": "pnpm test:factory-activity",
+    "kind": "integration",
+    "env": {}
   }
 }

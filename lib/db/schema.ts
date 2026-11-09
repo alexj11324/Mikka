@@ -1,7 +1,7 @@
 import type { ExecutionIdentity } from '../execution-identity'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import type { SendKey } from '../send-key'
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, check, foreignKey, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -426,6 +426,25 @@ export const agentRuns = pgTable('agent_runs', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`), index('agent_runs_continues_run_idx').on(table.continuesRunId).where(sql`${table.continuesRunId} is not null`)])
 
+/** Confirmed VM running intervals; mutable thread-machine custody is separate. */
+export const threadMachineSessions = pgTable('thread_machine_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull(), botId: uuid('botId'), sandboxId: text('sandboxId').notNull(),
+  startedAt: timestamp('startedAt', { withTimezone: true }).notNull(),
+  endedAt: timestamp('endedAt', { withTimezone: true }),
+  reason: text('reason').$type<'paused' | 'retired' | 'provider_missing' | 'transferred' | 'replaced' | 'scope_changed'>(),
+  source: text('source').$type<'running_since' | 'observed' | 'running_since_backfill'>().notNull(),
+}, table => [
+  uniqueIndex('thread_machine_sessions_open_run').on(table.runId).where(sql`${table.endedAt} IS NULL`),
+  index('thread_machine_sessions_scope_run').on(table.ownerId, table.workspaceId, table.runId, table.startedAt, table.id),
+  check('thread_machine_sessions_reason_check', sql`${table.reason} IN ('paused','retired','provider_missing','transferred','replaced','scope_changed')`),
+  check('thread_machine_sessions_source_check', sql`${table.source} IN ('running_since','observed','running_since_backfill')`),
+  check('thread_machine_sessions_check', sql`${table.endedAt} IS NULL OR ${table.endedAt}>=${table.startedAt}`),
+  check('thread_machine_sessions_check1', sql`(${table.endedAt} IS NULL)=(${table.reason} IS NULL)`),
+])
+
 /** A verified owner/repository binding. Installation tokens are never stored. */
 /** Plugins → GitHub connection, separate from the login identity; one GitHub account may serve many users. Tokens are sealed like Better Auth's. */
 export const githubConnections = pgTable('github_connections', {
@@ -579,6 +598,22 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_sessions_chat_key').on(table.userId, table.botId).nullsNotDistinct()])
+
+/** First inbox and run settings are committed together, before preparation.
+ * Replays still check the current chat lease and fresh execution authority. */
+export const coordinatorStartupReceipts = pgTable('coordinator_startup_receipts', {
+  userId: text('userId').notNull(), botId: uuid('botId').notNull(), holder: text('holder').notNull(),
+  round: integer('round').notNull(), version: integer('version').notNull().default(1),
+  settings: jsonb('settings').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupSettings>().notNull(),
+  inbox: jsonb('inbox').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupInbox>().notNull(),
+}, table => [
+  primaryKey({ columns: [table.userId, table.botId, table.holder, table.round] }),
+  foreignKey({ columns: [table.userId, table.botId], foreignColumns: [coordinatorSessions.userId, coordinatorSessions.botId] }).onDelete('cascade'),
+  check('coordinator_startup_receipts_round_check', sql`${table.round} = 0`),
+  check('coordinator_startup_receipts_version_check', sql`${table.version} = 1`),
+  check('coordinator_startup_receipts_settings_check', sql`jsonb_typeof(${table.settings}) = 'object'`),
+  check('coordinator_startup_receipts_inbox_check', sql`jsonb_typeof(${table.inbox}) = 'object'`),
+])
 
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
@@ -1017,6 +1052,19 @@ export const runCaptures = pgTable('run_captures', {
   index('run_captures_run_idx').on(table.runId, table.createdAt),
   index('run_captures_user_idx').on(table.userId, table.createdAt),
   uniqueIndex('run_captures_recording_key').on(table.runId).where(sql`${table.status} = 'recording'`),
+])
+
+/** A private poster derived from one immutable recording, with the same access boundary. */
+export const runCapturePosters = pgTable('run_capture_posters', {
+  captureId: uuid('captureId').primaryKey().references(() => runCaptures.id, { onDelete: 'cascade' }),
+  captureSha256: text('captureSha256').notNull(),
+  storageKey: text('storageKey').notNull(), inlineContent: bytea('inlineContent'),
+  size: integer('size').notNull(), sha256: text('sha256').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  check('run_capture_posters_captureSha256_check', sql`${table.captureSha256} ~ '^[a-f0-9]{64}$'`),
+  check('run_capture_posters_size_check', sql`${table.size}>0 AND ${table.size}<=256000`),
+  check('run_capture_posters_sha256_check', sql`${table.sha256} ~ '^[a-f0-9]{64}$'`),
 ])
 
 /** A recording's timeline (Figma 13): what the agent did, in its own words, and when. */

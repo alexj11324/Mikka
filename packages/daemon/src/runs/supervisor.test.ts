@@ -38,6 +38,26 @@ async function fixture(exit: Omit<ExitEvent, "type">, overrides: Partial<Supervi
 }
 const failure = captureRunFailure({ provider: "openai", status: 429, error: { code: "insufficient_quota", message: "Account exhausted. opaque-task-secret" } }, { runId: "original", appVersion: "1.2.3", occurredAt: "2026-11-01T00:00:00.000Z" })
 
+it('persists measured tool durations before outbox batching and keeps task secrets masked', async () => {
+  const f = await fixture({ outcome: 'succeeded' })
+  vi.mocked(f.adapter.start).mockResolvedValueOnce({
+    sessionId: 'timed-tools', send: async () => {}, cancel: async () => {},
+    async *events() {
+      yield { type: 'chunk', chunk: { type: 'tool-input-available', toolCallId: 'cmd', toolName: 'bash', input: { command: 'print result' } } }
+      yield { type: 'chunk', chunk: { type: 'tool-output-available', toolCallId: 'cmd', output: 'opaque-task-secret' } }
+      yield { type: 'exit', outcome: 'succeeded' }
+    },
+  })
+  f.server.online = false
+  f.supervisor.start(f.assignment)
+  await f.supervisor.idle()
+  await f.outbox.close()
+  const persisted = readFileSync(join(f.outboxDir, `${f.runId}.jsonl`), 'utf8')
+  expect(persisted).not.toContain('opaque-task-secret')
+  expect(persisted).toContain('[secret:SERVICE_SECRET]')
+  expect(persisted).toMatch(/"toolDurationMs":\d+/)
+})
+
 describe("supervisor structured terminal failures", () => {
   it("waits for execution ownership before repository/native work and retains it through finishing cleanup", async () => {
     const entered = deferred(), acquired = deferred(), collecting = deferred(), finished = deferred(), released = deferred(), acknowledged = deferred()

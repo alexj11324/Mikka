@@ -54,6 +54,8 @@ let releaseChunk: () => void
 const delayedDynamic: typeof dynamic = (loader, options) => dynamic(async () => { await chunkReady; return loader() }, options)
 mock.module('next/dynamic', { defaultExport: delayedDynamic })
 for (const [file, names] of [
+  // The real app-frame slot also exports an unused rail; its account menu is outside this shell-state fixture.
+  ['../workspace-menu.tsx', ['WorkspaceMenu']],
   ['../nav/bot-list.tsx', ['BotList']], ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
   ['../onboarding/onboarding.tsx', ['Onboarding']], ['../teams/team-home.tsx', ['TeamHome']],
   ['./issue-list.tsx', ['IssueList']], ['./board-page.tsx', ['BoardPage']],
@@ -61,7 +63,7 @@ for (const [file, names] of [
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
   ['../nav/group-avatar.tsx', ['GroupPillAvatar']], ['../browser/browser-pane.tsx', ['BrowserPane']],
   ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']], ['./group-chat-view.tsx', ['GroupChatView']],
-  ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed']],
+  ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
   ['./create-issue-dialog.tsx', ['CreateIssueDialog']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, empty])) })

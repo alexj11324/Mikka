@@ -35,7 +35,7 @@ import { coordinatorChatState } from './chat-state'
 import { compactChatMessage, compactChatToolMetadata, summaryChatMessage } from './chat-projection'
 import type { ChatToolMetadata, ChatToolMetadataRow } from './chat-tool-metadata'
 import { coordinatorLeaseActive } from './lease'
-import { readPreferences } from '@/lib/preferences'
+import { readCoordinatorPromptPreferences, readPreferences } from '@/lib/preferences'
 import type { InboxEvent } from '@/lib/push-reasons'
 import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
 import type { TriageJudgment } from './triage-batch'
@@ -46,6 +46,7 @@ import { botChatChanged } from '../live/chats'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { activeTaskWorkspaces, requireTaskWorkspace } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
+import type { CoordinatorStartupReceipt, CoordinatorStartupSettingsCandidate, CoordinatorStartupSettings, CoordinatorStartupTake } from './startup-receipt'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -132,16 +133,117 @@ export interface InboxTake {
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushEvents: [], pushHidesText: false }
 
 export async function takeInbox(userId: string, holder: string, botId: string): Promise<InboxTake> {
-  return db.transaction(async tx => {
+  return (await takeInboxTransaction(userId, holder, botId)).inbox
+}
+
+/** A bounded ordinary round zero commits a receipt before combined preparation.
+ * Other new takes retain the inbox-only durable boundary. Existing receipts
+ * always replay first; every attempt checks the lease and gains no authority. */
+export async function takeStartupInbox(userId: string, holder: string, botId: string, candidate: CoordinatorStartupSettingsCandidate): Promise<CoordinatorStartupTake> {
+  const codec = await import('./startup-receipt')
+  // Reject a missing or malformed candidate before any session/lease write;
+  // an unchecked JS caller must never fall through to a legacy take.
+  const result = await takeInboxTransaction(userId, holder, botId, codec.startupSettingsCandidate(candidate))
+  if (!result.startup) throw codec.startupReceiptConflict(new Error('coordinatorStartupReceiptMissing'))
+  return result.startup
+}
+
+type InboxTransactionResult = { inbox: InboxTake; startup?: CoordinatorStartupTake }
+/** SQL-only transport tuple: version and the two compact stored objects.
+ * The storage codec restores and checks the strict canonical receipt. */
+type StoredStartupReceipt = [unknown, unknown, unknown]
+type StartupEventRow = Omit<typeof coordinatorEvents.$inferSelect, 'id' | 'createdAt' | 'deliveredAt' | 'lastTriageAttemptAt' | 'nextWakeAt' | 'wakeLeaseUntil'> & {
+  id: string | null; createdAt: string | Date; deliveredAt: string | Date | null;
+  lastTriageAttemptAt: string | Date | null; nextWakeAt: string | Date; wakeLeaseUntil: string | Date | null;
+  r: StoredStartupReceipt | null;
+}
+type TimestampDecoder = Pick<typeof coordinatorSessions.leaseUntil, 'mapFromDriverValue'>
+function startupTimestamp(column: TimestampDecoder, value: string | Date): Date
+function startupTimestamp(column: TimestampDecoder, value: string | Date | null): Date | null
+function startupTimestamp(column: TimestampDecoder, value: string | Date | null): Date | null {
+  // Drizzle's raw node-postgres execute path retains timestamp strings. Use
+  // the same column decoder as select(), including its timezone semantics.
+  return value === null || value instanceof Date ? value : column.mapFromDriverValue(value) as Date
+}
+async function takeInboxTransaction(userId: string, holder: string, botId: string, candidate?: CoordinatorStartupSettingsCandidate): Promise<InboxTransactionResult> {
+  // Legacy takes do not load the new receipt decoder or change their SQL graph.
+  const codec = candidate ? await import('./startup-receipt') : null
+  const frozenCandidate = candidate ?? null
+  const rollbackLost = new Error('coordinatorStartupLeaseLost')
+  let lost: InboxTransactionResult | undefined
+  try { return await db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId, botId }).onConflictDoNothing()
-    const [previousLease] = await tx.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil })
-      .from(coordinatorSessions).where(sessionOf(userId, botId)).for('update')
-    const [taken] = await tx.update(coordinatorSessions)
-      .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
-      .where(and(sessionOf(userId, botId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
-      .returning({ userId: coordinatorSessions.userId })
-    if (!taken) return { held: false, ...NO_TAKE }
+    let previousLease: { leaseHolder: string | null; leaseUntil: Date | null } | undefined
+    let taken: boolean
+    let settings: CoordinatorStartupSettings | undefined
+    let startupRows: StartupEventRow[] | undefined
+    if (codec && frozenCandidate) {
+      // The locked row, including an EPQ-updated tuple after a concurrent
+      // holder commits, supplies the acquisition predicate and old holder.
+      // A single result column avoids four RowDescription fields. Tuple order
+      // is previous holder, previous expiry, acquired, Coordinator marker.
+      const lease = (await tx.execute(sql`WITH previous AS MATERIALIZED(SELECT "userId" u,"botId" b,"leaseHolder" h,"leaseUntil" t FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE),acquired AS(UPDATE coordinator_sessions s SET "leaseHolder"=v.h,"leaseUntil"=v.e,"updatedAt"=v.n FROM previous p,(VALUES(${holder}::text,${new Date(now.getTime() + LEASE_MS)}::timestamptz,${now}::timestamptz))v(h,e,n) WHERE (s."userId",s."botId")=(p.u,p.b) AND(p.t IS NULL OR p.t<v.n OR p.h=v.h) RETURNING 1) SELECT jsonb_build_array(p.h,p.t,EXISTS(SELECT 1 FROM acquired),EXISTS(SELECT 1 FROM coordinator_bots c WHERE(c."ownerId",c."botId")=(p.u,p.b))) l FROM previous p`)).rows[0]?.l as [string | null, string | Date | null, boolean, boolean] | undefined
+      previousLease = lease && { leaseHolder: lease[0], leaseUntil: startupTimestamp(coordinatorSessions.leaseUntil, lease[1]) }
+      taken = lease?.[2] === true
+      settings = { ...frozenCandidate, coordinator: lease?.[3] === true }
+      // This MUST be a new statement after the lock. A same-key waiter must
+      // see the winner's committed receipt, not its pre-lock snapshot.
+      let stored: StoredStartupReceipt | null | undefined
+      if (!taken) {
+        // A competing lease cannot take events. Still check the old key after
+        // the lock, without returning seventeen unused event column headers.
+        stored = (await tx.execute(sql`SELECT jsonb_build_array(version,settings,inbox) r FROM coordinator_startup_receipts WHERE("userId","botId",holder,round)=(${userId},${botId}::uuid,${holder},0)`)).rows[0]?.r as StoredStartupReceipt | undefined
+      } else {
+        startupRows = (await tx.execute(sql`SELECT CASE WHEN r.holder IS NOT NULL THEN jsonb_build_array(r.version,r.settings,r.inbox) END r,e.* FROM(VALUES(${userId}::text,${botId}::uuid,${holder}::text))k(u,b,h) LEFT JOIN coordinator_startup_receipts r ON(r."userId",r."botId",r.holder,r.round)=(k.u,k.b,k.h,0) LEFT JOIN coordinator_events e ON r.holder IS NULL AND(e."userId",e."botId")=(k.u,k.b) AND e."deliveredAt" IS NULL AND(e.kind='user_message' OR(e.tier IS NOT NULL AND e.tier<>'background')) WHERE r.holder IS NOT NULL OR e.id IS NOT NULL ORDER BY e."createdAt" LIMIT ${INBOX_BATCH}`)).rows as typeof startupRows
+        stored = startupRows?.[0]?.r
+      }
+      if (stored !== null && stored !== undefined) {
+        // Presence comes from the row key, never the stored inbox's truthiness.
+        const receipt = codec.decodeStoredStartupReceipt(stored[0], stored[1], stored[2])
+        if (!taken || previousLease?.leaseHolder !== holder) {
+          // Stop/release/new holder is terminal for this old key. Roll back
+          // even an otherwise eligible temporary claim, before any callbacks.
+          lost = { inbox: receipt.inbox, startup: { kind: 'lost', ...receipt, replayed: true } }
+          throw rollbackLost
+        }
+        if (!coordinatorLeaseActive(previousLease, now)) {
+          await botChatChanged(tx, userId, botId)
+          await tx.execute(sql`SELECT pg_notify(${COORDINATOR_LEASE_CHANNEL}, ${botId})`)
+        }
+        await coordinatorSessionChanged(tx, userId, botId)
+        return { inbox: receipt.inbox, startup: { kind: 'ready', ...receipt, replayed: true } }
+      }
+    } else {
+      ;[previousLease] = await tx.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil })
+        .from(coordinatorSessions).where(sessionOf(userId, botId)).for('update')
+      const rows = await tx.update(coordinatorSessions)
+        .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
+        .where(and(sessionOf(userId, botId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
+        .returning({ userId: coordinatorSessions.userId })
+      taken = rows.length > 0
+    }
+    if (!taken) {
+      const inbox = { held: false, ...NO_TAKE }
+      return { inbox, ...(codec ? { startup: { kind: 'not-held' as const, inbox } } : {}) }
+    }
+    const finish = async (inbox: InboxTake): Promise<InboxTransactionResult> => {
+      if (!codec || !settings) return { inbox }
+      const receipt = codec.readStartupReceipt(1, settings, inbox)
+      const stored = codec.encodeStoredStartupReceipt(receipt)
+      const storedSettings = JSON.stringify(stored.settings), storedInbox = JSON.stringify(stored.inbox)
+      // Only a small ordinary inbox needs a receipt for preparation inside
+      // this step. Larger/new non-combined takes return their complete inbox
+      // directly at the original durable boundary, with no fallible work
+      // after COMMIT. Existing receipts were replayed above before this choice.
+      if (inbox.added > 0 && (inbox.scheduledRead || !settings.agentKitEnabled ||
+        Buffer.byteLength(storedSettings, 'utf8') + Buffer.byteLength(storedInbox, 'utf8') > 256)) {
+        return { inbox: receipt.inbox, startup: { kind: 'inbox-only', ...receipt } }
+      }
+      const inserted = await tx.execute(sql`INSERT INTO coordinator_startup_receipts("userId","botId",holder,round,version,settings,inbox) VALUES(${userId},${botId}::uuid,${holder},0,1,${storedSettings}::jsonb,${storedInbox}::jsonb) ON CONFLICT("userId","botId",holder,round) DO NOTHING`)
+      if (inserted.rowCount !== 1) throw codec.startupReceiptConflict(new Error('coordinatorStartupReceiptConflict'))
+      return { inbox: receipt.inbox, startup: { kind: 'ready', ...receipt, replayed: false } }
+    }
     // Ordinary renewal is not a broad list update. Only a new/changed turn
     // or actual message delivery changes the summary that the sidebar shows.
     if (!coordinatorLeaseActive(previousLease, now) || previousLease?.leaseHolder !== holder) {
@@ -150,23 +252,39 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       await tx.execute(sql`SELECT pg_notify(${COORDINATOR_LEASE_CHANNEL}, ${botId})`)
     }
     await coordinatorSessionChanged(tx, userId, botId)
-    const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
+    // A receipt-only LEFT JOIN row has no event. It must never reach
+    // payload/source handling; empty seed rows are filtered in SQL already.
+    const candidates = startupRows ? startupRows.flatMap(row => {
+      if (row.id === null) return []
+      const { r: _receipt, ...event } = row
+      return [{ ...event, id: row.id,
+        createdAt: startupTimestamp(coordinatorEvents.createdAt, row.createdAt),
+        deliveredAt: startupTimestamp(coordinatorEvents.deliveredAt, row.deliveredAt),
+        lastTriageAttemptAt: startupTimestamp(coordinatorEvents.lastTriageAttemptAt, row.lastTriageAttemptAt),
+        nextWakeAt: startupTimestamp(coordinatorEvents.nextWakeAt, row.nextWakeAt),
+        wakeLeaseUntil: startupTimestamp(coordinatorEvents.wakeLeaseUntil, row.wakeLeaseUntil),
+      }]
+    }) : await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
     // A schedule is a separate read-only turn. Hydrate its authority through
     // the stored event link, never from notification/model payload fields.
     const scheduledCandidate = candidates[0]?.payload.source === 'schedule_due' ? candidates[0] : undefined
-    const scheduledRow=scheduledCandidate?(await tx.execute(sql`SELECT o.* FROM schedule_occurrences o JOIN user_schedules s ON s.id=o.schedule_id WHERE o.event_id=${scheduledCandidate.id} AND s.owner_id=${userId} AND s.bot_id=${botId}::uuid LIMIT 1`)).rows[0] as Occurrence|undefined:undefined
-    const scheduled=scheduledInbox(scheduledRow,now)
+    const scheduledRow=scheduledCandidate?(await tx.execute(sql`SELECT o.* FROM schedule_occurrences o JOIN user_schedules s ON s.id=o.schedule_id WHERE o.event_id=${scheduledCandidate.id} AND s.owner_id=${userId} AND s.bot_id=${botId}::uuid LIMIT 1`)).rows[0] as (Omit<Occurrence,'lease_until'> & {lease_until:string|Date|null})|undefined:undefined
+    // This shared legacy/startup read is raw Drizzle too. Decode its expiry
+    // before the schedule guard; a missing/non-finite lease grants no scope.
+    const scheduledUntil=scheduledRow?startupTimestamp(coordinatorSessions.leaseUntil,scheduledRow.lease_until):null
+    const scheduled=!scheduledRow?.event_id?null:!scheduledUntil||!Number.isFinite(scheduledUntil.getTime())
+      ?{eventId:scheduledRow.event_id,scope:null}:scheduledInbox({...scheduledRow,lease_until:scheduledUntil},now)
     if(scheduled && !scheduled.scope){
       await tx.update(coordinatorEvents).set({deliveredAt:now,tier:'background'}).where(eq(coordinatorEvents.id,scheduled.eventId))
-      return {held:true,...NO_TAKE}
+      return finish({held:true,...NO_TAKE})
     }
     const scheduledRead=scheduled?.scope??undefined
     const eligible = candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id)
     // Keep pending human corrections together, without runtime notifications in their turn.
     const direct = eligible.filter(event => event.kind === 'user_message')
     let due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(direct.length ? direct : eligible)
-    if (!due.length) return { held: true, ...NO_TAKE }
+    if (!due.length) return finish({ held: true, ...NO_TAKE })
     let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
     const source = due.findLast(event => event.kind === 'user_message' && event.payload.postedToChat !== true)
       ?? due.findLast(event => event.kind === 'user_message')
@@ -189,7 +307,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), eq(coordinatorEvents.tier, 'background')))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
-    if (!events.length) return { held: true, ...NO_TAKE }
+    if (!events.length) return finish({ held: true, ...NO_TAKE })
     const chatEvents = events.filter(event => !(event.kind === 'user_message' && event.payload.postedToChat === true))
     const completionObservations = await runCompletionObservations(tx, { userId, botId }, chatEvents)
     const first = await nextPosition(tx, userId, botId)
@@ -211,7 +329,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       .orderBy(asc(coordinatorEvents.createdAt), asc(coordinatorEvents.id)).limit(100)
     const handoffs = events.filter(event => isHandoff(event.kind))
     const attentionQuestions = scheduledRead ? [] : attentionQuestionsFromEvents(events)
-    return {
+    return finish({
       held: true, added: events.length,
       ...(taskEventId ? { taskEventId } : {}),
       ...(sourceEventId ? { sourceEventId } : {}),
@@ -223,12 +341,26 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       handoffOnly: handoffs.length === events.length,
       pushEvents: events.map(event => ({ kind: event.kind, tier: event.tier, runId: event.runId, issueId: event.issueId })),
       pushHidesText: handoffs.some(carriesCode),
-    }
-  })
+    })
+  }) } catch (error) {
+    if (error === rollbackLost && lost) return lost
+    throw error
+  }
 }
 
 function isHandoff(kind: string): boolean {
   return kind === 'matter_handoff'
+}
+
+/** Terminal-failure context only: no take, lease renewal or authorization
+ * snapshot. The execution cleanup separately rechecks current membership. */
+export async function recoverStartupInbox(userId: string, holder: string, botId: string): Promise<CoordinatorStartupReceipt | null> {
+  const row = (await db.execute(sql`SELECT r.version, r.settings, r.inbox FROM coordinator_startup_receipts r
+    JOIN bots b ON b.id=r."botId" AND b."ownerId"=${userId}
+    WHERE r."userId"=${userId} AND r."botId"=${botId}::uuid AND r.holder=${holder} AND r.round=0`)).rows[0]
+  if (!row) return null
+  const { decodeStoredStartupReceipt } = await import('./startup-receipt')
+  return decodeStoredStartupReceipt(row.version, row.settings, row.inbox)
 }
 
 function carriesCode(event: { payload: Record<string, unknown> }): boolean {
@@ -433,20 +565,47 @@ export async function sendRetryOf<T>(userId: string, botId: string, position: nu
 }
 
 /** The summary so far, the memory, and every message after the summary, oldest first. */
-export async function loadConversation(userId: string, botId: string): Promise<{ summary: string | null; memory: string; messages: StoredMessage[] }> {
+type LoadedConversation = { summary: string | null; memory: string; messages: StoredMessage[] }
+
+async function readConversationRows(userId: string, botId: string) {
   const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   const through = session?.summaryThrough ?? 0
   const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message })
     .from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), gt(coordinatorMessages.position, through)))
     .orderBy(asc(coordinatorMessages.position))
+  return { session, rows }
+}
+
+function conversationWithMemory({ session, rows }: Awaited<ReturnType<typeof readConversationRows>>, memoryEnabled: boolean): LoadedConversation {
   // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
-  const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
+  const memory = memoryEnabled ? session?.memory ?? '' : ''
   // A failed message retried with 重新发送 is not said twice: the new attempt stands for it.
   return { summary: session?.summary ?? null, memory, messages: rows.filter(row => (row.message as { mikkaRetried?: unknown }).mikkaRetried !== true).map(row => {
     const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, mikkaFailureDetails: _details, mikkaRetried: _retried, ...message } = row.message
     return { position: row.position, message: message as unknown as ModelMessage }
   }) }
+}
+
+export async function loadConversation(userId: string, botId: string): Promise<LoadedConversation> {
+  const conversation = await readConversationRows(userId, botId)
+  return conversationWithMemory(conversation, (await readPreferences(userId)).memoryEnabled)
+}
+
+/** One fresh owner-scoped preference row supplies this prompt's memory switch and personal instructions. */
+export async function loadConversationForPrompt(userId: string, botId: string): Promise<LoadedConversation & { personalInstructions: string }> {
+  const [conversation, preferences] = await Promise.allSettled([
+    readConversationRows(userId, botId),
+    readCoordinatorPromptPreferences(userId),
+  ])
+  // Observe both reads before returning to turn cleanup. Keep the original
+  // conversation-first failure precedence and the original error objects.
+  if (conversation.status === 'rejected') throw conversation.reason
+  if (preferences.status === 'rejected') throw preferences.reason
+  return {
+    ...conversationWithMemory(conversation.value, preferences.value.memoryEnabled),
+    personalInstructions: preferences.value.personalInstructions,
+  }
 }
 
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */
@@ -552,7 +711,7 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
     const task = row.issueId ? tasks.get(row.issueId) ?? null : null
     // The short title travels only when there is one, so a citation carries nothing new otherwise.
     const shortTitle = task && task.shortTitleFrom === task.title ? task.shortTitle : null
-    const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null } : null
+    const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status } : null
     const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
     const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
     sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, group, issue,

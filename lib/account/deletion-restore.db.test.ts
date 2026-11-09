@@ -14,7 +14,7 @@ test('current deletion journal replays only into explicit isolated restore targe
   t.after(async () => { await restored.end(); await source.query(`DROP SCHEMA "${scope}" CASCADE`); await source.end() })
   // A small old-backup fixture, with real PostgreSQL table definitions. The operations acceptance
   // separately owns a real pg_dump/restore drill; this tests the account replay adapter's boundaries.
-  const tables = ['user', 'bots', 'coordinator_bots', 'agents', 'agent_runs', 'run_messages', 'session_mailboxes', 'factory_tasks', 'artifacts', 'artifact_versions', 'run_captures', 'user_avatars', 'issues', 'issue_documents', 'issue_versions', 'issue_members', 'conversations', 'conversation_members', 'user_facts',
+  const tables = ['user', 'bots', 'coordinator_bots', 'agents', 'agent_runs', 'run_messages', 'session_mailboxes', 'factory_tasks', 'artifacts', 'artifact_versions', 'run_captures', 'run_capture_posters', 'user_avatars', 'issues', 'issue_documents', 'issue_versions', 'issue_members', 'conversations', 'conversation_members', 'user_facts',
     'mikka_workspaces', 'mikka_workspace_members', 'mikka_workspace_invitations', 'mikka_teams', 'mikka_team_members', 'mikka_team_issues', 'mikka_team_projects', 'team_issue_create_receipts', 'team_issue_promotion_receipts', 'workspace_projects', 'workspace_project_events']
   for (const table of tables) await restored.query(`CREATE TABLE "${scope}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`)
   for (const migration of ['20261031050731_account_deletion_jobs.sql', '20261031050732_workspace_deletion_guards.sql', '20261031050737_account_deletion_warnings.sql']) await restored.query(await readFile(new URL(`../../drizzle/${migration}`, import.meta.url), 'utf8'))

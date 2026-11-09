@@ -15,6 +15,8 @@ export interface IssueThread {
   outcome?: string | null
   /** A requested stop is status metadata, including for teammates. */
   stopping: boolean
+  /** agent_runs.kind when the read carries it (IssueThreadRow.kind). */
+  kind?: string
   createdAt: Date
   finishedAt: Date | null
   ownedByCurrentUser: boolean
@@ -126,6 +128,8 @@ export interface IssueThreadRow {
   agentName: string; harness: string; ownerName?: string | null
   stopRequestedAt?: Date | null
   outcome?: string | null
+  /** agent_runs.kind: `implement` and `plan` are the conversation; `acceptance` is a Factory check. */
+  kind?: string | null
   botColor?: string | null; botShape?: string | null
 }
 
@@ -170,7 +174,7 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
     .slice(0, ISSUE_THREAD_LIMIT)
     .map(row => ({
       failureDetails: readCompactRunFailure(row.failureDetails),
-      id: row.id, status: row.status, outcome: row.outcome ?? null, createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
+      id: row.id, status: row.status, outcome: row.outcome ?? null, ...(row.kind ? { kind: row.kind } : {}), createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
@@ -180,4 +184,25 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
       attempts: [{ runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
       question: null, continuation: null,
     }))
+}
+
+/** A run that is part of the task's conversation: implement or plan. A read without kinds counts every run. */
+export const isConversationRun = (thread: { kind?: string }) => !thread.kind || thread.kind === 'implement' || thread.kind === 'plan'
+
+/**
+ * One conversation per task (decision 2026-11-09-0045): consecutive threads by the same Agent are one
+ * stretch. Oldest first; a stretch opens at its first thread and reads as its last. A thread whose
+ * detail the reader cannot see has no Agent and stands alone unless the one before is hidden too.
+ */
+export function agentStretches<T extends { id: string; kind?: string; createdAt: Date | string; detail: { harness: string } | null }>(threads: readonly T[]): { agent: string | null; first: T; last: T; ids: string[] }[] {
+  const out: { agent: string | null; first: T; last: T; ids: string[] }[] = []
+  // Only the conversation's own runs make stretches; a Factory check (review, verify) is its result card on the
+  // task page (2026-11-04-2200), never a 「换 Codex」 row.
+  for (const thread of [...threads].filter(isConversationRun).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
+    const agent = thread.detail?.harness ?? null
+    const previous = out.at(-1)
+    if (previous && previous.agent === agent) { previous.last = thread; previous.ids.push(thread.id) }
+    else out.push({ agent, first: thread, last: thread, ids: [thread.id] })
+  }
+  return out
 }

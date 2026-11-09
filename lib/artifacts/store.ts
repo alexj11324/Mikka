@@ -15,6 +15,7 @@ import type { ArtifactDetail, ArtifactListItem, ArtifactMedia, ArtifactSummary }
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactStorage, getArtifactObject, putArtifactObject } from '@/lib/artifacts/storage'
 import { artifactChanged } from '@/lib/live/artifacts'
+import { taskActivityChanged } from '@/lib/factory/activity-live'
 import { artifactAccess, artifactReadAccess, artifactWorkspace, submissionWorkspace, type ArtifactReader } from './access'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
@@ -88,6 +89,7 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
     // response interruption must not leave a visible version without its run.
     await recordCoordinatorEvent(tx, artifactSubmittedEvent(submitter, submitted))
     await artifactChanged(tx, submitter.userId, artifactId)
+    if (submitter.runId) taskActivityChanged(tx, submitter.runId)
     return submitted
   }))
   if ('error' in result) return result
