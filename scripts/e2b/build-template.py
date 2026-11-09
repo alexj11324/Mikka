@@ -600,6 +600,7 @@ def probe_models(template_id, kind, api_key, source_commit, worker_sha, sandbox_
             failure.add_note('model_probe_cleanup_failed')
 
 
+CONSERVATION_RECEIPT_MAX_BYTES = 1024 * 1024
 CONSERVATION_DIAGNOSTIC_MAX_BYTES = 262144
 CONSERVATION_DIAGNOSTIC_MAX_CHANGES = 512
 
@@ -609,7 +610,7 @@ def fresh_conservation_command(kind):
     if kind not in KINDS:
         raise ValueError('e2b_finalization_policy_invalid')
     checks = [*ANONYMOUS_WORKER_CHECKS, ('official_files',
-        f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null')]
+        f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json')]
     command = ' && '.join(f'mikka_conservation_check={phase} && {predicate}' for phase, predicate in checks)
     return (command + '; mikka_conservation_status=$?; '
             'if [ "$mikka_conservation_status" -ne 0 ]; then '
@@ -700,6 +701,7 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None, *, on_d
         began = now
     stage('create')
     phase = 'preload_receipts'
+    failure = None
     try:
         conservation = json.loads(sandbox.files.read('/opt/mikka/official-files-conservation.json', user='root', request_timeout=30))
         conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/official-files-ready.json', user='root', request_timeout=30))
@@ -715,11 +717,21 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None, *, on_d
         stage('fresh_scan')
         phase = 'fresh_receipt'
         conservation['preloadFinalization'] = conservation['finalization']
-        conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/fresh-conservation.json', user='root', request_timeout=30))
+        # The verifier closes its exclusive receipt file before emitting this
+        # same JSON. Consume the completed command's output, without a second
+        # file-transfer request after the successful scan.
+        stdout = result.stdout
+        try:
+            if not isinstance(stdout, str) or len(stdout.encode('utf-8')) > CONSERVATION_RECEIPT_MAX_BYTES:
+                raise ValueError('official_conservation_invalid')
+            conservation['finalization'] = json.loads(stdout)
+        except (ValueError, TypeError, UnicodeError, RecursionError) as error:
+            raise ValueError('official_conservation_invalid') from error
         stage('fresh_receipt')
         phase = 'fresh_validation'
         return guard.validate_receipt(conservation, kind)
     except Exception as error:
+        failure = error
         # Emit before finally destroys the disposable instance. Never print
         # SDK stdout/stderr or exception messages; keep the original failure.
         detail = conservation_diagnostic(error, kind, phase)
@@ -733,7 +745,12 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None, *, on_d
               file=sys.stderr, flush=True)
         raise
     finally:
-        sandbox.kill()
+        try:
+            sandbox.kill()
+        except Exception:
+            if failure is None:
+                raise
+            failure.add_note('conservation_probe_cleanup_failed')
 
 
 def observed_mcp_business_evidence(value, run_hash, harness):

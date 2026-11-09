@@ -238,7 +238,7 @@ function fixture({ badProject = false, badEnvironment = false, unsafeProfile = f
         source: fixed(item).source, credentialOwnerId: adminId })), entries: [] })
       if (action === 'execution-settings.getBotModelMenu') return rpc({ current: { kind: 'subscription', chosen: true,
         provider: chatModel, modelId: CASES.find(item => item.id === chatModel).model, available: true } })
-      if (action === 'coordinator.getCoordinatorChat') return rpc({ botId, enabled: true, working: false })
+      if (action === 'coordinator.pollCoordinatorChat') return rpc({ botId, enabled: true, working: false })
       if (action === 'issues.saveIssue') {
         const issue = { ...args[0], id: id(200 + issues.length), userId: ownerId, revision: 1,
           projectId: null, identifier: 'WS-1687-' + (issues.length + 1) }
@@ -313,6 +313,24 @@ test('preflight uses the existing team account, exports only closed candidates a
   assert.ok(!JSON.stringify(report).includes('PRIVATE_'))
   assert.equal(report.cleanup.workspaceRestored, true); assert.equal(report.cleanup.sessionClosed, true)
   assert.ok(!f.calls.some(call => /sendCoordinator|saveIssue|chooseBotModel|changeModelOrder|delete/i.test(call.body?.action ?? '')))
+})
+
+test('active acceptance reads the registered Coordinator RPC before creating either subscription Task', async () => {
+  const f = fixture(), report = await f.run()
+  assert.equal(report.status, 'execution_observed_pending_snapshot_review')
+  assert.equal(report.cases.length, 2)
+  assert.ok(report.cases.every(item => item.status === 'execution_observed'))
+  const reads = f.calls.filter(call => call.body?.action === 'coordinator.pollCoordinatorChat')
+  assert.equal(reads.length, 2)
+  assert.ok(reads.every(call => JSON.stringify(call.body.args) === JSON.stringify([botId])))
+  const actions = f.calls.map(call => call.body?.action)
+  let readsBeforeCreate = 0
+  for (const action of actions) {
+    if (action === 'coordinator.pollCoordinatorChat') readsBeforeCreate++
+    if (action === 'issues.saveIssue') { assert.equal(readsBeforeCreate, 1); readsBeforeCreate-- }
+  }
+  assert.equal(readsBeforeCreate, 0)
+  assert.ok(!actions.includes('coordinator.getCoordinatorChat'))
 })
 
 const provisionScope = () => {

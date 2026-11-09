@@ -24,7 +24,9 @@ const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
 const ROOT_CA = '/usr/local/share/ca-certificates/e2b-ca.crt'
 // Desktop is official-only artifact 13538924302; Claude is the d63 fresh-scan
 // failure (42326876749 / 128264238545), not by itself a production gate pass.
+// Codex is official-only control 42670291715/1, artifact 13697989038.
 const ROOT_CA_ROTATIONS = {
+  codex: ['713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a', '545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a'],
   desktop: ['7177f680c9c87f91ff9ab72a4409511cc4781d7c3dc549f302bfa17bd973b6b9', '88a5a279fec06a155bf9de1dd28abc93aae0f17db5f9febe69d5e25b15f8ff4d'],
   claude: ['fd1175201e861f159f0d6ae42523b0f5d754ade8a36d105e8b7110b180101862', '21899698fbaa1da5314e42bc049b146f16cddb2e7540822b2a15f009f8342996'],
 }
@@ -176,8 +178,29 @@ test('exact root CA publication rules preserve metadata and reject other certifi
   const codex = conservation('codex')
   codex.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }]
   assert.doesNotThrow(() => assertConservation(codex, 'codex'))
-  codex.finalization.providerChanges[0] = { path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 511 } }
+  codex.finalization.providerChanges[0] = { path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 493 } }
   assert.throws(() => assertConservation(codex, 'codex'), /runtime_release_conservation_invalid/)
+})
+
+test('Codex root CA mode-only evidence requires the observed regular file and exact modes', () => {
+  const proof = conservation('codex')
+  proof.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 511 } }]
+  assert.doesNotThrow(() => assertConservation(proof, 'codex'))
+  for (const kind of ['directory', 'link', undefined]) {
+    const invalid = structuredClone(proof)
+    if (kind === undefined) delete invalid.finalization.providerChanges[0].kind
+    else invalid.finalization.providerChanges[0].kind = kind
+    assert.throws(() => assertConservation(invalid, 'codex'), /runtime_release_conservation_invalid/)
+  }
+  for (const [before, after] of [[384, 511], [416, 511], [420, 438], [420, 493], [511, 420]]) {
+    const invalid = structuredClone(proof)
+    invalid.finalization.providerChanges[0].before.mode = before
+    invalid.finalization.providerChanges[0].after.mode = after
+    assert.throws(() => assertConservation(invalid, 'codex'), /runtime_release_conservation_invalid/)
+  }
+  for (const kind of ['claude', 'desktop']) {
+    assert.throws(() => assertConservation(proof, kind), /runtime_release_conservation_invalid/)
+  }
 })
 
 test('certificate conversion proof fixes the original bytes and exact link target', () => {

@@ -239,7 +239,7 @@ class Publish(unittest.TestCase):
         result = bt.probe_conservation('candidate', 'fixture-key', 'codex', lambda *_, **__: Probe())
         self.assertEqual(result['preloadFinalization'], final)
         self.assertEqual(result['finalization'], final)
-        self.assertEqual([call[0] for call in calls], ['read', 'read', 'run', 'read', 'kill'])
+        self.assertEqual([call[0] for call in calls], ['read', 'read', 'run', 'kill'])
         self.assertIn('verify /opt/mikka/official-files-before.json --e2b-finalization codex', calls[2][1])
 
     def test_build_name_must_be_absent_and_never_an_official_alias(self):
@@ -984,6 +984,180 @@ class WorkerImports(unittest.TestCase):
                         if not any(resolved == top or resolved.startswith(top + os.sep) for top in shipped):
                             escapes.append(f'{source.relative_to(bt.ROOT)} -> {target}')
         self.assertEqual(escapes, [])
+
+
+class FreshConservationTransport(unittest.TestCase):
+    @staticmethod
+    def finalization(kind='claude'):
+        digest = {'entries': 5, 'sha256': 'f' * 64}
+        final = {'kind': kind, 'policySha256': bt.official_files_guard().finalization_policy(kind)[1],
+                 'before': digest, 'after': digest, 'originalBefore': digest, 'originalAfter': digest,
+                 'providerChanges': []}
+        return digest, final
+
+    def invoke(self, result, *, fresh_read=None, raised=None, kill_error=None, on_diagnostic=None):
+        digest, final = self.finalization()
+        calls = []
+        class Probe:
+            def __init__(self): self.files = self.commands = self
+            def read(self, path, **options):
+                calls.append(('read', path, options))
+                if path == '/opt/mikka/official-files-conservation.json':
+                    return json.dumps({'before': digest, 'after': digest})
+                if path == '/opt/mikka/official-files-ready.json': return json.dumps(final)
+                if path == '/opt/mikka/fresh-conservation.json' and fresh_read is not None: return fresh_read
+                raise AssertionError('successful fresh command must not need another file transfer')
+            def run(self, command, **options):
+                calls.append(('run', command, options))
+                if raised is not None: raise raised
+                return result
+            def kill(self):
+                calls.append(('kill',))
+                if kill_error is not None: raise kill_error
+        factory_options = []
+        def factory(*_args, **options):
+            factory_options.append(options)
+            return Probe()
+        try:
+            value = bt.probe_conservation('candidate', 'fixture-key', 'claude', factory,
+                                          on_diagnostic=on_diagnostic)
+            return value, calls, factory_options
+        except BaseException as error:
+            error.test_calls = calls
+            error.test_factory_options = factory_options
+            raise
+
+    def test_completed_fresh_rpc_returns_the_receipt_without_a_second_file_transfer(self):
+        _, final = self.finalization()
+        with redirect_stderr(io.StringIO()):
+            value, calls, options = self.invoke(SimpleNamespace(exit_code=0, stdout=json.dumps(final) + '\n'))
+        self.assertEqual(value['finalization'], final)
+        self.assertEqual(value['preloadFinalization'], final)
+        self.assertEqual([row[0] for row in calls], ['read', 'read', 'run', 'kill'])
+        self.assertEqual(calls[2][2], {'user': 'root', 'timeout': 300, 'request_timeout': 310})
+        self.assertEqual(options[0]['timeout'], 600)
+        self.assertEqual([row[2] for row in calls[:2]], [{'user': 'root', 'request_timeout': 30}] * 2)
+
+    def test_invalid_or_oversized_stdout_never_falls_back_to_an_existing_receipt(self):
+        _, final = self.finalization()
+        private = 'DO-NOT-LOG-STDOUT-OR-URL-https://fixture.invalid/private'
+        payloads = [None, b'{}', '', ' \n', '{', '[]', 'null', '{}{}', '\ud800',
+                    json.dumps(final) + '\n' + private, json.dumps({'private': private}),
+                    'x' * (1024 * 1024 + 1), '界' * (1024 * 1024 // 3 + 1)]
+        for payload in payloads:
+            with self.subTest(type=type(payload).__name__, characters=len(payload) if payload is not None else None):
+                output, diagnostics = io.StringIO(), []
+                with redirect_stderr(output), self.assertRaisesRegex(ValueError, '^official_conservation_invalid$') as raised:
+                    self.invoke(SimpleNamespace(exit_code=0, stdout=payload), fresh_read=json.dumps(final),
+                                on_diagnostic=diagnostics.append)
+                self.assertEqual([row[0] for row in raised.exception.test_calls], ['read', 'read', 'run', 'kill'])
+                self.assertEqual(diagnostics, [{'kind': 'claude', 'stage': 'fresh_receipt', 'code': 'official_conservation_invalid'}]
+                                 if payload not in ['[]', 'null', json.dumps({'private': private})] else
+                                 [{'kind': 'claude', 'stage': 'fresh_validation', 'code': 'official_conservation_invalid'}])
+                if diagnostics[0]['stage'] == 'fresh_receipt':
+                    self.assertIsInstance(raised.exception.__cause__, (ValueError, TypeError, UnicodeError, RecursionError))
+                    if isinstance(raised.exception.__cause__, json.JSONDecodeError):
+                        self.assertEqual(raised.exception.__cause__.doc, payload)
+                self.assertNotIn(private, output.getvalue())
+
+    def test_stdout_proof_is_still_bound_to_preload_baseline_template_and_policy(self):
+        _, valid = self.finalization()
+        invalid = []
+        for key, value in [('kind', 'codex'), ('policySha256', '0' * 64),
+                           ('originalBefore', {'entries': 5, 'sha256': 'a' * 64}),
+                           ('after', {'entries': 5, 'sha256': 'e' * 64}),
+                           ('providerChanges', [{'path': '/unregistered-fixture', 'kind': 'file',
+                                                 'before': {'mode': 420}, 'after': {'mode': 511}}])]:
+            invalid.append({**valid, key: value})
+        for final in invalid:
+            diagnostics = []
+            with self.subTest(fields=final), redirect_stderr(io.StringIO()), self.assertRaisesRegex(ValueError, '^official_conservation_invalid$') as raised:
+                self.invoke(SimpleNamespace(exit_code=0, stdout=json.dumps(final)), fresh_read=json.dumps(valid),
+                            on_diagnostic=diagnostics.append)
+            self.assertEqual(diagnostics, [{'kind': 'claude', 'stage': 'fresh_validation', 'code': 'official_conservation_invalid'}])
+            self.assertEqual([row[0] for row in raised.exception.test_calls], ['read', 'read', 'run', 'kill'])
+
+    def test_failed_fresh_command_keeps_failure_and_cleanup_even_with_valid_stdout(self):
+        _, final = self.finalization()
+        failure = RuntimeError('DO-NOT-LOG-COMMAND-CAUSE')
+        failure.exit_code = 23
+        failure.stdout = json.dumps(final)
+        failure.stderr = 'mikka-conservation-check-failed official_files 23\n'
+        for exception in (None, failure):
+            diagnostics, output = [], io.StringIO()
+            with self.subTest(sdk_error=exception is not None), redirect_stderr(output), self.assertRaises(RuntimeError) as raised:
+                self.invoke(SimpleNamespace(exit_code=23, stdout=json.dumps(final)), raised=exception,
+                            fresh_read=json.dumps(final), on_diagnostic=diagnostics.append)
+            if exception is not None:
+                self.assertIs(raised.exception, failure)
+                self.assertEqual(diagnostics, [{'kind': 'claude', 'stage': 'fresh_scan', 'code': 'conservation_failed',
+                                               'exitCode': 23, 'check': 'official_files'}])
+            else:
+                self.assertEqual(str(raised.exception), 'official_conservation_missing')
+            self.assertEqual([row[0] for row in raised.exception.test_calls], ['read', 'read', 'run', 'kill'])
+            self.assertNotIn('DO-NOT-LOG-COMMAND-CAUSE', output.getvalue())
+
+    def test_cleanup_failure_keeps_the_primary_failure_and_never_turns_success_into_pass(self):
+        _, final = self.finalization()
+        failure = RuntimeError('DO-NOT-LOG-PRIMARY-CAUSE')
+        failure.exit_code = 23
+        failure.stderr = 'mikka-conservation-check-failed official_files 23\n'
+        failure.__cause__ = ValueError('DO-NOT-LOG-ORIGINAL-CAUSE')
+        cleanup_error = RuntimeError('DO-NOT-LOG-CLEANUP-CAUSE')
+        output, diagnostics = io.StringIO(), []
+        with redirect_stderr(output), self.assertRaises(RuntimeError) as raised:
+            self.invoke(SimpleNamespace(exit_code=0, stdout=json.dumps(final)), raised=failure,
+                        kill_error=cleanup_error, on_diagnostic=diagnostics.append)
+        self.assertIs(raised.exception, failure)
+        self.assertEqual(str(raised.exception.__cause__), 'DO-NOT-LOG-ORIGINAL-CAUSE')
+        self.assertEqual(raised.exception.__notes__, ['conservation_probe_cleanup_failed'])
+        self.assertEqual(raised.exception.test_calls[-1], ('kill',))
+        self.assertEqual(diagnostics, [{'kind': 'claude', 'stage': 'fresh_scan', 'code': 'conservation_failed',
+                                       'exitCode': 23, 'check': 'official_files'}])
+        for marker in ['DO-NOT-LOG-PRIMARY-CAUSE', 'DO-NOT-LOG-ORIGINAL-CAUSE', 'DO-NOT-LOG-CLEANUP-CAUSE']:
+            self.assertNotIn(marker, output.getvalue())
+        output = io.StringIO()
+        with redirect_stderr(output), self.assertRaises(RuntimeError) as raised:
+            self.invoke(SimpleNamespace(exit_code=0, stdout=json.dumps(final)), kill_error=cleanup_error,
+                        fresh_read=json.dumps(final))
+        self.assertIs(raised.exception, cleanup_error)
+        self.assertEqual(raised.exception.test_calls[-1], ('kill',))
+        self.assertNotIn('DO-NOT-LOG-CLEANUP-CAUSE', output.getvalue())
+
+    def test_real_verifier_stdout_matches_closed_receipt_and_cannot_reuse_an_old_file(self):
+        guard = bt.official_files_guard()
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            protected, manifest_path, receipt_path = [directory / value for value in ('protected', 'manifest.json', 'fresh.json')]
+            protected.write_text('fixture content\n')
+            manifest = {'version': 1, 'entries': [guard.entry(protected)]}
+            manifest_path.write_text(json.dumps(manifest))
+            checks = tuple((phase, 'test -f ' + shlex.quote(str(protected))) for phase, _ in bt.ANONYMOUS_WORKER_CHECKS)
+            with patch.object(bt, 'ANONYMOUS_WORKER_CHECKS', checks):
+                command = bt.fresh_conservation_command('claude')
+            for old, replacement in [('/opt/mikka/official-files.py', Path(__file__).with_name('official-files.py')),
+                                     ('/opt/mikka/official-files-before.json', manifest_path),
+                                     ('/opt/mikka/fresh-conservation.json', receipt_path)]:
+                command = command.replace(old, shlex.quote(str(replacement)))
+            result = subprocess.run(['bash', '-c', command], capture_output=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            receipt = receipt_path.read_bytes()
+            self.assertEqual(result.stdout, receipt)
+            digest = guard.receipt(manifest['entries'])
+            guard.validate_receipt({'before': digest, 'after': digest, 'finalization': json.loads(result.stdout)}, 'claude')
+            repeated = subprocess.run(['bash', '-c', command], capture_output=True, timeout=5)
+            self.assertNotEqual(repeated.returncode, 0)
+            self.assertEqual(repeated.stdout, b'')
+            self.assertEqual(receipt_path.read_bytes(), receipt)
+            self.assertIn(b'mikka-conservation-check-failed official_files 1\n', repeated.stderr)
+            receipt_path.unlink()
+            protected.write_text('changed protected fixture\n')
+            rejected = subprocess.run(['bash', '-c', command], capture_output=True, timeout=5)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertEqual(rejected.stdout, b'')
+            self.assertFalse(receipt_path.exists())
+            self.assertIn(b'official_files_changed', rejected.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

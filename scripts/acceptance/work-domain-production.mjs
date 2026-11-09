@@ -571,7 +571,7 @@ async function runCase(client, shared, options, item, deps, pin) {
     const state = await inventory(client, shared), selected = await selectedScope(client, shared, state, options.scope)
     record.selection = selected.summary
     check(['any', item.harness].includes(selected.environment.configuration.harness), 'environment_incompatible')
-    const chat = await client.rpc('coordinator.getCoordinatorChat', [shared.botId])
+    const chat = await client.rpc('coordinator.pollCoordinatorChat', [shared.botId])
     check(chat.botId === shared.botId && chat.enabled === true && chat.working === false && !chat.streamRunId, 'bot_busy')
     await refuseDuplicate(client, shared, item, document.fingerprint)
     const profile = await profileFor(client, state, options.scope, item, document.fingerprint, record)
