@@ -9,9 +9,9 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '3d004c18ddfd55698cd7ba10e6714d793594ec90',
-  tree: '02e38ad1a421eac6ed183d02d6c2d27da9666cb8',
-  workerSha: '42b1cbd54279363f0492ac4300570e3a0e62890f',
+  source: '141c7834ad187083a04d396bd94a9d3e343719f2',
+  tree: '8553a2bfe4dec5bb95ba13ddf456c7b1e99fa35c',
+  workerSha: '300c7be89fb2bbb701e29d4c74ec7962694613e1',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
     'package.json': '306d928ed8f02dad3cbd9fa3b8cf7a6f18ed1c342394a8013a0bfc35ec0dc5e4',
@@ -19,10 +19,10 @@ export const P0 = Object.freeze({
     'pnpm-workspace.yaml': '5a24e67ade7fae19b2d160b4ca61b58170eb3c04a18f8b06efb9a5a0fae36b9f',
     'scripts/e2b/workspace-candidates.py': '2440d02b368288e4a6e8a618f65e2ecca88f5a0251a0a005f9c71b6c0c977237',
     'scripts/e2b/workspace-candidates.test.py': 'ce408974f1841de2ba164cd108b69c7dfc1d3bcab8c4cc84c9d1cc7db5622b37',
-    'scripts/e2b/build-template.py': '3927d62d13683aab6fc44b869dfccf2b3d76aa5804bfb47b9399838b9667d325',
-    'scripts/e2b/build-template.test.py': '10154108d0f34948aabaaf902a12a9f47e63c05d69345b266234935293fce7c1',
+    'scripts/e2b/build-template.py': '33ff017fa85e6e05fbdf7d0e8a5c59db4da98825e2aff73ac3314956e479b42c',
+    'scripts/e2b/build-template.test.py': '0481716b0fd2accfd66d08975ceee67ac5fdf6ae82c3918c20164632c79a3ed2',
     'scripts/e2b/official-files.py': '66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5',
-    'scripts/e2b/official-files.test.py': '01c31d24a17ed3d0745ed5f0ba24327d11c2e4222a466ca26584c5f7674827b4',
+    'scripts/e2b/official-files.test.py': '0d31956e8825cedd739563404ae5d31c80b9388310399968b297344c581a3201',
     'scripts/e2b/cleanup-template-candidates.py': '893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d',
     'scripts/e2b/cleanup-template-candidates.test.py': '826a489c570a788ea018b6a6ce786fd3e71b41dc8d514cfd8a09e516f8bf84f1',
     'scripts/e2b/workspace-ingress-acceptance.mjs': 'eefa6e240eb3cc236747a7b7537ef2309e8bc75dc54a2516a28a25c008db9e74',
