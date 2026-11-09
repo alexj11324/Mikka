@@ -19,7 +19,7 @@ jobs:
       actions: read
       id-token: write
     env:
-      P0_SOURCE: f48ede424f538f34f43b8a63dd674db2c988e944
+      P0_SOURCE: 0b598d264e45925bbec8ebc1284ab2ccf17e451d
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
       PYTHONDONTWRITEBYTECODE: '1'
@@ -33,7 +33,7 @@ jobs:
         timeout-minutes: 2
         with:
           repository: alexj11324/Mikka
-          ref: f48ede424f538f34f43b8a63dd674db2c988e944
+          ref: 0b598d264e45925bbec8ebc1284ab2ccf17e451d
           path: workspace-acceptance-source
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
