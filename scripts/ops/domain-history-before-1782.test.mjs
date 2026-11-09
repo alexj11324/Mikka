@@ -174,3 +174,15 @@ test('workflow isolates snapshot permissions and exact single-key credential rea
   assert.ok(beforeJob.indexOf('node --test') < beforeJob.indexOf('uses: Infisical'))
   assert.match(beforeJob, /recursive: false/g)
 })
+
+test('runner context is resolved only inside install and capture steps, never job env', async () => {
+  const source = await readFile(new URL('../../.github/workflows/issue1782-domain-history-before.yml', import.meta.url), 'utf8')
+  assert.doesNotMatch(source.slice(0, source.indexOf('    steps:')), /\$\{\{\s*runner\./)
+  for (const name of ['Install only the bounded PostgreSQL driver outside checkout', 'Capture only authorized historical UUIDs and immutable digests']) {
+    const start = source.indexOf('      - name: ' + name)
+    assert.ok(start >= 0)
+    const next = source.indexOf('\n      - ', start + 1)
+    const block = source.slice(start, next < 0 ? source.length : next)
+    assert.match(block, /        env:\n          DOMAIN_HISTORY_DEPENDENCIES: \$\{\{ runner.temp \}\}\/domain-history-dependencies/)
+  }
+})

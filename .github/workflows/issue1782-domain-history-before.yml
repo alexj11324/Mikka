@@ -19,7 +19,6 @@ jobs:
       id-token: write
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -35,6 +34,8 @@ jobs:
           node scripts/ops/domain-history-before-1782.mjs check
       - name: Install only the bounded PostgreSQL driver outside checkout
         timeout-minutes: 2
+        env:
+          DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
         run: npm install --prefix "$DOMAIN_HISTORY_DEPENDENCIES" --ignore-scripts --no-audit --no-fund pg@8.16.3
       - name: Read only the shared account email from existing OIDC
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -74,6 +75,8 @@ jobs:
           include-imports: false
       - name: Capture only authorized historical UUIDs and immutable digests
         timeout-minutes: 3
+        env:
+          DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
         run: node scripts/ops/domain-history-before-1782.mjs capture
       - name: Retain only closed before evidence and its digest receipt
         if: always()
