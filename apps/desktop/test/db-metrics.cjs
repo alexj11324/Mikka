@@ -9,6 +9,7 @@ const operations = require('./db-query-operations.cjs')
 const knownOperations = new Set(operations)
 const unattributedSourceKeys = require('./db-query-unattributed-sources.cjs')
 const knownUnattributedSources = new Set(unattributedSourceKeys.filter(key => key !== 'otherScoped' && key !== 'noScope'))
+const { createQueryDiagnostics } = require('./db-query-diagnostics.cjs')
 
 const socketPath = process.env.MIKKA_DESKTOP_METRICS_SOCKET
 const target = new URL(process.env.E2E_DATABASE_URL ?? 'invalid:')
@@ -57,6 +58,7 @@ function startMetrics() {
   const streams = new Map()
   const clients = new WeakSet()
   let instrumentedClients = 0
+  const diagnostics = createQueryDiagnostics({ globals: globalThis })
   const read = (stream, key) => {
     const value = stream[key]
     if (!Number.isSafeInteger(value) || value < 0) { unknownReadings++; return 0 }
@@ -83,6 +85,7 @@ function startMetrics() {
         const source = operation == null ? 'noScope' : knownUnattributedSources.has(operation) ? operation : 'otherScoped'
         unattributedSources[source]++
       }
+      diagnostics.record(queries, args[0], operation)
       return originalQuery.apply(this, args)
     }
     const originalConnect = Client.prototype.connect
@@ -150,10 +153,16 @@ function startMetrics() {
         entry.received = read(stream, 'bytesRead'); entry.sent = read(stream, 'bytesWritten')
       }
       startedAt = Date.now()
+      diagnostics.reset()
+    } else if (request.url === '/diagnostics' && request.method === 'GET') {
+      response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+      response.end(JSON.stringify(diagnostics.finish({ pid: process.pid, runtime, startedAt }, queries)))
+      return
     } else if (request.url !== '/metrics' || request.method !== 'GET') {
       response.writeHead(404).end(); return
     }
     response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+    diagnostics.checkpoint(queries)
     response.end(JSON.stringify(snapshot()))
   })
   server.on('error', () => { throw new Error('DESKTOP_METRICS_CONTROL_UNAVAILABLE') })

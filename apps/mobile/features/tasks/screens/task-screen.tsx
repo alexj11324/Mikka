@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router'
@@ -59,7 +60,7 @@ export function TaskScreen() {
     <View style={styles.screen}>
       <NavBar scrolled={bar.scrolled} />
       <ScrollView {...underBar} onScroll={bar.onScroll} scrollEventThrottle={16} contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 96 }]}>
-        <ReadNotice error={error} hasData={Boolean(data)} label="任务" onRetry={reload} />
+        <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />
         {loading && !data ? <View style={styles.center}><Spinner /></View> : null}
         {task ? (
           <>
@@ -69,15 +70,15 @@ export function TaskScreen() {
             {task.review ? <View style={styles.review}><ReviewSummaryRow short summary={task.review} onPress={() => router.push(reviewHref(task.id))} /></View> : null}
             <View style={styles.properties}>
               <Chip icon={<TaskStateIcon state={shown?.state ?? null} status={task.status} size={15} />}
-                label={shown?.reason ?? (shown?.state === 'waiting' ? '等待你' : shown?.state ? STATE_LABEL[shown.state] : BOARD_LABEL[task.status] ?? task.status)} />
-              <Chip icon={<PriorityIcon priority={task.priority} size={15} />} label={`${priorityLabel(task.priority)}优先级`} />
+                label={shown?.reason ?? (shown?.state === 'waiting' ? mobileMessages.MobileCore.groups.pending : shown?.state ? STATE_LABEL[shown.state] : BOARD_LABEL[task.status] ?? task.status)} />
+              <Chip icon={<PriorityIcon priority={task.priority} size={15} />} label={mobileMessages.MobileCore.priority.replace('{priority}', priorityLabel(task.priority))} />
               {task.bot ? <Chip icon={<BotAvatar id={task.bot.id} color={task.bot.color} shape={task.bot.shape} size={16} />} label={task.bot.name} /> : null}
               {task.agent ? <Chip icon={<Sparkles size={14} color={colors.secondary} strokeWidth={2} />} label={[HARNESS[task.agent.harness] ?? task.agent.harness, task.agent.model].filter(Boolean).join(' · ')} /> : null}
               {task.place ? <Chip icon={<MachineIcon machine={task.place.kind} size={15} />} label={task.place.name} /> : null}
               {task.schedule ? <Chip icon={<CalendarClock size={14} color={colors.secondary} strokeWidth={2} />} label={task.schedule.label} /> : null}
             </View>
             {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
-            {activity.length ? <Text accessibilityRole="header" style={styles.section}>活动</Text> : null}
+            {activity.length ? <Text accessibilityRole="header" style={styles.section}>{mobileMessages.MobileCore.activity}</Text> : null}
             {activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} first={index === 0} last={index === activity.length - 1}
 
               onOpen={item.kind === 'attempt' ? () => router.push(conversationHref(task.id, item.runId)) : undefined} />)}
@@ -87,7 +88,7 @@ export function TaskScreen() {
       {task ? (
         <View pointerEvents="box-none" style={[styles.commentWrap, { bottom: insets.bottom + 12 }]}>
           {/* Comments are written on the web for now: the app has no comment route yet (#1671). */}
-          <GlassButton label="+ 评论" onPress={() => void openOnWeb(`/?issue=${task.id}`)} />
+          <GlassButton label={mobileMessages.MobileCore.comment} onPress={() => void openOnWeb(`/?issue=${task.id}`)} />
         </View>
       ) : null}
     </View>
@@ -122,10 +123,10 @@ function ActivityRow({ item, first, last, onOpen }: { item: TaskActivity; first:
       </View>
       <View style={styles.activityText}>
         <Text style={styles.activityTitle} numberOfLines={1}>
-          {item.kind === 'attempt' ? `第 ${item.n} 次尝试` : item.kind === 'replaced' ? '换了新线程' : item.by ? `${item.by} 创建了任务` : '创建了任务'}
+          {item.kind === 'attempt' ? mobileMessages.MobileCore.attemptNumber.replace('{number}', String(item.n)) : item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
         </Text>
         <Text style={styles.activityMeta} numberOfLines={2}>
-          {result && item.kind === 'attempt' ? [ATTEMPT_WORD[result], result === 'done' && item.pullRequest ? `开了 PR #${item.pullRequest.number}` : null, HARNESS[item.harness] ?? item.harness, shortWhen(item.createdAt)].filter(Boolean).join(' · ') : shortWhen(item.createdAt)}
+          {result && item.kind === 'attempt' ? [ATTEMPT_WORD[result], result === 'done' && item.pullRequest ? mobileMessages.MobileCore.openedPullRequest.replace('{number}', String(item.pullRequest.number)) : null, HARNESS[item.harness] ?? item.harness, shortWhen(item.createdAt)].filter(Boolean).join(' · ') : shortWhen(item.createdAt)}
         </Text>
       </View>
       {onOpen ? <ChevronRight size={18} color={colors.tertiary} strokeWidth={2} /> : null}

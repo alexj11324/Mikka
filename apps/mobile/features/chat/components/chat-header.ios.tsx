@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { NavBar } from '@/components/NavBar'
 import { Symbol } from '@/components/Symbol'
 import { tap } from '@/lib/haptics'
@@ -16,11 +17,11 @@ export function ChatHeader({ name, color, shape, botId, coordinator, tasks, onTa
   return (
     <NavBar title={name} scrolled={scrolled} titleView={<ChatTitlePill name={name} color={color} shape={shape} botId={botId} coordinator={coordinator} onPress={onInfo} />}
       right={name ? {
-        icon: 'ellipsis', label: '更多', web: <Symbol name="ellipsis" size={18} color={colors.ink} />, onOpen: () => {},
+        icon: 'ellipsis', label: mobileMessages.Nav.more, web: <Symbol name="ellipsis" size={18} color={colors.ink} />, onOpen: () => {},
         items: [
           ...(tasks ?? []).map(task => ({ label: displayTitle(task.title), icon: taskSymbol(task), onPress: () => { tap(); onTask(task.id) } })),
-          { label: '全部任务', icon: 'checklist', onPress: () => { tap(); onAllTasks() } },
-          { label: '资料', icon: 'person.crop.circle', onPress: () => { tap(); onInfo() } },
+          { label: mobileMessages.MobileCore.allTasks, icon: 'checklist', onPress: () => { tap(); onAllTasks() } },
+          { label: mobileMessages.MobileCore.info, icon: 'person.crop.circle', onPress: () => { tap(); onInfo() } },
         ],
       } : undefined} />
   )
