@@ -17,6 +17,8 @@ test('Chinese device variants preserve Chinese navigation and task copy', () => 
     assert.equal(messages.Nav.tasks, '任务')
     assert.equal(messages.MobileCore.groups.done, '已完成')
     assert.equal(messages.MobileCore.attemptNumber.replace('{number}', '2'), '第 2 次尝试')
+    assert.equal(messages.MobileCore.threadSteps.commands.replace('{count}', '2'), '已运行 2 条命令')
+    assert.equal(messages.MobileCore.steps.replace('{count}', '3'), '执行了 3 步')
   }
 })
 

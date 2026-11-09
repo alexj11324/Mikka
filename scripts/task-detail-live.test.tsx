@@ -84,7 +84,7 @@ for (const [file, names] of [
 ] as const) mock.module(at(`components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, none])) })
 mock.module(at('components/workspace/issue-detail-actions.tsx'), { namedExports: { IssueDetailActions: ({ onHistory, disabled }: { onHistory: () => void; disabled: boolean }) => <button disabled={disabled} data-history="" onClick={onHistory}>History</button> } })
 const emptyThreads = { data: [] }
-mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads } })
+mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads, useAgentActivity: () => ({ rows: [], error: null }) } })
 mock.module(at('components/workspace/issue-detail-header.tsx'), { namedExports: { IssueDetailHeader: ({ actions }: { actions: ReactNode }) => <header>Task{actions}</header> } })
 mock.module(at('components/workspace/issue-detail-properties.tsx'), { namedExports: { IssueDetailProperties: ({ status, priority, task }: { status: string; priority: string; task: IssueView }) =>
   <output data-properties="" data-revision={task.revision}>{status}:{priority}</output> } })

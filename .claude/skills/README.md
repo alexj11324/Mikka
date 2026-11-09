@@ -12,6 +12,9 @@ why. Where the two skills disagree, `interface-design` decides. A skill audit
 never changes the shell layout (R-35), and the generated gradient avatar for
 people is intentional (R-36). The example
 code and copy in a skill are illustrations, not Mikka's components or wording.
+No skill restyles a paid block or component (BoardUI Pro, affectUI, beUI Pro):
+their token, icon-set, font and polish rules apply to Mikka's own UI only
+(`docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md`).
 
 Vendored on 2026-10-29, unmodified, from these pinned commits:
 

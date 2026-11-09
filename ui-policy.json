@@ -4,6 +4,10 @@
   "style": "base-nova",
   "iconLibrary": "lucide-react",
   "componentRoots": ["components/ui/", "components/reui/", "components/blocks/", "components/motion/", "components/agents/", "components/ai-elements/"],
+  "asShipped": {
+    "$comment": "Paid blocks and components are used as shipped: only data and text change. Files under these paths skip style/semantic-colors and typography/preset-only; every other rule applies. See docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md. Empty: paid source is not allowed in this repository; the hosted list is in its AGENTS.md.",
+    "public": []
+  },
   "typography": {
     "cssTokens": { "--text-xs": "0.75rem", "--text-xs--line-height": "1.125rem", "--text-sm": "0.8125rem", "--text-sm--line-height": "1.25rem", "--text-md": "0.9375rem", "--text-md--line-height": "1.5rem", "--text-lg": "1.125rem", "--text-lg--line-height": "1.75rem", "--text-lg--letter-spacing": "-0.01em", "--text-xl": "1.25rem", "--text-xl--line-height": "1.875rem", "--text-xl--letter-spacing": "-0.01em", "--text-2xl": "1.5rem", "--text-2xl--line-height": "2rem", "--font-weight-normal": "450", "font-weight": "var(--font-weight-normal)", "font-synthesis": "none" },
     "sizes": ["xs", "sm", "md", "base", "lg", "xl", "2xl", "3xl", "4xl"],
