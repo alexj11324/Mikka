@@ -6,6 +6,7 @@
   - on the hand on the second attempt: 「举手符号是在待处理的时候，需要我去处理时才会用到……怎么会用到这个举手符号呢？」. He also said that a blocked item needs its own symbol, not the hand;
   - on the large title below the buttons: 「该放在最顶上，你放在左上角干嘛？」.
 - Rule: R-52; `mobile.md` 「Where it lives」
+- Superseded in part by: [2026-11-09-0045](2026-11-09-0045-no-attempt-word.md) (no 「尝试」 in the UI: a task is one conversation; only an Agent switch gets a divider)
 - Superseded in part by: [2026-11-08-0120](2026-11-08-0120-ios-header-like-comma.md) (the phone's title row uses one centred native title).
 - Replaces, in part: [2045](2026-11-07-2045-tasks-only-threads-inside.md):
   - rule 2's 「newest first」 order and its one-thread-per-attempt opening;

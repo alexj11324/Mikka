@@ -7,7 +7,7 @@ import { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps } from '
 export { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps }
 
 /** Expo Web: the same list without the keyboard controller, which has no browser counterpart. A short chat still sits against the composer. */
-function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bottomInset, onStartReached, onAtLatestChange, anchorIndex, testID }: ChatListProps<T>, ref: React.Ref<ChatListHandle>) {
+function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bottomInset, onStartReached, onAtLatestChange, onScrollUnderBar, anchorIndex, testID }: ChatListProps<T>, ref: React.Ref<ChatListHandle>) {
   const list = useRef<LegendListRef>(null)
   // The anchored space counts the rows after the anchor but not the footer (the waiting line, notices): the anchor
   // sits that much lower so the footer does not push it above the top.
@@ -15,6 +15,7 @@ function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bott
   const atLatest = useRef(true)
   useImperativeHandle(ref, () => ({ toLatest: (animated = false) => { void list.current?.scrollToEnd({ animated }) } }), [])
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    onScrollUnderBar?.(event)
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent
     const latest = isAtLatest(contentOffset.y, contentSize.height, layoutMeasurement.height)
     if (latest !== atLatest.current) { atLatest.current = latest; onAtLatestChange(latest) }

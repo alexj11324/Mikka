@@ -128,9 +128,14 @@ async function go(target, suffix = '/') {
 }
 
 async function theme(target, value) {
+  stage = `theme-${target.mode}-${value}`
   // Apply the ordinary persisted appearance preference to each renderer
-  // partition. This changes no application response or business state.
-  await target.page.evaluate(value => localStorage.setItem('theme', value), value)
+  // partition. A hosted auth redirect can replace its document after native
+  // readiness: Playwright retries this idempotent predicate in the new context.
+  await target.page.waitForFunction(value => {
+    localStorage.setItem('theme', value)
+    return localStorage.getItem('theme') === value
+  }, value)
   await target.page.emulateMedia({ colorScheme: value, reducedMotion: 'reduce' })
   await target.page.reload({ waitUntil: 'domcontentloaded' })
   await target.page.waitForFunction(value => document.documentElement.classList.contains(value), value)

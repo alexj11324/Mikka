@@ -1,6 +1,69 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { chainChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, runSummaryText, runSummaryView, threadItems } from './issue-run-conversation'
+import { createSecretMasker, withCredentialMasking } from './secrets/mask'
+import { maskStreamedChunks } from './secrets/stream-mask'
+
+function resultStep(output: unknown, toolDurationMs?: unknown) {
+  const [item] = threadItems([
+    { chunk: { type: 'tool-input-available', toolCallId: 'cmd', toolName: 'bash', input: { command: 'pnpm test' } }, at: '2026-11-08T00:00:00Z' },
+    { chunk: { type: 'tool-output-available', toolCallId: 'cmd', output, ...(toolDurationMs === undefined ? {} : { toolDurationMs }) }, at: '2026-11-08T00:00:00Z' },
+  ], [])
+  assert.ok(item.kind === 'steps')
+  return item.steps[0]
+}
+
+test('successful commands expose output and the measured duration, independent of batch insert time', () => {
+  assert.deepEqual(resultStep('3 tests passed\n', 1250), {
+    id: 'cmd', name: 'bash', detail: 'pnpm test', failed: false, output: '3 tests passed\n', ms: 1250,
+  })
+  assert.equal(resultStep({ exitCode: 0, output: 'ok' }, 0).output, '{\n  "exitCode": 0,\n  "output": "ok"\n}')
+  assert.equal(resultStep('', 0).ms, 0)
+  for (const value of [undefined, null, -1, NaN, Infinity, '1250']) assert.ok(!('ms' in resultStep('ok', value)))
+  for (const value of [undefined, null]) assert.ok(!('output' in resultStep(value)))
+})
+
+test('long output retains both ends and marks truncation', () => {
+  const output = resultStep(`HEAD\n${'x'.repeat(20_000)}\nTAIL`).output!
+  assert.ok(output.startsWith('HEAD\n'))
+  assert.ok(output.endsWith('\nTAIL'))
+  assert.match(output, /\[output truncated\]/)
+  assert.ok(output.length < 8300)
+})
+
+test('failed calls still mark failure without exposing error text, and unmatched results add no steps', () => {
+  const at = new Date(0)
+  const [item] = threadItems([
+    { chunk: { type: 'tool-output-available', toolCallId: 'orphan', output: 'ignored', toolDurationMs: 7 }, at },
+    { chunk: { type: 'tool-input-available', toolCallId: 'failed', toolName: 'bash' }, at },
+    { chunk: { type: 'tool-output-error', toolCallId: 'failed', errorText: 'private failure details', toolDurationMs: 42 }, at },
+  ], [])
+  assert.ok(item.kind === 'steps')
+  assert.equal(item.count, 1)
+  assert.deepEqual(item.steps, [{ id: 'failed', name: 'bash', detail: null, failed: true, ms: 42 }])
+})
+
+test('output uses persisted workspace masking and masks credentials again before truncation', () => {
+  const secret = 'sk_live_workspace_test_secret'
+  const token = `ghp_${'T'.repeat(40)}`
+  const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+  const masked = maskStreamedChunks([
+    { type: 'tool-input-available', toolCallId: '1', toolName: 'bash' },
+    { type: 'tool-output-available', toolCallId: '1', output: { [secret]: [`key=${secret}`, Buffer.from(secret).toString('base64')] } },
+  ], withCredentialMasking(createSecretMasker([{ name: 'API_KEY', value: secret }])))
+  const [item] = threadItems(masked.map(chunk => ({ chunk, at: new Date(0) })), [])
+  assert.ok(item.kind === 'steps')
+  const serialized = JSON.stringify(item)
+  assert.ok(!serialized.includes(secret))
+  assert.ok(!serialized.includes(Buffer.from(secret).toString('base64')))
+  assert.match(serialized, /\[secret:API_KEY\]/)
+  const output = resultStep(`${'x'.repeat(4080)} ${token} ${jwt} ${'y'.repeat(10_000)} ${token}`).output!
+  assert.ok(!output.includes(token))
+  assert.ok(!output.includes(jwt))
+  assert.ok(!output.includes('ghp_'), 'mask the complete token before a cutoff can split it')
+  assert.match(output, /\[secret:github-token\]/)
+  assert.equal(resultStep({ [token]: jwt }).output, '{\n  "[secret:github-token]": "[secret:jwt]"\n}')
+})
 
 test('only active run states offer messages; completed history stays readable', () => {
   for (const state of ['queued', 'preparing', 'running', 'waiting_input', 'finishing']) assert.equal(runIsActive(state), true)
@@ -126,4 +189,13 @@ test('a thread that ran again reads as one conversation: each run keeps its own 
   assert.deepEqual(items.map(item => item.kind === 'agent' ? `agent:${item.text}` : item.kind === 'steps' ? `steps:${item.steps.map(step => `${step.name}${step.failed ? '!' : ''}`).join(',')}` : item.kind),
     ['agent:First.', 'steps:Edit', 'person', 'agent:Second.', 'steps:Bash!'])
   assert.deepEqual(chainChunks(rows.slice(0, 2)).map(row => row.chunk.id ?? row.chunk.toolCallId), ['t1', 'a'], 'one run keeps its ids')
+})
+
+test('a folded steps row counts commands and tools the way iOS does (#1770)', async () => {
+  const { isCommandStep, threadStepCounts } = await import('./issue-run-conversation')
+  for (const name of ['Bash', 'bash', 'shell', 'execute']) assert.equal(isCommandStep({ name }), true)
+  for (const name of ['Read', 'apply_patch', 'mcp__mikka__record_decision', 'tool']) assert.equal(isCommandStep({ name }), false)
+  assert.deepEqual(threadStepCounts([{ name: 'Bash' }, { name: 'bash' }, { name: 'Edit' }]), { commands: 2, tools: 1 })
+  assert.deepEqual(threadStepCounts([{ name: 'Read' }]), { commands: 0, tools: 1 })
+  assert.deepEqual(threadStepCounts([]), { commands: 0, tools: 0 })
 })

@@ -7,6 +7,7 @@
 - Rule: adds R-84 to R-89 and the "How a design is reviewed" steps
   (`rules.md`, Design review).
 - Replaces: —
+- Superseded in part by: [2026-11-09-0050](2026-11-09-0050-paid-blocks-as-shipped.md): for a paid block the side-by-side is against the library demo, not the live product.
 
 The Factory redesign passed its author's own `ux-heuristics` self-score (8 to
 9 on every screen), yet Alex found six problems in it:

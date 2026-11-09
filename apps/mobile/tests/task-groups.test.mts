@@ -102,3 +102,23 @@ test('a task\'s attempts read as one conversation, oldest first, each keeping on
   assert.equal(dividerText(attempt('r1', 1, 'codex', { group: 'blocked' }), attempt('r2', 2, 'codex')), '第 1 次尝试受阻 · 再试')
   assert.deepEqual(conversationSegments([{ kind: 'created', by: null, createdAt: '' }], new Map()), [])
 })
+
+// Alex 2026-11-08: the folded steps row opens to each command and tool call, labelled as Codex does.
+test('a steps row says what ran: commands and tools, or the plain count without the steps', async () => {
+  const { stepsLabel, stepLine, commandText, stepDuration } = await import('../features/tasks/model/thread-steps.ts')
+  const steps = [
+    { name: 'bash', detail: '/bin/bash -lc "pnpm test"' },
+    { name: 'Bash', detail: 'git status' },
+    { name: 'mcp__mikka__record_decision', detail: 'Choose provider receipts' },
+  ]
+  const words = mobileMessages.MobileCore
+  assert.equal(stepsLabel(steps, 3), `${words.threadSteps.commands.replace('{count}', '2')} · ${words.threadSteps.tool}`)
+  assert.equal(stepsLabel([steps[2]!], 1), words.threadSteps.tool)
+  assert.equal(stepsLabel(undefined, 3), words.steps.replace('{count}', '3'))
+  assert.equal(commandText('/bin/bash -lc "pnpm test"'), 'pnpm test')
+  assert.equal(commandText(`/bin/bash -lc "python3 - <<'PY' import json…`), `python3 - <<'PY' import json…`)
+  assert.deepEqual(stepLine(steps[2]!), { title: 'record_decision', detail: 'Choose provider receipts', code: false })
+  assert.deepEqual(stepLine({ name: 'apply_patch', detail: '/home/user/.mikka/worker/worktrees/abc/apps/mobile/lib/a.ts' }), { title: 'apply_patch', detail: 'lib/a.ts', code: false })
+  assert.deepEqual(stepLine(steps[0]!), { title: 'pnpm test', detail: null, code: true })
+  assert.deepEqual([stepDuration(850), stepDuration(1240), stepDuration(125_000), stepDuration(undefined)], [words.threadSteps.milliseconds.replace('{count}', '850'), words.threadSteps.seconds.replace('{count}', '1.2'), words.threadSteps.minutes.replace('{minutes}', '2').replace('{seconds}', '5'), null])
+})

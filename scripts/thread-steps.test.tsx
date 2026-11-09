@@ -6,13 +6,16 @@ import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 
 const en = JSON.parse(readFileSync(new URL('../messages/en.json', import.meta.url), 'utf8')).IssueThreads
-mock.module('next-intl', { namedExports: { useTranslations: () => (key: string, args: { harness: string; count: number }) => {
-  assert.equal(key, 'steps')
-  assert.match(en.steps, /^Handed to \{harness\}/)
-  return `Handed to ${args.harness} · ${args.count} ${args.count === 1 ? 'step' : 'steps'}`
+// Formats the real English messages (one/other plurals only), so the test follows en.json.
+const plural = (message: string, count: number) => {
+  const match = /^\{count, plural, one \{(.*)\} other \{(.*)\}\}$/.exec(message)
+  assert.ok(match, `a plain one/other plural: ${message}`)
+  return (count === 1 ? match[1] : match[2]).replace('#', String(count))
+}
+mock.module('next-intl', { namedExports: { useTranslations: () => (key: string, args: { count: number }) => {
+  assert.ok(['steps', 'stepsCommands', 'stepsTools'].includes(key), key)
+  return plural(en[key], args.count)
 } } })
-// harnessLabel's module also reads threads through server actions; only the label matters here.
-mock.module(new URL('../components/workspace/issue-threads.tsx', import.meta.url).href, { namedExports: { harnessLabel: (harness: string) => harness === 'claude_code' ? 'Claude Code' : harness } })
 
 const browser = new Window({ url: 'https://mikka.example/en' })
 let container: HTMLDivElement
@@ -36,12 +39,12 @@ const steps = [
   { id: 'b', name: 'Edit', detail: 'lib/run.ts', failed: true },
 ]
 
-test('a "Handed to … · N steps" line opens to list each step and closes again', async () => {
-  await act(async () => { root.render(<ThreadSteps harness="claude_code" steps={steps} />) })
+test('a "Ran N commands · Called N tools" line opens to list each step and closes again', async () => {
+  await act(async () => { root.render(<ThreadSteps steps={steps} />) })
   const trigger = container.querySelector('button')
   assert.ok(trigger, 'the line is a real button, so Enter and Space work')
   assert.equal(trigger.getAttribute('type'), 'button')
-  assert.equal(trigger.textContent, 'Handed to Claude Code · 2 steps')
+  assert.equal(trigger.textContent, 'Ran 1 command · Called 1 tool', 'says what ran, not which Agent')
   assert.equal(trigger.getAttribute('aria-expanded'), 'false')
   assert.doesNotMatch(container.textContent ?? '', /pnpm test/)
 
