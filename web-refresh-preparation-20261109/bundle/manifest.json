@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "issue": 1505,
+  "activated": false,
+  "operatorExecuted": false,
+  "productionSecretsRead": 0,
+  "refsChanged": 0,
+  "files": [
+    {
+      "path": ".github/workflows/issue1505-web-overlay-refresh.yml.in",
+      "bytes": 21453,
+      "sha256": "1d58cf23f3eff0c0b55e00a639aeaea1f89cd3fb349af0743a11700c5ce95f16"
+    },
+    {
+      "path": "scripts/ops/issue1505-fresh-h-web-refresh.json.in",
+      "bytes": 5,
+      "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+    },
+    {
+      "path": "operator.py",
+      "bytes": 16248,
+      "sha256": "6783b9653932834a2e0738387f946972c0d0826a312355e12daf99e66f95572b"
+    },
+    {
+      "path": "pins.unfilled.json",
+      "bytes": 534,
+      "sha256": "d38e363bee87d3c5b6cd246c0cc8b45b1375b6f5a2ae8f9095ba63afeded9e5a"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6960,
+      "sha256": "eca2c3590416e25b38d7ee9e1093b4c59a6016f170263a7983f082ca062e91ab"
+    }
+  ]
+}

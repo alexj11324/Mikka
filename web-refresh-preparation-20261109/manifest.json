@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "directory": "web-refresh-preparation-20261109",
+  "evidenceParent": "ed399bf20e955795b14d1d22ffeaaee0fcf6ac0b",
+  "baseTree": "43629102136a54ab9f36d8325e58067251dd8fdc",
+  "purpose": "Byte-identical archive of the frozen disabled Web refresh preparation package and the root-provided existing static validation result.",
+  "originalPayloadFiles": 8,
+  "originalPayloadBytes": 97325,
+  "manifestExcludesItself": true,
+  "sourceFilesChanged": false,
+  "materializerOrOperatorExecutedByArchivist": false,
+  "testsOrBusinessProofAdded": false,
+  "entries": [
+    {
+      "path": "bundle/.github/workflows/issue1505-web-overlay-refresh.yml.in",
+      "originalSource": "/workspace/scratch/263e36984c81/web-dispatch-preparation-1505/.github/workflows/issue1505-web-overlay-refresh.yml.in",
+      "mode": "100644",
+      "bytes": 21453,
+      "sha256": "1d58cf23f3eff0c0b55e00a639aeaea1f89cd3fb349af0743a11700c5ce95f16",
+      "gitBlob": "a25e65ac1dd6d8ad7b3e28baa2f3486b7bb4179a"
+    },
+    {
+      "path": "bundle/README.md",
+      "originalSource": "/workspace/scratch/263e36984c81/web-dispatch-preparation-1505/README.md",
+      "mode": "100644",
+      "bytes": 6960,
+      "sha256": "eca2c3590416e25b38d7ee9e1093b4c59a6016f170263a7983f082ca062e91ab",
+      "gitBlob": "d6734db1efd17df4ce19384edd8ea7171da1f236"
+    },
+    {
+      "path": "bundle/manifest.json",
+      "originalSource": "/workspace/scratch/263e36984c81/web-dispatch-preparation-1505/manifest.json",
+      "mode": "100644",
+      "bytes": 968,
+      "sha256": "28217c67790db0147dd647f1784e490ba1829f5e0f93b6ae2293b062202a274c",
+      "gitBlob": "4620e3b145de902b6e55930cfe10912ea6228187"
+    },
+    {
+      "path": "bundle/operator.py",
+      "originalSource": "/workspace/scratch/263e36984c81/web-dispatch-preparation-1505/operator.py",
+      "mode": "100644",
+      "bytes": 16248,
+      "sha256": "6783b9653932834a2e0738387f946972c0d0826a312355e12daf99e66f95572b",
+      "gitBlob": "c4a42d43a6e1d679793f4094a3d0a7d28ee2e432"
+    },
+    {
+      "path": "bundle/pins.unfilled.json",
+      "originalSource": "/workspace/scratch/263e36984c81/web-dispatch-preparation-1505/pins.unfilled.json",
+      "mode": "100644",
+      "bytes": 534,
+      "sha256": "d38e363bee87d3c5b6cd246c0cc8b45b1375b6f5a2ae8f9095ba63afeded9e5a",
+      "gitBlob": "c2508b3c5e8cf9d33b57fd5d507b38b9f70f5099"
+    },
+    {
+      "path": "bundle/scripts/ops/issue1505-fresh-h-web-refresh.json.in",
+      "originalSource": "/workspace/scratch/263e36984c81/web-dispatch-preparation-1505/scripts/ops/issue1505-fresh-h-web-refresh.json.in",
+      "mode": "100644",
+      "bytes": 5,
+      "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+      "gitBlob": "19765bd501b636fce433540d9e6735f51d66151d"
+    },
+    {
+      "path": "materialize.py",
+      "originalSource": "/workspace/scratch/263e36984c81/web-dispatch-materialize-1505.py",
+      "mode": "100644",
+      "bytes": 49654,
+      "sha256": "a77fd8e52a2651c6c1df2df913a09c04f68bb7449a868a6d3370d2a30fd749ea",
+      "gitBlob": "2093e3bdf14a5fdf4f21bcc1950dee7805dadd52"
+    },
+    {
+      "path": "validation/static-checks.json",
+      "originalSource": "/workspace/scratch/263e36984c81/web-dispatch-validation-1505/static-checks.json",
+      "mode": "100644",
+      "bytes": 1503,
+      "sha256": "3e61f5d64d88c989105b304e4d408ef339952781b28adcfbc0773d5194a1dffd",
+      "gitBlob": "826d94e136814699e9e70b28d5b642e9ab7a8d57"
+    }
+  ]
+}

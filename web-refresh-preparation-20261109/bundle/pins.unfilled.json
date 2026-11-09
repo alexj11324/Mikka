@@ -1,0 +1,23 @@
+{
+  "APP_SOURCE": null,
+  "APP_TREE": null,
+  "WEB_WORKFLOW_SHA256": null,
+  "H_HEAD": null,
+  "H_BRANCH": null,
+  "H_RUN_ID": null,
+  "H_ATTEMPT": null,
+  "H_ARTIFACT_ID": null,
+  "H_ARTIFACT_NAME": null,
+  "H_ARTIFACT_SIZE": null,
+  "H_ARTIFACT_SHA256": null,
+  "H_RECEIPT_MEMBER": null,
+  "H_ORIGINAL_RECEIPT_SHA256": null,
+  "RECEIPT_SHA256": null,
+  "H_SCOPE_ID": null,
+  "H_SCOPE_VALUE_SHA256": null,
+  "H_SCOPE_EXPIRES_AT": null,
+  "NOT_BEFORE": null,
+  "ENTRY_DEADLINE": null,
+  "HARD_DEADLINE": null,
+  "DISPATCH_GO": null
+}

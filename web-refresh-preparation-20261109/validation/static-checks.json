@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-09T16:38:26.074716+00:00",
+  "status": "offline_static_checks_passed",
+  "materializerExitCode": 0,
+  "operatorFunctionsExecuted": 0,
+  "networkOrProductionCalls": 0,
+  "activated": false,
+  "yamlParsed": true,
+  "pythonAstParsed": true,
+  "workflowEmbedByteEqual": true,
+  "nullPins": 21,
+  "exactPermissions": {
+    "contents": "read",
+    "actions": "write"
+  },
+  "jobMinutes": 5,
+  "postCallSites": 1,
+  "originalHashVerified": true,
+  "files": {
+    "operator.py": {
+      "bytes": 16248,
+      "sha256": "6783b9653932834a2e0738387f946972c0d0826a312355e12daf99e66f95572b"
+    },
+    "pins.unfilled.json": {
+      "bytes": 534,
+      "sha256": "d38e363bee87d3c5b6cd246c0cc8b45b1375b6f5a2ae8f9095ba63afeded9e5a"
+    },
+    "README.md": {
+      "bytes": 6960,
+      "sha256": "eca2c3590416e25b38d7ee9e1093b4c59a6016f170263a7983f082ca062e91ab"
+    },
+    "manifest.json": {
+      "bytes": 968,
+      "sha256": "28217c67790db0147dd647f1784e490ba1829f5e0f93b6ae2293b062202a274c"
+    },
+    ".github/workflows/issue1505-web-overlay-refresh.yml.in": {
+      "bytes": 21453,
+      "sha256": "1d58cf23f3eff0c0b55e00a639aeaea1f89cd3fb349af0743a11700c5ce95f16"
+    },
+    "scripts/ops/issue1505-fresh-h-web-refresh.json.in": {
+      "bytes": 5,
+      "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+    }
+  },
+  "materializer": {
+    "bytes": 49654,
+    "sha256": "a77fd8e52a2651c6c1df2df913a09c04f68bb7449a868a6d3370d2a30fd749ea"
+  }
+}
