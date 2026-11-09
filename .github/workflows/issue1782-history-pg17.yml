@@ -87,7 +87,7 @@ jobs:
           import hashlib, json, os, pathlib, re, subprocess
           root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'history-pg17-1782'
           summaries = {}
-          for name, expected in [('unit', 177), ('before-pg17', 30), ('after-pg17', 31), ('metadata-unit', 35), ('metadata-pg17', 16)]:
+          for name, expected in [('unit', 199), ('before-pg17', 30), ('after-pg17', 31), ('metadata-unit', 46), ('metadata-pg17', 16)]:
               content = (root / (name + '.tap')).read_text()
               counts = {}
               for field in ['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo']:

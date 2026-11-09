@@ -25,6 +25,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
       id-token: write
     services:
       postgres:
@@ -44,15 +45,11 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
-      - name: Verify closed source and real before artifact before any production credential
-        timeout-minutes: 2
-        run: |
-          node --test scripts/ops/domain-history-before-1782.test.mjs scripts/ops/domain-history-after-1782.test.mjs
-          node scripts/ops/domain-history-after-1782.mjs check
       - name: Install only the bounded PostgreSQL driver outside checkout
         timeout-minutes: 2
         env:
@@ -64,6 +61,11 @@ jobs:
           DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
           DOMAIN_HISTORY_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_history_1782_fixture
         run: node --test scripts/ops/domain-history-after-1782.db.test.mjs
+      - name: Verify all unit contracts and the actual finite account window before credentials
+        timeout-minutes: 2
+        run: |
+          node --test scripts/ops/domain-history-before-1782.test.mjs scripts/ops/domain-history-after-1782.test.mjs
+          node scripts/ops/domain-history-after-1782.mjs check
       - name: Read only existing shared account email
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:

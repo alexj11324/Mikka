@@ -3,13 +3,16 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
-import { archiveEvidence, assertActiveIdentity, authorize, BINDING, checkBinding, closeResources, compareDatabases,
-  guardContext, guardMain, projectActive, projectMetadata, publicFailure, readActive, readDatabase, validateActive } from './domain-production-readonly-1782.mjs'
+import { archiveEvidence, assertActiveIdentity, authorize, BINDING, checkBinding, checkWindowBinding, closeResources, compareDatabases,
+  guardContext, guardMain, projectActive, projectMetadata, publicFailure, readActive, readDatabase, validateActive, WINDOW, windowRecord } from './domain-production-readonly-1782.mjs'
+import { checkWindow, guardWindowContext, guardWindowScope } from './domain-history-before-1782.mjs'
 import { COUNTERS, LEDGER, SQL } from './domain-production-readonly-1782-sql.mjs'
 
 const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const hash = value => createHash('sha256').update(value).digest('hex')
 const ownerId = 'synthetic-reader', adminId = 'synthetic-policy-admin', email = 'synthetic@example.invalid'
+const at = Date.parse('2026-11-09T20:10:00.000Z')
+const activationCondition = "    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108' && github.run_attempt == 1\n"
 const selection = { projectId: id(100), environmentId: id(200), projectRevision: 2, policyRevision: 1, environmentRevision: 3,
   repositoryKey: 'v2/github.com/synthetic/repository', baseBranch: 'main', runtime: 'cloud', harness: 'any' }
 function fixture() {
@@ -31,6 +34,30 @@ function fixture() {
       runs: pin.runIds.map(runId => ({ runId, harness: index ? 'codex' : 'claude_code', model: index ? 'gpt-6-luna' : 'claude-haiku-5-5',
         status: 'succeeded', credentialType: 'subscription', sharedIdentityVerified: true, route: index ? 'codex_cli' : 'claude_code_cli' })) })) }
   return { binding, report }
+}
+function windowFixture(binding = fixture().binding) {
+  const window = { workspaceId: binding.workspaceId, readerSha256: binding.readerSha256, opsParentSha: 'c'.repeat(40),
+    commentId: 3456, commentBodySha256: null, startsAt: '2026-11-09T20:05:00.000Z', expiresAt: '2026-11-09T20:24:00.000Z' }
+  const comment = { id: window.commentId, issue_url: 'https://api.github.com/repos/alexj11324/Mikka/issues/1752',
+    user: { id: 183887963, login: 'alexj11324' },
+    body: '<!-- mikka-1782-domain-production-readonly:v1\n' + JSON.stringify(windowRecord(binding, window)) + '\n-->' }
+  window.commentBodySha256 = hash(comment.body)
+  return { window, comment }
+}
+function sourceFixture(change = () => {}) {
+  const { binding } = fixture(), { window, comment } = windowFixture(binding), calls = []
+  const data = { main: { ref: 'refs/heads/main', object: { type: 'commit', sha: binding.applicationSha } },
+    version: { build: binding.applicationSha }, issue: { number: 1752, comments: 17 }, comments: [comment] }
+  change(data, window, binding)
+  const read = async (url, init) => {
+    calls.push({ url, init })
+    if (url.endsWith('/git/ref/heads/main')) return Response.json(data.main)
+    if (url.startsWith('https://app.aspectlylabs.com/mikka/api/version?verify=')) return Response.json(data.version)
+    if (url.endsWith('/issues/1752')) return Response.json(data.issue)
+    assert.equal(url, 'https://api.github.com/repos/alexj11324/Mikka/issues/1752/comments?per_page=1&page=' + data.issue.comments)
+    return Response.json(data.comments)
+  }
+  return { binding, window, calls, data, read }
 }
 function zip(value, extra = false) {
   return execFileSync('python3', ['-c', `import io,sys,zipfile\nb=io.BytesIO()\nwith zipfile.ZipFile(b,'w',compression=zipfile.ZIP_STORED) as z:\n z.writestr('report.json',sys.stdin.buffer.read())\n ${extra ? "z.writestr('../other.json',b'{}')" : 'pass'}\nsys.stdout.buffer.write(b.getvalue())\n`],
@@ -94,12 +121,15 @@ function database(kind, scope, { readonly = 'on', failQuery, failRollback = fals
   } }
 }
 
-test('default binding is wholly null and refuses before any request or credential use', async () => {
-  assert.ok(Object.values(BINDING).every(value => value === null))
-  let calls = 0
-  await assert.rejects(guardMain({}, BINDING, async () => { calls++ }))
-  await assert.rejects(readActive({}, BINDING, async () => { calls++ }))
-  assert.equal(calls, 0)
+test('default binding is wholly null and refuses before any request or credential use; complete reviewed activation stays testable', async () => {
+  const values = [...Object.values(BINDING), ...Object.values(WINDOW)]
+  if (values.some(value => value === null)) {
+    assert.ok(values.every(value => value === null), 'partial compiled activation must fail this same suite')
+    let calls = 0
+    await assert.rejects(guardMain({}, BINDING, async () => { calls++ }))
+    await assert.rejects(readActive({}, BINDING, async () => { calls++ }))
+    assert.equal(calls, 0)
+  } else { checkBinding(); checkWindowBinding() }
   const { binding } = fixture(); checkBinding(binding)
   for (const change of [{ applicationSha: 'wrong' }, { activeRunAttempt: 2 }, { workspaceId: id(901), extraSql: 'SELECT private' },
     { activeActor: { login: 'another-user', id: 12 } }]) assert.throws(() => checkBinding({ ...binding, ...change }))
@@ -121,16 +151,69 @@ test('only the real owned Ops push and exact workflow can run the collector', ()
 })
 
 test('main and publicly served version both bind M without forwarding GitHub authorization', async () => {
-  const { binding } = fixture()
   for (const changed of [null, 'main', 'served']) {
-    const calls = []
-    const read = async (url, init) => { calls.push({ url, init }); return Response.json(url.includes('api.github.com')
-      ? { ref: 'refs/heads/main', object: { type: 'commit', sha: changed === 'main' ? 'b'.repeat(40) : binding.applicationSha } }
-      : { build: changed === 'served' ? 'b'.repeat(40) : binding.applicationSha }) }
-    if (changed) await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, binding, read))
-    else await guardMain({ GITHUB_TOKEN: 'synthetic' }, binding, read)
-    if (calls.length > 1) assert.equal(calls[1].init.headers.authorization, undefined)
+    const f = sourceFixture(data => { if (changed === 'main') data.main.object.sha = 'b'.repeat(40)
+      if (changed === 'served') data.version.build = 'b'.repeat(40) })
+    if (changed) await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.read, f.window, () => at))
+    else await guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.read, f.window, () => at)
+    if (f.calls.length > 1) assert.equal(f.calls[1].init.headers.authorization, undefined)
   }
+})
+
+test('the imported finite window contract binds one ordinary Ops child and the same actual account scope', () => {
+  const { binding } = fixture(), { window } = windowFixture(binding)
+  checkWindowBinding(binding, window)
+  guardWindowContext({ before: window.opsParentSha }, [window.opsParentSha], window)
+  guardWindowScope({ ownerId, workspaceId: binding.workspaceId }, window)
+  for (const [event, parents] of [[{ before: 'd'.repeat(40) }, [window.opsParentSha]],
+    [{ before: window.opsParentSha }, ['d'.repeat(40)]], [{ before: window.opsParentSha }, [window.opsParentSha, 'd'.repeat(40)]]]) {
+    assert.throws(() => guardWindowContext(event, parents, window), { code: 'window_source_changed' })
+  }
+  for (const patch of [{ workspaceId: id(901) }, { readerSha256: hash('another-reader') }]) {
+    assert.throws(() => checkWindowBinding(binding, { ...window, ...patch }), { code: 'window_scope_changed' })
+  }
+  assert.throws(() => guardWindowScope({ ownerId: 'another-reader', workspaceId: binding.workspaceId }, window), { code: 'window_scope_changed' })
+})
+
+test('every partial, oversized or noncanonical compiled window is refused before network use', () => {
+  const { binding } = fixture(), { window } = windowFixture(binding)
+  for (const patch of [{ opsParentSha: null }, { commentId: 0 }, { commentBodySha256: 'short' },
+    { startsAt: '2026-11-09T20:05:00Z' }, { expiresAt: window.startsAt }, { expiresAt: '2026-11-09T20:26:00.000Z' },
+    { extraMode: 'anything' }]) assert.throws(() => checkWindow({ ...window, ...patch }), { code: 'window_unbound' })
+})
+
+test('latest owner comment binds this source, reader, active run and exact active artifact', async () => {
+  const f = sourceFixture()
+  const result = await guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.read, f.window, () => at, 4 * 60000)
+  assert.equal(result.windowCommentId, f.window.commentId); assert.equal(result.opsParentSha, f.window.opsParentSha)
+  assert.equal(result.windowExpiresAt, f.window.expiresAt); assert.equal(f.calls.length, 4)
+  assert.equal(windowRecord(f.binding, f.window).artifactId, f.binding.artifactId)
+  assert.equal(windowRecord(f.binding, f.window).archiveSha256, f.binding.archiveSha256)
+})
+
+for (const [name, change] of [
+  ['different latest comment', d => { d.comments[0].id++ }],
+  ['different numeric owner', d => { d.comments[0].user.id++ }],
+  ['another issue', d => { d.comments[0].issue_url = 'https://api.github.com/repos/alexj11324/Mikka/issues/1503' }],
+  ['body changed', d => { d.comments[0].body += '\nreleased' }],
+  ['released semantic record', (d, w) => { d.comments[0].body = d.comments[0].body.replace('"active"', '"released"'); w.commentBodySha256 = hash(d.comments[0].body) }],
+  ['different active artifact', (d, w, b) => { d.comments[0].body = d.comments[0].body.replace('"artifactId":' + b.artifactId, '"artifactId":99999'); w.commentBodySha256 = hash(d.comments[0].body) }],
+  ['duplicate marker', (d, w) => { d.comments[0].body += '\n' + d.comments[0].body; w.commentBodySha256 = hash(d.comments[0].body) }],
+]) test('actual account window refuses ' + name, async () => {
+  const f = sourceFixture(change)
+  await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.read, f.window, () => at), { code: 'window_changed' })
+})
+
+test('expired, future and insufficient windows refuse all network access, and expiry during reads is checked again', async () => {
+  for (const [now, remaining] of [[Date.parse('2026-11-09T20:04:59.999Z'), 0], [Date.parse('2026-11-09T20:24:00.000Z'), 0], [at, 14 * 60000]]) {
+    const f = sourceFixture()
+    await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.read, f.window, () => now, remaining), { code: 'window_expired' })
+    assert.equal(f.calls.length, 0)
+  }
+  const f = sourceFixture(); let clockReads = 0
+  await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.read, f.window,
+    () => ++clockReads === 1 ? at : Date.parse(f.window.expiresAt)), { code: 'window_expired' })
+  assert.equal(f.calls.length, 4)
 })
 
 test('the actual active run event, branch, actor, source and artifact are checked independently', () => {
@@ -284,15 +367,19 @@ test('connection close, sign-out and cookie clear follow actual calls even if pr
   assert.deepEqual(publicFailure(Error('postgres://user:secret@private/production')), { code: 'collection_failed' })
 })
 
-test('workflow stays disabled and grants only exact read keys after source/artifact verification', async () => {
+test('workflow stays disabled until fully bound and grants only exact read keys after source/artifact verification', async () => {
   const source = await readFile(new URL('../../.github/workflows/issue1782-domain-production-readonly.yml', import.meta.url), 'utf8')
-  assert.match(source, /    if: false\n/); assert.match(source, /group: production-smoke-owner-acceptance/)
+  if ([...Object.values(BINDING), ...Object.values(WINDOW)].every(value => value === null)) assert.match(source, /    if: false\n/)
+  else { checkWindowBinding(); assert.ok(source.includes(activationCondition)) }
+  assert.match(source, /group: production-smoke-owner-acceptance/)
   assert.match(source, /actions: read/); assert.doesNotMatch(source, /actions: write|contents: write|E2B_API_KEY|continue-on-error/)
+  assert.match(source, /issues: read/); assert.match(source, /fetch-depth: 2/)
   assert.ok(source.indexOf('mjs check') < source.indexOf('uses: Infisical'))
   assert.match(source, /image: postgres:17\n/); assert.match(source, /127\.0\.0\.1:5432:5432/)
   assert.match(source, /DOMAIN_READONLY_TEST_DATABASE_URL: postgresql:\/\/e2e:e2e-local-only@127\.0\.0\.1:5432\/mikka_domain_metadata_1782_fixture\n/)
   const pgGate = source.indexOf('node --test scripts/ops/domain-production-readonly-1782.db.test.mjs')
   assert.ok(pgGate > source.indexOf('pg@8.16.3') && pgGate < source.indexOf('uses: Infisical'))
+  assert.ok(pgGate < source.indexOf('mjs check'), 'all real PG cases run before an unbound/expired window can refuse credentials')
   for (const name of ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD', 'MIKKA_DATABASE_URL', 'DATABASE_URL']) assert.equal((source.match(new RegExp('secret-name: ' + name + '\n', 'g')) ?? []).length, 1)
   assert.doesNotMatch(source.slice(0, source.indexOf('    steps:')), /\$\{\{\s*runner\./)
 })

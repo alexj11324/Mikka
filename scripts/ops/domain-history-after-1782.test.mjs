@@ -7,6 +7,7 @@ import { createSessionClient } from '../acceptance/cloud-startup.mjs'
 import { BINDING, checkBinding, guardContext, guardMain, assertBeforeIdentity, archiveEvidence,
   validateBefore, readBefore, SQL, compareHistory, snapshotAfter, authorizeFixedScope, publicFailure } from './domain-history-after-1782.mjs'
 import { projectRows } from './domain-history-before-1782.mjs'
+import * as afterDriver from './domain-history-after-1782.mjs'
 
 const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const hash = value => createHash('sha256').update(value).digest('hex')
@@ -109,6 +110,21 @@ function fixture({ beforeAccess = taskAccess, historyRows = raw() } = {}) {
   return { binding, before, receipt, beforeBytes, receiptBytes, archive, workflow, run, artifact }
 }
 
+const windowNow = Date.parse('2026-11-09T20:01:00.000Z')
+function windowFixture(binding = fixture().binding) {
+  const window = { workspaceId: binding.workspaceId, readerSha256: binding.readerSha256,
+    opsParentSha: 'd'.repeat(40), commentId: 4567, commentBodySha256: null,
+    startsAt: '2026-11-09T20:00:00.000Z', expiresAt: '2026-11-09T20:16:00.000Z' }
+  const record = { state: 'active', batch: 1782, mode: 'domain_history_after', mainSha: binding.applicationSha,
+    beforeArtifactId: binding.artifactId, beforeSha256: binding.beforeSha256,
+    workspaceSha256: hash(window.workspaceId), readerSha256: window.readerSha256,
+    opsParentSha: window.opsParentSha, startsAt: window.startsAt, expiresAt: window.expiresAt }
+  const comment = { id: window.commentId, issue_url: 'https://api.github.com/repos/alexj11324/Mikka/issues/1752',
+    user: { login: 'alexj11324', id: 183887963 }, body: '<!-- mikka-1782-domain-history-after:v1\n' + JSON.stringify(record) + '\n-->' }
+  window.commentBodySha256 = hash(comment.body)
+  return { binding, window, record, comment }
+}
+
 test('unbound production pins fail before any I/O; fixed unique frozen IDs are required', () => {
   assert.throws(() => checkBinding({ ...BINDING, applicationSha: null }), /binding_refused/)
   const { binding } = fixture(); checkBinding(binding)
@@ -136,14 +152,17 @@ test('only the real clean owned after job and attempt 1 are accepted', () => {
 test('actual main and served build both match M, production fetch never receives GitHub token', async () => {
   const { binding } = fixture()
   for (const drift of ['', 'main', 'build']) {
+    const { window, comment } = windowFixture(binding)
     const fake = async (url, init) => {
       assert.equal(init.redirect, 'error')
+      if (url.includes('/comments?')) return Response.json([comment])
+      if (url.endsWith('/issues/1752')) return Response.json({ number: 1752, comments: 7 })
       if (url.includes('api.github.com')) return Response.json({ ref: 'refs/heads/main', object: { type: 'commit', sha: drift === 'main' ? 'f'.repeat(40) : binding.applicationSha } })
       assert.equal(init.headers.authorization, undefined)
       return Response.json({ build: drift === 'build' ? 'f'.repeat(40) : binding.applicationSha })
     }
-    if (drift) await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, binding, fake))
-    else assert.equal((await guardMain({ GITHUB_TOKEN: 'synthetic' }, binding, fake)).servedBuild, binding.applicationSha)
+    if (drift) await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, binding, fake, window, () => windowNow))
+    else assert.equal((await guardMain({ GITHUB_TOKEN: 'synthetic' }, binding, fake, window, () => windowNow)).servedBuild, binding.applicationSha)
   }
 })
 
@@ -497,7 +516,7 @@ test('unknown errors remain closed and never contain private URL/error text', ()
 test('workflow stays disabled while unbound and keeps existing OIDC subject, exact keys and no publisher permissions', async () => {
   const text = await readFile(new URL('../../.github/workflows/issue1782-domain-history-after.yml', import.meta.url), 'utf8')
   let bound = false
-  try { checkBinding(BINDING); bound = true } catch { /* Inactive draft must remain unable to request a credential. */ }
+  try { checkBinding(BINDING); afterDriver.checkWindow(); bound = true } catch { /* Inactive draft must remain unable to request a credential. */ }
   if (!bound) assert.match(text, /false &&/)
   assert.match(text, /group: production-smoke-owner-acceptance/)
   assert.match(text, /actions: read/); assert.ok(!/actions: write|contents: write|E2B_API_KEY|VERCEL_TEAM_TOKEN|DATABASE_URL\s*$/.test(text))
@@ -510,6 +529,138 @@ test('workflow stays disabled while unbound and keeps existing OIDC subject, exa
   assert.match(text, /127\.0\.0\.1:5432:5432/)
   assert.doesNotMatch(text, /continue-on-error/)
   assert.ok(!/env:\n(?: {6}.+\n)* {6}DOMAIN_HISTORY_DEPENDENCIES:/.test(text), 'runner.temp is step context, never job.env')
+})
+
+test('an expired after account window refuses even while main and served sources still match', async () => {
+  const { binding, window } = windowFixture()
+  const fake = async url => Response.json(url.includes('api.github.com')
+    ? { ref: 'refs/heads/main', object: { sha: binding.applicationSha, type: 'commit' } } : { build: binding.applicationSha })
+  await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, binding, fake, window, () => Date.parse(window.expiresAt)),
+    error => error.code === 'window_expired')
+})
+
+test('after window is closed by default and fully bound to the fixed artifact reader and Workspace', () => {
+  const { binding, window, record } = windowFixture()
+  const values = Object.values(afterDriver.WINDOW)
+  if (values.some(value => value === null)) {
+    assert.ok(values.every(value => value === null), 'a partially activated window must fail the required test gate')
+    assert.throws(() => afterDriver.checkWindow(afterDriver.WINDOW, binding), error => error.code === 'window_unbound')
+  } else assert.deepEqual(afterDriver.checkWindow(), afterDriver.WINDOW)
+  assert.deepEqual(afterDriver.checkWindow(window, binding), window)
+  assert.deepEqual(afterDriver.windowRecord(window, binding), record)
+  for (const change of [{ workspaceId: null }, { readerSha256: 'raw-owner' }, { opsParentSha: 'main' },
+    { commentId: 0 }, { commentBodySha256: null }, { expiresAt: window.startsAt },
+    { startsAt: '2026-11-09T20:00:00Z' }, { expiresAt: '2026-11-09T20:21:00.000Z' }, { extra: true }])
+    assert.throws(() => afterDriver.checkWindow({ ...window, ...change }, binding), error => error.code === 'window_unbound')
+  for (const change of [{ workspaceId: id(99) }, { readerSha256: hash('another-reader') }])
+    assert.throws(() => afterDriver.checkWindow({ ...window, ...change }, binding), error => error.code === 'window_scope_changed')
+})
+
+test('after permits only the ordinary child of the exact Ops parent, never a later private repin or merge', () => {
+  const { binding, window } = windowFixture(), event = { before: window.opsParentSha }
+  afterDriver.guardWindowContext(event, [window.opsParentSha], window, binding)
+  for (const [changed, parents] of [[{ before: 'e'.repeat(40) }, ['e'.repeat(40)]],
+    [event, ['e'.repeat(40)]], [event, []], [event, [window.opsParentSha, 'e'.repeat(40)]], [{}, [window.opsParentSha]]])
+    assert.throws(() => afterDriver.guardWindowContext(changed, parents, window, binding), error => error.code === 'window_source_changed')
+})
+
+test('after rechecks the normally authorized reader and Workspace against the actual window before APP', () => {
+  const { binding, window } = windowFixture()
+  afterDriver.guardWindowScope(scope, window, binding)
+  for (const changed of [{ ...scope, workspaceId: id(99) }, { ...scope, ownerId: 'another-authorized-reader' }])
+    assert.throws(() => afterDriver.guardWindowScope(changed, window, binding), error => error.code === 'window_scope_changed')
+})
+
+function windowFetch(change = () => {}) {
+  const f = windowFixture(), calls = []
+  f.issue = { number: 1752, comments: 7 }; f.comments = [f.comment]
+  change(f)
+  return { ...f, calls, fetchImpl: async (url, init) => {
+    calls.push({ url, init })
+    assert.equal(init.redirect, 'error')
+    if (url.includes('/comments?')) return Response.json(f.comments)
+    if (url.endsWith('/issues/1752')) return Response.json(f.issue)
+    if (url.includes('api.github.com')) return Response.json({ ref: 'refs/heads/main', object: { sha: f.binding.applicationSha, type: 'commit' } })
+    assert.equal(init.headers.authorization, undefined)
+    return Response.json({ build: f.binding.applicationSha })
+  } }
+}
+
+test('after uses the actual latest owner comment and exact finite record, with only GitHub reads authenticated', async () => {
+  const f = windowFetch()
+  const proof = await guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.fetchImpl, f.window, () => windowNow, 240000)
+  assert.equal(proof.windowCommentId, f.window.commentId); assert.equal(proof.windowExpiresAt, f.window.expiresAt)
+  assert.equal(proof.opsParentSha, f.window.opsParentSha)
+  assert.equal(f.calls.length, 4)
+  assert.ok(f.calls[3].url.endsWith('/comments?per_page=1&page=7'))
+  assert.equal(f.calls[3].init.headers.authorization, 'Bearer synthetic')
+  assert.ok(f.calls[1].url.includes('?verify=1782-after-'))
+})
+
+for (const [name, change] of [
+  ['later owner or release comment', f => { f.comments = [{ ...f.comment, id: f.comment.id + 1 }] }],
+  ['edited body', f => { f.comment.body += ' released' }],
+  ['different actor', f => { f.comment.user.login = 'other' }],
+  ['wrong numeric actor', f => { f.comment.user.id = 1 }],
+  ['different issue', f => { f.comment.issue_url = f.comment.issue_url.replace('1752', '1503') }],
+  ['empty latest page', f => { f.comments = [] }],
+  ['invalid comment count', f => { f.issue.comments = 0 }],
+  ['changed M with a valid body digest', f => { f.comment.body = f.comment.body.replace(f.binding.applicationSha, 'f'.repeat(40)); f.window.commentBodySha256 = hash(f.comment.body) }],
+  ['changed before artifact with a valid body digest', f => { f.comment.body = f.comment.body.replace('"beforeArtifactId":6789', '"beforeArtifactId":6790'); f.window.commentBodySha256 = hash(f.comment.body) }],
+  ['changed before digest with a valid body digest', f => { f.comment.body = f.comment.body.replace(f.binding.beforeSha256, 'a'.repeat(64)); f.window.commentBodySha256 = hash(f.comment.body) }],
+  ['released state with a valid body digest', f => { f.comment.body = f.comment.body.replace('active', 'released'); f.window.commentBodySha256 = hash(f.comment.body) }],
+  ['before window marker with a valid body digest', f => { f.comment.body = f.comment.body.replace('mikka-1782-domain-history-after:', 'mikka-1782-domain-history-before:'); f.window.commentBodySha256 = hash(f.comment.body) }],
+  ['duplicate marker with a valid body digest', f => { f.comment.body += f.comment.body; f.window.commentBodySha256 = hash(f.comment.body) }],
+]) test('after actual account window refuses ' + name, async () => {
+  const f = windowFetch(change)
+  await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.fetchImpl, f.window, () => windowNow), error => error.code === 'window_changed')
+})
+
+test('after refuses unstarted, expired or insufficient remaining time before any network or credential access', async () => {
+  const f = windowFetch()
+  for (const [at, minimum] of [[Date.parse(f.window.startsAt) - 1, 0], [Date.parse(f.window.expiresAt), 0],
+    [Date.parse(f.window.expiresAt) - 240000, 240000]])
+    await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.fetchImpl, f.window, () => at, minimum), error => error.code === 'window_expired')
+  assert.equal(f.calls.length, 0)
+})
+
+test('after cannot finish its source gate using a timestamp from before the window expired', async () => {
+  const f = windowFetch(); let reads = 0
+  await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.fetchImpl, f.window,
+    () => ++reads === 1 ? windowNow : Date.parse(f.window.expiresAt)), error => error.code === 'window_expired')
+  assert.equal(f.calls.length, 4)
+})
+
+test('after malformed window JSON preserves its cause while exposing only the closed failure code', async () => {
+  const f = windowFetch(value => {
+    value.comment.body = '<!-- mikka-1782-domain-history-after:v1\n{private-bad-json\n-->'
+    value.window.commentBodySha256 = hash(value.comment.body)
+  })
+  await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.binding, f.fetchImpl, f.window, () => windowNow), error => {
+    assert.ok(error.cause instanceof SyntaxError)
+    assert.deepEqual(publicFailure(error), { code: 'window_changed' })
+    assert.ok(!JSON.stringify(publicFailure(error)).includes('private-bad-json'))
+    return error.code === 'window_changed'
+  })
+})
+
+test('after keeps its original budgets and runs all fixtures before the final window gate and exact credential reads', async () => {
+  const workflow = await readFile(new URL('../../.github/workflows/issue1782-domain-history-after.yml', import.meta.url), 'utf8')
+  const pg = workflow.indexOf('node --test scripts/ops/domain-history-after-1782.db.test.mjs')
+  const unit = workflow.indexOf('node --test scripts/ops/domain-history-before-1782.test.mjs scripts/ops/domain-history-after-1782.test.mjs')
+  const gate = workflow.indexOf('node scripts/ops/domain-history-after-1782.mjs check')
+  const secret = workflow.indexOf('uses: Infisical/secrets-action@')
+  assert.ok(pg > workflow.indexOf('npm install --prefix') && unit > pg && gate > unit && secret > gate)
+  assert.match(workflow, /    timeout-minutes: 8\n/)
+  assert.deepEqual([...workflow.matchAll(/^        timeout-minutes: (\d+)$/gm)].map(match => Number(match[1])), [2, 1, 2, 3])
+  assert.match(workflow, /      issues: read\n/); assert.match(workflow, /          fetch-depth: 2\n/)
+  assert.equal((workflow.match(/secret-name:/g) ?? []).length, 3)
+  assert.doesNotMatch(workflow, /continue-on-error|actions: write|contents: write/)
+  const driver = await readFile(new URL('./domain-history-after-1782.mjs', import.meta.url), 'utf8')
+  assert.ok(driver.indexOf("guardWindowContext(event, git(") < driver.indexOf('const { email, password } = smokeAcceptanceAccount(env)'))
+  assert.ok(driver.indexOf('    guardWindowScope(scope)') < driver.indexOf('    pool = new Pool('))
+  assert.equal((driver.match(/await guardMain\(env/g) ?? []).length, 4)
+  assert.match(driver, /operation === 'check' \? 240000 : 180000/)
 })
 
 test('the after PG gate rejects absent, remote and inherited production targets without loading a driver', () => {

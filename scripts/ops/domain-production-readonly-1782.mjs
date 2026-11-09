@@ -9,6 +9,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { workflowGuard } from './self-hosted-closeout.mjs'
+import { checkWindow, guardWindowContext, guardWindowScope } from './domain-history-before-1782.mjs'
 import { createSessionClient, smokeAcceptanceAccount } from '../acceptance/cloud-startup.mjs'
 import { COUNTERS, LEDGER, REQUIRED_ZERO, SQL } from './domain-production-readonly-1782-sql.mjs'
 
@@ -31,7 +32,8 @@ const ids = (value, max) => Array.isArray(value) && value.length > 0 && value.le
 const CODES = new Set(['binding_refused', 'source_refused', 'main_changed', 'build_changed', 'http_failed',
   'active_identity', 'active_artifact', 'active_archive', 'active_digest', 'active_report', 'account_refused',
   'workspace_refused', 'sample_changed', 'resource_changed', 'database_binding', 'database_readonly',
-  'database_failed', 'metadata_invalid', 'migration_missing', 'active_snapshot', 'signout_failed', 'collection_failed'])
+  'database_failed', 'metadata_invalid', 'migration_missing', 'active_snapshot', 'signout_failed', 'collection_failed',
+  'window_unbound', 'window_changed', 'window_expired', 'window_source_changed', 'window_scope_changed'])
 export const publicFailure = error => ({ code: CODES.has(error?.code) ? error.code : 'collection_failed' })
 
 // Fill from the real successful owned active artifact after M exists. No CLI or
@@ -43,6 +45,10 @@ export const BINDING = Object.freeze({
   artifactId: null, artifactSizeBytes: null, archiveSha256: null, reportSha256: null,
   cases: null,
 })
+// Same reviewed finite-account contract as the before collector. This mode has
+// its own actual window record; a later private repin cannot reuse its parent.
+export const WINDOW = Object.freeze({ workspaceId: null, readerSha256: null, opsParentSha: null,
+  commentId: null, commentBodySha256: null, startsAt: null, expiresAt: null })
 const MODELS = Object.freeze({ claude: ['claude_code', 'claude-haiku-5-5'], codex: ['codex', 'gpt-6-luna'] })
 const actors = actor => exact(actor, ['login', 'id']) &&
   (actor.login === 'alexj11324' && actor.id === 183887963 || actor.login === 'github-actions[bot]' && actor.id === 41898282)
@@ -79,6 +85,19 @@ export function guardContext(env, event, checkout, dirty) {
     && event.deleted === false && checkout === env.GITHUB_SHA && !dirty, 'source_refused')
 }
 
+export function checkWindowBinding(binding = BINDING, window = WINDOW) {
+  checkBinding(binding); checkWindow(window)
+  check(window.workspaceId === binding.workspaceId && window.readerSha256 === binding.readerSha256, 'window_scope_changed')
+  return window
+}
+
+export function windowRecord(binding = BINDING, window = WINDOW) {
+  return { state: 'active', batch: 1782, mode: 'domain_production_readonly', mainSha: binding.applicationSha,
+    workspaceSha256: hash(window.workspaceId), readerSha256: window.readerSha256, opsParentSha: window.opsParentSha,
+    activeRunId: binding.activeRunId, artifactId: binding.artifactId, archiveSha256: binding.archiveSha256,
+    startsAt: window.startsAt, expiresAt: window.expiresAt }
+}
+
 async function boundedBytes(response, max) {
   const length = response.headers.get('content-length')
   check(response.ok && response.body && (!length || /^\d+$/.test(length) && Number(length) <= max), 'http_failed')
@@ -100,15 +119,36 @@ async function readGithub(path, env, fetchImpl) {
   const response = await fetchImpl(API + path, { headers: headers(env.GITHUB_TOKEN), redirect: 'error', signal: AbortSignal.timeout(15000) })
   return JSON.parse(await boundedBytes(response, MAX_REPORT))
 }
-export async function guardMain(env, binding = BINDING, fetchImpl = fetch) {
-  checkBinding(binding)
+export async function guardMain(env, binding = BINDING, fetchImpl = fetch, window = WINDOW, now = Date.now, minimumRemainingMs = 0) {
+  checkWindowBinding(binding, window)
+  const currentTime = () => {
+    const at = now()
+    check(Number.isFinite(at) && Number.isFinite(minimumRemainingMs) && minimumRemainingMs >= 0
+      && at >= Date.parse(window.startsAt) && at + minimumRemainingMs < Date.parse(window.expiresAt), 'window_expired')
+    return at
+  }
+  const started = currentTime()
   const main = await readGithub('/git/ref/heads/main', env, fetchImpl)
   check(main.ref === 'refs/heads/main' && main.object?.type === 'commit' && main.object.sha === binding.applicationSha, 'main_changed')
-  const response = await fetchImpl(ORIGIN + '/mikka/api/version', { headers: { 'cache-control': 'no-store' },
+  const response = await fetchImpl(ORIGIN + '/mikka/api/version?verify=1782-domain-readonly-' + started, { headers: { 'cache-control': 'no-store' },
     redirect: 'error', signal: AbortSignal.timeout(15000) })
   const version = JSON.parse(await boundedBytes(response, 8192))
   check(version.build === binding.applicationSha, 'build_changed')
-  return { mainSha: binding.applicationSha, servedBuild: version.build, origin: ORIGIN, checkedAt: new Date().toISOString() }
+  const issue = await readGithub('/issues/1752', env, fetchImpl)
+  check(issue.number === 1752 && positive(issue.comments), 'window_changed')
+  const comments = await readGithub('/issues/1752/comments?per_page=1&page=' + issue.comments, env, fetchImpl)
+  const comment = comments?.[0]
+  check(Array.isArray(comments) && comments.length === 1 && comment.id === window.commentId
+    && comment.issue_url === API + '/issues/1752' && comment.user?.login === 'alexj11324' && comment.user.id === 183887963
+    && typeof comment.body === 'string' && hash(comment.body) === window.commentBodySha256, 'window_changed')
+  const marker = '<!-- mikka-1782-domain-production-readonly:v1\n', start = comment.body.indexOf(marker)
+  const end = comment.body.indexOf('\n-->', start)
+  check(start >= 0 && end > start && comment.body.indexOf(marker, start + marker.length) === -1, 'window_changed')
+  let record
+  try { record = JSON.parse(comment.body.slice(start + marker.length, end)) } catch { check(false, 'window_changed') }
+  check(isDeepStrictEqual(record, windowRecord(binding, window)), 'window_changed')
+  return { mainSha: binding.applicationSha, servedBuild: version.build, origin: ORIGIN, checkedAt: new Date(currentTime()).toISOString(),
+    windowCommentId: window.commentId, windowExpiresAt: window.expiresAt, opsParentSha: window.opsParentSha }
 }
 
 export function assertActiveIdentity(binding, workflow, run, artifact, now = Date.now()) {
@@ -384,8 +424,14 @@ async function main(operation) {
   check(['check', 'capture'].includes(operation), 'source_refused')
   const env = process.env, binding = checkBinding()
   const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 16384 }).trim()
-  guardContext(env, JSON.parse(await readFile(env.GITHUB_EVENT_PATH, 'utf8')), git('rev-parse', 'HEAD'), git('status', '--porcelain', '--untracked-files=all') !== '')
-  const before = await guardMain(env, binding), active = await readActive(env, binding)
+  const event = JSON.parse(await readFile(env.GITHUB_EVENT_PATH, 'utf8'))
+  guardContext(env, event, git('rev-parse', 'HEAD'), git('status', '--porcelain', '--untracked-files=all') !== '')
+  guardWindowContext(event, git('show', '-s', '--format=%P', 'HEAD').split(' '), WINDOW)
+  const minimumRemainingMs = operation === 'check' ? 4 * 60000 : 3 * 60000
+  const before = await guardMain(env, binding, fetch, WINDOW, Date.now, minimumRemainingMs), active = await readActive(env, binding)
+  // Artifact reads are bounded but may consume time. Recheck the actual grant
+  // before returning permission to read credentials or start a normal session.
+  await guardMain(env, binding, fetch, WINDOW, Date.now, minimumRemainingMs)
   if (operation === 'check') { console.log(JSON.stringify({ sourceVerified: true, applicationSha: binding.applicationSha,
     activeRunId: binding.activeRunId, artifactId: binding.artifactId, cases: 2, runs: binding.cases.reduce((n, item) => n + item.runIds.length, 0) })); return }
   const { email, password } = smokeAcceptanceAccount(env)
@@ -419,6 +465,7 @@ async function main(operation) {
       body: JSON.stringify({ email, password, rememberMe: false }) })
     signedIn = true; check(login.ok, 'account_refused')
     const scope = await authorize(client, email, active, binding)
+    guardWindowScope(scope, WINDOW)
     await guardMain(env, binding)
     for (const kind of ['app', 'ws']) {
       const pool = pools[kind] = new Pool({ connectionString: credentials[kind], max: 1, connectionTimeoutMillis: 15000,
@@ -430,7 +477,7 @@ async function main(operation) {
         if (value.transactionRolledBack === true) report.cleanup[kind].transactionRolledBack = true
       }) } finally { db.release() }
     }
-    await authorize(client, email, active, binding)
+    guardWindowScope(await authorize(client, email, active, binding), WINDOW)
     report.after = await guardMain(env, binding)
     check(!report.connectionError, 'database_failed')
     report.comparison = compareDatabases(report.snapshots.app, report.snapshots.ws)

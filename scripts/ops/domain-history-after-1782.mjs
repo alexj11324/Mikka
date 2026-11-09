@@ -9,7 +9,8 @@ import { pathToFileURL } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { workflowGuard } from './self-hosted-closeout.mjs'
 import { EPIC_MIGRATIONS, SQL as BEFORE_SQL, projectRows, readHistoryTaskAccess,
-  verifyDatabaseTaskAccess, verifyScope } from './domain-history-before-1782.mjs'
+  verifyDatabaseTaskAccess, verifyScope, checkWindow as checkHistoryWindow,
+  guardWindowContext as guardHistoryWindowContext, guardWindowScope as guardHistoryWindowScope } from './domain-history-before-1782.mjs'
 import { createSessionClient, smokeAcceptanceAccount } from '../acceptance/cloud-startup.mjs'
 
 const REPO = 'alexj11324/Mikka', BRANCH = 'ops/self-hosted-vault-closeout-20261108'
@@ -27,7 +28,8 @@ const CODES = new Set(['binding_refused', 'source_refused', 'main_changed', 'bui
   'before_identity', 'before_artifact', 'before_archive', 'before_digest', 'before_projection',
   'account_refused', 'workspace_refused', 'sample_changed', 'sample_invalid', 'database_binding',
   'database_readonly', 'database_failed', 'migration_missing', 'history_missing', 'history_changed',
-  'identifier_missing', 'identifier_alias', 'publication_alias', 'signout_failed', 'after_failed'])
+  'identifier_missing', 'identifier_alias', 'publication_alias', 'signout_failed', 'after_failed',
+  'window_unbound', 'window_changed', 'window_expired', 'window_source_changed', 'window_scope_changed'])
 export const publicFailure = error => ({ code: CODES.has(error?.code) ? error.code : 'after_failed' })
 
 // Fill only after M exists and a real captured_before artifact has been
@@ -42,6 +44,11 @@ export const BINDING = Object.freeze({
   taskIds: null, publicationIds: null, runIds: null,
   workspaceId: null, workspaceKind: null, readerSha256: null, policyAdminSha256: null, taskCreatorSha256: null,
 })
+
+// One actual account window and one ordinary child of the reviewed Ops parent.
+// Later private repins cannot reuse the finite grant. No CLI or env overrides.
+export const WINDOW = Object.freeze({ workspaceId: null, readerSha256: null, opsParentSha: null,
+  commentId: null, commentBodySha256: null, startsAt: null, expiresAt: null })
 
 const ids = (value, max) => Array.isArray(value) && value.length > 0 && value.length <= max
   && value.every(id => UUID.test(id)) && new Set(value).size === value.length
@@ -69,6 +76,30 @@ export function guardContext(env, event, checkout, dirty) {
     && event.forced === false && event.deleted === false && checkout === env.GITHUB_SHA && !dirty, 'source_refused')
 }
 
+export function checkWindow(window = WINDOW, binding = BINDING) {
+  checkHistoryWindow(window)
+  checkBinding(binding)
+  check(window.workspaceId === binding.workspaceId && window.readerSha256 === binding.readerSha256, 'window_scope_changed')
+  return window
+}
+
+export function windowRecord(window = WINDOW, binding = BINDING) {
+  return { state: 'active', batch: 1782, mode: 'domain_history_after', mainSha: binding.applicationSha,
+    beforeArtifactId: binding.artifactId, beforeSha256: binding.beforeSha256,
+    workspaceSha256: hash(window.workspaceId), readerSha256: window.readerSha256,
+    opsParentSha: window.opsParentSha, startsAt: window.startsAt, expiresAt: window.expiresAt }
+}
+
+export function guardWindowContext(event, parents, window = WINDOW, binding = BINDING) {
+  checkWindow(window, binding)
+  guardHistoryWindowContext(event, parents, window)
+}
+
+export function guardWindowScope(scope, window = WINDOW, binding = BINDING) {
+  checkWindow(window, binding)
+  guardHistoryWindowScope(scope, window)
+}
+
 async function boundedBytes(response, max) {
   const length = response.headers.get('content-length')
   check(response.ok && response.body && (!length || /^\d+$/.test(length) && Number(length) <= max), 'http_failed')
@@ -94,15 +125,38 @@ async function readGithub(path, env, fetchImpl) {
   return JSON.parse(await boundedBytes(response, MAX_REPORT))
 }
 
-export async function guardMain(env, binding = BINDING, fetchImpl = fetch) {
+export async function guardMain(env, binding = BINDING, fetchImpl = fetch, window = WINDOW, now = Date.now, minimumRemainingMs = 0) {
   checkBinding(binding)
+  checkWindow(window, binding)
+  const currentTime = () => {
+    const at = now()
+    check(Number.isFinite(at) && Number.isFinite(minimumRemainingMs) && minimumRemainingMs >= 0
+      && at >= Date.parse(window.startsAt) && at + minimumRemainingMs < Date.parse(window.expiresAt), 'window_expired')
+    return at
+  }
+  const started = currentTime()
   const main = await readGithub('/git/ref/heads/main', env, fetchImpl)
   check(main.ref === 'refs/heads/main' && main.object?.type === 'commit' && main.object.sha === binding.applicationSha, 'main_changed')
-  const response = await fetchImpl(ORIGIN + '/mikka/api/version', { headers: { 'cache-control': 'no-store' },
+  const response = await fetchImpl(ORIGIN + '/mikka/api/version?verify=1782-after-' + started, { headers: { 'cache-control': 'no-store' },
     redirect: 'error', signal: AbortSignal.timeout(15000) })
   const version = JSON.parse(await boundedBytes(response, 8192))
   check(version.build === binding.applicationSha, 'build_changed')
-  return { mainSha: binding.applicationSha, servedBuild: version.build, origin: ORIGIN, checkedAt: new Date().toISOString() }
+  const issue = await readGithub('/issues/1752', env, fetchImpl)
+  check(issue.number === 1752 && positive(issue.comments), 'window_changed')
+  const comments = await readGithub('/issues/1752/comments?per_page=1&page=' + issue.comments, env, fetchImpl)
+  const comment = comments?.[0]
+  check(Array.isArray(comments) && comments.length === 1 && comment.id === window.commentId
+    && comment.issue_url === API + '/issues/1752' && comment.user?.login === 'alexj11324' && comment.user.id === 183887963
+    && typeof comment.body === 'string' && hash(comment.body) === window.commentBodySha256, 'window_changed')
+  const marker = '<!-- mikka-1782-domain-history-after:v1\n', start = comment.body.indexOf(marker)
+  const end = comment.body.indexOf('\n-->', start)
+  check(start >= 0 && end > start && comment.body.indexOf(marker, start + marker.length) === -1, 'window_changed')
+  let record
+  try { record = JSON.parse(comment.body.slice(start + marker.length, end)) }
+  catch (error) { throw Object.assign(new Error('window_changed', { cause: error }), { code: 'window_changed' }) }
+  check(isDeepStrictEqual(record, windowRecord(window, binding)), 'window_changed')
+  return { mainSha: binding.applicationSha, servedBuild: version.build, origin: ORIGIN, checkedAt: new Date(currentTime()).toISOString(),
+    windowCommentId: window.commentId, windowExpiresAt: window.expiresAt, opsParentSha: window.opsParentSha }
 }
 
 /** GitHub metadata is independently read by ID; no URL comes from the report. */
@@ -366,9 +420,12 @@ async function main(operation) {
   checkBinding()
   const env = process.env
   const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 16384 }).trim()
-  guardContext(env, JSON.parse(await readFile(env.GITHUB_EVENT_PATH, 'utf8')), git('rev-parse', 'HEAD'), git('status', '--porcelain', '--untracked-files=all') !== '')
-  const source = await guardMain(env), before = await readBefore(env)
-  await guardMain(env)
+  const event = JSON.parse(await readFile(env.GITHUB_EVENT_PATH, 'utf8'))
+  guardContext(env, event, git('rev-parse', 'HEAD'), git('status', '--porcelain', '--untracked-files=all') !== '')
+  guardWindowContext(event, git('show', '-s', '--format=%P', 'HEAD').split(' '))
+  const minimumRemainingMs = operation === 'check' ? 240000 : 180000
+  const source = await guardMain(env, BINDING, fetch, WINDOW, Date.now, minimumRemainingMs), before = await readBefore(env)
+  await guardMain(env, BINDING, fetch, WINDOW, Date.now, minimumRemainingMs)
   if (operation === 'check') { console.log(JSON.stringify({ phase: 'after', mainSha: BINDING.applicationSha, beforeVerified: true })); return }
   const { email, password } = smokeAcceptanceAccount(env)
   let target
@@ -395,6 +452,7 @@ async function main(operation) {
     const login = await client.request('/api/auth/sign-in/email', post({ email, password, rememberMe: false }))
     signedIn = true; check(login.ok, 'account_refused')
     const scope = await authorizeFixedScope(client, before, email)
+    guardWindowScope(scope)
     report.workspaceId = scope.workspaceId; report.workspaceKind = scope.workspaceKind; report.taskIds = scope.taskIds
     report.readerSha256 = before.readerSha256; report.policyAdminSha256 = before.policyAdminSha256
     await guardMain(env)
