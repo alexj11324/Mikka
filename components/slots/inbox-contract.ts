@@ -9,6 +9,8 @@ type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
 /** `INBOX_TITLE`, a message key the slot exports: the page's title, e.g. in the phone header. */
 export type InboxTitle = string
+/** `INBOX_PHONE_HEADER`, a boolean the slot exports: false when its body brings its own list and back button on phones. */
+export type InboxPhoneHeader = boolean
 
 export type InboxPageProps = {
   threads: Thread[]
