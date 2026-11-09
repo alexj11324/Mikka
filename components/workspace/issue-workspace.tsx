@@ -162,6 +162,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     plugins: tPlugins('title'),
     suggestions: i18nText('Nav.suggestions'),
     artifacts: i18nText('Nav.artifacts'),
+    memory: i18nText('HostedSettings.memory.title'),
   }
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const [settingsOpen, setSettingsOpen] = useState(Boolean(initialSettingsSection))

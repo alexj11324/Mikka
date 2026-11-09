@@ -26,7 +26,7 @@ export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   plugins: 'Nav.plugins',
   suggestions: 'Nav.suggestions',
   artifacts: 'Nav.artifacts',
-  memory: 'Settings.sections.memory.title',
+  memory: 'HostedSettings.memory.title',
 }
 
 /** Sections a reload or a shared link reopens; the others start from their parent page. The Coordinator's chat is the default and needs none. */
