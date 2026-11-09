@@ -119,7 +119,12 @@ requirements or permission to merge.
 The route reads the current candidate's persisted `run_publications` record;
 it never requests GitHub. Publication ingestion resolves the PR details and
 reads checks and commit statuses, with existing repository credentials and
-permissions. A checks refusal leaves `checks` null without failing publication.
+permissions. After validating the original PR creation/list receipt, it makes
+one optional detail read. A refused or unavailable detail read keeps the
+verified publication, preserves fields already known, and leaves missing
+counts and checks unknown. A detail response with a conflicting PR number,
+repository, branch, task marker or head still fails; it cannot fall back to
+older evidence. A checks refusal leaves `checks` null without failing publication.
 The existing signature-verified webhook updates PR metadata and, when delivered
 by the configured App, `check_run` and `status` events. Same-named jobs in
 different check suites are counted independently; a rerun replaces only the
