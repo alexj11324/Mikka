@@ -1,7 +1,7 @@
 # Design rules
 
 These are decisions Alex has already made. Designs, specs and code follow
-them without asking again. To change a rule, Alex decides, the change is
+them without asking again. Scope: these rules govern Mikka's own UI. Paid blocks and components (BoardUI Pro, affectUI, beUI Pro) in the hosted layer are used as shipped, and where a rule here would change one's look (icons, avatars, logos, layout, spacing, colours, type, borders, motion, subtitles), the block wins ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)). To change a rule, Alex decides, the change is
 recorded as a file in [`decisions/`](decisions/README.md), and this file is
 edited in the same PR. A new rule's id (`R-xx`) is assigned by the
 coordinator when the work is dispatched ([dev workflow](../dev-workflow.md)
@@ -521,6 +521,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   menu is 240px wide and opens above the rail avatar, never over it.
 
 ## Look
+
+The Look rules (R-30 to R-39) and the avatar, icon and chip rules elsewhere
+are Mikka's look. They are never applied inside a paid block, which keeps the
+library's shipped look ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
 
 - **R-30** Greys are pure neutral: `rgba(0,0,0,a)` and `#737373 / #A3A3A3 /
   #171717` in light mode, the same idea in dark. Never slate, zinc or teal
