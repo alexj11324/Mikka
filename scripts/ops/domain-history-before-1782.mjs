@@ -6,11 +6,16 @@ import { createRequire } from 'node:module'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
 import { workflowGuard } from './self-hosted-closeout.mjs'
 import { createSessionClient, decodeWire, smokeAcceptanceAccount } from '../acceptance/cloud-startup.mjs'
 
 export const MAIN = 'ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d'
 export const ORIGIN = 'https://app.aspectlylabs.com'
+// One actual account window and one ordinary child of a reviewed Ops parent.
+// Null is intentionally closed; later private repins cannot reuse this grant.
+export const WINDOW = Object.freeze({ workspaceId: null, readerSha256: null, opsParentSha: null,
+  commentId: null, commentBodySha256: null, startsAt: null, expiresAt: null })
 const ADMIN_HASH = '0049e13c050f799070a7d1a95bb843f2a0519b5e8732bf6986e2e1613b8941c3'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const SHA = /^[0-9a-f]{40}$/
@@ -20,7 +25,8 @@ const timestamp = value => typeof value === 'string' && value.length <= 64
   && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) && Number.isFinite(Date.parse(value))
 const CODES = new Set(['source_refused', 'main_changed', 'build_changed', 'http_failed', 'response_invalid', 'account_refused',
   'workspace_refused', 'sample_missing', 'sample_invalid', 'sample_changed', 'database_binding', 'database_readonly',
-  'sample_too_large', 'history_missing', 'migration_already_applied', 'database_failed', 'signout_failed', 'before_failed'])
+  'sample_too_large', 'history_missing', 'migration_already_applied', 'database_failed', 'signout_failed', 'before_failed',
+  'window_unbound', 'window_changed', 'window_expired', 'window_source_changed', 'window_scope_changed'])
 const hash = value => createHash('sha256').update(value).digest('hex')
 const creator = value => typeof value === 'string' && value.length > 0 && value.length <= 256
 const check = (ok, code) => { if (!ok) throw Object.assign(new Error(code), { code }) }
@@ -38,7 +44,44 @@ export function guardContext(env, event, checkout, dirty) {
     && env.GITHUB_JOB === 'domain_history_before' && SHA.test(env.GITHUB_SHA ?? '') && !dirty, 'source_refused')
 }
 
-export async function guardMain(env, fetchImpl = fetch) {
+export function checkWindow(window = WINDOW) {
+  const iso = value => timestamp(value) && new Date(value).toISOString() === value
+  check(window && isDeepStrictEqual(Object.keys(window).sort(), Object.keys(WINDOW).sort())
+    && UUID.test(window.workspaceId ?? '') && SHA.test(window.opsParentSha ?? '')
+    && /^[a-f0-9]{64}$/.test(window.readerSha256 ?? '') && /^[a-f0-9]{64}$/.test(window.commentBodySha256 ?? '')
+    && Number.isSafeInteger(window.commentId) && window.commentId > 0
+    && iso(window.startsAt) && iso(window.expiresAt)
+    && Date.parse(window.expiresAt) > Date.parse(window.startsAt)
+    && Date.parse(window.expiresAt) - Date.parse(window.startsAt) <= 20 * 60000, 'window_unbound')
+  return window
+}
+
+export function windowRecord(window = WINDOW) {
+  return { state: 'active', batch: 1782, mode: 'domain_history_before', mainSha: MAIN,
+    workspaceSha256: hash(window.workspaceId), readerSha256: window.readerSha256,
+    opsParentSha: window.opsParentSha, startsAt: window.startsAt, expiresAt: window.expiresAt }
+}
+
+export function guardWindowContext(event, parents, window = WINDOW) {
+  checkWindow(window)
+  check(event.before === window.opsParentSha && Array.isArray(parents) && parents.length === 1
+    && parents[0] === window.opsParentSha, 'window_source_changed')
+}
+
+export function guardWindowScope(scope, window = WINDOW) {
+  checkWindow(window)
+  check(scope.workspaceId === window.workspaceId && hash(scope.ownerId) === window.readerSha256, 'window_scope_changed')
+}
+
+export async function guardMain(env, fetchImpl = fetch, window = WINDOW, now = Date.now, minimumRemainingMs = 0) {
+  checkWindow(window)
+  const currentTime = () => {
+    const at = now()
+    check(Number.isFinite(at) && Number.isFinite(minimumRemainingMs) && minimumRemainingMs >= 0
+      && at >= Date.parse(window.startsAt) && at + minimumRemainingMs < Date.parse(window.expiresAt), 'window_expired')
+    return at
+  }
+  const started = currentTime()
   check(typeof env.GITHUB_TOKEN === 'string' && env.GITHUB_TOKEN.length > 0, 'source_refused')
   const read = async (url, headers = {}) => {
     const response = await fetchImpl(url, { headers: { 'cache-control': 'no-store', ...headers },
@@ -49,9 +92,25 @@ export async function guardMain(env, fetchImpl = fetch) {
   const main = await read('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',
     { authorization: `Bearer ${env.GITHUB_TOKEN}`, accept: 'application/vnd.github+json' })
   check(main.ref === 'refs/heads/main' && main.object?.sha === MAIN && main.object?.type === 'commit', 'main_changed')
-  const version = await read(ORIGIN + '/mikka/api/version')
+  const version = await read(ORIGIN + '/mikka/api/version?verify=1782-before-' + started)
   check(version.build === MAIN, 'build_changed')
-  return { mainSha: MAIN, servedBuild: version.build, origin: ORIGIN, checkedAt: new Date().toISOString() }
+  const api = 'https://api.github.com/repos/alexj11324/Mikka'
+  const headers = { authorization: `Bearer ${env.GITHUB_TOKEN}`, accept: 'application/vnd.github+json' }
+  const issue = await read(api + '/issues/1752', headers)
+  check(issue.number === 1752 && Number.isSafeInteger(issue.comments) && issue.comments > 0, 'window_changed')
+  const comments = await read(api + '/issues/1752/comments?per_page=1&page=' + issue.comments, headers)
+  const comment = comments?.[0]
+  check(Array.isArray(comments) && comments.length === 1 && comment.id === window.commentId
+    && comment.issue_url === api + '/issues/1752' && comment.user?.login === 'alexj11324' && comment.user.id === 183887963
+    && typeof comment.body === 'string' && hash(comment.body) === window.commentBodySha256, 'window_changed')
+  const marker = '<!-- mikka-1782-domain-history-before:v1\n', start = comment.body.indexOf(marker)
+  const end = comment.body.indexOf('\n-->', start)
+  check(start >= 0 && end > start && comment.body.indexOf(marker, start + marker.length) === -1, 'window_changed')
+  let record
+  try { record = JSON.parse(comment.body.slice(start + marker.length, end)) } catch { check(false, 'window_changed') }
+  check(isDeepStrictEqual(record, windowRecord(window)), 'window_changed')
+  return { mainSha: MAIN, servedBuild: version.build, origin: ORIGIN, checkedAt: new Date(currentTime()).toISOString(),
+    windowCommentId: window.commentId, windowExpiresAt: window.expiresAt, opsParentSha: window.opsParentSha }
 }
 
 /** Only ordinary account API choices can nominate a workspace. Search accepts
@@ -507,8 +566,10 @@ async function main(operation) {
   check(['check', 'capture'].includes(operation), 'source_refused')
   const env = process.env
   const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 16384 }).trim()
-  guardContext(env, JSON.parse(await readFile(env.GITHUB_EVENT_PATH, 'utf8')), git('rev-parse', 'HEAD'), git('status', '--porcelain', '--untracked-files=all') !== '')
-  const before = await guardMain(env)
+  const event = JSON.parse(await readFile(env.GITHUB_EVENT_PATH, 'utf8'))
+  guardContext(env, event, git('rev-parse', 'HEAD'), git('status', '--porcelain', '--untracked-files=all') !== '')
+  guardWindowContext(event, git('show', '-s', '--format=%P', 'HEAD').split(' '))
+  const before = await guardMain(env, fetch, WINDOW, Date.now, operation === 'check' ? 240000 : 180000)
   if (operation === 'check') { console.log(JSON.stringify({ phase: 'before', mainSha: MAIN, sourceVerified: true })); return }
   const { email, password } = smokeAcceptanceAccount(env)
   check(typeof env.MIKKA_DATABASE_URL === 'string' && env.MIKKA_DATABASE_URL.length > 0, 'database_binding')
@@ -531,6 +592,7 @@ async function main(operation) {
     const login = await client.request('/api/auth/sign-in/email', post({ email, password, rememberMe: false }))
     signedIn = true; check(login.ok, 'account_refused')
     const scope = await selectThreadScope(client, email, counts => { report.apiTaskInventory = counts })
+    guardWindowScope(scope)
     report.candidateCount = scope.candidateTaskIds.length
     report.workspaceId = scope.workspaceId
     report.workspaceKind = scope.workspaceKind

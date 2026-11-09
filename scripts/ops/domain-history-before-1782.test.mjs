@@ -24,6 +24,19 @@ const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka',
   GITHUB_ACTOR: 'alexj11324', GITHUB_TRIGGERING_ACTOR: 'alexj11324', GITHUB_JOB: 'domain_history_before',
   GITHUB_RUN_ID: '1234', GITHUB_RUN_ATTEMPT: '1', GITHUB_SHA: 'b'.repeat(40),
   GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/issue1782-domain-history-before.yml@refs/heads/ops/self-hosted-vault-closeout-20261108' }
+const windowNow = Date.parse('2026-11-09T19:00:00.000Z')
+const windowFixture = () => {
+  const window = { workspaceId: scope.workspaceId, readerSha256: createHash('sha256').update(scope.ownerId).digest('hex'),
+    opsParentSha: 'd'.repeat(40), commentId: 4567, commentBodySha256: null,
+    startsAt: '2026-11-09T18:59:00.000Z', expiresAt: '2026-11-09T19:15:00.000Z' }
+  const record = { state: 'active', batch: 1782, mode: 'domain_history_before', mainSha: MAIN,
+    workspaceSha256: createHash('sha256').update(window.workspaceId).digest('hex'), readerSha256: window.readerSha256,
+    opsParentSha: window.opsParentSha, startsAt: window.startsAt, expiresAt: window.expiresAt }
+  const comment = { id: window.commentId, issue_url: 'https://api.github.com/repos/alexj11324/Mikka/issues/1752',
+    user: { login: 'alexj11324', id: 183887963 }, body: '<!-- mikka-1782-domain-history-before:v1\n' + JSON.stringify(record) + '\n-->' }
+  window.commentBodySha256 = createHash('sha256').update(comment.body).digest('hex')
+  return { window, comment, record }
+}
 const event = { repository: { id: 1427517699, owner: { id: 183887963 } }, ref: env.GITHUB_REF,
   after: env.GITHUB_SHA, deleted: false, forced: false }
 
@@ -70,17 +83,19 @@ test('existing real Ops subject accepts only a clean first-attempt owned snapsho
 
 test('public served build and current main must both equal the exact before pin', async () => {
   for (const changed of [null, 'main', 'served']) {
-    const calls = []
+    const calls = [], { window, comment } = windowFixture()
     const fetchImpl = async (url, init) => {
       calls.push({ url, init })
+      if (url.includes('/comments?')) return Response.json([comment])
+      if (url.endsWith('/issues/1752')) return Response.json({ number: 1752, comments: 7 })
       return new Response(JSON.stringify(url.includes('api.github.com') ? {
         ref: 'refs/heads/main', object: { sha: changed === 'main' ? 'a'.repeat(40) : MAIN, type: 'commit' },
       } : { build: changed === 'served' ? 'a'.repeat(40) : MAIN }))
     }
-    if (changed) await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, fetchImpl))
-    else assert.equal((await guardMain({ GITHUB_TOKEN: 'synthetic' }, fetchImpl)).mainSha, MAIN)
+    if (changed) await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, fetchImpl, window, () => windowNow))
+    else assert.equal((await guardMain({ GITHUB_TOKEN: 'synthetic' }, fetchImpl, window, () => windowNow)).mainSha, MAIN)
     assert.equal(calls[0].init.redirect, 'error')
-    if (calls.length === 2) assert.equal(calls[1].init.headers.authorization, undefined)
+    if (calls.length >= 2) assert.equal(calls[1].init.headers.authorization, undefined)
   }
 })
 
@@ -265,7 +280,7 @@ test('workflow isolates snapshot permissions and exact single-key credential rea
   const source = await readFile(new URL('.github/workflows/issue1782-domain-history-before.yml', root), 'utf8')
   const beforeJob = source.slice(source.indexOf('  domain_history_before:'))
   assert.match(beforeJob, /group: production-smoke-owner-acceptance/)
-  assert.match(beforeJob, /contents: read\n      id-token: write/)
+  assert.match(beforeJob, /contents: read\n      issues: read\n      id-token: write/)
   assert.ok(!/actions: write|contents: write|E2B_API_KEY|VERCEL_TEAM_TOKEN/.test(beforeJob))
   for (const key of ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD', 'MIKKA_DATABASE_URL']) assert.equal((beforeJob.match(new RegExp('secret-name: ' + key, 'g')) ?? []).length, 1)
   assert.ok(beforeJob.indexOf('node --test') < beforeJob.indexOf('uses: Infisical'))
@@ -905,4 +920,117 @@ test('production capture chooses only the compiled own-thread entry and retains 
   assert.match(text, /const scope = await selectThreadScope\(client, email, counts/)
   assert.ok(!/process\.env\.(?:HISTORY_MODE|HISTORY_WORKSPACE|HISTORY_TASK_IDS)/.test(text))
   assert.equal(typeof beforeDriver.selectScope, 'function'); assert.equal(typeof beforeDriver.searchCandidates, 'function')
+})
+
+
+test('an expired before account window refuses even while main and served sources still match', async () => {
+  const { window } = windowFixture()
+  const fetchImpl = async url => Response.json(url.includes('api.github.com')
+    ? { ref: 'refs/heads/main', object: { sha: MAIN, type: 'commit' } } : { build: MAIN })
+  await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, fetchImpl, window, () => Date.parse(window.expiresAt)),
+    error => error.code === 'window_expired')
+})
+
+
+test('before account grant is closed by default and only a real bounded recorded window can be activated', () => {
+  const { window, record } = windowFixture()
+  const values = Object.values(beforeDriver.WINDOW)
+  if (values.some(value => value === null)) {
+    assert.throws(() => beforeDriver.checkWindow(), error => error.code === 'window_unbound')
+    assert.ok(values.every(value => value === null), 'a partially activated grant must fail the required test gate')
+  } else assert.deepEqual(beforeDriver.checkWindow(), beforeDriver.WINDOW)
+  assert.throws(() => beforeDriver.checkWindow({ ...window, workspaceId: null }), error => error.code === 'window_unbound')
+  assert.throws(() => beforeDriver.checkWindow({ ...window, commentId: null }), error => error.code === 'window_unbound')
+  assert.deepEqual(beforeDriver.windowRecord(window), record)
+  for (const change of [{ workspaceId: 'wrong' }, { readerSha256: 'raw-owner' }, { opsParentSha: 'main' },
+    { commentId: 0 }, { commentBodySha256: 'wrong' }, { expiresAt: window.startsAt },
+    { startsAt: '2026-11-09T18:59:00Z' }, { expiresAt: '2026-11-09T20:00:00.000Z' }, { extra: true }])
+    assert.throws(() => beforeDriver.checkWindow({ ...window, ...change }), error => error.code === 'window_unbound')
+})
+
+test('only one ordinary child of the exact Ops parent may use the window, so the next private repin cannot capture', () => {
+  const { window } = windowFixture(), own = { ...event, before: window.opsParentSha }
+  beforeDriver.guardWindowContext(own, [window.opsParentSha], window)
+  for (const [changed, parents] of [[{ ...own, before: env.GITHUB_SHA }, [env.GITHUB_SHA]],
+    [own, [env.GITHUB_SHA]], [own, []], [own, [window.opsParentSha, 'e'.repeat(40)]], [{ ...own, before: undefined }, [window.opsParentSha]]])
+    assert.throws(() => beforeDriver.guardWindowContext(changed, parents, window), error => error.code === 'window_source_changed')
+})
+
+test('normal API Workspace and reader must match the actual recorded account window before APP is opened', () => {
+  const { window } = windowFixture()
+  beforeDriver.guardWindowScope(scope, window)
+  for (const changed of [{ ...scope, workspaceId: id(99) }, { ...scope, ownerId: 'another-authorized-reader' }])
+    assert.throws(() => beforeDriver.guardWindowScope(changed, window), error => error.code === 'window_scope_changed')
+})
+
+function windowFetch(change = () => {}) {
+  const f = windowFixture(), calls = []
+  f.issue = { number: 1752, comments: 7 }; f.comments = [f.comment]
+  change(f)
+  return { ...f, calls, fetchImpl: async (url, init) => {
+    calls.push({ url, init })
+    if (url.includes('/comments?')) return Response.json(f.comments)
+    if (url.endsWith('/issues/1752')) return Response.json(f.issue)
+    if (url.includes('api.github.com')) return Response.json({ ref: 'refs/heads/main', object: { sha: MAIN, type: 'commit' } })
+    assert.equal(init.headers.authorization, undefined)
+    return Response.json({ build: MAIN })
+  } }
+}
+
+test('window gate reads the current latest comment, exact owner, body digest and structured source before accepting', async () => {
+  const f = windowFetch()
+  const proof = await guardMain({ GITHUB_TOKEN: 'synthetic' }, f.fetchImpl, f.window, () => windowNow, 240000)
+  assert.equal(proof.windowCommentId, f.window.commentId); assert.equal(proof.windowExpiresAt, f.window.expiresAt)
+  assert.equal(proof.opsParentSha, f.window.opsParentSha)
+  assert.ok(f.calls[3].url.endsWith('/comments?per_page=1&page=7'))
+  assert.equal(f.calls[3].init.headers.authorization, 'Bearer synthetic')
+  assert.ok(f.calls[1].url.includes('?verify=1782-before-'))
+})
+for (const [name, change] of [
+  ['later owner or release comment', f => { f.comments = [{ ...f.comment, id: f.comment.id + 1 }] }],
+  ['comment body edited', f => { f.comment.body += ' released' }],
+  ['different actor', f => { f.comment.user.login = 'other' }],
+  ['wrong numeric actor', f => { f.comment.user.id = 1 }],
+  ['different issue', f => { f.comment.issue_url = f.comment.issue_url.replace('1752', '1503') }],
+  ['empty latest page', f => { f.comments = [] }],
+  ['invalid comment count', f => { f.issue.comments = 0 }],
+  ['different pinned main in marker', f => { f.comment.body = f.comment.body.replace(MAIN, 'f'.repeat(40)); f.window.commentBodySha256 = createHash('sha256').update(f.comment.body).digest('hex') }],
+  ['released state with valid body digest', f => { f.comment.body = f.comment.body.replace('active', 'released'); f.window.commentBodySha256 = createHash('sha256').update(f.comment.body).digest('hex') }],
+  ['duplicate marker with valid body digest', f => { f.comment.body += f.comment.body; f.window.commentBodySha256 = createHash('sha256').update(f.comment.body).digest('hex') }],
+]) test('actual account window refuses ' + name, async () => {
+  const f = windowFetch(change)
+  await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.fetchImpl, f.window, () => windowNow), error => error.code === 'window_changed')
+})
+
+test('unstarted, expired and insufficient-remaining windows refuse before network, credentials or sign-in', async () => {
+  const f = windowFetch()
+  for (const [at, minimum] of [[Date.parse(f.window.startsAt) - 1, 0], [Date.parse(f.window.expiresAt), 0],
+    [Date.parse(f.window.expiresAt) - 240000, 240000]])
+    await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.fetchImpl, f.window, () => at, minimum), error => error.code === 'window_expired')
+  assert.equal(f.calls.length, 0)
+})
+
+test('every unit and real PG fixture still runs before the account gate, while every secret is behind it', async () => {
+  const source = await readFile(new URL('../../.github/workflows/issue1782-domain-history-before.yml', import.meta.url), 'utf8')
+  const unit = source.indexOf('node --test scripts/ops/domain-history-before-1782.test.mjs')
+  const pg = source.indexOf('node --test scripts/ops/domain-history-before-1782.db.test.mjs')
+  const gate = source.indexOf('node scripts/ops/domain-history-before-1782.mjs check')
+  const secret = source.indexOf('uses: Infisical/secrets-action@')
+  assert.ok(unit > 0 && pg > unit && gate > pg && secret > gate)
+  assert.match(source, /      issues: read\n/); assert.match(source, /          fetch-depth: 2\n/)
+  assert.doesNotMatch(source, /continue-on-error|if: false/)
+  assert.equal((source.match(/secret-name:/g) ?? []).length, 3)
+  const driver = await readFile(new URL('./domain-history-before-1782.mjs', import.meta.url), 'utf8')
+  assert.ok(driver.indexOf('guardWindowContext(event,') < driver.indexOf('const { email, password } = smokeAcceptanceAccount(env)'))
+  assert.ok(driver.indexOf('    guardWindowScope(scope)') < driver.indexOf('    pool = new Pool('))
+  assert.equal((driver.match(/await guardMain\(env/g) ?? []).length, 3)
+  assert.doesNotMatch(driver, /import .*publication-preflight/)
+})
+
+
+test('a window expiring during actual source reads cannot pass on its earlier check timestamp', async () => {
+  const f = windowFetch(); let reads = 0
+  await assert.rejects(guardMain({ GITHUB_TOKEN: 'synthetic' }, f.fetchImpl, f.window,
+    () => ++reads === 1 ? windowNow : Date.parse(f.window.expiresAt)), error => error.code === 'window_expired')
+  assert.equal(f.calls.length, 4)
 })

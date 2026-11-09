@@ -58,7 +58,7 @@ jobs:
           import hashlib, json, os, pathlib, re, subprocess
           root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'history-pg17-1782'
           summaries = {}
-          for name, expected in [('unit', 159), ('before-pg17', 30), ('after-pg17', 31)]:
+          for name, expected in [('unit', 177), ('before-pg17', 30), ('after-pg17', 31)]:
               content = (root / (name + '.tap')).read_text()
               counts = {}
               for field in ['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo']:
@@ -68,7 +68,7 @@ jobs:
               assert counts == dict(tests=expected, **{'pass': expected}, fail=0, cancelled=0, skipped=0, todo=0), name
               summaries[name] = {**counts, 'sha256': hashlib.sha256(content.encode()).hexdigest()}
           paths = ['scripts/ops/domain-history-' + phase + '-1782' + suffix for phase in ['before', 'after'] for suffix in ['.mjs', '.test.mjs', '.db.test.mjs']]
-          paths += ['.github/workflows/issue1782-domain-history-after.yml', '.github/workflows/issue1782-history-pg17.yml']
+          paths += ['.github/workflows/issue1782-domain-history-before.yml', '.github/workflows/issue1782-domain-history-after.yml', '.github/workflows/issue1782-history-pg17.yml']
           sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
           assert sha == os.environ['GITHUB_SHA']
           receipt = {'version': 1, 'status': 'isolated_pg17_passed', 'source': sha,
