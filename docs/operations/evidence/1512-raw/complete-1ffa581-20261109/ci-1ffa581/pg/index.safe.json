@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "kind": "postgres-terminal-evidence-index",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "workflowRunId": 42580506632,
+  "runAttempt": 1,
+  "prHead": "1ffa581f16319381054e0636ae41e6292719a1fe",
+  "actualCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+  "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+  "suggestedPrefix": "ci-1ffa581/pg",
+  "files": [
+    {
+      "path": "ci-1ffa581/pg/pg-1.original.log",
+      "kind": "original-decoded-job-log",
+      "jobId": 129038242411,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "bytes": 613371,
+      "sha256": "ecf90bbd9950f6f540a4f0067226df376fdf8bcedc71499b47629346635be265",
+      "gitBlob": "11ed47d4af08acd8b4d16151989b96e00b594a72"
+    },
+    {
+      "path": "ci-1ffa581/pg/pg-2.original.log",
+      "kind": "original-decoded-job-log",
+      "jobId": 129038242432,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "bytes": 1160098,
+      "sha256": "7ac5ea7027f101cbba2f02c389af5f09c227fc017cd53cca0e9f1d9dc2bbc82e",
+      "gitBlob": "87b1d187357304da1dc04e055f19a53e34d19e68"
+    },
+    {
+      "path": "ci-1ffa581/pg/pg-3.original.log",
+      "kind": "original-decoded-job-log",
+      "jobId": 129038242373,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "bytes": 2285320,
+      "sha256": "4ff5cd41ee11de54a1f6ba96620c80e77d4679d43a8005b8577f08a4ac498106",
+      "gitBlob": "ff0a2e266efe8f2e21dc7448adad365dc34cf236"
+    },
+    {
+      "path": "ci-1ffa581/pg/pg-4.original.log",
+      "kind": "original-decoded-job-log",
+      "jobId": 129038242365,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "bytes": 625415,
+      "sha256": "ef62aec4da5b02ca02cb20e5d530abbc2e6db098e898a3368bf2189b043b288b",
+      "gitBlob": "e169a4bf763ec3bdda52a0ab91468bb3069b53e0"
+    },
+    {
+      "path": "ci-1ffa581/pg/pg-aggregate.original.log",
+      "kind": "original-decoded-job-log",
+      "jobId": 129040339987,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "bytes": 13304,
+      "sha256": "1090e3c94802eb51be6fa1bc41b45396b080672f0c1db5d59bacdd85602de726",
+      "gitBlob": "1479ea99b73f7ab664da7d5f29af68c4b0e8ebbe"
+    },
+    {
+      "path": "ci-1ffa581/pg/postgres-terminal-review.safe.json",
+      "kind": "safe-review-receipt",
+      "bytes": 182008,
+      "sha256": "3a28a6ef3ad207034c53ff4fbd1df3609876babd245596b94dbefac2e44bfe96",
+      "gitBlob": "723fe5fe7b06e12a115798f703f7ea9c8cc7f117"
+    },
+    {
+      "path": "ci-1ffa581/pg/privacy-review.safe.json",
+      "kind": "safe-review-receipt",
+      "bytes": 6676,
+      "sha256": "e187a2459ddd9aba9f4aabf5fa2b468155e28fb790f013c886d85586f7a27d0b",
+      "gitBlob": "8752c77e076a89ed99e04103d5aea35b2d69488b"
+    }
+  ],
+  "filesExcludingThisIndex": 7,
+  "bytesExcludingThisIndex": 4886192,
+  "sharedSelection": {
+    "jobId": 129037801896,
+    "owner": "root",
+    "originalReadByThisReviewer": false,
+    "providedFullSelectionSuites": 72,
+    "independentEvidence": "Each shard original repeats the complete DB_TEST_SELECTED inventory and one Required DB selection; all full inventories and selected/grouped/timed unions agree.",
+    "permanentSourceBinding": {
+      "checkpointCommit": "35f0d803cd50e7736281bab0ebe0120868042046",
+      "path": "docs/operations/evidence/1512-raw/union-main89-1ffa-20261109/source/ordinary-union-and-selection.safe.json",
+      "gitBlob": "5984eff70d86dc1ebbbed4c30c86f106047e710c",
+      "bytes": 9599,
+      "sha256": "84f4d63982a7e0583e602e0d61290eadb33a979be28bb41d3c091bf0cfbcc843",
+      "providedBy": "root after remote byte verification"
+    },
+    "permanentSelection": {
+      "checkpointCommit": "35f0d803cd50e7736281bab0ebe0120868042046",
+      "path": "docs/operations/evidence/1512-raw/union-main89-1ffa-20261109/ci/selection.full.json",
+      "gitBlob": "bfe9fb4de83e59aa6db0d4449172079853e07291",
+      "bytes": 123548,
+      "sha256": "cf658839d0a35ced0088f0dcc3c0b1ccb91423f041b3eb1f7ee83d1f9d46da32",
+      "providedBy": "root after remote byte verification; not re-downloaded by PG reviewer"
+    }
+  },
+  "verdict": {
+    "requiredPgSuites": 72,
+    "shards": 4,
+    "suitesEach": 18,
+    "nodeExecutionSummaries": 91,
+    "tests": 3789,
+    "pass": 3789,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "perShardTests": [
+      741,
+      796,
+      1635,
+      617
+    ],
+    "C32": [
+      16,
+      11,
+      5
+    ],
+    "AB13": 13,
+    "activity": 57,
+    "queryFence": {
+      "roundTrips": [
+        11,
+        6
+      ],
+      "explicitTransactions": [
+        2,
+        1
+      ],
+      "strictAssertionsPreserved": true
+    },
+    "aggregate": "success; DB aggregate/timings only",
+    "wholeCiGreen": false,
+    "rootOwnedImageFailureRemains": true
+  },
+  "readAccounting": {
+    "selectionOriginalReadByThisReviewer": 0,
+    "shardOriginalReads": 4,
+    "aggregateOriginalReads": 1,
+    "eachOwnedOriginalOnce": true,
+    "teamDuplicateReads": 0,
+    "downloadMode": "GitHub official decoded-log tool; no ZIP/artifact download",
+    "metadataBounded": true,
+    "noPollingNeeded": "all five assigned jobs already terminal on first metadata read"
+  },
+  "publicBoundary": "Only original already-public decoded job-log strings and safe review/count/source receipts. API envelopes and platform account metadata are private. One same-source synthetic email collision and six natural-language bearer-title hits are classified; all 23 credential-label values are masked; unresolved candidates0.",
+  "fidelity": "Original decoded UTF-8 including BOM and ANSI. No text normalization, redaction, compression, base64 archive, or ZIP byte-fidelity claim. GitHub create_blob response SHA independently equals computed Git blob for each file.",
+  "limitations": [
+    "Required PG success does not establish whole-CI success, Native acceptance, Replay/production/model evidence.",
+    "The aggregate display name Production build and browser interactions is not evidence of actual build/browser work.",
+    "Conditional workflow skips and missing-optional-artifact warnings are preserved separately from Node-test skip0.",
+    "Previous025 is used only for comparison: current secrets-db90 and groups92 explain +2; no old execution counted."
+  ],
+  "resources": {
+    "created": 0,
+    "running": 0,
+    "testsRerun": 0,
+    "productionOrModelCalls": 0,
+    "backgroundPolling": false,
+    "refsChanged": false
+  }
+}

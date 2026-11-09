@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "kind": "postgres-public-log-privacy-review",
+  "actualCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+  "method": "Pattern-assisted review of original public GitHub Actions decoded logs, then exact-value source classification. Matching sensitive-looking values are not copied into this receipt.",
+  "rawLogOrigin": "Original decoded GitHub job-log endpoint content; public platform masking retained. Original strings retain BOM/ANSI and are encoded UTF-8 without normalization.",
+  "patterns": [
+    "private-key-header",
+    "provider-token-shaped",
+    "aws-key-shaped",
+    "email-shaped",
+    "authorization-bearer-shaped",
+    "credential-url-shaped",
+    "signed-url-shaped",
+    "credential-label-assignment"
+  ],
+  "findings": [
+    {
+      "jobId": 129038242411,
+      "line": 4145,
+      "category": "email-shaped",
+      "matchSha256": "fdb0d7655db963926cc4efe3326475516ec97dcbd6959766918e03ff45edb225",
+      "length": 19,
+      "isPassingTitle": false,
+      "resolution": "Same-source deliberately colliding synthetic signup fixture; exact normalized value checked in RAM.",
+      "source": {
+        "verified": true,
+        "sourceCommit": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+        "testPath": "lib/abuse/store.db.test.ts",
+        "testLines": [
+          386,
+          390
+        ],
+        "testBlob": "04792f1c02a965cabff134f30f938d14c97d62aa",
+        "normalizerPath": "drizzle/20261030230000_hosted_usage.sql",
+        "normalizerLines": [
+          38,
+          39,
+          40
+        ],
+        "normalizerBlob": "41c55d332822f397f51a75eb95bdeafc2abc685a",
+        "matchSha256": "fdb0d7655db963926cc4efe3326475516ec97dcbd6959766918e03ff45edb225",
+        "rawValueOmitted": true
+      }
+    },
+    {
+      "jobId": 129038242432,
+      "line": 5819,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "isPassingTitle": false,
+      "resolution": "Natural-language static test-title phrase describing authentication; not an authorization header or credential.",
+      "source": {
+        "type": "test-title/context",
+        "meaning": "The matched word after bearer is the verb authenticates; six occurrences are two named tests and their streamed/replayed copies."
+      }
+    },
+    {
+      "jobId": 129038242432,
+      "line": 5934,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "isPassingTitle": false,
+      "resolution": "Natural-language static test-title phrase describing authentication; not an authorization header or credential.",
+      "source": {
+        "type": "test-title/context",
+        "meaning": "The matched word after bearer is the verb authenticates; six occurrences are two named tests and their streamed/replayed copies."
+      }
+    },
+    {
+      "jobId": 129038242432,
+      "line": 6025,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "isPassingTitle": false,
+      "resolution": "Natural-language static test-title phrase describing authentication; not an authorization header or credential.",
+      "source": {
+        "type": "test-title/context",
+        "meaning": "The matched word after bearer is the verb authenticates; six occurrences are two named tests and their streamed/replayed copies."
+      }
+    },
+    {
+      "jobId": 129038242432,
+      "line": 6085,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "isPassingTitle": true,
+      "resolution": "Natural-language static test-title phrase describing authentication; not an authorization header or credential.",
+      "source": {
+        "type": "test-title/context",
+        "meaning": "The matched word after bearer is the verb authenticates; six occurrences are two named tests and their streamed/replayed copies."
+      }
+    },
+    {
+      "jobId": 129038242373,
+      "line": 2338,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "isPassingTitle": false,
+      "resolution": "Natural-language static test-title phrase describing authentication; not an authorization header or credential.",
+      "source": {
+        "type": "test-title/context",
+        "meaning": "The matched word after bearer is the verb authenticates; six occurrences are two named tests and their streamed/replayed copies."
+      }
+    },
+    {
+      "jobId": 129038242373,
+      "line": 2799,
+      "category": "authorization-bearer-shaped",
+      "matchSha256": "dbfd05383b6278053cfa19411e7cc68ac3de0aa3cf2a6ba3f801c443ef2dd703",
+      "length": 20,
+      "isPassingTitle": true,
+      "resolution": "Natural-language static test-title phrase describing authentication; not an authorization header or credential.",
+      "source": {
+        "type": "test-title/context",
+        "meaning": "The matched word after bearer is the verb authenticates; six occurrences are two named tests and their streamed/replayed copies."
+      }
+    }
+  ],
+  "credentialLabelReview": {
+    "total": 23,
+    "allMasked": true,
+    "keys": [
+      {
+        "key": "BETTER_AUTH_SECRET",
+        "occurrences": 22
+      },
+      {
+        "key": "GITHUB_TOKEN",
+        "occurrences": 1
+      }
+    ],
+    "unmaskedValuesExported": false
+  },
+  "unresolvedCandidates": 0,
+  "publicDisposition": "All five original decoded log strings may be preserved without edits. No raw API envelopes, account metadata, temporary download URLs or unmasked real credentials are included.",
+  "limitations": "Automated patterns and source checks cannot prove universal absence of personal data. These are isolated CI fixtures, not production/business-data reads.",
+  "downloadAccounting": [
+    {
+      "jobId": 129038242411,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129038242432,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129038242373,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129038242365,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129040339987,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    }
+  ],
+  "resources": {
+    "created": 0,
+    "running": 0,
+    "externalModelsOrProductionReads": 0
+  }
+}

@@ -1,0 +1,364 @@
+{
+  "runId": 42580506632,
+  "metadataObservations": [
+    {
+      "sequence": 0,
+      "observedAt": "2026-11-09T07:41:51.000Z",
+      "jobs": 18,
+      "owned": []
+    },
+    {
+      "sequence": 1,
+      "observedAt": "2026-11-09T07:42:59.824Z",
+      "jobs": 18,
+      "owned": []
+    },
+    {
+      "sequence": 2,
+      "observedAt": "2026-11-09T07:43:55.732Z",
+      "jobs": 19,
+      "owned": []
+    },
+    {
+      "sequence": 3,
+      "observedAt": "2026-11-09T07:44:51.568Z",
+      "jobs": 20,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:49Z",
+          "completed_at": null,
+          "activeSteps": [],
+          "lastCompletedStep": null
+        }
+      ]
+    },
+    {
+      "sequence": 4,
+      "observedAt": "2026-11-09T07:45:47.473Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 4,
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020"
+            }
+          ],
+          "lastCompletedStep": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1"
+        }
+      ]
+    },
+    {
+      "sequence": 5,
+      "observedAt": "2026-11-09T07:46:43.389Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 6,
+              "name": "Run pnpm install --frozen-lockfile"
+            }
+          ],
+          "lastCompletedStep": "Run test \"$(uname -m)\" = arm64"
+        }
+      ]
+    },
+    {
+      "sequence": 6,
+      "observedAt": "2026-11-09T07:47:39.333Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 12,
+              "name": "Run pnpm migrate && pnpm test:e2e:setup"
+            }
+          ],
+          "lastCompletedStep": "Generate ephemeral test-only auth secret"
+        }
+      ]
+    },
+    {
+      "sequence": 7,
+      "observedAt": "2026-11-09T07:48:35.310Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 13,
+              "name": "Build the production API for the native ARM64 runtime"
+            }
+          ],
+          "lastCompletedStep": "Run pnpm migrate && pnpm test:e2e:setup"
+        }
+      ]
+    },
+    {
+      "sequence": 8,
+      "observedAt": "2026-11-09T07:49:31.283Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 13,
+              "name": "Build the production API for the native ARM64 runtime"
+            }
+          ],
+          "lastCompletedStep": "Run pnpm migrate && pnpm test:e2e:setup"
+        }
+      ]
+    },
+    {
+      "sequence": 9,
+      "observedAt": "2026-11-09T07:50:27.831Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 15,
+              "name": "Package an inspector-enabled harness input"
+            }
+          ],
+          "lastCompletedStep": "Select Xcode 26"
+        }
+      ]
+    },
+    {
+      "sequence": 10,
+      "observedAt": "2026-11-09T07:51:23.736Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 17,
+              "name": "Real packaged Apple Silicon native acceptance"
+            }
+          ],
+          "lastCompletedStep": "Real Keychain encryption across three independent packaged processes"
+        }
+      ]
+    },
+    {
+      "sequence": 11,
+      "observedAt": "2026-11-09T07:52:19.663Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 17,
+              "name": "Real packaged Apple Silicon native acceptance"
+            }
+          ],
+          "lastCompletedStep": "Real Keychain encryption across three independent packaged processes"
+        }
+      ]
+    },
+    {
+      "sequence": 12,
+      "observedAt": "2026-11-09T07:53:15.777Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 17,
+              "name": "Real packaged Apple Silicon native acceptance"
+            }
+          ],
+          "lastCompletedStep": "Real Keychain encryption across three independent packaged processes"
+        }
+      ]
+    },
+    {
+      "sequence": 13,
+      "observedAt": "2026-11-09T07:54:11.693Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 17,
+              "name": "Real packaged Apple Silicon native acceptance"
+            }
+          ],
+          "lastCompletedStep": "Real Keychain encryption across three independent packaged processes"
+        }
+      ]
+    },
+    {
+      "sequence": 14,
+      "observedAt": "2026-11-09T07:55:07.541Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 17,
+              "name": "Real packaged Apple Silicon native acceptance"
+            }
+          ],
+          "lastCompletedStep": "Real Keychain encryption across three independent packaged processes"
+        }
+      ]
+    },
+    {
+      "sequence": 15,
+      "observedAt": "2026-11-09T07:56:03.449Z",
+      "jobs": 21,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": null,
+          "activeSteps": [
+            {
+              "number": 17,
+              "name": "Real packaged Apple Silicon native acceptance"
+            }
+          ],
+          "lastCompletedStep": "Real Keychain encryption across three independent packaged processes"
+        }
+      ]
+    },
+    {
+      "sequence": 16,
+      "observedAt": "2026-11-09T07:56:59.450Z",
+      "jobs": 22,
+      "owned": [
+        {
+          "id": 129040252138,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T07:44:51Z",
+          "completed_at": "2026-11-09T07:56:45Z",
+          "activeSteps": [],
+          "lastCompletedStep": "Complete job"
+        },
+        {
+          "id": 129044355119,
+          "name": "UI policy (strict)",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-09T07:56:47Z",
+          "completed_at": "2026-11-09T07:56:56Z",
+          "activeSteps": [],
+          "lastCompletedStep": "Complete job"
+        }
+      ]
+    }
+  ],
+  "metadataMaximumMinutes": 40,
+  "ownedLogs": [
+    {
+      "jobId": 129040252138,
+      "kind": "native",
+      "fetches": 1
+    },
+    {
+      "jobId": 129044355119,
+      "kind": "ui-strict",
+      "fetches": 1
+    }
+  ],
+  "artifactListReads": 1,
+  "requiredArtifactDownloads": [
+    {
+      "artifactId": 13657811860,
+      "kind": "native",
+      "downloadCalls": 1,
+      "fileReferenceMaterializations": 1
+    },
+    {
+      "artifactId": 13657866747,
+      "kind": "package",
+      "downloadCalls": 1,
+      "fileReferenceMaterializations": 1
+    }
+  ],
+  "oldArtifactsDownloaded": 0,
+  "selectionOrOtherJobLogsRead": 0,
+  "nativeJobReruns": 0,
+  "sourceWrites": 0,
+  "refWrites": 0
+}

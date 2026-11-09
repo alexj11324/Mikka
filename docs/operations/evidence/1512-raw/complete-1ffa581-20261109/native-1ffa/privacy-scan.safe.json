@@ -1,0 +1,180 @@
+{
+  "noMatchedValuesPrinted": true,
+  "scope": "Public decoded payload and original log strings only; raw ZIPs/platform metadata/download references excluded",
+  "patterns": [
+    "private-key",
+    "github-token",
+    "provider-key",
+    "jwt",
+    "email",
+    "credential-url",
+    "authorization",
+    "signed-download-query"
+  ],
+  "files": [
+    {
+      "path": "arithmetic.safe.json",
+      "sha256": "97091c0533d2e425179d638eb72ee5571a677fe51171f8907a01e98cce5e0de2",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "budget-verdict.safe.json",
+      "sha256": "64021b03d015d21d698465e2867df7d4dae158387d6a8188a21158e36cf46bd5",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "cleanup-package.safe.json",
+      "sha256": "48609e8ae7be0bdc2e2600b039b37ca6446b58309b0b94bdecd9a167e01ae1f2",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "download-recovery.safe.json",
+      "sha256": "39c0f15c753178e97a128ec58a71f82451390491998db916c7ef0beaee6b45b8",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "first-read.safe.json",
+      "sha256": "8a1a2414836d0b166aaa48a063b506bd766ff98a91a0595b19d8e7de337d8dcc",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "logs-metadata.safe.json",
+      "sha256": "74f69b2575a52e79e5ec5bd1b4ca7cbc7f647ec69d3b2fcd01997983a3515690",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original/lifecycle.json",
+      "sha256": "ac7e3e6cd0d3ea9788a52e76ec20f486a8134b2c703b2c8607963d61b274b336",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original/mac-acceptance-package.json",
+      "sha256": "95cd9426af04766df4f3d4c9faa50c589acb39a8e4a97bb587c240386a121cef",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original/native-crypto.json",
+      "sha256": "afaa4f32cf9e9c198e7daa21f5f9fbe0ec27f0d7c41cbd10876f7fa80fb959b2",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original/parity.json",
+      "sha256": "28d330f86d9753400a76f3c17af34d0b21b33bebfcc68f60f349b2867700a3ba",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original/smoke.json",
+      "sha256": "3f08548c7954c0482b20af0a09b3dfe67f25477b2cb7f7a2e8b549f913761d32",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original-files-manifest.safe.json",
+      "sha256": "516f2220afac90e8ac618816f12c90004362ab439de2f210eddfba88a0467ae8",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "read-ledger.safe.json",
+      "sha256": "559852b81274a80e9f4f57fd691def73b344ac00fac07ed3c2d6bc21948bcb6d",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "rpc-diagnostics.safe.json",
+      "sha256": "68238b3b8237d55ef7056b8b434ed0774bab9f5c6a7636cd8312c59e4d2f1b5a",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "source-contract.safe.json",
+      "sha256": "a1e847c6efe32edbed01be314c268b6e7804a68bc73407f0b3a9b1bc4edd3923",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "terminal-jobs.safe.json",
+      "sha256": "d085a12d778047e1edcc99a45ad8daae00e78b25e2d282a2fb4cfd39bb1ec45c",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "ui-gate.safe.json",
+      "sha256": "30e2383b1a299d102d82e6c56a87bb070062f492f356af977ae95c517102ce66",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "verification-run.safe.json",
+      "sha256": "ebf20e29dd03cd7cdd8ebd618e854654260b3f2a7f1357abe70b9d83c62c5fa4",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "verify-artifact-download.py",
+      "sha256": "e1a5e5f099374637b340b0c5fb2dc5587a27241b7f8aec10d103c534d4285eea",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "verify-native-originals.py",
+      "sha256": "1970a2f893deb17ca9cbfec8ad3ae0e98e3a6d4d5b2021ca0750cac149b8c00a",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "worker-source.safe.json",
+      "sha256": "4b1891a8e51124c928b3783bd083d9bd8b29fe3e786d4b05ebbffb2cb76ac4ad",
+      "findings": [],
+      "unresolved": 0
+    }
+  ],
+  "additionalFiles": [
+    {
+      "path": "action-counts-vs-025.safe.json",
+      "findings": []
+    },
+    {
+      "path": "export-recovery.safe.json",
+      "findings": []
+    },
+    {
+      "path": "vm-cleanup.safe.json",
+      "findings": []
+    },
+    {
+      "path": "README.md",
+      "findings": []
+    },
+    {
+      "path": "first-pair-difference.safe.json",
+      "findings": []
+    }
+  ],
+  "logs": [
+    {
+      "path": "job-129040252138.original.log",
+      "sha256": "5a25528dc75fbb9f8e0906f2a2d68a7e50162db34eff25e4b195b13dfc8135b4",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "job-129044355119.original.log",
+      "sha256": "776ae504afe06cd248f3f961055556d6713062bb64db23729e89d50834f10609",
+      "findings": [],
+      "unresolved": 0
+    }
+  ],
+  "unresolved": 0,
+  "limit": "Pattern screening is an explicit publication review aid, not proof of absence of every possible private value."
+}

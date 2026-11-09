@@ -1,0 +1,1172 @@
+{
+  "version": 1,
+  "kind": "read-only first-pair source and query mapping",
+  "observedAtUTC": "2026-11-09T08:09:59.831Z",
+  "source": {
+    "head": "1ffa581f16319381054e0636ae41e6292719a1fe",
+    "actualCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "actualTree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+    "ciRunId": 42580506632
+  },
+  "inputs": [
+    {
+      "kind": "original-lifecycle",
+      "blob": "ab391175191106f0fa09c4de83856060327fb79d",
+      "bytes": 675268,
+      "sha256": "ac7e3e6cd0d3ea9788a52e76ec20f486a8134b2c703b2c8607963d61b274b336"
+    },
+    {
+      "kind": "owner-first-pair-safe",
+      "blob": "257f7cbba70b300b3ce6a46960beb617b0cea56e",
+      "bytes": 79041,
+      "sha256": "a21ab23cc7a4eafb994d08abd80709a950b9173fdc0df40f8d640c5dce98e630"
+    }
+  ],
+  "measurement": {
+    "originalPair": 1,
+    "nativeWindow": {
+      "start": "2026-11-09T07:55:52.401Z",
+      "end": "2026-11-09T07:55:53.991Z",
+      "durationMs": 1590,
+      "queryCalls": 183
+    },
+    "hostedWindow": {
+      "start": "2026-11-09T07:55:54.625Z",
+      "end": "2026-11-09T07:55:56.550Z",
+      "durationMs": 1925,
+      "queryCalls": 139
+    },
+    "difference": 44,
+    "firstPairPassed": false,
+    "sourceContract": "lifecycle.mjs 381 begin before launch; 384 original usable; 386 original complete checkpoint; no added wait or removed background",
+    "unchanged": true
+  },
+  "sqlConservation": {
+    "nativeKnownContexts": 130,
+    "nativeUnknownContexts": 53,
+    "hostedKnownContexts": 102,
+    "hostedUnknownContexts": 37,
+    "knownContextDifference": 28,
+    "unknownContextDifference": 16,
+    "sixActionsNative": 71,
+    "sixActionsHosted": 43,
+    "sixActionNetDifference": 28,
+    "sixNativeFirstCalls": 34,
+    "sixNativeSecondCalls": 37,
+    "sixFirstCallsVersusHostedDifference": -9,
+    "unknownContextDeltaScopeCounts": {
+      "/api/conversations": 5,
+      "/api/approved-writes": 10,
+      "/api/pending-actions": 1
+    },
+    "scopeCountsAreNotHttpInvocationAttribution": true,
+    "deviceV1ScopeQueries": {
+      "native": 0,
+      "hosted": 0
+    },
+    "enrollmentScopeQueries": {
+      "native": 2,
+      "hosted": 2
+    }
+  },
+  "batches": [
+    {
+      "httpInvocationId": "a85fafa6-7f1f-44be-a1c1-2b277b6ea6cf",
+      "startedAt": "2026-11-09T07:55:53.680Z",
+      "completedAt": "2026-11-09T07:55:53.805Z",
+      "rpcItemCount": 9,
+      "contextIndices": [
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187
+      ]
+    },
+    {
+      "httpInvocationId": "cca25906-6f93-4277-95a6-07b9ad3ccdf0",
+      "startedAt": "2026-11-09T07:55:53.824Z",
+      "completedAt": "2026-11-09T07:55:53.829Z",
+      "rpcItemCount": 2,
+      "contextIndices": [
+        190,
+        191
+      ]
+    },
+    {
+      "httpInvocationId": "00808da0-4303-47a1-b04c-1df2f0b91b19",
+      "startedAt": "2026-11-09T07:55:53.838Z",
+      "completedAt": "2026-11-09T07:55:53.863Z",
+      "rpcItemCount": 3,
+      "contextIndices": [
+        192,
+        193,
+        194
+      ]
+    }
+  ],
+  "actionMap": [
+    {
+      "action": "bots.pollBots",
+      "inputContract": "zero arguments",
+      "actualArgumentValuesRecorded": false,
+      "actualArgumentEquality": "not_observed",
+      "startup-bundled": [
+        {
+          "contextIndex": 180,
+          "httpInvocationId": "a85fafa6-7f1f-44be-a1c1-2b277b6ea6cf",
+          "invocationId": "80c364f4-c266-412a-975b-86e471f7eb3f",
+          "startedAt": "2026-11-09T07:55:53.709Z",
+          "completedAt": "2026-11-09T07:55:53.719Z",
+          "httpStatus": 200,
+          "queryCount": 2,
+          "queryOrdinals": [
+            28096,
+            28103
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28096,
+              "status": "known",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28103,
+              "status": "known",
+              "normalizedStructureId": "4c80688f4aac",
+              "command": "SELECT",
+              "parameterCount": 4
+            }
+          ],
+          "unknownStatementCount": 0
+        },
+        {
+          "contextIndex": 195,
+          "httpInvocationId": "e2224a07-a4cc-4a7b-a1ed-1f399a016df6",
+          "invocationId": "e2224a07-a4cc-4a7b-a1ed-1f399a016df6",
+          "startedAt": "2026-11-09T07:55:53.924Z",
+          "completedAt": "2026-11-09T07:55:53.927Z",
+          "httpStatus": 200,
+          "queryCount": 2,
+          "queryOrdinals": [
+            28224,
+            28225
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28224,
+              "status": "known",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28225,
+              "status": "known",
+              "normalizedStructureId": "4c80688f4aac",
+              "command": "SELECT",
+              "parameterCount": 4
+            }
+          ],
+          "unknownStatementCount": 0
+        }
+      ],
+      "startup-hosted": [
+        {
+          "contextIndex": 211,
+          "httpInvocationId": "d18dcb18-b8ae-4ed4-b5fb-fed7a5a26057",
+          "invocationId": "d18dcb18-b8ae-4ed4-b5fb-fed7a5a26057",
+          "startedAt": "2026-11-09T07:55:56.216Z",
+          "completedAt": "2026-11-09T07:55:56.227Z",
+          "httpStatus": 200,
+          "queryCount": 2,
+          "queryOrdinals": [
+            28293,
+            28294
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28293,
+              "status": "known",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28294,
+              "status": "known",
+              "normalizedStructureId": "4c80688f4aac",
+              "command": "SELECT",
+              "parameterCount": 4
+            }
+          ],
+          "unknownStatementCount": 0
+        }
+      ]
+    },
+    {
+      "action": "coordinator.pollBotChatSummaries",
+      "inputContract": "zero arguments",
+      "actualArgumentValuesRecorded": false,
+      "actualArgumentEquality": "not_observed",
+      "startup-bundled": [
+        {
+          "contextIndex": 186,
+          "httpInvocationId": "a85fafa6-7f1f-44be-a1c1-2b277b6ea6cf",
+          "invocationId": "efd2e211-d6e1-41e4-ac05-5bce61ba1bc5",
+          "startedAt": "2026-11-09T07:55:53.708Z",
+          "completedAt": "2026-11-09T07:55:53.742Z",
+          "httpStatus": 200,
+          "queryCount": 3,
+          "queryOrdinals": [
+            28110,
+            28116,
+            28120
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28116,
+              "status": "known",
+              "normalizedStructureId": "c6b2c2d19748",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28120,
+              "status": "known",
+              "normalizedStructureId": "88fee9a39995",
+              "command": "SELECT",
+              "parameterCount": 1
+            }
+          ],
+          "unknownStatementCount": 1
+        },
+        {
+          "contextIndex": 194,
+          "httpInvocationId": "00808da0-4303-47a1-b04c-1df2f0b91b19",
+          "invocationId": "1df89b0d-87f2-483a-80eb-070ca48675de",
+          "startedAt": "2026-11-09T07:55:53.840Z",
+          "completedAt": "2026-11-09T07:55:53.846Z",
+          "httpStatus": 200,
+          "queryCount": 3,
+          "queryOrdinals": [
+            28195,
+            28198,
+            28200
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28198,
+              "status": "known",
+              "normalizedStructureId": "c6b2c2d19748",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28200,
+              "status": "known",
+              "normalizedStructureId": "88fee9a39995",
+              "command": "SELECT",
+              "parameterCount": 1
+            }
+          ],
+          "unknownStatementCount": 1
+        }
+      ],
+      "startup-hosted": [
+        {
+          "contextIndex": 209,
+          "httpInvocationId": "dbad780a-8d02-4786-90bc-f251085bbdce",
+          "invocationId": "dbad780a-8d02-4786-90bc-f251085bbdce",
+          "startedAt": "2026-11-09T07:55:56.201Z",
+          "completedAt": "2026-11-09T07:55:56.211Z",
+          "httpStatus": 200,
+          "queryCount": 5,
+          "queryOrdinals": [
+            28284,
+            28286,
+            28288,
+            28289,
+            28290
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28286,
+              "status": "known",
+              "normalizedStructureId": "9f0fe8477a06",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28289,
+              "status": "known",
+              "normalizedStructureId": "c6b2c2d19748",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28290,
+              "status": "known",
+              "normalizedStructureId": "88fee9a39995",
+              "command": "SELECT",
+              "parameterCount": 1
+            }
+          ],
+          "unknownStatementCount": 2
+        }
+      ]
+    },
+    {
+      "action": "coordinator.syncCoordinatorChat",
+      "inputContract": "optional botId, known version, bounded continuation",
+      "actualArgumentValuesRecorded": false,
+      "actualArgumentEquality": "not_observed",
+      "startup-bundled": [
+        {
+          "contextIndex": 184,
+          "httpInvocationId": "a85fafa6-7f1f-44be-a1c1-2b277b6ea6cf",
+          "invocationId": "9ddab839-1191-4619-bd28-89cab644d972",
+          "startedAt": "2026-11-09T07:55:53.709Z",
+          "completedAt": "2026-11-09T07:55:53.804Z",
+          "httpStatus": 200,
+          "queryCount": 21,
+          "queryOrdinals": [
+            28102,
+            28106,
+            28114,
+            28122,
+            28125,
+            28130,
+            28133,
+            28136,
+            28139,
+            28143,
+            28146,
+            28148,
+            28150,
+            28153,
+            28158,
+            28166,
+            28169,
+            28173,
+            28176,
+            28178,
+            28185
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28102,
+              "status": "known",
+              "normalizedStructureId": "6f38736a0170",
+              "command": "SELECT",
+              "parameterCount": 3
+            },
+            {
+              "queryOrdinal": 28106,
+              "status": "known",
+              "normalizedStructureId": "66cde7eead86",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28114,
+              "status": "known",
+              "normalizedStructureId": "a130e5d92ffc",
+              "command": "SELECT",
+              "parameterCount": 4
+            },
+            {
+              "queryOrdinal": 28122,
+              "status": "known",
+              "normalizedStructureId": "23d0664babd6",
+              "command": "SELECT",
+              "parameterCount": 3
+            },
+            {
+              "queryOrdinal": 28125,
+              "status": "known",
+              "normalizedStructureId": "b27c6e931d1b",
+              "command": "SELECT",
+              "parameterCount": 3
+            },
+            {
+              "queryOrdinal": 28130,
+              "status": "known",
+              "normalizedStructureId": "82919a1d33a6",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28143,
+              "status": "known",
+              "normalizedStructureId": "cfc5423a080d",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28148,
+              "status": "known",
+              "normalizedStructureId": "a6d8d51b1b0b",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28150,
+              "status": "known",
+              "normalizedStructureId": "1365a978dee8",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28166,
+              "status": "known",
+              "normalizedStructureId": "9f0fe8477a06",
+              "command": "SELECT",
+              "parameterCount": 2
+            }
+          ],
+          "unknownStatementCount": 11
+        },
+        {
+          "contextIndex": 193,
+          "httpInvocationId": "00808da0-4303-47a1-b04c-1df2f0b91b19",
+          "invocationId": "f2638606-925e-4456-82c8-15776107926f",
+          "startedAt": "2026-11-09T07:55:53.840Z",
+          "completedAt": "2026-11-09T07:55:53.863Z",
+          "httpStatus": 200,
+          "queryCount": 22,
+          "queryOrdinals": [
+            28191,
+            28193,
+            28197,
+            28199,
+            28201,
+            28202,
+            28203,
+            28204,
+            28205,
+            28206,
+            28207,
+            28208,
+            28209,
+            28210,
+            28211,
+            28212,
+            28213,
+            28214,
+            28215,
+            28216,
+            28217,
+            28218
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28191,
+              "status": "known",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28193,
+              "status": "known",
+              "normalizedStructureId": "6f38736a0170",
+              "command": "SELECT",
+              "parameterCount": 3
+            },
+            {
+              "queryOrdinal": 28197,
+              "status": "known",
+              "normalizedStructureId": "66cde7eead86",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28199,
+              "status": "known",
+              "normalizedStructureId": "a130e5d92ffc",
+              "command": "SELECT",
+              "parameterCount": 4
+            },
+            {
+              "queryOrdinal": 28201,
+              "status": "known",
+              "normalizedStructureId": "23d0664babd6",
+              "command": "SELECT",
+              "parameterCount": 3
+            },
+            {
+              "queryOrdinal": 28202,
+              "status": "known",
+              "normalizedStructureId": "b27c6e931d1b",
+              "command": "SELECT",
+              "parameterCount": 3
+            },
+            {
+              "queryOrdinal": 28203,
+              "status": "known",
+              "normalizedStructureId": "82919a1d33a6",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28207,
+              "status": "known",
+              "normalizedStructureId": "cfc5423a080d",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28209,
+              "status": "known",
+              "normalizedStructureId": "a6d8d51b1b0b",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28210,
+              "status": "known",
+              "normalizedStructureId": "1365a978dee8",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28213,
+              "status": "known",
+              "normalizedStructureId": "9f0fe8477a06",
+              "command": "SELECT",
+              "parameterCount": 2
+            }
+          ],
+          "unknownStatementCount": 11
+        }
+      ],
+      "startup-hosted": [
+        {
+          "contextIndex": 213,
+          "httpInvocationId": "d847e62c-3cae-46f2-8a81-f8d0f146c30c",
+          "invocationId": "d847e62c-3cae-46f2-8a81-f8d0f146c30c",
+          "startedAt": "2026-11-09T07:55:56.226Z",
+          "completedAt": "2026-11-09T07:55:56.272Z",
+          "httpStatus": 200,
+          "queryCount": 24,
+          "queryOrdinals": [
+            28296,
+            28298,
+            28302,
+            28305,
+            28309,
+            28315,
+            28318,
+            28322,
+            28327,
+            28328,
+            28331,
+            28333,
+            28334,
+            28336,
+            28337,
+            28339,
+            28341,
+            28343,
+            28345,
+            28347,
+            28350,
+            28352,
+            28354,
+            28355
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28296,
+              "status": "known",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28298,
+              "status": "known",
+              "normalizedStructureId": "6f38736a0170",
+              "command": "SELECT",
+              "parameterCount": 3
+            },
+            {
+              "queryOrdinal": 28302,
+              "status": "known",
+              "normalizedStructureId": "66cde7eead86",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28305,
+              "status": "known",
+              "normalizedStructureId": "a130e5d92ffc",
+              "command": "SELECT",
+              "parameterCount": 4
+            },
+            {
+              "queryOrdinal": 28309,
+              "status": "known",
+              "normalizedStructureId": "23d0664babd6",
+              "command": "SELECT",
+              "parameterCount": 3
+            },
+            {
+              "queryOrdinal": 28315,
+              "status": "known",
+              "normalizedStructureId": "b27c6e931d1b",
+              "command": "SELECT",
+              "parameterCount": 3
+            },
+            {
+              "queryOrdinal": 28318,
+              "status": "known",
+              "normalizedStructureId": "82919a1d33a6",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28331,
+              "status": "known",
+              "normalizedStructureId": "82919a1d33a6",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28333,
+              "status": "known",
+              "normalizedStructureId": "cfc5423a080d",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28336,
+              "status": "known",
+              "normalizedStructureId": "a6d8d51b1b0b",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28337,
+              "status": "known",
+              "normalizedStructureId": "1365a978dee8",
+              "command": "SELECT",
+              "parameterCount": 1
+            },
+            {
+              "queryOrdinal": 28345,
+              "status": "known",
+              "normalizedStructureId": "9f0fe8477a06",
+              "command": "SELECT",
+              "parameterCount": 2
+            }
+          ],
+          "unknownStatementCount": 12
+        }
+      ]
+    },
+    {
+      "action": "issues.syncIssueList",
+      "inputContract": "optional known version and list positions",
+      "actualArgumentValuesRecorded": false,
+      "actualArgumentEquality": "not_observed",
+      "startup-bundled": [
+        {
+          "contextIndex": 187,
+          "httpInvocationId": "a85fafa6-7f1f-44be-a1c1-2b277b6ea6cf",
+          "invocationId": "67c816cb-e602-4545-9cf2-816506ea5af4",
+          "startedAt": "2026-11-09T07:55:53.709Z",
+          "completedAt": "2026-11-09T07:55:53.758Z",
+          "httpStatus": 200,
+          "queryCount": 6,
+          "queryOrdinals": [
+            28111,
+            28117,
+            28121,
+            28126,
+            28131,
+            28137
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28111,
+              "status": "known",
+              "normalizedStructureId": "3a287aa80050",
+              "command": "SELECT",
+              "parameterCount": 2
+            }
+          ],
+          "unknownStatementCount": 5
+        },
+        {
+          "contextIndex": 196,
+          "httpInvocationId": "cd35ab58-6c7c-4898-950e-c7f9a2183d28",
+          "invocationId": "cd35ab58-6c7c-4898-950e-c7f9a2183d28",
+          "startedAt": "2026-11-09T07:55:53.954Z",
+          "completedAt": "2026-11-09T07:55:53.967Z",
+          "httpStatus": 200,
+          "queryCount": 7,
+          "queryOrdinals": [
+            28226,
+            28227,
+            28228,
+            28229,
+            28230,
+            28231,
+            28232
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28226,
+              "status": "known",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28228,
+              "status": "known",
+              "normalizedStructureId": "9f0fe8477a06",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28229,
+              "status": "known",
+              "normalizedStructureId": "3a287aa80050",
+              "command": "SELECT",
+              "parameterCount": 2
+            }
+          ],
+          "unknownStatementCount": 4
+        }
+      ],
+      "startup-hosted": [
+        {
+          "contextIndex": 214,
+          "httpInvocationId": "61cf6f93-b41e-4cf9-97c0-8fb060937575",
+          "invocationId": "61cf6f93-b41e-4cf9-97c0-8fb060937575",
+          "startedAt": "2026-11-09T07:55:56.232Z",
+          "completedAt": "2026-11-09T07:55:56.256Z",
+          "httpStatus": 200,
+          "queryCount": 9,
+          "queryOrdinals": [
+            28299,
+            28301,
+            28304,
+            28308,
+            28314,
+            28317,
+            28320,
+            28324,
+            28330
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28299,
+              "status": "known",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28304,
+              "status": "known",
+              "normalizedStructureId": "9f0fe8477a06",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28308,
+              "status": "known",
+              "normalizedStructureId": "3a287aa80050",
+              "command": "SELECT",
+              "parameterCount": 2
+            }
+          ],
+          "unknownStatementCount": 6
+        }
+      ]
+    },
+    {
+      "action": "team-relations.listProjectTeams",
+      "inputContract": "zero arguments",
+      "actualArgumentValuesRecorded": false,
+      "actualArgumentEquality": "not_observed",
+      "startup-bundled": [
+        {
+          "contextIndex": 179,
+          "httpInvocationId": "a85fafa6-7f1f-44be-a1c1-2b277b6ea6cf",
+          "invocationId": "9c71d08e-412f-4668-b174-f4adaa649b31",
+          "startedAt": "2026-11-09T07:55:53.708Z",
+          "completedAt": "2026-11-09T07:55:53.715Z",
+          "httpStatus": 200,
+          "queryCount": 1,
+          "queryOrdinals": [
+            28095
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28095,
+              "status": "known",
+              "normalizedStructureId": "fcb49b74a39e",
+              "command": "SELECT",
+              "parameterCount": 4
+            }
+          ],
+          "unknownStatementCount": 0
+        },
+        {
+          "contextIndex": 190,
+          "httpInvocationId": "cca25906-6f93-4277-95a6-07b9ad3ccdf0",
+          "invocationId": "f9767435-0f7b-4f03-8165-b64b9d4b9116",
+          "startedAt": "2026-11-09T07:55:53.826Z",
+          "completedAt": "2026-11-09T07:55:53.828Z",
+          "httpStatus": 200,
+          "queryCount": 1,
+          "queryOrdinals": [
+            28187
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28187,
+              "status": "known",
+              "normalizedStructureId": "fcb49b74a39e",
+              "command": "SELECT",
+              "parameterCount": 4
+            }
+          ],
+          "unknownStatementCount": 0
+        }
+      ],
+      "startup-hosted": [
+        {
+          "contextIndex": 207,
+          "httpInvocationId": "48ab2a1c-21de-4719-b99d-fa5caf4de545",
+          "invocationId": "48ab2a1c-21de-4719-b99d-fa5caf4de545",
+          "startedAt": "2026-11-09T07:55:56.175Z",
+          "completedAt": "2026-11-09T07:55:56.198Z",
+          "httpStatus": 200,
+          "queryCount": 1,
+          "queryOrdinals": [
+            28282
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28282,
+              "status": "known",
+              "normalizedStructureId": "fcb49b74a39e",
+              "command": "SELECT",
+              "parameterCount": 4
+            }
+          ],
+          "unknownStatementCount": 0
+        }
+      ]
+    },
+    {
+      "action": "teams.listTeams",
+      "inputContract": "zero arguments",
+      "actualArgumentValuesRecorded": false,
+      "actualArgumentEquality": "not_observed",
+      "startup-bundled": [
+        {
+          "contextIndex": 182,
+          "httpInvocationId": "a85fafa6-7f1f-44be-a1c1-2b277b6ea6cf",
+          "invocationId": "64a8e6f1-8707-41a1-bee7-2f8e8a69500c",
+          "startedAt": "2026-11-09T07:55:53.708Z",
+          "completedAt": "2026-11-09T07:55:53.719Z",
+          "httpStatus": 200,
+          "queryCount": 1,
+          "queryOrdinals": [
+            28100
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28100,
+              "status": "known",
+              "normalizedStructureId": "ca5780bf570b",
+              "command": "SELECT",
+              "parameterCount": 4
+            }
+          ],
+          "unknownStatementCount": 0
+        },
+        {
+          "contextIndex": 191,
+          "httpInvocationId": "cca25906-6f93-4277-95a6-07b9ad3ccdf0",
+          "invocationId": "6b45a3a0-74e2-47c2-a002-846891ed8e52",
+          "startedAt": "2026-11-09T07:55:53.826Z",
+          "completedAt": "2026-11-09T07:55:53.829Z",
+          "httpStatus": 200,
+          "queryCount": 2,
+          "queryOrdinals": [
+            28188,
+            28189
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28188,
+              "status": "known",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28189,
+              "status": "known",
+              "normalizedStructureId": "ca5780bf570b",
+              "command": "SELECT",
+              "parameterCount": 4
+            }
+          ],
+          "unknownStatementCount": 0
+        }
+      ],
+      "startup-hosted": [
+        {
+          "contextIndex": 206,
+          "httpInvocationId": "8d88c6ea-e0ee-462a-8a09-5dd34d646fb0",
+          "invocationId": "8d88c6ea-e0ee-462a-8a09-5dd34d646fb0",
+          "startedAt": "2026-11-09T07:55:56.131Z",
+          "completedAt": "2026-11-09T07:55:56.176Z",
+          "httpStatus": 200,
+          "queryCount": 2,
+          "queryOrdinals": [
+            28280,
+            28281
+          ],
+          "knownStatementStructures": [
+            {
+              "queryOrdinal": 28280,
+              "status": "known",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "command": "SELECT",
+              "parameterCount": 2
+            },
+            {
+              "queryOrdinal": 28281,
+              "status": "known",
+              "normalizedStructureId": "ca5780bf570b",
+              "command": "SELECT",
+              "parameterCount": 4
+            }
+          ],
+          "unknownStatementCount": 0
+        }
+      ]
+    }
+  ],
+  "sourceContracts": [
+    {
+      "path": "app/actions/bots.ts",
+      "lines": "28–43",
+      "contract": "fresh authenticated user + selected workspace context, then actual owner/workspace bot list; no client parameters"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "lines": "112–148",
+      "contract": "own bot authorization, current model availability, before-data live revisions, version state, validated optional cursor; conditional full/tail data + citation/artifact access refresh. Existing singleFlight shares only after each current authorization/version observation"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "lines": "209–217",
+      "contract": "owner-wide summaries; before-data owner-home revision; actual snapshot; no parameters"
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "lines": "81–90,103–167",
+      "contract": "optional known/positions; fresh selected workspace and team scopes before version/visibility; unchanged branch returns after fresh checks"
+    },
+    {
+      "path": "app/actions/teams.ts",
+      "lines": "35–37",
+      "contract": "selected workspace context then accessible teams; no parameters"
+    },
+    {
+      "path": "app/actions/team-relations.ts",
+      "lines": "55–58",
+      "contract": "fresh user then accessible projects and their links; no parameters"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "lines": "18–48",
+      "contract": "prepare+validate all closed actions, Promise.all exact action calls, finally-limited batch memo, no extra logical invocation loop"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "contract": "existing per-batch owner/revision/policy reuse; workspace/owner key checks and read-before-data prefetch; active=false cleanup; background policy paths fresh"
+    }
+  ],
+  "conclusion": {
+    "rootCauseStatus": "client second-read trigger still under independent root investigation",
+    "selectedHighCostPath": "coordinator.syncCoordinatorChat context 193: 22 SQL, after first context 184: 21 SQL",
+    "knownStructures": "Each Native chat invocation contains each recorded known structure once; the second has the same ten known structures plus one selected-workspace structure. Unknown statement shapes remain unknown.",
+    "notEstablished": [
+      "actual request argument equality",
+      "the second reads are redundant under the real live subscription lifecycle",
+      "all 37 second-call SQL can safely be removed",
+      "all 44 excess SQL are resolved"
+    ],
+    "noServerPatchProposed": true,
+    "reason": "The measured batching already saves queries for first calls. Source does not justify cross-request authorization/policy caching or discarding current live observations."
+  },
+  "limitations": [
+    "Literal-free statement structure IDs do not prove parameter equality and are not production raw-text statement IDs.",
+    "Four schemas require zero arguments, but authenticated scope and selected workspace values are intentionally absent from diagnostics.",
+    "Existing counters preserve all original-window SQL, including unknown context and background; no duration adjustment, boundary change, test-mode shortcut, threshold change or rerun."
+  ],
+  "sourceBindings": [
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "blob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+      "bytes": 33181,
+      "sha256": "45a0f56985f256f5f392ad015e0c4442a784e1b9ff1ebd8703829ecc61152a77",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/apps/desktop/test/lifecycle.mjs"
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.cjs",
+      "blob": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+      "bytes": 18406,
+      "sha256": "763d180bfc0d0a62e67a99624a4815eeca953bbcb7290193a5515bb67e24ccad",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/apps/desktop/test/db-query-diagnostics.cjs"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "blob": "528365a2f6735a12fa514f6088bf81446c813ec7",
+      "bytes": 3099,
+      "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/lib/desktop-rpc/read-batch.ts"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "blob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+      "bytes": 6263,
+      "sha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/lib/desktop-rpc/read-batch-context.ts"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "blob": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b",
+      "bytes": 1637,
+      "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/lib/desktop-rpc/read-batch-contract.ts"
+    },
+    {
+      "path": "lib/desktop-rpc/schemas.ts",
+      "blob": "cdf2e74781d8f3f9fe89f059865b65bb12803f51",
+      "bytes": 21164,
+      "sha256": "f2683f698c9852c82a70aa9a4f4ecbfd8629b7231ce541fcb7c642bf882d443f",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/lib/desktop-rpc/schemas.ts"
+    },
+    {
+      "path": "app/actions/bots.ts",
+      "blob": "31669b225519bb59eb12df87134b18fd1ac5b24d",
+      "bytes": 4487,
+      "sha256": "41e0a4ade7d04d478c67d118ca9f48507f588db1e6d8dd7ca67590ff98011557",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/app/actions/bots.ts"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "blob": "3cde11bdaab0164d179d51f37efdf1d77ec7e938",
+      "bytes": 23196,
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/app/actions/coordinator.ts"
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "blob": "6cefb0dc6e6e895fabad5b8348c7b6de6eba5556",
+      "bytes": 27134,
+      "sha256": "610a5e47fb5115723e44c229fdb4f5b49135bed51b5dc8fb11032a924ebbf399",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/app/actions/issues.ts"
+    },
+    {
+      "path": "app/actions/teams.ts",
+      "blob": "7061770c808167b27dfef76746721045bd04c25b",
+      "bytes": 9147,
+      "sha256": "447529822f093e0cc19ab04f4f3a82107289f8aeb7e2da85fd679b5f6f117e9b",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/app/actions/teams.ts"
+    },
+    {
+      "path": "app/actions/team-relations.ts",
+      "blob": "a5937e7121cf5f996ab699ea27d7ef4074e20484",
+      "bytes": 8008,
+      "sha256": "a88696e7e83e8a5fae31ef9e9f0f552046129ac9730f47e4320073ba058afc98",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/app/actions/team-relations.ts"
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "blob": "561752eef3ab1d5a439d39d61be8da7a41ed0a45",
+      "bytes": 21237,
+      "sha256": "fa1ae6aaf4f8271bb620e97d90ed425a9727026d8861675d67dab2930fccb238",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/lib/coordinator/coordinator-bot.ts"
+    },
+    {
+      "path": "lib/coordinator/store.ts",
+      "blob": "0198839eeb0ebb522b22a790f08c65b35550584c",
+      "bytes": 74347,
+      "sha256": "cb977de26084965e6860eac8821d11a68a34038ec4379cca679c776cc3c7a641",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/lib/coordinator/store.ts"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "blob": "a5c563dcd1e70e7c48749b76924a54da2d1a3982",
+      "bytes": 7976,
+      "sha256": "db5f3de381689ec358c5862c6f3d0b06823d40ade368791e85006005ea8545cd",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/lib/workspace-access.ts"
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "blob": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+      "bytes": 8694,
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/lib/personal-policy.ts"
+    },
+    {
+      "path": "lib/device-management.ts",
+      "blob": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+      "bytes": 3206,
+      "sha256": "17fb62c6033acded70487b56e09f989410b782d4afaaa0445988442b5f5754b1",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/lib/device-management.ts"
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "blob": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+      "bytes": 1050,
+      "sha256": "59a025174235a9bbb5a17aa5c654a96d52deb002bb72859ae655af0322b0fede",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/lib/device-enrollment.ts"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "blob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "bytes": 1305,
+      "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/app/v1/devices/[deviceId]/runs/route.ts"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "blob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "bytes": 1983,
+      "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+      "url": "https://github.com/alexj11324/Mikka/blob/c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0/app/v1/devices/[deviceId]/repos/route.ts"
+    }
+  ],
+  "actionsPerformed": {
+    "sourceReads": true,
+    "existingGitEvidenceReads": true,
+    "tests": 0,
+    "ciLogDownloads": 0,
+    "productionQueries": 0,
+    "modelCalls": 0,
+    "resourcesCreated": 0,
+    "sourceChanges": 0,
+    "refChanges": 0
+  }
+}

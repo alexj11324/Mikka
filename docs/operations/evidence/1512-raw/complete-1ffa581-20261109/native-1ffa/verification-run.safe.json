@@ -1,0 +1,79 @@
+{
+  "integrityAndConservationVerified": true,
+  "summary": {
+    "verified": true,
+    "totals": {
+      "webLogin": 412,
+      "nativeLogin": 394,
+      "startup-bundled": 183,
+      "startup-hosted": 139
+    },
+    "records": 24,
+    "checkpoints": 12,
+    "buckets": [
+      17,
+      78
+    ],
+    "diagnosticsStatus": "incomplete",
+    "projectedQueries": 1128,
+    "overflow": false,
+    "unknowns": {
+      "nativeLogin": {
+        "context": 91,
+        "statement": 134
+      },
+      "webLogin": {
+        "context": 87,
+        "statement": 139
+      },
+      "startup-bundled": {
+        "context": 53,
+        "statement": 73
+      },
+      "startup-hosted": {
+        "context": 37,
+        "statement": 55
+      }
+    },
+    "cleanupAfter": {
+      "lifecycle": {
+        "owner": true,
+        "peer": true
+      },
+      "smoke": {
+        "owner": true,
+        "peer": true
+      }
+    },
+    "nativeFiles": 308
+  },
+  "budgetVerdict": {
+    "sourceRevision": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "sourceTree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+    "workflowNativeJobConclusion": "success",
+    "uiStrictConclusion": "failure",
+    "totals": {
+      "webLogin": 412,
+      "nativeLogin": 394,
+      "startup-bundled": 183,
+      "startup-hosted": 139
+    },
+    "fullLoginBudgetPassed": true,
+    "firstPairBudgetPassed": false,
+    "nativeSqlAcceptancePassed": false,
+    "originalFirstPair": 1,
+    "originalFullWindowsPreserved": true,
+    "backgroundQueriesExcluded": 0,
+    "alternatePairSelected": false,
+    "rerun": false,
+    "limit": "Verifier verified=true reports integrity and conservation only. Original first-pair SQL budget is RED despite Native workflow job success."
+  },
+  "commandId": "cmd_5c74f5dddefc4adb8d8375f3fafb",
+  "exitCode": 0,
+  "vmPurpose": "original artifact analysis only, not Native execution",
+  "requiredEnvironment": {
+    "FORENSIC_ROOT": "/vercel/sandbox/native-1ffa",
+    "FORENSIC_REVISION": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "FORENSIC_TREE": "bc4d584fa651385886e79dc6359b1b43324425d1"
+  }
+}

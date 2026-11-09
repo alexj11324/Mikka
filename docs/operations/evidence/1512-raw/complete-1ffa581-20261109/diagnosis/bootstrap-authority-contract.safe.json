@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "kind": "bootstrap workspace hint server contract review",
+  "observedAtUTC": "2026-11-09T08:12:07.549Z",
+  "source": {
+    "actualCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+    "head": "1ffa581f16319381054e0636ae41e6292719a1fe"
+  },
+  "relatedMapping": {
+    "blob": "d4a7142c408a20be03860cf0bd8d1d1c8ff74897",
+    "bytes": 39296,
+    "sha256": "cfcd4a34d57b48a29ad1b9c0faa25c4110f9ef692c75838c94aa539cc012a437"
+  },
+  "conclusion": "A non-null cacheWorkspace is suitable as a provisional initial live workspace hint for the same authenticated bootstrap user and unchanged selector. It is not an authorization capability or a guaranteed final selected workspace. Server ticket and reader authorization remain unchanged.",
+  "authorityChain": [
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "contract": "desktopBootstrap first calls desktopSession; absent identity throws authRequired. authorizedCacheWorkspace receives that exact session.user.id and the optional requested workspace ID. The returned user and cacheWorkspace belong to the same bootstrap operation."
+    },
+    {
+      "path": "lib/desktop-rpc/schemas.ts",
+      "contract": "desktop.bootstrap uses the existing optional-workspace schema. Renderer also validates the workspace UUID before requesting it; no request value can select an unlisted membership."
+    },
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "contract": "Each invocation executes one actual SELECT of workspaces joined to memberships filtered by the authenticated userId and status='active'; only workspaceId and role are projected. An explicit unlisted workspace returns null. No disk-provided membership or cross-request memo is used here."
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "contract": "DesktopBootstrap includes cacheWorkspace as workspaceId plus admin/member role, or null; it contains no signed live capability."
+    },
+    {
+      "path": "lib/desktop-rpc/authentication.ts",
+      "contract": "The ordinary Native bootstrap identity may use Better Auth's existing signed token-bound read cache. The membership SELECT is current, but bootstrap must not be described as an unconditional fresh DB session lookup."
+    },
+    {
+      "path": "app/api/live/ticket/route.ts",
+      "contract": "Ticket route independently validates allowed human bearer/cookie, requests getSession with disableCookieCache=true, validates workspace UUID, checks current active membership for authenticated userId, then signs both owner and workspace. Invalid/revoked identity is 401; missing/invalid workspace membership is 403. No gateway configuration produces null ticket fields."
+    },
+    {
+      "path": "lib/live/session-ticket.ts",
+      "contract": "Builtin gateway ticket carries bounded session ID plus signature/expiry; source explicitly requires fresh session validation at upgrade and open. A workspace hint cannot construct or authorize this ticket."
+    }
+  ],
+  "selectionRules": [
+    {
+      "scenario": "explicit valid requested workspace and active membership",
+      "cacheWorkspace": "exact requested workspace",
+      "finalWorkspace": "explicit loadWorkspaceContext selection matches when the same selector is actually supplied"
+    },
+    {
+      "scenario": "explicit requested workspace absent/suspended/revoked",
+      "cacheWorkspace": null,
+      "finalWorkspace": "ordinary reader remains responsible for its access failure; do not fall back to an older hint"
+    },
+    {
+      "scenario": "invalid nonempty renderer workspace selector",
+      "cacheWorkspace": null,
+      "finalWorkspace": "renderer deliberately nulls the cache hint even though it sent an unscoped bootstrap"
+    },
+    {
+      "scenario": "no explicit requested workspace; valid selection cookie",
+      "cacheWorkspace": "matching active membership",
+      "finalWorkspace": "loadWorkspaceContext uses that valid cookie too"
+    },
+    {
+      "scenario": "no explicit requested workspace; missing or stale selection cookie",
+      "cacheWorkspace": "earliest active membership by workspace creation time, or null",
+      "finalWorkspace": "loadWorkspaceContext prefers a personal workspace before the first choice; it may create a missing personal workspace. Selection equality is not guaranteed."
+    },
+    {
+      "scenario": "no active memberships",
+      "cacheWorkspace": null,
+      "finalWorkspace": "bootstrap gate creates no workspace; later ordinary workspace reader may initialize one through its existing first-use path"
+    },
+    {
+      "scenario": "membership removed or session revoked after bootstrap",
+      "cacheWorkspace": "past observation only",
+      "finalWorkspace": "fresh ticket and each ordinary read retain their existing refusal; cached hint does not extend authorization"
+    },
+    {
+      "scenario": "client selector changes after the bootstrap",
+      "cacheWorkspace": "old observation for the previous selector",
+      "finalWorkspace": "must not seed another selector with this hint; AuthenticatedReadCache already disables persistence when requested workspace differs"
+    }
+  ],
+  "clientBoundary": {
+    "existingOwnerBinding": "AuthenticatedReadCache receives user.id and bootstrap.cacheWorkspace from Workspace; any initial Live hint must retain the same-owner guard.",
+    "existingSelectorGuard": "AuthenticatedReadCache permits a workspace namespace only when there is no explicit requested selector or it exactly equals workspace.workspaceId.",
+    "provisionalUse": "Use a matching bootstrap hint only while the real workspace read is unresolved. A successfully resolved same-user workspace remains authoritative. A mismatched-user result, invalid selector, or unavailable/null bootstrap authority is not permission to borrow the old hint.",
+    "unscopedReader": "WorkspaceScope currently calls useWorkspace(user.email) without an explicit workspace argument. Therefore an explicit bootstrap URL selector alone does not prove the later unscoped API request chooses the same workspace.",
+    "noAuthorizationChange": "Do not skip/seed server auth, do not manufacture LiveRead revisions or home-scope proofs, do not replace ticket verification, and do not suppress a real later scope change.",
+    "regressionOwnership": "Root and native agent own the real React/SWR lifecycle reproduction; this report is static server contract review only."
+  },
+  "existingTestsReadOnly": {
+    "path": "tests/read-cache-scope.db.test.ts",
+    "coverageObservedInSource": [
+      "one membership SQL",
+      "exact requested workspace",
+      "cookie selection",
+      "foreign account denied",
+      "unknown explicit workspace null",
+      "role downgrade changes namespace",
+      "suspended/deleted membership null",
+      "deleted account null"
+    ],
+    "executedByThisReview": false,
+    "selectionMismatchFallbackCoveredByThisFile": false
+  },
+  "limitations": [
+    "This source analysis does not establish that the proposed hint eliminates the current 44-query regression.",
+    "A hint may be stale immediately after its current membership read; correctness relies on the unchanged fresh ticket/reader boundaries.",
+    "No actual request values, membership data, account identifiers or credentials were read."
+  ],
+  "sourceBindings": [
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "blob": "7ce269b3388d3acb8f2fd66cc666f992e18c327c",
+      "bytes": 2551,
+      "sha256": "813567b1df80383b08c855b098e0ecc42657f5d1042fde28024b515ea71e7a3d"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "blob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3"
+    },
+    {
+      "path": "lib/desktop-rpc/schemas.ts",
+      "blob": "cdf2e74781d8f3f9fe89f059865b65bb12803f51",
+      "bytes": 21164,
+      "sha256": "f2683f698c9852c82a70aa9a4f4ecbfd8629b7231ce541fcb7c642bf882d443f"
+    },
+    {
+      "path": "lib/desktop-rpc/authentication.ts",
+      "blob": "261b44d879290f415d8fd58f01e27713d43f6861",
+      "bytes": 2516,
+      "sha256": "206f09f84f14d2d09bbe734f3dc9072d5b99b80f1976ca12f73cfa22af72a92c"
+    },
+    {
+      "path": "lib/desktop-rpc/session.ts",
+      "blob": "c6b0bd381b0c62df8c7404cd62b31402c95354a9",
+      "bytes": 2969,
+      "sha256": "9a9083622b42034d00f5e425319561397ea28e3c8b2220f1a0ed93b43b969103"
+    },
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "blob": "788d222d3faf4d11f2f32f6c3907de4f37b6419f",
+      "bytes": 1246,
+      "sha256": "2b6ea0143688bc5f80fd4d2b4984d4843991972c10dea5e4586a0949a5d3b2f2"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "blob": "a5c563dcd1e70e7c48749b76924a54da2d1a3982",
+      "bytes": 7976,
+      "sha256": "db5f3de381689ec358c5862c6f3d0b06823d40ade368791e85006005ea8545cd"
+    },
+    {
+      "path": "components/authenticated-read-cache.tsx",
+      "blob": "54b50bb03a114cdb99dd02d2909553e29b3002fc",
+      "bytes": 4539,
+      "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c"
+    },
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "blob": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5",
+      "bytes": 3596,
+      "sha256": "1aac5eb7968426e8ec6158f4c2d511b13993d392e4f204111e631ccc6d58a333"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace.tsx",
+      "blob": "e45052573bb4424f61da35eeaedb5f0a8d80844f",
+      "bytes": 2569,
+      "sha256": "2307562ffbbb8c4e95a693f8b234987649bdbb746ded23137d8a8ca37772016c"
+    },
+    {
+      "path": "hooks/use-workspace.ts",
+      "blob": "3bc951bb32838b9784f64ec60659a74edd1c626b",
+      "bytes": 1305,
+      "sha256": "f2a0bb97ae72c86b7a3f97a7a92f262e25bb60189a8c637af6cee666d7bc6f73"
+    },
+    {
+      "path": "app/api/live/ticket/route.ts",
+      "blob": "ac053b943ad49b343cbef59b87554da207b09f85",
+      "bytes": 2494,
+      "sha256": "846569d41cb1ade9f9449fb2cb2e500eb3389c8a0a3b5f14b57880ffa1dd0880"
+    },
+    {
+      "path": "lib/live/session-ticket.ts",
+      "blob": "584d2416b15530c0047e91bccfd3a5968813a774",
+      "bytes": 2366,
+      "sha256": "57bf9c7de70246b7e1b8ec54799c398d75626e3b7312597380ee0e4c1c78fa33"
+    },
+    {
+      "path": "lib/live/scope.ts",
+      "blob": "1dc1a84095f6b59c806be1ca3e2e9f2b43ccb2c2",
+      "bytes": 1345,
+      "sha256": "b323f66c5c01440d72e3ce1627a4c0a523e019895e71cf3da61c09a1ad056511"
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "blob": "58169dd22a616a3950d292e43f14eb6781a02106",
+      "bytes": 5202,
+      "sha256": "df331574da125f746b812f655378d53c5973cedd25788c2556f4c1da9f165395"
+    }
+  ],
+  "actionsPerformed": {
+    "tests": 0,
+    "productionQueries": 0,
+    "modelCalls": 0,
+    "browserActions": 0,
+    "resourcesCreated": 0,
+    "sourceChanges": 0,
+    "refChanges": 0
+  }
+}

@@ -1,0 +1,397 @@
+{
+  "schemaVersion": 1,
+  "kind": "companion-ci-originals-and-safe-review-index",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "prHead": "1ffa581f16319381054e0636ae41e6292719a1fe",
+  "actualCheckoutFor13Jobs": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+  "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+  "checkoutException": {
+    "jobId": 129037801052,
+    "workflow": "browser-gate",
+    "actualCheckout": null,
+    "reason": "Only the existing browser-tests-disabled echo executes; no checkout step."
+  },
+  "suggestedPrefix": "ci-1ffa581/companion",
+  "files": [
+    {
+      "workflow": "unattended",
+      "jobId": 129037801406,
+      "path": "ci-1ffa581/companion/unattended-129037801406.original.log",
+      "bytes": 71640,
+      "sha256": "76f5adace67a5b221530557e425f8f335ccfc394ba4bbbd9c716bb405a0584d6",
+      "gitBlob": "29b64b858be0d075804c1c383b79dfe653a736b2",
+      "lineCount": 811,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "site-search",
+      "jobId": 129037802177,
+      "path": "ci-1ffa581/companion/site-search-129037802177.original.log",
+      "bytes": 299456,
+      "sha256": "583f6fbb0c55f5d87393be51f6872a8f9a911e25fc67decff418c87d27b8dc1b",
+      "gitBlob": "ac51deae72b162666bc456139a91e781481b8f29",
+      "lineCount": 3210,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "browser-gate",
+      "jobId": 129037801052,
+      "path": "ci-1ffa581/companion/browser-gate-129037801052.original.log",
+      "bytes": 2196,
+      "sha256": "cffd499c244b2af7bfd85cb3bd867346ca5f2cf9d0313aa6744df8e720284745",
+      "gitBlob": "fa37e2a2f6dffd3dfa060720514aa5db11267cba",
+      "lineCount": 37,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "custody",
+      "jobId": 129037800822,
+      "path": "ci-1ffa581/companion/custody-129037800822.original.log",
+      "bytes": 217488,
+      "sha256": "58492073357124fc3f146fcaf4dc0b3c41770ce6677f82d50298ecccc091094e",
+      "gitBlob": "e58964b0954e25f5e39cf59d73648a81e6344d25",
+      "lineCount": 1854,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "ssh",
+      "jobId": 129037800929,
+      "path": "ci-1ffa581/companion/ssh-129037800929.original.log",
+      "bytes": 159646,
+      "sha256": "5783f5461a5a9e0061fc995c40385c403a406393a5e7b62c992ae522586d3084",
+      "gitBlob": "51d50355330067ec881a879a327b746b53581213",
+      "lineCount": 1683,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "e2b-additive",
+      "jobId": 129037801644,
+      "path": "ci-1ffa581/companion/e2b-additive-129037801644.original.log",
+      "bytes": 50841,
+      "sha256": "4386186cb4b75877e20a84368023fd468dadf3dc48be7d26373e8e4b571341bb",
+      "gitBlob": "69d6bf9685f4df71a5a65bb39dd9555e5f7df70a",
+      "lineCount": 449,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "cloud-backend",
+      "jobId": 129037801209,
+      "path": "ci-1ffa581/companion/cloud-backend-129037801209.original.log",
+      "bytes": 27112,
+      "sha256": "33b17f08ec5f5ec11ef405ac2cd34178bcb7d96897ceb74396ae6c7baf732a8c",
+      "gitBlob": "61c8bff3ad1cfecaadd1bb8578ab8e14fccc5dd2",
+      "lineCount": 338,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "cloud-backend",
+      "jobId": 129037801408,
+      "path": "ci-1ffa581/companion/cloud-backend-129037801408.original.log",
+      "bytes": 18171,
+      "sha256": "65b2ae3be0dbb345bf230ac9f43da275d136576b4977bffeee2ee2d3f621075f",
+      "gitBlob": "599806c496d38aef584d10314e32328fa5cd104b",
+      "lineCount": 215,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "cloud-backend",
+      "jobId": 129037801569,
+      "path": "ci-1ffa581/companion/cloud-backend-129037801569.original.log",
+      "bytes": 71062,
+      "sha256": "7b7c084a591ec09578b4bd3f44a902b1854f7bbe67de89b55dfd32f2898352df",
+      "gitBlob": "af9b7b02f06e12df552be0e0d57cdfae8c5571a7",
+      "lineCount": 908,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "read-cache",
+      "jobId": 129037801490,
+      "path": "ci-1ffa581/companion/read-cache-129037801490.original.log",
+      "bytes": 232612,
+      "sha256": "7ffb231b9b63753c254d1e1de849e0db7cc8145c96495ad613d905188c90ee02",
+      "gitBlob": "2beffd0e6e95e30893fd74e7f7a4eb83ccae29f6",
+      "lineCount": 2565,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "node22",
+      "jobId": 129037801375,
+      "path": "ci-1ffa581/companion/node22-129037801375.original.log",
+      "bytes": 35390,
+      "sha256": "9c85939096acfa5b1e713fad505099019d245c3b3c365dadf560a30b1005a177",
+      "gitBlob": "db9d12d00583e82017eddb2653897578d24b609b",
+      "lineCount": 493,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "node22",
+      "jobId": 129037801731,
+      "path": "ci-1ffa581/companion/node22-129037801731.original.log",
+      "bytes": 136826,
+      "sha256": "6ecff79c95e876b520c4cbb6cd5d036df753d41b0bd46aad671d28d19cb3f38f",
+      "gitBlob": "390d03c5c06f891fd250bff3be2e8441f46bcf0b",
+      "lineCount": 1476,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "node22",
+      "jobId": 129038172171,
+      "path": "ci-1ffa581/companion/node22-129038172171.original.log",
+      "bytes": 48073,
+      "sha256": "54e9a90534031924f56d5fb8ae8d4162708e3fec94b164afaddb148139b1d4ca",
+      "gitBlob": "d2076726d8a5e7089e4054b65531c045c9a5c4a9",
+      "lineCount": 628,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "workflow": "node22",
+      "jobId": 129038172257,
+      "path": "ci-1ffa581/companion/node22-129038172257.original.log",
+      "bytes": 42735,
+      "sha256": "0d3a204369453a3b115fb6bd672c21de341c9d019625ab635c529d7660bae83c",
+      "gitBlob": "99301692b36c197510277a6797b331d3eb241bd9",
+      "lineCount": 549,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1,
+      "kind": "original-decoded-job-log",
+      "remotelyConfirmed": true
+    },
+    {
+      "path": "ci-1ffa581/companion/execution-review.safe.json",
+      "bytes": 220623,
+      "sha256": "173d2af303e9118709c25f656a596b70c76b5bbeb83c89191e6e5176c652e7fb",
+      "gitBlob": "797b5383f6f7b409013795f1c7ce25564fcd7c9a",
+      "kind": "safe-review-receipt",
+      "remotelyConfirmed": true
+    },
+    {
+      "path": "ci-1ffa581/companion/privacy-review.safe.json",
+      "bytes": 1754,
+      "sha256": "d10810b0942dfb238bf694813a1536f6fb4207063528535b0e329c9c5c4fe595",
+      "gitBlob": "953fce9d7e2b42a76c838660e9b7886319c644c9",
+      "kind": "safe-review-receipt",
+      "remotelyConfirmed": true
+    }
+  ],
+  "filesExcludingIndex": 16,
+  "bytesExcludingIndex": 1635625,
+  "workflows": [
+    {
+      "name": "unattended",
+      "runId": 42580506569,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42580506569",
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129037801406
+      ],
+      "skippedJobs": []
+    },
+    {
+      "name": "site-search",
+      "runId": 42580506759,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42580506759",
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129037802177
+      ],
+      "skippedJobs": []
+    },
+    {
+      "name": "browser-gate",
+      "runId": 42580506565,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42580506565",
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129037801052
+      ],
+      "skippedJobs": []
+    },
+    {
+      "name": "custody",
+      "runId": 42580506558,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42580506558",
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129037800822
+      ],
+      "skippedJobs": []
+    },
+    {
+      "name": "ssh",
+      "runId": 42580506605,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42580506605",
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129037800929
+      ],
+      "skippedJobs": []
+    },
+    {
+      "name": "e2b-additive",
+      "runId": 42580506635,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42580506635",
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129037801644
+      ],
+      "skippedJobs": [
+        {
+          "id": 129037935164,
+          "name": "check",
+          "conclusion": "skipped"
+        },
+        {
+          "id": 129037936262,
+          "name": "await-web",
+          "conclusion": "skipped"
+        },
+        {
+          "id": 129037936398,
+          "name": "subscriptions",
+          "conclusion": "skipped"
+        },
+        {
+          "id": 129037936582,
+          "name": "validate",
+          "conclusion": "skipped"
+        },
+        {
+          "id": 129037936808,
+          "name": "publish",
+          "conclusion": "skipped"
+        },
+        {
+          "id": 129037937304,
+          "name": "cleanup",
+          "conclusion": "skipped"
+        }
+      ]
+    },
+    {
+      "name": "cloud-backend",
+      "runId": 42580506672,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42580506672",
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129037801209,
+        129037801408,
+        129037801569
+      ],
+      "skippedJobs": []
+    },
+    {
+      "name": "read-cache",
+      "runId": 42580506592,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42580506592",
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129037801490
+      ],
+      "skippedJobs": []
+    },
+    {
+      "name": "node22",
+      "runId": 42580506559,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42580506559",
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129037801375,
+        129037801731,
+        129038172171,
+        129038172257
+      ],
+      "skippedJobs": []
+    }
+  ],
+  "semanticLimits": [
+    "All nine assigned companion workflows and fourteen executed jobs completed success. This is not all-required-checks, main CI, Native, release or production acceptance; the independently reported image504 failure remains outside this package.",
+    "Every original job log was fetched once by this sole assigned reader. Six E2B release jobs were PR-conditional skipped; none of their logs was fetched and no release/model/cleanup execution is inferred.",
+    "Node22 actual Vitest:139 files passed,1 disabled real-agents file,1577 tests passed,2 Cursor-conditional tests skipped; additional Node TAP83 passed. The skips remain skips.",
+    "Node18 expected node_required rejection has npmStarted=false and0 registrations/heartbeats/enrollments. Node22 isolated macOS fixture reports actual npm/LaunchAgent/enrollment/reconnect success.",
+    "The package job produced @aspectlylabs/mikka0.0.1; both macOS jobs log a matching download digest for the same package artifact. No production daemon version or independently downloaded archive is claimed.",
+    "Cloud macOS driver retains continue-on-error=true but its current test actually passed1/1. Browser gate is echo-only.",
+    "Five GitHub service container removals and four network removals have matching command/echo proof. Read-cache reports fixtures succeeded,lease released-clean,retainedDirectChildren0. Mac LaunchAgent bootout,SSH fixture stop and several process-finalizer outcomes remain source-level/unknown where no separate exit receipt was emitted.",
+    "Current reads/tests are source-bound to c3b and same tree as1ffa. Previous025 logs were not re-fetched or relabeled."
+  ],
+  "rawIntegrity": {
+    "format": "Original decoded MCP job-log content, UTF-8 encoded for bytes/hash, with BOM and ANSI unchanged.",
+    "rawFiles": 14,
+    "rawBytes": 1413248,
+    "reviewerFetches": 14,
+    "teamFetchesForAssignedJobs": 14,
+    "rawApiEnvelopesIncluded": false,
+    "signedArtifactUrlsAdded": false,
+    "binaryZipDownloaded": false,
+    "compressionUsed": false
+  },
+  "privacy": {
+    "receiptGitBlob": "953fce9d7e2b42a76c838660e9b7886319c644c9",
+    "unresolvedCandidates": 0,
+    "resolvedCandidateCount": 1,
+    "scope": "Already-public GitHub-masked logs; current systemd service filename false positive. No credential lookup or production/business-data read.",
+    "limitation": "Pattern-assisted review is bounded and does not prove universal absence of all sensitive strings."
+  },
+  "publication": {
+    "allListedBlobsRemotelyCreatedAndShaConfirmed": true,
+    "evidenceBranchRefChanged": false,
+    "persistentEvidenceCommitByRootPending": true
+  },
+  "resources": {
+    "newVMs": 0,
+    "newDatabases": 0,
+    "modelRuns": 0,
+    "workflowTriggers": 0,
+    "refsChanged": 0,
+    "activeOwnedResources": 0
+  }
+}

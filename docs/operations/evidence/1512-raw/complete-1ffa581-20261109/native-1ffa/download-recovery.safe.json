@@ -1,0 +1,17 @@
+{
+  "runId": 42580506632,
+  "nativeLogFetches": 1,
+  "uiLogFetches": 1,
+  "nativeArtifactDownloadCalls": 1,
+  "packageArtifactDownloadCalls": 1,
+  "downloadReferenceRefreshes": 0,
+  "previousArtifactsDownloaded": 0,
+  "materializationUsesExistingFileReferences": true,
+  "vmCreatedBeforeDownloadReferences": true,
+  "downloadUrlsExcluded": true,
+  "initialVmProbeExitCode": 0,
+  "materializeCommandId": "cmd_7d8dc036f56c4772906160c6ec7a",
+  "materializeExitCode": 0,
+  "ciRerun": false,
+  "modelsInvoked": 0
+}

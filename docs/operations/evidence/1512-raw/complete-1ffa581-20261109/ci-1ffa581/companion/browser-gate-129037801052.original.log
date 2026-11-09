@@ -1,0 +1,36 @@
+﻿2026-11-09T07:37:27.6461843Z Current runner version: '2.338.2'
+2026-11-09T07:37:27.6483089Z ##[group]Runner Image Provisioner
+2026-11-09T07:37:27.6484112Z Hosted Compute Agent
+2026-11-09T07:37:27.6484830Z Version: 20261028.624
+2026-11-09T07:37:27.6485396Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T07:37:27.6486055Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T07:37:27.6486653Z Worker ID: {f77a8016-7fa0-4a7b-a5c2-99a2b9e7703a}
+2026-11-09T07:37:27.6487229Z Region: centralus
+2026-11-09T07:37:27.6487801Z Cloud: Azure
+2026-11-09T07:37:27.6488318Z ##[endgroup]
+2026-11-09T07:37:27.6489606Z ##[group]Operating System
+2026-11-09T07:37:27.6490152Z Ubuntu
+2026-11-09T07:37:27.6490594Z 24.04.5
+2026-11-09T07:37:27.6491131Z LTS
+2026-11-09T07:37:27.6491620Z ##[endgroup]
+2026-11-09T07:37:27.6492131Z ##[group]Runner Image
+2026-11-09T07:37:27.6492884Z Image: ubuntu-24.04
+2026-11-09T07:37:27.6493382Z Version: 20261101.360.1
+2026-11-09T07:37:27.6494700Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T07:37:27.6496022Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T07:37:27.6496916Z ##[endgroup]
+2026-11-09T07:37:27.6497941Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T07:37:27.6499753Z Contents: read
+2026-11-09T07:37:27.6500310Z Metadata: read
+2026-11-09T07:37:27.6500887Z ##[endgroup]
+2026-11-09T07:37:27.6502891Z Secret source: Actions
+2026-11-09T07:37:27.6503771Z Cache mode: write
+2026-11-09T07:37:27.6504642Z Prepare workflow directory
+2026-11-09T07:37:27.6771709Z Prepare all required actions
+2026-11-09T07:37:27.6855375Z Complete job name: Browser tests (before merge)
+2026-11-09T07:37:27.7676352Z ##[group]Run echo "Browser tests are not run in CI (decision 2026-11-01-1520)."
+2026-11-09T07:37:27.7677397Z [36;1mecho "Browser tests are not run in CI (decision 2026-11-01-1520)."[0m
+2026-11-09T07:37:27.8013560Z shell: /usr/bin/bash -e {0}
+2026-11-09T07:37:27.8014739Z ##[endgroup]
+2026-11-09T07:37:27.8205504Z Browser tests are not run in CI (decision 2026-11-01-1520).
+2026-11-09T07:37:27.8384658Z Cleaning up orphan processes

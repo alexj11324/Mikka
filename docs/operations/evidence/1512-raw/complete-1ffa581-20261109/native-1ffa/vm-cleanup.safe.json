@@ -1,0 +1,58 @@
+{
+  "purpose": "Decode and verify original artifacts from completed GitHub Native job; this VM is not the Native execution source",
+  "createdAfterArtifactsReady": true,
+  "sessionId": "sbx_Wz7odbCTP5bW88FCQfwmRkxXzIwu",
+  "name": "issue1512-native-1ffa-20261109",
+  "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+  "architecture": "amd64",
+  "region": "iad1",
+  "vcpus": 1,
+  "memoryMiB": 2048,
+  "timeoutMs": 900000,
+  "persistent": false,
+  "exposedPorts": [],
+  "networkPolicy": {
+    "mode": "custom",
+    "allowedDomains": [
+      "*.blob.core.windows.net",
+      "*.amazonaws.com",
+      "*.oaiusercontent.com",
+      "chatgpt.com"
+    ]
+  },
+  "startedAt": "2026-11-09T07:58:10.568Z",
+  "stoppedAt": "2026-11-09T08:01:36.999Z",
+  "actualDurationMs": 206431,
+  "actualActiveCpuMs": 7284,
+  "actualNetworkBytes": {
+    "ingress": 14970638,
+    "egress": 401035
+  },
+  "stopped": true,
+  "deleteSucceeded": true,
+  "exactNameFinalRead": {
+    "resume": false,
+    "status": 404,
+    "code": "not_found"
+  },
+  "timeoutExtended": false,
+  "otherVmCreated": false,
+  "modelsInvoked": 0,
+  "ciRunsStarted": 0,
+  "repoRefsChanged": false,
+  "cost": "Not calculated; actual resource duration, active CPU and transfer are reported without claiming zero cost.",
+  "remainingActiveOwnedResources": 0,
+  "recoveryBeforeStop": {
+    "files": 21,
+    "jsonBytes": 1346865,
+    "jsonSha256": "b41b843cff3c401af567c6a2057c6049c5746657d77e2bb6a8451aa39a20eee7",
+    "gzipBytes": 175270,
+    "gzipSha256": "8bcf453b5258f7c268ed2e1fc3765fe16eed3207d7774ef753e62cbca8805733",
+    "chunkBytes": 1455,
+    "chunks": 121,
+    "allChunksRecovered": true,
+    "gzipCrcAndISizeVerified": true,
+    "bundleShaVerified": true,
+    "allFileHashesAndGitBlobsVerified": true
+  }
+}

@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "task": "Source-only initial subscription/hydration/read-proof diagnosis for original first-pair SQL RED",
+  "head": "1ffa581f16319381054e0636ae41e6292719a1fe",
+  "actualRevision": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+  "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+  "originalLifecycleBlob": "ab391175191106f0fa09c4de83856060327fb79d",
+  "firstPairDifferenceBlob": "257f7cbba70b300b3ce6a46960beb617b0cea56e",
+  "sourceManifest": [
+    {
+      "path": "lib/live/channel.ts",
+      "bytes": 24031,
+      "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede",
+      "blob": "38df2110ac19c41e413dbbdfae8fac34361b2480"
+    },
+    {
+      "path": "lib/live/channels.ts",
+      "bytes": 1580,
+      "sha256": "b54a1ea2cb517ce4135d91423c1999420591f3bfc9487d1a9c11396460a321c8",
+      "blob": "d459548cbd8785bf2764d23543109b99ae146d18"
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "bytes": 4433,
+      "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
+      "blob": "f6be8710182ad68ce0a87f6cac910184bf1d52f3"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "bytes": 8050,
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+      "blob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "bytes": 5786,
+      "sha256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+      "blob": "2dc3ab5a9934fed5146189fd236b450f0d223920"
+    },
+    {
+      "path": "lib/swr/persistent-cache.ts",
+      "bytes": 10956,
+      "sha256": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a",
+      "blob": "6776b93c8d98738a3e7c84a383da435af64baa95"
+    },
+    {
+      "path": "components/authenticated-read-cache.tsx",
+      "bytes": 4539,
+      "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c",
+      "blob": "54b50bb03a114cdb99dd02d2909553e29b3002fc"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace.tsx",
+      "bytes": 2569,
+      "sha256": "2307562ffbbb8c4e95a693f8b234987649bdbb746ded23137d8a8ca37772016c",
+      "blob": "e45052573bb4424f61da35eeaedb5f0a8d80844f"
+    },
+    {
+      "path": "lib/live/browser-runtime.ts",
+      "bytes": 2455,
+      "sha256": "b640f6de894ec6f94847681567148f35314134455382a2309933f769a6f17c72",
+      "blob": "c2ba886fd0f55956832060eee83f7a385b1796cf"
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "bytes": 58655,
+      "sha256": "da2c31a515397745e02d3118981751aedc319ac3ea53f01dc22d340c6ed75512",
+      "blob": "f981a61d72fb9c0e153e490f89d7328fb014558e"
+    },
+    {
+      "path": "lib/swr/persistent-cache.test.tsx",
+      "bytes": 28784,
+      "sha256": "d57c1fdf88356395dc67d5f1d81891541bb9ea7800bab8d24cdd26583fbdca30",
+      "blob": "99a37c3f55ab05b6b3e986cc5c1eedd0b68d1460"
+    },
+    {
+      "path": "apps/desktop/src/renderer/live-runtime.ts",
+      "bytes": 3537,
+      "sha256": "d2561036b5b90c671a5061bc12cc3d0f7e8dcc1d509efbb578dee3ed56f35a61",
+      "blob": "e632451a6e9f4300159f7ff44ae74761349ab8fd"
+    },
+    {
+      "path": "hooks/use-workspace.ts",
+      "bytes": 1305,
+      "sha256": "f2a0bb97ae72c86b7a3f97a7a92f262e25bb60189a8c637af6cee666d7bc6f73",
+      "blob": "3bc951bb32838b9784f64ec60659a74edd1c626b"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "bytes": 9682,
+      "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a",
+      "blob": "ac60a59be511ec45cc372b8c91c0535861a30931"
+    },
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "bytes": 3596,
+      "sha256": "1aac5eb7968426e8ec6158f4c2d511b13993d392e4f204111e631ccc6d58a333",
+      "blob": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5"
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "bytes": 3337,
+      "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0",
+      "blob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969"
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "bytes": 56571,
+      "sha256": "1729446b75be85a93c009adee62883f617334c1981ffa3464befc9bba0e3e2b8",
+      "blob": "b043d5c09d02d5f675cd62d28e40bb8dc38b5060"
+    },
+    {
+      "path": "hooks/use-workspace-switcher.ts",
+      "bytes": 4636,
+      "sha256": "088f1ed918e101f3cbefbde5329146f04512aef01f90087c820a481782e518e2",
+      "blob": "63550f8517171bafa565327bfb4a72b84d242f7f"
+    },
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "bytes": 4428,
+      "sha256": "71447f74b45076755aefb322e721c3263c61cf8188d31b4c2159246645d76168",
+      "blob": "a755882162c52559579cbd96b26373f121d74761"
+    },
+    {
+      "path": "lib/hooks/view-state.tsx",
+      "bytes": 5475,
+      "sha256": "d2ed5c4daadc8c8d5237ad5e1d890c0e47c604c6f1ed385011dd8e64cfd55366",
+      "blob": "c7be43e24c613af120c86c589b8792d237d95a86"
+    }
+  ],
+  "findings": [
+    {
+      "id": "effective-scope",
+      "status": "source-confirmed",
+      "paths": [
+        "hooks/use-live-key.tsx",
+        "lib/live/channels.ts"
+      ],
+      "facts": [
+        "useLiveKeys uses Provider.workspaceId only when its workspaceId argument is undefined; explicit null is retained.",
+        "Effect lifetime includes the effective scope, serialized entities/keys, cache, mutate, share, owner and namespace.",
+        "LiveProvider retains one LiveChannels object per owner; changing its workspaceId prop alone does not allocate a new object or open a connection.",
+        "LiveChannels creates a channel only upon an actual subscription and removes it when its final subscriber leaves."
+      ]
+    },
+    {
+      "id": "actual-callers-override-provider",
+      "status": "source-confirmed",
+      "paths": [
+        "hooks/use-live-lists.ts",
+        "lib/live/list-read.ts",
+        "components/workspace/issue-workspace.tsx",
+        "components/desktop/desktop-integration.tsx"
+      ],
+      "facts": [
+        "ownerListWorkspace returns null until a matching-owner response supplies a valid owned-home UUID.",
+        "Task runs, chat summaries and thread list explicitly pass that home, including null.",
+        "Issue list and roster explicitly pass their selected/read scope; workspace_settings explicitly passes workspaceHome and owns workspace/switcher, workspace, teams and project-teams invalidations.",
+        "DesktopIntegration uses the same explicit-home task-run hook; it is not an independent default-scope connection anchor.",
+        "Consequently, setting only the Provider bootstrap workspace does not establish an earlier channel for these actual callers."
+      ]
+    },
+    {
+      "id": "coverage-not-data-existence",
+      "status": "source-confirmed",
+      "paths": [
+        "lib/live/channel.ts",
+        "lib/swr/read-observer.ts",
+        "apps/desktop/src/renderer/live-runtime.ts"
+      ],
+      "facts": [
+        "Both web and Native ticket functions return null for an unresolved scope.",
+        "A newly opened socket invalidates to cover its connection gap; readiness captures a new same-realm ordering boundary.",
+        "readFresh requires a later actual read, a committed current cache object, no supersession/error, and all required/held revisions.",
+        "The observer may promote its start boundary using an actual response object's dispatch WeakMap proof; it does not treat arbitrary stored data as freshness.",
+        "Before-ready reads, reconnects, new actual scopes and permission failures retain the ordinary catch-up requirement."
+      ]
+    },
+    {
+      "id": "hydration-duplicate-not-established",
+      "status": "source-confirmed-with-limit",
+      "paths": [
+        "lib/swr/persistent-cache.ts",
+        "components/swr-defaults.tsx",
+        "components/authenticated-read-cache.tsx",
+        "lib/hooks/view-state.tsx"
+      ],
+      "facts": [
+        "PersistentReadCache.hydrate has a started guard and resolves one hydration promise; its restoration does not count as fresh network data.",
+        "HydrateReadCache resumes only while its effect remains mounted and depends on cache/mutate.",
+        "staleOnFocus pauses before SWR starts while hydration is incomplete, then registers one bound revalidator per mounted key; resumeHydrationReads chooses one reader for each key and skips freshly committed data.",
+        "The Native AuthenticatedReadCache creates a stable cache per authorized namespace; IssueWorkspace withinLiveProvider does not add another cache boundary.",
+        "ViewStateProvider changes its context store on scope change but has no keyed children or SWR provider remount.",
+        "No concrete duplicate hydration/resume path has been established in the inspected actual mount path."
+      ]
+    },
+    {
+      "id": "artifact-causality-limit",
+      "status": "explicit-unknown",
+      "facts": [
+        "The first Native readBatch includes task-runs.pollTaskRuns, chat summaries and bot roster under the same HTTP request.",
+        "Task runs occurs once while chat summaries and roster occur twice, so a blanket claim that every Native batch lost dispatch proof is unsupported.",
+        "Original server receipts do not include JavaScript readBoundary values, effective live-scope transitions or client open/ready observations.",
+        "Server timestamps/count differences alone do not distinguish a legitimate first watch-gap read from lost proof or a needless subscription restart."
+      ]
+    }
+  ],
+  "existingRegressionContracts": [
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "cases": [
+        "committed post-ready read covers pending flush",
+        "late subscription on continuously ready connection reuses committed read",
+        "before/no readiness, new push and earlier generation still read",
+        "discarded/replaced cache value and failed read do not certify freshness",
+        "retired owner cannot start or adopt another read",
+        "resolving owned home preserves selected channel; unresolved home never guesses Provider scope",
+        "actual Native queue/codec/MessageChannel snapshot proofs for task runs, summaries and roster: before readiness reads twice, after readiness once"
+      ],
+      "executedThisTask": false
+    },
+    {
+      "path": "lib/swr/persistent-cache.test.tsx",
+      "cases": [
+        "real React/SWR hydration and StrictMode expect exactly one fresh read",
+        "empty/failed disk starts a cold read",
+        "server seed and optimistic value outrank disk",
+        "denial retires cache",
+        "document departure preserves retired boundary and cleanup"
+      ],
+      "executedThisTask": false
+    }
+  ],
+  "regressionProposal": {
+    "entry": "scripts/use-live-lists.live.test.tsx",
+    "runtime": "Existing real React, SWR, LiveChannels, staleOnFocus, Native callAction/read-batch/codec and runtime MessageChannel; add actual PersistentReadCache and HydrateReadCache with fixture-only storage and authenticated HTTP/WS boundaries.",
+    "requiredEventOrder": [
+      "cache activation and each restored scoped key",
+      "hydration resolved/resume",
+      "effective subscription scope",
+      "socket open and capability ready",
+      "SWR fetcher entry",
+      "Native queue insertion",
+      "actual fetch dispatch",
+      "actual accepted cache object and revision",
+      "live flush and any trailing request"
+    ],
+    "cases": [
+      {
+        "name": "provider-hint-negative-control",
+        "purpose": "Use actual list hooks with explicit unresolved home and compare Provider workspace undefined versus authorized hint. Neither may guess an owner-home ticket or skip the first required catch-up. Do not manufacture a default-scope anchor absent from production."
+      },
+      {
+        "name": "same-scope-covered-dispatch",
+        "purpose": "With a legitimate existing scoped subscription and a real hydrated snapshot, control capability acknowledgement before actual Native HTTP dispatch. Once the exact result commits with sufficient revisions, an additional identical read must not occur. A failure here would be a meaningful RED requiring trace-local explanation."
+      },
+      {
+        "name": "uncovered-or-new-generation",
+        "purpose": "Move acknowledgement after actual dispatch, reconnect, or change actual workspace/owner. Require the later fresh read and prove late old results cannot populate or refresh the new scope."
+      },
+      {
+        "name": "hydration-and-revision-boundaries",
+        "purpose": "Preserve fresh initial network validation, empty/failed storage, StrictMode, fresh-vs-disk precedence, discarded/comparator-retained data, higher required revision, permission failures and retired cache."
+      }
+    ],
+    "redGreenRule": "Do not claim RED/GREEN until the actual baseline fixture runs. If the covered-dispatch test already passes, reject that candidate rather than relaxing its guards or counting mandatory gap reads as duplicates.",
+    "bootstrapGuardIfFurtherProposed": [
+      "fresh bootstrap owner must match current user",
+      "requested selector must be compatible with the authorized bootstrap scope",
+      "fresh matching read supersedes a bootstrap hint",
+      "mismatched owner, denial/error and changed selector cannot fall back to former authorization",
+      "null owned-home from owner-wide list remains null; selected workspace is not a substitute for owned home"
+    ]
+  },
+  "minimumChangeAssessment": {
+    "providerHintAlone": "Not demonstrated to affect the targeted actual consumers; do not publish it as a 44-query fix.",
+    "genericHydrationOrReadFresh": "No justified source change identified; retain initial authoritative read and all existing revision/lifetime guards.",
+    "separateCandidateForRoot": "teams.listTeams and team-relations.listProjectTeams are direct useSWR array readers in IssueWorkspace. Root owns Native dispatch whitelist review; these could be reviewed as separate exact-result proof candidates, with actual before/after readiness tests. They do not by themselves establish resolution of the 44-query deficit.",
+    "implementation": "None; product source/ref unchanged."
+  },
+  "boundaries": {
+    "resourcesCreated": 0,
+    "ciRunsStarted": 0,
+    "browsersOrModelsInvoked": 0,
+    "testsRun": 0,
+    "localExecAttempts": 0,
+    "artifactOrLogDownloads": 0,
+    "sourceChanges": 0,
+    "refChanges": 0
+  }
+}

@@ -1,0 +1,8540 @@
+{
+  "schemaVersion": 1,
+  "kind": "postgres-terminal-review",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "runId": 42580506632,
+  "runAttempt": 1,
+  "event": "pull_request",
+  "preparedAtUTC": "2026-11-09T07:55:47.138Z",
+  "source": {
+    "prHead": "1ffa581f16319381054e0636ae41e6292719a1fe",
+    "actualCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+    "checkoutProof": "Each of four shard originals and aggregate has its own git log -1 --format=%H output; all five exactly match actualCheckout.",
+    "treeProof": "Exact tree bc4d584fa651385886e79dc6359b1b43324425d1 is root's remotely verified binding in CP23 source receipt below. This reviewer independently bound all five job-log git-log outputs to c3b and did not repeat selection-log or commit API reads.",
+    "selection": {
+      "jobId": 129037801896,
+      "owner": "root",
+      "originalReadByThisReviewer": false,
+      "providedFullSelectionSuites": 72,
+      "independentEvidence": "Each shard original repeats the complete DB_TEST_SELECTED inventory and one Required DB selection; all full inventories and selected/grouped/timed unions agree.",
+      "permanentSourceBinding": {
+        "checkpointCommit": "35f0d803cd50e7736281bab0ebe0120868042046",
+        "path": "docs/operations/evidence/1512-raw/union-main89-1ffa-20261109/source/ordinary-union-and-selection.safe.json",
+        "gitBlob": "5984eff70d86dc1ebbbed4c30c86f106047e710c",
+        "bytes": 9599,
+        "sha256": "84f4d63982a7e0583e602e0d61290eadb33a979be28bb41d3c091bf0cfbcc843",
+        "providedBy": "root after remote byte verification"
+      },
+      "permanentSelection": {
+        "checkpointCommit": "35f0d803cd50e7736281bab0ebe0120868042046",
+        "path": "docs/operations/evidence/1512-raw/union-main89-1ffa-20261109/ci/selection.full.json",
+        "gitBlob": "bfe9fb4de83e59aa6db0d4449172079853e07291",
+        "bytes": 123548,
+        "sha256": "cf658839d0a35ced0088f0dcc3c0b1ccb91423f041b3eb1f7ee83d1f9d46da32",
+        "providedBy": "root after remote byte verification; not re-downloaded by PG reviewer"
+      }
+    },
+    "exactPackage": {
+      "path": "package.json",
+      "bytes": 80325,
+      "sha256": "e677d9ca43c64d5050c38e880a7d4745c838086e0ed16f83990106f4b1f5e39a",
+      "gitBlob": "4d4d856e9f90ea102c4e42cf42114e9d5daad731",
+      "nodeVersion": "24.x"
+    },
+    "supportingSources": [
+      {
+        "path": "scripts/run-db-tests.mjs",
+        "bytes": 37271,
+        "sha256": "7f54e6d9c241f6c60056f2c1c1d2f9b82c398638c4e31713894ce7c8168286f3",
+        "gitBlob": "2d797fb4603f4e668b56439e7dea11d6065dbd46"
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "bytes": 21505,
+        "sha256": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d",
+        "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530"
+      },
+      {
+        "path": "lib/device-route-fence.db.test.ts",
+        "bytes": 6255,
+        "sha256": "807ca25b55897be37e616a1ae892a149d3570c3efbc8a6f9ca8696493a8fff9b",
+        "gitBlob": "85ad4273e1f1f533b2dd361005a3b46719d0c667"
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "bytes": 11425,
+        "sha256": "e4f1ee4f90de93ce22f74e5dc97a3475816a5d2a932b0d327ee2441953224d51",
+        "gitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+      }
+    ]
+  },
+  "jobs": [
+    {
+      "id": 129038242411,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAtUTC": "2026-11-09T07:39:36Z",
+      "completedAtUTC": "2026-11-09T07:42:41Z",
+      "checkout": [
+        {
+          "line": 250,
+          "sha": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+        }
+      ],
+      "original": {
+        "bytes": 613371,
+        "sha256": "ecf90bbd9950f6f540a4f0067226df376fdf8bcedc71499b47629346635be265",
+        "gitBlob": "11ed47d4af08acd8b4d16151989b96e00b594a72",
+        "lines": 4366,
+        "originalDecoded": true,
+        "format": "Original decoded GitHub job log UTF-8 including BOM/ANSI, no normalization"
+      },
+      "reviewerDownloadCount": 1,
+      "teamDownloadCount": 1,
+      "downloadedAtUTC": "2026-11-09T07:49:04.373Z",
+      "requiredSteps": [
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "conditionalSkippedSteps": [
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "conclusion": "skipped"
+        }
+      ],
+      "platformWarnings": [
+        {
+          "line": 4006,
+          "text": "##[warning]No files were found with the provided path: /tmp/mikka-http-network-approval-*/evidence.json"
+        },
+        {
+          "line": 4365,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    },
+    {
+      "id": 129038242432,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAtUTC": "2026-11-09T07:38:47Z",
+      "completedAtUTC": "2026-11-09T07:41:52Z",
+      "checkout": [
+        {
+          "line": 246,
+          "sha": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+        }
+      ],
+      "original": {
+        "bytes": 1160098,
+        "sha256": "7ac5ea7027f101cbba2f02c389af5f09c227fc017cd53cca0e9f1d9dc2bbc82e",
+        "gitBlob": "87b1d187357304da1dc04e055f19a53e34d19e68",
+        "lines": 7257,
+        "originalDecoded": true,
+        "format": "Original decoded GitHub job log UTF-8 including BOM/ANSI, no normalization"
+      },
+      "reviewerDownloadCount": 1,
+      "teamDownloadCount": 1,
+      "downloadedAtUTC": "2026-11-09T07:49:04.421Z",
+      "requiredSteps": [
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "conditionalSkippedSteps": [
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "conclusion": "skipped"
+        }
+      ],
+      "platformWarnings": [
+        {
+          "line": 6660,
+          "text": "##[warning]No files were found with the provided path: /tmp/mikka-http-network-approval-*/evidence.json"
+        },
+        {
+          "line": 7256,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    },
+    {
+      "id": 129038242373,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAtUTC": "2026-11-09T07:38:47Z",
+      "completedAtUTC": "2026-11-09T07:45:04Z",
+      "checkout": [
+        {
+          "line": 250,
+          "sha": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+        }
+      ],
+      "original": {
+        "bytes": 2285320,
+        "sha256": "4ff5cd41ee11de54a1f6ba96620c80e77d4679d43a8005b8577f08a4ac498106",
+        "gitBlob": "ff0a2e266efe8f2e21dc7448adad365dc34cf236",
+        "lines": 13421,
+        "originalDecoded": true,
+        "format": "Original decoded GitHub job log UTF-8 including BOM/ANSI, no normalization"
+      },
+      "reviewerDownloadCount": 1,
+      "teamDownloadCount": 1,
+      "downloadedAtUTC": "2026-11-09T07:49:04.456Z",
+      "requiredSteps": [
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "conditionalSkippedSteps": [
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "conclusion": "skipped"
+        }
+      ],
+      "platformWarnings": [
+        {
+          "line": 12898,
+          "text": "##[warning]No files were found with the provided path: /tmp/mikka-http-network-approval-*/evidence.json"
+        },
+        {
+          "line": 13420,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    },
+    {
+      "id": 129038242365,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAtUTC": "2026-11-09T07:38:47Z",
+      "completedAtUTC": "2026-11-09T07:42:42Z",
+      "checkout": [
+        {
+          "line": 249,
+          "sha": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+        }
+      ],
+      "original": {
+        "bytes": 625415,
+        "sha256": "ef62aec4da5b02ca02cb20e5d530abbc2e6db098e898a3368bf2189b043b288b",
+        "gitBlob": "e169a4bf763ec3bdda52a0ab91468bb3069b53e0",
+        "lines": 3982,
+        "originalDecoded": true,
+        "format": "Original decoded GitHub job log UTF-8 including BOM/ANSI, no normalization"
+      },
+      "reviewerDownloadCount": 1,
+      "teamDownloadCount": 1,
+      "downloadedAtUTC": "2026-11-09T07:49:04.346Z",
+      "requiredSteps": [
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "conditionalSkippedSteps": [
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "conclusion": "skipped"
+        }
+      ],
+      "platformWarnings": [
+        {
+          "line": 3981,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    },
+    {
+      "id": 129040339987,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAtUTC": "2026-11-09T07:45:07Z",
+      "completedAtUTC": "2026-11-09T07:45:18Z",
+      "checkout": [
+        {
+          "line": 149,
+          "sha": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+        }
+      ],
+      "original": {
+        "bytes": 13304,
+        "sha256": "1090e3c94802eb51be6fa1bc41b45396b080672f0c1db5d59bacdd85602de726",
+        "gitBlob": "1479ea99b73f7ab664da7d5f29af68c4b0e8ebbe",
+        "lines": 178,
+        "originalDecoded": true,
+        "format": "Original decoded GitHub job log UTF-8 including BOM/ANSI, no normalization"
+      },
+      "reviewerDownloadCount": 1,
+      "teamDownloadCount": 1,
+      "downloadedAtUTC": "2026-11-09T07:49:04.092Z",
+      "requiredSteps": [
+        {
+          "number": 2,
+          "name": "Require every selected database shard",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Record actual completed job timings",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "conditionalSkippedSteps": [],
+      "platformWarnings": [
+        {
+          "line": 177,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    }
+  ],
+  "reconciliation": {
+    "expectedSuites": 72,
+    "observedSuites": 72,
+    "uniqueSuites": 72,
+    "missing": [],
+    "extra": [],
+    "duplicates": [],
+    "everyFullSelectionEqual": true,
+    "everyShardExact": true,
+    "everySuiteCompleteAndPass": true,
+    "executionSummaries": 91,
+    "totals": {
+      "tests": 3789,
+      "suites": 1,
+      "pass": 3789,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "aggregateGate": {
+      "jobId": 129040339987,
+      "changesSuccess": true,
+      "expectsDb": true,
+      "dbSuccess": true,
+      "lines": [
+        {
+          "line": 50,
+          "text": "CHANGES_RESULT: success"
+        },
+        {
+          "line": 51,
+          "text": "EXPECT_DB: true"
+        },
+        {
+          "line": 52,
+          "text": "DB_RESULT: success"
+        }
+      ],
+      "meaning": "Database-result aggregate plus timing summary only. The display name Production build and browser interactions does not establish a build or browser execution in this job.",
+      "checkout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    "shardEvidence": [
+      {
+        "jobId": 129038242411,
+        "shard": 1,
+        "suiteCount": 18,
+        "totals": {
+          "tests": 741,
+          "suites": 0,
+          "pass": 741,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "selectionLine": 1258,
+        "timingLine": 3968,
+        "selection": {
+          "shard": "1/4",
+          "total": 72,
+          "scripts": [
+            "test:abuse-db",
+            "test:agent-kit-db",
+            "test:audit-db",
+            "test:chat-attachments-db",
+            "test:conversation-reads",
+            "test:coordinator-task-binding-db",
+            "test:device-revocation-db",
+            "test:factory-activity-http-db",
+            "test:factory-checks-db",
+            "test:group-turns",
+            "test:local-repository-migration-db",
+            "test:ops-db",
+            "test:plugins-db",
+            "test:run-dispatch",
+            "test:scope-detachment-db",
+            "test:session-mailbox-db",
+            "test:suggestion-artifact-db",
+            "test:web-auth-db"
+          ]
+        },
+        "timingsMatchSuites": true,
+        "repeatedFullSelectionCount": 18,
+        "repeatedFullSelectionConsistent": true,
+        "allLifecycleCloseSuccess": true
+      },
+      {
+        "jobId": 129038242432,
+        "shard": 2,
+        "suiteCount": 18,
+        "totals": {
+          "tests": 796,
+          "suites": 0,
+          "pass": 796,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "selectionLine": 1176,
+        "timingLine": 6622,
+        "selection": {
+          "shard": "2/4",
+          "total": 72,
+          "scripts": [
+            "test:account-db",
+            "test:agent-tool-approval-db",
+            "test:bot-chats-db",
+            "test:cloud-backend-db",
+            "test:coordinator-issue-create-db",
+            "test:credentials-db",
+            "test:execution-settings-db",
+            "test:factory-all-dispatch-db",
+            "test:factory-monitor-db",
+            "test:groups",
+            "test:migration-steps-db",
+            "test:pat-api-db",
+            "test:preview-driver",
+            "test:run-publication-db",
+            "test:secrets-db",
+            "test:settings-activity-db",
+            "test:test-accounts-db",
+            "test:worker-authorization-db"
+          ]
+        },
+        "timingsMatchSuites": true,
+        "repeatedFullSelectionCount": 16,
+        "repeatedFullSelectionConsistent": true,
+        "allLifecycleCloseSuccess": true
+      },
+      {
+        "jobId": 129038242373,
+        "shard": 3,
+        "suiteCount": 18,
+        "totals": {
+          "tests": 1635,
+          "suites": 1,
+          "pass": 1635,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "selectionLine": 1180,
+        "timingLine": 12860,
+        "selection": {
+          "shard": "3/4",
+          "total": 72,
+          "scripts": [
+            "test:active-agents",
+            "test:approved-writes-db",
+            "test:bot-threads-db",
+            "test:cloud-services-db",
+            "test:coordinator-issue-tools-db",
+            "test:desktop-auth",
+            "test:factory",
+            "test:factory-approval-db",
+            "test:factory-routing-db",
+            "test:issue-search-db",
+            "test:model-admission-db",
+            "test:pat-db",
+            "test:project-decisions-db",
+            "test:run-recovery-db",
+            "test:self-improvement-db",
+            "test:settings-prefs-db",
+            "test:user-facts-db",
+            "test:workspace-admin-db"
+          ]
+        },
+        "timingsMatchSuites": true,
+        "repeatedFullSelectionCount": 16,
+        "repeatedFullSelectionConsistent": true,
+        "allLifecycleCloseSuccess": true
+      },
+      {
+        "jobId": 129038242365,
+        "shard": 4,
+        "suiteCount": 18,
+        "totals": {
+          "tests": 617,
+          "suites": 0,
+          "pass": 617,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "selectionLine": 1186,
+        "timingLine": 3592,
+        "selection": {
+          "shard": "4/4",
+          "total": 72,
+          "scripts": [
+            "test:activity-actor-db",
+            "test:artifact-migration-db",
+            "test:captures-db",
+            "test:computer-db",
+            "test:coordinator-native",
+            "test:device-enrollment-db",
+            "test:factory-activity-db",
+            "test:factory-check-independence-db",
+            "test:github-connections-db",
+            "test:live-db",
+            "test:onboarding-db",
+            "test:personal-mailbox-default-off-db",
+            "test:relation-cycle",
+            "test:schedules-db",
+            "test:self-improvement-unit",
+            "test:skill-semantic-db",
+            "test:visibility-db",
+            "test:workspace-migration-db"
+          ]
+        },
+        "timingsMatchSuites": true,
+        "repeatedFullSelectionCount": 16,
+        "repeatedFullSelectionConsistent": true,
+        "allLifecycleCloseSuccess": true
+      }
+    ],
+    "differenceFrom025": [
+      {
+        "script": "test:secrets-db",
+        "priorTests": 89,
+        "currentTests": 90,
+        "sourceOfPrior": "Frozen prior safe ledger ccce4c2b4e0ca8a696d2ef4ebdadeb4d4ccc302e; no prior original log re-downloaded.",
+        "causeNotInferred": true
+      },
+      {
+        "script": "test:groups",
+        "priorTests": 91,
+        "currentTests": 92,
+        "sourceOfPrior": "Frozen prior safe ledger ccce4c2b4e0ca8a696d2ef4ebdadeb4d4ccc302e; no prior original log re-downloaded.",
+        "causeNotInferred": true
+      }
+    ]
+  },
+  "countingMethod": {
+    "authoritative": "Count each unprefixed Node summary once inside each completed pnpm test:* output group. Ignore earlier [db-runner ... stdout] copies for totals; independently compare those streamed summaries to the canonical group.",
+    "summaryCount": 91,
+    "selectedScriptCount": 72,
+    "selectedScripts": [
+      "test:abuse-db",
+      "test:account-db",
+      "test:active-agents",
+      "test:activity-actor-db",
+      "test:agent-kit-db",
+      "test:agent-tool-approval-db",
+      "test:approved-writes-db",
+      "test:artifact-migration-db",
+      "test:audit-db",
+      "test:bot-chats-db",
+      "test:bot-threads-db",
+      "test:captures-db",
+      "test:chat-attachments-db",
+      "test:cloud-backend-db",
+      "test:cloud-services-db",
+      "test:computer-db",
+      "test:conversation-reads",
+      "test:coordinator-issue-create-db",
+      "test:coordinator-issue-tools-db",
+      "test:coordinator-native",
+      "test:coordinator-task-binding-db",
+      "test:credentials-db",
+      "test:desktop-auth",
+      "test:device-enrollment-db",
+      "test:device-revocation-db",
+      "test:execution-settings-db",
+      "test:factory",
+      "test:factory-activity-db",
+      "test:factory-activity-http-db",
+      "test:factory-all-dispatch-db",
+      "test:factory-approval-db",
+      "test:factory-check-independence-db",
+      "test:factory-checks-db",
+      "test:factory-monitor-db",
+      "test:factory-routing-db",
+      "test:github-connections-db",
+      "test:group-turns",
+      "test:groups",
+      "test:issue-search-db",
+      "test:live-db",
+      "test:local-repository-migration-db",
+      "test:migration-steps-db",
+      "test:model-admission-db",
+      "test:onboarding-db",
+      "test:ops-db",
+      "test:pat-api-db",
+      "test:pat-db",
+      "test:personal-mailbox-default-off-db",
+      "test:plugins-db",
+      "test:preview-driver",
+      "test:project-decisions-db",
+      "test:relation-cycle",
+      "test:run-dispatch",
+      "test:run-publication-db",
+      "test:run-recovery-db",
+      "test:schedules-db",
+      "test:scope-detachment-db",
+      "test:secrets-db",
+      "test:self-improvement-db",
+      "test:self-improvement-unit",
+      "test:session-mailbox-db",
+      "test:settings-activity-db",
+      "test:settings-prefs-db",
+      "test:skill-semantic-db",
+      "test:suggestion-artifact-db",
+      "test:test-accounts-db",
+      "test:user-facts-db",
+      "test:visibility-db",
+      "test:web-auth-db",
+      "test:worker-authorization-db",
+      "test:workspace-admin-db",
+      "test:workspace-migration-db"
+    ],
+    "nodeDescribeSuiteCountIsNotSelectedScriptCount": true,
+    "allGroupsClosed": true,
+    "allScriptOk": true,
+    "allSummaryFieldsComplete": true,
+    "allStreamCopiesMatch": true,
+    "runnerContract": {
+      "path": "scripts/run-db-tests.mjs",
+      "gitBlob": "2d797fb4603f4e668b56439e7dea11d6065dbd46",
+      "lines": [
+        168,
+        179
+      ],
+      "requirements": "nonzero tests, pass==tests, fail/cancelled/skipped/todo==0 and exit0"
+    }
+  },
+  "suiteLedger": [
+    {
+      "script": "test:group-turns",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 1497,
+      "endLine": 1672,
+      "okLine": 1673,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          123,
+          5
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          123,
+          5
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 128,
+        "suites": 0,
+        "pass": 128,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 1646,
+          "metric": "tests",
+          "value": 123
+        },
+        {
+          "line": 1647,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 1648,
+          "metric": "pass",
+          "value": 123
+        },
+        {
+          "line": 1649,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1650,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1651,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1652,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1664,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 1665,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 1666,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 1667,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1668,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1669,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1670,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:audit-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 1832,
+      "endLine": 1929,
+      "okLine": 1930,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          44
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          44
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 44,
+        "suites": 0,
+        "pass": 44,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 1921,
+          "metric": "tests",
+          "value": 44
+        },
+        {
+          "line": 1922,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 1923,
+          "metric": "pass",
+          "value": 44
+        },
+        {
+          "line": 1924,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1925,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1926,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1927,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:conversation-reads",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 1985,
+      "endLine": 2031,
+      "okLine": 2032,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          22
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          22
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 22,
+        "suites": 0,
+        "pass": 22,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2023,
+          "metric": "tests",
+          "value": 22
+        },
+        {
+          "line": 2024,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2025,
+          "metric": "pass",
+          "value": 22
+        },
+        {
+          "line": 2026,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2027,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2028,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2029,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:abuse-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 2206,
+      "endLine": 2289,
+      "okLine": 2290,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          24,
+          5
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          24,
+          5
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 29,
+        "suites": 0,
+        "pass": 29,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2261,
+          "metric": "tests",
+          "value": 24
+        },
+        {
+          "line": 2262,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2263,
+          "metric": "pass",
+          "value": 24
+        },
+        {
+          "line": 2264,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2265,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2266,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2267,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2281,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 2282,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2283,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 2284,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2285,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2286,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2287,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:device-revocation-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 2475,
+      "endLine": 2565,
+      "okLine": 2566,
+      "summaryCount": 3,
+      "counts": {
+        "tests": [
+          16,
+          11,
+          5
+        ],
+        "suites": [
+          0,
+          0,
+          0
+        ],
+        "pass": [
+          16,
+          11,
+          5
+        ],
+        "fail": [
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 32,
+        "suites": 0,
+        "pass": 32,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2500,
+          "metric": "tests",
+          "value": 16
+        },
+        {
+          "line": 2501,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2502,
+          "metric": "pass",
+          "value": 16
+        },
+        {
+          "line": 2503,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2504,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2505,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2506,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2543,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 2544,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2545,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 2546,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2547,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2548,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2549,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2557,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 2558,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2559,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 2560,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2561,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2562,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2563,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:plugins-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 2578,
+      "endLine": 2629,
+      "okLine": 2630,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          18
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          18
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 18,
+        "suites": 0,
+        "pass": 18,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2621,
+          "metric": "tests",
+          "value": 18
+        },
+        {
+          "line": 2622,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2623,
+          "metric": "pass",
+          "value": 18
+        },
+        {
+          "line": 2624,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2625,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2626,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2627,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:agent-kit-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 2694,
+      "endLine": 2753,
+      "okLine": 2754,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          23
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          23
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 23,
+        "suites": 0,
+        "pass": 23,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2745,
+          "metric": "tests",
+          "value": 23
+        },
+        {
+          "line": 2746,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2747,
+          "metric": "pass",
+          "value": 23
+        },
+        {
+          "line": 2748,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2749,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2750,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2751,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:chat-attachments-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 2773,
+      "endLine": 2789,
+      "okLine": 2790,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          6
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          6
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 6,
+        "suites": 0,
+        "pass": 6,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2781,
+          "metric": "tests",
+          "value": 6
+        },
+        {
+          "line": 2782,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2783,
+          "metric": "pass",
+          "value": 6
+        },
+        {
+          "line": 2784,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2785,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2786,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2787,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:coordinator-task-binding-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 2832,
+      "endLine": 2843,
+      "okLine": 2844,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2835,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 2836,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2837,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 2838,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2839,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2840,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2841,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:local-repository-migration-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 2921,
+      "endLine": 2932,
+      "okLine": 2933,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2924,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 2925,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2926,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 2927,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2928,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2929,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2930,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:session-mailbox-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 2955,
+      "endLine": 2970,
+      "okLine": 2971,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          5
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          5
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2962,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 2963,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2964,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 2965,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2966,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2967,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2968,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:scope-detachment-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 3050,
+      "endLine": 3150,
+      "okLine": 3151,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          69
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          69
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 69,
+        "suites": 0,
+        "pass": 69,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 3142,
+          "metric": "tests",
+          "value": 69
+        },
+        {
+          "line": 3143,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3144,
+          "metric": "pass",
+          "value": 69
+        },
+        {
+          "line": 3145,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3146,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3147,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3148,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:suggestion-artifact-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 3176,
+      "endLine": 3193,
+      "okLine": 3194,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          4
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          4
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 4,
+        "suites": 0,
+        "pass": 4,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 3185,
+          "metric": "tests",
+          "value": 4
+        },
+        {
+          "line": 3186,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3187,
+          "metric": "pass",
+          "value": 4
+        },
+        {
+          "line": 3188,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3189,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3190,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3191,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:web-auth-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 3220,
+      "endLine": 3237,
+      "okLine": 3238,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          5
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          5
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 3229,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 3230,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3231,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 3232,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3233,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3234,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3235,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:factory-checks-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 3339,
+      "endLine": 3777,
+      "okLine": 3778,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          320
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          320
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 320,
+        "suites": 0,
+        "pass": 320,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 3769,
+          "metric": "tests",
+          "value": 320
+        },
+        {
+          "line": 3770,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3771,
+          "metric": "pass",
+          "value": 320
+        },
+        {
+          "line": 3772,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3773,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3774,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3775,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:factory-activity-http-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 3798,
+      "endLine": 3816,
+      "okLine": 3817,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          7
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          7
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 7,
+        "suites": 0,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 3808,
+          "metric": "tests",
+          "value": 7
+        },
+        {
+          "line": 3809,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3810,
+          "metric": "pass",
+          "value": 7
+        },
+        {
+          "line": 3811,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3812,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3813,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3814,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:ops-db",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 3868,
+      "endLine": 3922,
+      "okLine": 3923,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          11,
+          6
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          11,
+          6
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 17,
+        "suites": 0,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 3883,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 3884,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3885,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 3886,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3887,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3888,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3889,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3914,
+          "metric": "tests",
+          "value": 6
+        },
+        {
+          "line": 3915,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3916,
+          "metric": "pass",
+          "value": 6
+        },
+        {
+          "line": 3917,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3918,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3919,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3920,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:run-dispatch",
+      "jobId": 129038242411,
+      "shard": 1,
+      "startLine": 3946,
+      "endLine": 3966,
+      "okLine": 3967,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          10
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          10
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 3958,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 3959,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3960,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 3961,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3962,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3963,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3964,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:execution-settings-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 1255,
+      "endLine": 1276,
+      "okLine": 1277,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          5
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          5
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 1268,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 1269,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 1270,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 1271,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1272,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1273,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1274,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:test-accounts-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 1322,
+      "endLine": 1349,
+      "okLine": 1350,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          17
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          17
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 17,
+        "suites": 0,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 1341,
+          "metric": "tests",
+          "value": 17
+        },
+        {
+          "line": 1342,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 1343,
+          "metric": "pass",
+          "value": 17
+        },
+        {
+          "line": 1344,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1345,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1346,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1347,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:account-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 1398,
+      "endLine": 1455,
+      "okLine": 1456,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          40
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          40
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 40,
+        "suites": 0,
+        "pass": 40,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 1447,
+          "metric": "tests",
+          "value": 40
+        },
+        {
+          "line": 1448,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 1449,
+          "metric": "pass",
+          "value": 40
+        },
+        {
+          "line": 1450,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1451,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1452,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1453,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:worker-authorization-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 2778,
+      "endLine": 2920,
+      "okLine": 2921,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          76
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          76
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 76,
+        "suites": 0,
+        "pass": 76,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2912,
+          "metric": "tests",
+          "value": 76
+        },
+        {
+          "line": 2913,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2914,
+          "metric": "pass",
+          "value": 76
+        },
+        {
+          "line": 2915,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2916,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2917,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2918,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:cloud-backend-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 3541,
+      "endLine": 5030,
+      "okLine": 5031,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          215
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          215
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 215,
+        "suites": 0,
+        "pass": 215,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 5022,
+          "metric": "tests",
+          "value": 215
+        },
+        {
+          "line": 5023,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 5024,
+          "metric": "pass",
+          "value": 215
+        },
+        {
+          "line": 5025,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5026,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5027,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5028,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:factory-monitor-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 5092,
+      "endLine": 5138,
+      "okLine": 5139,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          2,
+          10
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          2,
+          10
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 12,
+        "suites": 0,
+        "pass": 12,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 5099,
+          "metric": "tests",
+          "value": 2
+        },
+        {
+          "line": 5100,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 5101,
+          "metric": "pass",
+          "value": 2
+        },
+        {
+          "line": 5102,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5103,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5104,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5105,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5130,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 5131,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 5132,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 5133,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5134,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5135,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5136,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:secrets-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 5208,
+      "endLine": 5313,
+      "okLine": 5314,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          90
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          90
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 90,
+        "suites": 0,
+        "pass": 90,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 5305,
+          "metric": "tests",
+          "value": 90
+        },
+        {
+          "line": 5306,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 5307,
+          "metric": "pass",
+          "value": 90
+        },
+        {
+          "line": 5308,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5309,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5310,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5311,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:groups",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 5330,
+      "endLine": 5466,
+      "okLine": 5467,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          12,
+          80
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          12,
+          80
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 92,
+        "suites": 0,
+        "pass": 92,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 5345,
+          "metric": "tests",
+          "value": 12
+        },
+        {
+          "line": 5346,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 5347,
+          "metric": "pass",
+          "value": 12
+        },
+        {
+          "line": 5348,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5349,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5350,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5351,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5458,
+          "metric": "tests",
+          "value": 80
+        },
+        {
+          "line": 5459,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 5460,
+          "metric": "pass",
+          "value": 80
+        },
+        {
+          "line": 5461,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5462,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5463,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5464,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:bot-chats-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 5524,
+      "endLine": 5774,
+      "okLine": 5775,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          144
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          144
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 144,
+        "suites": 0,
+        "pass": 144,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 5766,
+          "metric": "tests",
+          "value": 144
+        },
+        {
+          "line": 5767,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 5768,
+          "metric": "pass",
+          "value": 144
+        },
+        {
+          "line": 5769,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5770,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5771,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5772,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:coordinator-issue-create-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 5870,
+      "endLine": 5890,
+      "okLine": 5891,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          10
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          10
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 5882,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 5883,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 5884,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 5885,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5886,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5887,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5888,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:pat-api-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 5996,
+      "endLine": 6145,
+      "okLine": 6146,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          38
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          38
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 38,
+        "suites": 0,
+        "pass": 38,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 6137,
+          "metric": "tests",
+          "value": 38
+        },
+        {
+          "line": 6138,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6139,
+          "metric": "pass",
+          "value": 38
+        },
+        {
+          "line": 6140,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6141,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6142,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6143,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:credentials-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 6182,
+      "endLine": 6194,
+      "okLine": 6195,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          3
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          3
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 3,
+        "suites": 0,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 6186,
+          "metric": "tests",
+          "value": 3
+        },
+        {
+          "line": 6187,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6188,
+          "metric": "pass",
+          "value": 3
+        },
+        {
+          "line": 6189,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6190,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6191,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6192,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:migration-steps-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 6224,
+      "endLine": 6237,
+      "okLine": 6238,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 6229,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 6230,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6231,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 6232,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6233,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6234,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6235,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:preview-driver",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 6260,
+      "endLine": 6270,
+      "okLine": 6271,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 6262,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 6263,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6264,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 6265,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6266,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6267,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6268,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:run-publication-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 6317,
+      "endLine": 6397,
+      "okLine": 6398,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          24,
+          1
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          24,
+          1
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 25,
+        "suites": 0,
+        "pass": 25,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 6352,
+          "metric": "tests",
+          "value": 24
+        },
+        {
+          "line": 6353,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6354,
+          "metric": "pass",
+          "value": 24
+        },
+        {
+          "line": 6355,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6356,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6357,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6358,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6389,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 6390,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6391,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 6392,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6393,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6394,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6395,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:factory-all-dispatch-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 6454,
+      "endLine": 6508,
+      "okLine": 6509,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          2
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 6500,
+          "metric": "tests",
+          "value": 2
+        },
+        {
+          "line": 6501,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6502,
+          "metric": "pass",
+          "value": 2
+        },
+        {
+          "line": 6503,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6504,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6505,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6506,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:settings-activity-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 6532,
+      "endLine": 6553,
+      "okLine": 6554,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          6
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          6
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 6,
+        "suites": 0,
+        "pass": 6,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 6545,
+          "metric": "tests",
+          "value": 6
+        },
+        {
+          "line": 6546,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6547,
+          "metric": "pass",
+          "value": 6
+        },
+        {
+          "line": 6548,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6549,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6550,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6551,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:agent-tool-approval-db",
+      "jobId": 129038242432,
+      "shard": 2,
+      "startLine": 6566,
+      "endLine": 6620,
+      "okLine": 6621,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          16,
+          3
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          16,
+          3
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 19,
+        "suites": 0,
+        "pass": 19,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 6585,
+          "metric": "tests",
+          "value": 16
+        },
+        {
+          "line": 6586,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6587,
+          "metric": "pass",
+          "value": 16
+        },
+        {
+          "line": 6588,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6589,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6590,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6591,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6611,
+          "metric": "tests",
+          "value": 3
+        },
+        {
+          "line": 6612,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6613,
+          "metric": "pass",
+          "value": 3
+        },
+        {
+          "line": 6614,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6615,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6616,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6617,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:desktop-auth",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 2571,
+      "endLine": 2833,
+      "okLine": 2834,
+      "summaryCount": 4,
+      "counts": {
+        "tests": [
+          70,
+          3,
+          11,
+          44
+        ],
+        "suites": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "pass": [
+          70,
+          3,
+          11,
+          44
+        ],
+        "fail": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 128,
+        "suites": 0,
+        "pass": 128,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2642,
+          "metric": "tests",
+          "value": 70
+        },
+        {
+          "line": 2643,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2644,
+          "metric": "pass",
+          "value": 70
+        },
+        {
+          "line": 2645,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2646,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2647,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2648,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2653,
+          "metric": "tests",
+          "value": 3
+        },
+        {
+          "line": 2654,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2655,
+          "metric": "pass",
+          "value": 3
+        },
+        {
+          "line": 2656,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2657,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2658,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2659,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2733,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 2734,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2735,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 2736,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2737,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2738,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2739,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2825,
+          "metric": "tests",
+          "value": 44
+        },
+        {
+          "line": 2826,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2827,
+          "metric": "pass",
+          "value": 44
+        },
+        {
+          "line": 2828,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2829,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2830,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2831,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:workspace-admin-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 4167,
+      "endLine": 4314,
+      "okLine": 4315,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          109
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          109
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 109,
+        "suites": 0,
+        "pass": 109,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 4306,
+          "metric": "tests",
+          "value": 109
+        },
+        {
+          "line": 4307,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 4308,
+          "metric": "pass",
+          "value": 109
+        },
+        {
+          "line": 4309,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4310,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4311,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4312,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:factory",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 4689,
+      "endLine": 5247,
+      "okLine": 5248,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          511
+        ],
+        "suites": [
+          1
+        ],
+        "pass": [
+          511
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 511,
+        "suites": 1,
+        "pass": 511,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 5239,
+          "metric": "tests",
+          "value": 511
+        },
+        {
+          "line": 5240,
+          "metric": "suites",
+          "value": 1
+        },
+        {
+          "line": 5241,
+          "metric": "pass",
+          "value": 511
+        },
+        {
+          "line": 5242,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5243,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5244,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5245,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:self-improvement-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 5938,
+      "endLine": 5983,
+      "okLine": 5984,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          28
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          28
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 28,
+        "suites": 0,
+        "pass": 28,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 5975,
+          "metric": "tests",
+          "value": 28
+        },
+        {
+          "line": 5976,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 5977,
+          "metric": "pass",
+          "value": 28
+        },
+        {
+          "line": 5978,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5979,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5980,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5981,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:factory-approval-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 6740,
+      "endLine": 6858,
+      "okLine": 6859,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          52
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          52
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 52,
+        "suites": 0,
+        "pass": 52,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 6850,
+          "metric": "tests",
+          "value": 52
+        },
+        {
+          "line": 6851,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 6852,
+          "metric": "pass",
+          "value": 52
+        },
+        {
+          "line": 6853,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6854,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6855,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6856,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:project-decisions-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 7577,
+      "endLine": 8059,
+      "okLine": 8060,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          39
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          39
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 39,
+        "suites": 0,
+        "pass": 39,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 8051,
+          "metric": "tests",
+          "value": 39
+        },
+        {
+          "line": 8052,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 8053,
+          "metric": "pass",
+          "value": 39
+        },
+        {
+          "line": 8054,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 8055,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 8056,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 8057,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:approved-writes-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 8292,
+      "endLine": 8319,
+      "okLine": 8320,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          10
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          10
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 8311,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 8312,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 8313,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 8314,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 8315,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 8316,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 8317,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:factory-routing-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 8402,
+      "endLine": 9016,
+      "okLine": 9017,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          282,
+          5
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          282,
+          5
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 287,
+        "suites": 0,
+        "pass": 287,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 8987,
+          "metric": "tests",
+          "value": 282
+        },
+        {
+          "line": 8988,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 8989,
+          "metric": "pass",
+          "value": 282
+        },
+        {
+          "line": 8990,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 8991,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 8992,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 8993,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 9008,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 9009,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 9010,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 9011,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 9012,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 9013,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 9014,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:cloud-services-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 9070,
+      "endLine": 9095,
+      "okLine": 9096,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          10
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          10
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 9087,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 9088,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 9089,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 9090,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 9091,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 9092,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 9093,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:model-admission-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 9138,
+      "endLine": 9200,
+      "okLine": 9201,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          13,
+          1
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          13,
+          1
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 14,
+        "suites": 0,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 9180,
+          "metric": "tests",
+          "value": 13
+        },
+        {
+          "line": 9181,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 9182,
+          "metric": "pass",
+          "value": 13
+        },
+        {
+          "line": 9183,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 9184,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 9185,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 9186,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 9192,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 9193,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 9194,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 9195,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 9196,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 9197,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 9198,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:bot-threads-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 9230,
+      "endLine": 12140,
+      "okLine": 12141,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          338
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          338
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 338,
+        "suites": 0,
+        "pass": 338,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 12132,
+          "metric": "tests",
+          "value": 338
+        },
+        {
+          "line": 12133,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12134,
+          "metric": "pass",
+          "value": 338
+        },
+        {
+          "line": 12135,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12136,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12137,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12138,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:run-recovery-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 12163,
+      "endLine": 12595,
+      "okLine": 12596,
+      "summaryCount": 5,
+      "counts": {
+        "tests": [
+          20,
+          9,
+          11,
+          12,
+          9
+        ],
+        "suites": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "pass": [
+          20,
+          9,
+          11,
+          12,
+          9
+        ],
+        "fail": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 61,
+        "suites": 0,
+        "pass": 61,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 12186,
+          "metric": "tests",
+          "value": 20
+        },
+        {
+          "line": 12187,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12188,
+          "metric": "pass",
+          "value": 20
+        },
+        {
+          "line": 12189,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12190,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12191,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12192,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 12345,
+          "metric": "tests",
+          "value": 9
+        },
+        {
+          "line": 12346,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12347,
+          "metric": "pass",
+          "value": 9
+        },
+        {
+          "line": 12348,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12349,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12350,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12351,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 12548,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 12549,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12550,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 12551,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12552,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12553,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12554,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 12569,
+          "metric": "tests",
+          "value": 12
+        },
+        {
+          "line": 12570,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12571,
+          "metric": "pass",
+          "value": 12
+        },
+        {
+          "line": 12572,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12573,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12574,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12575,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 12587,
+          "metric": "tests",
+          "value": 9
+        },
+        {
+          "line": 12588,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12589,
+          "metric": "pass",
+          "value": 9
+        },
+        {
+          "line": 12590,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12591,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12592,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12593,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:coordinator-issue-tools-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 12612,
+      "endLine": 12625,
+      "okLine": 12626,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          2
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 12617,
+          "metric": "tests",
+          "value": 2
+        },
+        {
+          "line": 12618,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12619,
+          "metric": "pass",
+          "value": 2
+        },
+        {
+          "line": 12620,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12621,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12622,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12623,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:pat-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 12651,
+      "endLine": 12673,
+      "okLine": 12674,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          12
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          12
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 12,
+        "suites": 0,
+        "pass": 12,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 12665,
+          "metric": "tests",
+          "value": 12
+        },
+        {
+          "line": 12666,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12667,
+          "metric": "pass",
+          "value": 12
+        },
+        {
+          "line": 12668,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12669,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12670,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12671,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:user-facts-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 12715,
+      "endLine": 12725,
+      "okLine": 12726,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 12717,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 12718,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12719,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 12720,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12721,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12722,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12723,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:issue-search-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 12750,
+      "endLine": 12778,
+      "okLine": 12779,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          8
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          8
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 8,
+        "suites": 0,
+        "pass": 8,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 12770,
+          "metric": "tests",
+          "value": 8
+        },
+        {
+          "line": 12771,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12772,
+          "metric": "pass",
+          "value": 8
+        },
+        {
+          "line": 12773,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12774,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12775,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12776,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:active-agents",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 12798,
+      "endLine": 12822,
+      "okLine": 12823,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          14
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          14
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 14,
+        "suites": 0,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 12814,
+          "metric": "tests",
+          "value": 14
+        },
+        {
+          "line": 12815,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12816,
+          "metric": "pass",
+          "value": 14
+        },
+        {
+          "line": 12817,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12818,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12819,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12820,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:settings-prefs-db",
+      "jobId": 129038242373,
+      "shard": 3,
+      "startLine": 12834,
+      "endLine": 12858,
+      "okLine": 12859,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          11
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          11
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 11,
+        "suites": 0,
+        "pass": 11,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 12850,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 12851,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 12852,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 12853,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 12854,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 12855,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 12856,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:self-improvement-unit",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 1415,
+      "endLine": 1554,
+      "okLine": 1555,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          100
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          100
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 100,
+        "suites": 0,
+        "pass": 100,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 1546,
+          "metric": "tests",
+          "value": 100
+        },
+        {
+          "line": 1547,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 1548,
+          "metric": "pass",
+          "value": 100
+        },
+        {
+          "line": 1549,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1550,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1551,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1552,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:coordinator-native",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 1626,
+      "endLine": 1677,
+      "okLine": 1678,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          36
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          36
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 36,
+        "suites": 0,
+        "pass": 36,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 1669,
+          "metric": "tests",
+          "value": 36
+        },
+        {
+          "line": 1670,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 1671,
+          "metric": "pass",
+          "value": 36
+        },
+        {
+          "line": 1672,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1673,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1674,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1675,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:computer-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 1725,
+      "endLine": 1750,
+      "okLine": 1751,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          8
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          8
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 8,
+        "suites": 0,
+        "pass": 8,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 1742,
+          "metric": "tests",
+          "value": 8
+        },
+        {
+          "line": 1743,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 1744,
+          "metric": "pass",
+          "value": 8
+        },
+        {
+          "line": 1745,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1746,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1747,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1748,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:github-connections-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 1864,
+      "endLine": 1954,
+      "okLine": 1955,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          24
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          24
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 24,
+        "suites": 0,
+        "pass": 24,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 1946,
+          "metric": "tests",
+          "value": 24
+        },
+        {
+          "line": 1947,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 1948,
+          "metric": "pass",
+          "value": 24
+        },
+        {
+          "line": 1949,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1950,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1951,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1952,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:factory-activity-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2057,
+      "endLine": 2116,
+      "okLine": 2117,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          45
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          45
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 45,
+        "suites": 0,
+        "pass": 45,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2108,
+          "metric": "tests",
+          "value": 45
+        },
+        {
+          "line": 2109,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2110,
+          "metric": "pass",
+          "value": 45
+        },
+        {
+          "line": 2111,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2112,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2113,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2114,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:personal-mailbox-default-off-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2184,
+      "endLine": 2243,
+      "okLine": 2244,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          42
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          42
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 42,
+        "suites": 0,
+        "pass": 42,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2235,
+          "metric": "tests",
+          "value": 42
+        },
+        {
+          "line": 2236,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2237,
+          "metric": "pass",
+          "value": 42
+        },
+        {
+          "line": 2238,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2239,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2240,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2241,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:schedules-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2359,
+      "endLine": 2387,
+      "okLine": 2388,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          16
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          16
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 16,
+        "suites": 0,
+        "pass": 16,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2379,
+          "metric": "tests",
+          "value": 16
+        },
+        {
+          "line": 2380,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2381,
+          "metric": "pass",
+          "value": 16
+        },
+        {
+          "line": 2382,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2383,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2384,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2385,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:skill-semantic-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2407,
+      "endLine": 2421,
+      "okLine": 2422,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          2
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2413,
+          "metric": "tests",
+          "value": 2
+        },
+        {
+          "line": 2414,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2415,
+          "metric": "pass",
+          "value": 2
+        },
+        {
+          "line": 2416,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2417,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2418,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2419,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:captures-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2434,
+      "endLine": 2488,
+      "okLine": 2489,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          29
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          29
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 29,
+        "suites": 0,
+        "pass": 29,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2480,
+          "metric": "tests",
+          "value": 29
+        },
+        {
+          "line": 2481,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2482,
+          "metric": "pass",
+          "value": 29
+        },
+        {
+          "line": 2483,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2484,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2485,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2486,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:artifact-migration-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2502,
+      "endLine": 2512,
+      "okLine": 2513,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2504,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 2505,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2506,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 2507,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2508,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2509,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2510,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:visibility-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2538,
+      "endLine": 2549,
+      "okLine": 2550,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          2
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 2,
+        "suites": 0,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2541,
+          "metric": "tests",
+          "value": 2
+        },
+        {
+          "line": 2542,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2543,
+          "metric": "pass",
+          "value": 2
+        },
+        {
+          "line": 2544,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2545,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2546,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2547,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:factory-check-independence-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2628,
+      "endLine": 2694,
+      "okLine": 2695,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          55
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          55
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 55,
+        "suites": 0,
+        "pass": 55,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2686,
+          "metric": "tests",
+          "value": 55
+        },
+        {
+          "line": 2687,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2688,
+          "metric": "pass",
+          "value": 55
+        },
+        {
+          "line": 2689,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2690,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2691,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2692,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:onboarding-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2717,
+      "endLine": 2736,
+      "okLine": 2737,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          5
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          5
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2728,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 2729,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2730,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 2731,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2732,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2733,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2734,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:relation-cycle",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2896,
+      "endLine": 2917,
+      "okLine": 2918,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          6
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          6
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 6,
+        "suites": 0,
+        "pass": 6,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2909,
+          "metric": "tests",
+          "value": 6
+        },
+        {
+          "line": 2910,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2911,
+          "metric": "pass",
+          "value": 6
+        },
+        {
+          "line": 2912,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2913,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2914,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2915,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:workspace-migration-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 2931,
+      "endLine": 2941,
+      "okLine": 2942,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          1
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 2933,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 2934,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 2935,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 2936,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2937,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2938,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2939,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:activity-actor-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 3018,
+      "endLine": 3202,
+      "okLine": 3203,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          57
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          57
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 57,
+        "suites": 0,
+        "pass": 57,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 3194,
+          "metric": "tests",
+          "value": 57
+        },
+        {
+          "line": 3195,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3196,
+          "metric": "pass",
+          "value": 57
+        },
+        {
+          "line": 3197,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3198,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3199,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3200,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:device-enrollment-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 3214,
+      "endLine": 3244,
+      "okLine": 3245,
+      "summaryCount": 1,
+      "counts": {
+        "tests": [
+          13
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          13
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "totals": {
+        "tests": 13,
+        "suites": 0,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 3236,
+          "metric": "tests",
+          "value": 13
+        },
+        {
+          "line": 3237,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3238,
+          "metric": "pass",
+          "value": 13
+        },
+        {
+          "line": 3239,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3240,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3241,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3242,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "script": "test:live-db",
+      "jobId": 129038242365,
+      "shard": 4,
+      "startLine": 3294,
+      "endLine": 3590,
+      "okLine": 3591,
+      "summaryCount": 2,
+      "counts": {
+        "tests": [
+          10,
+          165
+        ],
+        "suites": [
+          0,
+          0
+        ],
+        "pass": [
+          10,
+          165
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "totals": {
+        "tests": 175,
+        "suites": 0,
+        "pass": 175,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "allSummariesComplete": true,
+      "everySummaryPassed": true,
+      "streamCountsEqual": true,
+      "ok": true,
+      "summaryLines": [
+        {
+          "line": 3312,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 3313,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3314,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 3315,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3316,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3317,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3318,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3582,
+          "metric": "tests",
+          "value": 165
+        },
+        {
+          "line": 3583,
+          "metric": "suites",
+          "value": 0
+        },
+        {
+          "line": 3584,
+          "metric": "pass",
+          "value": 165
+        },
+        {
+          "line": 3585,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3586,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3587,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3588,
+          "metric": "todo",
+          "value": 0
+        }
+      ]
+    }
+  ],
+  "lifecycle": [
+    {
+      "jobId": 129038242411,
+      "closes": [
+        {
+          "script": "test:group-turns",
+          "line": 1496,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:audit-db",
+          "line": 1831,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:conversation-reads",
+          "line": 1984,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:abuse-db",
+          "line": 2205,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:device-revocation-db",
+          "line": 2474,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:plugins-db",
+          "line": 2577,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:agent-kit-db",
+          "line": 2693,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:chat-attachments-db",
+          "line": 2772,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:coordinator-task-binding-db",
+          "line": 2831,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:local-repository-migration-db",
+          "line": 2920,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:session-mailbox-db",
+          "line": 2954,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:scope-detachment-db",
+          "line": 3049,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:suggestion-artifact-db",
+          "line": 3175,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:web-auth-db",
+          "line": 3219,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:factory-checks-db",
+          "line": 3338,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:factory-activity-http-db",
+          "line": 3797,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:ops-db",
+          "line": 3867,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:run-dispatch",
+          "line": 3945,
+          "exitCode": 0,
+          "signal": "none"
+        }
+      ],
+      "count": 18,
+      "allSuccess": true
+    },
+    {
+      "jobId": 129038242432,
+      "closes": [
+        {
+          "script": "test:execution-settings-db",
+          "line": 1254,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:test-accounts-db",
+          "line": 1321,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:account-db",
+          "line": 1397,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:worker-authorization-db",
+          "line": 2777,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:cloud-backend-db",
+          "line": 3540,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:factory-monitor-db",
+          "line": 5091,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:secrets-db",
+          "line": 5207,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:groups",
+          "line": 5329,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:bot-chats-db",
+          "line": 5523,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:coordinator-issue-create-db",
+          "line": 5869,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:pat-api-db",
+          "line": 5995,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:credentials-db",
+          "line": 6181,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:migration-steps-db",
+          "line": 6223,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:preview-driver",
+          "line": 6259,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:run-publication-db",
+          "line": 6316,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:factory-all-dispatch-db",
+          "line": 6453,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:settings-activity-db",
+          "line": 6531,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:agent-tool-approval-db",
+          "line": 6565,
+          "exitCode": 0,
+          "signal": "none"
+        }
+      ],
+      "count": 18,
+      "allSuccess": true
+    },
+    {
+      "jobId": 129038242373,
+      "closes": [
+        {
+          "script": "test:desktop-auth",
+          "line": 2570,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:workspace-admin-db",
+          "line": 4166,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:factory",
+          "line": 4688,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:self-improvement-db",
+          "line": 5937,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:factory-approval-db",
+          "line": 6739,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:project-decisions-db",
+          "line": 7576,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:approved-writes-db",
+          "line": 8291,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:factory-routing-db",
+          "line": 8401,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:cloud-services-db",
+          "line": 9069,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:model-admission-db",
+          "line": 9137,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:bot-threads-db",
+          "line": 9229,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:run-recovery-db",
+          "line": 12162,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:coordinator-issue-tools-db",
+          "line": 12611,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:pat-db",
+          "line": 12650,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:user-facts-db",
+          "line": 12714,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:issue-search-db",
+          "line": 12749,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:active-agents",
+          "line": 12797,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:settings-prefs-db",
+          "line": 12833,
+          "exitCode": 0,
+          "signal": "none"
+        }
+      ],
+      "count": 18,
+      "allSuccess": true
+    },
+    {
+      "jobId": 129038242365,
+      "closes": [
+        {
+          "script": "test:self-improvement-unit",
+          "line": 1414,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:coordinator-native",
+          "line": 1625,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:computer-db",
+          "line": 1724,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:github-connections-db",
+          "line": 1863,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:factory-activity-db",
+          "line": 2056,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:personal-mailbox-default-off-db",
+          "line": 2183,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:schedules-db",
+          "line": 2358,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:skill-semantic-db",
+          "line": 2406,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:captures-db",
+          "line": 2433,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:artifact-migration-db",
+          "line": 2501,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:visibility-db",
+          "line": 2537,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:factory-check-independence-db",
+          "line": 2627,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:onboarding-db",
+          "line": 2716,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:relation-cycle",
+          "line": 2895,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:workspace-migration-db",
+          "line": 2930,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:activity-actor-db",
+          "line": 3017,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:device-enrollment-db",
+          "line": 3213,
+          "exitCode": 0,
+          "signal": "none"
+        },
+        {
+          "script": "test:live-db",
+          "line": 3293,
+          "exitCode": 0,
+          "signal": "none"
+        }
+      ],
+      "count": 18,
+      "allSuccess": true
+    }
+  ],
+  "targetedEvidence": {
+    "deviceSuites": [
+      {
+        "script": "test:device-revocation-db",
+        "jobId": 129038242411,
+        "startLine": 2475,
+        "endLine": 2565,
+        "counts": {
+          "tests": [
+            16,
+            11,
+            5
+          ],
+          "suites": [
+            0,
+            0,
+            0
+          ],
+          "pass": [
+            16,
+            11,
+            5
+          ],
+          "fail": [
+            0,
+            0,
+            0
+          ],
+          "cancelled": [
+            0,
+            0,
+            0
+          ],
+          "skipped": [
+            0,
+            0,
+            0
+          ],
+          "todo": [
+            0,
+            0,
+            0
+          ]
+        },
+        "metrics": [
+          {
+            "line": 2497,
+            "value": {
+              "queuedRunsRequestDbBytes": 432
+            }
+          },
+          {
+            "line": 2523,
+            "value": {
+              "scenario": "runs-empty-poll",
+              "statements": 2
+            }
+          },
+          {
+            "line": 2525,
+            "value": {
+              "scenario": "repos-empty-poll",
+              "statements": 2
+            }
+          },
+          {
+            "line": 2527,
+            "value": {
+              "metric": "initial_repository_task_delta",
+              "scenario": "missing",
+              "unchangedTaskPrefixSuffixExcluded": true,
+              "protocol": "PostgreSQL messages, excluding TCP/TLS/connect; HTTP JSON bodies separately",
+              "original": {
+                "queries": 8,
+                "sqlBytes": 1520,
+                "resultRows": 4,
+                "sentBytes": 2562,
+                "receivedBytes": 1242
+              },
+              "candidate": {
+                "queries": 1,
+                "sqlBytes": 214,
+                "resultRows": 0,
+                "sentBytes": 366,
+                "receivedBytes": 228
+              },
+              "oldResponseBytes": 331,
+              "nextResponseBytes": 327,
+              "sqlDelta": -7,
+              "rowDelta": -4,
+              "wireDelta": -3210,
+              "responseBodyDelta": -4
+            }
+          },
+          {
+            "line": 2528,
+            "value": {
+              "metric": "initial_repository_task_delta",
+              "scenario": "complete",
+              "unchangedTaskPrefixSuffixExcluded": true,
+              "protocol": "PostgreSQL messages, excluding TCP/TLS/connect; HTTP JSON bodies separately",
+              "original": {
+                "queries": 8,
+                "sqlBytes": 1520,
+                "resultRows": 6,
+                "sentBytes": 2562,
+                "receivedBytes": 1588
+              },
+              "candidate": {
+                "queries": 1,
+                "sqlBytes": 214,
+                "resultRows": 1,
+                "sentBytes": 366,
+                "receivedBytes": 469
+              },
+              "oldResponseBytes": 441,
+              "nextResponseBytes": 437,
+              "sqlDelta": -7,
+              "rowDelta": -5,
+              "wireDelta": -3315,
+              "responseBodyDelta": -4
+            }
+          },
+          {
+            "line": 2529,
+            "value": {
+              "metric": "initial_repository_task_delta",
+              "scenario": "unicode",
+              "unchangedTaskPrefixSuffixExcluded": true,
+              "protocol": "PostgreSQL messages, excluding TCP/TLS/connect; HTTP JSON bodies separately",
+              "original": {
+                "queries": 8,
+                "sqlBytes": 1520,
+                "resultRows": 6,
+                "sentBytes": 2562,
+                "receivedBytes": 5186
+              },
+              "candidate": {
+                "queries": 1,
+                "sqlBytes": 214,
+                "resultRows": 1,
+                "sentBytes": 366,
+                "receivedBytes": 2268
+              },
+              "oldResponseBytes": 2240,
+              "nextResponseBytes": 2236,
+              "sqlDelta": -7,
+              "rowDelta": -5,
+              "wireDelta": -5114,
+              "responseBodyDelta": -4
+            }
+          },
+          {
+            "line": 2542,
+            "value": {
+              "routes": 31
+            }
+          },
+          {
+            "line": 2556,
+            "value": {
+              "perStatement": {
+                "completed": 3,
+                "roundTrips": 11,
+                "explicit": 2
+              },
+              "perUnit": {
+                "completed": 4,
+                "roundTrips": 6,
+                "explicit": 1
+              },
+              "measurement": "backend_command_tags_and_ready_for_query"
+            }
+          }
+        ],
+        "titles": [
+          {
+            "line": 2477,
+            "text": "✔ normal demo cleanup stops active runs, preserves history and excludes prefix/version lookalikes (9109.976004ms)"
+          },
+          {
+            "line": 2478,
+            "text": "✔ committed messages push addresses, notification receipts preserve read and ACK semantics (115.30047ms)"
+          },
+          {
+            "line": 2479,
+            "text": "✔ stopped, terminal, expired, disabled and cross-owner runs never receive notifications (17.1078ms)"
+          },
+          {
+            "line": 2480,
+            "text": "✔ real Postgres: idle gateway presence drives dispatch, device selection and post-commit uninstall (3401.760682ms)"
+          },
+          {
+            "line": 2481,
+            "text": "✔ owner revoke stops attributed work, revokes worker access, records once and preserves sibling credentials (247.809566ms)"
+          },
+          {
+            "line": 2482,
+            "text": "✔ a receipt write fault rolls token, stop, lease and worker revocation back atomically (99.596714ms)"
+          },
+          {
+            "line": 2483,
+            "text": "✔ a revocation waits for the admitted writer transaction, and later raw/ORM admissions all refuse (151.704789ms)"
+          },
+          {
+            "line": 2484,
+            "text": "✔ the actual event route accepts before revoke and rejects the old token after a fresh request scope (114.510011ms)"
+          },
+          {
+            "line": 2485,
+            "text": "✔ revocation while the real event handler waits for its body prevents the later write (1038.162842ms)"
+          },
+          {
+            "line": 2486,
+            "text": "✔ terminating an admitted write connection rolls back both the write and authority lock (33.13632ms)"
+          },
+          {
+            "line": 2489,
+            "text": "✔ a long poll loses token authority within its five-second database polling interval (2046.371196ms)"
+          },
+          {
+            "line": 2494,
+            "text": "✔ with push, revocation ends a waiting long poll on its NOTIFY, long before any timer; a lost NOTIFY still fails it at the deadline (4129.221546ms)"
+          },
+          {
+            "line": 2495,
+            "text": "✔ existing device removal still refuses live work, then records revocation without deleting history (57.175894ms)"
+          },
+          {
+            "line": 2496,
+            "text": "✔ a device request is fenced by its first statement, with no check up front, and reads no device report it does not use (47.373254ms)"
+          },
+          {
+            "line": 2498,
+            "text": "✔ one read of a device's runs finds its stops, messages and queued runs (961.81552ms)"
+          },
+          {
+            "line": 2499,
+            "text": "✔ the idle check answers in one statement, finds the same work and pending device commands, and refuses a revoked credential (114.091109ms)"
+          },
+          {
+            "line": 2512,
+            "text": "  ✔ the same credential remains valid for its established heartbeat route (90.727294ms)"
+          },
+          {
+            "line": 2513,
+            "text": "  ✔ own run renewal passes route authentication and reaches issuance once (56.411326ms)"
+          },
+          {
+            "line": 2514,
+            "text": "  ✔ another device and another run remain refused before issuance (10.780564ms)"
+          },
+          {
+            "line": 2515,
+            "text": "  ✔ an ended machine cannot obtain a new lease (5.968595ms)"
+          },
+          {
+            "line": 2516,
+            "text": "  ✔ revoked cloud credentials remain refused (1.839869ms)"
+          },
+          {
+            "line": 2517,
+            "text": "✔ a bound cloud device can renew its own subscription lease through the actual route (2019.432612ms)"
+          },
+          {
+            "line": 2521,
+            "text": "✔ a heartbeat re-checks execution identities only when the harnesses change or the device comes back, and renews the leases of the runs it reports (5477.927979ms)"
+          },
+          {
+            "line": 2522,
+            "text": "✔ runs poll reads current authority, ownership and results in one snapshot (155.635942ms)"
+          },
+          {
+            "line": 2524,
+            "text": "✔ repos poll reads current authority, ownership and results in one snapshot (95.455722ms)"
+          },
+          {
+            "line": 2526,
+            "text": "✔ initial claim repository handoff removes a real cloud repos request without increasing SQL, rows or response bytes (170.403304ms)"
+          },
+          {
+            "line": 2541,
+            "text": "✔ every device route refuses a token revoked after authentication before it calls out or issues anything (6108.793032ms)"
+          },
+          {
+            "line": 2551,
+            "text": "✔ a revocation waits for the burst in flight; the next burst answers 401 (1156.744973ms)"
+          },
+          {
+            "line": 2552,
+            "text": "✔ between bursts (a wait, network IO) the fence is not held: a revocation goes through at once (1312.948622ms)"
+          },
+          {
+            "line": 2553,
+            "text": "✔ a hung unit loses its fence after 10 s; the revocation then completes and the unit fails closed (4018.906322ms)"
+          },
+          {
+            "line": 2554,
+            "text": "✔ when no fence connection can be had the request is refused with 503, never run unfenced (2375.795348ms)"
+          },
+          {
+            "line": 2555,
+            "text": "✔ ten concurrent multi-statement device requests complete with three fence connections; fewer authorization transactions and round trips than one fence per statement (154.145347ms)"
+          }
+        ]
+      },
+      {
+        "script": "test:device-enrollment-db",
+        "jobId": 129038242365,
+        "startLine": 3214,
+        "endLine": 3244,
+        "counts": {
+          "tests": [
+            13
+          ],
+          "suites": [
+            0
+          ],
+          "pass": [
+            13
+          ],
+          "fail": [
+            0
+          ],
+          "cancelled": [
+            0
+          ],
+          "skipped": [
+            0
+          ],
+          "todo": [
+            0
+          ]
+        },
+        "metrics": [
+          {
+            "line": 3223,
+            "value": {
+              "scenario": "enrollment-consumption",
+              "statements": 1
+            }
+          },
+          {
+            "line": 3230,
+            "value": {
+              "scenario": "disabled-device",
+              "statements": 1
+            }
+          },
+          {
+            "line": 3231,
+            "value": {
+              "scenario": "removed-device",
+              "statements": 1
+            }
+          },
+          {
+            "line": 3232,
+            "value": {
+              "scenario": "empty-device",
+              "statements": 1
+            }
+          },
+          {
+            "line": 3233,
+            "value": {
+              "scenario": "missing-device",
+              "statements": 1
+            }
+          }
+        ],
+        "titles": [
+          {
+            "line": 3218,
+            "text": "✔ desktop account context reads only the current browser owner's active local devices (485.590749ms)"
+          },
+          {
+            "line": 3219,
+            "text": "✔ local setup owner view retains fresh session checks without reading unused devices (13.78403ms)"
+          },
+          {
+            "line": 3220,
+            "text": "✔ owner token pagination preserves microsecond ordering and rejects foreign or malformed anchors (91.338759ms)"
+          },
+          {
+            "line": 3221,
+            "text": "✔ registration grant is user-bound, expires, and has one concurrent winner (40.647249ms)"
+          },
+          {
+            "line": 3222,
+            "text": "✔ registration grant consumption uses one PostgreSQL statement (9.719974ms)"
+          },
+          {
+            "line": 3224,
+            "text": "✔ a failed credential insertion does not consume the enrollment grant (27.760511ms)"
+          },
+          {
+            "line": 3225,
+            "text": "✔ daemon acceptance follows real local enrollment and owner routes without a cloud token binding (38.600123ms)"
+          },
+          {
+            "line": 3226,
+            "text": "✔ online removal offers only uninstall, and its own receipt revokes credentials (14768.982312ms)"
+          },
+          {
+            "line": 3227,
+            "text": "✔ unacknowledged uninstall expires after ten minutes; offline removal revokes immediately (33.294349ms)"
+          },
+          {
+            "line": 3228,
+            "text": "✔ management queue is owner-scoped, serial and acknowledges only its device (30.799136ms)"
+          },
+          {
+            "line": 3229,
+            "text": "✔ pending commands without receipts are one read and preserve current device removal state (12.799168ms)"
+          },
+          {
+            "line": 3234,
+            "text": "✔ a fresh login cannot admit an old daemon, and updating cannot revive a revoked credential (45.641911ms)"
+          },
+          {
+            "line": 3235,
+            "text": "✔ registration metadata cannot disguise an old daemon behind a current header (26.141806ms)"
+          }
+        ]
+      }
+    ],
+    "cRaceSource": {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+      "actualCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+      "tests": [
+        "runs poll reads current authority, ownership and results in one snapshot",
+        "repos poll reads current authority, ownership and results in one snapshot"
+      ],
+      "sourceScope": "Real initial authentication precedes params barrier. Four changes: revoked credential, expired credential, removed device, foreign owner. 401 for revoked/expired; 404 for removed/foreign without result data. Disabled runs/nonempty results remain covered.",
+      "executionScope": "Two passing parent tests each execute four in-test loop cases; not eight independently named Node tests."
+    },
+    "cEmptyPollMeasurements": {
+      "runsStatements": 2,
+      "reposStatements": 2,
+      "boundary": "Fresh auth plus one current authority/owner/results snapshot in canonical isolated fixture, not full Native login savings."
+    },
+    "atomicEnrollmentAndPendingCommands": {
+      "testsPassed": 13,
+      "enrollmentConsumptionStatements": 1,
+      "commandScenarios": [
+        "disabled-device",
+        "removed-device",
+        "empty-device",
+        "missing-device"
+      ],
+      "eachStatements": 1,
+      "concurrentWinnerAndInsertionRollbackTitlesPresent": true
+    },
+    "queryFence": {
+      "sourcePath": "lib/device-unit-fence.db.test.ts",
+      "sourceBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "strictSourceLines": [
+        199,
+        200
+      ],
+      "strictAssertions": {
+        "explicitLessThanRetained": true,
+        "roundTripsLessThanRetained": true
+      },
+      "observed": {
+        "line": 2556,
+        "value": {
+          "perStatement": {
+            "completed": 3,
+            "roundTrips": 11,
+            "explicit": 2
+          },
+          "perUnit": {
+            "completed": 4,
+            "roundTrips": 6,
+            "explicit": 1
+          },
+          "measurement": "backend_command_tags_and_ready_for_query"
+        }
+      },
+      "revocationWaitBurstBetweenBurstsTimeoutAndCapacityRefusalTestsPassed": true
+    },
+    "liveRevisionRead": {
+      "script": "test:activity-actor-db",
+      "jobId": 129038242365,
+      "startLine": 3018,
+      "endLine": 3202,
+      "counts": {
+        "tests": [
+          57
+        ],
+        "suites": [
+          0
+        ],
+        "pass": [
+          57
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "metrics": [
+        {
+          "line": 3084,
+          "value": {
+            "scope": "personal",
+            "before": [
+              {
+                "refs": 3,
+                "rows": 3,
+                "rowJsonBytes": 251
+              },
+              {
+                "refs": 1,
+                "rows": 1,
+                "rowJsonBytes": 82
+              }
+            ],
+            "after": [
+              {
+                "refs": 4,
+                "rows": 4,
+                "rowJsonBytes": 332
+              }
+            ],
+            "byteMeaning": "UTF-8 JSON of actual pg result rows, not transport/TLS bytes"
+          }
+        },
+        {
+          "line": 3085,
+          "value": {
+            "scope": "team-key",
+            "before": [
+              {
+                "refs": 3,
+                "rows": 3,
+                "rowJsonBytes": 251
+              },
+              {
+                "refs": 2,
+                "rows": 2,
+                "rowJsonBytes": 163
+              }
+            ],
+            "after": [
+              {
+                "refs": 4,
+                "rows": 4,
+                "rowJsonBytes": 332
+              },
+              {
+                "refs": 1,
+                "rows": 1,
+                "rowJsonBytes": 82
+              }
+            ],
+            "byteMeaning": "UTF-8 JSON of actual pg result rows, not transport/TLS bytes"
+          }
+        }
+      ],
+      "titles": [
+        {
+          "line": 3083,
+          "text": "✔ prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows (14.294074ms)"
+        }
+      ],
+      "tests": 57,
+      "skipped": 0,
+      "canonicalCommandIncludes": "tests/live-revision-reads.db.test.ts",
+      "byteBoundary": "UTF-8 JSON result-row bytes; not transport/TLS or production-window measurement."
+    }
+  },
+  "cleanup": {
+    "services": "Four workflow-owned temporary Postgres17 containers",
+    "entries": [
+      {
+        "jobId": 129038242411,
+        "containerId": "08c9bae7288c0733e02223b6852b2bbcb076db443bd741490f3b9bd7747ad59e",
+        "containerCommandLine": 4359,
+        "containerOutputLine": 4360,
+        "containerRemoved": true,
+        "networkId": "github_network_01556afb51ad4a9aa7d7de5bba0bb00e",
+        "networkCommandLine": 4362,
+        "networkOutputLine": 4363,
+        "networkRemoved": true
+      },
+      {
+        "jobId": 129038242432,
+        "containerId": "8d596f5f589d3aaa1aa02da39398a96946a38023985dd1bd8afa97cda277e372",
+        "containerCommandLine": 7250,
+        "containerOutputLine": 7251,
+        "containerRemoved": true,
+        "networkId": "github_network_5d5e86adde384765973e0f44325df19e",
+        "networkCommandLine": 7253,
+        "networkOutputLine": 7254,
+        "networkRemoved": true
+      },
+      {
+        "jobId": 129038242373,
+        "containerId": "270be884324ab2aeca08212a2cd03cf49ee3d871debdb5e6181ab48ecde70d5d",
+        "containerCommandLine": 13414,
+        "containerOutputLine": 13415,
+        "containerRemoved": true,
+        "networkId": "github_network_4218ec30783a43ab821334b676614d46",
+        "networkCommandLine": 13417,
+        "networkOutputLine": 13418,
+        "networkRemoved": true
+      },
+      {
+        "jobId": 129038242365,
+        "containerId": "1931d993bb44d3ce84b2739897054056ed62a0d71f5897e515142b7a9f301cdd",
+        "containerCommandLine": 3975,
+        "containerOutputLine": 3976,
+        "containerRemoved": true,
+        "networkId": "github_network_c8735757fdeb4d0c8e510f328b6246ba",
+        "networkCommandLine": 3978,
+        "networkOutputLine": 3979,
+        "networkRemoved": true
+      }
+    ],
+    "containersRemoved": 4,
+    "networksRemoved": 4,
+    "allStopContainerStepsSucceeded": true
+  },
+  "earlySourceGate": {
+    "jobId": 129038242266,
+    "status": "completed",
+    "conclusion": "success",
+    "evidence": "Metadata only; root owns original",
+    "sourceLogReadByThisReviewer": false
+  },
+  "overallRunBoundary": {
+    "imageJobId": 129038569886,
+    "status": "failure",
+    "evidence": "Actual job metadata plus root's separate original-log report; this reviewer did not read that log.",
+    "rootReportedCause": "Docker ffmpeg-static official b6.1.1 linux-x64.gz HTTP504 / exit1 before business acceptance.",
+    "wholeCiGreen": false,
+    "PGSuccessDoesNotOverrideImageFailure": true
+  },
+  "privacy": {
+    "receiptFile": "privacy-review.safe.json",
+    "patternCandidates": 7,
+    "credentialLabelCandidates": 23,
+    "unresolvedCandidates": 0,
+    "disposition": "One same-source synthetic normalization value and six natural-language title matches resolved; all credential-label values masked. Preserve original public logs unchanged."
+  },
+  "limitations": [
+    "Proves only these selected PostgreSQL CI suites at actual c3b, not production, Replay, real model acceptance or Native full-window budgets.",
+    "Aggregate display name is misleading; actual work is DB gate and timing summary.",
+    "Prior025 results are comparison only; all current counts originate from current originals.",
+    "Current image failure remains a failure; this PG result does not make the overall CI green.",
+    "No blanket claim of no unknown log content; source-assisted pattern review has the stated bounded scope.",
+    "Zero skipped refers to required Node test summaries. Optional workflow cache and shard-one-only checks retain their conditional step skips; optional artifact-missing warnings remain in originals."
+  ],
+  "resources": {
+    "created": 0,
+    "running": 0,
+    "testsRerun": 0,
+    "productionOrModelCalls": 0,
+    "backgroundPolls": 0
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "files": 21,
+  "jsonBytes": 1346865,
+  "jsonSha256": "b41b843cff3c401af567c6a2057c6049c5746657d77e2bb6a8451aa39a20eee7",
+  "gzipBytes": 175270,
+  "gzipSha256": "8bcf453b5258f7c268ed2e1fc3765fe16eed3207d7774ef753e62cbca8805733",
+  "chunkBytes": 1455,
+  "chunks": 121,
+  "allChunksRecovered": true,
+  "gzipCrcAndISizeVerified": true,
+  "bundleShaVerified": true,
+  "allFileHashesAndGitBlobsVerified": true
+}

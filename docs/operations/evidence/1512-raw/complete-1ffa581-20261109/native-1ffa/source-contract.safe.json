@@ -1,0 +1,84 @@
+{
+  "head": "1ffa581f16319381054e0636ae41e6292719a1fe",
+  "comparedActualSource": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+  "files": [
+    {
+      "path": ".github/workflows/desktop.yml",
+      "bytes": 14422,
+      "sha256": "17c5837075328e66c7236cb9533602107b1317b8a21ae862e923492669f25977",
+      "gitBlobSha1": "cb418bbf2ee0fed758e37f83a9ed6401d8a921b7",
+      "identicalToPriorContract": true
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "bytes": 33181,
+      "sha256": "45a0f56985f256f5f392ad015e0c4442a784e1b9ff1ebd8703829ecc61152a77",
+      "gitBlobSha1": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+      "identicalToPriorContract": true
+    },
+    {
+      "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "bytes": 23696,
+      "sha256": "564706188c1b96bc9d9ebadb01bab5be4bc03cd0920131ecda0185b6e07fda7f",
+      "gitBlobSha1": "39e1facecdf28a661511f72e14580fdb4b1ae967",
+      "identicalToPriorContract": true
+    },
+    {
+      "path": "apps/desktop/test/run-acceptance.mjs",
+      "bytes": 917,
+      "sha256": "ba62ec990c4b0ed4a6fc752fce4c68ef4edb19cbdb09340ec3e1e5506d63c869",
+      "gitBlobSha1": "c28c6348d1efcd359ca1440267189d40341aae30",
+      "identicalToPriorContract": true
+    }
+  ],
+  "unchangedOriginalWindows": true,
+  "runtimeExecuted": false,
+  "runId": 42580506632,
+  "runnerContract": {
+    "runner": "macos-26",
+    "architecture": "ARM64",
+    "jobTimeoutMinutes": 150,
+    "modes": [
+      "bundled-smoke",
+      "parity",
+      "lifecycle"
+    ],
+    "fullLoginRetainsEmailPkceAndBackground": true,
+    "startupMeasurement": "original first pair within unchanged five-pair lifecycle",
+    "nativeAndPackageAuditsRetained": true,
+    "artifactRetentionDays": 7
+  },
+  "boundaries": {
+    "sourceComparisonOnly": true,
+    "actualCheckoutPendingOwnNativeLog": false,
+    "ciRerun": false,
+    "vmCreated": false,
+    "skipCannotSatisfyAcceptance": true,
+    "parityAndApplicationMayDifferOnNewMain": true
+  },
+  "actualSourceBinding": {
+    "sha": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+    "parents": [
+      "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+      "1ffa581f16319381054e0636ae41e6292719a1fe"
+    ],
+    "nativeCheckout": [
+      {
+        "line": 123,
+        "revision": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+        "timestamp": "2026-11-09T07:45:01.6915360Z"
+      }
+    ],
+    "uiCheckout": [
+      {
+        "line": 165,
+        "revision": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+        "timestamp": "2026-11-09T07:56:53.3852978Z"
+      }
+    ],
+    "head": "1ffa581f16319381054e0636ae41e6292719a1fe",
+    "headTree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+    "treeMatchesHead": true
+  }
+}

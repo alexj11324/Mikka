@@ -1,0 +1,26 @@
+{
+  "jobId": 129044355119,
+  "conclusion": "failure",
+  "failedStep": "Require every selected source, unit and daemon job",
+  "exitCode": 1,
+  "environment": {
+    "CHANGES_RESULT": "success",
+    "EXPECT_CORE": "true",
+    "EXPECT_INTEGRATION": "true",
+    "EXPECT_SOURCE": "true",
+    "EXPECT_DAEMON": "true",
+    "EXPECT_IMAGE": "true",
+    "EXPECT_DESKTOP": "true",
+    "EXPECT_ANALYTICS": "true",
+    "IMAGE": "failure",
+    "DESKTOP": "success",
+    "ANALYTICS": "success",
+    "CORE": "success",
+    "INTEGRATION": "success",
+    "SOURCE": "success",
+    "DAEMON": "success"
+  },
+  "sourceLogBlob": "0bff2e11db9c79242a9b7ac777318ea9b1bd2df6",
+  "sourceLogSha256": "776ae504afe06cd248f3f961055556d6713062bb64db23729e89d50834f10609",
+  "limit": "This receipt reads only the UI strict aggregate log; root owns the separate image job log and HTTP 504 diagnosis."
+}

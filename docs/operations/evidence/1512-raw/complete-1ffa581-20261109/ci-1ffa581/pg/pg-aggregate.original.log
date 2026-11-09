@@ -1,0 +1,177 @@
+﻿2026-11-09T07:45:08.3624592Z Current runner version: '2.338.2'
+2026-11-09T07:45:08.3650843Z ##[group]Runner Image Provisioner
+2026-11-09T07:45:08.3651740Z Hosted Compute Agent
+2026-11-09T07:45:08.3652430Z Version: 20261028.624
+2026-11-09T07:45:08.3653104Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T07:45:08.3653843Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T07:45:08.3654631Z Worker ID: {8e2b4cd6-0e79-469c-80e1-ce5c0fe6b468}
+2026-11-09T07:45:08.3655350Z Region: westus
+2026-11-09T07:45:08.3655968Z Cloud: Azure
+2026-11-09T07:45:08.3656531Z ##[endgroup]
+2026-11-09T07:45:08.3657986Z ##[group]Operating System
+2026-11-09T07:45:08.3658985Z Ubuntu
+2026-11-09T07:45:08.3659547Z 24.04.5
+2026-11-09T07:45:08.3660068Z LTS
+2026-11-09T07:45:08.3660673Z ##[endgroup]
+2026-11-09T07:45:08.3661230Z ##[group]Runner Image
+2026-11-09T07:45:08.3661916Z Image: ubuntu-24.04
+2026-11-09T07:45:08.3662514Z Version: 20261101.360.1
+2026-11-09T07:45:08.3663832Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T07:45:08.3665417Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T07:45:08.3666474Z ##[endgroup]
+2026-11-09T07:45:08.3667720Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T07:45:08.3670336Z Actions: read
+2026-11-09T07:45:08.3671062Z Contents: read
+2026-11-09T07:45:08.3671660Z Metadata: read
+2026-11-09T07:45:08.3672287Z ##[endgroup]
+2026-11-09T07:45:08.3674444Z Secret source: Actions
+2026-11-09T07:45:08.3675493Z Cache mode: write
+2026-11-09T07:45:08.3676653Z Prepare workflow directory
+2026-11-09T07:45:08.4089540Z Prepare all required actions
+2026-11-09T07:45:08.4140445Z Getting action download info
+2026-11-09T07:45:08.7463887Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T07:45:08.9559899Z Complete job name: Production build and browser interactions
+2026-11-09T07:45:09.0368887Z ##[group]Run test "$CHANGES_RESULT" = success
+2026-11-09T07:45:09.0369689Z [36;1mtest "$CHANGES_RESULT" = success[0m
+2026-11-09T07:45:09.0370286Z [36;1mcase "$EXPECT_DB" in[0m
+2026-11-09T07:45:09.0370845Z [36;1m  true) test "$DB_RESULT" = success ;;[0m
+2026-11-09T07:45:09.0371499Z [36;1m  false) test "$DB_RESULT" = skipped ;;[0m
+2026-11-09T07:45:09.0372097Z [36;1m  *) exit 1 ;;[0m
+2026-11-09T07:45:09.0372562Z [36;1mesac[0m
+2026-11-09T07:45:09.0373401Z [36;1mecho "Database gate: $DB_RESULT; complete inventory validated in Changed files." >> "$GITHUB_STEP_SUMMARY"[0m
+2026-11-09T07:45:09.0398417Z shell: /usr/bin/bash -e {0}
+2026-11-09T07:45:09.0399507Z env:
+2026-11-09T07:45:09.0399954Z   MIKKA_EDITION: cloud
+2026-11-09T07:45:09.0400454Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T07:45:09.0401144Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T07:45:09.0401894Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T07:45:09.0402649Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T07:45:09.0403400Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T07:45:09.0403982Z   CHANGES_RESULT: success
+2026-11-09T07:45:09.0404455Z   EXPECT_DB: true
+2026-11-09T07:45:09.0404885Z   DB_RESULT: success
+2026-11-09T07:45:09.0405325Z ##[endgroup]
+2026-11-09T07:45:09.0755377Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T07:45:09.0756162Z with:
+2026-11-09T07:45:09.0756593Z   repository: alexj11324/Mikka
+2026-11-09T07:45:09.0760578Z   token: ***
+2026-11-09T07:45:09.0761032Z   ssh-strict: true
+2026-11-09T07:45:09.0761477Z   ssh-user: git
+2026-11-09T07:45:09.0761928Z   persist-credentials: true
+2026-11-09T07:45:09.0762424Z   clean: true
+2026-11-09T07:45:09.0762873Z   sparse-checkout-cone-mode: true
+2026-11-09T07:45:09.0763398Z   fetch-depth: 1
+2026-11-09T07:45:09.0763828Z   fetch-tags: false
+2026-11-09T07:45:09.0764274Z   show-progress: true
+2026-11-09T07:45:09.0764878Z   lfs: false
+2026-11-09T07:45:09.0765315Z   submodules: false
+2026-11-09T07:45:09.0765775Z   set-safe-directory: true
+2026-11-09T07:45:09.0766286Z   allow-unsafe-pr-checkout: false
+2026-11-09T07:45:09.0767088Z env:
+2026-11-09T07:45:09.0767493Z   MIKKA_EDITION: cloud
+2026-11-09T07:45:09.0767971Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T07:45:09.0768537Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T07:45:09.0769380Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T07:45:09.0769936Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T07:45:09.0770497Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T07:45:09.0771040Z ##[endgroup]
+2026-11-09T07:45:09.3912709Z Syncing repository: alexj11324/Mikka
+2026-11-09T07:45:09.3914568Z ##[group]Getting Git version info
+2026-11-09T07:45:09.3915455Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T07:45:09.3917362Z [command]/usr/bin/git version
+2026-11-09T07:45:09.4037422Z git version 2.56.0
+2026-11-09T07:45:09.4063572Z ##[endgroup]
+2026-11-09T07:45:09.4080750Z Temporarily overriding HOME='/home/runner/work/_temp/457eccbe-6215-4e19-81fd-2721f34b6631' before making global git config changes
+2026-11-09T07:45:09.4089570Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T07:45:09.4091301Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T07:45:09.4151930Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T07:45:09.4167098Z ##[group]Initializing the repository
+2026-11-09T07:45:09.4189680Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T07:45:09.4391798Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T07:45:09.4393768Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T07:45:09.4395548Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T07:45:09.4397247Z hint: call:
+2026-11-09T07:45:09.4398148Z hint:
+2026-11-09T07:45:09.4399528Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T07:45:09.4406274Z hint:
+2026-11-09T07:45:09.4407469Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T07:45:09.4409511Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T07:45:09.4411018Z hint:
+2026-11-09T07:45:09.4411851Z hint: 	git branch -m <name>
+2026-11-09T07:45:09.4412778Z hint:
+2026-11-09T07:45:09.4414060Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T07:45:09.4417344Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T07:45:09.4426355Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T07:45:09.4495701Z ##[endgroup]
+2026-11-09T07:45:09.4497357Z ##[group]Disabling automatic garbage collection
+2026-11-09T07:45:09.4505227Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T07:45:09.4554689Z ##[endgroup]
+2026-11-09T07:45:09.4556147Z ##[group]Setting up auth
+2026-11-09T07:45:09.4570308Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T07:45:09.4674832Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T07:45:09.5138056Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T07:45:09.5184086Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T07:45:09.5437615Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T07:45:09.5485786Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T07:45:09.5737208Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T07:45:09.5792000Z ##[endgroup]
+2026-11-09T07:45:09.5792934Z ##[group]Fetching the repository
+2026-11-09T07:45:09.5831081Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0:refs/remotes/pull/1799/merge
+2026-11-09T07:45:13.3858056Z From https://github.com/alexj11324/Mikka
+2026-11-09T07:45:13.3860108Z  * [new ref]         c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0 -> pull/1799/merge
+2026-11-09T07:45:13.3865463Z ##[endgroup]
+2026-11-09T07:45:13.3867414Z ##[group]Determining the checkout info
+2026-11-09T07:45:13.3869859Z ##[endgroup]
+2026-11-09T07:45:13.3871433Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T07:45:13.3938167Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T07:45:13.3980323Z ##[group]Checking out the ref
+2026-11-09T07:45:13.3984149Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge
+2026-11-09T07:45:14.0839398Z Note: switching to 'refs/remotes/pull/1799/merge'.
+2026-11-09T07:45:14.0840097Z 
+2026-11-09T07:45:14.0840600Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T07:45:14.0841571Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T07:45:14.0842359Z state without impacting any branches by switching back to a branch.
+2026-11-09T07:45:14.0842817Z 
+2026-11-09T07:45:14.0843172Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T07:45:14.0843995Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T07:45:14.0844455Z 
+2026-11-09T07:45:14.0844661Z   git switch -c <new-branch-name>
+2026-11-09T07:45:14.0844981Z 
+2026-11-09T07:45:14.0845213Z Or undo this operation with:
+2026-11-09T07:45:14.0845540Z 
+2026-11-09T07:45:14.0845714Z   git switch -
+2026-11-09T07:45:14.0845974Z 
+2026-11-09T07:45:14.0846373Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T07:45:14.0846934Z 
+2026-11-09T07:45:14.0847550Z HEAD is now at c3b547d Merge 1ffa581f16319381054e0636ae41e6292719a1fe into 89eae89e9e79422e0a8b4b1346aa1c7fb6470016
+2026-11-09T07:45:14.0864401Z ##[endgroup]
+2026-11-09T07:45:14.0923974Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T07:45:14.0960251Z c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0
+2026-11-09T07:45:14.1220000Z ##[group]Run node scripts/ci/summary.mjs
+2026-11-09T07:45:14.1220771Z [36;1mnode scripts/ci/summary.mjs[0m
+2026-11-09T07:45:14.1243794Z shell: /usr/bin/bash -e {0}
+2026-11-09T07:45:14.1244124Z env:
+2026-11-09T07:45:14.1244365Z   MIKKA_EDITION: cloud
+2026-11-09T07:45:14.1244661Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T07:45:14.1244975Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T07:45:14.1245301Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T07:45:14.1245626Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T07:45:14.1245955Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T07:45:14.1249155Z   GITHUB_TOKEN: ***
+2026-11-09T07:45:14.1249465Z ##[endgroup]
+2026-11-09T07:45:15.5621828Z Post job cleanup.
+2026-11-09T07:45:15.6512351Z [command]/usr/bin/git version
+2026-11-09T07:45:15.6563545Z git version 2.56.0
+2026-11-09T07:45:15.6614033Z Temporarily overriding HOME='/home/runner/work/_temp/c2f37dd0-ff5a-41ac-8f7f-c0bd38cbd7af' before making global git config changes
+2026-11-09T07:45:15.6615882Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T07:45:15.6621723Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T07:45:15.6672337Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T07:45:15.6717702Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T07:45:15.7089973Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T07:45:15.7120497Z http.https://github.com/.extraheader
+2026-11-09T07:45:15.7134766Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T07:45:15.7182660Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T07:45:15.7486385Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T07:45:15.7531843Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T07:45:15.8072665Z Cleaning up orphan processes
+2026-11-09T07:45:15.8522140Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

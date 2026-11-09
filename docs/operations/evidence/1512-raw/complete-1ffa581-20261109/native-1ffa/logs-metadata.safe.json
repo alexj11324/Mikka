@@ -1,0 +1,50 @@
+[
+  {
+    "path": "job-129040252138.original.log",
+    "jobId": 129040252138,
+    "kind": "native",
+    "bytes": 245600,
+    "sha256": "5a25528dc75fbb9f8e0906f2a2d68a7e50162db34eff25e4b195b13dfc8135b4",
+    "gitBlobSha1": "cc608c0a321ad77c34d7f43c87c57fc1b5051f76",
+    "bomPreserved": true,
+    "ansiPresent": true,
+    "logTimestampRange": {
+      "first": "2026-11-09T07:44:52.6392360Z",
+      "last": "2026-11-09T07:56:42.9883840Z"
+    },
+    "checkoutCandidates": [
+      {
+        "line": 123,
+        "revision": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+        "timestamp": "2026-11-09T07:45:01.6915360Z"
+      }
+    ],
+    "privacyFindings": [],
+    "unresolvedFindings": 0,
+    "blob": "cc608c0a321ad77c34d7f43c87c57fc1b5051f76"
+  },
+  {
+    "path": "job-129044355119.original.log",
+    "jobId": 129044355119,
+    "kind": "ui-strict",
+    "bytes": 14163,
+    "sha256": "776ae504afe06cd248f3f961055556d6713062bb64db23729e89d50834f10609",
+    "gitBlobSha1": "0bff2e11db9c79242a9b7ac777318ea9b1bd2df6",
+    "bomPreserved": true,
+    "ansiPresent": true,
+    "logTimestampRange": {
+      "first": "2026-11-09T07:56:48.0740880Z",
+      "last": "2026-11-09T07:56:54.7809767Z"
+    },
+    "checkoutCandidates": [
+      {
+        "line": 165,
+        "revision": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+        "timestamp": "2026-11-09T07:56:53.3852978Z"
+      }
+    ],
+    "privacyFindings": [],
+    "unresolvedFindings": 0,
+    "blob": "0bff2e11db9c79242a9b7ac777318ea9b1bd2df6"
+  }
+]

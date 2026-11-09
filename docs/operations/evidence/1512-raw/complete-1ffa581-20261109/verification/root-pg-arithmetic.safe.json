@@ -1,0 +1,37 @@
+{
+  "counts": {
+    "tests": 3789,
+    "pass": 3789,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "shards": {
+    "1": {
+      "suites": 18,
+      "tests": 741,
+      "pass": 741
+    },
+    "2": {
+      "suites": 18,
+      "tests": 796,
+      "pass": 796
+    },
+    "3": {
+      "suites": 18,
+      "tests": 1635,
+      "pass": 1635
+    },
+    "4": {
+      "suites": 18,
+      "tests": 617,
+      "pass": 617
+    }
+  },
+  "suites": 72,
+  "summaries": 91,
+  "selectionBlob": "bfe9fb4de83e59aa6db0d4449172079853e07291",
+  "ledgerBlob": "723fe5fe7b06e12a115798f703f7ea9c8cc7f117",
+  "scope": "Independent recomputation of the full72-suite safe ledger against root original selection; original logs read once by assigned reader."
+}

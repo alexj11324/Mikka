@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "bounded-public-ci-log-privacy-review",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "actualCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+  "categories": [
+    "private-key-header",
+    "provider-token-shaped",
+    "aws-key-shaped",
+    "email-shaped",
+    "authorization-bearer-shaped",
+    "credential-url-shaped",
+    "signed-download-url-shaped"
+  ],
+  "findings": [
+    {
+      "workflow": "ssh",
+      "jobId": 129037800929,
+      "line": 1275,
+      "category": "email-shaped",
+      "length": 18,
+      "valueSha256": "07b42a2c7c98a6c3ba6d31c65ad4dca3e83410fbdeaeffa9f7db670d00ec84d2",
+      "resolution": "False positive: an instantiated systemd getty service filename in a Debian package symlink message; not an email address or personal data. The current raw context was inspected with the candidate redacted; the candidate hash also matches the earlier independently resolved public fixture category."
+    }
+  ],
+  "unresolvedCandidates": 0,
+  "originalLogCount": 14,
+  "rawBytes": 1413248,
+  "method": "Pattern-assisted review of already-public, platform-masked decoded GitHub logs. One email-shaped candidate was inspected in its current systemd package-installation context; candidate values are not included in this receipt.",
+  "platformMaskingBoundary": "Original GitHub masking remains exactly as received. This bounded review does not prove universal absence of sensitive strings. No actual credential or personal-data candidate remained.",
+  "sourceBoundary": "No production/business data lookup, credentials, private API envelope, signed download URL or provider invocation was added. Ordinary unsigned public artifact locations already in the original logs remain unchanged."
+}
