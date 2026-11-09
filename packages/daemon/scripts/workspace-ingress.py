@@ -213,8 +213,8 @@ def ack_policy(ports, family):
             yield (prefix + f'ip frag-off & 0x3fff == 0 ip hdrlength 5 tcp doff {doff} '
                    f'meta length {20 + 4 * doff} ip length {20 + 4 * doff} return')
         else:
-            yield (prefix + f'ip6 nexthdr tcp tcp doff {doff} '
-                   f'meta length {40 + 4 * doff} ip6 length {4 * doff} return')
+            yield (prefix + f'ip6 length {4 * doff} ip6 nexthdr tcp tcp doff {doff} '
+                   f'meta length {40 + 4 * doff} return')
 
 
 def policy(ports):
@@ -225,7 +225,7 @@ def policy(ports):
     # proves both skb and IP lengths against one exact TCP header length.
     # IPv4 options/fragments and IPv6 extension headers stay outside this
     # exception. SYN/FIN/RST and data retain the original UID/mark requirements.
-    # Separate rules avoid nft 1.0.6/1.0.9's sub-byte concat readback failure.
+    # Separate rules avoid nft's sub-byte concat readback failure.
     # Priority -1 follows conntrack (-200), and still visits later hooks.
     return '\n'.join((
         f'create table inet {TABLE}',
@@ -253,8 +253,10 @@ def check_ack_rule(rule, family, ports, doff):
                      match(payload('ip', 'hdrlength'), 5), match(payload('tcp', 'doff'), doff),
                      match(meta('length'), 20 + 4 * doff), match(payload('ip', 'length'), 20 + 4 * doff)])
     else:
-        expr.extend([match(payload('ip6', 'nexthdr'), 6), match(payload('tcp', 'doff'), doff),
-                     match(meta('length'), 40 + 4 * doff), match(payload('ip6', 'length'), 4 * doff)])
+        # nft merges adjacent IPv6 length/nexthdr payload loads and emits them
+        # in header order. Emit and require that same exact order.
+        expr.extend([match(payload('ip6', 'length'), 4 * doff), match(payload('ip6', 'nexthdr'), 6),
+                     match(payload('tcp', 'doff'), doff), match(meta('length'), 40 + 4 * doff)])
     expr.append({'return': None})
     canonical = lambda item: json.dumps(item, sort_keys=True, separators=(',', ':'))
     binding = {'family': 'inet', 'table': TABLE, 'chain': CHAIN}
