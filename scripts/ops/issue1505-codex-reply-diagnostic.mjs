@@ -156,7 +156,21 @@ try {
     const sqlState = /(?:ERROR|FATAL):\s+([0-9A-Z]{5})(?:\s|$)/.exec(result.stderr ?? '')?.[1]
     const queryStates = new Set(['08000','08001','08003','08004','08006','08007','08P01','22001','22003','22007','22023',
       '25006','25P02','28000','28P01','3D000','3F000','42501','42601','42703','42804','42883','42P01','55P03','57014','57P01','53300','53400','XX000'])
-    closed.queryProcess = { exitCode: Number.isInteger(result.status) ? result.status : null,
+    const connectionErrorKinds = [
+      ['unsupported_startup_parameter', /unsupported startup parameter|unsupported startup option|unsupported.*parameter.*options/i],
+      ['password_authentication_failed', /password authentication failed|SASL authentication failed|SCRAM authentication failed|no password supplied/i],
+      ['role_missing', /role .* does not exist/i],
+      ['database_missing', /database .* does not exist/i],
+      ['dns_resolution_failed', /could not translate host name|Name or service not known|Temporary failure in name resolution/i],
+      ['connection_refused', /connection refused/i],
+      ['connection_timeout', /timeout expired|connection timed out/i],
+      ['tls_or_channel_binding', /SSL|TLS|certificate|channel binding/i],
+      ['connection_closed', /server closed the connection|connection.*closed unexpectedly/i],
+      ['endpoint_not_identified', /endpoint ID is not specified|endpoint.*not found/i],
+    ].filter(([, pattern]) => pattern.test(result.stderr ?? '')).map(([kind]) => kind)
+    const startupParameterNames = ['default_transaction_read_only','statement_timeout','lock_timeout','idle_in_transaction_session_timeout']
+      .filter(name => (result.stderr ?? '').includes(name))
+    closed.queryProcess = { connectionErrorKinds, startupParameterNames, exitCode: Number.isInteger(result.status) ? result.status : null,
       signal: ['SIGKILL','SIGTERM'].includes(result.signal) ? result.signal : null,
       timedOut: result.error?.code === 'ETIMEDOUT',
       postgresSqlState: sqlState === undefined ? null : queryStates.has(sqlState) ? sqlState : 'unmapped' }

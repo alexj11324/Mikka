@@ -19,7 +19,7 @@ jobs:
     env:
       DIAGNOSTIC_SOURCE_COMMIT: 89eae89e9e79422e0a8b4b1346aa1c7fb6470016
       DIAGNOSTIC_SOURCE_TREE: a850a89f11cbb467df869651ee39beca157c6351
-      DIAGNOSTIC_COLLECTOR_SHA256: 8612ce46b956cb3f32a92fdfbfd5563879a8a8b48f4dd4c6e78026126d751f85
+      DIAGNOSTIC_COLLECTOR_SHA256: eccd29515bc82a4f0f961c0ab019f8632e335c75a9a6b39e91464bde9b15fcda
     steps:
       - name: Check out the exact historical application source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
