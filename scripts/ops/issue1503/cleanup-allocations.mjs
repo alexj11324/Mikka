@@ -140,35 +140,35 @@ export const PINNED_HISTORY = Object.freeze([
     "issueId": "9b4f90bf-9268-4e68-8037-0d12950529cb",
     "taskId": "c687460b-e6a4-44ac-8696-f60d66bf64d3",
     "runId": "0c66bb7d-f166-4deb-81c2-7197c042c6ab",
-    "operationId": null,
+    "operationId": "acde36fc-c52b-453a-88c4-5a2c95b3cf61",
     "lookup": "operation_metadata"
   },
   {
     "issueId": "9b4f90bf-9268-4e68-8037-0d12950529cb",
     "taskId": "c687460b-e6a4-44ac-8696-f60d66bf64d3",
     "runId": "51f9f9b1-cabd-4530-8147-93c58f9d5ecf",
-    "operationId": null,
+    "operationId": "8a0295bd-daf8-4b9c-9572-8ee1324b4f69",
     "lookup": "operation_metadata"
   },
   {
     "issueId": "facee344-3cc3-4919-8708-1462f815fb21",
     "taskId": "5919985f-c531-4915-b51e-fea3b1702211",
     "runId": "58a0260d-f0fd-4f38-8c29-3acca904bbdd",
-    "operationId": null,
+    "operationId": "f32ae3d7-0857-46e5-98fa-1be54b067c64",
     "lookup": "operation_metadata"
   },
   {
     "issueId": "facee344-3cc3-4919-8708-1462f815fb21",
     "taskId": "5919985f-c531-4915-b51e-fea3b1702211",
     "runId": "6fb2b7dd-ca53-4ba7-8d6c-4526a1de227a",
-    "operationId": null,
+    "operationId": "232ffa5f-831c-47ac-9731-e2b4e18efe8d",
     "lookup": "operation_metadata"
   },
   {
     "issueId": "facee344-3cc3-4919-8708-1462f815fb21",
     "taskId": "5919985f-c531-4915-b51e-fea3b1702211",
     "runId": "7970d2af-b75b-4450-89e3-47f0a8a1154a",
-    "operationId": null,
+    "operationId": "a2f200cf-28ad-43a4-be76-118ade1660ef",
     "lookup": "operation_metadata"
   }
 ].map(Object.freeze))
