@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "pullRequest": 1799,
+  "publishedAt": "2026-11-09 11:40:43 UTC",
+  "source": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "parents": [
+      "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "e78fccffd9dd878edd490b113ea80efcff1525e7"
+    ],
+    "mainInput": "e78fccffd9dd878edd490b113ea80efcff1525e7",
+    "mainTree": "48b0d459ca1c9087e8abab29e7c3ccf9428fbbcc",
+    "priorHead": "ae10f28aa471dbfc64f04d981b8934d374476259",
+    "priorTree": "1acbe0b8d50a7102543e24b9bd0395355bcba438"
+  },
+  "normalFastForward": true,
+  "force": false,
+  "changedMain": false,
+  "overlay": [
+    {
+      "path": "components/workspace/issue-threads.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4633425a91944750ab91b7c220b5af1a234dc6ee"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-08-2140-task-one-conversation.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9136436d3f0ba1768f49b8c40429c23c5f977ae6"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-09-0045-no-attempt-word.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ee8e64c779b8ac369e0b36743242232efaca30b7"
+    },
+    {
+      "path": "docs/design/glossary.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d0acbf45a96fed6349bc897fec57219b88199f58"
+    },
+    {
+      "path": "docs/design/rules.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "231289267a355ebb1644f7287f4520759cf240da"
+    },
+    {
+      "path": "messages/en.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7c56dc09490258db5f15a772b3ff176efaf3450c"
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e61e3a62e6879189fb4f469c870abbffbfe7bb73"
+    },
+    {
+      "path": "scripts/issue-thread-acceptance.test.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "03657c4aec2ff53fd524459c6589c6b5fd071b17"
+    }
+  ],
+  "classificationCounts": {
+    "unchanged": 6307,
+    "oursOnly": 477,
+    "theirsOnly": 6,
+    "bothSame": 0,
+    "bothDifferent": 2
+  },
+  "conflicts": [
+    "messages/en.json",
+    "messages/zh-CN.json"
+  ],
+  "rootWholeTree": {
+    "actualLeaves": 6792,
+    "expectedLeaves": 6792,
+    "differences": [],
+    "changedPaths": 8,
+    "unchangedPaths": 6784,
+    "gitTreeMatchesIndependentExpected": true,
+    "parents": [
+      "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "e78fccffd9dd878edd490b113ea80efcff1525e7"
+    ],
+    "commit": "f3466ba479ef51918790f521a288feaef5160e44",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2"
+  },
+  "rootLanguageSemanticReview": [
+    {
+      "language": "en",
+      "oldBytes": 253309,
+      "newBytes": 252821,
+      "oldSha256": "9d43a03419a898462d5d7edcdf801c3c2c77b6960f3d80ce22c95c905a1a346d",
+      "newSha256": "b3bda8ced94b1c0ba9cbbb39de18d06ce9e85dbc1b50ec3099837c6a9ab36efa",
+      "removedPaths": [
+        "Shell.panel.task.attempt",
+        "Shell.panel.task.switch",
+        "Shell.panel.task.switchAfterFailure",
+        "Shell.panel.task.switchRow",
+        "Shell.panel.task.divider",
+        "Shell.panel.task.dividerOutcome.failed",
+        "Shell.panel.task.dividerOutcome.blocked",
+        "Shell.panel.task.dividerOutcome.other",
+        "Shell.panel.task.replaced",
+        "Shell.panel.task.result.replaced"
+      ],
+      "addedPaths": [],
+      "changedPaths": [],
+      "p0Errors": {
+        "taskWorkspaceUnresolved": "This resource has no verified workspace. Select a workspace for a new resource, or ask an administrator to resolve its recorded ownership.",
+        "taskWorkspaceMismatch": "The task, thread, artifact and Agent must belong to the same workspace. Choose resources from the current workspace.",
+        "taskWorkspaceTransferDenied": "A task cannot be moved between workspaces. Its workspace is fixed when it is created."
+      },
+      "oldCanonicalBytes": false,
+      "newCanonicalBytes": false
+    },
+    {
+      "language": "zh-CN",
+      "oldBytes": 243955,
+      "newBytes": 243494,
+      "oldSha256": "32cbd22b9d04e56684549434f14f930c3e1dbebcfc50b5f0f2f356918acaadd3",
+      "newSha256": "f81068a50e63fe02f08b46805f635818ca3a29e72a24b98c6d368ad9f3e152e9",
+      "removedPaths": [
+        "Shell.panel.task.attempt",
+        "Shell.panel.task.switch",
+        "Shell.panel.task.switchAfterFailure",
+        "Shell.panel.task.switchRow",
+        "Shell.panel.task.divider",
+        "Shell.panel.task.dividerOutcome.failed",
+        "Shell.panel.task.dividerOutcome.blocked",
+        "Shell.panel.task.dividerOutcome.other",
+        "Shell.panel.task.replaced",
+        "Shell.panel.task.result.replaced"
+      ],
+      "addedPaths": [],
+      "changedPaths": [],
+      "p0Errors": {
+        "taskWorkspaceUnresolved": "此资源尚无已核实的工作区归属。新建资源时请选择工作区；历史资源请由管理员核实归属记录。",
+        "taskWorkspaceMismatch": "任务、对话、产物和 Agent 必须属于同一工作区。请使用当前工作区的资源。",
+        "taskWorkspaceTransferDenied": "任务创建后工作区归属固定，不支持跨工作区转移。"
+      },
+      "oldCanonicalBytes": false,
+      "newCanonicalBytes": false
+    }
+  ],
+  "peer": {
+    "blob": "1e21ba2a1e247d61d8ad03f9a3a5b1e721748de8",
+    "bytes": 29344,
+    "sha256": "8db3a8b101871e415d2a10de89b22171a316080ed3e59d9f780ad1ca5f65492d",
+    "rootFetchedAndHashVerified": true,
+    "strictV8ForwardReversePatchProof": true,
+    "gitCliMergeNotExecuted": true,
+    "independentBinaryGitTreeReconstructionMatches": true
+  },
+  "initialCi": {
+    "runId": 42610943512,
+    "status": "in_progress",
+    "wholeCiPassed": false,
+    "actualCheckout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+    "actualTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "actualParents": [
+      "e78fccffd9dd878edd490b113ea80efcff1525e7",
+      "f3466ba479ef51918790f521a288feaef5160e44"
+    ],
+    "changesLog": {
+      "jobId": 129138895818,
+      "bytes": 970097,
+      "sha256": "0e2e3998f97339cbbd5bf0492a465c92d7cea94936d09e66136bbd628ec14f46",
+      "downloadCount": 1,
+      "lines": 10353,
+      "sha": "d381ccc263060f0cc701b9ffd1cd98a094745644"
+    },
+    "selection": {
+      "bytes": 389272,
+      "sha256": "e1305a79e9240dc4e1c1dca2b997fbea4bf31ef8d520d676c837e7167baed178",
+      "sourceJob": 129138895818,
+      "actualCheckout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+      "lineRange": [
+        2644,
+        10318
+      ],
+      "sameSelectorJsonAsAe10": true,
+      "changedKeys": [],
+      "sha": "f9a8897406fe2e318823ceed90a2810744a0b1d5"
+    }
+  },
+  "priorEvidence": {
+    "checkpoint": "CP29",
+    "commit": "df0d632f4108f2f81a9a8db0e0e64ed099d25f99",
+    "indexUrl": "https://github.com/alexj11324/Mikka/blob/df0d632f4108f2f81a9a8db0e0e64ed099d25f99/docs/operations/evidence/1512-raw/complete-ae10f28-20261109/index.safe.json",
+    "notPromotedToNewWholeTreePass": true
+  },
+  "boundaries": {
+    "onlyOriginalUiOwnerChangesMerged": true,
+    "noProductBehaviorInvented": true,
+    "backEndTraceDbAndWorkflowsUnchangedFromAe10": true,
+    "sharedLocaleFilesActuallyChanged": true,
+    "allTransitiveInputsUnchangedNotClaimed": true,
+    "newUiSourceAndNativeNeedActualNewRun": true,
+    "p0MustMergeByOriginalOwnerFirst": true,
+    "factoryActualWindowStillNotReleasedAsOfLastRead": true,
+    "productionAcceptedCases": 0,
+    "currentOwnedActiveVm": 0
+  }
+}

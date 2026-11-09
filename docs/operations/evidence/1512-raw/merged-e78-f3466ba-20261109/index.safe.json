@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 30,
+  "issue": 1512,
+  "prefix": "docs/operations/evidence/1512-raw/merged-e78-f3466ba-20261109",
+  "source": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "parents": [
+      "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "e78fccffd9dd878edd490b113ea80efcff1525e7"
+    ],
+    "mainInput": "e78fccffd9dd878edd490b113ea80efcff1525e7",
+    "mainTree": "48b0d459ca1c9087e8abab29e7c3ccf9428fbbcc",
+    "priorHead": "ae10f28aa471dbfc64f04d981b8934d374476259",
+    "priorTree": "1acbe0b8d50a7102543e24b9bd0395355bcba438"
+  },
+  "files": [
+    {
+      "path": "peer-risk-and-merge-inputs.safe.json",
+      "sha": "1e21ba2a1e247d61d8ad03f9a3a5b1e721748de8",
+      "bytes": 29344,
+      "sha256": "8db3a8b101871e415d2a10de89b22171a316080ed3e59d9f780ad1ca5f65492d",
+      "mode": "100644",
+      "kind": "independent-review"
+    },
+    {
+      "path": "changes-129138895818.original.log",
+      "jobId": 129138895818,
+      "bytes": 970097,
+      "sha256": "0e2e3998f97339cbbd5bf0492a465c92d7cea94936d09e66136bbd628ec14f46",
+      "downloadCount": 1,
+      "lines": 10353,
+      "sha": "d381ccc263060f0cc701b9ffd1cd98a094745644",
+      "mode": "100644",
+      "kind": "original-decoded-GitHub-job-log"
+    },
+    {
+      "path": "root-merge-review.safe.json",
+      "sha": "fe31291801baa0293ca82d19fb5a8e9310c782aa",
+      "mode": "100644",
+      "bytes": 7530,
+      "sha256": "585a595b4af3fc3966b926da59c021541a92912214d8359054e97439427ca6a6",
+      "kind": "root-evidence"
+    },
+    {
+      "path": "PR-body-before-e78.md",
+      "sha": "96749463e8627f7592cfff00c2e57889fb1e5000",
+      "mode": "100644",
+      "bytes": 13113,
+      "sha256": "54578287c400417d45cdfb863df85f3c3ea0fa3345a8c8904f4da2a8d88238d8",
+      "kind": "root-evidence"
+    },
+    {
+      "path": "PR-body-f346.md",
+      "sha": "645e3b8ee2b8d0d0ccae5965effa5c72c7071791",
+      "mode": "100644",
+      "bytes": 13921,
+      "sha256": "8bbc8aee18b2d1e281256721cb06b4b4c9876c59d4ceeadb94a9203a7a12c713",
+      "kind": "root-evidence"
+    },
+    {
+      "path": "README.md",
+      "sha": "37d42517b46f5ac1325e7b1c68353e25d1c86bdb",
+      "mode": "100644",
+      "bytes": 2628,
+      "sha256": "c0ede788b2bdd37cec7f5e86d05175871e6778856f5311cac4b69377bedc8eae",
+      "kind": "root-evidence"
+    }
+  ],
+  "payloadFileCount": 6,
+  "payloadBytes": 1036633,
+  "indexExcluded": true,
+  "selectionReferencedWithoutDuplicatingBytes": {
+    "bytes": 389272,
+    "sha256": "e1305a79e9240dc4e1c1dca2b997fbea4bf31ef8d520d676c837e7167baed178",
+    "sourceJob": 129138895818,
+    "actualCheckout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+    "lineRange": [
+      2644,
+      10318
+    ],
+    "sameSelectorJsonAsAe10": true,
+    "changedKeys": [],
+    "sha": "f9a8897406fe2e318823ceed90a2810744a0b1d5"
+  },
+  "priorCheckpoint": {
+    "commit": "df0d632f4108f2f81a9a8db0e0e64ed099d25f99",
+    "url": "https://github.com/alexj11324/Mikka/blob/df0d632f4108f2f81a9a8db0e0e64ed099d25f99/docs/operations/evidence/1512-raw/complete-ae10f28-20261109/index.safe.json"
+  },
+  "currentCi": {
+    "runId": 42610943512,
+    "complete": false
+  },
+  "productionAcceptedCases": 0,
+  "ownedVmCount": 0
+}

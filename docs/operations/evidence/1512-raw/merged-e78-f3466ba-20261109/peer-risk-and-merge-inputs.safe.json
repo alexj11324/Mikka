@@ -1,0 +1,819 @@
+{
+  "schemaVersion": 1,
+  "name": "ae10-final-risk-and-e78-merge-inputs.safe.json",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "reviewDateUtc": "2026-11-09",
+  "scope": "Read-only final risk review and two authorized immutable locale blob preparations; no tree, commit, ref, workflow, test, account or compute changes.",
+  "sources": {
+    "testedHead": "ae10f28aa471dbfc64f04d981b8934d374476259",
+    "testedActualCheckout": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+    "testedTree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+    "mergeBase": "a2198c8c2f608f7b8169329b9da853067618dba6",
+    "main": "e78fccffd9dd878edd490b113ea80efcff1525e7",
+    "mainTree": "48b0d459ca1c9087e8abab29e7c3ccf9428fbbcc",
+    "mainParent": "a2198c8c2f608f7b8169329b9da853067618dba6",
+    "mainCommitTime": "2026-11-09T11:26:37Z",
+    "mainCommitTitle": "Agent labels, not switch verbs: 活动 rows and dividers name the Agent (#1816)",
+    "mainIsP0Merge": false,
+    "fixedP0InTestedHead": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "compareUrl": "https://github.com/alexj11324/Mikka/compare/a2198c8c2f608f7b8169329b9da853067618dba6...e78fccffd9dd878edd490b113ea80efcff1525e7",
+    "instructions": {
+      "agents": "fa963e4d0a342002661c58772d370484e8af740a",
+      "contributing": "768523980c14db13055f22a68c7e9c5960013508",
+      "mergeRiskSkill": "c8a545a237d7be29c0302d4aba3f1a8b7cfe9851"
+    }
+  },
+  "mergeRisk": {
+    "level": "medium",
+    "alignment": "good",
+    "impact": "large",
+    "verification": "decent",
+    "rollbackCost": "medium",
+    "errorDetection": "decent",
+    "codeLevelMustFixFoundInE78Increment": false,
+    "conditionalConclusion": "Reviewed ae10/1ac is ready at the code-review level subject to owner P0 merge order and fresh source, writer and account-window guards. Prepared e78 union is not a tested or published tree.",
+    "reasons": [
+      "Changes include tracing/privacy, fresh device authority SQL, P0 tenant scope, release fixtures and installer behavior.",
+      "Exact tested source has complete CI, database and Native evidence; the newly prepared e78 UI/locale union and final production chain are separate evidence boundaries.",
+      "Ordinary revert and redeployment can restore code, while P0 migrations and already performed external-model effects require separate operational handling.",
+      "Fail-closed readers and error/cause contracts are covered; actual PostHog storage and production observations require their own receipts."
+    ]
+  },
+  "testedEvidence": {
+    "workflowRun": 42603781956,
+    "workflowJobs": {
+      "total": 22,
+      "success": 21,
+      "skipped": 1
+    },
+    "headChecks": {
+      "total": 51,
+      "success": 40,
+      "skipped": 11,
+      "failure": 0,
+      "active": 0
+    },
+    "independentlyReadMetadataAt": "2026-11-09T11:23:58Z",
+    "workflowTerminalSuccessReportedByRootAt": "2026-11-09T11:15:02Z",
+    "sourceOriginal": {
+      "gitBlob": "38bf977089b0ca71c735d992d5d849f4195adcbb",
+      "bytes": 138798,
+      "sha256": "f661fe72c2028a54088ddd6bb9a7fbddc3ec51c662a555ad4795a8fa16dd178d"
+    },
+    "pgIndex": {
+      "gitBlob": "11ca37fd83bebcd6fa75b60fdfeb9ac878c4994d",
+      "bytes": 8099,
+      "sha256": "fe121e7114ef8362928a5893b493a61683042e8fe5d51aa09788b386a599b02e"
+    },
+    "postgres": {
+      "suites": 72,
+      "tests": 3904,
+      "pass": 3904,
+      "fail": 0,
+      "skippedTests": 0,
+      "todo": 0,
+      "cancelled": 0,
+      "selectionAndExecutedSetsEqual": true,
+      "shardCounts": [
+        759,
+        806,
+        1660,
+        679
+      ],
+      "cRegressionTests": 32,
+      "abRegressionTests": 13,
+      "strictFence": {
+        "roundTripsBefore": 11,
+        "roundTripsAfter": 6,
+        "completedBefore": 3,
+        "completedAfter": 4
+      },
+      "containerAndNetworkRemoval": "actual matching IDs in all four original logs",
+      "aggregateBoundary": "Database shard gate and timing summary; not production build/browser execution."
+    },
+    "nativeIndex": {
+      "gitBlob": "12dede621624365344eed77d81218ad1953b47de",
+      "bytes": 8320,
+      "sha256": "056441e959451891fdbc3aef664880f5671bc4ae0cb7264855b494dd5d0ebfad"
+    },
+    "native": {
+      "completeLogin": {
+        "native": 429,
+        "web": 435
+      },
+      "originalFirstPair": {
+        "native": 197,
+        "hosted": 230
+      },
+      "diagnosticsComplete": false,
+      "lifecycleWorkspaceNameRestored": false,
+      "unknownCountsByOriginalWindow": [
+        [
+          91,
+          130
+        ],
+        [
+          87,
+          132
+        ],
+        [
+          48,
+          69
+        ],
+        [
+          48,
+          78
+        ]
+      ],
+      "rootArithmetic": "Root independently reported 24 records, 12 checkpoints, 8 segments, 2280 bucket cells and 1291 query ordinals; zero arithmetic errors. This reviewer did not repeat that work.",
+      "parity": "100 screens at original threshold 0.001/color 0; 224 changed pixels; maximum ratio 0.00010262345679012345. No new manual PNG review by this reviewer.",
+      "vmCleanupBlob": "32f66cb05cfc140a027b14e536bec9fe3d59f9a6",
+      "productionAcceptance": false
+    },
+    "persistence": {
+      "checkpoint29": "df0d632",
+      "issueComment": "https://github.com/alexj11324/Mikka/issues/1512#issuecomment-6739029170",
+      "source": "Parent reported normal evidence-branch publication; no independent ref reread in this bounded review."
+    },
+    "preservation": "All prior failures, conditional skips, incomplete diagnostic dimensions and original source bindings remain valid history."
+  },
+  "e78Assessment": {
+    "changedPaths": 8,
+    "directIntersectionWithPrior1512F095ChangedPaths": 0,
+    "intersectionWithTestedP0Union": [
+      "messages/en.json",
+      "messages/zh-CN.json"
+    ],
+    "semanticLanguageConflict": false,
+    "affectedRuntime": "Agent activity row labels/marks and wording in components/workspace/issue-threads.tsx.",
+    "unchangedReadContracts": [
+      "useIssueThreads",
+      "useAcceptanceTasks",
+      "live subscription/read scheduling"
+    ],
+    "verifiedNewDependency": {
+      "path": "components/labels/entity-labels.tsx",
+      "gitBlob": "3a164cf8db7a49a535661b32a4731395abe82a51",
+      "boundary": "Existing static harness-name mappings and SVG presentation; no new hook, HTTP or DB read."
+    },
+    "acceptanceBrowserActor": "Current production browser actor does not select the removed task switch/attempt labels.",
+    "limitations": "This is source analysis. It neither establishes an increase in SQL nor transfers whole-tree Native/parity evidence from 1ac to the prepared e78 union."
+  },
+  "overlay": [
+    {
+      "path": "components/workspace/issue-threads.tsx",
+      "bytes": 6418,
+      "sha256": "21bd1e5a5ad4a0ed48a89e0050276d003ba1d7bc131eb0e41bfa11271f3758ba",
+      "gitBlob": "4633425a91944750ab91b7c220b5af1a234dc6ee",
+      "mode": "100644",
+      "type": "blob",
+      "beforeBlob": "33328818b49b5d6fa3c940ec0281fd2e0cac5ccf",
+      "source": "exact-e78-blob"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-08-2140-task-one-conversation.md",
+      "bytes": 2245,
+      "sha256": "800fe690ba1a7124be7c255f8d61e26f75fcd1e33b8e0cb81fc62baaaeeff899",
+      "gitBlob": "9136436d3f0ba1768f49b8c40429c23c5f977ae6",
+      "mode": "100644",
+      "type": "blob",
+      "beforeBlob": "5ecbc97b275176091b0cfed5fc68de945c77f4c1",
+      "source": "exact-e78-blob"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-09-0045-no-attempt-word.md",
+      "bytes": 3786,
+      "sha256": "468f9057d8379054fb1f9c3fa2034bf95c316159034f9c037ef1034e9e5df72a",
+      "gitBlob": "ee8e64c779b8ac369e0b36743242232efaca30b7",
+      "mode": "100644",
+      "type": "blob",
+      "beforeBlob": "c2870e670ac43641d4e8e88168da9192edf7986e",
+      "source": "exact-e78-blob"
+    },
+    {
+      "path": "docs/design/glossary.md",
+      "bytes": 19515,
+      "sha256": "ffc5934d14a0878adc56db8411ab463b9e9c9e16989baae316382177b3b6c28d",
+      "gitBlob": "d0acbf45a96fed6349bc897fec57219b88199f58",
+      "mode": "100644",
+      "type": "blob",
+      "beforeBlob": "bf4d10e9b5f228ff1009cba7015e62ba73b9c220",
+      "source": "exact-e78-blob"
+    },
+    {
+      "path": "docs/design/rules.md",
+      "bytes": 58095,
+      "sha256": "edd46c770de42664454a4597dadfe54d34dc9062eaca296256e9768c2a640e25",
+      "gitBlob": "231289267a355ebb1644f7287f4520759cf240da",
+      "mode": "100644",
+      "type": "blob",
+      "beforeBlob": "7f732181f78949fe743e6991cb60af7005cbba60",
+      "source": "exact-e78-blob"
+    },
+    {
+      "path": "messages/en.json",
+      "bytes": 252821,
+      "sha256": "b3bda8ced94b1c0ba9cbbb39de18d06ce9e85dbc1b50ec3099837c6a9ab36efa",
+      "gitBlob": "7c56dc09490258db5f15a772b3ff176efaf3450c",
+      "mode": "100644",
+      "type": "blob",
+      "beforeBlob": "f8d4dc109e3adbf625a37e291b1ef11e83473ac9",
+      "source": "mechanical-three-way"
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "bytes": 243494,
+      "sha256": "f81068a50e63fe02f08b46805f635818ca3a29e72a24b98c6d368ad9f3e152e9",
+      "gitBlob": "e61e3a62e6879189fb4f469c870abbffbfe7bb73",
+      "mode": "100644",
+      "type": "blob",
+      "beforeBlob": "cdda5d5fc21468db80c1bc475ec68e47cd1cddff",
+      "source": "mechanical-three-way"
+    },
+    {
+      "path": "scripts/issue-thread-acceptance.test.tsx",
+      "bytes": 8434,
+      "sha256": "900225d1a18fb18dc5066adc55eff960815bc9e993c6d6cdb1764bb8fa643199",
+      "gitBlob": "03657c4aec2ff53fd524459c6589c6b5fd071b17",
+      "mode": "100644",
+      "type": "blob",
+      "beforeBlob": "779dc18f1eb72f13505108efb0c41bafcb79048b",
+      "source": "exact-e78-blob"
+    }
+  ],
+  "patchProof": {
+    "mechanism": "Strict V8 unified-hunk validation: counts and exact context; unique location where existing P0 locale keys add three lines; exact forward/reverse bytes. This is not a git CLI merge or test execution.",
+    "completeOriginalComparePatches": [
+      {
+        "path": "components/workspace/issue-threads.tsx",
+        "status": "modified",
+        "bytes": 3822,
+        "sha256": "408337439e7f5d9db79315c505c562b8a40bb7b5d0356768ccc9ea943bbbf68d"
+      },
+      {
+        "path": "docs/design/decisions/2026-11-08-2140-task-one-conversation.md",
+        "status": "modified",
+        "bytes": 1124,
+        "sha256": "33832e3a2a0330873d31e5849fcadf6c1800e0656193bfcaf87304d08b7a7e2c"
+      },
+      {
+        "path": "docs/design/decisions/2026-11-09-0045-no-attempt-word.md",
+        "status": "modified",
+        "bytes": 4785,
+        "sha256": "c3c9405176ba526b946f415f555d6ecdf832ecfc4af039adb1d651801fc694fe"
+      },
+      {
+        "path": "docs/design/glossary.md",
+        "status": "modified",
+        "bytes": 1374,
+        "sha256": "87960d03d148fb8c164bd355732c5d0b92e715587a261e48f11391044c0b4df4"
+      },
+      {
+        "path": "docs/design/rules.md",
+        "status": "modified",
+        "bytes": 734,
+        "sha256": "518b9b02a66bcac1b369c7778d97b55b429d2a7228e22d0caa5e31eca887b2d6"
+      },
+      {
+        "path": "messages/en.json",
+        "status": "modified",
+        "bytes": 1091,
+        "sha256": "a3003c0029ce30b78824c3a09797d75f03698746b40c49488638c625c6b70158"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "status": "modified",
+        "bytes": 1069,
+        "sha256": "61f8fd8fab85214d35d7140d24f910117f17fe26fbb5e8de479587786872a571"
+      },
+      {
+        "path": "scripts/issue-thread-acceptance.test.tsx",
+        "status": "modified",
+        "bytes": 1910,
+        "sha256": "3688fe29be8711db3c0d8512a88b8b95cec4642b593083870467cde72b8fc242"
+      }
+    ],
+    "files": [
+      {
+        "path": "components/workspace/issue-threads.tsx",
+        "oursBlob": "33328818b49b5d6fa3c940ec0281fd2e0cac5ccf",
+        "mainBlob": "4633425a91944750ab91b7c220b5af1a234dc6ee",
+        "mode": "100644",
+        "reverseReconstructsExactOursBlob": true,
+        "forwardMatchesExactMainBlob": true,
+        "hunkLocations": [
+          {
+            "header": "@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'",
+            "declaredLine": 13,
+            "actualLine": 13,
+            "offset": 0,
+            "removedLines": 6,
+            "addedLines": 7
+          },
+          {
+            "header": "@@ -44,12 +45,12 @@ export type AgentActivityRow = { id: string; at: string; node: ReactNode }",
+            "declaredLine": 45,
+            "actualLine": 45,
+            "offset": 0,
+            "removedLines": 12,
+            "addedLines": 12
+          },
+          {
+            "header": "@@ -58,17 +59,17 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:",
+            "declaredLine": 59,
+            "actualLine": 59,
+            "offset": 0,
+            "removedLines": 17,
+            "addedLines": 17
+          }
+        ]
+      },
+      {
+        "path": "docs/design/decisions/2026-11-08-2140-task-one-conversation.md",
+        "oursBlob": "5ecbc97b275176091b0cfed5fc68de945c77f4c1",
+        "mainBlob": "9136436d3f0ba1768f49b8c40429c23c5f977ae6",
+        "mode": "100644",
+        "reverseReconstructsExactOursBlob": true,
+        "forwardMatchesExactMainBlob": true,
+        "hunkLocations": [
+          {
+            "header": "@@ -3,7 +3,7 @@",
+            "declaredLine": 3,
+            "actualLine": 3,
+            "offset": 0,
+            "removedLines": 7,
+            "addedLines": 7
+          }
+        ]
+      },
+      {
+        "path": "docs/design/decisions/2026-11-09-0045-no-attempt-word.md",
+        "oursBlob": "c2870e670ac43641d4e8e88168da9192edf7986e",
+        "mainBlob": "ee8e64c779b8ac369e0b36743242232efaca30b7",
+        "mode": "100644",
+        "reverseReconstructsExactOursBlob": true,
+        "forwardMatchesExactMainBlob": true,
+        "hunkLocations": [
+          {
+            "header": "@@ -2,19 +2,29 @@",
+            "declaredLine": 2,
+            "actualLine": 2,
+            "offset": 0,
+            "removedLines": 19,
+            "addedLines": 29
+          }
+        ]
+      },
+      {
+        "path": "docs/design/glossary.md",
+        "oursBlob": "bf4d10e9b5f228ff1009cba7015e62ba73b9c220",
+        "mainBlob": "d0acbf45a96fed6349bc897fec57219b88199f58",
+        "mode": "100644",
+        "reverseReconstructsExactOursBlob": true,
+        "forwardMatchesExactMainBlob": true,
+        "hunkLocations": [
+          {
+            "header": "@@ -53,7 +53,8 @@ Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspac",
+            "declaredLine": 53,
+            "actualLine": 53,
+            "offset": 0,
+            "removedLines": 7,
+            "addedLines": 8
+          },
+          {
+            "header": "@@ -78,7 +79,8 @@ the task's status: task status, Factory stage, run result and the derived",
+            "declaredLine": 79,
+            "actualLine": 79,
+            "offset": 0,
+            "removedLines": 7,
+            "addedLines": 8
+          }
+        ]
+      },
+      {
+        "path": "docs/design/rules.md",
+        "oursBlob": "7f732181f78949fe743e6991cb60af7005cbba60",
+        "mainBlob": "231289267a355ebb1644f7287f4520759cf240da",
+        "mode": "100644",
+        "reverseReconstructsExactOursBlob": true,
+        "forwardMatchesExactMainBlob": true,
+        "hunkLocations": [
+          {
+            "header": "@@ -203,7 +203,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).",
+            "declaredLine": 203,
+            "actualLine": 203,
+            "offset": 0,
+            "removedLines": 7,
+            "addedLines": 8
+          }
+        ]
+      },
+      {
+        "path": "messages/en.json",
+        "oursBlob": "f8d4dc109e3adbf625a37e291b1ef11e83473ac9",
+        "mainBaseBlob": "eefae5cb99d77220d53cdf802fa6716e64db3cd1",
+        "mainBlob": "c1f88dac78f116cfa010ff9deb88c890c5b6d464",
+        "mode": "100644",
+        "mainPatchForwardMatchesExactMainBlob": true,
+        "forwardReverseMatchesExactOursBytes": true,
+        "actualLeafChanges": [
+          {
+            "path": "Shell.panel.task.attempt",
+            "before": "Attempt {n}",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.switch",
+            "before": "Continuing with {agent}",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.switchAfterFailure",
+            "before": "{from} didn't get through · continuing with {agent}",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.switchRow",
+            "before": "Switched to {agent}",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.divider",
+            "before": "Attempt {n} {outcome} · retrying with {agent}",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.dividerOutcome.failed",
+            "before": "failed",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.dividerOutcome.blocked",
+            "before": "was blocked",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.dividerOutcome.other",
+            "before": "ended",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.replaced",
+            "before": "Started a new thread",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.result.replaced",
+            "before": "Replaced",
+            "after": null
+          }
+        ],
+        "leafChangesExactlyMatchMain": true,
+        "errorsObjectByteValuesUnchanged": true,
+        "preservedP0ErrorKeys": [
+          "taskWorkspaceUnresolved",
+          "taskWorkspaceMismatch",
+          "taskWorkspaceTransferDenied"
+        ],
+        "hunkLocations": [
+          {
+            "header": "@@ -4309,20 +4309,9 @@",
+            "declaredLine": 4309,
+            "actualLine": 4312,
+            "offset": 3,
+            "removedLines": 20,
+            "addedLines": 9
+          },
+          {
+            "header": "@@ -4365,7 +4354,6 @@",
+            "declaredLine": 4354,
+            "actualLine": 4357,
+            "offset": 3,
+            "removedLines": 7,
+            "addedLines": 6
+          }
+        ]
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "oursBlob": "cdda5d5fc21468db80c1bc475ec68e47cd1cddff",
+        "mainBaseBlob": "be4f5f0c7d4237df4bcdf5e77d3e64513f161e65",
+        "mainBlob": "c34c7f5639bba44642c91d2a107abb21f451740f",
+        "mode": "100644",
+        "mainPatchForwardMatchesExactMainBlob": true,
+        "forwardReverseMatchesExactOursBytes": true,
+        "actualLeafChanges": [
+          {
+            "path": "Shell.panel.task.attempt",
+            "before": "第 {n} 次尝试",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.switch",
+            "before": "换 {agent} 继续",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.switchAfterFailure",
+            "before": "{from} 没跑通 · 换 {agent} 继续",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.switchRow",
+            "before": "换 {agent}",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.divider",
+            "before": "第 {n} 次尝试{outcome} · 换 {agent} 再试",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.dividerOutcome.failed",
+            "before": "失败",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.dividerOutcome.blocked",
+            "before": "受阻",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.dividerOutcome.other",
+            "before": "结束",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.replaced",
+            "before": "换了新线程",
+            "after": null
+          },
+          {
+            "path": "Shell.panel.task.result.replaced",
+            "before": "已替换",
+            "after": null
+          }
+        ],
+        "leafChangesExactlyMatchMain": true,
+        "errorsObjectByteValuesUnchanged": true,
+        "preservedP0ErrorKeys": [
+          "taskWorkspaceUnresolved",
+          "taskWorkspaceMismatch",
+          "taskWorkspaceTransferDenied"
+        ],
+        "hunkLocations": [
+          {
+            "header": "@@ -4309,20 +4309,9 @@",
+            "declaredLine": 4309,
+            "actualLine": 4312,
+            "offset": 3,
+            "removedLines": 20,
+            "addedLines": 9
+          },
+          {
+            "header": "@@ -4365,7 +4354,6 @@",
+            "declaredLine": 4354,
+            "actualLine": 4357,
+            "offset": 3,
+            "removedLines": 7,
+            "addedLines": 6
+          }
+        ]
+      },
+      {
+        "path": "scripts/issue-thread-acceptance.test.tsx",
+        "oursBlob": "779dc18f1eb72f13505108efb0c41bafcb79048b",
+        "mainBlob": "03657c4aec2ff53fd524459c6589c6b5fd071b17",
+        "mode": "100644",
+        "reverseReconstructsExactOursBlob": true,
+        "forwardMatchesExactMainBlob": true,
+        "hunkLocations": [
+          {
+            "header": "@@ -52,7 +52,8 @@ const render = () => renderToStaticMarkup(<IntlProvider locale=\"en\" timeZone=\"UT",
+            "declaredLine": 52,
+            "actualLine": 52,
+            "offset": 0,
+            "removedLines": 7,
+            "addedLines": 8
+          },
+          {
+            "header": "@@ -80,7 +81,7 @@ test('runs by one Agent are one 活动 row in the latest run\\'s state; run data",
+            "declaredLine": 81,
+            "actualLine": 81,
+            "offset": 0,
+            "removedLines": 7,
+            "addedLines": 7
+          },
+          {
+            "header": "@@ -89,7 +90,8 @@ test('an Agent switch starts a new row that reads 「Switched to」 the new Agen",
+            "declaredLine": 90,
+            "actualLine": 90,
+            "offset": 0,
+            "removedLines": 7,
+            "addedLines": 8
+          }
+        ]
+      }
+    ],
+    "unchangedP0Errors": [
+      "Errors.taskWorkspaceUnresolved",
+      "Errors.taskWorkspaceMismatch",
+      "Errors.taskWorkspaceTransferDenied"
+    ],
+    "originalAlgorithmSha256": "b335ba51443e4649446c02510d1d1fbf84eb3cf8cbf1d3e0873e47cb79c5a77b"
+  },
+  "expectedWholeTree": {
+    "method": "Pure V8 Git tree byte serialization and SHA-1; not git merge execution",
+    "sourceTreeValidation": {
+      "ours": {
+        "expected": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+        "actual": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+        "allSubtreesMatched": true,
+        "blobs": 6792,
+        "gitlinks": 0
+      },
+      "theirs": {
+        "expected": "48b0d459ca1c9087e8abab29e7c3ccf9428fbbcc",
+        "actual": "48b0d459ca1c9087e8abab29e7c3ccf9428fbbcc",
+        "allSubtreesMatched": true,
+        "blobs": 6762,
+        "gitlinks": 0
+      }
+    },
+    "expectedUnion": {
+      "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+      "blobs": 6792,
+      "gitlinks": 0,
+      "changedLeafCount": 8,
+      "unchangedLeafCount": 6784,
+      "addedLeaves": 0,
+      "deletedLeaves": 0,
+      "changedTrees": [
+        {
+          "path": "components/workspace",
+          "old": "daa81288bffac863e89e4ca89e9ecf2029e39537",
+          "new": "79803a29a65fd1563ea0cc81a55f2c0f534be049"
+        },
+        {
+          "path": "components",
+          "old": "d304d0e5602aee211ded199bb62e2ae99953ba2b",
+          "new": "46feb41e6fb87b587dc1168db2992c7f1c2136be"
+        },
+        {
+          "path": "docs/design/decisions",
+          "old": "0150e98e7918a40de088379282ab4464810afaa8",
+          "new": "a3d429daf1464a91b0310591b47c698b40857b77"
+        },
+        {
+          "path": "docs/design",
+          "old": "37b9222cc677bf690382c46d0ced660b8cedc4b7",
+          "new": "c9c47f7c8fa66f640ff2f4cabfb86075c194ef82"
+        },
+        {
+          "path": "docs",
+          "old": "aa6613f4e91914f8407d52aa12e60e23f198ed0d",
+          "new": "bfd9805ded987eb147282e7150bc7c2670141ef7"
+        },
+        {
+          "path": "messages",
+          "old": "2a83680d7fa11250f71db72dda3debdd739ce8b4",
+          "new": "a026c82e5d8aff3e21ca05291e87b91e2dc37495"
+        },
+        {
+          "path": "scripts",
+          "old": "052b38c84eff97ad177399b0cf6e262041c6443a",
+          "new": "c4c794c69cb4112449a06c765fad0fd46103dde9"
+        },
+        {
+          "path": "",
+          "old": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+          "new": "102bc671b4c5e3cf49fcce54025c71b26f817cf2"
+        }
+      ]
+    },
+    "changedLeaves": [
+      {
+        "path": "components/workspace/issue-threads.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4633425a91944750ab91b7c220b5af1a234dc6ee"
+      },
+      {
+        "path": "docs/design/decisions/2026-11-08-2140-task-one-conversation.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9136436d3f0ba1768f49b8c40429c23c5f977ae6"
+      },
+      {
+        "path": "docs/design/decisions/2026-11-09-0045-no-attempt-word.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ee8e64c779b8ac369e0b36743242232efaca30b7"
+      },
+      {
+        "path": "docs/design/glossary.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d0acbf45a96fed6349bc897fec57219b88199f58"
+      },
+      {
+        "path": "docs/design/rules.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "231289267a355ebb1644f7287f4520759cf240da"
+      },
+      {
+        "path": "messages/en.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7c56dc09490258db5f15a772b3ff176efaf3450c"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e61e3a62e6879189fb4f469c870abbffbfe7bb73"
+      },
+      {
+        "path": "scripts/issue-thread-acceptance.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "03657c4aec2ff53fd524459c6589c6b5fd071b17"
+      }
+    ],
+    "allOtherLeavesPreserved": true
+  },
+  "additionalPreservedLeaves": [
+    {
+      "path": "package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "568cfeee161309202699acefd0a57a8edc52bf6e"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+    }
+  ],
+  "parentIndependentClassification": {
+    "source": "Parent message; separate independent computation",
+    "unionBlobs": 6792,
+    "unchanged": 6307,
+    "oursOnly": 477,
+    "theirsOnly": 6,
+    "sameBoth": 0,
+    "languageConflicts": 2
+  },
+  "preparedRemoteLanguageBlobs": [
+    {
+      "path": "messages/en.json",
+      "bytes": 252821,
+      "sha256": "b3bda8ced94b1c0ba9cbbb39de18d06ce9e85dbc1b50ec3099837c6a9ab36efa",
+      "gitBlob": "7c56dc09490258db5f15a772b3ff176efaf3450c",
+      "remoteSha": "7c56dc09490258db5f15a772b3ff176efaf3450c",
+      "confirmed": true
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "bytes": 243494,
+      "sha256": "f81068a50e63fe02f08b46805f635818ca3a29e72a24b98c6d368ad9f3e152e9",
+      "gitBlob": "e61e3a62e6879189fb4f469c870abbffbfe7bb73",
+      "remoteSha": "e61e3a62e6879189fb4f469c870abbffbfe7bb73",
+      "confirmed": true
+    }
+  ],
+  "productionBoundaries": [
+    "No production or account window is acquired by this review. At the last supplied queue observation the Factory window was 10:26:04–12:56:04 UTC; two cases had failed, but cleanup or early release was not established. Failure is not release.",
+    "P0 must be merged by its owner as coordinated; final main/ref/writer/window guards must be refreshed before any later merge or execution.",
+    "Final served Web version, daemon release, E2B writer and runtime-refresh identities require their actual serial release receipts.",
+    "The issue-specific ACME authorization applies; a Personal Workspace result does not prove team acceptance.",
+    "Real subscription Coordinator-to-agent trace continuity, per-generation analytics, Replay and native logs require actual PostHog evidence.",
+    "Controlled failure retention needs backend ingestion observation, not merely local collectors or exporter callback success.",
+    "This review did not query Timeline, scout or PostHog settings; their status is not inferred.",
+    "Native SQL budgets do not substitute for telemetry latency measurements; preserve every benchmark's source hash and measurement limits.",
+    "CI success and merging are not issue1512 production acceptance, and do not authorize closing the issue without that acceptance."
+  ],
+  "operations": {
+    "sourceBlobCreates": 2,
+    "sourceBlobReturnHashesVerified": true,
+    "safeReceiptCreate": 1,
+    "treeCreates": 0,
+    "commitCreates": 0,
+    "refWrites": 0,
+    "workflowTriggers": 0,
+    "workflowJobLogDownloads": 0,
+    "newTests": 0,
+    "computeResources": 0,
+    "accountReadsOrActions": 0
+  }
+}
