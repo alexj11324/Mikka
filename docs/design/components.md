@@ -8,6 +8,11 @@ to code: a frame draws the existing component as its code renders it, never
 a look-alike (R-90). `pnpm lint:ui` blocks hand-built UI that a library
 component covers.
 
+Inside a paid block or component (BoardUI Pro, affectUI, beUI Pro, in the
+hosted layer) nothing here replaces its parts: it keeps its own icons,
+avatars, controls and look, and only data and text change
+([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
+
 ## Build selection
 
 The public components below include the default UI slots. Official builds can

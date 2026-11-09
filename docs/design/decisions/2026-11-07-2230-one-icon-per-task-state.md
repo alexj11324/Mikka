@@ -6,6 +6,7 @@
 - Superseded in part by: [2026-11-08-0130](2026-11-08-0130-task-state-icon-colours.md) (mobile task and attempt glyph colours; shapes and the ban on dots and badges remain).
 - Superseded in part by: [2026-11-07-2300](2026-11-07-2300-one-conversation-per-task.md) (受阻 has its own octagon, not the hand; an attempt never shows the hand)
 - Replaces, in part: [2045](2026-11-07-2045-tasks-only-threads-inside.md) rules 3 and 4 (the group 待处理 and its icon on every row); the board-blocked tasks in 待处理 from the #1673 mapping
+- Superseded in part by: [2026-11-09-0050](2026-11-09-0050-paid-blocks-as-shipped.md): "use semantic tokens (BoardUI on the web…)" applies to Mikka's own UI and BoardUI components; inside an affectUI or beUI block the block's own colours stay.
 
 ## What went wrong
 

@@ -1,6 +1,6 @@
 # UI slots and the hosted UI layer
 
-The official web app and desktop installers lay a private BoardUI layer over
+The official web app and desktop installers lay a private layer (BoardUI, affectUI and beUI Pro) over
 this repository's interface ([decision 2026-11-06-2000](design/decisions/2026-11-06-2000-hosted-ui-overlay.md)).
 The paid code lives only in `alexj11324/mikka-hosted-ui`; this repository
 never imports it. The build pipeline that checks the layer out is issue #1527.
@@ -141,6 +141,11 @@ the production update.
   app's names). A few of BoardUI's theme variables share a name with this
   app's (`--font-sans`, `--color-blue-400`); this app's utilities inline their
   own values, so pages outside the slots look the same in both builds.
+  Paid blocks in the layer keep their shipped look and only data and text
+  change ([2026-11-09-0050](design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md)). Because the
+  shadcn token block is left out, affectUI blocks currently resolve shadcn
+  token names to this app's values; that is recorded drift, not a rule to
+  follow.
 - **Dependencies.** Packages BoardUI needs that this repository lacks are
   installed in the layer. `react` and `react-dom` come from this repository
   only.

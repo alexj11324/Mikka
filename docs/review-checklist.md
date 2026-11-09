@@ -4,6 +4,11 @@ Run this before you show any UI to Alex, in Figma or in code, and before you
 approve someone else's UI PR. Each item names the rule it checks. If an item
 fails, fix it first; do not show work with known failures.
 
+A paid block or component (BoardUI Pro, affectUI, beUI Pro) is checked against
+the library's demo instead: attach a side-by-side and list every visual
+difference beyond data and text. The Reuse, Look and Figma items below never
+ask to restyle one ([2026-11-09-0050](design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
+
 ## Before showing UI
 
 ### Reuse (R-90)
