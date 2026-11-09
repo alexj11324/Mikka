@@ -175,6 +175,12 @@ export async function cleanupWorkspaceCase(client, record, scope, { checkpoint, 
   await checkpoint(); return result
 }
 
+export function createWorkspaceReviewIssue(client, scope, record, fixture) {
+  return client.rpc('issues.saveIssue', [{ title: title(record),
+    content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: fixture.instructions }] }] },
+    status: 'todo', priority: 'low' }], { headers: { 'x-mikka-workspace-id': scope.workspaceId } })
+}
+
 async function executeCase(client, record, scope, profile, options, { checkpoint, pin, live = openLive,
   terminal = verifyExistingTaskTerminal, preview = verifyExistingTaskPreview, now = Date.now, signal } = {}) {
   const fixture = codingFixture(record.caseId, record.harness), channels = []
@@ -183,9 +189,7 @@ async function executeCase(client, record, scope, profile, options, { checkpoint
   const phase = async value => { record.phase = value; await checkpoint(); check(!signal?.aborted, 'interrupted'); await pin() }
   try {
     await phase('issue_create')
-    const created = await write('issue_create', () => client.rpc('issues.saveIssue', [{ workspaceId: scope.workspaceId,
-      title: title(record), content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: fixture.instructions }] }] },
-      status: 'todo', priority: 'low' }]), value => {
+    const created = await write('issue_create', () => createWorkspaceReviewIssue(client, scope, record, fixture), value => {
       check(UUID.test(value?.issue?.id ?? ''), 'issue'); record.issueId = value.issue.id
     })
     const issue = created.issue

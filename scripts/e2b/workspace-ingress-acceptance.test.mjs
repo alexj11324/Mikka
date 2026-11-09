@@ -3,7 +3,8 @@ import { EventEmitter } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { CommandExitError, SandboxError } from 'e2b'
 import test from 'node:test'
-import { candidateIdentity, cleanupOwnedRuntime, guardReceipt, observeHmr, probeWorkspaceIngress, validateJournal, validPorts } from './workspace-ingress-acceptance.mjs'
+import { candidateIdentity, cleanupOwnedRuntime, guardReceipt, observeHmr, probeTerminalAfterPreview,
+  probeWorkspaceIngress, validateJournal, validPorts } from './workspace-ingress-acceptance.mjs'
 
 const source = 'a'.repeat(40), ops = 'b'.repeat(40), worker = 'c'.repeat(40), digest = 'd'.repeat(64)
 const execution = { runId: '1234', runAttempt: '1' }
@@ -266,4 +267,90 @@ test('a WS that closed or produced invalid traffic before revoke cannot satisfy 
   socket.emit('open'); socket.emit('message', Buffer.from('{"type":"connected"}'), false)
   await observer.ready(); observer.expectRevoke(); socket.terminate()
   assert.equal((await observer.revoked()).closed, true)
+})
+
+function shutdownSandbox({ reply = { stopped: true }, output, exitCode = 0, commandError } = {}) {
+  const calls = [], files = new Map()
+  const sandbox = { files: { async write(path, value, options) {
+    assert.match(path, /^\/run\/mikka-preview\/acceptance-[a-f0-9-]+\.json$/)
+    assert.deepEqual(options, { user: 'root' })
+    assert.deepEqual(JSON.parse(value), { operation: 'shutdown' })
+    files.set(path, value); calls.push('write')
+  } }, commands: { async run(command, options) {
+    if (command.startsWith('rm -f -- ')) {
+      assert.deepEqual(options, { user: 'root', timeoutMs: 5000 })
+      assert.ok(command.includes([...files.keys()][0]))
+      calls.push('remove'); return { exitCode: 0, stdout: '' }
+    }
+    assert.deepEqual(options, { user: 'root', timeoutMs: 25_000 })
+    const path = [...files.keys()][0]
+    assert.equal(command, `chmod 600 '${path}' && python3 '/opt/mikka/worker/scripts/e2b/preview-gateway.py' control '${path}'`)
+    calls.push('shutdown')
+    if (commandError) throw commandError
+    return { exitCode, stdout: output ?? JSON.stringify(reply) }
+  } } }
+  return { sandbox, calls }
+}
+
+const afterFrameworks = () => ({ stage: 'vite', passed: false,
+  frameworks: ['next', 'vite'].map(framework => ({ framework, hotReload: true, revoked: true, takeoverDenied: true })) })
+
+test('the real preview-to-terminal transition requires a shutdown acknowledgement and keeps the command budgets and ordering', async () => {
+  const { sandbox, calls } = shutdownSandbox({ reply: { stopped: true, private: 'synthetic-private-reply' } })
+  const report = afterFrameworks(), frameworks = structuredClone(report.frameworks)
+  const fetchImpl = () => { throw new Error('must not issue a network request') }
+  const terminalProbe = async (actual, options) => {
+    calls.push('terminal')
+    assert.equal(actual, sandbox)
+    assert.deepEqual(options, { sourceCommit: source, fixtureId: fixture, fetchImpl })
+    assert.equal(report.stage, 'terminal'); assert.equal(report.previewStopped, true)
+    return { passed: true }
+  }
+  await probeTerminalAfterPreview(sandbox, report, journal, terminalProbe, fetchImpl)
+  assert.deepEqual(calls, ['write', 'shutdown', 'remove', 'terminal'])
+  assert.deepEqual(report.frameworks, frameworks)
+  assert.deepEqual(report.terminal, { passed: true }); assert.equal(report.passed, false)
+  assert.equal(JSON.stringify(report).includes('synthetic-private-reply'), false)
+})
+
+test('false, absent and truthy non-boolean shutdown replies cannot advance to PTY or report Vite failure', async () => {
+  for (const stopped of [undefined, null, false, 'true', 1, {}, []]) {
+    const { sandbox, calls } = shutdownSandbox({ reply: { stopped } }), report = afterFrameworks()
+    let terminalCalls = 0
+    await assert.rejects(probeTerminalAfterPreview(sandbox, report, journal, async () => {
+      terminalCalls++; return { passed: true }
+    }, () => {}), cause => cause.receiptCode === 'process')
+    assert.equal(report.stage, 'preview_shutdown'); assert.equal(report.previewStopped, false)
+    assert.equal(report.passed, false); assert.equal(report.terminal, undefined); assert.equal(terminalCalls, 0)
+    assert.deepEqual(calls, ['write', 'shutdown', 'remove'])
+  }
+})
+
+test('shutdown command failure remains process, retains its cause and completed frameworks, and never calls the terminal probe', async () => {
+  const privateText = 'synthetic-private-command-url-and-output'
+  const commandError = new CommandExitError({ exitCode: 1, stdout: privateText, stderr: privateText, error: privateText })
+  for (const options of [{ commandError }, { exitCode: 1 }, { output: privateText }, { output: 'x'.repeat(32_769) }]) {
+    const { sandbox, calls } = shutdownSandbox(options), report = afterFrameworks(), frameworks = structuredClone(report.frameworks)
+    let terminalCalls = 0
+    await assert.rejects(probeTerminalAfterPreview(sandbox, report, journal, async () => {
+      terminalCalls++; return { passed: true }
+    }, () => {}), cause => {
+      assert.equal(cause.receiptCode, 'process'); assert.ok(cause.cause)
+      if (options.commandError) assert.equal(cause.cause, commandError)
+      return true
+    })
+    assert.equal(report.stage, 'preview_shutdown'); assert.equal(report.passed, false)
+    assert.deepEqual(report.frameworks, frameworks); assert.equal(report.terminal, undefined); assert.equal(terminalCalls, 0)
+    assert.deepEqual(calls, ['write', 'shutdown', 'remove'])
+    assert.equal(JSON.stringify(report).includes(privateText), false)
+  }
+})
+
+test('a failed terminal result after acknowledged shutdown keeps the original terminal condition', async () => {
+  const { sandbox, calls } = shutdownSandbox(), report = afterFrameworks()
+  await assert.rejects(probeTerminalAfterPreview(sandbox, report, journal, async () => {
+    calls.push('terminal'); return { passed: false }
+  }, () => {}), cause => cause.receiptCode === 'terminal')
+  assert.equal(report.stage, 'terminal'); assert.equal(report.previewStopped, true); assert.equal(report.passed, false)
+  assert.deepEqual(calls, ['write', 'shutdown', 'remove', 'terminal'])
 })

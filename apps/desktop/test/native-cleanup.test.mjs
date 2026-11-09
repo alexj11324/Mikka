@@ -8,10 +8,11 @@ import { fileURLToPath } from 'node:url'
 import { stopLocalDaemons } from './native-cleanup.mjs'
 import { readNativeDaemonMetadata } from './native-metadata.mjs'
 
-async function daemon(t, { delayedListen = false, helloPid } = {}) {
+async function daemon(t, { delayedListen = false, helloPid, closeWithoutReply = false, holdAfterClose = false, drainReply = '' } = {}) {
   // Keep the Unix socket below macOS's path length limit.
   const profile = await mkdtemp('/tmp/mikka-drain-')
-  const child = fork(fileURLToPath(new URL('./fixtures/native-daemon.mjs', import.meta.url)), [profile, delayedListen ? 'delayed-listen' : '', helloPid ? String(helloPid) : ''], { execArgv: ['--import', 'tsx'], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] })
+  const child = fork(fileURLToPath(new URL('./fixtures/native-daemon.mjs', import.meta.url)), [profile, delayedListen ? 'delayed-listen' : '', helloPid ? String(helloPid) : '',
+    closeWithoutReply ? 'close-without-reply' : '', holdAfterClose ? 'hold-after-close' : '', drainReply], { execArgv: ['--import', 'tsx'], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] })
   let stderr = ''
   child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-4000) })
   t.after(async () => {
@@ -57,6 +58,58 @@ test('drain authenticates exact profiles and waits past socket closure to proces
   })
   assert.equal(foreign.child.exitCode, null, 'a different profile remains running')
   assert.deepEqual(await stopLocalDaemons([foreign.profile]), { profilesStopped: true })
+})
+
+test('a drain reply lost to actual authenticated socket closure still requires the exact owned process to exit', async t => {
+  const owned = await daemon(t, { closeWithoutReply: true }), foreign = await daemon(t)
+  const started = performance.now()
+  await observeChildExit(owned.child, async () => {
+    assert.deepEqual(await stopLocalDaemons([owned.profile]), { profilesStopped: true })
+    assert.ok(performance.now() - started >= 4900, 'a lost reply retains the original five-second response window')
+  })
+  assert.equal(foreign.child.exitCode, null, 'another exact profile is never drained')
+  assert.deepEqual(await stopLocalDaemons([foreign.profile]), { profilesStopped: true })
+})
+
+test('socket closure without a drain reply cannot permit cleanup while its authenticated PID remains live', async t => {
+  const owned = await daemon(t, { closeWithoutReply: true, holdAfterClose: true })
+  const closed = once(owned.child, 'message', { signal: AbortSignal.timeout(5000) })
+  let stopped = false
+  const started = performance.now()
+  const cleanup = stopLocalDaemons([owned.profile]).then(() => {
+    stopped = true
+  })
+  void cleanup.catch(() => undefined)
+  assert.equal((await closed)[0], 'socket-closed')
+  await new Promise(resolve => setTimeout(resolve, 250))
+  assert.equal(stopped, false); assert.equal(owned.child.exitCode, null)
+  process.kill(owned.child.pid, 0)
+  await assert.rejects(cleanup, /NATIVE_DAEMON_EXIT_TIMEOUT/)
+  assert.ok(performance.now() - started >= 19_000, 'the original total deadline still bounds process-exit proof')
+  assert.equal(stopped, false); assert.equal(owned.child.exitCode, null)
+  process.kill(owned.child.pid, 0)
+})
+
+test('a real drain RPC error with the timeout text remains a failure when that daemon subsequently closes and exits', async t => {
+  const { profile, child } = await daemon(t, { drainReply: 'error' })
+  const exited = once(child, 'exit', { signal: AbortSignal.timeout(5000) })
+  await assert.rejects(stopLocalDaemons([profile]), error => {
+    assert.equal(error.code, -32603)
+    assert.equal(error.message, 'NATIVE_DAEMON_DRAIN_TIMEOUT')
+    return true
+  })
+  assert.deepEqual(await exited, [0, null])
+})
+
+test('a malformed drain reply remains a failure even when that daemon subsequently closes and exits', async t => {
+  const { profile, child } = await daemon(t, { drainReply: 'invalid' })
+  const exited = once(child, 'exit', { signal: AbortSignal.timeout(5000) })
+  await assert.rejects(stopLocalDaemons([profile]), error => {
+    assert.equal(error.name, 'ZodError')
+    assert.ok(Array.isArray(error.issues) && error.issues.some(issue => issue.path.join('.') === 'ok'))
+    return true
+  })
+  assert.deepEqual(await exited, [0, null])
 })
 
 test('a recorded starting daemon is drained when its socket appears within the same cleanup deadline', async t => {

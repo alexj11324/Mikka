@@ -6,6 +6,7 @@ import { createDesktopRpc, desktopBearerHeaders, dispatchRpc, humanSessionHeader
 import { workspaceSelection } from '../workspace-selection'
 import { createSessionClient } from '../../scripts/acceptance/cloud-startup.mjs'
 import { CASES, createDomainIssue } from '../../scripts/acceptance/work-domain-production.mjs'
+import { codingFixture, createWorkspaceReviewIssue } from '../../scripts/acceptance/coding-workspace.mjs'
 import { desktopActionSchemas } from './schemas'
 import { currentDesktopSession, withDesktopSession, safeDesktopSession } from './session'
 import { decode, encode, UPDATE_REQUIRED } from './wire'
@@ -311,3 +312,45 @@ test('domain production Task creation uses the actual strict saveIssue schema an
   assert.equal(invoked, 1)
   assert.equal(result.issue.id, issueId); assert.equal(result.issue.workspaceId, workspaceId); assert.equal(result.issue.userId, owner)
 })
+
+for (const harness of ['claude_code', 'codex']) {
+  test(`Coding Workspace ${harness} creates its normal Task through the strict RPC with a fixed Workspace header`, async () => {
+    const workspaceId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    const issueId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    const record = { caseId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', harness }
+    const fixture = codingFixture(record.caseId, harness)
+    const expected = { title: `测试 Coding Workspace ${record.caseId} ${harness}`,
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: fixture.instructions }] }] },
+      status: 'todo', priority: 'low' }
+    const session = { user: { id: owner } }
+    let invoked = 0, selected: string | null = null
+    const options = {
+      actions: { 'issues.saveIssue': { args: desktopActionSchemas['issues.saveIssue'], invoke: async (args: unknown[]) => {
+        invoked++
+        assert.equal(selected, workspaceId)
+        assert.deepEqual(args, [expected])
+        return { issue: { ...expected, id: issueId, userId: owner, workspaceId: selected, revision: 1 } }
+      } } },
+      scope: async (_session: typeof session, work: () => Promise<Response>, req: Request) => {
+        assert.equal(req.headers.get('x-mikka-rpc'), '1')
+        const choice = workspaceSelection(req.headers)
+        assert.equal(choice.present, true); assert.equal(choice.workspaceId, workspaceId)
+        selected = choice.workspaceId
+        return work()
+      },
+    }
+    const legacy = new Request('https://app.example/mikka/api/rpc', { method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-mikka-rpc': '1' },
+      body: JSON.stringify({ version: 1, action: 'issues.saveIssue', args: [{ workspaceId, ...expected }] }) })
+    const refused = await dispatchRpc(options, legacy, session, 'Cookie')
+    assert.equal(refused.status, 400)
+    assert.equal((await refused.json()).error.code, 'desktop_rpc_request_invalid')
+    assert.equal(invoked, 0)
+    const client = createSessionClient('https://app.example', (url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+      dispatchRpc(options, new Request(url, init), session, 'Cookie'))
+    const result = await createWorkspaceReviewIssue(client, { workspaceId }, record, fixture)
+    assert.equal(invoked, 1)
+    assert.equal(result.issue.id, issueId); assert.equal(result.issue.workspaceId, workspaceId); assert.equal(result.issue.userId, owner)
+    assert.deepEqual(result.issue.content, expected.content)
+  })
+}

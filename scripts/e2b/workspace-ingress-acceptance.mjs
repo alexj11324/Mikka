@@ -390,6 +390,15 @@ async function framework(sandbox, kind, root, identity, fetchImpl, Socket) {
   }
 }
 
+export async function probeTerminalAfterPreview(sandbox, report, identity, terminalProbe, fetchImpl) {
+  report.stage = 'preview_shutdown'
+  report.previewStopped = (await control(sandbox, { operation: 'shutdown' }))?.stopped === true
+  check(report.previewStopped, 'process')
+  report.stage = 'terminal'
+  report.terminal = await terminalProbe(sandbox, { sourceCommit: identity.sourceCommit, fixtureId: identity.fixtureId, fetchImpl })
+  check(report.terminal?.passed === true, 'terminal')
+}
+
 export async function probeWorkspaceIngress(initialSandbox, identity, {
   fetchImpl = fetch, Socket = require('next/dist/compiled/ws'),
   terminalProbe = async (...args) => (await import('./workspace-terminal-acceptance.mjs')).probeWorkspaceTerminal(...args),
@@ -454,10 +463,7 @@ export async function probeWorkspaceIngress(initialSandbox, identity, {
     report.frameworkLockSha256 = hash(await readFile(new URL('./fixtures/preview-frameworks/package-lock.json', import.meta.url)))
     await jsonCommand(sandbox, `python3 '${GATEWAY}' ensure`)
     for (const kind of ['next', 'vite']) { report.stage = kind; report.frameworks.push(await framework(sandbox, kind, appRoot, identity, fetchImpl, Socket)) }
-    await control(sandbox, { operation: 'shutdown' })
-    report.stage = 'terminal'
-    report.terminal = await terminalProbe(sandbox, { sourceCommit: identity.sourceCommit, fixtureId: identity.fixtureId, fetchImpl })
-    check(report.terminal?.passed === true, 'terminal')
+    await probeTerminalAfterPreview(sandbox, report, identity, terminalProbe, fetchImpl)
     report.stage = 'pause_resume'
     check(await sandbox.pause({ mode: 'full' }) === true, 'resume')
     sandbox = await sandbox.connect({ timeoutMs: 480_000 })
