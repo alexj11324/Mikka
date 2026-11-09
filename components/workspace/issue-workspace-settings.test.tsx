@@ -63,7 +63,7 @@ for (const [file, names] of [
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
   ['../nav/group-avatar.tsx', ['GroupPillAvatar']], ['../browser/browser-pane.tsx', ['BrowserPane']],
   ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']], ['./group-chat-view.tsx', ['GroupChatView']],
-  ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed']],
+  ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
   ['./create-issue-dialog.tsx', ['CreateIssueDialog']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, empty])) })
