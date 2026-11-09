@@ -202,6 +202,7 @@ export function pngDimensions(bytes) {
 export function loginFlow() {
   return `appId: ${BUNDLE}
 ---
+- launchApp
 - extendedWaitUntil:
     visible:
       id: signin-email
