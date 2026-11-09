@@ -173,6 +173,14 @@ jobs:
           echo "$RUNNER_TEMP/mikka-maestro/maestro/bin" >> "$GITHUB_PATH"
       - name: Boot English simulator and check stock Settings accessibility
         run: bash scripts/release/mobile-screenshots-build.sh --preflight-only
+      - name: Measure a second stock session on the same simulator
+        run: |
+          node --input-type=module <<'JS'
+          import { rmSync } from 'node:fs'
+          import { join } from 'node:path'
+          rmSync(join(process.env.RUNNER_TEMP, 'mikka-screenshots-private', 'driver-output'), { recursive: true, force: true })
+          JS
+          node scripts/release/mobile-screenshots.mjs driver-preflight
       - name: Remove owned simulator and private driver output
         if: always()
         run: node scripts/release/mobile-screenshots.mjs cleanup
