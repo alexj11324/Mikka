@@ -10,12 +10,19 @@ import { isDeepStrictEqual } from 'node:util'
 import { workflowGuard } from './self-hosted-closeout.mjs'
 import { createSessionClient, decodeWire, smokeAcceptanceAccount } from '../acceptance/cloud-startup.mjs'
 
-export const MAIN = 'ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d'
+export const MAIN = '12458fe22e1217f644e8b28f82ab856211e73b72'
 export const ORIGIN = 'https://app.aspectlylabs.com'
 // One actual account window and one ordinary child of a reviewed Ops parent.
 // Null is intentionally closed; later private repins cannot reuse this grant.
-export const WINDOW = Object.freeze({ workspaceId: null, readerSha256: null, opsParentSha: null,
-  commentId: null, commentBodySha256: null, startsAt: null, expiresAt: null })
+export const WINDOW = Object.freeze({
+  "workspaceId": "de300001-ece6-4021-8214-c986ea306bde",
+  "readerSha256": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e",
+  "opsParentSha": "d669914d054b172d0ed8f3eb2d072fdc36951fc9",
+  "commentId": 6752001836,
+  "commentBodySha256": "421eada4fdadcfb3e95bfda6ed6270957f944878940ee8b90fd2884708a392de",
+  "startsAt": "2026-11-09T21:31:57.000Z",
+  "expiresAt": "2026-11-09T21:51:57.000Z"
+})
 const ADMIN_HASH = '0049e13c050f799070a7d1a95bb843f2a0519b5e8732bf6986e2e1613b8941c3'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const SHA = /^[0-9a-f]{40}$/
