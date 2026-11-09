@@ -1,0 +1,33 @@
+{
+  "kind": "immutable-production-acceptance-evidence-index",
+  "issue": 1212,
+  "applicationSha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "driverSha": "3edbbb94eaa971644b6d0b407f89a5c959eece10",
+  "runId": 42548083101,
+  "jobId": 128937344660,
+  "artifactId": 13644815038,
+  "artifactZipSha256": "d54af3c11098588e3738023ff2175dacb31f42f9d63fc1d3694ffb2ceafd5bb7",
+  "artifactDownloadCount": 1,
+  "originalReports": [
+    {
+      "name": "mcp-reply.json",
+      "bytes": 7934,
+      "sha256": "d9f1f16c34e7fa5f65c2210a8676e003dc1775253ea32d56a7cc99b44b492535"
+    },
+    {
+      "name": "release-gate.json",
+      "bytes": 287,
+      "sha256": "78dd6c47ebaffe2234f354a453fe2a53464b749206cd7c036eb260860c5d20af"
+    }
+  ],
+  "archivedFiles": [
+    {
+      "name": "server-correlation.json",
+      "bytes": 3476,
+      "sha256": "7f0266f8b4c5aca6fc432125c9eb821f675e3448f9b73f629d27254257c4ea1c"
+    }
+  ],
+  "originalReportRewritten": false,
+  "runtimeLogSelection": "mcp_reply_wait_complete within 01:55:40–01:57:30 UTC; three exact provider request IDs matched X-Vercel-Id final segment",
+  "privacy": "Only numeric completion fields, opaque technical hashes, own request/deployment IDs and immutable provenance; no secrets, cookie, identity, history text, model output or raw unfiltered logs."
+}
