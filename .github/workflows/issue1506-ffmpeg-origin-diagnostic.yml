@@ -1,138 +1,16 @@
 name: Issue 1506 FFmpeg origin diagnostic
-run-name: Issue 1506 fixed API authenticated diagnosis
+run-name: Issue 1506 diagnostic entry closed
 on:
   push:
     branches:
       - diagnostic/issue1506-ffmpeg-20261109t0758
     paths:
       - .github/workflows/issue1506-ffmpeg-origin-diagnostic.yml
-permissions:
-  contents: read
-concurrency:
-  group: issue1506-ffmpeg-origin-diagnostic-20261109t0758
-  cancel-in-progress: false
+permissions: {}
 jobs:
   probe:
-    if: github.ref == 'refs/heads/diagnostic/issue1506-ffmpeg-20261109t0758'
-    timeout-minutes: 4
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [macos-26]
-    runs-on: ${{ matrix.runner }}
+    if: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
     steps:
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '24'
-      - name: Read bounded official asset response metadata
-        env:
-          ASSET_DIAGNOSTIC_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          node <<'NODE'
-          const https = require('node:https');
-          const os = require('node:os');
-          const { createHash } = require('node:crypto');
-          const platforms = {
-            linux: { arch: 'x64', name: 'linux-x64.LICENSE', id: '316529924' },
-            darwin: { arch: 'arm64', name: 'ffmpeg-darwin-arm64.gz', id: '316528311' },
-          };
-          const selected = platforms[os.platform()];
-          if (!selected || selected.arch !== os.arch()) throw new Error('Unexpected diagnostic runner');
-          const apiUrl = 'https://api.github.com/repos/eugeneware/ffmpeg-static/releases/assets/' + selected.id;
-          const releaseUrl = 'https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/' + selected.name;
-          const hosts = new Map([
-            ['github.com', 'release'], ['api.github.com', 'api'],
-            ['release-assets.githubusercontent.com', 'release_assets'],
-            ['objects.githubusercontent.com', 'objects'],
-            ['github-production-release-asset-2e65be.s3.amazonaws.com', 'legacy_release_assets'],
-          ]);
-          function numberHeader(value) {
-            return typeof value === 'string' && /^\d{1,12}$/.test(value) ? Number(value) : null;
-          }
-          async function probe(source, initial, authenticated = false) {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 30_000);
-            const started = Date.now();
-            const row = { source, authenticated, asset: selected.name, startedAt: new Date().toISOString(), hops: [] };
-            let url = initial;
-            try {
-              for (let redirects = 0; redirects <= 3; redirects++) {
-                const parsed = new URL(url);
-                if (parsed.protocol !== 'https:' || !hosts.has(parsed.hostname) || parsed.username ||
-                    parsed.password || (parsed.port && parsed.port !== '443')) throw new Error('Unexpected redirect');
-                const headers = {
-                  Accept: 'application/octet-stream', 'Accept-Encoding': 'identity',
-                  'User-Agent': 'ffmpeg-static/5.3.0',
-                };
-                // An existing read-only Actions token is used only for a conditional API-origin diagnostic.
-                // Headers are recreated on every hop, so signed-CDN redirects receive no Authorization.
-                if (authenticated && parsed.href === apiUrl) {
-                  if (!process.env.ASSET_DIAGNOSTIC_TOKEN) throw new Error('Missing diagnostic token');
-                  headers.Authorization = 'Bearer ' + process.env.ASSET_DIAGNOSTIC_TOKEN;
-                }
-                const response = await new Promise((resolve, reject) => {
-                  const request = https.get(parsed, { agent: false, signal: controller.signal, headers }, resolve);
-                  request.once('error', reject);
-                });
-                const hop = {
-                  origin: hosts.get(parsed.hostname), redirect: redirects, status: response.statusCode,
-                  elapsedMs: Date.now() - started,
-                  rateLimitRemaining: numberHeader(response.headers['x-ratelimit-remaining']),
-                  rateLimitLimit: numberHeader(response.headers['x-ratelimit-limit']),
-                  rateLimitReset: numberHeader(response.headers['x-ratelimit-reset']),
-                  retryAfterSeconds: numberHeader(response.headers['retry-after']),
-                };
-                row.hops.push(hop);
-                if ([301, 302, 303, 307, 308].includes(response.statusCode)) {
-                  const location = response.headers.location;
-                  response.destroy();
-                  if (!location || redirects === 3) { row.result = 'redirect_limit'; return row; }
-                  url = new URL(location, parsed).href;
-                  continue;
-                }
-                if (response.statusCode === 200) {
-                  response.destroy();
-                  row.result = 'headers_200_body_not_downloaded';
-                  return row;
-                }
-                let chunks = [], bytes = 0;
-                for await (const chunk of response) {
-                  const retained = chunk.subarray(0, Math.max(0, 4096 - bytes));
-                  chunks.push(retained); bytes += retained.length;
-                  if (bytes >= 4096) { response.destroy(); break; }
-                }
-                const body = Buffer.concat(chunks);
-                const text = body.toString('utf8').toLowerCase();
-                hop.errorBodyBytesRetained = body.length;
-                hop.errorBodySha256 = createHash('sha256').update(body).digest('hex');
-                hop.classification = hop.rateLimitRemaining === 0 ? 'primary_rate_limit' :
-                  text.includes('secondary rate limit') || text.includes('abuse detection') ? 'secondary_rate_limit' :
-                  text.includes('expiredtoken') || text.includes('jwt:expired') ? 'expired_signed_asset' :
-                  text.includes('resource not accessible by integration') ? 'integration_scope' : 'unclassified_http';
-                row.result = 'http_error';
-                return row;
-              }
-            } catch (error) {
-              row.result = controller.signal.aborted ? 'deadline' : 'request_error';
-              row.errorCode = ['ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ABORT_ERR']
-                .includes(error.code) ? error.code : 'OTHER';
-            } finally {
-              clearTimeout(timeout);
-              controller.abort();
-              row.elapsedMs = Date.now() - started;
-              row.endedAt = new Date().toISOString();
-            }
-            return row;
-          }
-          (async () => {
-            console.log(JSON.stringify({ kind: 'auth_diagnostic_start', workflowSha: process.env.GITHUB_SHA,
-              sourceBase: 'e9fa621f18c7809c7f890a5b4670bd580c7424dc', precedingDiagnosticRun: 42583267142,
-              platform: os.platform(), arch: os.arch(), fixedAsset: selected.name,
-              requestBudget: 'one authenticated attempt at the fixed API endpoint; no anonymous baseline request',
-              productionActions: 0, modelCalls: 0, installation: false }));
-            const api = await probe('api_existing_actions_token', apiUrl, true);
-            console.log(JSON.stringify({ kind: 'origin_result', ...api }));
-            console.log(JSON.stringify({ kind: 'auth_diagnostic_completed', installationVerified: false }));
-          })().catch(() => { console.error('diagnostic_setup_failed'); process.exitCode = 1; });
-          NODE
+      - run: exit 1
