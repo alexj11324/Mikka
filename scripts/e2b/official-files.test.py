@@ -231,7 +231,7 @@ class OfficialFiles(unittest.TestCase):
                         files.verify({'version': 1, 'entries': [before]}, kind)
         with patch.object(files, 'entry', return_value={**original, 'sha256': after_sha}):
             files.verify({'version': 1, 'entries': [original]}, 'codex')
-        with patch.object(files, 'entry', return_value={**original, 'mode': 0o777}):
+        with patch.object(files, 'entry', return_value={**original, 'mode': 0o755}):
             with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
                 files.verify({'version': 1, 'entries': [original]}, 'codex')
 
@@ -434,8 +434,8 @@ class OfficialFiles(unittest.TestCase):
 
     def test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization(self):
         # The d63 Claude fresh scan observed both the existing control-proven
-        # 0644 -> 0777 transition and a new provider CA. Codex already permits
-        # this exact path's per-boot bytes; its mode rule must not be widened.
+        # 0644 -> 0777 transition and a new provider CA. The Codex case retains
+        # its pre-existing permission while checking the per-boot digest rule.
         path = '/usr/local/share/ca-certificates/e2b-ca.crt'
         for kind, mode in [('claude', 0o644), ('desktop', 0o644), ('codex', 0o777)]:
             with self.subTest(kind=kind):
@@ -480,9 +480,8 @@ class OfficialFiles(unittest.TestCase):
                 with self.subTest(kind=kind, path=other), patch.object(files, 'entry', return_value={**before, 'sha256': 'b' * 64}):
                     with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
                         files.verify({'version': 1, 'entries': [before]}, kind)
-        # Codex's measured policy still allows only byte rotation, not a new
-        # permission transition inferred from the other official templates.
-        with patch.object(files, 'entry', return_value={**original, 'mode': 0o777}):
+        # The official Codex observation proves 0644 -> 0777, not arbitrary modes.
+        with patch.object(files, 'entry', return_value={**original, 'mode': 0o755}):
             with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
                 files.verify({'version': 1, 'entries': [original]}, 'codex')
 
@@ -692,7 +691,7 @@ class DesktopCertificateRelinks(unittest.TestCase):
                 ('group', 'desktop', 'after', {'gid': 1000}),
                 ('type', 'desktop', 'after', {'kind': 'directory'}),
                 ('codex scope', 'codex', 'after', {}),
-                ('claude scope', 'claude', 'after', {}),
+                ('claude wrong baseline digest', 'claude', 'before', {'sha256': self.CODEX_SHA}),
             ]
             for label, kind, side, update in mutations:
                 before, after = self.rows()
@@ -749,6 +748,230 @@ class DesktopCertificateRelinks(unittest.TestCase):
             with self.subTest(defect=defect):
                 with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
                     files.validate_receipt(invalid, 'desktop')
+
+
+class ClaudeCertificateRelinks(unittest.TestCase):
+    # Candidate regression for the published R8db fresh-scan failure. These
+    # metadata fixtures are not an official-only control or release acceptance.
+    PATHS = DesktopCertificateRelinks.PATHS
+    TARGETS = DesktopCertificateRelinks.TARGETS
+
+    def proof(self):
+        return DesktopCertificateRelinks().proof('claude')
+
+    def test_claude_relinks_require_finalization_and_preserve_strict_installation(self):
+        # proof() checks unchanged installation, rejects these links during
+        # strict verification, then invokes the real finalization verifier.
+        proof = self.proof()
+        self.assertIs(files.validate_receipt(proof, 'claude'), proof)
+        final = proof['finalization']
+        self.assertEqual(proof['before'], proof['after'])
+        self.assertEqual(final['before'], final['after'])
+        self.assertNotEqual(final['originalBefore'], final['originalAfter'])
+        changes = {row['path']: row for row in final['providerChanges']}
+        for path, target in zip(self.PATHS, self.TARGETS):
+            self.assertEqual(changes[path], {
+                'path': path, 'kind': 'file',
+                'before': {'kind': 'file', 'sha256': DesktopCertificateRelinks.DESKTOP_SHA, 'target': None},
+                'after': {'kind': 'link', 'sha256': None, 'target': target},
+                'resolvedSha256': DesktopCertificateRelinks.ROOT_FRESH_SHA,
+            })
+        # Provider-root renewal remains the existing per-boot behavior; the
+        # packaged aliases are still bound to their measured source bytes.
+        self.assertNotEqual(DesktopCertificateRelinks.ROOT_FRESH_SHA,
+                            DesktopCertificateRelinks.DESKTOP_SHA)
+
+    def test_claude_relinks_reject_wrong_digest_target_kind_mode_and_owner(self):
+        defects = [
+            ('legacy Codex digest', 'before', {'sha256': DesktopCertificateRelinks.CODEX_SHA}),
+            ('unmeasured digest', 'before', {'sha256': 'a' * 64}),
+            ('raw target', 'after', {'target': '/opt/mikka/replaced.crt'}),
+            ('original kind', 'before', {'kind': 'link'}),
+            ('result kind', 'after', {'kind': 'directory'}),
+            ('changed old mode', 'before', {'mode': 0o644}),
+            ('changed new mode', 'after', {'mode': 0o775}),
+            ('owner', 'after', {'uid': 1000}),
+            ('group', 'after', {'gid': 1000}),
+        ]
+        for path in self.PATHS:
+            for label, side, update in defects:
+                before, after = DesktopCertificateRelinks().rows()
+                (before if side == 'before' else after)[path].update(update)
+                with self.subTest(path=path, defect=label), \
+                        patch.object(files, 'entry', side_effect=lambda p: deepcopy(after[str(p)])), \
+                        patch.object(files.Path, 'resolve', return_value=Path(ROOT_CA)):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed ') as raised:
+                        files.verify({'version': 1, 'entries': list(before.values())}, 'claude')
+                changes = json.loads(str(raised.exception).removeprefix('official_files_changed '))
+                self.assertIn(path, [change['path'] for change in changes])
+
+    def test_claude_relinks_require_the_exact_regular_provider_root_terminal(self):
+        for path in self.PATHS:
+            before, after = DesktopCertificateRelinks().rows()
+            for label, terminal_path, terminal in [
+                ('wrong terminal', '/opt/mikka/e2b-ca.crt', after[ROOT_CA]),
+                ('directory terminal', ROOT_CA, {**after[ROOT_CA], 'kind': 'directory'}),
+                ('link terminal', ROOT_CA, {**after[ROOT_CA], 'kind': 'link', 'target': '/opt/mikka/replaced.crt'}),
+            ]:
+                def actual_entry(requested):
+                    return deepcopy(after[path] if str(requested) == path else terminal)
+                with self.subTest(path=path, defect=label), \
+                        patch.object(files, 'entry', side_effect=actual_entry), \
+                        patch.object(files.Path, 'resolve', return_value=Path(terminal_path)):
+                    with self.assertRaisesRegex(RuntimeError, '^e2b_certificate_target_invalid$'):
+                        files.verify({'version': 1, 'entries': [before[path]]}, 'claude')
+
+    def test_claude_relinks_do_not_exempt_original_clis_or_unlisted_certificates(self):
+        before, after = DesktopCertificateRelinks().rows()
+        for path in ('/usr/local/bin/claude', '/usr/local/bin/codex',
+                     '/etc/ssl/certs/unobserved-provider-root.pem',
+                     '/etc/ssl/certs/e2b-ca.pem.backup'):
+            original = {**before[self.PATHS[0]], 'path': path}
+            updated = {**after[self.PATHS[0]], 'path': path}
+            for change in (updated, {**original, 'sha256': DesktopCertificateRelinks.ROOT_FRESH_SHA}):
+                with self.subTest(path=path, kind=change['kind']), patch.object(files, 'entry', return_value=change):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': [original]}, 'claude')
+
+    def test_claude_relink_receipts_reject_tampering_and_installation_substitution(self):
+        proof = self.proof()
+        for defect in ('missing resolved hash', 'invalid resolved hash', 'wrong raw target',
+                       'wrong baseline', 'missing original kind', 'duplicate path',
+                       'wrong finalization kind', 'wrong policy', 'replaced installation'):
+            invalid = deepcopy(proof)
+            final = invalid['finalization']
+            change = next(row for row in final['providerChanges'] if row['path'] == self.PATHS[0])
+            if defect == 'missing resolved hash':
+                change.pop('resolvedSha256')
+            elif defect == 'invalid resolved hash':
+                change['resolvedSha256'] = 'not-a-digest'
+            elif defect == 'wrong raw target':
+                change['after']['target'] = '/opt/mikka/replaced.crt'
+            elif defect == 'wrong baseline':
+                change['before']['sha256'] = DesktopCertificateRelinks.CODEX_SHA
+            elif defect == 'missing original kind':
+                change.pop('kind')
+            elif defect == 'duplicate path':
+                final['providerChanges'].append(deepcopy(change))
+            elif defect == 'wrong finalization kind':
+                final['kind'] = 'desktop'
+            elif defect == 'wrong policy':
+                final['policySha256'] = '0' * 64
+            else:
+                invalid['after'] = final['originalAfter']
+            with self.subTest(defect=defect):
+                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                    files.validate_receipt(invalid, 'claude')
+
+
+class CodexRootCaFinalization(unittest.TestCase):
+    # Actual metadata from official-only control 42670291715 / attempt 1,
+    # ops b75871ea1753f75769daa33b095704475cf9a4a2. This replays the
+    # observed path through the real verifier; it is not a filesystem scan.
+    BEFORE_SHA = '713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a'
+    FRESH_SHA = '545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a'
+
+    def setUp(self):
+        self.original = {'path': ROOT_CA, 'kind': 'file', 'mode': 0o644,
+                         'uid': 0, 'gid': 0, 'sha256': self.BEFORE_SHA}
+
+    def test_observed_mode_then_digest_changes_require_finalization_and_strict_proof(self):
+        baseline = {'version': 1, 'entries': [self.original]}
+        with patch.object(files, 'entry', return_value=self.original):
+            installation = files.verify(baseline)
+        for phase, mode, sha in [('pre_finalization', 0o644, self.BEFORE_SHA),
+                                 ('ready', 0o777, self.BEFORE_SHA),
+                                 ('fresh', 0o777, self.FRESH_SHA)]:
+            updated = {**self.original, 'mode': mode, 'sha256': sha}
+            with self.subTest(phase=phase), patch.object(files, 'entry', return_value=updated):
+                if phase == 'pre_finalization':
+                    self.assertEqual(files.verify(baseline), installation)
+                else:
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify(baseline)
+                final = files.verify(baseline, 'codex')
+                proof = {**installation, 'finalization': final}
+                self.assertIs(files.validate_receipt(proof, 'codex'), proof)
+                expected_before, expected_after = {}, {}
+                if mode != 0o644:
+                    expected_before['mode'], expected_after['mode'] = 0o644, mode
+                if sha != self.BEFORE_SHA:
+                    expected_before['sha256'], expected_after['sha256'] = self.BEFORE_SHA, sha
+                expected = ([{'path': ROOT_CA, 'kind': 'file', 'before': expected_before,
+                              'after': expected_after}] if expected_before else [])
+                self.assertEqual(final['providerChanges'], expected)
+                if phase != 'pre_finalization':
+                    proof['after'] = final['originalAfter']
+                    with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                        files.validate_receipt(proof, 'codex')
+
+    def test_unobserved_modes_and_owner_or_file_kind_changes_are_rejected(self):
+        cases = []
+        for before_mode, after_mode in [(0o600, 0o777), (0o640, 0o777),
+                                        (0o644, 0o666), (0o644, 0o755),
+                                        (0o777, 0o644), (0o777, 0o755)]:
+            original = {**self.original, 'mode': before_mode}
+            cases.append((f'mode {before_mode:o}->{after_mode:o}', original,
+                          {**original, 'mode': after_mode, 'sha256': self.FRESH_SHA}))
+        for field, value in [('uid', 1000), ('gid', 1000), ('sha256', 'not-a-digest')]:
+            cases.append((field, self.original,
+                          {**self.original, 'mode': 0o777, 'sha256': self.FRESH_SHA, field: value}))
+        for kind in ('directory', 'link'):
+            nonfile = {'path': ROOT_CA, 'kind': kind, 'mode': 0o644, 'uid': 0, 'gid': 0}
+            if kind == 'link':
+                nonfile['target'] = '/opt/mikka/replaced.crt'
+            cases.append((f'unchanged {kind}', nonfile, {**nonfile, 'mode': 0o777}))
+            cases.append((f'file to {kind}', self.original, {**nonfile, 'mode': 0o777}))
+        for name, original, updated in cases:
+            with self.subTest(case=name), patch.object(files, 'entry', return_value=updated):
+                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                    files.verify({'version': 1, 'entries': [original]}, 'codex')
+
+    def test_other_paths_cli_and_desktop_backup_keep_their_existing_protection(self):
+        for path in ('/usr/local/share/ca-certificates/unobserved.crt', ROOT_CA + '.backup',
+                     '/usr/local/bin/codex', '/var/backups/apt.extended_states.0'):
+            original = {**self.original, 'path': path}
+            with self.subTest(path=path), patch.object(files, 'entry', return_value={
+                    **original, 'mode': 0o777, 'sha256': self.FRESH_SHA}):
+                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                    files.verify({'version': 1, 'entries': [original]}, 'codex')
+        cli = {**self.original, 'path': '/usr/local/bin/codex', 'mode': 0o755}
+        after = {ROOT_CA: {**self.original, 'mode': 0o777},
+                 cli['path']: {**cli, 'sha256': self.FRESH_SHA}}
+        with patch.object(files, 'entry', side_effect=lambda path: after[str(path)]):
+            with self.assertRaisesRegex(RuntimeError, '/usr/local/bin/codex'):
+                files.verify({'version': 1, 'entries': [self.original, cli]}, 'codex')
+        # Desktop's observed backup stayed unchanged; a synthetic digest change
+        # remains forbidden, even though Codex now has one additional mode rule.
+        backup = {**self.original, 'path': '/var/backups/apt.extended_states.0',
+                  'sha256': '52f87bdad074b319ed8b601e4c5e97ab0d5ce235bafac3213d32f1873f7413ac'}
+        with patch.object(files, 'entry', return_value={**backup, 'sha256': 'b' * 64}):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify({'version': 1, 'entries': [backup]}, 'desktop')
+
+    def test_receipts_cannot_widen_the_measured_codex_transition(self):
+        baseline = {'version': 1, 'entries': [self.original]}
+        with patch.object(files, 'entry', return_value=self.original):
+            proof = files.verify(baseline)
+        with patch.object(files, 'entry', return_value={**self.original, 'mode': 0o777}):
+            proof['finalization'] = files.verify(baseline, 'codex')
+        self.assertIs(files.validate_receipt(proof, 'codex'), proof)
+        for defect in ('before mode', 'after mode', 'kind', 'path', 'owner'):
+            invalid = deepcopy(proof)
+            change = invalid['finalization']['providerChanges'][0]
+            if defect == 'before mode':
+                change['before']['mode'] = 0o600
+            elif defect == 'after mode':
+                change['after']['mode'] = 0o755
+            elif defect == 'kind':
+                change['kind'] = 'directory'
+            elif defect == 'path':
+                change['path'] = ROOT_CA + '.backup'
+            else:
+                change['before']['uid'], change['after']['uid'] = 0, 1000
+            with self.subTest(defect=defect):
+                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                    files.validate_receipt(invalid, 'codex')
 
 
 if __name__ == '__main__':
