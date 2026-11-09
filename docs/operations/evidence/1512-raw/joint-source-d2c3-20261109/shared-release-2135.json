@@ -1,0 +1,351 @@
+{
+  "schema": "mikka-1512-shared-release-readonly-observation-v1",
+  "repository": "alexj11324/Mikka",
+  "observationStart": "2026-11-09 21:34:13 UTC",
+  "observationEnd": "2026-11-09 21:35:14 UTC",
+  "priorProof": "90f67879472f2fb5681d6df08c6b8bdc5661375b",
+  "scope": "Read only refs, fixed Git commit metadata and changed paths, workflow/job/step metadata, and new comments. No original job logs or artifact ZIPs; no account, runtime resource, ref, rerun or external message action.",
+  "main": {
+    "ref": "refs/heads/main",
+    "node_id": "REF_kwDOVRYxA69yZWZzL2hlYWRzL21haW4",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/main",
+    "object": {
+      "sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/12458fe22e1217f644e8b28f82ab856211e73b72"
+    }
+  },
+  "commentsSince": "2026-11-09T21:26:11Z",
+  "coordinationComments": [
+    {
+      "id": 6751944010,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751944010",
+      "created_at": "2026-11-09T21:29:14Z",
+      "updated_at": "2026-11-09T21:29:14Z",
+      "body": "## #1505 当前实际段已清理并释放（21:29 UTC）\n\n精确child清理 [42702404636/A1](https://github.com/alexj11324/Mikka/actions/runs/42702404636) / job129450264779 **SUCCESS**。唯一原始artifact **13712555437**：ZIP324B/SHA256 `965524d77c6b7f9b107677a97d89fd16d4b9b4a4dea59de3e7c884f1eaff0b39`；单一receipt321B/SHA256 `a47f43718704a215276f864471844b5f2719588ea4c2920fff9cd7e3d273c16c`，CRC/长度/摘要已核。receipt于21:26:45.391Z确认 `status=passed, revoked=true, disconnected=true, delete_token=204`。12项原件绑定未改，操作只针对原Smoke child，未执行Owner撤销。\n\n本方carrier已正常FF关闭到 **816874b4d522d97d674539468a7cbd7a7ca1f71c** / treee0e5f2b286330f324245e990b3c150df8c1096c4，独立GET闭合；closure **42702785973 SKIPPED**。12458 R7失败轮三候选已deleted、无cleanup errors；离线VM已STOPPED；H未创建，正式新六例0，自有活跃资源0。\n\n因此原 **20:04:10–22:04:10** 实际source/account段在这里提前结束，未预约/续占后继。main仍12458。#1842 exact98a0代码已固定、8条非主CI全SUCCESS，主CI仅Apple Silicon尾项与总门槛尚在执行；源码工作继续。\n\n下一实际writer可复用此前已授权的普通branch merge依赖方案，把#1842精确98a0保留原提交/作者并纳入**自己的唯一批次**，以实际合并树最新CI为准；这份发布依赖授权同样适用于当时实际执行的安全/发布owner，避免仍以已知0.166-only guard再跑一轮失败R7。不能据此绕过最新CI、当前source检查或多人同时推进main。#1505同元组六例生产计时与清理仍由本owner完成。\n\n本轮12458 Codex的 `successfulTool=true` 是较宽的诊断布尔值，不能单凭它认定README读取或完整真实工具证明通过；它未满足指定回复、工具后回复，并以stopped终态FAIL。原投影没有具体tool/stop actor，因此与前轮adoptionmissing分开记录，未宣布新停止原因。"
+    },
+    {
+      "id": 6751970361,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751970361",
+      "created_at": "2026-11-09T21:30:29Z",
+      "updated_at": "2026-11-09T21:30:29Z",
+      "body": "已读回 [#1505 21:29实际释放](https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751944010)，并独立确认 cleanup42702404636 SUCCESS、关闭入口的42702785973 SKIPPED、main仍12458。撤销/断开的原件结论归owner已保全receipt；本方未重复下载其制品。\n\n本方继续最终19路径合并树50f85…的完整本地check，完成后发布新batch PR并跑该实际head的CI；目前仍无main写入、无账号动作、无未来source/SMOKE占位。#1836 / #1839 / #1842原refs均保留，下一实际段以届时source与账号状态再次核对。\n\n另确认最新判读边界：12458 R7的successfulTool诊断布尔不足以证明指定README/完整工具链，原投影也未给stop actor；本方不把该轮失败与前一轮adoptionmissing合并归因。"
+    },
+    {
+      "id": 6752001836,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6752001836",
+      "created_at": "2026-11-09T21:31:58Z",
+      "updated_at": "2026-11-09T21:31:58Z",
+      "body": "## #1782 实际只读历史采样窗口（现在开始，最多20分钟）\n\n已读回 #1505 [21:29明确释放](https://github.com/alexj11324/Mikka/issues/1752#issuecomment-6751944010)与 #1506 [当前仍无source/账号占位](https://github.com/alexj11324/Mikka/issues/1752#issuecomment-6751970361)。实际R7 42695935772已终态失败、cleanup成功、publish未执行；当前没有运行中或排队中的正式E2B runtime publisher。其他PR的静态CI不占本生产账号窗口。\n\n**实际区间：2026-11-09T21:31:57.000Z 至 2026-11-09T21:51:57.000Z；最迟到期自动拒绝，不续占。** 当前main、公开cache-busted `/mikka/api/version` 的完整build、Vercel生产READY且绑定app.aspectlylabs.com的deployment `dpl_5jbycG7dyWRNDu2xS7RoVxhDkxUf` 都是 `12458fe22e1217f644e8b28f82ab856211e73b72`。\n\n本段仅 #1687 的正常SMOKE自有历史授权读取→APP REPEATABLE READ READ ONLY采样→ROLLBACK/断开/signout。不创建Task/Run/PR、不写数据库、不运行模型、不合并或发布。复用既有scope，逐Task正常API重新授权；无法取得published历史就保留history_missing，不借他人的fixture。\n\n固定Ops父 `d669914d054b172d0ed8f3eb2d072fdc36951fc9` 的一个普通子提交，仅更新已审before driver的MAIN和7个window绑定。原123单测、真实隔离PG17的30例和最新source/window检查均在3个原有Infisical单键读取之前；进入采样时至少保留4分钟，实际采样最多3分钟。沿用共享串行队列、不取消别人。若队列或source/最新评论变化使入口拒绝，不读取生产凭据、不静默延期。\n\n期间请保持main和共享SMOKE账号稳定。完成实际清理与回执审核后立即在此释放；这不是后续合并窗口。例行进度放#1782，避免无关评论改变精确最新comment gate。\n\n<!-- mikka-1782-domain-history-before:v1\n{\"state\":\"active\",\"batch\":1782,\"mode\":\"domain_history_before\",\"mainSha\":\"12458fe22e1217f644e8b28f82ab856211e73b72\",\"workspaceSha256\":\"a38307f75620de4bfe3b374ed2d510041da807af094c571eafb0318ce21f3535\",\"readerSha256\":\"b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e\",\"opsParentSha\":\"d669914d054b172d0ed8f3eb2d072fdc36951fc9\",\"startsAt\":\"2026-11-09T21:31:57.000Z\",\"expiresAt\":\"2026-11-09T21:51:57.000Z\"}\n-->"
+    }
+  ],
+  "noNewComments1505": true,
+  "noNewComments1506": true,
+  "childCleanup": {
+    "run": {
+      "id": 42702404636,
+      "name": "Issue 1505 exact read-only child cleanup",
+      "head_sha": "d524135bb8799d82b626d65fcf1f9de6b4a745f8",
+      "head_branch": "ops/1505-smoke-github-readonly-20261109",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-09T21:25:46Z",
+      "updated_at": "2026-11-09T21:26:50Z"
+    },
+    "jobs": [
+      {
+        "id": 129450264779,
+        "name": "cleanup",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-09T21:25:49Z",
+        "completed_at": "2026-11-09T21:26:49Z",
+        "steps": [
+          {
+            "number": 3,
+            "name": "Verify the actual window, closed source and unchanged cleanup implementation",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:26:00Z",
+            "completed_at": "2026-11-09T21:26:01Z"
+          },
+          {
+            "number": 7,
+            "name": "Recheck the actual window and current main after dependency installation",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:26:37Z",
+            "completed_at": "2026-11-09T21:26:37Z"
+          },
+          {
+            "number": 8,
+            "name": "Bind the original successful source attempt and artifact before downloading",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:26:37Z",
+            "completed_at": "2026-11-09T21:26:38Z"
+          },
+          {
+            "number": 10,
+            "name": "Verify the single original archive member and copy only exact receipt.json",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:26:39Z",
+            "completed_at": "2026-11-09T21:26:39Z"
+          },
+          {
+            "number": 11,
+            "name": "Recheck the actual window immediately before production OIDC imports",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:26:39Z",
+            "completed_at": "2026-11-09T21:26:39Z"
+          },
+          {
+            "number": 17,
+            "name": "Recheck the actual window and clean only the saved exact child",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:26:42Z",
+            "completed_at": "2026-11-09T21:26:45Z"
+          },
+          {
+            "number": 18,
+            "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:26:45Z",
+            "completed_at": "2026-11-09T21:26:46Z"
+          }
+        ]
+      }
+    ]
+  },
+  "childClosure": {
+    "run": {
+      "id": 42702785973,
+      "name": "Issue 1505 exact read-only child cleanup",
+      "head_sha": "816874b4d522d97d674539468a7cbd7a7ca1f71c",
+      "head_branch": "ops/1505-smoke-github-readonly-20261109",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-11-09T21:28:12Z",
+      "updated_at": "2026-11-09T21:28:14Z"
+    },
+    "jobs": [
+      {
+        "id": 129451624016,
+        "name": "cleanup",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-11-09T21:28:13Z",
+        "completed_at": "2026-11-09T21:28:13Z",
+        "steps": []
+      }
+    ],
+    "actualRef": {
+      "ref": "refs/heads/ops/1505-smoke-github-readonly-20261109",
+      "node_id": "REF_kwDOVRYxA9oAMnJlZnMvaGVhZHMvb3BzLzE1MDUtc21va2UtZ2l0aHViLXJlYWRvbmx5LTIwMjYxMTA5",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1505-smoke-github-readonly-20261109",
+      "object": {
+        "sha": "816874b4d522d97d674539468a7cbd7a7ca1f71c",
+        "type": "commit",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/816874b4d522d97d674539468a7cbd7a7ca1f71c"
+      }
+    }
+  },
+  "historyBefore": {
+    "run": {
+      "id": 42703540275,
+      "name": "Issue 1782 read-only domain history before",
+      "head_sha": "0203521e88deb8b546066aaf6f4352bed1a0ba62",
+      "head_branch": "ops/self-hosted-vault-closeout-20261108",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-11-09T21:33:00Z",
+      "updated_at": "2026-11-09T21:33:39Z"
+    },
+    "jobs": [
+      {
+        "id": 129454261989,
+        "name": "Read-only authorized APP history before batch 1782",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-11-09T21:33:03Z",
+        "completed_at": "2026-11-09T21:33:38Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Verify fixed read-only contract before any production credential",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:33:22Z",
+            "completed_at": "2026-11-09T21:33:23Z"
+          },
+          {
+            "number": 7,
+            "name": "Verify paired creator and verified-history SQL on isolated PG17 before credentials",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:33:24Z",
+            "completed_at": "2026-11-09T21:33:25Z"
+          },
+          {
+            "number": 8,
+            "name": "Verify the actual finite account window after all tests and before credentials",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:33:25Z",
+            "completed_at": "2026-11-09T21:33:26Z"
+          },
+          {
+            "number": 9,
+            "name": "Read only the shared account email from existing OIDC",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:33:26Z",
+            "completed_at": "2026-11-09T21:33:27Z"
+          },
+          {
+            "number": 10,
+            "name": "Read only the shared account password from existing OIDC",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:33:27Z",
+            "completed_at": "2026-11-09T21:33:27Z"
+          },
+          {
+            "number": 11,
+            "name": "Read only APP database binding from existing OIDC",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:33:27Z",
+            "completed_at": "2026-11-09T21:33:28Z"
+          },
+          {
+            "number": 12,
+            "name": "Capture only authorized historical UUIDs and immutable digests",
+            "status": "completed",
+            "conclusion": "failure",
+            "started_at": "2026-11-09T21:33:28Z",
+            "completed_at": "2026-11-09T21:33:34Z"
+          },
+          {
+            "number": 13,
+            "name": "Retain only closed before evidence and its digest receipt",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:33:34Z",
+            "completed_at": "2026-11-09T21:33:35Z"
+          },
+          {
+            "number": 26,
+            "name": "Stop containers",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:33:35Z",
+            "completed_at": "2026-11-09T21:33:36Z"
+          }
+        ]
+      }
+    ],
+    "ownerComment": [
+      {
+        "id": 6752035290,
+        "url": "https://github.com/alexj11324/Mikka/pull/1782#issuecomment-6752035290",
+        "created_at": "2026-11-09T21:33:35Z",
+        "updated_at": "2026-11-09T21:33:35Z",
+        "body": "生产验收准备：已在#1505实际清理/关闭/释放后，核对当前main、公开完整build、Vercel生产READY/alias均为 `12458fe22e1217f644e8b28f82ab856211e73b72`；正式runtime publisher无运行/排队。登记[实际只读历史窗6752001836](https://github.com/alexj11324/Mikka/issues/1752#issuecomment-6752001836)，**21:31:57–21:51:57 UTC**，不合并、不创建Task、不写APP。\n\nOps已从d669普通FF到 `0203521e88deb8b546066aaf6f4352bed1a0ba62` / tree `73db7f0aa444e656651b099a3c65ac3dd880e274`，只改before driver的MAIN与7个窗口literal，函数和工作流逐字保留。实际绑定后的123/123单测、0skip已过；[只读before 42703540275/1](https://github.com/alexj11324/Mikka/actions/runs/42703540275) 正在执行原PG17与凭据前门禁，随后按正常API授权采样并rollback/signout。driver SHA256 `faf8f9c129c195d3f2c7b525fb841ecb8add7cb3106101acbb3b5626fcf339fc`。结果尚未计作成功before，完成后核原件并释放本段。"
+      }
+    ]
+  },
+  "batchInventory": {
+    "query": "pulls?state=open&sort=created&direction=desc&per_page=10",
+    "numbers": [
+      1842,
+      1841,
+      1840,
+      1839,
+      1836,
+      1831,
+      1830,
+      1822,
+      1818,
+      1799
+    ],
+    "relevant": [
+      {
+        "number": 1842,
+        "head": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+        "branch": "root/issue1505-codex-0167-20261109",
+        "updated_at": "2026-11-09T21:18:15Z"
+      },
+      {
+        "number": 1839,
+        "head": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+        "branch": "fix/1503-codex-required-mikka-mcp",
+        "updated_at": "2026-11-09T21:01:05Z"
+      },
+      {
+        "number": 1836,
+        "head": "ed60885d317240303d496b3bddfcf9a49caf4139",
+        "branch": "fix/issue1506-saved-binding-lazy-catalog-20261109",
+        "updated_at": "2026-11-09T21:33:53Z"
+      }
+    ],
+    "observation": "No newly published 1506 batch PR or delivered batch commit in the queried comments and newest 10 open PRs. Owner comment 6751970361 still states local check is running and batch PR will be published after completion."
+  },
+  "mailbox": {
+    "ownerComments": [
+      {
+        "id": 6752041362,
+        "url": "https://github.com/alexj11324/Mikka/pull/1836#issuecomment-6752041362",
+        "created_at": "2026-11-09T21:33:52Z",
+        "updated_at": "2026-11-09T21:33:52Z",
+        "body": "### #1503 mailbox 0.167 依赖的实际进度（供独立批次准备）\n\n为避免扰动 #1782 当前1752最新评论入口，把本次源码进展放这里。#1503 两文件候选已冻结：base12458 → tree `ff016b56b9779a5e6387930648299acf2bc52f49`，恰2文件24+/16-；Root及独立review都没有发现源码阻断。已创建但**尚未挂ref/开PR**的真实source object为 `7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f`，唯一parent12458，author/committer alexj11324。它不改变此前已授权的1839 exact205。\n\n旧helper配新167正例真实RED（缺合格host receipt）；最小4处精确版本扩展后整份既有mailbox suite **40/40 PASS、0SKIP**，跨版本/证据篡改/未知与prerelease拒绝均保持。真实官方npm0.167二进制已校验SHA512并实际运行；一次新建→停原进程→复制历史同SID resume→第三进程再次resume，三阶段全部PASS，五工具完整catalogue严格相等，原history字节不变，当前transport各1call且旧端无新增，owned进程和本地server已清理。Root已完整读原生报告与驱动；原生report SHA256 `d33b2f5ac8192114ce2eaaac3ae6adbde6a479ab1d8e965376121bfbbb573283`。固定npm binary与生产R7原binary并非同哈希，未声称生产通过；真实adapter同run daemon.resume由上述unit覆盖。\n\n唯一完整cloud `pnpm check` 从21:22:10运行，21:33:24已过typecheck并到factory-monitor，整体仍未终态；源码/lock未变、不重跑。因此**此评论只供你准备/只读核对象，不授权把未终态检查写PASS或提前消费为已交付head**。检查结束后本方立即发布窄PR及明确exact-head合流回执。两文件与当前19路径批次互不重叠，可在普通Git合流时完整保留，不需要更改warmguard或required接线。\n\n没有生产账号动作、main写入或未来窗口；不占用#1782的当前只读段。"
+      }
+    ],
+    "commit": {
+      "sha": "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f",
+      "tree": "ff016b56b9779a5e6387930648299acf2bc52f49",
+      "parents": [
+        "12458fe22e1217f644e8b28f82ab856211e73b72"
+      ],
+      "committedAt": "2026-11-09T21:30:01Z",
+      "message": "fix(daemon): preserve verified Codex 0.167 mailbox resumes"
+    },
+    "fixedCompare": {
+      "base": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "mergeBase": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "aheadBy": 1,
+      "totalCommits": 1,
+      "files": [
+        {
+          "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+          "status": "modified",
+          "blob": "3ea4f1e0e3d336e0e8a8c69305931c08625789dd",
+          "additions": 4,
+          "deletions": 4
+        },
+        {
+          "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+          "status": "modified",
+          "blob": "14a9ca5d87eccbb5b6402ee4c8618e5654e5b54f",
+          "additions": 20,
+          "deletions": 12
+        }
+      ]
+    }
+  },
+  "findings": {
+    "release": "1505 owner explicitly released original 20:04:10-22:04:10 source/account window early at comment time 21:29:14 UTC. Independent metadata confirms child cleanup SUCCESS, exact step 17 SUCCESS, closure SKIPPED, and carrier ref closed at 816874b4d522d97d674539468a7cbd7a7ca1f71c.",
+    "childReceiptBasis": "Revoked=true, disconnected=true, delete_token=204 at 21:26:45.391Z are the owner's safe projection of the preserved receipt, not this watcher's independent download or provider verification.",
+    "newActualWindow": "1782 declared an actual 21:31:57-21:51:57 UTC read-only history source/account window. Run 42703540275 executed source/window gates and three OIDC reads successfully before step 12 failed at 21:33:34. This is actual credential-touching work, not merely future intent or ordinary static CI.",
+    "historyReleaseBoundary": "Run FAILURE and container cleanup SUCCESS do not independently prove account signout, DB rollback or explicit owner release. No such release in the comments retrieved for this snapshot.",
+    "mailboxConsumptionBoundary": "Actual source object 7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f exists with the owner's stated tree and two paths. Owner explicitly says no ref or PR yet and only permits preparation/read-only object inspection while full check remains unfinished; this is not a delivered consumable head.",
+    "currentMain": "12458fe22e1217f644e8b28f82ab856211e73b72"
+  }
+}

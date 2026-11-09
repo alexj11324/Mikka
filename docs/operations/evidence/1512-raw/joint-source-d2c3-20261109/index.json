@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 49,
+  "createdAtUtc": "2026-11-09 22:02:04 UTC",
+  "scope": "Joint fixed-source integration and initial CI publication",
+  "source": {
+    "head": "d2c3f63448130443e3e10bb5304417162f585776",
+    "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "parents": [
+      "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "9f1429343d5fafff2cdf9a473ebec43f07e61721",
+      "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f",
+      "1c7698655405b289d7fdbd814713d15e542cc2bb"
+    ],
+    "publishedAtObserved": "2026-11-09 21:56:43 UTC",
+    "actualMain": "1c7698655405b289d7fdbd814713d15e542cc2bb"
+  },
+  "payloadCount": 11,
+  "totalPayloadBytes": 1176737,
+  "files": [
+    {
+      "name": "root-merge-proof",
+      "path": "root-merge-proof.json",
+      "sha": "9b40a2a34dbde83d82cb6b34f767e1967bb4806f",
+      "bytes": 41412,
+      "sha256": "be5d2cf2f0d6d8fa5538c405bdec9a299e3014e7ace10d6877c152c76f35ce71"
+    },
+    {
+      "name": "ui-source-review",
+      "path": "ui-source-review.json",
+      "sha": "1c8e549227692f78bb49d4d4cbed68dbc186a4dd",
+      "bytes": 70907,
+      "sha256": "db01e80e70aa7584eebdbdce811332a1658421f7688c54fdaff73eb22970d27a"
+    },
+    {
+      "name": "mailbox-source-review",
+      "path": "mailbox-source-review.json",
+      "sha": "720cf452949abb7a014b485515c6669368e83971",
+      "bytes": 14269,
+      "sha256": "f2347c843e38d30f0a8e4bd32a7e7a83c5cabca845b6b0011f30c6953cb2f0bf"
+    },
+    {
+      "name": "b6c-independent-review",
+      "path": "b6c-independent-review.json",
+      "sha": "b5f5bcd56416df90962dfc09f5e7d3008b840116",
+      "bytes": 29810,
+      "sha256": "b8076e17480ead44a5a6d237a733e1e1c625702725d92eed3256d9211a415051"
+    },
+    {
+      "name": "final-independent-review",
+      "path": "final-independent-review.json",
+      "sha": "d7a637a24b3f1b46f2802555a590a27cf83da971",
+      "bytes": 110593,
+      "sha256": "ffaf04f2d54ad89276e54e4b40d847f4ce933bad7417a49a981ff7a1013386e9"
+    },
+    {
+      "name": "complete-final-tree",
+      "path": "complete-final-tree.json",
+      "sha": "0d34c46715f6602f832fd4d45dc177aff3bdc759",
+      "bytes": 823828,
+      "sha256": "3a45030142602314527acb760d944852243237760c4727dd18c8baf43698ffb5"
+    },
+    {
+      "name": "shared-release-2135",
+      "path": "shared-release-2135.json",
+      "sha": "5020ddb10f2d483509c8d02f0318240ce1f71c9a",
+      "bytes": 21555,
+      "sha256": "fb2701313534fc78487f5a413658287f9874b56fbe66ff82e50c9e27f0fd38aa"
+    },
+    {
+      "name": "shared-release-2138",
+      "path": "shared-release-2138.json",
+      "sha": "46852a45dbfd1bfb0523864fea73d371ca5f38d1",
+      "bytes": 8657,
+      "sha256": "f5b5597d689d3a9b7ffd27265e45df856ee5b53a2f53d2997c1a4d765c96397d"
+    },
+    {
+      "name": "shared-source-2152",
+      "path": "shared-source-2152.json",
+      "sha": "ae057aa3b830554fb4905aff7c87f555ec4f7d5e",
+      "bytes": 29888,
+      "sha256": "1acccee539cfe83e9254c6b797eb453e0797b378147065694bff6b1ab5c154e2"
+    },
+    {
+      "name": "pr1799-current-body",
+      "path": "pr1799-current-body.md",
+      "sha": "c32710d55832caa709f049ee1588f2b666a35fa1",
+      "bytes": 18924,
+      "sha256": "6b96f8341c1efc7bce6453853b08cf2f380d364a044a0a2a9e0ccaf026cc8b31"
+    },
+    {
+      "name": "publication-receipt",
+      "path": "publication-receipt.json",
+      "sha": "7a2bf16ec86f4b7d2477ff9df877880fd3d58456",
+      "bytes": 6894,
+      "sha256": "d089e8417ab4ee07b80239764f94c9e01511622c7a00bba9a1cdca86231f1e91"
+    }
+  ],
+  "claims": {
+    "completeTreeLeaves": 6840,
+    "diffVsPreparedB6c": 52,
+    "diffVsActualMain": 69,
+    "independentSourceReview": "PASS",
+    "CI": "new run created; results pending",
+    "productionCases": 0,
+    "ownedRuntimeResources": 0
+  },
+  "boundaries": [
+    "Preparation proof statuses retain their original pre-publication time; publication-receipt records the later actual CAS.",
+    "Shared snapshots retain their own timestamps; later release activity supersedes earlier active windows.",
+    "Old84ce CI/Native pass remains historical and does not qualify this changed source.",
+    "No original job log or ZIP was read by this checkpoint; future readers are partitioned in publication receipt.",
+    "Native checkout, actual production runtime, final App/overlay public version, PostHog native PNG and Replay remain unverified for this head."
+  ]
+}

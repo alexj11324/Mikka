@@ -1,0 +1,917 @@
+{
+  "schema": "mikka.issue1512.four-parent-feature-merge-independent-review.v1",
+  "observedAtUtc": "2026-11-09 21:44:08 UTC",
+  "status": "PASS_EXACT_PARENTS_AND_COMPLETE_OWN_TO_CANDIDATE_TREE_DIFF; NO_BLOCKING_SOURCE_UNION_FINDING",
+  "candidate": {
+    "sha": "b6c860869eb3d48a26a4b931f8273ef7b8db896b",
+    "tree": "84e5abc87cd5fcd3d6c9459d3e9ff1e6a2dde058",
+    "orderedParents": [
+      "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "ed60885d317240303d496b3bddfcf9a49caf4139",
+      "205d26db8f8435ab18ce74d1b14c9669550098e4",
+      "98a0db9e8ec4264eb641e7fd36c25e344a124cf2"
+    ],
+    "message": "Merge fixed #1836 #1839 #1842 into #1512 tracing acceptance branch",
+    "commitRetrievedFromImmutableGitApi": true
+  },
+  "publishedFixedParents": {
+    "own": {
+      "sha": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+      "observedBranches": [
+        {
+          "name": "fix/1512-daemon-fixture-executable-20261109",
+          "sha": "84ce7f876817f0d73c34a1ef89797fc27ba8661e"
+        }
+      ]
+    },
+    "issue1506": {
+      "sha": "ed60885d317240303d496b3bddfcf9a49caf4139",
+      "tree": "4c7fafd7f838d41ee26f5f3cdd604b949a5a4c6c",
+      "observedBranches": [
+        {
+          "name": "fix/issue1506-saved-binding-lazy-catalog-20261109",
+          "sha": "ed60885d317240303d496b3bddfcf9a49caf4139"
+        }
+      ],
+      "pr": {
+        "number": 1836,
+        "head": "fix/issue1506-saved-binding-lazy-catalog-20261109",
+        "head_sha": "ed60885d317240303d496b3bddfcf9a49caf4139",
+        "state": "open",
+        "merged": false
+      }
+    },
+    "issue1503": {
+      "sha": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+      "tree": "bc9ee26434149707781001decacfd3de565e5c63",
+      "observedRef": "refs/heads/fix/1503-codex-required-mikka-mcp",
+      "observedSha": "205d26db8f8435ab18ce74d1b14c9669550098e4"
+    },
+    "issue1505": {
+      "sha": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+      "tree": "3f9ff8a38e91ee3971ea255b9cc1e254ab4c61a4",
+      "observedRef": "refs/heads/root/issue1505-codex-0167-20261109",
+      "observedSha": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2"
+    }
+  },
+  "sourceUnion": {
+    "ownTree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+    "actualCandidateTree": "84e5abc87cd5fcd3d6c9459d3e9ff1e6a2dde058",
+    "completeDiffCount": 21,
+    "expectedIncomingCount": 21,
+    "components": {
+      "pr1836ExactSourceLeaves": 14,
+      "pr1839And1842UnionLeaves": 5,
+      "inheritedMainReadmes": 2
+    },
+    "priorOwnChangeCount": 48,
+    "ownChangedPaths": [
+      ".github/workflows/run-trace-acceptance.yml",
+      "app/actions/coordinator.ts",
+      "app/v1/devices/[deviceId]/repos/route.ts",
+      "app/v1/devices/[deviceId]/runs/route.ts",
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts",
+      "apps/desktop/src/renderer/read-batch.ts",
+      "apps/desktop/src/renderer/rpc.ts",
+      "components/swr-defaults.tsx",
+      "components/workspace/issue-workspace.tsx",
+      "docs/operations/tracing.md",
+      "hooks/use-live-lists.ts",
+      "instrumentation-client.ts",
+      "lib/analytics-policy.ts",
+      "lib/coordinator/coordinator-bot.ts",
+      "lib/coordinator/repository-resolution.test.ts",
+      "lib/coordinator/repository-resolution.ts",
+      "lib/desktop-rpc/read-batch-context.test.ts",
+      "lib/desktop-rpc/read-batch-context.ts",
+      "lib/desktop-rpc/read-batch-contract.ts",
+      "lib/device-enrollment.db.test.ts",
+      "lib/device-enrollment.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "lib/device-management.ts",
+      "lib/device-unit-fence.db.test.ts",
+      "lib/dispatch-timing.ts",
+      "lib/live/revision-read.ts",
+      "lib/personal-policy.test.ts",
+      "lib/personal-policy.ts",
+      "lib/replay-readiness.ts",
+      "lib/swr/read-observer.ts",
+      "lib/tracing/logs.test.ts",
+      "lib/tracing/node.ts",
+      "scripts/acceptance/run-observability-browser.mjs",
+      "scripts/acceptance/run-observability-browser.test.mjs",
+      "scripts/acceptance/run-observability.md",
+      "scripts/acceptance/run-observability.mjs",
+      "scripts/acceptance/run-observability.test.mjs",
+      "scripts/e2b/validate-template-subscriptions.mjs",
+      "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "scripts/use-live-lists.live.test.tsx",
+      "tests/analytics-policy.test.mjs",
+      "tests/cloud-dispatch-startup.test.ts",
+      "tests/coordinator-bot.db.test.ts",
+      "tests/live-revision-reads.db.test.ts",
+      "tests/replay-readiness.test.mjs",
+      "workflows/coordinator/factory-steps.ts",
+      "workflows/coordinator/steps.ts"
+    ],
+    "overlapWithOwnChangedPaths": [],
+    "missingExpected": [],
+    "failures": [],
+    "exactLeafChecks": [
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "before": {
+          "path": "web-deploy.yml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+          "size": 11670
+        },
+        "actual": {
+          "path": "web-deploy.yml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "710f70c3528e1b8eb5c37f1be52c6442445bf9be",
+          "size": 11721
+        },
+        "expected": {
+          "path": "web-deploy.yml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "710f70c3528e1b8eb5c37f1be52c6442445bf9be",
+          "size": 11721
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "README.md",
+        "before": {
+          "path": "README.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "3e6889be962b2ba6c7063f94297d5a30376db3ca",
+          "size": 29903
+        },
+        "actual": {
+          "path": "README.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d59106749f60229439efc9593aea2077bfc1367f",
+          "size": 7761
+        },
+        "expected": {
+          "path": "README.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d59106749f60229439efc9593aea2077bfc1367f",
+          "size": 7761
+        },
+        "source": "Inherited main12458 README",
+        "exactExpectedLeaf": true
+      },
+      {
+        "path": "README.zh-CN.md",
+        "before": {
+          "path": "README.zh-CN.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "74d25464bc7e41d119cea2b1efad8fee8358bca1",
+          "size": 29283
+        },
+        "actual": {
+          "path": "README.zh-CN.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "842bad68e1a1470b90f4daa90f505494e7656f6b",
+          "size": 7590
+        },
+        "expected": {
+          "path": "README.zh-CN.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "842bad68e1a1470b90f4daa90f505494e7656f6b",
+          "size": 7590
+        },
+        "source": "Inherited main12458 README",
+        "exactExpectedLeaf": true
+      },
+      {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "before": {
+          "path": "2026-11-03-1430-official-e2b-templates-unchanged.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee",
+          "size": 95749
+        },
+        "actual": {
+          "path": "2026-11-03-1430-official-e2b-templates-unchanged.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ea4f398aabb120f760d133168ed4ed49ddd4b767",
+          "size": 99013
+        },
+        "expected": {
+          "sha": "ea4f398aabb120f760d133168ed4ed49ddd4b767",
+          "type": "blob",
+          "mode": "100644",
+          "size": 99013
+        },
+        "source": "unchanged PR1842 head blob",
+        "exactExpectedLeaf": true
+      },
+      {
+        "path": "lib/bot-model-choice.ts",
+        "before": {
+          "path": "bot-model-choice.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d2fd785e8e164ea86387bfd013d070da9ed3e3f0",
+          "size": 8023
+        },
+        "actual": {
+          "path": "bot-model-choice.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "20df161806c9647a77093746ca074fddf97643a9",
+          "size": 8142
+        },
+        "expected": {
+          "path": "bot-model-choice.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "20df161806c9647a77093746ca074fddf97643a9",
+          "size": 8142
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "lib/bot-model-selection.test.ts",
+        "before": {
+          "path": "bot-model-selection.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "9a39ebf1f05ad2521297cfa577311955a51f9cec",
+          "size": 18777
+        },
+        "actual": {
+          "path": "bot-model-selection.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6453ff0fae3dd8549c7f6ecb68b315d65a59f633",
+          "size": 22916
+        },
+        "expected": {
+          "path": "bot-model-selection.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6453ff0fae3dd8549c7f6ecb68b315d65a59f633",
+          "size": 22916
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "lib/model-call-timing.test.ts",
+        "before": {
+          "path": "model-call-timing.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d3bf5426989c74de27ed62c3bccdca4aafad5b68",
+          "size": 21064
+        },
+        "actual": {
+          "path": "model-call-timing.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "9b98a617cb833fed907a4947dc63a0097d8b554c",
+          "size": 25687
+        },
+        "expected": {
+          "path": "model-call-timing.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "9b98a617cb833fed907a4947dc63a0097d8b554c",
+          "size": 25687
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "lib/model-call-timing.ts",
+        "before": {
+          "path": "model-call-timing.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f5d5a9cae9f792e2b1b4a5573abcbc7579264f12",
+          "size": 9727
+        },
+        "actual": {
+          "path": "model-call-timing.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d944022361313be7b13bcc0bc377ee6b42b248e1",
+          "size": 11430
+        },
+        "expected": {
+          "path": "model-call-timing.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d944022361313be7b13bcc0bc377ee6b42b248e1",
+          "size": 11430
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "lib/subscription-workflow-model.test.ts",
+        "before": {
+          "path": "subscription-workflow-model.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "96b23777317bedb29db1df3404d8b08c37cd099a",
+          "size": 11939
+        },
+        "actual": {
+          "path": "subscription-workflow-model.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c30d59512477d11703c23212a6a3f638fcc08765",
+          "size": 13045
+        },
+        "expected": {
+          "path": "subscription-workflow-model.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c30d59512477d11703c23212a6a3f638fcc08765",
+          "size": 13045
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "packages/daemon/src/adapters/codex.ts",
+        "before": {
+          "path": "codex.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e85815a955eaff56d7ac389c9d9722c64607345d",
+          "size": 51844
+        },
+        "actual": {
+          "path": "codex.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1c8ca694b2f3eec633fb71440970170485957703",
+          "size": 51989
+        },
+        "expected": {
+          "sha": "1c8ca694b2f3eec633fb71440970170485957703",
+          "type": "blob",
+          "mode": "100644",
+          "size": 51989
+        },
+        "source": "unchanged PR1839 head blob",
+        "exactExpectedLeaf": true
+      },
+      {
+        "path": "packages/daemon/src/anonymous-codex-spare.ts",
+        "before": {
+          "path": "anonymous-codex-spare.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "00f476c51799a68c4af5edc38d9a62c91aeea545",
+          "size": 11991
+        },
+        "actual": {
+          "path": "anonymous-codex-spare.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "080ddc3797f196d9db97d2790ccceb87f7ca1c4d",
+          "size": 12128
+        },
+        "expected": {
+          "sha": "080ddc3797f196d9db97d2790ccceb87f7ca1c4d",
+          "type": "blob",
+          "mode": "100644",
+          "size": 12128
+        },
+        "source": "exact PR1839+PR1842 text edits, independently recomputed in both orders",
+        "exactExpectedLeaf": true
+      },
+      {
+        "path": "packages/daemon/src/subscription-worker-client.ts",
+        "before": {
+          "path": "subscription-worker-client.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e8cf0150fc8ce0962a55ec9723b441abbfb41c02",
+          "size": 17361
+        },
+        "actual": {
+          "path": "subscription-worker-client.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cc1efb7058e1afc6a44ba6e224540886b1d9a378",
+          "size": 17598
+        },
+        "expected": {
+          "path": "subscription-worker-client.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cc1efb7058e1afc6a44ba6e224540886b1d9a378",
+          "size": 17598
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "packages/daemon/src/subscription-worker-timing.test.ts",
+        "before": {
+          "path": "subscription-worker-timing.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a81384d2249da654d52f63d0c426d41d9145636e",
+          "size": 7219
+        },
+        "actual": {
+          "path": "subscription-worker-timing.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "0461fec9a9cb63bc974169df605315839ab9d297",
+          "size": 9365
+        },
+        "expected": {
+          "path": "subscription-worker-timing.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "0461fec9a9cb63bc974169df605315839ab9d297",
+          "size": 9365
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "packages/daemon/src/subscription-worker-timing.ts",
+        "before": {
+          "path": "subscription-worker-timing.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "622a0d39f562ff326dc42a4bd7af16b3d1c3d3e0",
+          "size": 9712
+        },
+        "actual": {
+          "path": "subscription-worker-timing.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "041dc0e73ef6446a37e73a50d7af977f0ad8da61",
+          "size": 12589
+        },
+        "expected": {
+          "path": "subscription-worker-timing.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "041dc0e73ef6446a37e73a50d7af977f0ad8da61",
+          "size": 12589
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+        "before": {
+          "path": "anonymous-codex-hosted.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c",
+          "size": 13467
+        },
+        "actual": {
+          "path": "anonymous-codex-hosted.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "8ffd1fa642e7e3b22463c4127471f02a4e7eb6fd",
+          "size": 13662
+        },
+        "expected": {
+          "sha": "8ffd1fa642e7e3b22463c4127471f02a4e7eb6fd",
+          "type": "blob",
+          "mode": "100644",
+          "size": 13662
+        },
+        "source": "exact PR1839+PR1842 text edits, independently recomputed in both orders",
+        "exactExpectedLeaf": true
+      },
+      {
+        "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+        "before": {
+          "path": "anonymous-codex-spare.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6a2e49857783a337e6be23ee53680b66e4f8a0bd",
+          "size": 14630
+        },
+        "actual": {
+          "path": "anonymous-codex-spare.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6",
+          "size": 15067
+        },
+        "expected": {
+          "sha": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6",
+          "type": "blob",
+          "mode": "100644",
+          "size": 15067
+        },
+        "source": "unchanged PR1842 head blob",
+        "exactExpectedLeaf": true
+      },
+      {
+        "path": "packages/subscription-worker/http_transport_timing.go",
+        "before": null,
+        "actual": {
+          "path": "http_transport_timing.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4156c512311676d451eb61075095dd735386d246",
+          "size": 4421
+        },
+        "expected": {
+          "path": "http_transport_timing.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4156c512311676d451eb61075095dd735386d246",
+          "size": 4421
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "packages/subscription-worker/http_transport_timing_test.go",
+        "before": null,
+        "actual": {
+          "path": "http_transport_timing_test.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "12d7c565a713d6bd85f05c0e87804c961af2e8bc",
+          "size": 4998
+        },
+        "expected": {
+          "path": "http_transport_timing_test.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "12d7c565a713d6bd85f05c0e87804c961af2e8bc",
+          "size": 4998
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "packages/subscription-worker/plain_model.go",
+        "before": {
+          "path": "plain_model.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "3c42dc694dbecae63d3f899779d4d94e2a21a186",
+          "size": 12166
+        },
+        "actual": {
+          "path": "plain_model.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "5348116628941ea4252d5ccc004e49492b42d4ba",
+          "size": 12378
+        },
+        "expected": {
+          "path": "plain_model.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "5348116628941ea4252d5ccc004e49492b42d4ba",
+          "size": 12378
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "packages/subscription-worker/timing.go",
+        "before": {
+          "path": "timing.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f8debf6cc695c2603945b190ddd18bbc301be4a9",
+          "size": 5289
+        },
+        "actual": {
+          "path": "timing.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "b7931270db2b77a5d7fddf108bb059a3941c3684",
+          "size": 5728
+        },
+        "expected": {
+          "path": "timing.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "b7931270db2b77a5d7fddf108bb059a3941c3684",
+          "size": 5728
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      },
+      {
+        "path": "packages/subscription-worker/timing_test.go",
+        "before": {
+          "path": "timing_test.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "71402e0d9d3121ab4c257bcfe23f313c102b53a1",
+          "size": 7531
+        },
+        "actual": {
+          "path": "timing_test.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "da2288ca4598c5c0a9a03fe63f451b7fbb152169",
+          "size": 13357
+        },
+        "expected": {
+          "path": "timing_test.go",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "da2288ca4598c5c0a9a03fe63f451b7fbb152169",
+          "size": 13357
+        },
+        "source": "PR1836 ed608 exact leaf",
+        "exactExpectedLeaf": true,
+        "ed608PreimageUnchangedInOwn": true
+      }
+    ],
+    "conclusion": "Every actual own→candidate changed leaf is expected and exactly matches its reviewed parent source or the previously proven two-file composition. The full diff has only these21 paths; all other own-tree leaves are identical. Own48 trace/read/driver/journal/Native-contract modifications therefore remain byte-identical.",
+    "staleBranchPreimageCheck": {
+      "head": "ed60885d317240303d496b3bddfcf9a49caf4139",
+      "actualMergeBase": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+      "actualMergeBaseTree": "a59d2e3ff90594a2625b131ab5a403393715cf40",
+      "comparisonAhead": 3,
+      "comparisonBehind": 44,
+      "all14PreimagesEqualOwn": true,
+      "detail": "For each PR1836 modified/added path, the leaf at its true merge base equals the own84ce preimage, including absence for the two new files. Its older branch does not overwrite intervening own/main edits on these14 paths."
+    }
+  },
+  "verification": {
+    "method": "Nonrecursive Git tree API; require returned SHA identity and nontruncated entries; recompute canonical raw tree bytes SHA1; recurse only unequal tree entries for a complete own→candidate diff. Resolve parent and true merge-base leaves for all14 PR1836 paths. Reuse the two prior exact text-composition proofs for PR1839/1842.",
+    "treesVerified": [
+      {
+        "sha": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+        "entries": 59,
+        "sha1Verified": true
+      },
+      {
+        "sha": "84e5abc87cd5fcd3d6c9459d3e9ff1e6a2dde058",
+        "entries": 59,
+        "sha1Verified": true
+      },
+      {
+        "sha": "db151222120ed732ba0146071027170434d9fc66",
+        "entries": 4,
+        "sha1Verified": true
+      },
+      {
+        "sha": "c258d0053c801138288015c66727beafcf74d69b",
+        "entries": 4,
+        "sha1Verified": true
+      },
+      {
+        "sha": "62332d7b3c0d21ab5f1d0aaf228aea807dc76b2d",
+        "entries": 11,
+        "sha1Verified": true
+      },
+      {
+        "sha": "f7c7ef7ef59128df0439d8880d22c188e574fe93",
+        "entries": 11,
+        "sha1Verified": true
+      },
+      {
+        "sha": "23a4c87ccca0df22d3a1cf44b24a5093c62c22e6",
+        "entries": 99,
+        "sha1Verified": true
+      },
+      {
+        "sha": "de8a712cb6a981e9b342b430d40c01fbba4239f1",
+        "entries": 99,
+        "sha1Verified": true
+      },
+      {
+        "sha": "be7b54d3de1261bc57d15a1c61a0d7665a5afc29",
+        "entries": 121,
+        "sha1Verified": true
+      },
+      {
+        "sha": "0535a384d55e97f9896aee06f095d97997321cb3",
+        "entries": 121,
+        "sha1Verified": true
+      },
+      {
+        "sha": "3f142b625865b00cf8271ec232a75a16538229a3",
+        "entries": 12,
+        "sha1Verified": true
+      },
+      {
+        "sha": "3885ffaa27853e2a96635eeb0acc86a7400ed0d8",
+        "entries": 12,
+        "sha1Verified": true
+      },
+      {
+        "sha": "8c65c8f30e763e8c79875fbbe6ed2d681ba2d49e",
+        "entries": 65,
+        "sha1Verified": true
+      },
+      {
+        "sha": "a2d8e9eba3f89472aebd9adb0fad34a3fec8f230",
+        "entries": 4,
+        "sha1Verified": true
+      },
+      {
+        "sha": "791744c5decbe95589bba65191b3663ffeb05215",
+        "entries": 4,
+        "sha1Verified": true
+      },
+      {
+        "sha": "2baf27bac92fa9a14bfec1df9250422935826fed",
+        "entries": 46,
+        "sha1Verified": true
+      },
+      {
+        "sha": "3e5b7226ce1dfa4d094ac3ded904cfbc0ad31743",
+        "entries": 713,
+        "sha1Verified": true
+      },
+      {
+        "sha": "ffa1044ec889c60058bbaf7f74f97a0044585f8b",
+        "entries": 46,
+        "sha1Verified": true
+      },
+      {
+        "sha": "3532fd211d37e6c5b8494dcd5feec55b0ede7486",
+        "entries": 57,
+        "sha1Verified": true
+      },
+      {
+        "sha": "af70b4ffcb33f0ec76af395d57283e4edb4feace",
+        "entries": 713,
+        "sha1Verified": true
+      },
+      {
+        "sha": "41737da0ae30143b793f8645ff2f0ce4be8cf622",
+        "entries": 43,
+        "sha1Verified": true
+      },
+      {
+        "sha": "6cf7061e9f107ba15a549c51fece5889b3a59383",
+        "entries": 67,
+        "sha1Verified": true
+      },
+      {
+        "sha": "1fbdd258dfc73fcfd8a6fc2a253f360865748240",
+        "entries": 43,
+        "sha1Verified": true
+      },
+      {
+        "sha": "563f073765dd5f751a96e445c605da09afd7bf2d",
+        "entries": 57,
+        "sha1Verified": true
+      },
+      {
+        "sha": "c2bfb055d84bb3047e22d90be5dddfa8cc53bfcd",
+        "entries": 202,
+        "sha1Verified": true
+      },
+      {
+        "sha": "efc8be656692c852373a64f23caa16625d16895e",
+        "entries": 202,
+        "sha1Verified": true
+      },
+      {
+        "sha": "a59d2e3ff90594a2625b131ab5a403393715cf40",
+        "entries": 59,
+        "sha1Verified": true
+      },
+      {
+        "sha": "4c7fafd7f838d41ee26f5f3cdd604b949a5a4c6c",
+        "entries": 59,
+        "sha1Verified": true
+      },
+      {
+        "sha": "ba36fc4402c85e80f25a8a9d08a75bf27e4674bb",
+        "entries": 4,
+        "sha1Verified": true
+      },
+      {
+        "sha": "a29f9e3ae5c6bd2e9527241d0ad645f114ad2b6d",
+        "entries": 713,
+        "sha1Verified": true
+      },
+      {
+        "sha": "2584fa16b118e7b364222701cc156e06740b5c98",
+        "entries": 713,
+        "sha1Verified": true
+      },
+      {
+        "sha": "b6677c20a75c6bf855bc356aedd8e231d484a27c",
+        "entries": 4,
+        "sha1Verified": true
+      },
+      {
+        "sha": "8daa5e2e525f44cc619be813653e1c553cc3c376",
+        "entries": 11,
+        "sha1Verified": true
+      },
+      {
+        "sha": "660333afe26cf7a658fda66273ef7c67b61dac45",
+        "entries": 43,
+        "sha1Verified": true
+      },
+      {
+        "sha": "7cefda8f02d61c8df27b0d0974aca7b6c40f8bdc",
+        "entries": 4,
+        "sha1Verified": true
+      },
+      {
+        "sha": "400a605857bc11c3e210b6cf396ab2d50bce9448",
+        "entries": 99,
+        "sha1Verified": true
+      },
+      {
+        "sha": "7c97968358741da8fdd77a6e1cb63237b0b7fbaf",
+        "entries": 43,
+        "sha1Verified": true
+      }
+    ],
+    "verifiedTreeCount": 37,
+    "full6822LeafEnumerationRepeated": false
+  },
+  "mergeSemantics": {
+    "ordinaryFourParentCommit": true,
+    "firstParentIsOwn": true,
+    "exactOriginalDependencyCommitsRetained": true,
+    "originalAuthorAndCommitHistoryRetained": true,
+    "reason": "The actual merge object directly names the four original immutable commit IDs as ordered parents. Their existing author/committer data and all ancestors remain in the graph; this does not rewrite/squash/cherry-pick dependency commits.",
+    "normalGitMergeCommandClaimed": false,
+    "otherBranchOrMainRefChangedByReview": false,
+    "unpublishedMailboxCommitAdded": false,
+    "unpublishedMailboxNote": "No7d mailbox commit is among the parents and no additional incoming path exists outside the21 verified leaves. This review does not claim that pre-existing mailbox support is absent."
+  },
+  "reusedProofs": [
+    {
+      "bytes": 179816,
+      "sha256": "d6363b9efd3d735073bf5e510c1cafb47280051c4edbc07a86a38cc25a4c28f2",
+      "gitBlob": "914e3641f3dd590b7c651558504ebba34712fab6"
+    },
+    {
+      "bytes": 29089,
+      "sha256": "344a18f3a99ce7af89b4eabcdf85cbc5295a469100249213e3e443cd3280d4b5",
+      "gitBlob": "43c81b87e83c7eb8f36a33cc815dd0b363925728"
+    },
+    {
+      "bytes": 17445,
+      "sha256": "95371a2c3635ca347820a8b8075abcf1e87012a4f98bbb0aedc7e4d9db4b5f74",
+      "gitBlob": "7a2e43795102cf46c97c919299824af07236300a"
+    }
+  ],
+  "scopeBoundaries": {
+    "otherDependenciesFunctionalBehaviorRetested": false,
+    "runtimeOrProductionAcceptanceCertified": false,
+    "oldNativeEvidenceRelabelled": false,
+    "extraApprovalRequiredByThisReview": false,
+    "testsRun": 0,
+    "ciLogsRead": 0,
+    "ciZipsRead": 0,
+    "resourcesStarted": 0,
+    "resourcesRemaining": 0,
+    "refsUpdated": 0,
+    "ciTriggered": 0,
+    "sourceTreesCreated": 0,
+    "sourceCommitsCreated": 0,
+    "sourceBlobsCreated": 0,
+    "otherPullRequestsMerged": 0,
+    "mainChanged": 0,
+    "evidenceBlobOnly": true
+  }
+}

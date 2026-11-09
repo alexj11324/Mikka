@@ -1,0 +1,131 @@
+{
+  "schema": "mikka-1512-shared-release-readonly-observation-v1",
+  "repository": "alexj11324/Mikka",
+  "observationStart": "2026-11-09 21:38:56 UTC",
+  "observationEnd": "2026-11-09 21:38:57 UTC",
+  "priorProof": "5020ddb10f2d483509c8d02f0318240ce1f71c9a",
+  "boundedObservation": {
+    "plannedMaximumQueries": 3,
+    "performedQueries": 1,
+    "stopReason": "Actual 1782 cleanup and release event appeared in the first query."
+  },
+  "scope": "Read only current main, new comments and latest five open PR metadata. No job logs or artifact ZIPs; no production credential, resource, ref, rerun or GitHub message action.",
+  "main": {
+    "ref": "refs/heads/main",
+    "node_id": "REF_kwDOVRYxA69yZWZzL2hlYWRzL21haW4",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/main",
+    "object": {
+      "sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/12458fe22e1217f644e8b28f82ab856211e73b72"
+    }
+  },
+  "commentsQuerySince": "2026-11-09T21:35:14Z",
+  "coordinationComments": [
+    {
+      "id": 6752091507,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6752091507",
+      "created_at": "2026-11-09T21:36:19Z",
+      "updated_at": "2026-11-09T21:36:19Z",
+      "body": "## #1782 只读历史段已结束并释放\n\n[实际窗口6752001836](https://github.com/alexj11324/Mikka/issues/1752#issuecomment-6752001836)现在提前释放，不占到21:51:57。实际 [42703540275/1](https://github.com/alexj11324/Mikka/actions/runs/42703540275) 于21:33:39终态；root已独立下载artifact13711884517，1986B/ZIP SHA256 `4ae2425372dc7e4772cd7485c2038a00ef5ce996450762bffb26957f2e75044f`，CRC、两成员及receipt→before摘要闭合。ROLLBACK、APP连接关闭和SMOKE signout均true；没有生产Task/Run/PR或数据库写入。\n\n本轮真实90个已授权Task均有ended，published仍0，故诚实history_missing，未取得成功before。来源0203521e、main/公开build12458；原18项Epic迁移守卫均0。实际入口以精确父d669、attempt1、最新comment和截止时间绑定；后继push/本释放comment不能复用本段账号授权。\n\n原工作流随Ops提交自动启动的 [42703540104/1](https://github.com/alexj11324/Mikka/actions/runs/42703540104) 是同一eb387的独立私有派生候选复核，只使用E2B私有资源，不使用SMOKE/APP、也不发布正式runtime；由本方继续确认其清理。当前无本方生产账号动作或正式runtime发布。本批后续正常发布样本预检与合并均须届时重新核对并登记实际窗口，没有后续预占。"
+    },
+    {
+      "id": 6752138485,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6752138485",
+      "created_at": "2026-11-09T21:38:29Z",
+      "updated_at": "2026-11-09T21:38:29Z",
+      "body": "## #1772 / #1833 实际只读复验开始（最多2分钟）\n\n现在实际开始 2026-11-09T21:38:28Z → 最迟 2026-11-09T21:40:28.000Z；完成立即明确释放，不续期。已fresh读取#1505清理释放6751944010、#1782真实ROLLBACK/断开/signout及提前释放6752091507；最新1512/6752114413仅准备，无已激活其他账号段。\n\nmain/public完整 App均12458fe22e1217f644e8b28f82ab856211e73b72 / overlay ea6c2d163488fdf9bd9db6da34fcf387c873d333，Vercel dpl_5jbycG7dyWRNDu2xS7RoVxhDkxUf READY/production/别名已由本方独立核验。相对d8的12路径仅文档与E2B保全政策/测试，不改线程投影/可见性/timer。\n\n仅在正常shared SMOKE账号选择既有Alex团队，沿已审SHA f7736e8b…ebbaf的包装脚本读取正常smoke能力与<=12条既有thread详情；first/final完整source guard、所有404失败、output/mask/长度/ms断言及finally恢复workspace/signout/clear保留。0新Task/模型/VM/child，无main/其他PR写入。不输出正文/secret/账号或thread标识。正式新runtime门禁仍独立未完成，不借本次read计作发布。"
+    }
+  ],
+  "historyOwnerReleaseComment": [
+    {
+      "id": 6752091122,
+      "url": "https://github.com/alexj11324/Mikka/pull/1782#issuecomment-6752091122",
+      "created_at": "2026-11-09T21:36:18Z",
+      "updated_at": "2026-11-09T21:36:18Z",
+      "body": "#1687实际before采样 [42703540275/1](https://github.com/alexj11324/Mikka/actions/runs/42703540275) 已结束：123单元+PG17 30例+凭据前source/window门禁通过；106 own-thread引用→90授权Task（18live/72自有已删除），ended90，但publication0，保留 **history_missing**，没有合格snapshot。ROLLBACK/连接关闭/signout全确认。artifact13711884517，ZIP `4ae2425372dc7e4772cd7485c2038a00ef5ce996450762bffb26957f2e75044f`。完整回执已写#1687；立即释放只读段，继续正常自有发布样本的只读配置预检，不放宽历史条件。\n\n最新eb387的Apple和严格aggregate已实际SUCCESS，完整14workflow回执正在封存；生产验收仍未完成。"
+    }
+  ],
+  "pr1836NewComments": [],
+  "latestOpenPRs": [
+    {
+      "number": 1842,
+      "title": "fix: adopt verified Codex 0.167 anonymous initialization",
+      "created_at": "2026-11-09T21:14:19Z",
+      "updated_at": "2026-11-09T21:18:15Z",
+      "head": {
+        "sha": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+        "ref": "root/issue1505-codex-0167-20261109"
+      },
+      "base": {
+        "sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "ref": "main"
+      }
+    },
+    {
+      "number": 1841,
+      "title": "fix(core): release deferred device authority and close cleanup diagnostics (#1826)",
+      "created_at": "2026-11-09T21:09:24Z",
+      "updated_at": "2026-11-09T21:19:34Z",
+      "head": {
+        "sha": "1ce527c666b06fbf399643c0040bf05bff78fc7f",
+        "ref": "fix/core-cleanup-1826"
+      },
+      "base": {
+        "sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "ref": "main"
+      }
+    },
+    {
+      "number": 1840,
+      "title": "docs: restore Mikka slogans, community badge, signup copy, and OSS thanks",
+      "created_at": "2026-11-09T20:52:06Z",
+      "updated_at": "2026-11-09T20:54:07Z",
+      "head": {
+        "sha": "c90eff4dbd7558cbd2faf01327cff16ce7432e4d",
+        "ref": "docs/readme-brand-and-acknowledgements-1837"
+      },
+      "base": {
+        "sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "ref": "main"
+      }
+    },
+    {
+      "number": 1839,
+      "title": "fix(daemon): require local Mikka MCP before Codex turns",
+      "created_at": "2026-11-09T20:21:08Z",
+      "updated_at": "2026-11-09T21:01:05Z",
+      "head": {
+        "sha": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+        "ref": "fix/1503-codex-required-mikka-mcp"
+      },
+      "base": {
+        "sha": "7848e79df9c5af67e526aeed1c828858db392066",
+        "ref": "main"
+      }
+    },
+    {
+      "number": 1836,
+      "title": "perf: 使用 HTTP Workflow events 并细分订阅首字计时",
+      "created_at": "2026-11-09T18:16:51Z",
+      "updated_at": "2026-11-09T21:33:53Z",
+      "head": {
+        "sha": "ed60885d317240303d496b3bddfcf9a49caf4139",
+        "ref": "fix/issue1506-saved-binding-lazy-catalog-20261109"
+      },
+      "base": {
+        "sha": "ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d",
+        "ref": "main"
+      }
+    }
+  ],
+  "findings": {
+    "historyWindowReleased": "1782 owner explicitly released the 21:31:57-21:51:57 account/source window early in comment 6752091507 at 21:36:19 UTC.",
+    "cleanupEvidenceBasis": "ROLLBACK, APP connection closure and SMOKE signout true are the owner's safe projection of preserved artifact13711884517. This watcher did not reread the original artifact ZIP. Prior proof already bound the real run's metadata and actual credential imports.",
+    "actualHistoryResult": "history_missing remains; there is no successful before snapshot. The owner reports no production Task/Run/PR or database write.",
+    "privateFollowOn": "Owner states 42703540104 is a private E2B candidate revalidation only, with no SMOKE/APP use or formal runtime publication; its continuation does not extend the released production account window.",
+    "newCurrentShortWindow": "1772/1833 owner opened actual read-only revalidation 21:38:28-21:40:28 UTC in comment 6752138485. It is a new current finite source/SMOKE window, not future prebooking. No release for that new short window in this snapshot.",
+    "batchHead": "No newly published 1506 batch commit or PR was found in the retrieved new comments and latest five open PRs. This bounded observation does not assert that no unannounced Git object exists.",
+    "currentMain": "12458fe22e1217f644e8b28f82ab856211e73b72"
+  }
+}

@@ -1,0 +1,140 @@
+## 当前结论：联合源已更新，等待本次 CI；生产验收 0/2
+
+当前 head `d2c3f63448130443e3e10bb5304417162f585776`，tree `a311b73945e9846a33a2bbd3ffa54b9e23888b1d`。这次把已正式交付的运行时批次 #1844（`9f1429343d5fafff2cdf9a473ebec43f07e61721`）、Codex 0.167 mailbox 修复 #1846（`7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f`）以及已实际合入的 UI main（`1c7698655405b289d7fdbd814713d15e542cc2bb`）普通合入本分支，保留各原提交、作者与 ref，没有 squash / rebase / force。
+
+最终树完整核对 6,840 个叶子。UI 的 50 路径与本次工作只有 `issue-workspace.tsx` 一处交集；保留 UI owner 的完整界面行为，同时保留 `snapshotReadFetcher` import 及两处 teams fetcher 包装。mailbox 的两条路径与其他改动不重叠。验收 driver、完整 Native 原始预算窗口与 FIRST pair1 判定保持。
+
+原 `84ce7f8` 的 CI / Native 成功仍作为历史证据，**不能替代本次联合源验证**。新 UI 会改变实际页面挂载和读取，本次将按新 head 重新核对 CI 与 Native 完整窗口。正式 Web 还须绑定实际 hosted overlay `b92b0e1d48f75c92d059ee071162b72455e6af90` 或后续实际部署回执，不把公共 PR CI 当作私有 overlay 生产证明。
+
+生产两条真实 UI 用例、完整 PostHog 调用链、原生 PNG、实际 Replay 回放及最后清理仍待完成。#1512 保持开启；本 PR 不自动关闭 issue。
+
+---
+
+## 历史检查记录：84ce 代码门禁和原始 Native 预算通过；当时生产验收 0/2
+
+固定 feature **84ce7f876817f0d73c34a1ef89797fc27ba8661e**，tree **e7c7c6ad66acd729278393711c10eeed67c6d7ac**。20:17:40 UTC 正常 CAS 更新自有分支，有序 parents=[实际测试候选5a0c907, 已合并main7848e79]，未移动main。[CI42691592260/A1](https://github.com/alexj11324/Mikka/actions/runs/42691592260) 实际 checkout **197ba2452796ce6d5942309f488009963b7cbc7d**，tree完全相同。
+
+**10 workflows全部SUCCESS；40 jobs=32SUCCESS+8SKIPPED；41 checks=33SUCCESS+8SKIPPED。** Root和独立reader逐exact job/check ID、head、状态及分页闭合，0未解释缺口，唯一额外check为GitGuardian。最终strict真实原日志的七项expected=true均success。SKIP不改写成执行通过。
+
+**#1512正式生产验收仍0/2，issue保持OPEN，本PR不自动关闭。** PR尚未合并；共享主线发布/账号窗口仍由实际owner使用。本轮通过不代替生产同trace、全部模型调用、Logs、Replay和原生截图。
+
+### 本轮 Native：保留原窗口的实际结果
+
+| 原窗口 | Native | Web / Hosted | 判定 |
+| --- | ---: | ---: | --- |
+| 完整登录：email、PKCE、navigation、usable-workspace及后台 | **426=19+15+392** | **427=19+0+408** | PASS |
+| 原始FIRST pair1启动 | **198** | **228** | PASS |
+
+Root独立核五份JSON原字节和SHA，复算 **24 records /12 checkpoints /8 segments /2280桶 /1279 ordinals，errors=[]**；独立reader一致。四窗unknown-context为Web87/Native94/NativeFIRST53/HostedFIRST53，unknown-statement为128/130/69/75，uncaptured=0；细分归因仍incomplete。四窗crossesEnd均0。没有扣除unknown、背景、跨端或重划窗口/换首对/同源重跑。
+
+Native job129416680401于20:42:40 UTC成功；实际daemon为0.0.564 /8db16095f46be955df22f42914e0f89b6e5f3d11，和云worker来源分列。原5对启动中位bundled2560.78ms、hosted3264.78ms，只属于本轮测量，未增设时延门槛。原parity/crypto/smoke通过；Root未直接查看parity PNG像素，不能代替PostHog截图。
+
+生命周期workspaceNameCleanup保留phase=unchanged/restored=false；owner/peer sealed-baseline均false→true。Smoke的true→true与smoke/parity restored=true分别保留。原job log一位reader一次，两个ZIP各一次；复核只用Git原件。取证VM已stop/delete/exact same-project/name GET404，duration147716ms、CPU6633ms，**自有资源0**，美元费用UNKNOWN。
+
+### 空回填修复与独立真实 PostgreSQL 回归
+
+已有active-owned-Personal读取附带11类旧数据的保守EXISTS判定。只有已有Personal Coordinator且数据库严格返回false才跳过空ensure/migration；未知、缺目标、权限不足、有旧数据或失败保留原路径。迁移尾部、锁、原10分钟周期、Native harness/窗口/ready/deadline/首对选择全部不变。最终测试新增316行、21子例，原测试全文逐字保留。
+
+[真实隔离运行42690271741/A1](https://github.com/alexj11324/Mikka/actions/runs/42690271741)：
+
+| 对照 | 实际结果 |
+| --- | --- |
+| 旧e093 + 同一修正测试 | 47 tests /42 pass/5 fail：4个指定ERR_ASSERTION子例及父汇总；旧25子例全过，0skip/cancel/todo |
+| 四个旧源空路径 | Personal26、Team26、已复制head27、晚到family29；各期望1 |
+| 新5a0，原完整25-file Coordinator族 | **375/375 PASS**，0fail/skip/cancel/todo；Coordinator旧25+新21全部通过 |
+
+两个阶段各用全新runner、PG17/loopback数据库，原72-suite inventory和required DB runner，Node24.22.2/pnpm10.34.3；不使用生产凭据。Root从原TAP独立复算，未把流式镜像重复计数。所有container/network已由Actions移除；Ops215f846已enabled=false，closing42691624148两job真实SKIP。
+
+早先YAML启动失败42688581877（0job/PG）和夹具错误42689043866（NOT_VALID_RED、GREEN未启动）均保留。三处夹具修正仅UUID/text参数及Factory attempt外键，没有放宽断言或限时。
+
+**归因边界：** 上一e093 Native完整451>427仍为RED。本轮Native预算通过与PG空路径26→1是两项独立事实；原Native记录没有证明这次触发了due回填，不能把451→426的净差全部归给修复。FIRST对照的变化也不当作代码收益。
+
+### 本轮其他原件
+
+| 门禁 | 实际执行证据 |
+| --- | --- |
+| Source | 361/361，含63迁移测试 |
+| Core | 原57targets逐名匹配，skip-nx-cache；driver74/74及A22均PASS |
+| Integration | 原29targets逐名匹配；三份完整Live原件104/104；team-import13949.067515ms，原15s子限时/20s外限时不变 |
+| PostgreSQL | 四片job metadata全SUCCESS；所读PG3原18suites1694/1694，PG4原18suites685/685；不编造未读PG1/2测试总数 |
+| E2B离线 | Node215/215；Python32/5/38/16均通过，py_compile/bash语法通过；本PR六个生产job为原条件SKIP |
+| DBsummary/strict | 原DB gate及CI依赖汇总真实通过；DBsummary的显示名称不被解释为另一次production build/browser验收 |
+
+## 问题与修改后的行为
+
+实际发布和取证暴露了几个相互关联的问题：tracked daemon fixture权限不稳定、serverless返回时仍有在途遥测未收尾、返回式工具错误未正确保留ERROR，以及Native完整窗口SQL超预算。生产验收准备还发现原模型/绑定的恢复依据只存于进程内存，失败退出后无法继续核对。原始失败和未知都保留在证据中。
+
+- **调用链收尾和错误：** root-span的waitUntil覆盖batch队列与已开始的exporter transport，Logs并行flush；响应不等待遥测。工具拒绝保留子span、ERROR与闭集code，不改变业务返回或授权。
+- **Native与SQL：** snapshot读取使用可撤销的本地发送提示等待在途读取，仍要求实际response proof、SWR commit、scope和revision；无新增timer、产品SQL或轮询。保持后台fresh policy、原子enrollment、command snapshot、runs/repos的新鲜授权与撤权回归。
+- **模型和发布关联：** 保留daemon generation、W3C carrier和metadata-only合同，复用已授权最小Codex MCP reader/producer/writer回归。E2B诊断只输出闭集关联字段，HTTP trace仅表示提交请求。
+- **安装器凭据：** 默认空的显式输入覆盖环境继承，既有16个只读调用明确opt-in、两个写权限调用匿名；保留完整性和30秒/3重定向限制。
+- **生产验收driver：** Factory read/write/cleanup固定已核Personal selector，拒绝冲突selector；有界owner-idle检查保留。只有精确HTTP404加agentProfileNotFound能判缺失，权限/未知代码/坏JSON不能被写成清理成功。
+- **恢复记录：** CLI在任何新配置修改前先持久化最小recovery.json，收到实际implicit bindingId/revision后立即保存。配置已确认而checkpoint随后失败时，仍执行原有安全清理，并阻止下一case；不削弱ownRunsStopped、ownerIdle、版本/摘要、值比较或implicit CAS。独立文件0600、fsync和atomic rename；always artifact清单只增精确文件名。
+- **费用语义：** 文档明确区分Gateway返回的逐次金额、ZeroCat按配置token价计算的估算，以及未知费用。passthrough本身不证明实际订阅扣款；没有改计费代码、历史数据或冻结查询。
+
+journal只保存经过校验的模型id/kind/modelId/provider/chosen、实际绑定版本、profile id/version/digest/enabled和闭集状态。profile定义正文、消息、凭据、cookie、label、quota均不落盘。响应丢失/SIGKILL仍可能只留下未确认intent，不能猜恢复；固定文件不是跨执行历史数据库，现有非CAS picker/fallback边界仍保留。
+
+上游Workspace身份、fresh lease、PAT/跨tenant和迁移保护完整保留。移动端设计仅保留原UI owner的固定源码与原截图审阅；没有新增本方UI设计。
+
+## 原始证据与历史结论
+
+- **[CP45：完整Native、最终CI闭合、资源404及当前定价核验](https://github.com/alexj11324/Mikka/blob/4bd0cfff84ab3297de1143770af0edf3f6857dcf/docs/operations/evidence/1512-raw/gate-completion-84ce7f-20261109/index.safe.json)**：31 payload /1,807,502B，加README/index共33文件；全部path/mode/blob和普通单父ref已读回。[说明](https://github.com/alexj11324/Mikka/blob/4bd0cfff84ab3297de1143770af0edf3f6857dcf/docs/operations/evidence/1512-raw/gate-completion-84ce7f-20261109/README.md)。
+- **[CP44：Source/Core/Integration/PG/E2B原件](https://github.com/alexj11324/Mikka/blob/e69ed5945825aa1298093d5129ce7d961a90c80b/docs/operations/evidence/1512-raw/non-native-gates-84ce-20261109/index.safe.json)**：17 payload /6,323,401B，加README/index19文件。
+- **[CP43：真实PG RED/GREEN及实际源码](https://github.com/alexj11324/Mikka/blob/e1fb8f50cdde7c570c4f8144ba3e6724ce414a23/docs/operations/evidence/1512-raw/coordinator-empty-backfill-20261109/index.safe.json)**：64 payload /6,880,425B，加README/index66文件；含失败控制器、夹具修正、原TAP、Root复算、18项canonical worker输入及验收源码审计。
+- **[CP42：e093原预算RED](https://github.com/alexj11324/Mikka/blob/a995674f93b90ee0110dce9bdb71348cb0019647/docs/operations/evidence/1512-raw/gate-completion-e0934e-20261109/index.safe.json)**：完整451>427、FIRST205≤207；原Hosted chat跨end227ms保留，未补算。
+- [CP38：6cc原完整门禁](https://github.com/alexj11324/Mikka/blob/8eb9564e2b5f03a4d7901f29f0f42b0327e18982/docs/operations/evidence/1512-raw/gate-completion-6cc38a-20261109/index.safe.json)、[CP36：932及一次有据Integration重复](https://github.com/alexj11324/Mikka/blob/5429efb005f91355dc8251ea118835cebb2be31d/docs/operations/evidence/1512-raw/gate-completion-932bd154-20261109/index.safe.json)、[CP34：恢复journal真实反例/74测试](https://github.com/alexj11324/Mikka/blob/22c873a4882140c361dc48abd424fb5e5087eac0/docs/operations/evidence/1512-raw/recovery-journal-20261109/index.safe.json)。
+- [更新前PR完整正文](https://github.com/alexj11324/Mikka/blob/4bd0cfff84ab3297de1143770af0edf3f6857dcf/docs/operations/evidence/1512-raw/gate-completion-84ce7f-20261109/pr1799-before-cp45.md)保留此前各阶段叙述、旧失败、旧未知、CP27–44链接和误关重开记录。旧正文里的“当前”只属于其快照时间；本节不把旧失败改成通过。6414完整433>431、FIRST209>147仍是RED；旧full-Live未捕获结果仍UNKNOWN。
+
+## 历史受控失败、开销及适用边界
+
+实际源1d126/run42552094175的故意失败已在隔离环境完成：**20完整traces /80spans /40ERROR**，两轮后端快照稳定，17条最初未被head采样选中，实际error_or_slow保留。原runner backendObserved=false保留，后端证明另列。
+
+历史Web HTTP/PG内存exporter测量为每条件600次、各100次预热、20请求一组交替，mean **+0.344583ms**、p95 **+0.436580ms**。它不是逐请求随机配对，也不是当前生产OTLP网络或全daemon成本。CP43已审20项依赖：18项字节相同；新增serverless root对已在途exporter的drain不被该serverless=false probe覆盖，现有waitUntil反例测试覆盖该分支。重复同probe不会补足该范围，故不无故重跑。
+
+warm-up/user/action告警已有实际配置回读和真实HogQL fixture；24h历史、绝对floor、冲突归unattributed等规则保留，不另造强制告警或OAuth门槛。
+
+## 当前共享发布与最终生产步骤
+
+截至21:50:59–21:51:25只读快照，actual main **1c7698655405b289d7fdbd814713d15e542cc2bb** 已普通合入 #1818；hosted UI #58 已普通合入 **b92b0e1d48f75c92d059ee071162b72455e6af90**，其 release/dispatch 成功。Mikka main Web42705513711仍 pending，R7 42705513501的build仍 queued；这些状态不代表新的完整 App/overlay/runtime 已公开 READY。#1505、#1782及#1772先前账号段均已明确结束；现在的实际 UI source 窗口为 **21:42–22:22 UTC**，本轮未见释放。自动 R7 本身会调用真实模型，不能因 UI owner 不手动跑模型就视为账号空闲。本方未占生产窗口；#1506 batch owner 仍负责其实际 main/R7/child 发布段。各旧失败保持原判，不重复读取其他 owner 原始 log/ZIP。
+
+1. 只在实际发布writer终态且账号/source窗口释放后，fresh核main/head、正常merge自身PR1799；上游实质源码变化按真实影响验证，不用旧绿覆盖新差异。
+2. 核本方Web READY和公开version，分别从授权ACME账号的Personal真实UI发起 **Claude Haiku5.5**、**GPT6 Luna** 官方订阅案例；禁止API/Pro替代，不重试凑绿。App SHA、有效runtime和任务实际worker来源分列，不要求三者SHA相同。
+3. 用实际run/thread/issue载体ID查到真实trace，两轮稳定完整分页核父树和每次generation/APM对应。NewTask点击已源级确认进入真实Coordinator消息→turn→无repo派发→Factory；实际证据仍须运行后取得。Factory task UUID与carrier issue ID分开。
+4. 核Logs、实际Session Replay播放、PostHog原生PNG（真正查看像素）、填入真实ID的运行时间线；机械集合一致不代替链路阶段/parent和视觉判断。
+5. 保存实际用量、费用未知边界、开启的APM/AI scouts和所有清理回执；达成issue验收后**手动关闭#1512**。
+
+## 可观测性用量与费用
+
+19:19–19:24 UTC原只读账期产品视图：Logs **492MB**、AI **1222events**、Web Replay **22recordings**；额度分别10000MB/100000events/5000recordings。另一usage_summary口径为373/857/16，不混加或强行相等；日级精确scope返回[]不当作0。金额/主单价字段为null，实际美元费用仍UNKNOWN。Vision原quota0/2500credits、signals0/4500；不是已执行本issue正式案例的证明。
+
+APM/AI两个scout enabled/active/emit=true，1440分钟，Inbox开启，无Slack/Webhook，连续失败0；当时今日2/100次。last_run_at 06:30/07:30早于本次验收准备，不声称已检查尚未发生的正式案例。
+
+| 已核公开价格 | 免费月额度 | 第一付费档 | 边界 |
+| --- | ---: | ---: | --- |
+| Logs摄入 | 10GB | $0.25/GB（300GB以上$0.15） | 默认14天；自定义保留另计$0.05/GB-month |
+| AI Observability | 100000events | $0.000350/event | 所有$ai_事件按AI计费，不重复Product Analytics |
+| Web Replay | 5000recordings | $0.005/recording | 不假定一个run必等于一条录制 |
+| Replay Vision，Gemini 3 Flash | 以实际组织quota为准 | 成功observation5credits，每credit$0.01 | 两个成功且实际model匹配时，名义10credits/$0.10；未扣免费额度，不是实际账单 |
+
+来源：[Logs](https://posthog.com/docs/logs/pricing)、[AI](https://posthog.com/ai-observability/pricing)、[Replay](https://posthog.com/session-replay/pricing)、[当前MCP确认的Vision](https://posthog.com/docs/replay-vision/quota-and-limits)、[AI事件类别](https://posthog.com/docs/ai-observability/basics#the-ai_-prefix)。CP45保留只读价格准备及随后MCP对Vision单位价格的局部补充。
+
+**APM独立数值单价/计量映射、Scout每调用金额尚未证实，保持UNKNOWN；旧正文“Logs/Tracing共享同一档价”的断言不沿用。** OTLP压缩字节、JSON字节、span个数均不能替代billable MB；不把候选公开价当合同价格，也不把null当$0。
+
+容量场景明确采用假设：旧73MB traces/day在流量/每条大小不变时为2.19GB/月；若其中10%的既有流量由10%采样变全量，再假设100runs/day×每run25spans+10logs×每条1KB，则约4.27GB/月。若全部原流量全量为21.9GB/月、未含新增。这是体积场景，**不绑定未证实的APM价格**。100runs/day×5generations为15000generation events/月，额外$ai_事件另计；另设100新增Web recordings/day才为3000/月。
+
+取得实际本issue用量后按每产品分段价计算增量 **F(B+x)−F(B)**。已知公开摄入项的保守上界为 **0.25×Logs_MB/1000 +0.000350×AI_events +0.005×Web_recordings**，再单列实际Vision credits×0.01；APM、Scout、自定义保留、税/特殊合同价不在此式中。免费额度为组织共享，不为本issue预留。PostHog费与模型费分开；$ai_total_cost_usd或API单价估算不冒充Claude/Codex官方订阅逐次账单。
+
+## 合并风险
+
+**Merge risk: medium（中）**。本PR影响trace收尾、权限内读取、安装器和运维恢复；原业务返回与错误闭集保持。
+
+**Alignment: good（符合目标）**。补齐#1512实际发布/验收暴露的缺口，源级合同和原始反例均可复核。
+
+**Impact: large（影响面较大）**。Native、Workspace、遥测和真实生产driver都有变更；上游所有权与新鲜授权边界保留。
+
+**Verification: joint-source CI pending; production pending（联合源 CI 和生产均待验）**。84ce历史完整CI与原Native预算已闭合；新增运行时、mailbox和实际UI已作独立源审及完整tree合流复核。本次d2c的CI/Native须独立完成；正式两案例、摄入、PNG/Replay仍未完成，不能以历史CI成功替代。
+
+**Rollback cost: medium（中）**。源码用正常revert PR回退；任务/设置按原owner-idle、版本/值比较、CAS和回执清理。journal不能猜恢复未知ACK或覆盖并发变化。
+
+**Error detection: decent（已有直接反例）**。返回式ERROR、在途flush、权限404、恢复失败、空回填SQL均有实际反例；最终链路仍以生产原件判断。
+

@@ -1,0 +1,301 @@
+{
+  "schema": "issue1512.pr1846.mailbox-source-compatibility-review.v1",
+  "observedAtUtc": "2026-11-09 21:52:26 UTC",
+  "status": "no_source_blocker_found_qualification_execution_evidence_attributed_to_owner",
+  "identities": {
+    "repository": "alexj11324/Mikka",
+    "pr": 1846,
+    "head": "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f",
+    "tree": "ff016b56b9779a5e6387930648299acf2bc52f49",
+    "parents": [
+      "12458fe22e1217f644e8b28f82ab856211e73b72"
+    ],
+    "prState": "open",
+    "prMerged": false,
+    "comparedPendingCandidate": "b6c860869eb3d48a26a4b931f8273ef7b8db896b",
+    "comparedPendingTree": "84e5abc87cd5fcd3d6c9459d3e9ff1e6a2dde058",
+    "comparedActualMain": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+    "comparedActualMainTree": "dd908e3c3befc8e3be883f32669734c0f3481f87",
+    "rootReportedFinalCandidate": {
+      "sha": "d2c3f63448130443e3e10bb5304417162f585776",
+      "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+      "parentsShort": [
+        "84ce",
+        "9f142",
+        "7d518",
+        "1c769"
+      ],
+      "verification": "Root message only; full-tree verification belongs to the independent integration reader. No current CI or production execution is claimed here."
+    }
+  },
+  "exactSource": [
+    {
+      "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+      "blob": "3ea4f1e0e3d336e0e8a8c69305931c08625789dd",
+      "bytes": 6016,
+      "sha256": "1825ccbfb2abb1915e1d9a0fc368e69cdccb25bd3e5fbdb52e1f815100e70654",
+      "sourceRead": true
+    },
+    {
+      "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+      "blob": "14a9ca5d87eccbb5b6402ee4c8618e5654e5b54f",
+      "bytes": 15881,
+      "sha256": "f11548e6de43a94469f9a1d0095303a4e6db882ab9fb4a8816d579e4e53047c1",
+      "sourceRead": true
+    }
+  ],
+  "exactDelta": [
+    {
+      "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+      "before": {
+        "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448",
+        "size": 5930
+      },
+      "after": {
+        "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3ea4f1e0e3d336e0e8a8c69305931c08625789dd",
+        "size": 6016
+      }
+    },
+    {
+      "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+      "before": {
+        "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7d40937784ca75dffc01a9ee2cf4cb3948c4ecf5",
+        "size": 15132
+      },
+      "after": {
+        "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "14a9ca5d87eccbb5b6402ee4c8618e5654e5b54f",
+        "size": 15881
+      }
+    }
+  ],
+  "structuralCompatibility": {
+    "fullTrees": {
+      "parent12458Truncated": false,
+      "mailboxTruncated": false,
+      "pendingB6Truncated": false,
+      "actualMain1cTruncated": false
+    },
+    "exactChangedPaths": 2,
+    "otherLeavesChanged": 0,
+    "overlapWithB6Net67": [],
+    "overlapWithB6Incoming19": [],
+    "overlapWithActualUI50": [],
+    "preimages": [
+      {
+        "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+        "parent12458": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448",
+        "b6": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448",
+        "main1c": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448"
+      },
+      {
+        "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+        "parent12458": "7d40937784ca75dffc01a9ee2cf4cb3948c4ecf5",
+        "b6": "7d40937784ca75dffc01a9ee2cf4cb3948c4ecf5",
+        "main1c": "7d40937784ca75dffc01a9ee2cf4cb3948c4ecf5"
+      }
+    ],
+    "conclusion": "The two new blobs can be preserved unchanged in the planned ordinary combined merge; their exact preimages are identical in parent12458, b6 and actual main1c.",
+    "mergerExecutedByReviewer": false
+  },
+  "productChange": {
+    "fourChangedLinesOnly": true,
+    "preciseChange": "Add exact0.167.0 to NativeVersion, the initialize user-agent regexp and its return enum, and the receipt nativeVersion validation.",
+    "noVersionRangeOrPrereleaseAllowance": true,
+    "previous0_163_0And0_166_0Retained": true,
+    "unknownAndPrereleaseVersions": "Still unqualified for mailbox resume. A fresh thread retains the previous supported behavior but cannot create a qualified receipt for an unknown release.",
+    "authorizationAndHistoryGuardsDeleted": 0,
+    "defaultEnablementOrMailboxGrantChanged": false,
+    "mechanism": "Without the change, exact0.167 initialization returns no qualified native version: fresh work can proceed but no qualified mailbox receipt is recorded, and later history continuation fails closed. The fix closes this conditional gap; it is not evidence that a prior production failure was caused by it."
+  },
+  "sourceSemantics": [
+    {
+      "id": "new_cold",
+      "anchors": [
+        "codex.ts:345-353",
+        "codex.ts:919-926",
+        "codex.ts:959-995"
+      ],
+      "finding": "Cold/new opens thread/start with the current frozen dynamic-tools catalogue. Actual initialize version0.167 can now qualify the returned original thread/path receipt before turn/start. Missing valid evidence still does not fail an otherwise supported fresh thread; subsequent resume requires evidence."
+    },
+    {
+      "id": "history",
+      "anchors": [
+        "codex-mailbox.ts:28-32",
+        "codex-mailbox.ts:40-66",
+        "codex-mailbox.ts:74-82",
+        "codex.ts:403-423"
+      ],
+      "finding": "Continuation keeps the original run history and verifies exact runId, threadId, version1 receipt and full deep-equal catalogue; history paths remain under sessions/archived_sessions and reject traversal, symlink directories/files and nonregular or multilink files. Reads remain bounded and do not log history."
+    },
+    {
+      "id": "same_version_and_sid",
+      "anchors": [
+        "codex.ts:924-926",
+        "codex.ts:969-990",
+        "codex-mailbox.ts:87-105"
+      ],
+      "finding": "Current initialize version must equal the receipt version. thread/resume omits dynamicTools. Mailbox resume or required resume rejects native refusal or a different SID and never silently falls back to thread/start. The actually opened history is checked again before another prompt."
+    },
+    {
+      "id": "same_run_restart",
+      "anchors": [
+        "codex.ts:356-357",
+        "codex.ts:419-422",
+        "codex-mailbox-resume.node-test.ts:118-147"
+      ],
+      "finding": "Adapter.resume opens restart using the same run's receipt and SID. The expanded synthetic adapter case explicitly starts a continued run, closes that transport, resumes that same run with a new transport, and rechecks actual receipt version/SID."
+    },
+    {
+      "id": "current_callback",
+      "anchors": [
+        "codex.ts:652-657",
+        "codex.ts:695-699",
+        "codex.ts:776-787",
+        "codex.ts:882-885"
+      ],
+      "finding": "Only the current host-bound thread, acknowledged active turn, null namespace, live mailbox and non-ending run can call current mailbox transport. Previous/foreign notifications cannot rewrite current authority. The whitelist addition changes none of these checks."
+    },
+    {
+      "id": "anonymous_adoption",
+      "anchors": [
+        "codex.ts:523-529",
+        "anonymous-codex-spare.ts:134-140"
+      ],
+      "finding": "b6's PR1842 anonymous initialization admits exact166/167, and adoption is still new-mode only with fresh-bound inputs and revocation controls. Continue/restart does not adopt an anonymous fresh candidate. Mailbox receipt qualification is an independent complementary boundary, not a substitute for the warm guard or PR1839 MCP readiness."
+    }
+  ],
+  "combinedSourceAnchors": [
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "blob": "1c8ca694b2f3eec633fb71440970170485957703",
+      "read": true
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "blob": "080ddc3797f196d9db97d2790ccceb87f7ca1c4d",
+      "read": true
+    }
+  ],
+  "testsSourceReview": {
+    "executionByReviewer": false,
+    "fullAdapterUses": "The source imports real CodexAdapter but launches the repository fake-codex fixture. These are adapter contract tests, not official CLI execution.",
+    "addedOrExpanded": [
+      "Exact0.167 positive receipt and new-run continuation; same-SID, current callback and same-run Adapter.resume with a third transport.",
+      "All six ordered cross-version pairs among0.163/0.166/0.167 reject before a native turn and record no new receipt.",
+      "For0.163 and0.167, eleven missing/tampered catalogue/header/history/receipt/path/link variants reject without a native turn.",
+      "Unknown0.168 and prerelease0.167-alpha retain fresh/no-qualified-receipt and resume rejection."
+    ],
+    "retained": [
+      "Native resume refusal and changed SID do not create a replacement fresh thread.",
+      "A previous-turn callback during resume cannot use the current mailbox.",
+      "Fresh operation can succeed without a rollout path, but later resume fails closed."
+    ],
+    "noMissingExportOnlyRegressionObservedInSource": true,
+    "causalOldHelperReason": "The added0.167 positive assertion requires receipt existence; old helper returns null for this exact version and does not record one."
+  },
+  "ownerQualificationEvidence": {
+    "publiclyReadSources": [
+      {
+        "url": "https://github.com/alexj11324/Mikka/pull/1846",
+        "type": "PR body",
+        "fixedHead": "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f"
+      },
+      {
+        "url": "https://github.com/alexj11324/Mikka/pull/1844#issuecomment-6752213715",
+        "createdAt": "2026-11-09T21:41:57Z",
+        "type": "Original owner Root delivery and attested independent review"
+      },
+      {
+        "url": "https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6752217238",
+        "createdAt": "2026-11-09T21:42:06Z",
+        "type": "Owner public handoff summary"
+      }
+    ],
+    "claimedResults": {
+      "causalRed": "Added0.167 positive test fails on original helper because no qualified receipt exists.",
+      "adapter": {
+        "passed": 40,
+        "skipped": 0
+      },
+      "fullCloudCheck": {
+        "command": "MIKKA_EDITION=cloud pnpm check",
+        "exitCode": 0,
+        "start": "2026-11-09T21:22:10.050912Z",
+        "end": "2026-11-09T21:34:21.191231Z",
+        "durationSeconds": 731.14,
+        "scope": "Parent12458 plus exact two frozen files; treeff016b56. Existing skips retained. Owner says command terminal and tree independently verified."
+      },
+      "nativeCLI": {
+        "package": "@openai/codex@0.167.0-linux-x64",
+        "version": "codex-cli0.167.0",
+        "provider": "credential-free loopback synthetic Responses",
+        "stages": 3,
+        "newThread": 1,
+        "newProcessesResumingSameSID": 2,
+        "dynamicToolsReinjectedOnResume": false,
+        "catalogueDeepEqual": true,
+        "currentTransportCallback": true,
+        "originalHistoryUnchanged": true
+      },
+      "cleanup": "Owner attests native processes/listeners and source-check resource ended; this reviewer did not query those resources."
+    },
+    "immutableDigestsPublished": {
+      "sourceReceipt": {
+        "bytes": 12625,
+        "sha256": "18587be9307e3c78237d6e35d2dc851505df48dfebc6981a8eaf1fc605644407"
+      },
+      "sourceBundle": {
+        "bytes": 299934,
+        "sha256": "10e8675a34087be4aec96a9b5d2ed394ea6636cf4bf996d20d68e383361d0a32"
+      },
+      "nativeReport": {
+        "bytes": 15512,
+        "sha256": "d33b2f5ac8192114ce2eaaac3ae6adbde6a479ab1d8e965376121bfbbb573283"
+      }
+    },
+    "independentlyRecomputedOriginalExecutionArtifacts": false,
+    "exactMissingReadbackAnchors": "The read PR body and delivery comments publish bytes/SHA256 but no Git blob or immutable file reference for these execution artifacts. No original report/stdout was obtained or rehashed in this review; no failed execution was observed.",
+    "qualificationBoundaries": [
+      "Native third phase uses a new synthetic host runId, not the full same-run daemon.resume entry. Same-run adapter path is separately covered by the owner-reported synthetic CodexAdapter suite.",
+      "The official npm binary is not claimed byte-identical to a particular R7 candidate binary.",
+      "Offline protocol evidence does not establish real provider, production Factory, R7 release or combined-source CI success.",
+      "The exact native report/statements are attributed to the original owner, not promoted to independent raw-artifact verification."
+    ]
+  },
+  "recommendation": {
+    "sourceIntegration": "No concrete source blocker found; preserve the two exact new blobs in the single ordinary combined candidate.",
+    "qualificationAssessment": "Public owner evidence describes the relevant exact0.167 native protocol qualification plus complementary adapter coverage. The absent Git readback anchor is an evidence-access limitation, not evidence that qualification failed or grounds to invent another experiment gate.",
+    "sourceRisk": "Medium: enables same-version mailbox history continuity; existing capability/current-run checks remain.",
+    "workerFingerprint": "Both changed paths are beneath packages/daemon and are canonical worker inputs, including the test file. Do not claim the old worker input is identical. No numeric W computed and no AppSHA==runtimeSHA requirement introduced.",
+    "priorNativeBudgetTransfer": false,
+    "futureCIAndProduction": "Use the actual final combined source and its normal CI/release results; old parent checks remain scoped to their original tree."
+  },
+  "limitations": {
+    "fullUIReview": false,
+    "fullSecurityAudit": false,
+    "liveProviderProtocolObserved": false,
+    "finalCombinedTreeIndependentlyVerified": false
+  },
+  "actions": {
+    "sourceOrRefWrites": 0,
+    "sourceTreesOrCommitsCreated": 0,
+    "testsRun": 0,
+    "originalJobLogsRead": 0,
+    "artifactsOrZIPsDownloaded": 0,
+    "resourcesCreated": 0,
+    "modelOrProductionCalls": 0,
+    "onlyNewObject": "Unreferenced safe review JSON blob"
+  }
+}

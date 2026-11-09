@@ -1,0 +1,3362 @@
+{
+  "schema": "mikka.issue1512.final-d2c3-four-parent-full-tree-independent-review.v1",
+  "observedAtUtc": "2026-11-09 21:59:27 UTC",
+  "status": "PASS_COMPLETE_EXPECTED_ACTUAL_TREE_6840_LEAVES_AND_874_DIRECTORIES; EXACT_FINAL_COMMIT_AND_PARENTS",
+  "commit": {
+    "sha": "d2c3f63448130443e3e10bb5304417162f585776",
+    "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "parents": [
+      "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "9f1429343d5fafff2cdf9a473ebec43f07e61721",
+      "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f",
+      "1c7698655405b289d7fdbd814713d15e542cc2bb"
+    ],
+    "message": "Merge runtime batch #1844, mailbox #1846, and current UI main into #1512"
+  },
+  "parentSources": {
+    "own": {
+      "sha": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+      "parents": [
+        "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+        "7848e79df9c5af67e526aeed1c828858db392066"
+      ],
+      "message": "Merge main into Coordinator backfill correction\n\nInclude the actual main merge of PR #1835 at 7848e79 while retaining the reviewed Coordinator empty-legacy backfill source and corrected PostgreSQL fixtures from 5a0c907. Preserve all main changes, the existing Native read corrections, and the unchanged Native measurement harness."
+    },
+    "publishedBatch": {
+      "sha": "9f1429343d5fafff2cdf9a473ebec43f07e61721",
+      "tree": "50f85fb5c687ec19c3e0c06d96e189fb6b18e62b",
+      "parents": [
+        "ed60885d317240303d496b3bddfcf9a49caf4139",
+        "205d26db8f8435ab18ce74d1b14c9669550098e4",
+        "98a0db9e8ec4264eb641e7fd36c25e344a124cf2"
+      ],
+      "message": "perf: merge Coordinator HTTP events and Codex startup fixes\n\nIntegrate original PR heads #1836, #1839, and #1842 with an ordinary three-parent merge. Preserve the original commits and refs.\n\nThe conflict-free 19-path tree passed the complete pnpm check and 60 combined Codex tests. Production latency acceptance remains pending under #1506."
+    },
+    "publishedMailbox": {
+      "sha": "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f",
+      "tree": "ff016b56b9779a5e6387930648299acf2bc52f49",
+      "parents": [
+        "12458fe22e1217f644e8b28f82ab856211e73b72"
+      ],
+      "message": "fix(daemon): preserve verified Codex 0.167 mailbox resumes"
+    },
+    "actualMain": {
+      "sha": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "tree": "dd908e3c3befc8e3be883f32669734c0f3481f87",
+      "parents": [
+        "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "9d8e5f8d321b9ca523875f92c401223be7309cd3"
+      ],
+      "message": "One affectUI shell: frame data, slots, hooks and decision note (#1818)\n\nOne affectUI shell and the template screens (public side)"
+    }
+  },
+  "observedPublishedRefs": {
+    "own": {
+      "ref": "refs/heads/fix/1512-daemon-fixture-executable-20261109",
+      "node_id": "REF_kwDOVRYxA9oANnJlZnMvaGVhZHMvZml4LzE1MTItZGFlbW9uLWZpeHR1cmUtZXhlY3V0YWJsZS0yMDI2MTEwOQ",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/fix/1512-daemon-fixture-executable-20261109",
+      "object": {
+        "sha": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+        "type": "commit",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/84ce7f876817f0d73c34a1ef89797fc27ba8661e"
+      }
+    },
+    "batch": [
+      {
+        "name": "batch/issue1506-http-events-codex-20261109t2139",
+        "sha": "9f1429343d5fafff2cdf9a473ebec43f07e61721"
+      }
+    ],
+    "mailbox": [
+      {
+        "name": "fix/issue-1503-codex-0167-mailbox-resume-7d5185f",
+        "sha": "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f"
+      }
+    ],
+    "main": {
+      "ref": "refs/heads/main",
+      "node_id": "REF_kwDOVRYxA69yZWZzL2hlYWRzL21haW4",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/main",
+      "object": {
+        "sha": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+        "type": "commit",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/1c7698655405b289d7fdbd814713d15e542cc2bb"
+      }
+    }
+  },
+  "priorIndependentBaseline": {
+    "commit": "b6c860869eb3d48a26a4b931f8273ef7b8db896b",
+    "tree": "84e5abc87cd5fcd3d6c9459d3e9ff1e6a2dde058",
+    "proof": {
+      "bytes": 29810,
+      "sha256": "b8076e17480ead44a5a6d237a733e1e1c625702725d92eed3256d9211a415051",
+      "gitBlob": "b5f5bcd56416df90962dfc09f5e7d3008b840116"
+    },
+    "interpretation": "Unpublished review intermediate only; final merge preserves the same reviewed runtime sources through actual batch9f ancestry instead of parenting b6."
+  },
+  "completeTreeManifest": {
+    "bytes": 823828,
+    "sha256": "3a45030142602314527acb760d944852243237760c4727dd18c8baf43698ffb5",
+    "gitBlob": "0d34c46715f6602f832fd4d45dc177aff3bdc759"
+  },
+  "recursiveTreeVerification": [
+    {
+      "root": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+      "entries": 7713,
+      "leaves": 6840,
+      "directoriesIncludingRoot": 874,
+      "typeCounts": {
+        "tree": 873,
+        "blob": 6840
+      },
+      "truncated": false,
+      "allCanonicalTreeSHA1Recomputed": true,
+      "duplicatePaths": 0,
+      "missingParents": 0,
+      "prefixCollisions": 0,
+      "directoryVerificationListSHA256": "8528df5468016ef1b3cc426fee22d53ec210ca0414d93198f286befb0788e595"
+    },
+    {
+      "root": "84e5abc87cd5fcd3d6c9459d3e9ff1e6a2dde058",
+      "entries": 7695,
+      "leaves": 6822,
+      "directoriesIncludingRoot": 874,
+      "typeCounts": {
+        "tree": 873,
+        "blob": 6822
+      },
+      "truncated": false,
+      "allCanonicalTreeSHA1Recomputed": true,
+      "duplicatePaths": 0,
+      "missingParents": 0,
+      "prefixCollisions": 0,
+      "directoryVerificationListSHA256": "d72b2a07937609e196e02662e3816a0acca4616d900ac995a91f447460a1dc1e"
+    },
+    {
+      "root": "dd908e3c3befc8e3be883f32669734c0f3481f87",
+      "entries": 7711,
+      "leaves": 6838,
+      "directoriesIncludingRoot": 874,
+      "typeCounts": {
+        "tree": 873,
+        "blob": 6838
+      },
+      "truncated": false,
+      "allCanonicalTreeSHA1Recomputed": true,
+      "duplicatePaths": 0,
+      "missingParents": 0,
+      "prefixCollisions": 0,
+      "directoryVerificationListSHA256": "d32f6a2b4acdf61bd8c69ba54ce0c556b0fbb7b6b0687788ece50aa830a2a2f9"
+    }
+  ],
+  "expectedTreeRebuiltFromIndependentLeavesAndParentDirectories": {
+    "expectedRoot": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "actualRoot": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "expectedDirectories": 874,
+    "actualDirectories": 874,
+    "allDirectoryHashesEqual": true,
+    "missing": [],
+    "extra": [],
+    "mismatch": [],
+    "expectedPathIdentityValidated": true,
+    "allPass": true
+  },
+  "fullUnionReview": {
+    "finalLeaves": 6840,
+    "expectedLeaves": 6840,
+    "baselineLeaves": 6822,
+    "actualMainLeaves": 6838,
+    "missing": [],
+    "extra": [],
+    "mismatch": [],
+    "prefixCollisions": [],
+    "deltaFromB6": 52,
+    "deltaFromB6Stats": {
+      "modified": 34,
+      "added": 18
+    },
+    "deltaFromMain": 69,
+    "deltaFromMainStats": {
+      "modified": 67,
+      "added": 2
+    },
+    "mainIncomingPaths": 50,
+    "mailboxIncomingPaths": 2,
+    "unexpectedDeltaPaths": [],
+    "missingDeltaPaths": [],
+    "ownChecks": [
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "actual": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "composed": false
+      },
+      {
+        "path": "app/actions/coordinator.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+        "actual": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+        "composed": false
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+        "actual": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+        "composed": false
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+        "actual": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+        "composed": false
+      },
+      {
+        "path": "apps/api/generated/routes.json",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+        "actual": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+        "composed": false
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+        "actual": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+        "composed": false
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "e7f6972a23519ae45e059038cd0c404789d44a98",
+        "actual": "e7f6972a23519ae45e059038cd0c404789d44a98",
+        "composed": false
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "actual": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "composed": false
+      },
+      {
+        "path": "components/swr-defaults.tsx",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+        "actual": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+        "composed": false
+      },
+      {
+        "path": "components/workspace/issue-workspace.tsx",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "383e0446d95a3e490b8e1c808b6e325b0539faaf",
+        "actual": "064b7cb66429d3219622637eaa4228596f98d54b",
+        "composed": true
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+        "actual": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+        "composed": false
+      },
+      {
+        "path": "hooks/use-live-lists.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+        "actual": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+        "composed": false
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "9109982d1c3245179b85a42d6969003aec2f5047",
+        "actual": "9109982d1c3245179b85a42d6969003aec2f5047",
+        "composed": false
+      },
+      {
+        "path": "lib/analytics-policy.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "152b941ff7b05004a7c57a909f776c6268ede106",
+        "actual": "152b941ff7b05004a7c57a909f776c6268ede106",
+        "composed": false
+      },
+      {
+        "path": "lib/coordinator/coordinator-bot.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+        "actual": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+        "composed": false
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.test.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "a5157f09e8022bf9077053686d36aa02760a4e94",
+        "actual": "a5157f09e8022bf9077053686d36aa02760a4e94",
+        "composed": false
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+        "actual": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+        "composed": false
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5",
+        "actual": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5",
+        "composed": false
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "ec8497366c9c46cdac494814bd832beb1828c880",
+        "actual": "ec8497366c9c46cdac494814bd832beb1828c880",
+        "composed": false
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "a40f946620ec874320586cb12ddb90c4b2fc438d",
+        "actual": "a40f946620ec874320586cb12ddb90c4b2fc438d",
+        "composed": false
+      },
+      {
+        "path": "lib/device-enrollment.db.test.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+        "actual": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+        "composed": false
+      },
+      {
+        "path": "lib/device-enrollment.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+        "actual": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+        "composed": false
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+        "actual": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+        "composed": false
+      },
+      {
+        "path": "lib/device-management.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+        "actual": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+        "composed": false
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+        "actual": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+        "composed": false
+      },
+      {
+        "path": "lib/dispatch-timing.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+        "actual": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+        "composed": false
+      },
+      {
+        "path": "lib/live/revision-read.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "266aa82ba4a683e88d207bc197fd97cee1f2b1ae",
+        "actual": "266aa82ba4a683e88d207bc197fd97cee1f2b1ae",
+        "composed": false
+      },
+      {
+        "path": "lib/personal-policy.test.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96",
+        "actual": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96",
+        "composed": false
+      },
+      {
+        "path": "lib/personal-policy.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+        "actual": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+        "composed": false
+      },
+      {
+        "path": "lib/replay-readiness.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "d60598b09201228e23c5ac7a9df00938192f0e67",
+        "actual": "d60598b09201228e23c5ac7a9df00938192f0e67",
+        "composed": false
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "actual": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "composed": false
+      },
+      {
+        "path": "lib/tracing/logs.test.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "737fa373e4a8333a4a703bf6133f9a533d585460",
+        "actual": "737fa373e4a8333a4a703bf6133f9a533d585460",
+        "composed": false
+      },
+      {
+        "path": "lib/tracing/node.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "00775a5928228262a66b12b845ee0dc18f6c6047",
+        "actual": "00775a5928228262a66b12b845ee0dc18f6c6047",
+        "composed": false
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+        "actual": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+        "composed": false
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+        "actual": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+        "composed": false
+      },
+      {
+        "path": "scripts/acceptance/run-observability.md",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "4ca2cf35c1f499b338469556836ae0505649e82a",
+        "actual": "4ca2cf35c1f499b338469556836ae0505649e82a",
+        "composed": false
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "104075571c73b97a985458f206dba310e4894490",
+        "actual": "104075571c73b97a985458f206dba310e4894490",
+        "composed": false
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+        "actual": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+        "composed": false
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.mjs",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+        "actual": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+        "composed": false
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "628395f91d97a64655afb80117788d70207200c0",
+        "actual": "628395f91d97a64655afb80117788d70207200c0",
+        "composed": false
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "30ef728a5a2d465d389916a63d40a816d13b1d4c",
+        "actual": "30ef728a5a2d465d389916a63d40a816d13b1d4c",
+        "composed": false
+      },
+      {
+        "path": "tests/analytics-policy.test.mjs",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+        "actual": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+        "composed": false
+      },
+      {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "609029dde521868c00ab7eb687394ad5cacd6183",
+        "actual": "609029dde521868c00ab7eb687394ad5cacd6183",
+        "composed": false
+      },
+      {
+        "path": "tests/coordinator-bot.db.test.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+        "actual": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+        "composed": false
+      },
+      {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351",
+        "actual": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351",
+        "composed": false
+      },
+      {
+        "path": "tests/replay-readiness.test.mjs",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "58e4706039dafe6901082676f37a3c92da613d43",
+        "actual": "58e4706039dafe6901082676f37a3c92da613d43",
+        "composed": false
+      },
+      {
+        "path": "workflows/coordinator/factory-steps.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+        "actual": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+        "composed": false
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "preservedExactExceptApprovedUI": true,
+        "baseline": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+        "actual": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+        "composed": false
+      }
+    ],
+    "prior21": [
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "sha": "710f70c3528e1b8eb5c37f1be52c6442445bf9be",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "README.md",
+        "sha": "d59106749f60229439efc9593aea2077bfc1367f",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "README.zh-CN.md",
+        "sha": "842bad68e1a1470b90f4daa90f505494e7656f6b",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "sha": "ea4f398aabb120f760d133168ed4ed49ddd4b767",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "lib/bot-model-choice.ts",
+        "sha": "20df161806c9647a77093746ca074fddf97643a9",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "lib/bot-model-selection.test.ts",
+        "sha": "6453ff0fae3dd8549c7f6ecb68b315d65a59f633",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "lib/model-call-timing.test.ts",
+        "sha": "9b98a617cb833fed907a4947dc63a0097d8b554c",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "lib/model-call-timing.ts",
+        "sha": "d944022361313be7b13bcc0bc377ee6b42b248e1",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "lib/subscription-workflow-model.test.ts",
+        "sha": "c30d59512477d11703c23212a6a3f638fcc08765",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/daemon/src/adapters/codex.ts",
+        "sha": "1c8ca694b2f3eec633fb71440970170485957703",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/daemon/src/anonymous-codex-spare.ts",
+        "sha": "080ddc3797f196d9db97d2790ccceb87f7ca1c4d",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/daemon/src/subscription-worker-client.ts",
+        "sha": "cc1efb7058e1afc6a44ba6e224540886b1d9a378",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/daemon/src/subscription-worker-timing.test.ts",
+        "sha": "0461fec9a9cb63bc974169df605315839ab9d297",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/daemon/src/subscription-worker-timing.ts",
+        "sha": "041dc0e73ef6446a37e73a50d7af977f0ad8da61",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+        "sha": "8ffd1fa642e7e3b22463c4127471f02a4e7eb6fd",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+        "sha": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/subscription-worker/http_transport_timing.go",
+        "sha": "4156c512311676d451eb61075095dd735386d246",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/subscription-worker/http_transport_timing_test.go",
+        "sha": "12d7c565a713d6bd85f05c0e87804c961af2e8bc",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/subscription-worker/plain_model.go",
+        "sha": "5348116628941ea4252d5ccc004e49492b42d4ba",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/subscription-worker/timing.go",
+        "sha": "b7931270db2b77a5d7fddf108bb059a3941c3684",
+        "unchangedFromB6": true
+      },
+      {
+        "path": "packages/subscription-worker/timing_test.go",
+        "sha": "da2288ca4598c5c0a9a03fe63f451b7fbb152169",
+        "unchangedFromB6": true
+      }
+    ],
+    "protectedChecks": [
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "baseline": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "actual": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "baseline": "42ae23945f798020ec068635e7621869fb427af2",
+        "actual": "42ae23945f798020ec068635e7621869fb427af2",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/db-query-diagnostics.cjs",
+        "baseline": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+        "actual": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/db-query-diagnostics.test.mjs",
+        "baseline": "671bc3cb87e263ffb4cae20da0c408aa91519431",
+        "actual": "671bc3cb87e263ffb4cae20da0c408aa91519431",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/db-query-operations.cjs",
+        "baseline": "9011b6edb7296c8872d3e311074529a49987b575",
+        "actual": "9011b6edb7296c8872d3e311074529a49987b575",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+        "baseline": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+        "actual": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+        "baseline": "39e1facecdf28a661511f72e14580fdb4b1ae967",
+        "actual": "39e1facecdf28a661511f72e14580fdb4b1ae967",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/lifecycle.mjs",
+        "baseline": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+        "actual": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-device-ready.mjs",
+        "baseline": "aeacdb31da2c30da3e9afe5dbe7849af91da9a57",
+        "actual": "aeacdb31da2c30da3e9afe5dbe7849af91da9a57",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-device-ready.test.mjs",
+        "baseline": "9ed7176172b9f9301b25d625611bdf7839447411",
+        "actual": "9ed7176172b9f9301b25d625611bdf7839447411",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "docs/acceptance/issue-1415/native-lifecycle-3c0-diagnosis.json",
+        "baseline": "2c6bec950c31e99bb4dce1b349eeddb5ecee8ac6",
+        "actual": "2c6bec950c31e99bb4dce1b349eeddb5ecee8ac6",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "docs/design/decisions/2026-11-02-1050-desktop-lifecycle.md",
+        "baseline": "547257982bf72c29236dbef4128b889d0675d833",
+        "actual": "547257982bf72c29236dbef4128b889d0675d833",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "docs/factory/192-lifecycle-contract.md",
+        "baseline": "ebfa282dabe897a40e700c5ff701fe8166d5c0a4",
+        "actual": "ebfa282dabe897a40e700c5ff701fe8166d5c0a4",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "drizzle/20261029044014_skill_lifecycle_operations.sql",
+        "baseline": "6fae53f67a610a74cc2da018de5f2fd816afb924",
+        "actual": "6fae53f67a610a74cc2da018de5f2fd816afb924",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "drizzle/20261107120000_thread_machine_lifecycle.sql",
+        "baseline": "dda5d45f0ccdedbfe4ca4866f2e066945fe8991b",
+        "actual": "dda5d45f0ccdedbfe4ca4866f2e066945fe8991b",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/cloud-computer/thread-lifecycle-due.ts",
+        "baseline": "e7476a1187ddb7c97c23a2f5c07553f905c24ba6",
+        "actual": "e7476a1187ddb7c97c23a2f5c07553f905c24ba6",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/cloud-computer/thread-lifecycle-log.ts",
+        "baseline": "d9d086006f1a32c664a1ac987617bb627fc0f14a",
+        "actual": "d9d086006f1a32c664a1ac987617bb627fc0f14a",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/cloud-computer/thread-lifecycle-provider.test.ts",
+        "baseline": "f394760298659c1fe9950fcc628d43edb794cf4f",
+        "actual": "f394760298659c1fe9950fcc628d43edb794cf4f",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/cloud-computer/thread-lifecycle-provider.ts",
+        "baseline": "9673307f89de3213cf75c466dd90b1a07520978c",
+        "actual": "9673307f89de3213cf75c466dd90b1a07520978c",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/cloud-computer/thread-lifecycle.test.ts",
+        "baseline": "55ac195f77de1a999691fe9a9be0d2f7fac897f0",
+        "actual": "55ac195f77de1a999691fe9a9be0d2f7fac897f0",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/cloud-computer/thread-lifecycle.ts",
+        "baseline": "7ed83281a5ac156952a046a39dfaa7adca1f0257",
+        "actual": "7ed83281a5ac156952a046a39dfaa7adca1f0257",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/db/pool-lifecycle.ts",
+        "baseline": "5732f6a883aa55c38bd220508439670561b0b2be",
+        "actual": "5732f6a883aa55c38bd220508439670561b0b2be",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/factory/lifecycle.db-cases.ts",
+        "baseline": "5dbdeb40dd6dffdc03d63b979247024388aa3296",
+        "actual": "5dbdeb40dd6dffdc03d63b979247024388aa3296",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/factory/monitor-lifecycle.ts",
+        "baseline": "78a213c5d8245a860bad852d225a6d00e975ca42",
+        "actual": "78a213c5d8245a860bad852d225a6d00e975ca42",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/swr/session-lifecycle.test.ts",
+        "baseline": "23fee55c53b2d517956b0654634f949cc88957e7",
+        "actual": "23fee55c53b2d517956b0654634f949cc88957e7",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "packages/daemon/test/computer-review-lifecycle.test.ts",
+        "baseline": "985ce1cfd300033fc4caaf07de0cba0d1ecf8964",
+        "actual": "985ce1cfd300033fc4caaf07de0cba0d1ecf8964",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "packages/daemon/test/hosted-cli-prefetch-lifecycle.test.ts",
+        "baseline": "79331e40785b8b45f9b2776d6dfb8c3dabd25613",
+        "actual": "79331e40785b8b45f9b2776d6dfb8c3dabd25613",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "packages/subscription-worker/claude_lifecycle.go",
+        "baseline": "d42c5d52bc6770c487fd2d7d06c41a46d04a4557",
+        "actual": "d42c5d52bc6770c487fd2d7d06c41a46d04a4557",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "packages/subscription-worker/codex_lifecycle.go",
+        "baseline": "95688c11dbd3b708c5bd075d9f3df8ccad98ae8b",
+        "actual": "95688c11dbd3b708c5bd075d9f3df8ccad98ae8b",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "packages/subscription-worker/lifecycle_more_test.go",
+        "baseline": "3a809d2a89b9fb0bdb2b355045f76850fae8a073",
+        "actual": "3a809d2a89b9fb0bdb2b355045f76850fae8a073",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "baseline": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+        "actual": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "baseline": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+        "actual": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability-workflow.mjs",
+        "baseline": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+        "actual": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability-workflow.test.mjs",
+        "baseline": "fd1327b287b8d97424a3c3ca5c01c4abd0f8b8f2",
+        "actual": "fd1327b287b8d97424a3c3ca5c01c4abd0f8b8f2",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability.md",
+        "baseline": "4ca2cf35c1f499b338469556836ae0505649e82a",
+        "actual": "4ca2cf35c1f499b338469556836ae0505649e82a",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "baseline": "104075571c73b97a985458f206dba310e4894490",
+        "actual": "104075571c73b97a985458f206dba310e4894490",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "baseline": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+        "actual": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/thread-lifecycle-ci.mjs",
+        "baseline": "8fb0e7d0cd1934315f1bd33826bc75fd8212b601",
+        "actual": "8fb0e7d0cd1934315f1bd33826bc75fd8212b601",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+        "baseline": "1e6db52b36680b6137a16f39c4499672527c595b",
+        "actual": "1e6db52b36680b6137a16f39c4499672527c595b",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/thread-lifecycle.mjs",
+        "baseline": "3068076819e52ef93642e429aa1edfb4759af0ed",
+        "actual": "3068076819e52ef93642e429aa1edfb4759af0ed",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/acceptance/thread-lifecycle.test.mjs",
+        "baseline": "d3290eae6c1c3b0466d2490811f5336940dce178",
+        "actual": "d3290eae6c1c3b0466d2490811f5336940dce178",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/e2b/thread-lifecycle-acceptance.test.ts",
+        "baseline": "5bd2b6ff2a37532a4cf87a26f37acb454923d80d",
+        "actual": "5bd2b6ff2a37532a4cf87a26f37acb454923d80d",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/e2b/thread-lifecycle-acceptance.ts",
+        "baseline": "0971dc0fa9eebbb955ca97c8363cbbbd0e4fb7b0",
+        "actual": "0971dc0fa9eebbb955ca97c8363cbbbd0e4fb7b0",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/e2b/thread-lifecycle-archive.test.ts",
+        "baseline": "ae4d21b058399fd9aa5167ef3b306847d976564f",
+        "actual": "ae4d21b058399fd9aa5167ef3b306847d976564f",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/e2b/thread-lifecycle-archive.ts",
+        "baseline": "2241a3e8dfb9462f53be61e1295d9fae3f982fc7",
+        "actual": "2241a3e8dfb9462f53be61e1295d9fae3f982fc7",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "tests/e2e/artifact-share-lifecycle.spec.ts",
+        "baseline": "7bcde420b9861c6cab7b2a319260b544f02d8b75",
+        "actual": "7bcde420b9861c6cab7b2a319260b544f02d8b75",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "tests/security-lifecycle-audit.db.test.ts",
+        "baseline": "7bd05962f5814d8d53bc69f92f58d048848d648b",
+        "actual": "7bd05962f5814d8d53bc69f92f58d048848d648b",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "workflows/thread-machine/lifecycle.test.ts",
+        "baseline": "59d7555dd2830c39c8e475b35b7ed0d08c74ce85",
+        "actual": "59d7555dd2830c39c8e475b35b7ed0d08c74ce85",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "workflows/thread-machine/lifecycle.ts",
+        "baseline": "89ce8b04fb743a95960e0eb0e1487c4482155708",
+        "actual": "89ce8b04fb743a95960e0eb0e1487c4482155708",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "components/nav/global-search.tsx",
+        "baseline": "a5248f4e3f70e113ed19b21542bdb81df67b45d4",
+        "actual": "a5248f4e3f70e113ed19b21542bdb81df67b45d4",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "baseline": "9109982d1c3245179b85a42d6969003aec2f5047",
+        "actual": "9109982d1c3245179b85a42d6969003aec2f5047",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/replay-readiness.ts",
+        "baseline": "d60598b09201228e23c5ac7a9df00938192f0e67",
+        "actual": "d60598b09201228e23c5ac7a9df00938192f0e67",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "baseline": "ec8497366c9c46cdac494814bd832beb1828c880",
+        "actual": "ec8497366c9c46cdac494814bd832beb1828c880",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "baseline": "a40f946620ec874320586cb12ddb90c4b2fc438d",
+        "actual": "a40f946620ec874320586cb12ddb90c4b2fc438d",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "baseline": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "actual": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "baseline": "e7f6972a23519ae45e059038cd0c404789d44a98",
+        "actual": "e7f6972a23519ae45e059038cd0c404789d44a98",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "baseline": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "actual": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "hooks/use-live-lists.ts",
+        "baseline": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+        "actual": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+        "mode": "100644",
+        "unchanged": true
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "baseline": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+        "actual": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+        "mode": "100644",
+        "unchanged": true
+      }
+    ],
+    "allPass": true
+  },
+  "actual52ChangesFromB6": [
+    {
+      "path": "apps/desktop/test/parity-settings-ready.mjs",
+      "status": "modified",
+      "before": {
+        "path": "apps/desktop/test/parity-settings-ready.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5d71e2eb2a022912b6fa5807ae44b42a19f7e44e",
+        "size": 9945
+      },
+      "after": {
+        "path": "apps/desktop/test/parity-settings-ready.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2697029e9975359d0f82441f59c05dc0279065e8",
+        "size": 10591
+      }
+    },
+    {
+      "path": "components/app-shell.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/app-shell.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "505e4b12cef1a5aa69127d97475a778cff5ff41e",
+        "size": 7124
+      },
+      "after": {
+        "path": "components/app-shell.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "331428506cfa0fb674cdc08ebe8b10a1f47937d8",
+        "size": 7249
+      }
+    },
+    {
+      "path": "components/blocks/kanban-board-1/components/kanban-board.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/blocks/kanban-board-1/components/kanban-board.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9709fd592fa10f8f54702b91d4e4a91cad4b27a1",
+        "size": 22515
+      },
+      "after": {
+        "path": "components/blocks/kanban-board-1/components/kanban-board.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d29afc43df9d9b98b83924cae28e31690576510a",
+        "size": 24966
+      }
+    },
+    {
+      "path": "components/coordinator/coordinator-chat.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/coordinator/coordinator-chat.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8bd5309e8cbe71fbbc6603d91c7fad890a026c6e",
+        "size": 48888
+      },
+      "after": {
+        "path": "components/coordinator/coordinator-chat.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8eb580a57b83c952a87f4be7251ebaea4b417724",
+        "size": 58786
+      }
+    },
+    {
+      "path": "components/coordinator/reply-activity.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/coordinator/reply-activity.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ab7a77ff091de106db0f3f0b4567535102176a06",
+        "size": 17254
+      },
+      "after": {
+        "path": "components/coordinator/reply-activity.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0e902357917ef430865a35b7f6d3ea055030e1fb",
+        "size": 18713
+      }
+    },
+    {
+      "path": "components/coordinator/retry-reply-button.test.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/coordinator/retry-reply-button.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9bac59a0f1b702e89214766f364ac27dd26ae3b9",
+        "size": 30504
+      },
+      "after": {
+        "path": "components/coordinator/retry-reply-button.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "589f2db2a01c715bfab07bdc02c155da70db134c",
+        "size": 30539
+      }
+    },
+    {
+      "path": "components/nav/bot-list.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/nav/bot-list.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "971b28a81a315d30eb0a50bc9db804e2f7eb3ad9",
+        "size": 15448
+      },
+      "after": {
+        "path": "components/nav/bot-list.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "42f22c08761c03822a589bc10143fb9ecaebd723",
+        "size": 17497
+      }
+    },
+    {
+      "path": "components/nav/rail-items.ts",
+      "status": "modified",
+      "before": {
+        "path": "components/nav/rail-items.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b3ca87271210c568bf9d01e655977418be2e5363",
+        "size": 1635
+      },
+      "after": {
+        "path": "components/nav/rail-items.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0010450f5fe71b962bd5985849cb51ee9ef27057",
+        "size": 2041
+      }
+    },
+    {
+      "path": "components/plugins/plugins-view.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/plugins/plugins-view.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fbee8f6f6cd33f293586bd73519620548eec944f",
+        "size": 29494
+      },
+      "after": {
+        "path": "components/plugins/plugins-view.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "488bea11b24a9c363ad9cb6be839bf3c65800f79",
+        "size": 29501
+      }
+    },
+    {
+      "path": "components/settings/bot-permissions.tsx",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/settings/bot-permissions.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "39bfd8794285a628bf9adcb299558fed19929243",
+        "size": 12983
+      }
+    },
+    {
+      "path": "components/settings/settings-view.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/settings/settings-view.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d9447f9e939826e24688da35d6636d82353f4c0d",
+        "size": 11161
+      },
+      "after": {
+        "path": "components/settings/settings-view.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "52337a2eb36be2b1520dcbf34feb1e57c8b59569",
+        "size": 11296
+      }
+    },
+    {
+      "path": "components/slots/app-frame-contract.ts",
+      "status": "modified",
+      "before": {
+        "path": "components/slots/app-frame-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e05dbf8d9c025925c1cac4312b87ab05810d815f",
+        "size": 919
+      },
+      "after": {
+        "path": "components/slots/app-frame-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "75152a9f76ee99ea731f74f3648027a8748f32f8",
+        "size": 1145
+      }
+    },
+    {
+      "path": "components/slots/app-frame.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/slots/app-frame.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "10a38aec26e5567f587451619b1f2793f4ed2cb3",
+        "size": 412
+      },
+      "after": {
+        "path": "components/slots/app-frame.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e2497e74f5000e1c3626ed4730674adae6ec09dd",
+        "size": 521
+      }
+    },
+    {
+      "path": "components/slots/artifacts-contract.ts",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/artifacts-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c14f1f57e521ff6b7ab0e0cdf8aa672d5f1314ce",
+        "size": 406
+      }
+    },
+    {
+      "path": "components/slots/artifacts.tsx",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/artifacts.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e16ad35bc37d7f269ae9988a3ded3a9e2067cd31",
+        "size": 398
+      }
+    },
+    {
+      "path": "components/slots/board-contract.ts",
+      "status": "modified",
+      "before": {
+        "path": "components/slots/board-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "801d266d18ac86225823dce62f49ddcd357f4684",
+        "size": 3043
+      },
+      "after": {
+        "path": "components/slots/board-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2afa1da78c7d9a3dc54059f8e39aa429434e97b0",
+        "size": 5605
+      }
+    },
+    {
+      "path": "components/slots/board.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/slots/board.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "73ffe8744c0878a49e825fef0cf11463f14133bd",
+        "size": 414
+      },
+      "after": {
+        "path": "components/slots/board.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3f67dc7b28d8d7809929aaba06c8597454d8e493",
+        "size": 711
+      }
+    },
+    {
+      "path": "components/slots/inbox-contract.ts",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/inbox-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a204a2a6d6970cb4ffa208f6acea54f91c3fa1dd",
+        "size": 1101
+      }
+    },
+    {
+      "path": "components/slots/inbox.tsx",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/inbox.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3030dfee0bd6b1e2d8acd4b2d032dfbc30e3b70c",
+        "size": 790
+      }
+    },
+    {
+      "path": "components/slots/memory-contract.ts",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/memory-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "10423702e965232136609d1eaea44b1428a39611",
+        "size": 213
+      }
+    },
+    {
+      "path": "components/slots/memory.tsx",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/memory.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d7e0df5a4ea1f4faec9c6fe91d7048435bab30c4",
+        "size": 459
+      }
+    },
+    {
+      "path": "components/slots/onboarding-contract.ts",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/onboarding-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "aa43d00130d8e05f5f6bc0e4a905fa1e1738f2f5",
+        "size": 972
+      }
+    },
+    {
+      "path": "components/slots/onboarding.tsx",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/onboarding.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d69c490b9e06200e348e6caa232708d127c57c64",
+        "size": 261
+      }
+    },
+    {
+      "path": "components/slots/settings-bot-permissions-contract.ts",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/settings-bot-permissions-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5c60f724e096853a6e7e94cf3df491f4d1cf52ca",
+        "size": 3196
+      }
+    },
+    {
+      "path": "components/slots/settings-bot-permissions.tsx",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/settings-bot-permissions.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c5a94f648a17fef558f8a6e15605cd42b15f2053",
+        "size": 322
+      }
+    },
+    {
+      "path": "components/slots/settings-sidebar.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/slots/settings-sidebar.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1d42666e15e2371c024f5e19065bbc5c2d7818f6",
+        "size": 7673
+      },
+      "after": {
+        "path": "components/slots/settings-sidebar.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6069d131153219e78b3712288425992463fd287d",
+        "size": 7718
+      }
+    },
+    {
+      "path": "components/slots/tasks-contract.ts",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/tasks-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b8f2ac9ad9b07ab6c5a3f652ed5ef2e0371ecc92",
+        "size": 652
+      }
+    },
+    {
+      "path": "components/slots/tasks.tsx",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/tasks.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8e9977d9bedad9e93df7d8fbf2d8b181a6be597a",
+        "size": 509
+      }
+    },
+    {
+      "path": "components/slots/thread-contract.ts",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/thread-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d2d70119ebc2929324b193e806d9c5805c338453",
+        "size": 4667
+      }
+    },
+    {
+      "path": "components/slots/thread.tsx",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/slots/thread.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3c3002f3b70d7d35b537872862d736d2a8877246",
+        "size": 363
+      }
+    },
+    {
+      "path": "components/suggestions/suggestion-feed.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/suggestions/suggestion-feed.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3be20b5c40964444221e0e5264f6c5083c0ea693",
+        "size": 7979
+      },
+      "after": {
+        "path": "components/suggestions/suggestion-feed.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ccaf574a0bd0c9b752d93e0a7d83df60592cbb11",
+        "size": 8475
+      }
+    },
+    {
+      "path": "components/workspace/agent-citations.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/workspace/agent-citations.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e7d97e4e315cbaaaf7e986afa691d0b6be5b921f",
+        "size": 14815
+      },
+      "after": {
+        "path": "components/workspace/agent-citations.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "71b38a31ca234a6d099646ef0bdd5f7743804cf9",
+        "size": 14875
+      }
+    },
+    {
+      "path": "components/workspace/board-page.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/workspace/board-page.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b09c75272dc3f108d0800a8fcdaeba5995769431",
+        "size": 26711
+      },
+      "after": {
+        "path": "components/workspace/board-page.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "52221b5be67770340cf520609e243c5136ae5441",
+        "size": 30273
+      }
+    },
+    {
+      "path": "components/workspace/board-screen.tsx",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "components/workspace/board-screen.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a15f1db359dae2ff500d204561073da3fef0e13b",
+        "size": 5356
+      }
+    },
+    {
+      "path": "components/workspace/board-view-state.test.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/workspace/board-view-state.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8945bd29697301e9ca11c25bc8dcbf04a8ec561e",
+        "size": 9133
+      },
+      "after": {
+        "path": "components/workspace/board-view-state.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "10d2934ea643e922024c72b6801fbdf638f02e06",
+        "size": 9228
+      }
+    },
+    {
+      "path": "components/workspace/issue-board.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/workspace/issue-board.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2517ad5b4f28ded6fb1cad683f7efe55b2da1637",
+        "size": 13778
+      },
+      "after": {
+        "path": "components/workspace/issue-board.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "05207f686a1f4ef6a652a110cede55d7a7ef1410",
+        "size": 15611
+      }
+    },
+    {
+      "path": "components/workspace/issue-thread-panel.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/workspace/issue-thread-panel.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c9e5223c1cceca956f4b5d5abfec17ececa04654",
+        "size": 30410
+      },
+      "after": {
+        "path": "components/workspace/issue-thread-panel.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "68a490a14a2a4963b7ac03738f361c9f9c3addb7",
+        "size": 38530
+      }
+    },
+    {
+      "path": "components/workspace/issue-workspace-settings.test.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/workspace/issue-workspace-settings.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "db3ea66b5755862a86f8d334ec7fbbb1aaeb2e68",
+        "size": 25512
+      },
+      "after": {
+        "path": "components/workspace/issue-workspace-settings.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4581baa184e667961f3de31cb5b78718829c5690",
+        "size": 25654
+      }
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/workspace/issue-workspace.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "383e0446d95a3e490b8e1c808b6e325b0539faaf",
+        "size": 56675
+      },
+      "after": {
+        "path": "components/workspace/issue-workspace.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "064b7cb66429d3219622637eaa4228596f98d54b",
+        "size": 58662
+      }
+    },
+    {
+      "path": "components/workspace/workspace-navigation.ts",
+      "status": "modified",
+      "before": {
+        "path": "components/workspace/workspace-navigation.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f4c0b2d0054fc35ad99677c8f3e1eb487257ba0d",
+        "size": 19620
+      },
+      "after": {
+        "path": "components/workspace/workspace-navigation.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8b57eada2dc225af1b5f6aba34fdfe6443c17129",
+        "size": 19723
+      }
+    },
+    {
+      "path": "docs/design/decisions/2026-11-09-1143-one-shell-affectui-palette.md",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "docs/design/decisions/2026-11-09-1143-one-shell-affectui-palette.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b92a71eba335e3d164e17d8001bd384abbcfe604",
+        "size": 1401
+      }
+    },
+    {
+      "path": "docs/ui-overlay.md",
+      "status": "modified",
+      "before": {
+        "path": "docs/ui-overlay.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "99fef0f2d392f99cc4865404454fe8a60b570101",
+        "size": 18688
+      },
+      "after": {
+        "path": "docs/ui-overlay.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a94dcafd2c84b9ef5eed5c168897b7c9d96876ec",
+        "size": 21986
+      }
+    },
+    {
+      "path": "hooks/use-factory-questions.ts",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "hooks/use-factory-questions.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "347a85b453cb0c346977f72cc187a39f20ee871e",
+        "size": 3151
+      }
+    },
+    {
+      "path": "lib/auth-return.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/auth-return.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "070624d76e0d4b49103cdc39c78c110cd7666b8b",
+        "size": 5839
+      },
+      "after": {
+        "path": "lib/auth-return.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e95618d9eecd9e80f676fac4a270c18e9e4163fd",
+        "size": 5858
+      }
+    },
+    {
+      "path": "lib/settings-sections.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/settings-sections.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dd3d4e2df7b1ed80bf197620d43d4f4ed904aa85",
+        "size": 5684
+      },
+      "after": {
+        "path": "lib/settings-sections.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d61c50fd4d80574676eb9926f66d9e0ce6dd0acf",
+        "size": 5884
+      }
+    },
+    {
+      "path": "lib/ui-overlay.mjs",
+      "status": "modified",
+      "before": {
+        "path": "lib/ui-overlay.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d4ce8c48af955ed7f6c515d71500c19a14c56774",
+        "size": 5623
+      },
+      "after": {
+        "path": "lib/ui-overlay.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c31081b86e2b3508cca60bcd8b1fd3a8b870855f",
+        "size": 5990
+      }
+    },
+    {
+      "path": "messages/en.json",
+      "status": "modified",
+      "before": {
+        "path": "messages/en.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4d6b1a40230130fbb4d7e8afb1defbc4f5e2dd04",
+        "size": 252645
+      },
+      "after": {
+        "path": "messages/en.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1d480c5612c2da3b7b8aac79558c5359827a96fe",
+        "size": 263899
+      }
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "status": "modified",
+      "before": {
+        "path": "messages/zh-CN.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1fd3ad6714b3efdb93eede541bb156843b2d74d9",
+        "size": 243343
+      },
+      "after": {
+        "path": "messages/zh-CN.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "071337d0867d62b9a33736ab7f7e697f966440ea",
+        "size": 254368
+      }
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448",
+        "size": 5930
+      },
+      "after": {
+        "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3ea4f1e0e3d336e0e8a8c69305931c08625789dd",
+        "size": 6016
+      }
+    },
+    {
+      "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7d40937784ca75dffc01a9ee2cf4cb3948c4ecf5",
+        "size": 15132
+      },
+      "after": {
+        "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "14a9ca5d87eccbb5b6402ee4c8618e5654e5b54f",
+        "size": 15881
+      }
+    },
+    {
+      "path": "tests/agent-ui-report.test.tsx",
+      "status": "modified",
+      "before": {
+        "path": "tests/agent-ui-report.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fe7dc3f194e5e7375b522aa551b2a6c050f29f1f",
+        "size": 20553
+      },
+      "after": {
+        "path": "tests/agent-ui-report.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a256bc547d61260a53f84bb654d231927d3b59a2",
+        "size": 20594
+      }
+    },
+    {
+      "path": "tests/settings-sections.test.mjs",
+      "status": "modified",
+      "before": {
+        "path": "tests/settings-sections.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c3a431dd00309849fa30ba80eb1428d1a402ac72",
+        "size": 5209
+      },
+      "after": {
+        "path": "tests/settings-sections.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "719478baef0dbf2d8efd014a49ba0784b6f4103f",
+        "size": 5266
+      }
+    }
+  ],
+  "actual69ChangesFromMain": [
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "status": "modified",
+      "before": {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23",
+        "size": 13984
+      },
+      "after": {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "size": 14046
+      }
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "status": "modified",
+      "before": {
+        "path": ".github/workflows/web-deploy.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+        "size": 11670
+      },
+      "after": {
+        "path": ".github/workflows/web-deploy.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "710f70c3528e1b8eb5c37f1be52c6442445bf9be",
+        "size": 11721
+      }
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "status": "modified",
+      "before": {
+        "path": "app/actions/coordinator.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bd24ef4c103b670d92d381d396d5c3e1b6aba083",
+        "size": 25249
+      },
+      "after": {
+        "path": "app/actions/coordinator.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+        "size": 25408
+      }
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "status": "modified",
+      "before": {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9fe33b05a9570ab59e4bb041f9a1344c44ab31ad",
+        "size": 1704
+      },
+      "after": {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+        "size": 1983
+      }
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "status": "modified",
+      "before": {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3bbb71a8a7d249eb517d75a95986cf75d1994168",
+        "size": 1226
+      },
+      "after": {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+        "size": 1305
+      }
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "status": "modified",
+      "before": {
+        "path": "apps/api/generated/routes.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "016af99a766db7d863704225d451d9eb3a950bbb",
+        "size": 76186
+      },
+      "after": {
+        "path": "apps/api/generated/routes.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+        "size": 76186
+      }
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "status": "modified",
+      "before": {
+        "path": "apps/api/generated/routes.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f218fd0698bfae6296be7a06c732c26cac412eb7",
+        "size": 78570
+      },
+      "after": {
+        "path": "apps/api/generated/routes.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+        "size": 78570
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "status": "modified",
+      "before": {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b72659facb8a5a710fb0c0121e2543add0ad8f33",
+        "size": 5988
+      },
+      "after": {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e7f6972a23519ae45e059038cd0c404789d44a98",
+        "size": 6301
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "status": "modified",
+      "before": {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c69dcfe5f459de0e603651fd510f06cf8d32e75b",
+        "size": 4351
+      },
+      "after": {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "size": 4726
+      }
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/swr-defaults.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f6be8710182ad68ce0a87f6cac910184bf1d52f3",
+        "size": 4433
+      },
+      "after": {
+        "path": "components/swr-defaults.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+        "size": 4551
+      }
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "status": "modified",
+      "before": {
+        "path": "components/workspace/issue-workspace.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6f031756fc13de69dc87fc011bb3696b5a15aa52",
+        "size": 58558
+      },
+      "after": {
+        "path": "components/workspace/issue-workspace.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "064b7cb66429d3219622637eaa4228596f98d54b",
+        "size": 58662
+      }
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "status": "modified",
+      "before": {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee",
+        "size": 95749
+      },
+      "after": {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ea4f398aabb120f760d133168ed4ed49ddd4b767",
+        "size": 99013
+      }
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "status": "modified",
+      "before": {
+        "path": "docs/operations/tracing.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e75e8377fbcb6f92d3446f5325d6d55cc4b294af",
+        "size": 63844
+      },
+      "after": {
+        "path": "docs/operations/tracing.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+        "size": 67256
+      }
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "status": "modified",
+      "before": {
+        "path": "hooks/use-live-lists.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ac60a59be511ec45cc372b8c91c0535861a30931",
+        "size": 9682
+      },
+      "after": {
+        "path": "hooks/use-live-lists.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+        "size": 9807
+      }
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "status": "modified",
+      "before": {
+        "path": "instrumentation-client.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+        "size": 2360
+      },
+      "after": {
+        "path": "instrumentation-client.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9109982d1c3245179b85a42d6969003aec2f5047",
+        "size": 2442
+      }
+    },
+    {
+      "path": "lib/analytics-policy.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/analytics-policy.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9529e8f563ef43d3e7c1eedd992165626eb86085",
+        "size": 3166
+      },
+      "after": {
+        "path": "lib/analytics-policy.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "152b941ff7b05004a7c57a909f776c6268ede106",
+        "size": 3400
+      }
+    },
+    {
+      "path": "lib/bot-model-choice.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/bot-model-choice.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d2fd785e8e164ea86387bfd013d070da9ed3e3f0",
+        "size": 8023
+      },
+      "after": {
+        "path": "lib/bot-model-choice.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "20df161806c9647a77093746ca074fddf97643a9",
+        "size": 8142
+      }
+    },
+    {
+      "path": "lib/bot-model-selection.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/bot-model-selection.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9a39ebf1f05ad2521297cfa577311955a51f9cec",
+        "size": 18777
+      },
+      "after": {
+        "path": "lib/bot-model-selection.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6453ff0fae3dd8549c7f6ecb68b315d65a59f633",
+        "size": 22916
+      }
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/coordinator/coordinator-bot.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+        "size": 22425
+      },
+      "after": {
+        "path": "lib/coordinator/coordinator-bot.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+        "size": 24861
+      }
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/coordinator/repository-resolution.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1d76b2da5d6b70fce05221cb10f8a7a35a72ae1c",
+        "size": 15458
+      },
+      "after": {
+        "path": "lib/coordinator/repository-resolution.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a5157f09e8022bf9077053686d36aa02760a4e94",
+        "size": 22313
+      }
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/coordinator/repository-resolution.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "faa8276d73120a257034b2a31d4c89d24856b46c",
+        "size": 11110
+      },
+      "after": {
+        "path": "lib/coordinator/repository-resolution.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+        "size": 11263
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "076d59eea10b000cd08df46754d32454609ecdc6",
+        "size": 18417
+      },
+      "after": {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5",
+        "size": 26773
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9ddddf4230c9f63ca9fb5f966de87116449844fe",
+        "size": 5039
+      },
+      "after": {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ec8497366c9c46cdac494814bd832beb1828c880",
+        "size": 8621
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b",
+        "size": 1637
+      },
+      "after": {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a40f946620ec874320586cb12ddb90c4b2fc438d",
+        "size": 2241
+      }
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/device-enrollment.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "431897540dc97e29fbc514ecb1ccd1dbf5d0c9ed",
+        "size": 21207
+      },
+      "after": {
+        "path": "lib/device-enrollment.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+        "size": 24843
+      }
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/device-enrollment.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f9490f18359d2d3a9b61b068bfb14ef4b965144d",
+        "size": 1338
+      },
+      "after": {
+        "path": "lib/device-enrollment.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+        "size": 1050
+      }
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "46c43f5c8bd9d33818f67d1e899f924ac9d267ae",
+        "size": 16340
+      },
+      "after": {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+        "size": 21768
+      }
+    },
+    {
+      "path": "lib/device-management.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/device-management.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c2e44913f843391095232bdda81d774a58ff9d24",
+        "size": 2661
+      },
+      "after": {
+        "path": "lib/device-management.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+        "size": 3206
+      }
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a5237da052e304897cd48afdebc42ee6f7571d96",
+        "size": 11209
+      },
+      "after": {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+        "size": 11425
+      }
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/dispatch-timing.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7f5ca1b72b28823f00936a820edac001766f5e71",
+        "size": 3006
+      },
+      "after": {
+        "path": "lib/dispatch-timing.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+        "size": 4016
+      }
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/live/revision-read.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "445ea81dccbed5f4b6ad16816757df0154a74b76",
+        "size": 2120
+      },
+      "after": {
+        "path": "lib/live/revision-read.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "266aa82ba4a683e88d207bc197fd97cee1f2b1ae",
+        "size": 2332
+      }
+    },
+    {
+      "path": "lib/model-call-timing.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/model-call-timing.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d3bf5426989c74de27ed62c3bccdca4aafad5b68",
+        "size": 21064
+      },
+      "after": {
+        "path": "lib/model-call-timing.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9b98a617cb833fed907a4947dc63a0097d8b554c",
+        "size": 25687
+      }
+    },
+    {
+      "path": "lib/model-call-timing.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/model-call-timing.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f5d5a9cae9f792e2b1b4a5573abcbc7579264f12",
+        "size": 9727
+      },
+      "after": {
+        "path": "lib/model-call-timing.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d944022361313be7b13bcc0bc377ee6b42b248e1",
+        "size": 11430
+      }
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/personal-policy.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bb2de016988758cbf34c00a8284a084c19b9e809",
+        "size": 2560
+      },
+      "after": {
+        "path": "lib/personal-policy.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96",
+        "size": 19713
+      }
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/personal-policy.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bbb9684619cbfa8faca236a78e6f8f61148d9a94",
+        "size": 8535
+      },
+      "after": {
+        "path": "lib/personal-policy.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+        "size": 8694
+      }
+    },
+    {
+      "path": "lib/replay-readiness.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/replay-readiness.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "899a9dcf33af282913c3e25c99b0826566b2c56b",
+        "size": 3291
+      },
+      "after": {
+        "path": "lib/replay-readiness.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d60598b09201228e23c5ac7a9df00938192f0e67",
+        "size": 3871
+      }
+    },
+    {
+      "path": "lib/subscription-workflow-model.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/subscription-workflow-model.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "96b23777317bedb29db1df3404d8b08c37cd099a",
+        "size": 11939
+      },
+      "after": {
+        "path": "lib/subscription-workflow-model.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c30d59512477d11703c23212a6a3f638fcc08765",
+        "size": 13045
+      }
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/swr/read-observer.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+        "size": 5786
+      },
+      "after": {
+        "path": "lib/swr/read-observer.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "size": 8237
+      }
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/tracing/logs.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8e6dc9b951d1126376ab29d4d0a80f276391a58a",
+        "size": 3342
+      },
+      "after": {
+        "path": "lib/tracing/logs.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "737fa373e4a8333a4a703bf6133f9a533d585460",
+        "size": 11375
+      }
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "status": "modified",
+      "before": {
+        "path": "lib/tracing/node.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+        "size": 7106
+      },
+      "after": {
+        "path": "lib/tracing/node.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "00775a5928228262a66b12b845ee0dc18f6c6047",
+        "size": 7287
+      }
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448",
+        "size": 5930
+      },
+      "after": {
+        "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3ea4f1e0e3d336e0e8a8c69305931c08625789dd",
+        "size": 6016
+      }
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/src/adapters/codex.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e85815a955eaff56d7ac389c9d9722c64607345d",
+        "size": 51844
+      },
+      "after": {
+        "path": "packages/daemon/src/adapters/codex.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1c8ca694b2f3eec633fb71440970170485957703",
+        "size": 51989
+      }
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/src/anonymous-codex-spare.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "00f476c51799a68c4af5edc38d9a62c91aeea545",
+        "size": 11991
+      },
+      "after": {
+        "path": "packages/daemon/src/anonymous-codex-spare.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "080ddc3797f196d9db97d2790ccceb87f7ca1c4d",
+        "size": 12128
+      }
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-client.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/src/subscription-worker-client.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e8cf0150fc8ce0962a55ec9723b441abbfb41c02",
+        "size": 17361
+      },
+      "after": {
+        "path": "packages/daemon/src/subscription-worker-client.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cc1efb7058e1afc6a44ba6e224540886b1d9a378",
+        "size": 17598
+      }
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-timing.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/src/subscription-worker-timing.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a81384d2249da654d52f63d0c426d41d9145636e",
+        "size": 7219
+      },
+      "after": {
+        "path": "packages/daemon/src/subscription-worker-timing.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0461fec9a9cb63bc974169df605315839ab9d297",
+        "size": 9365
+      }
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-timing.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/src/subscription-worker-timing.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "622a0d39f562ff326dc42a4bd7af16b3d1c3d3e0",
+        "size": 9712
+      },
+      "after": {
+        "path": "packages/daemon/src/subscription-worker-timing.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "041dc0e73ef6446a37e73a50d7af977f0ad8da61",
+        "size": 12589
+      }
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c",
+        "size": 13467
+      },
+      "after": {
+        "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8ffd1fa642e7e3b22463c4127471f02a4e7eb6fd",
+        "size": 13662
+      }
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6a2e49857783a337e6be23ee53680b66e4f8a0bd",
+        "size": 14630
+      },
+      "after": {
+        "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6",
+        "size": 15067
+      }
+    },
+    {
+      "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+      "status": "modified",
+      "before": {
+        "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7d40937784ca75dffc01a9ee2cf4cb3948c4ecf5",
+        "size": 15132
+      },
+      "after": {
+        "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "14a9ca5d87eccbb5b6402ee4c8618e5654e5b54f",
+        "size": 15881
+      }
+    },
+    {
+      "path": "packages/subscription-worker/http_transport_timing.go",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "packages/subscription-worker/http_transport_timing.go",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4156c512311676d451eb61075095dd735386d246",
+        "size": 4421
+      }
+    },
+    {
+      "path": "packages/subscription-worker/http_transport_timing_test.go",
+      "status": "added",
+      "before": null,
+      "after": {
+        "path": "packages/subscription-worker/http_transport_timing_test.go",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "12d7c565a713d6bd85f05c0e87804c961af2e8bc",
+        "size": 4998
+      }
+    },
+    {
+      "path": "packages/subscription-worker/plain_model.go",
+      "status": "modified",
+      "before": {
+        "path": "packages/subscription-worker/plain_model.go",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3c42dc694dbecae63d3f899779d4d94e2a21a186",
+        "size": 12166
+      },
+      "after": {
+        "path": "packages/subscription-worker/plain_model.go",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5348116628941ea4252d5ccc004e49492b42d4ba",
+        "size": 12378
+      }
+    },
+    {
+      "path": "packages/subscription-worker/timing.go",
+      "status": "modified",
+      "before": {
+        "path": "packages/subscription-worker/timing.go",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f8debf6cc695c2603945b190ddd18bbc301be4a9",
+        "size": 5289
+      },
+      "after": {
+        "path": "packages/subscription-worker/timing.go",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b7931270db2b77a5d7fddf108bb059a3941c3684",
+        "size": 5728
+      }
+    },
+    {
+      "path": "packages/subscription-worker/timing_test.go",
+      "status": "modified",
+      "before": {
+        "path": "packages/subscription-worker/timing_test.go",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "71402e0d9d3121ab4c257bcfe23f313c102b53a1",
+        "size": 7531
+      },
+      "after": {
+        "path": "packages/subscription-worker/timing_test.go",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "da2288ca4598c5c0a9a03fe63f451b7fbb152169",
+        "size": 13357
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "status": "modified",
+      "before": {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+        "size": 24958
+      },
+      "after": {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+        "size": 25516
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "status": "modified",
+      "before": {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "58170f27b9586752ca966e377c9255ac6e6174a9",
+        "size": 26414
+      },
+      "after": {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+        "size": 29638
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "status": "modified",
+      "before": {
+        "path": "scripts/acceptance/run-observability.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "176e3aead0068d801f829dcadaafcd02a61e67a3",
+        "size": 19025
+      },
+      "after": {
+        "path": "scripts/acceptance/run-observability.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4ca2cf35c1f499b338469556836ae0505649e82a",
+        "size": 19730
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "status": "modified",
+      "before": {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+        "size": 59415
+      },
+      "after": {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "104075571c73b97a985458f206dba310e4894490",
+        "size": 69119
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "status": "modified",
+      "before": {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d",
+        "size": 55389
+      },
+      "after": {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+        "size": 94496
+      }
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "status": "modified",
+      "before": {
+        "path": "scripts/e2b/validate-template-subscriptions.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ee7564fe213ce3fba762fee8685eb9a4bb31329",
+        "size": 31628
+      },
+      "after": {
+        "path": "scripts/e2b/validate-template-subscriptions.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+        "size": 34092
+      }
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "status": "modified",
+      "before": {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a70f45e7395309a1cf93ae295e880e06ad521ef2",
+        "size": 57524
+      },
+      "after": {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "628395f91d97a64655afb80117788d70207200c0",
+        "size": 65889
+      }
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "status": "modified",
+      "before": {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f981a61d72fb9c0e153e490f89d7328fb014558e",
+        "size": 58655
+      },
+      "after": {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "30ef728a5a2d465d389916a63d40a816d13b1d4c",
+        "size": 84780
+      }
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "status": "modified",
+      "before": {
+        "path": "tests/analytics-policy.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+        "size": 25297
+      },
+      "after": {
+        "path": "tests/analytics-policy.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+        "size": 26926
+      }
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c006685c7862c1fd41197f3a786ecb399076aa8b",
+        "size": 28252
+      },
+      "after": {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "609029dde521868c00ab7eb687394ad5cacd6183",
+        "size": 32351
+      }
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "tests/coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "32a8321c981dd6a534f8859fa35f281e874466e6",
+        "size": 65832
+      },
+      "after": {
+        "path": "tests/coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+        "size": 86798
+      }
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "status": "modified",
+      "before": {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "960eb24ff24aba996a681bc47468290cf6200398",
+        "size": 16071
+      },
+      "after": {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351",
+        "size": 18747
+      }
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "status": "modified",
+      "before": {
+        "path": "tests/replay-readiness.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2c67bead9d3d211e58dd6a7a684d60139d7df16c",
+        "size": 6214
+      },
+      "after": {
+        "path": "tests/replay-readiness.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "58e4706039dafe6901082676f37a3c92da613d43",
+        "size": 7564
+      }
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "status": "modified",
+      "before": {
+        "path": "workflows/coordinator/factory-steps.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "665573940610341eea039de5fb2c02406c6ef3b7",
+        "size": 11826
+      },
+      "after": {
+        "path": "workflows/coordinator/factory-steps.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+        "size": 11913
+      }
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "status": "modified",
+      "before": {
+        "path": "workflows/coordinator/steps.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5002aebd9ed3df6047ccb3f7a083401c3cad34c3",
+        "size": 93353
+      },
+      "after": {
+        "path": "workflows/coordinator/steps.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+        "size": 93440
+      }
+    }
+  ],
+  "expectedConstruction": {
+    "baseline": "All6822 leaves of independently fetched and fully SHA1-verified b6 tree84e5.",
+    "main": "Apply the50 actual immutable main1c-vs12458 change paths, taking actual main leaf IDs/modes/sizes from its full verified6838-leaf tree.",
+    "mailbox": "Apply exactly the two7d-vs12458 changed paths; resolve each leaf directly from the fixed7d Git tree.",
+    "onlyOverlap": "Replace only issue-workspace.tsx with the independently recomputed complete actual-main file plus own original snapshot import/listTeams/listProjectTeams edits.",
+    "equality": "Every6840 expected path key and complete leaf metadata(path,mode,type,blob,size) matches actual. Rebuild all expected directory hashes bottom-up and require exact root a311; no missing/extra/path-prefix collision.",
+    "leafPathIdentityValidated": true
+  },
+  "uiComposition": {
+    "identities": {
+      "base": {
+        "gitBlob": "b043d5c09d02d5f675cd62d28e40bb8dc38b5060",
+        "sha256": "1729446b75be85a93c009adee62883f617334c1981ffa3464befc9bba0e3e2b8",
+        "bytes": 56571
+      },
+      "own": {
+        "gitBlob": "383e0446d95a3e490b8e1c808b6e325b0539faaf",
+        "sha256": "d22ee5554f1d942cf7aecd98c2e2398fdfb7ce36073de2e42c488e11ec0215cb",
+        "bytes": 56675
+      },
+      "main": {
+        "gitBlob": "6f031756fc13de69dc87fc011bb3696b5a15aa52",
+        "sha256": "17d7ad42bfd7d0f54c0f5326a289291268ff8c27f392fb45c593ce64bab58111",
+        "bytes": 58558
+      },
+      "combined": {
+        "gitBlob": "064b7cb66429d3219622637eaa4228596f98d54b",
+        "sha256": "40d9e39b440c3893080ea524a8d48048924d1b33ed949bf467dd7cff3565c0d0",
+        "bytes": 58662
+      }
+    },
+    "lineEditSegments": 2,
+    "edits": [
+      {
+        "baseStartLine": 50,
+        "newStartLine": 50,
+        "removed": [],
+        "added": [
+          "import { snapshotReadFetcher } from '@/lib/swr/read-observer'"
+        ]
+      },
+      {
+        "baseStartLine": 207,
+        "newStartLine": 208,
+        "removed": [
+          "  const { data: teams = [] } = useSWR('teams', listTeams, whileSettings)",
+          "  const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams, whileSettings)"
+        ],
+        "added": [
+          "  const { data: teams = [] } = useSWR('teams', snapshotReadFetcher(listTeams), whileSettings)",
+          "  const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', snapshotReadFetcher(listProjectTeams), whileSettings)"
+        ]
+      }
+    ],
+    "operations": [
+      {
+        "baseStartLine": 50,
+        "from": "import { useLiveBotChatList, useLiveBotRoster, useLiveGroupList, useLiveIssueList, useLiveThreadList } from '@/hooks/use-live-lists'\n",
+        "to": "import { useLiveBotChatList, useLiveBotRoster, useLiveGroupList, useLiveIssueList, useLiveThreadList } from '@/hooks/use-live-lists'\nimport { snapshotReadFetcher } from '@/lib/swr/read-observer'\n"
+      },
+      {
+        "baseStartLine": 207,
+        "from": "  const { data: teams = [] } = useSWR('teams', listTeams, whileSettings)\n  const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams, whileSettings)\n",
+        "to": "  const { data: teams = [] } = useSWR('teams', snapshotReadFetcher(listTeams), whileSettings)\n  const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', snapshotReadFetcher(listProjectTeams), whileSettings)\n"
+      }
+    ],
+    "baseToOwnExact": true,
+    "mainPlusOwnEditsEqualsActual": true,
+    "reverseActualEqualsEntireMain": true,
+    "expectedRootBytes": true,
+    "expectedRootSHA256": true
+  },
+  "uiReviewReused": {
+    "gitBlob": "1c8e549227692f78bb49d4d4cbed68dbc186a4dd",
+    "bytes": 70907,
+    "sha256": "db01e80e70aa7584eebdbdce811332a1658421f7688c54fdaff73eb22970d27a"
+  },
+  "mailboxBinding": {
+    "commit": "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f",
+    "tree": "ff016b56b9779a5e6387930648299acf2bc52f49",
+    "compareMergeBase": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "paths": [
+      {
+        "path": "packages/daemon/src/adapters/codex-mailbox.ts",
+        "entry": {
+          "path": "codex-mailbox.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "3ea4f1e0e3d336e0e8a8c69305931c08625789dd",
+          "size": 6016
+        },
+        "chain": [
+          {
+            "tree": "ff016b56b9779a5e6387930648299acf2bc52f49",
+            "entry": {
+              "path": "packages",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "1d31700f287aa7c9881d8e2077109214602afec7"
+            }
+          },
+          {
+            "tree": "1d31700f287aa7c9881d8e2077109214602afec7",
+            "entry": {
+              "path": "daemon",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "9a08745d3af83fab03966bd376758a9e3c5813db"
+            }
+          },
+          {
+            "tree": "9a08745d3af83fab03966bd376758a9e3c5813db",
+            "entry": {
+              "path": "src",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "d396e4e55371ed2e239ca7f180b36f6f1e202e6f"
+            }
+          },
+          {
+            "tree": "d396e4e55371ed2e239ca7f180b36f6f1e202e6f",
+            "entry": {
+              "path": "adapters",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "027abfcdbc50510394a61a207381962a15e2748a"
+            }
+          },
+          {
+            "tree": "027abfcdbc50510394a61a207381962a15e2748a",
+            "entry": {
+              "path": "codex-mailbox.ts",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "3ea4f1e0e3d336e0e8a8c69305931c08625789dd",
+              "size": 6016
+            }
+          }
+        ]
+      },
+      {
+        "path": "packages/daemon/test/codex-mailbox-resume.node-test.ts",
+        "entry": {
+          "path": "codex-mailbox-resume.node-test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "14a9ca5d87eccbb5b6402ee4c8618e5654e5b54f",
+          "size": 15881
+        },
+        "chain": [
+          {
+            "tree": "ff016b56b9779a5e6387930648299acf2bc52f49",
+            "entry": {
+              "path": "packages",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "1d31700f287aa7c9881d8e2077109214602afec7"
+            }
+          },
+          {
+            "tree": "1d31700f287aa7c9881d8e2077109214602afec7",
+            "entry": {
+              "path": "daemon",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "9a08745d3af83fab03966bd376758a9e3c5813db"
+            }
+          },
+          {
+            "tree": "9a08745d3af83fab03966bd376758a9e3c5813db",
+            "entry": {
+              "path": "test",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "8c66d44fdbed9160145c247b8703f9c91e55e5d1"
+            }
+          },
+          {
+            "tree": "8c66d44fdbed9160145c247b8703f9c91e55e5d1",
+            "entry": {
+              "path": "codex-mailbox-resume.node-test.ts",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "14a9ca5d87eccbb5b6402ee4c8618e5654e5b54f",
+              "size": 15881
+            }
+          }
+        ]
+      }
+    ],
+    "verifiedPathTreeCount": 6,
+    "semanticsReviewedSeparatelyByAcceptanceAgent": true,
+    "semanticProofProvidedByRoot": "720cf452949abb7a014b485515c6669368e83971",
+    "semanticProofNotRecomputedHere": true
+  },
+  "nativeContractPreservation": {
+    "allListedProtectedBlobsEqualB6": true,
+    "lifecycle": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+    "queryCounts": "39e1facecdf28a661511f72e14580fdb4b1ae967",
+    "unattributedSources": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+    "acceptanceDriver": "104075571c73b97a985458f206dba310e4894490",
+    "browserDriver": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+    "traceWorkflow": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+    "meaning": "The existing Native four-window/FIRST-pair/query-budget/unknown handling harness and listed trace/read/journal/driver contracts remain their original blobs. No numeric historical result or window is rewritten. The authorized UI parity-settings-ready test change remains among the actual50 main paths; it is not described as an unchanged harness file."
+  },
+  "history": {
+    "ordinaryFourParentMerge": true,
+    "ownFirstParent": true,
+    "publishedBatchOriginalHistoryRetained": true,
+    "publishedBatchOriginalParents": [
+      "ed60885d317240303d496b3bddfcf9a49caf4139",
+      "205d26db8f8435ab18ce74d1b14c9669550098e4",
+      "98a0db9e8ec4264eb641e7fd36c25e344a124cf2"
+    ],
+    "uiMainHistoryRetained": true,
+    "mailboxOriginalCommitRetained": true,
+    "authorAndAncestorObjectsUnmodified": true,
+    "noSyntheticAppShaRuntimeShaGate": true
+  },
+  "reproducibility": {
+    "recursiveTreeVerifier": "function verifyRecursiveTree(t,verifyTree,utf8,sha1){\n if(t.truncated||!Array.isArray(t.tree))throw Error(\"truncated recursive tree\");\n const byPath=new Map(),groups=new Map([[\"\",[]]]),directorySha=new Map([[\"\",t.sha]]),typeCounts={};\n for(const e of t.tree){\n  if(!e.path||e.path.startsWith(\"/\")||e.path.endsWith(\"/\")||e.path.split(\"/\").some(x=>!x||x===\".\"||x===\"..\")||byPath.has(e.path))throw Error(\"invalid/duplicate path \"+e.path);\n  byPath.set(e.path,e);typeCounts[e.type]=(typeCounts[e.type]||0)+1;\n  if(e.type===\"tree\"){groups.set(e.path,[]);directorySha.set(e.path,e.sha);}\n }\n for(const e of t.tree){\n  const slash=e.path.lastIndexOf(\"/\"),parent=slash<0?\"\":e.path.slice(0,slash),name=e.path.slice(slash+1);\n  if(!groups.has(parent))throw Error(\"missing parent or prefix collision \"+e.path);\n  groups.get(parent).push({...e,path:name});\n }\n const verified=[];\n for(const [path,children]of groups){const sha=directorySha.get(path);const v=verifyTree({sha,truncated:false,tree:children},utf8,sha1);verified.push({path,sha,children:children.length,verified:v.verified});}\n const leaves=t.tree.filter(e=>e.type!==\"tree\").map(({path,mode,type,sha,size})=>({path,mode,type,sha,...(size===undefined?{}:{size})})).sort((a,b)=>a.path.localeCompare(b.path,\"en\"));\n return {root:t.sha,entries:t.tree.length,leafCount:leaves.length,directoryCount:groups.size,duplicatePaths:0,missingParents:0,prefixCollisions:0,typeCounts,allTreeHashesVerified:true,verifiedDirectories:verified,leaves};\n}",
+    "treeHasherFromPriorProof": "function verifyTree(t,utf8,sha1){\n if(t.truncated||!Array.isArray(t.tree))throw Error(\"truncated/missing tree\");\n const encoded=t.tree.map(e=>({e,key:utf8(e.path+(e.type===\"tree\"?\"/\":\"\"))})).sort((a,b)=>{const n=Math.min(a.key.length,b.key.length);for(let i=0;i<n;i++)if(a.key[i]!==b.key[i])return a.key[i]-b.key[i];return a.key.length-b.key.length});\n let b=[];for(const {e} of encoded){b.push(...utf8(e.mode.replace(/^0+/,\"\")+\" \"+e.path+\"\\0\"));for(let i=0;i<40;i+=2)b.push(parseInt(e.sha.slice(i,i+2),16));}\n const actual=sha1(utf8(\"tree \"+b.length+\"\\0\").concat(b));if(actual!==t.sha)throw Error(\"tree SHA mismatch \"+t.sha+\" != \"+actual);\n return {sha:t.sha,verified:true,entries:t.tree.map(({path,mode,type,sha,size})=>({path,mode,type,sha,...(size===undefined?{}:{size})}))};\n}",
+    "sourceComposition": "See exact stored own edits/operations; both forward complete-file equality and reverse-to-entire-upstream equality passed.",
+    "manifest": "JSONL header followed by all7713 actual tree entries, including all6840 leaves and873 subtree entries. All expected entries equal actual."
+  },
+  "boundaries": {
+    "testsRun": 0,
+    "ciOriginalLogsRead": 0,
+    "ciZipsRead": 0,
+    "resourcesStarted": 0,
+    "resourcesRemaining": 0,
+    "refsUpdated": 0,
+    "ciTriggered": 0,
+    "sourceTreesCreated": 0,
+    "sourceCommitsCreated": 0,
+    "sourceBlobsCreated": 0,
+    "otherPRsMerged": 0,
+    "mainChanged": 0,
+    "productionActions": 0,
+    "historicalNativeRelabelled": false,
+    "newRuntimeCertified": false,
+    "extraApprovalGate": false,
+    "evidenceObjectsOnly": true
+  },
+  "manifestReadback": {
+    "fullTextEqual": true,
+    "bytes": 823828,
+    "sha256": "3a45030142602314527acb760d944852243237760c4727dd18c8baf43698ffb5",
+    "gitBlob": "0d34c46715f6602f832fd4d45dc177aff3bdc759"
+  }
+}

@@ -1,0 +1,216 @@
+{
+  "schema": "issue1512.d2c3.publication-receipt.v1",
+  "observedAtUtc": "2026-11-09 22:01:08 UTC",
+  "source": {
+    "sha": "d2c3f63448130443e3e10bb5304417162f585776",
+    "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "parents": [
+      "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "9f1429343d5fafff2cdf9a473ebec43f07e61721",
+      "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f",
+      "1c7698655405b289d7fdbd814713d15e542cc2bb"
+    ],
+    "published": true,
+    "observedAt": "2026-11-09 21:56:43 UTC",
+    "branch": "fix/1512-daemon-fixture-executable-20261109",
+    "expectedBefore": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+    "force": false,
+    "CAS": {
+      "success": true
+    },
+    "refReadback": "d2c3f63448130443e3e10bb5304417162f585776",
+    "rootProof": "9b40a2a34dbde83d82cb6b34f767e1967bb4806f",
+    "independentProof": "d7a637a24b3f1b46f2802555a590a27cf83da971"
+  },
+  "pullRequest": {
+    "number": 1799,
+    "state": "open",
+    "head": "d2c3f63448130443e3e10bb5304417162f585776",
+    "bodyUpdatedAt": "2026-11-09T21:56:43Z",
+    "bodyReadbackExact": true,
+    "bodySnapshot": "c32710d55832caa709f049ee1588f2b666a35fa1"
+  },
+  "syntheticMerge": {
+    "sha": "3bc095c100537563296186fc3d4cc4d60b59b698",
+    "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "parents": [
+      "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "d2c3f63448130443e3e10bb5304417162f585776"
+    ],
+    "actualJobCheckout": "unknown_pending_original_job_log"
+  },
+  "workflowDiscovery": {
+    "total": 12,
+    "items": [
+      {
+        "id": 42707257858,
+        "name": "Site search read contract",
+        "path": ".github/workflows/site-search.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:45Z"
+      },
+      {
+        "id": 42707256896,
+        "name": "Workspace governance acceptance",
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:45Z"
+      },
+      {
+        "id": 42707258434,
+        "name": "Cloud computer backend",
+        "path": ".github/workflows/cloud-computer.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:45Z"
+      },
+      {
+        "id": 42707256414,
+        "name": "Device gateway",
+        "path": ".github/workflows/device-gateway.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:44Z"
+      },
+      {
+        "id": 42707256520,
+        "name": "Local device Node 22",
+        "path": ".github/workflows/local-device-node22.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:44Z"
+      },
+      {
+        "id": 42707256455,
+        "name": "Unattended sandbox acceptance",
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:44Z"
+      },
+      {
+        "id": 42707256278,
+        "name": "Browser gate",
+        "path": ".github/workflows/browser-gate.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:44Z"
+      },
+      {
+        "id": 42707256395,
+        "name": "Read cache API acceptance",
+        "path": ".github/workflows/read-cache.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:44Z"
+      },
+      {
+        "id": 42707256401,
+        "name": "E2B additive runtime release",
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:44Z"
+      },
+      {
+        "id": 42707256422,
+        "name": "CI",
+        "path": ".github/workflows/ui-policy.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:44Z"
+      },
+      {
+        "id": 42707256524,
+        "name": "E2B subscription custody",
+        "path": ".github/workflows/e2b-byos.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:44Z"
+      },
+      {
+        "id": 42707256513,
+        "name": "SSH device backend",
+        "path": ".github/workflows/ssh-device-backend.yml",
+        "head": "d2c3f63448130443e3e10bb5304417162f585776",
+        "attempt": 1,
+        "status": "queued",
+        "conclusion": null,
+        "createdAt": "2026-11-09T21:56:44Z"
+      }
+    ],
+    "completedResults": "not_yet_available",
+    "statusMeaning": "Initial discovery snapshot; not a claim that these statuses remain current at receipt creation.",
+    "snapshotReadNoLaterThanUtc": "2026-11-09 21:57:43 UTC"
+  },
+  "comments": [
+    {
+      "issue": 1512,
+      "id": 6752535997,
+      "createdAt": "2026-11-09T21:57:24Z",
+      "readbackExact": true
+    },
+    {
+      "issue": 1752,
+      "id": 6752540209,
+      "createdAt": "2026-11-09T21:57:36Z",
+      "readbackExact": true
+    }
+  ],
+  "readerAssignments": {
+    "root": [
+      "Changes",
+      "Integration",
+      "Daemon",
+      "PR E2B",
+      "strict",
+      "DB summary"
+    ],
+    "current_source_review": [
+      "Source",
+      "Core",
+      "PG 3/4",
+      "PG 4/4"
+    ],
+    "native_6180_review": [
+      "Native job original log",
+      "Native artifact ZIP originals"
+    ],
+    "metadataCoordination": "Native reader monitors main CI; source reader pauses duplicate periodic reads; root independently verifies final metadata"
+  },
+  "productionCases": 0,
+  "mainMovedByRoot": false,
+  "productionWindowClaimed": false,
+  "ownedVMs": 0,
+  "ownedPGServices": 0,
+  "limitations": [
+    "CI/workflow creation is not execution success",
+    "old84ce Native budget does not qualify changed UI source",
+    "synthetic Git commit is not actual job checkout evidence",
+    "no private overlay source or final public app/overlay/runtime tuple verified in this checkpoint"
+  ]
+}
