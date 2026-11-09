@@ -1209,6 +1209,9 @@
     "projectIssueAlreadyLinked": "A task can belong to only one project. Remove it from the original project first.",
     "projectIssuesSaveFailed": "Could not link tasks. Check your access and try again.",
     "workspaceAccessDenied": "You do not have permission to manage this workspace, or your membership is suspended.",
+    "taskWorkspaceUnresolved": "This resource has no verified workspace. Select a workspace for a new resource, or ask an administrator to resolve its recorded ownership.",
+    "taskWorkspaceMismatch": "The task, thread, artifact and Agent must belong to the same workspace. Choose resources from the current workspace.",
+    "taskWorkspaceTransferDenied": "A task cannot be moved between workspaces. Its workspace is fixed when it is created.",
     "workspaceNotFound": "No accessible workspace.",
     "workspacePaymentTaken": "Another member's card already pays for this team.",
     "workspacePersonal": "A personal workspace has only you. To invite people, create a shared workspace.",
@@ -5800,9 +5803,6 @@
     "activity": "Activity",
     "comment": "+ Comment",
     "conversation": {
-      "switched": "Continued with {agent}",
-      "switchedAfterFailure": "{previous} didn't get through · continued with {agent}",
-      "switchedTo": "Switched to {agent}",
       "fix": "Fix",
       "needsYou": "Needs you: {what}",
       "verdicts": {

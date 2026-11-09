@@ -1,3 +1,4 @@
+import { actingContext } from '@/lib/activity-actor';
 import { remoteKey } from "@mikka/protocol/repository";
 import { factoryChanged } from "../../live/factory";
 import { runChanged } from "../../live/panels";
@@ -275,11 +276,20 @@ export function createFactoryQuestions(
         : null };
   }
   return {
-    /** Newest 50 pending questions of this user; `runId` (origin or continuation) is filtered in SQL, before the cap. */
+    /** The tenant and optional run are filtered in SQL before the newest-50 cap. */
     async pending(userId: string, runId?: string, readScope: "bot" | "user" = "bot") {
+      const actor = actingContext.getStore();
+      const workspaceId = actor?.userId === userId ? actor.tokenWorkspaceId : undefined;
       const { rows } = await pool.query(
-        "SELECT id FROM factory_questions WHERE \"userId\"=$1 AND status IN ('open','waiting_user','resuming','blocked') AND NOT (status IN ('open','waiting_user') AND \"expiresAt\" IS NOT NULL AND \"expiresAt\"<=clock_timestamp()) AND ($2::uuid IS NULL OR \"originRunId\"=$2::uuid OR \"continuationRunId\"=$2::uuid) ORDER BY \"createdAt\" DESC, id DESC LIMIT 50",
-        [userId, runId ?? null],
+        `SELECT q.id FROM factory_questions q
+          JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId" AND t."issueId"=q."issueId"
+          JOIN issues i ON i.id=t."issueId" AND i."ownershipState"='bound' AND i."workspaceId"=t."workspaceId"
+          WHERE q."userId"=$1 AND q.status IN ('open','waiting_user','resuming','blocked')
+            AND NOT (q.status IN ('open','waiting_user') AND q."expiresAt" IS NOT NULL AND q."expiresAt"<=clock_timestamp())
+            AND ($2::uuid IS NULL OR q."originRunId"=$2::uuid OR q."continuationRunId"=$2::uuid)
+            AND ($3::uuid IS NULL OR t."workspaceId"=$3::uuid)
+          ORDER BY q."createdAt" DESC, q.id DESC LIMIT 50`,
+        [userId, runId ?? null, workspaceId ?? null],
       );
       const result = [];
       for (const row of rows) {

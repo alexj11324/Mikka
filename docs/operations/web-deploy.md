@@ -107,11 +107,15 @@ requires it.
 
 The official runtime workflow keeps its existing disposable-instance validation,
 worker hash, measured model catalogue and unchanged-file proofs. After validation,
-a read-only job waits up to 40 minutes for the same source's latest Web run to
+a read-only job waits up to 90 minutes for the same source's latest Web run to
 succeed, including its actual build/upload/version steps, and for the public
-version to match. A docs-only skipped build cannot satisfy this gate. If `main`
-advances, the old release stops. This wait is outside the shared deployment queue
-so it cannot block the Web job it is waiting for.
+version to match. The job has a 95-minute limit. This budget allows for an active
+Web build followed by a queued build; each Web deploy job has a 45-minute limit.
+The latest matching run must succeed even when an older run already succeeded.
+A failed, cancelled or skipped run cannot satisfy this gate. If `main` advances,
+the old release stops. This wait is outside the shared deployment queue so it
+cannot block the Web job it is waiting for. Desktop's Web wait and direct callers
+keep their existing 40-minute default.
 
 Changes to the two release workflows, `scripts/release/web-deploy.mjs` or
 `scripts/e2b/publish-template-env.mjs` also require the full runtime validation

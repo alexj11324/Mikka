@@ -99,7 +99,7 @@ stub('../attention/store.ts', {
 })
 stub('../agent-runs.ts', { addRunMessage: forbidden, queueRun: forbidden, queueFactoryRun: forbidden, readRun: forbidden, requestRunStop: forbidden, visibleRuns: forbidden })
 stub('../issue-visibility.ts', { issueVisibility: forbidden })
-stub('../issue-access.ts', { issueForUser: forbidden })
+stub('../issue-access.ts', { issueForUser: forbidden, requireUser: forbidden })
 stub('../task-identifier-server.ts', { taskIdentifiers: forbidden, taskPrefixInput: forbidden, issueView: forbidden })
 stub('../artifacts/store.ts', { artifactSummaries: forbidden })
 stub('./bot-instructions.ts', { botInstructions: forbidden })
@@ -108,7 +108,10 @@ stub('./github-context.ts', { githubPromptContext: async () => 'Synthetic author
 stub('./summary-model.ts', { summarizeConversation: forbidden })
 stub('../personal-mailbox-config.ts', { personalMailboxEnabled: () => false })
 stub('../search/index.ts', { webSearch: forbidden })
-stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synthetic-unused' })
+// The real prompt/tool graph imports session helpers; reading preferences must never authenticate.
+const unexpectedAuth = () => { throw new Error('Unexpected authentication or OAuth effect in pure prompt fixture') }
+stub('../auth.ts', { auth: new Proxy({}, { get: unexpectedAuth }), authBaseURL: 'https://auth-fixture.example.invalid' })
+stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synthetic-unused', issueDeviceToken: unexpectedAuth })
 stub('../composio.ts', { runComposioAction: forbidden })
 stub('../github/user-access.ts', { readAuthorizedIssue: forbidden })
 stub('../pending-action-store.ts', { proposeAction: forbidden, writeAccountAction: forbidden, proposeRepositoryPush: forbidden })

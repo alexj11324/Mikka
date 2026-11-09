@@ -21,6 +21,12 @@ mock.module(new URL('./computer/native-run-binding.ts', import.meta.url).href, {
   nativeRunBinding: async () => ({ ...subscription, workspaceId: id(2), consumerId: id(21), route: 'claude_code_cli' }),
 } })
 mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: {
+  // These source-selection cases have no Profile. Import the full storage
+  // boundary, but fail if they unexpectedly start Workspace authorization.
+  workspaceDb: {
+    select: () => { throw new Error('Unexpected Workspace selection in credential-source fixture') },
+    transaction: async () => { throw new Error('Unexpected Workspace transaction in credential-source fixture') },
+  },
   workspacePool: { query: async (sql: string, args: unknown[]) => {
     assert.match(sql, /FROM mikka_workspace_members/)
     assert.deepEqual(args, [id(2), ['alice']])

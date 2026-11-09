@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../tests/helpers/task-workspace'
 import { runMessagePrompt } from './run-message-prompt'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -36,8 +37,9 @@ dbTest('one read of a device\'s runs finds its stops, messages and queued runs',
     await pool.query(`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values ($1, 'Device work fixture', $1 || '@example.invalid', false, now(), now())`, [owner])
     await pool.query(`insert into devices (id, name, "ownerId") values ($1, 'mine', $3), ($2, 'other', $3)`, [device, other, owner])
     await pool.query(`insert into agents (id, "userId", harness, name) values ($1, $2, 'codex', 'a')`, [agent, owner])
+    const workspaceId = await seedFixtureWorkspace(pool, owner)
     const run = (id: string, deviceId: string, status: string, stop = false) => pool.query(
-      `insert into agent_runs (id, "agentId", "userId", "deviceId", status, "stopRequestedAt") values ($1, $2, $3, $4, $5, ${stop ? 'now()' : 'null'})`, [id, agent, owner, deviceId, status])
+      `insert into agent_runs (id, "agentId", "userId", "deviceId", "workspaceId", status, "stopRequestedAt") values ($1, $2, $3, $4, $6, $5, ${stop ? 'now()' : 'null'})`, [id, agent, owner, deviceId, status, workspaceId])
     await run(ids.queued, device, 'queued')
     await run(ids.skippedQueued, device, 'queued')
     await run(ids.stopping, device, 'running', true)
@@ -79,12 +81,13 @@ dbTest('the idle check answers in one statement, finds the same work and pending
     await pool.query(`insert into devices (id, name, "ownerId") values ($1, 'mine', $2)`, [device, owner])
     await pool.query(`insert into device_tokens (id, "userId", "tokenHash") values ($1, $2, $3)`, [tokenId, owner, randomUUID()])
     await pool.query(`insert into agents (id, "userId", harness, name) values ($1, $2, 'codex', 'a')`, [agent, owner])
+    const workspaceId = await seedFixtureWorkspace(pool, owner)
     const idle = (options: { queued?: boolean; mailboxNotices?: boolean; skipDeviceCommands?: string[] } = {}, skip: string[] = []) =>
       withDeviceDatabaseAuthority({ tokenId, userId: owner }, () => deviceMayHaveWork(device, skip, options))
     const check = async (options: { queued?: boolean; mailboxNotices?: boolean } = {}, skip: string[] = []) => (await idle(options, skip)).work
 
     assert.equal(await check({ queued: true }), false, 'no runs: nothing to read')
-    await pool.query(`insert into agent_runs (id, "agentId", "userId", "deviceId", status) values ($1, $2, $3, $4, 'queued')`, [run, agent, owner, device])
+    await pool.query(`insert into agent_runs (id, "agentId", "userId", "deviceId", "workspaceId", status) values ($1, $2, $3, $4, $5, 'queued')`, [run, agent, owner, device, workspaceId])
     assert.equal(await check({ queued: true }), true, 'a queued run')
     assert.equal(await check({ queued: false }), false, 'scheduling off: a queued run is not work')
     assert.equal(await check({ queued: true }, [run, 'not-a-uuid']), false, 'a skipped run is not work')

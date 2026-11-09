@@ -28,6 +28,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   const { sendThreadMessage } = await import('../lib/thread-continue')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
+  const { withTaskWorkspace } = await import('../lib/task-workspace')
   const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
   const users: string[] = []
   const github = githubAppStub()
@@ -65,7 +66,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
       [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
-    const issueId = await seedIssue(pool, id)
+    const issueId = await seedIssue(pool, id, ws.id)
     await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 2000 + users.length } } })])
     // A computer that takes part (参与调度) and runs gpt-5.
     const deviceId = randomUUID()
@@ -105,7 +106,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.deepEqual(await sendThreadMessage(b.id, initial.runId, text, 'user', requestId), accepted)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_messages WHERE id=$1', [eventId])).rows[0].n, 1)
     await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Changed payload.', 'user', requestId), { code: 'submissionConflict' })
-    const otherIssue = await seedIssue(pool, b.id)
+    const otherIssue = await seedIssue(pool, b.id, b.ws.id)
     await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [otherIssue, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 9000 + users.length } } })])
     const other = await steps.dispatchRun(b.id, { issueId: otherIssue, repo: 'octo/repo', requestKey: `other:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     assert.ok(other.runId, JSON.stringify(other))
@@ -198,13 +199,16 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       const questions = factoryRuntimeForBot(legacyNullScope ? null : b.botId).questions
       // Exercise the same host claim gate that admitted the production run.
       // A task's chat Bot may send work to another owned Bot in its workspace.
-      const claimTx = await pool.connect()
-      try {
-        await claimTx.query('BEGIN')
-        const originalClaim = await factoryRuntimeForBot(legacyNullScope ? null : b.botId).claim(claimTx, b.id, childDevice, initial.runId, new Date(Date.now() + 60_000).toISOString())
-        assert.equal(originalClaim.preserveQuestionWorktree, true)
-        await claimTx.query('ROLLBACK')
-      } finally { claimTx.release() }
+      await withTaskWorkspace(b.id, b.ws.id, async () => {
+        const claimTx = await pool.connect()
+        try {
+          await claimTx.query('BEGIN')
+          const originalClaim = await factoryRuntimeForBot(legacyNullScope ? null : b.botId).claim(claimTx, b.id, childDevice, initial.runId, new Date(Date.now() + 60_000).toISOString())
+          assert.equal(originalClaim.preserveQuestionWorktree, true)
+        } finally {
+          try { await claimTx.query('ROLLBACK') } finally { claimTx.release() }
+        }
+      })
       const questionId = randomUUID(), sessionId = randomUUID(), nativeSessionId = `native:${initial.runId}`
       await pool.query(`INSERT INTO "session" (id,"userId",token,"expiresAt","createdAt","updatedAt")
         VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [sessionId, b.id, `fixture-${randomUUID()}`])
@@ -234,12 +238,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       if (scope === 'separate-runtime') {
         const otherWorkspace = await seedWorkspace(pool, b.id, [{ userId: b.id, role: 'admin' }])
         const otherChatBot = await seedBot(pool, otherWorkspace.id, b.id, 'Question in another workspace')
-        await pool.query('UPDATE factory_tasks SET "botId"=$2 WHERE id=$1', [task.id, otherChatBot])
-        await pool.query('UPDATE coordinator_events SET "botId"=$2 WHERE id=$1', [task.sourceEventId, otherChatBot])
-        await assert.rejects(sendThreadMessage(b.id, initial.runId, text, human), /factoryQuestionContinuationUnavailable|factoryNotFound/)
-        await pool.query('UPDATE factory_tasks SET "botId"=$2 WHERE id=$1', [task.id, b.botId])
-        await pool.query('UPDATE coordinator_events SET "botId"=$2 WHERE id=$1', [task.sourceEventId, b.botId])
-        assert.deepEqual(await snapshot(), before, 'the task chat Bot cannot borrow a runtime in another workspace')
+        await assert.rejects(pool.query('UPDATE factory_tasks SET "botId"=$2 WHERE id=$1', [task.id, otherChatBot]), /taskWorkspaceMismatch/)
+        assert.deepEqual(await snapshot(), before, 'the database refuses a task chat Bot from another workspace before continuation')
       }
 
       const requestId = randomUUID()
@@ -381,9 +381,22 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       assert.equal((await questionExecutionContinuation(pool, current, producerAttemptId))?.sourceRunId, origin.id)
       const otherWorkspace = await seedWorkspace(pool, b.id, [{ userId: b.id, role: 'admin' }])
       const otherBot = await chatBotId(b.id, null, otherWorkspace.id)
+      const lineage = async () => (await pool.query('SELECT "userId","workspaceId","issueId","continuesRunId","questionContinuation",status FROM agent_runs WHERE id=$1', [next.id])).rows[0]
+      const beforeLineage = await lineage()
+      for (const [label, statement, args] of [
+        ['another owner predecessor', 'UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [next.id, first.runId]],
+        ['missing question origin', `UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{originRunId}',to_jsonb($2::text)) WHERE id=$1`, [next.id, randomUUID()]],
+      ] as [string, string, unknown[]][]) {
+        await assert.rejects(pool.query(statement, args), { code: '23514' }, label)
+        assert.deepEqual(await lineage(), beforeLineage, `${label}: the rejected write changes no run authority`)
+        assert.deepEqual(JSON.parse(await producerCommandObservations(pool, current, candidate)), result,
+          `${label}: the admitted same-tenant question evidence stays intact`)
+      }
       const corruptions: [string, string, unknown[]][] = [
-        ['explicit conflicting predecessor', 'UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [next.id, first.runId]],
-        ['wrong origin payload', `UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{originRunId}',to_jsonb($2::text)) WHERE id=$1`, [next.id, randomUUID()]],
+        // These rows exist in the same owner/task/tenant. The question receipt
+        // must still reject a self-cycle or an origin other than its real parent.
+        ['explicit conflicting predecessor', 'UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [next.id, next.id]],
+        ['wrong origin payload', `UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{originRunId}',to_jsonb($2::text)) WHERE id=$1`, [next.id, next.id]],
         ['missing receipt', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, factoryEventId('question-resume', answered.answerId!)]],
         ['wrong answer fingerprint', `UPDATE factory_questions SET "answerFingerprint"='changed' WHERE id=$1`, [questionId]],
         ['different actual SID', 'UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [next.id, 'different-native-session']],
@@ -756,8 +769,10 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"botId","agentDefinition") SELECT $1,"userId","issueId","agentId","deviceId","deviceRepoId",'queued',$2,"botId","agentDefinition" FROM agent_runs WHERE id=$3`, [repairId, 'Historical issue: ' + JSON.stringify(oldText), sent.runId])
       return { runId: repairId }
     })
-    await dispatch(b.id, { binding: factoryBinding(repairingTask), agentId: execution.agentId, deviceRepoId: execution.deviceRepoId })
-    assert.equal((await dispatch(b.id, { binding: factoryBinding(repairingTask), agentId: execution.agentId, deviceRepoId: execution.deviceRepoId })).runId, repairId)
+    const dispatchRepair = () => withTaskWorkspace(b.id, b.ws.id, () =>
+      dispatch(b.id, { binding: factoryBinding(repairingTask), agentId: execution.agentId, deviceRepoId: execution.deviceRepoId }))
+    await dispatchRepair()
+    assert.equal((await dispatchRepair()).runId, repairId)
     assert.equal(repairQueues, 1, 'same automatic repair/source replay does not queue another execute')
     const repaired = (await pool.query('SELECT t."sourceEventId",r.prompt FROM factory_tasks t JOIN agent_runs r ON r.id=$2 WHERE t.id=$1', [task.id, repairId])).rows[0]
     assert.equal(repaired.sourceEventId, event.id)

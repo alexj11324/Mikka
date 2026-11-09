@@ -174,7 +174,7 @@ async function notifyHistory(executor: Pick<typeof db, 'select'>, userId: string
 }
 
 /** The Decisions API's settlement for matters the Coordinator left undecided; no answer snoozes it to be asked again. */
-async function settlements(userId: string, matters: readonly Matter[], now: Date, call: AttentionDecide) {
+async function settlements(userId: string, matters: readonly (MatterSummary & Pick<Matter, 'userId'>)[], now: Date, call: AttentionDecide) {
   const notified = await notifyHistory(db, userId, now)
   return Promise.all(matters.map(async matter => {
     const answers = await call(userId, 'attention-settle', settleInput(brief(matter, now), notified, now), settleQuestions())
@@ -207,7 +207,7 @@ export async function releaseAttention(userId: string, now = new Date(), call: A
   if (!await attentionEnabled(userId)) return false
   // Only once the Coordinator read it: a handoff still in the inbox waits for the next turn.
   const delivered = sql`exists (select 1 from ${coordinatorEvents} where ${coordinatorEvents.userId} = ${userId} and ${coordinatorEvents.dedupeKey} = 'matter_handoff:' || ${attentionMatters.id} || ':' || ${attentionMatters.handoffs} and ${coordinatorEvents.deliveredAt} is not null)`
-  const stale = await db.select().from(attentionMatters)
+  const stale = await db.select({ ...briefColumns, userId: attentionMatters.userId }).from(attentionMatters)
     .where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'handed'), lte(attentionMatters.handedAt, new Date(now.getTime() - HANDED_STALE_MS)), delivered))
   const settled = stale.length ? await settlements(userId, stale, now, call) : []
   const waiting = await db.transaction(async tx => {

@@ -68,13 +68,18 @@ export function automaticFactoryDispatch(pool: Pool) {
       if (!queued) throw new FactoryError('factoryCheckBindingMismatch')
       assertRecoveredCheck(checkStart, queued, queued.checkAssignment)
     }
-    const { rows: [source] } = await tx.query(`SELECT r.*,repo."remoteUrl",d.kind AS "deviceKind",b."botId" AS "runtimeBotId",b."workspaceId",COALESCE(r."agentDefinition"->>'harness',a.harness) AS harness
+    const { rows: [source] } = await tx.query(`SELECT r.*,repo."remoteUrl",d.kind AS "deviceKind",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId",COALESCE(r."agentDefinition"->>'harness',a.harness) AS harness
       FROM factory_attempts f JOIN agent_runs r ON r.id=f."runId"
       JOIN agents a ON a.id=r."agentId" JOIN devices d ON d.id=r."deviceId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId"
       LEFT JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       WHERE f."taskId"=$1 AND f.stage IN ('execute','spec') ORDER BY f.position DESC LIMIT 1`, [task.id])
-    if (!source) throw new FactoryError('factoryRunMismatch')
+    const workspaceId = task.workspaceId
+    // The runtime join must not shadow the run's persisted tenant (it is
+    // absent for local runs). Every later role and recovery selection keeps
+    // the task/run tenant, including a botless shared task.
+    if (!source || !workspaceId || source.workspaceId !== workspaceId || source.userId !== task.userId || source.issueId !== task.issueId ||
+      (source.deviceKind === 'cloud' && source.runtimeWorkspaceId !== workspaceId)) throw new FactoryError('factoryRunMismatch')
     const check = task.stage !== 'execute'
     const checkStage = task.stage === 'review' || task.stage === 'verify' ? task.stage : undefined
     const candidateId = task.candidateId
@@ -116,7 +121,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       }
     }
     let profileChoice = selectStageProfile && !checkStart ? await (await import('./agent-profile')).resolveAgentProfileDispatch(pool, {
-      ownerId: task.userId, workspaceId: source.workspaceId ?? await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId), botId: task.botId,
+      ownerId: task.userId, workspaceId, botId: task.botId,
     }, { issueId: task.issueId, stage: task.stage, location: source.deviceKind === 'cloud' ? 'cloud' : 'local',
       defaultHarness: source.harness, cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
       ...(source.agentDefinition?.pinnedDeviceId ? { deviceId: source.agentDefinition.pinnedDeviceId } : {}),
@@ -143,7 +148,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       [task.id, pending?.position, task.sourceEventId, source.id])
       if (failed) {
         const scope = {
-          ownerId: task.userId, workspaceId: source.workspaceId ?? await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId), botId: task.botId,
+          ownerId: task.userId, workspaceId, botId: task.botId,
         }
         let target = await (await import('@/lib/model-dispatch')).resolveModelDispatch(pool, scope, null, source.deviceKind === 'cloud' ? 'cloud' : 'local', source.agentDefinition.pinnedDeviceId, {
           cloudPurpose: source.remoteUrl ? 'task' : 'desktop', bindSubscription: false,
@@ -190,7 +195,6 @@ export function automaticFactoryDispatch(pool: Pool) {
       [task.userId, source.deviceId, source.harness, DAEMON_PROTOCOL_VERSION])
       const online = await deviceOnlineStates(candidates.map(c => ({ id: c.deviceId, lastSeenAt: c.lastSeenAt })))
       const targets = candidates.filter(c => online.get(c.deviceId)).slice(0, 5)
-      const workspaceId = await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId)
       let selected = false
       const profile = source.agentDefinition?.agentProfile
       const exactEntry = profile?.definition.model.mode === 'fixed' ? profile.targetEntry

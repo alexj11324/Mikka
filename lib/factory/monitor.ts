@@ -1,3 +1,4 @@
+import type { FactoryWorkspaceBoundary } from './background-workspace';
 import { randomUUID } from "node:crypto";
 import { wakeCoordinatorAfterCommit } from "../coordinator/wake-after-commit";
 import { factoryCheckIndependent } from "./check-independence";
@@ -203,6 +204,7 @@ export function createFactoryMonitor(
   ) => Promise<void> = async () => {},
   probes: MonitorProbeAdapter[] = [],
   botId: string | null = null,
+  withWorkspace?: FactoryWorkspaceBoundary,
 ) {
   async function consume(
     userId: string,
@@ -212,6 +214,7 @@ export function createFactoryMonitor(
     const parsed = inputSchema.safeParse(raw);
     if (!parsed.success) fail("factoryInvalid");
     const input = parsed.data;
+    const transact = async () => {
     const tx = existing ?? await pool.connect();
     try {
       if (!existing) await tx.query("BEGIN");
@@ -378,10 +381,10 @@ export function createFactoryMonitor(
           [userId, scope, keys.fingerprint],
         );
         if (original) {
-          let current: FactoryIssueScope & { taskScopeVersion: number | null } | undefined;
+          let current: FactoryIssueScope & { taskScopeVersion: number | null; taskWorkspaceId: string | null } | undefined;
           try {
-            ({ rows: [current] } = await tx.query<FactoryIssueScope & { taskScopeVersion: number | null }>(
-              'SELECT i."userId",i.scope,i."scopeVersion",t."scopeVersion" AS "taskScopeVersion" FROM issues i JOIN factory_tasks t ON t."issueId"=i.id AND t.id=$2 AND t."userId"=$3 WHERE i.id=$1 FOR UPDATE OF i NOWAIT',
+            ({ rows: [current] } = await tx.query<FactoryIssueScope & { taskScopeVersion: number | null; taskWorkspaceId: string | null }>(
+              'SELECT i."userId",i.scope,i."scopeVersion",i."workspaceId",i."ownershipState",t."scopeVersion" AS "taskScopeVersion",t."workspaceId" AS "taskWorkspaceId" FROM issues i JOIN factory_tasks t ON t."issueId"=i.id AND t.id=$2 AND t."userId"=$3 WHERE i.id=$1 FOR UPDATE OF i NOWAIT',
               [original.issueId, original.taskId, userId],
             ));
           } catch (error) {
@@ -391,7 +394,7 @@ export function createFactoryMonitor(
             if (error && typeof error === "object" && "code" in error && error.code === "55P03") fail("factoryStale");
             throw error;
           }
-          if (!current || !factoryScopeAllows({ userId, scopeVersion: current.taskScopeVersion }, current)
+          if (!current || !factoryScopeAllows({ userId, workspaceId: current.taskWorkspaceId }, current)
             || !await authorize(userId, original.issueId, tx)
             || await workspaceKey(userId, original.issueId, tx) !== scope) fail("factoryNotFound");
         }
@@ -562,6 +565,8 @@ export function createFactoryMonitor(
     } finally {
       if (!existing) tx.release();
     }
+    };
+    return withWorkspace ? withWorkspace(userId, input.binding.taskId, transact, existing) : transact();
   }
   return {
     consume,
@@ -573,6 +578,7 @@ export function createFactoryMonitor(
          JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
          JOIN coordinator_events e ON e."runId"=a."runId" AND e."userId"=t."userId" AND e."issueId"=t."issueId" AND e.kind='run_finished'
          WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND t.stage='monitor' AND t.status NOT IN ('cancelled','revoked')
+          AND EXISTS (SELECT 1 FROM "user" u WHERE u.id=t."userId")
          AND NOT EXISTS (SELECT 1 FROM factory_monitor_observations o WHERE o."userId"=$1 AND o."sourceEventId"=e.id)
          ORDER BY e."createdAt" LIMIT 50`,
         [userId,botId],

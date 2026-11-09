@@ -44,6 +44,7 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
       - run: pnpm --filter @mikka/desktop typecheck
       - run: pnpm --filter @mikka/desktop lint
       - run: pnpm --filter @mikka/desktop test
@@ -92,6 +93,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        env:
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
       - name: Install Chromium system dependencies
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium
@@ -188,6 +191,8 @@ jobs:
           cache: pnpm
       - run: test "$(uname -m)" = arm64
       - run: pnpm install --frozen-lockfile
+        env:
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
       - name: Keep setup-node 24 in the native installer login shell
         run: node apps/desktop/test/native-node.mjs
       - name: Prepare the pinned native Electron and builder checksum cache

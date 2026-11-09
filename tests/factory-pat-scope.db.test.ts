@@ -17,9 +17,10 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
   const otherBot = await seedBot(pool, otherWorkspace.id, owner)
   let currentHeaders = new Headers()
   let browser = false
+  let browserWorkspaceId = workspace.id
   mock.module('next/headers', { namedExports: {
     headers: async () => currentHeaders,
-    cookies: async () => ({ get: () => undefined }),
+    cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' ? { value: browserWorkspaceId } : undefined }),
   } })
   mock.module('next-intl/server', { namedExports: {
     getLocale: async () => 'en',
@@ -51,7 +52,7 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
     const workspaceId = foreign ? otherWorkspace.id : workspace.id
     const teamId = foreign ? otherTeam.id : team.id
     const botId = foreign ? otherBot : bot
-    await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Factory PAT fixture','{"type":"doc"}','todo','normal','workspace')`, [issueId, owner])
+    await pool.query(`INSERT INTO issues (id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES ($1,$2,$3,'bound','Factory PAT fixture','{"type":"doc"}','todo','normal','workspace')`, [issueId, owner, workspaceId])
     await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner])
     await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,'user_message',$4,'{"text":"Isolated scope fixture"}')`, [sourceEventId, owner, withTask ? botId : null, sourceEventId])
     const input = { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Isolated requested task', missingInformation: ['No external execution needed'], missingPermissions: [], needsSpec: false }
@@ -153,11 +154,19 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
     }), { params: Promise.resolve({ taskId: own.task!.id }) })
     assert.equal(sidebar.status,404)
   })
-  await t.test('ordinary browser owner access is unchanged', async () => {
+  await t.test('a browser reads only its selected workspace, including another owned workspace', async () => {
     browser = true
-    const response = await detail.GET(request(`/api/factory/tasks/${foreign.task!.id}`), { params: Promise.resolve({ taskId: foreign.task!.id }) })
-    assert.equal(response.status, 200)
-    browser = false
+    try {
+      browserWorkspaceId = otherWorkspace.id
+      assert.equal((await detail.GET(request(`/api/factory/tasks/${foreign.task!.id}`), { params: Promise.resolve({ taskId: foreign.task!.id }) })).status, 200)
+      assert.equal((await list.GET(request(`/api/factory/tasks?issueId=${foreign.issueId}`))).status, 200)
+      browserWorkspaceId = workspace.id
+      assert.equal((await detail.GET(request(`/api/factory/tasks/${foreign.task!.id}`), { params: Promise.resolve({ taskId: foreign.task!.id }) })).status, 404)
+      assert.equal((await list.GET(request(`/api/factory/tasks?issueId=${foreign.issueId}`))).status, 404)
+    } finally {
+      browser = false
+      browserWorkspaceId = workspace.id
+    }
   })
   await t.test('expired and revoked PATs remain unauthenticated', async () => {
     for (const column of ['expiresAt', 'revokedAt']) {

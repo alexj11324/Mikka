@@ -3,7 +3,7 @@ import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { attemptState, groupOf, groupOfThread, rowState, taskListRows } from '../features/tasks/model/task-groups.ts'
-import { activityEntries, agentRunTitle, boundary, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
+import { activityEntries, boundary, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
 
 test('a task\'s current thread decides its group, by R-52\'s judgement', () => {
   assert.equal(groupOfThread('waiting'), 'pending')
@@ -101,16 +101,15 @@ test('a task\'s attempts read as one conversation, oldest first, each keeping on
   assert.deepEqual(conversationSegments([{ kind: 'created', by: null, createdAt: '' }], new Map()), [])
 })
 
-// Alex 2026-11-09: a task is one conversation; no 「尝试」 and no numbering, a divider only where the Agent changed.
-test('runs with the same Agent read as one; a divider only where the Agent changed, naming the Agent that did not get through', () => {
+// Alex 2026-11-09: a task is one conversation; no 「尝试」, no numbering and no switch verb (as Warp): where the Agent changed, the next Agent itself.
+test('runs with the same Agent read as one; where the Agent changed, the divider is the next Agent', () => {
   const run = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness, createdAt: '', failed: false, ...extra })
   const r1 = run('r1', 1, 'codex'), r2 = run('r2', 2, 'codex'), r3 = run('r3', 3, 'codex', { failed: true, state: 'failed' }), r4 = run('r4', 4, 'claude_code'), r5 = run('r5', 5, 'cursor')
   // Same Agent: nothing between them, however many runs (follow-ups, waiting for a reply).
   assert.equal(boundary(r1, r2), null)
-  // The Agent changed after a failure: the one that failed is named, nothing is numbered.
-  assert.deepEqual(boundary(r3, r4), { kind: 'switch', text: mobileMessages.MobileCore.conversation.switchedAfterFailure.replace('{previous}', 'Codex').replace('{agent}', 'Claude Code') })
-  // The Agent changed without a failure.
-  assert.deepEqual(boundary(r4, r5), { kind: 'switch', text: mobileMessages.MobileCore.conversation.switched.replace('{agent}', 'Cursor') })
+  // The Agent changed, after a failure or not: the divider is the next Agent, with no 「换」 and no 「没跑通」.
+  assert.deepEqual(boundary(r3, r4), { kind: 'agent', harness: 'claude_code' })
+  assert.deepEqual(boundary(r4, r5), { kind: 'agent', harness: 'cursor' })
 })
 
 // 2026-11-04-2200: verification belongs to 实现, and 审阅 is its own result card; only a fix is marked inline.
@@ -139,12 +138,12 @@ test('a factory task shows one stage and what it needs from you; 审阅 has one 
   assert.equal(verdictWord(undefined), null)
 })
 
-test('活动 merges an Agent\'s runs in a row into one row; a switch starts 「换 X」', () => {
+test('活动 merges an Agent\'s runs in a row into one row; the next Agent starts its own row', () => {
   const run = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'waiting' as const, harness, createdAt: '2026-11-05T10:00:00.000Z', failed: false, ...extra })
   // The server sends 活动 newest first.
   const activity = [run('r4', 4, 'claude_code'), run('r3', 3, 'codex'), run('r2', 2, 'codex'), run('r1', 1, 'codex'), { kind: 'created' as const, by: 'Coordinator', createdAt: '2026-11-05T09:00:00.000Z' }]
   const entries = activityEntries(activity)
-  assert.deepEqual(entries.map(entry => entry.kind === 'agent' ? [agentRunTitle(entry), entry.run.attempts.map(item => item.runId)] : entry.kind), ['created', ['Codex', ['r1', 'r2', 'r3']], [mobileMessages.MobileCore.conversation.switchedTo.replace('{agent}', 'Claude Code'), ['r4']]])
+  assert.deepEqual(entries.map(entry => entry.kind === 'agent' ? [entry.run.harness, entry.run.attempts.map(item => item.runId)] : entry.kind), ['created', ['codex', ['r1', 'r2', 'r3']], ['claude_code', ['r4']]])
 })
 
 // Alex 2026-11-08: the folded steps row opens to each command and tool call, labelled as Codex does.
@@ -165,4 +164,20 @@ test('a steps row says what ran: commands and tools, or the plain count without 
   assert.deepEqual(stepLine({ name: 'apply_patch', detail: '/home/user/.mikka/worker/worktrees/abc/apps/mobile/lib/a.ts' }), { title: 'apply_patch', detail: 'lib/a.ts', code: false })
   assert.deepEqual(stepLine(steps[0]!), { title: 'pnpm test', detail: null, code: true })
   assert.deepEqual([stepDuration(850), stepDuration(1240), stepDuration(125_000), stepDuration(undefined)], [words.threadSteps.milliseconds.replace('{count}', '850'), words.threadSteps.seconds.replace('{count}', '1.2'), words.threadSteps.minutes.replace('{minutes}', '2').replace('{seconds}', '5'), null])
+})
+
+// Alex 2026-11-09: the Agents' real brand marks, from @lobehub/icons-static-svg (MIT) as files.
+test('an Agent brand mark is the package\'s own markup, sized by its caller, without Codex\'s white backdrop', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { createRequire } = await import('node:module')
+  const { agentMark } = await import('../features/tasks/model/agent-marks.ts')
+  const file = (name: string) => readFileSync(createRequire(import.meta.url).resolve(`@lobehub/icons-static-svg/icons/${name}`), 'utf8')
+  for (const name of ['claudecode-color.svg', 'codex-color.svg', 'cursor.svg']) {
+    const mark = agentMark(file(name))
+    assert.match(mark, /^<svg[^>]*viewBox="0 0 24 24"/)
+    assert.doesNotMatch(mark, /1em|style=/)
+  }
+  assert.match(file('codex-color.svg'), /fill="#fff"/)
+  assert.doesNotMatch(agentMark(file('codex-color.svg')), /fill="#fff"/)
+  assert.match(agentMark(file('cursor.svg')), /currentColor/)
 })

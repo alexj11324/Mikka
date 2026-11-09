@@ -9,7 +9,7 @@ import { overrideDeploymentSwitch } from './deployment-switches'
 // Real dispatch functions, controlled persistence. These tests never open a
 // database or invoke a provider and do not prove FK/locking behavior.
 const owner = 'synthetic-owner', botId = '28700000-0000-4000-8000-000000000011'
-const workspaceId = '28700000-0000-4000-8000-000000000012', globalId = '00000000-0000-4000-8000-000000000001'
+const workspaceId = '28700000-0000-4000-8000-000000000012'
 const agentId = '28700000-0000-4000-8000-000000000013', repoId = '28700000-0000-4000-8000-000000000014', issueId = '28700000-0000-4000-8000-000000000015'
 const connectionId = '28700000-0000-4000-8000-000000000019'
 before(async () => {
@@ -47,7 +47,7 @@ mock.module(new URL('./device-repositories.ts', import.meta.url).href, { namedEx
 mock.module(new URL('./run-admission-store.ts', import.meta.url).href, { namedExports: { acceptLocalRun: async (input: { id: string; definition: unknown }) => {
   inserted.push({ agentDefinition: input.definition }); return { runId: input.id }
 } } })
-mock.module(new URL('./issue-access.ts', import.meta.url).href, { namedExports: { requireUser: () => { throw Error('Unexpected user session lookup') }, issueForUser: async (id: string) => { assert.equal(id, owner); return { id: issueId, title: 'Fixture', content: null } } } })
+mock.module(new URL('./issue-access.ts', import.meta.url).href, { namedExports: { requireUser: () => { throw Error('Unexpected user session lookup') }, issueForUser: async (id: string) => { assert.equal(id, owner); return { id: issueId, workspaceId, ownershipState: 'bound', title: 'Fixture', content: null } } } })
 mock.module(new URL('./subscription-repository.ts', import.meta.url).href, { namedExports: { SubscriptionRepository: class {
   async nativeBinding(userId: string, consumerId: string, harness: string, _bindingId?: string, namespace?: string) {
     assert.deepEqual([userId, consumerId, harness, namespace], [owner, agentId, 'codex', workspaceId])
@@ -58,12 +58,12 @@ const flags = ['MIKKA_BYOS_ENABLED', 'MIKKA_AGENT_KIT'] as const
 const original = Object.fromEntries(flags.map(key => [key, process.env[key]]))
 after(() => { overrideDeploymentSwitch('personalMailbox', undefined); for (const key of flags) if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key] })
 
-test('actual personal producer freezes owned Bot workspace or explicit unbound scope and keeps mailbox-off namespace reads query-free', async () => {
+test('actual personal producer freezes the task workspace with or without a Bot and keeps mailbox-off namespace reads query-free', async () => {
   const { queueRun } = await import('./agent-runs')
   overrideDeploymentSwitch('personalMailbox', undefined); delete process.env.MIKKA_BYOS_ENABLED
   for (const bot of [botId, null]) {
     await queueRun(owner, { issueId, agentId, repo: repoUrl, model: 'fixture' }, bot, execution)
-    assert.equal(personalWorkerMailboxScopeMatches('codex', inserted.at(-1)!.agentDefinition, { botId: bot, workspaceId: bot ? workspaceId : globalId }), true)
+    assert.equal(personalWorkerMailboxScopeMatches('codex', inserted.at(-1)!.agentDefinition, { botId: bot, workspaceId }), true)
   }
   ownedBot = false
   const count = inserted.length

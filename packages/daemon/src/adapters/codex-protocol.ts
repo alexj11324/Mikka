@@ -96,6 +96,7 @@ export type ThreadItem =
       server: string
       tool: string
       arguments: unknown
+      status: "inProgress" | "completed" | "failed"
       result: { content: unknown[] } | null
       error: { message: string } | null
     }

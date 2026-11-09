@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -42,8 +43,10 @@ test('run tokens recheck current task, workspace and execution authority', { ski
     await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,$4,\'active\')', [id, user, `${user}@example.invalid`, role])
   }
   await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,\'Authorization fixture\',\'A207\')', [team, workspace, owner])
+  const personalOwnerWorkspace = await seedFixtureWorkspace(pool, owner)
+  const personalMemberWorkspace = await seedFixtureWorkspace(pool, member)
   for (const [id, user, scope] of [[shared, owner, 'workspace'], [personal, owner, 'personal'], [ownPersonal, member, 'personal']]) {
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Authorization fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',$3)', [id, user, scope])
+    await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope) VALUES ($1,$2,$4,\'Authorization fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',$3)', [id, user, scope, id === shared ? workspace : user === owner ? personalOwnerWorkspace : personalMemberWorkspace])
   }
   await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [shared, team, workspace, owner])
   await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,\'Authorization fixture\')', [bot, member, workspace])
