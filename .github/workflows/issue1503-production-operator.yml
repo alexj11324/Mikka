@@ -1,4 +1,4 @@
-name: Issue 1503 encrypted private-question diagnosis
+name: Issue 1503 encrypted continuation tool diagnosis
 on:
   push:
     branches: [ops/issue-1503-production-smoke]
@@ -14,7 +14,7 @@ concurrency:
   queue: max
 jobs:
   diagnose:
-    if: false
+    if: true
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
@@ -26,8 +26,8 @@ jobs:
       id-token: write
     env:
       MIKKA_EDITION: cloud
-      MIKKA_EXPECTED_DEPLOYMENT_SHA: '8db16095f46be955df22f42914e0f89b6e5f3d11'
-      MIKKA_1503_PRIVATE_QUESTION_DIAGNOSTIC_GO: ''
+      MIKKA_EXPECTED_DEPLOYMENT_SHA: '5ba1f9e2359ce714d83cd16fc040f2567c40a6d0'
+      MIKKA_1503_PRIVATE_THREAD_DIAGNOSTIC_GO: 'read_and_seal_fixed_child_tools_once'
       MIKKA_1503_START_FIXTURE_SHA256: 9e0836aa5e5d290dac5c282e82f56907b99207820ded44396159b935c53f9de7
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -47,8 +47,8 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - name: Read and encrypt the fixed external question once
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/diagnose-f42636835234-private-question.ts
+      - name: Read and encrypt the fixed continuation tools once
+        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/single-thread-diagnostic.ts
         env:
           NODE_ENV: production
           VERCEL_ENV: production
@@ -57,7 +57,7 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-private-question-6e8e0149
-          path: issue1503-report/private-question-6e8e0149.json
+          name: issue1503-private-thread-0450e5aa
+          path: issue1503-report/private-thread-0450e5aa.json
           if-no-files-found: error
           retention-days: 3
