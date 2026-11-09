@@ -1773,6 +1773,9 @@
       "connections": {
         "title": "Connections"
       },
+      "bot-permissions": {
+        "title": "Bot permissions"
+      },
       "models": {
         "title": "Models and subscriptions",
         "keywords": "model subscriptions quota API key provider models preferred order dispatch run location cloud local bots agents"
@@ -2246,6 +2249,18 @@
       "save": "Save",
       "changePassword": "Change password",
       "actions": "Actions for {site}"
+    },
+    "botPermissions": {
+      "loading": "Reading connected apps…",
+      "notice": "Every write asks you first for now; finer settings are coming.",
+      "empty": "No apps connected",
+      "read": "Read",
+      "write": "Writes",
+      "level": {
+        "allow": "On its own",
+        "ask": "Asks you first",
+        "never": "Never"
+      }
     },
     "workspaceLoading": "Loading the workspace…",
     "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again.",
@@ -5792,6 +5807,41 @@
       "sent": "Message sent.",
       "selected": "selected."
     }
+  },
+  "HostedPermissions": {
+    "autonomy": "How much it does on its own",
+    "apps": "Apps",
+    "redLines": "Red lines",
+    "redLinesText": "These always ask – or never happen – whatever you pick above",
+    "redLinesEmpty": "Custom red lines are not available yet",
+    "cautious": "Careful",
+    "cautiousText": "Reads on its own, asks before it changes anything",
+    "balanced": "Balanced",
+    "balancedText": "Works on its own, asks before anything that needs care",
+    "handsoff": "Hands-off",
+    "handsoffText": "Does everything on its own – except the red lines",
+    "allowLong": "On its own",
+    "askLong": "Asks first",
+    "neverLong": "Never",
+    "allowText": "Does it without asking – you see it in the activity",
+    "askText": "Waits for your OK in the Inbox",
+    "neverText": "Won't do it, and tells you it can't",
+    "mixed": "Mixed",
+    "locked": "A red line – it can't do this on its own",
+    "reads": "Reads",
+    "changes": "Changes",
+    "care": "Needs care",
+    "nothingToDecide": "Connect an app first",
+    "noActions": "The Bot doesn't use this app for anything yet",
+    "noApp": "Nothing open",
+    "noAppText": "Pick an app to see what the Bot may do in it.",
+    "empty": "No apps connected",
+    "emptyText": "Connect an app and what the Bot may do in it shows up here.",
+    "means": "{allow} on its own · asks before {ask} · never {never}",
+    "summaryAllow": "{count} on its own",
+    "summaryAsk": "asks before {count}",
+    "summaryNever": "never {count}",
+    "all": "All {kind}"
   },
   "HostedBoard": {
     "due": "Due {date}",

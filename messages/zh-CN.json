@@ -1773,6 +1773,9 @@
       "connections": {
         "title": "连接"
       },
+      "bot-permissions": {
+        "title": "Bot 权限"
+      },
       "models": {
         "title": "模型与订阅",
         "keywords": "模型订阅 订阅 额度 API Key 服务商 模型 优先使用的模型 顺序 派发 运行位置 云端 本地 Bot Agent"
@@ -2246,6 +2249,18 @@
       "save": "保存",
       "changePassword": "改密码",
       "actions": "{site} 的操作"
+    },
+    "botPermissions": {
+      "loading": "正在读取连接的应用…",
+      "notice": "目前所有写操作都会先问你，更细的设置即将支持。",
+      "empty": "还没有连接应用",
+      "read": "读取",
+      "write": "写操作",
+      "level": {
+        "allow": "自己做",
+        "ask": "先问你",
+        "never": "不做"
+      }
     },
     "workspaceLoading": "正在读取工作区…",
     "workspaceUnavailable": "无法读取工作区，请刷新后重试。",
@@ -5792,6 +5807,41 @@
       "sent": "已发送。",
       "selected": "已选中。"
     }
+  },
+  "HostedPermissions": {
+    "autonomy": "自己做多少",
+    "apps": "应用",
+    "redLines": "红线",
+    "redLinesText": "无论上面选哪一档，这些都会先问你或不做",
+    "redLinesEmpty": "暂不支持自定义红线",
+    "cautious": "谨慎",
+    "cautiousText": "读取自己做，改动前先问你",
+    "balanced": "平衡",
+    "balancedText": "自己做，需要小心的先问你",
+    "handsoff": "放手",
+    "handsoffText": "除了红线都自己做",
+    "allowLong": "自己做",
+    "askLong": "先问你",
+    "neverLong": "不做",
+    "allowText": "不问你直接做，动态里看得到",
+    "askText": "在收件箱等你确认",
+    "neverText": "不做，并告诉你做不了",
+    "mixed": "不一致",
+    "locked": "红线：不会自己做",
+    "reads": "读取",
+    "changes": "改动",
+    "care": "需要小心",
+    "nothingToDecide": "先连接一个应用",
+    "noActions": "Bot 还没在这个应用里做任何事",
+    "noApp": "没有打开的应用",
+    "noAppText": "选一个应用，看 Bot 能在里面做什么。",
+    "empty": "还没有连接应用",
+    "emptyText": "连接应用后，Bot 能在里面做什么会显示在这里。",
+    "means": "自己做 {allow} 项 · 先问你 {ask} 项 · 不做 {never} 项",
+    "summaryAllow": "自己做 {count}",
+    "summaryAsk": "先问你 {count}",
+    "summaryNever": "不做 {count}",
+    "all": "全部{kind}"
   },
   "HostedBoard": {
     "due": "截止 {date}",
