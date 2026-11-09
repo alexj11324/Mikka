@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     # An unrelated merge can obsolete an in-flight publication. Recheck the
-    # live worker on every main push; the check job still gates validation.
+    # live worker on every main push; failed input fingerprints skip retries.
   pull_request:
     paths: &runtime_paths
       - 'package.json'
@@ -20,6 +20,7 @@ on:
       - 'lib/computer/official-runtime.ts'
       - '.github/workflows/e2b-official-runtime.yml'
       - '.github/workflows/e2b-template.yml'
+      - '.github/workflows/e2b-runtime-release.yml'
       - 'scripts/e2b/validate-template-subscriptions.mjs'
       - 'scripts/e2b/cleanup-template-candidates.py'
       - 'scripts/e2b/runtime-report.mjs'
@@ -54,14 +55,12 @@ on:
         description: Validate and publish even when the configured worker hash matches
         type: boolean
         default: false
+      reason:
+        description: Reason for this manual runtime retry (recorded in the dispatch event)
+        type: string
+        required: true
 permissions:
   contents: read
-concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('e2b-official-runtime-{0}', github.ref) || 'e2b-official-runtime-release' }}
-  # An old rerun must not replace the latest main's pending runtime validation.
-  # PRs have their own group and only run the offline test job; retain those too.
-  cancel-in-progress: false
-  queue: max
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -78,7 +77,7 @@ jobs:
           ln -s "$RUNNER_TEMP/runtime-gate-tests/node_modules" node_modules
           mkdir -p node_modules/@mikka
           ln -s "$GITHUB_WORKSPACE/packages/protocol" node_modules/@mikka/protocol
-      - run: node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
+      - run: node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
       - run: python3 scripts/e2b/build-template.test.py
       - run: python3 packages/daemon/scripts/prepare-worker-install.test.py
       - run: python3 scripts/e2b/official-files.test.py
@@ -86,8 +85,7 @@ jobs:
       - run: python3 scripts/e2b/workspace-candidates.test.py
       - run: python3 -m py_compile scripts/e2b/validate-official-instances.py
       - run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh
-  # Unchanged runtime content skips validation unless its release-control path
-  # changed in this push, or an operator explicitly requested a full refresh.
+  # Check before acquiring the publication queue or any E2B credentials.
   check:
     needs: test
     if: github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -95,9 +93,10 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: read
       id-token: write
     outputs:
-      changed: ${{ steps.compare.outputs.changed }}
+      changed: ${{ steps.compare.outputs.changed || 'false' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -115,7 +114,14 @@ jobs:
         run: node scripts/release/web-deploy.mjs runtime-refresh
         env:
           RUNTIME_REFRESH: ${{ inputs.runtime-refresh }}
+      - name: Fingerprint runtime inputs and suppress a previously failed automatic retry
+        id: history
+        run: node scripts/e2b/runtime-inputs.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RETRY_REASON: ${{ inputs.reason }}
       - name: Read the Vercel team token through Infisical workload identity
+        if: steps.history.outputs.skip != 'true'
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
@@ -127,248 +133,25 @@ jobs:
           secret-name: VERCEL_TEAM_TOKEN
           include-imports: false
       - name: Compare the worker hash with production
+        if: steps.history.outputs.skip != 'true'
         id: compare
         run: |
           wanted="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
           live="$(node scripts/e2b/publish-template-env.mjs --current)"
           echo "worker hash $wanted; production $live"
-          if [ "$RUNTIME_REFRESH" = true ] || [ "$wanted" != "$live" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
+          if [ "$MANUAL_RETRY" = true ] || [ "$RUNTIME_REFRESH" = true ] || [ "$wanted" != "$live" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
         env:
           RUNTIME_REFRESH: ${{ steps.control.outputs.refresh }}
-  validate:
+          MANUAL_RETRY: ${{ github.event_name == 'workflow_dispatch' }}
+  release:
     needs: [test, check]
     if: needs.check.outputs.changed == 'true'
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/e2b-template.yml
-  # Do not take web-deploy-production here: the matching Web job needs that
-  # queue to finish its GitHub build and upload while this read-only job waits.
-  await-web:
-    needs: validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 95
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-      - name: Await this source's actual Web build and public version
-        run: node scripts/release/web-deploy.mjs await-web
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-  subscriptions:
-    needs: [validate, await-web]
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
     concurrency:
-      group: production-smoke-owner-acceptance
+      group: e2b-official-runtime-release
       cancel-in-progress: false
       queue: max
     permissions:
       contents: read
+      actions: read
       id-token: write
-    outputs:
-      release-artifact-id: ${{ steps.release.outputs.artifact-id }}
-      release-sha256: ${{ steps.publish.outputs.release-sha256 }}
-      template-ids: ${{ steps.publish.outputs.template-ids }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-      - name: Refuse an obsolete source before real subscription work
-        run: node scripts/release/web-deploy.mjs main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: Require one immutable candidate artifact reference
-        run: node scripts/e2b/runtime-report.mjs reference
-        env:
-          RUNTIME_REPORT_ARTIFACT_ID: ${{ needs.validate.outputs.candidate-artifact-id }}
-          RUNTIME_REPORT_SHA256: ${{ needs.validate.outputs.candidate-sha256 }}
-      - name: Download this run's complete private candidate report
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          artifact-ids: ${{ needs.validate.outputs.candidate-artifact-id }}
-          path: ${{ runner.temp }}/e2b-candidates
-          merge-multiple: true
-      - name: Bind the candidate bytes to this source, worker and run attempt
-        run: node scripts/e2b/runtime-report.mjs verify "$RUNNER_TEMP/e2b-candidates/candidates.json"
-        env:
-          RUNTIME_REPORT_ARTIFACT_ID: ${{ needs.validate.outputs.candidate-artifact-id }}
-          RUNTIME_REPORT_SHA256: ${{ needs.validate.outputs.candidate-sha256 }}
-          SOURCE_SHA: ${{ needs.validate.outputs.source-sha }}
-      - name: Install only the pinned gate SDKs
-        run: |
-          npm install --prefix "$RUNNER_TEMP/e2b-js" --ignore-scripts --no-audit --no-fund 'e2b@2.62.1'
-          ln -s "$RUNNER_TEMP/e2b-js/node_modules" node_modules
-          python3 -m venv "$RUNNER_TEMP/e2b"
-          "$RUNNER_TEMP/e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
-      - name: Read the existing candidate E2B key
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: E2B_API_KEY
-          include-imports: false
-      - name: Read the authorized acceptance account email
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /
-          secret-name: SMOKE_OWNER_EMAIL
-          include-imports: false
-      - name: Read the authorized acceptance account password
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /
-          secret-name: SMOKE_OWNER_PASSWORD
-          include-imports: false
-      - name: Require real Claude Code and Codex subscriptions on the private candidates
-        run: node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/e2b-candidates/candidates.json" "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/subscription-diagnostics.json"
-      - name: Preserve closed diagnostics and any accepted subscription proof
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: e2b-template-subscription-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/subscription-diagnostics.json
-            ${{ runner.temp }}/accepted.json
-          if-no-files-found: warn
-          retention-days: 7
-      - name: Make only fully accepted candidates public
-        id: publish
-        run: |
-          node scripts/release/web-deploy.mjs main
-          node --input-type=module - "$RUNNER_TEMP/accepted.json" <<'JS'
-          import { readFileSync } from 'node:fs'
-          import { join } from 'node:path'
-          import { assertCandidatePreserved, assertReportIdentity, readRuntimeReport, reportStep, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
-          reportStep(() => {
-            const report = JSON.parse(readFileSync(process.argv[2]))
-            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
-              runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
-            assertReportIdentity(report, expected)
-            const candidate = readRuntimeReport(join(process.env.RUNNER_TEMP, 'e2b-candidates/candidates.json'), {
-              ...expected, sha256: process.env.CANDIDATE_SHA256,
-            })
-            assertCandidatePreserved(report, candidate)
-            if (templateModelsDigest(report) !== process.env.TEMPLATE_MODELS_SHA256) throw Error('runtime_release_models_digest_mismatch')
-          })
-          JS
-          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --publish-verified "$RUNNER_TEMP/accepted.json" > "$RUNNER_TEMP/release.json"
-          node --input-type=module - "$RUNNER_TEMP/release.json" <<'JS'
-          import { readFileSync, appendFileSync } from 'node:fs'
-          import { join } from 'node:path'
-          import { assertCandidatePreserved, assertReportIdentity, readRuntimeReport, reportDigest, reportStep, TEMPLATE_KINDS } from './scripts/e2b/runtime-report.mjs'
-          reportStep(() => {
-            const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
-            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
-              runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
-            assertReportIdentity(report, expected)
-            const candidate = readRuntimeReport(join(process.env.RUNNER_TEMP, 'e2b-candidates/candidates.json'), {
-              ...expected, sha256: process.env.CANDIDATE_SHA256,
-            })
-            assertCandidatePreserved(report, candidate, { published: true })
-            const ids = Object.fromEntries(TEMPLATE_KINDS.map(kind => [kind, report.templates[kind].templateId]))
-            appendFileSync(process.env.GITHUB_OUTPUT, `release-sha256=${reportDigest(bytes)}\ntemplate-ids=${JSON.stringify(ids)}\n`)
-          })
-          JS
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ needs.validate.outputs.source-sha }}
-          CANDIDATE_SHA256: ${{ needs.validate.outputs.candidate-sha256 }}
-          TEMPLATE_MODELS_SHA256: ${{ needs.validate.outputs.template-models-sha256 }}
-      - name: Preserve the complete public release report
-        id: release
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: e2b-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/release.json
-          if-no-files-found: error
-          retention-days: 7
-  publish:
-    needs: [validate, await-web, subscriptions]
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/web-deploy.yml
-    with:
-      runtime-refresh: true
-      runtime-worker-sha: ${{ needs.validate.outputs.source-sha }}
-      runtime-template-models-sha256: ${{ needs.validate.outputs.template-models-sha256 }}
-      runtime-template-ids: ${{ needs.subscriptions.outputs.template-ids }}
-      runtime-release-artifact-id: ${{ needs.subscriptions.outputs.release-artifact-id }}
-      runtime-release-sha256: ${{ needs.subscriptions.outputs.release-sha256 }}
-  cleanup:
-    needs: [check, validate, await-web, subscriptions, publish]
-    if: always() && github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.check.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - name: Install the pinned cleanup SDK
-        run: |
-          python3 -m venv "$RUNNER_TEMP/e2b-cleanup"
-          "$RUNNER_TEMP/e2b-cleanup/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
-      - name: Read this release's E2B key
-        id: e2b-key
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: E2B_API_KEY
-          include-imports: false
-      - name: Close this attempt's instances and remove only its private candidates
-        if: always() && steps.e2b-key.outcome == 'success'
-        run: |
-          python3 - <<'PY'
-          import os,pathlib
-          pathlib.Path(os.environ['RUNNER_TEMP'],'cleanup-identities.json').write_text(os.environ.get('CANDIDATE_IDENTITIES') or '')
-          PY
-          args=()
-          if [ "$IDENTITIES_REQUIRED" = true ]; then args+=(--identities-required); fi
-          "$RUNNER_TEMP/e2b-cleanup/bin/python" scripts/e2b/cleanup-template-candidates.py --identities-file "$RUNNER_TEMP/cleanup-identities.json" "${args[@]}" --output "$RUNNER_TEMP/release-cleanup.json"
-        env:
-          # At most 2 KiB, independently validated exact resource identities.
-          # No dependency on downloading the large report: a failed download
-          # must still reclaim these known IDs and leave the failed job red.
-          CANDIDATE_IDENTITIES: ${{ needs.validate.outputs.candidate-identities }}
-          IDENTITIES_REQUIRED: ${{ needs.validate.result == 'success' }}
-      - name: Preserve release cleanup receipt
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: e2b-runtime-release-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/release-cleanup.json
-          if-no-files-found: warn
-          retention-days: 7
+    uses: ./.github/workflows/e2b-runtime-release.yml

@@ -154,19 +154,19 @@ test('the actual workflow producer and pre-publication scripts keep large proofs
   assert.equal(values['template-models-sha256'], templateModelsDigest(f.report))
   assert.equal(values['candidate-identities'], cleanupIdentity(f.report, expected))
   assert.ok(lines.every(line => Buffer.byteLength(line) < CLEANUP_IDENTITY_MAX_BYTES))
-  const accepted = run('e2b-official-runtime.yml', 'accepted.json')
+  const accepted = run('e2b-runtime-release.yml', 'accepted.json')
   assert.equal(accepted.status, 0, accepted.stderr)
-  assert.notEqual(run('e2b-official-runtime.yml', 'accepted.json', { GITHUB_RUN_ATTEMPT: '3' }).status, 0)
-  assert.notEqual(run('e2b-official-runtime.yml', 'accepted.json', { TEMPLATE_MODELS_SHA256: 'd'.repeat(64) }).status, 0)
+  assert.notEqual(run('e2b-runtime-release.yml', 'accepted.json', { GITHUB_RUN_ATTEMPT: '3' }).status, 0)
+  assert.notEqual(run('e2b-runtime-release.yml', 'accepted.json', { TEMPLATE_MODELS_SHA256: 'd'.repeat(64) }).status, 0)
   const changedBuild = structuredClone(f.report); changedBuild.templates.codex.buildId = 'other-build'
   writeFileSync(f.path, JSON.stringify(changedBuild))
-  assert.notEqual(run('e2b-official-runtime.yml', 'accepted.json').status, 0, 'a changed build is refused before publish-verified')
+  assert.notEqual(run('e2b-runtime-release.yml', 'accepted.json').status, 0, 'a changed build is refused before publish-verified')
   const publicReport = structuredClone(f.report)
   for (const row of Object.values(publicReport.templates)) Object.assign(row, { public: true, buildStatus: 'ready' })
   const publicBytes = Buffer.from(JSON.stringify(publicReport) + '\n')
   writeFileSync(f.path, publicBytes)
   writeFileSync(output, '')
-  const release = run('e2b-official-runtime.yml', 'release.json')
+  const release = run('e2b-runtime-release.yml', 'release.json')
   assert.equal(release.status, 0, release.stderr)
   const releaseLines = readFileSync(output, 'utf8').trim().split('\n')
   assert.equal(releaseLines.length, 2)
@@ -176,14 +176,14 @@ test('the actual workflow producer and pre-publication scripts keep large proofs
   assert.deepEqual(readFileSync(f.path), publicBytes)
   publicReport.templates.codex.conservation.preserved.pop()
   writeFileSync(f.path, JSON.stringify(publicReport))
-  assert.notEqual(run('e2b-official-runtime.yml', 'release.json').status, 0, 'a changed preservation report cannot become a release artifact')
+  assert.notEqual(run('e2b-runtime-release.yml', 'release.json').status, 0, 'a changed preservation report cannot become a release artifact')
 })
 
 test('actual producer, accepted and release scripts never print malformed report content', t => {
   const f = withReport(t), bytes = Buffer.from('{"CANARY_REPORT_CONTENT":invalid}')
   writeFileSync(f.path, bytes)
   for (const [workflow, argument] of [['e2b-template.yml', 'candidates.json'],
-    ['e2b-official-runtime.yml', 'accepted.json'], ['e2b-official-runtime.yml', 'release.json']]) {
+    ['e2b-runtime-release.yml', 'accepted.json'], ['e2b-runtime-release.yml', 'release.json']]) {
     const result = spawnSync(process.execPath, ['--input-type=module', '-', f.path], {
       input: workflowNodeScript(workflow, argument), encoding: 'utf8',
       env: { PATH: process.env.PATH, RUNNER_TEMP: f.dir }, cwd: fileURLToPath(new URL('../../', import.meta.url)),
