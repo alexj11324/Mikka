@@ -1,19 +1,24 @@
 import assert from 'node:assert/strict'
 import { beforeEach, mock, test } from 'node:test'
+import messages from '../../../messages/zh-CN.json'
 import { apiCache } from '../lib/api-cache.ts'
 
 const urls: string[] = [], alerts: string[] = []
+const confirmations: { title: string; body?: string; actions?: { text: string; onPress?: () => void }[] }[] = []
+let finishApple: (id: string) => Promise<boolean> = async () => false
 const calls: { path: string; connection: unknown }[] = []
 const platform = { OS: 'ios' }
 let account = { id: 'fixture-account-a', server: { url: 'https://fixture.example/mikka' } }
 let read: () => Promise<unknown> = async () => ({ token: 'fixture-one-time-token' })
 let openURL: (url: string) => Promise<void> = async url => { urls.push(url) }
-mock.module('react-native', { namedExports: { Platform: platform, Alert: { alert: (message: string) => alerts.push(message) }, Linking: { openURL: (url: string) => openURL(url) } } })
+mock.module('react-native', { namedExports: { Platform: platform, Alert: { alert: (title: string, body?: string, actions?: { text: string; onPress?: () => void }[]) => { alerts.push(title); confirmations.push({ title, body, actions }) } }, Linking: { openURL: (url: string) => openURL(url) } } })
 mock.module('expo-web-browser', { namedExports: { openBrowserAsync: async (url: string) => { urls.push(url) } } })
 mock.module(new URL('../lib/api.ts', import.meta.url).href, { namedExports: { api: (path: string, _init: unknown, connection: unknown) => { calls.push({ path, connection }); return read() }, apiConnection: () => ({ account }) } })
-mock.module(new URL('../lib/config.ts', import.meta.url).href, { namedExports: { API_URL: 'https://fixture.example/mikka' } })
-const { openCloudBilling, openOnWeb, openPrivacyPolicy } = await import('../lib/web.ts')
-beforeEach(() => { urls.length = 0; alerts.length = 0; calls.length = 0; platform.OS = 'ios'; account = { id: 'fixture-account-a', server: { url: 'https://fixture.example/mikka' } }; apiCache.clear(); read = async () => ({ token: 'fixture-one-time-token' }); openURL = async url => { urls.push(url) } })
+mock.module(new URL('../lib/config.ts', import.meta.url).href, { namedExports: { API_URL: 'https://fixture.example/mikka', currentAccount: () => account } })
+mock.module(new URL('../lib/apple-auth.ts', import.meta.url).href, { namedExports: { finishAppleDeletionHandoff: (id: string) => finishApple(id) } })
+mock.module(new URL('../lib/messages.ts', import.meta.url).href, { namedExports: { mobileMessages: messages } })
+const { openAccountDeletion, openCloudBilling, openOnWeb, openPrivacyPolicy } = await import('../lib/web.ts')
+beforeEach(() => { urls.length = 0; alerts.length = 0; calls.length = 0; confirmations.length = 0; finishApple = async () => false; platform.OS = 'ios'; account = { id: 'fixture-account-a', server: { url: 'https://fixture.example/mikka' } }; apiCache.clear(); read = async () => ({ token: 'fixture-one-time-token' }); openURL = async url => { urls.push(url) } })
 
 test('privacy opens the public website without requesting an account token', async () => {
   await openPrivacyPolicy()
@@ -110,4 +115,37 @@ test('Expo Web uses the selected server authenticated redirect directly from the
   assert.deepEqual(opened, [['https://fixture.example/mikka/api/cloud/models/billing?redirect=1', '_blank', 'noopener']])
   assert.deepEqual(calls, [])
   assert.deepEqual(urls, [])
+})
+
+test('an ended Apple session after the deletion handoff offers the public Apple authorization page', async () => {
+  finishApple = async id => { assert.equal(id, 'fixture-account-a'); assert.equal(urls.length, 1); return true }
+  await openAccountDeletion()
+  assert.equal(new URL(urls[0]).searchParams.get('to'), '/settings?section=account')
+  assert.equal(confirmations[0].title, messages.Auth.appleAuthorizationTitle)
+  assert.equal(confirmations[0].body, messages.Auth.appleRevocationBody)
+  confirmations[0].actions?.[1].onPress?.()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(urls[1], 'https://account.apple.com/')
+  assert.equal(new URL(urls[1]).search, '')
+})
+
+test('a deletion handoff that retains its session has no Apple revocation alert', async () => {
+  await openAccountDeletion()
+  assert.deepEqual(alerts, [])
+})
+
+test('unknown deletion-session status reports uncertainty without an Apple management action', async () => {
+  finishApple = async () => { throw new Error('fixture-private-session-error') }
+  await openAccountDeletion()
+  assert.deepEqual(alerts, [messages.Auth.accountDeletionUnconfirmed])
+  assert.equal(confirmations[0].actions, undefined)
+})
+
+test('an Apple management link failure preserves the manual revocation instructions', async () => {
+  finishApple = async () => true
+  await openAccountDeletion()
+  openURL = async () => { throw new Error('fixture-private-browser-error') }
+  confirmations[0].actions?.[1].onPress?.()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(alerts, [messages.Auth.appleAuthorizationTitle, messages.Auth.webOpenUnconfirmed])
 })
