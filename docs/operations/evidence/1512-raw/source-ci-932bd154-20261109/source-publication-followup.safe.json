@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kind": "source-publish-followup",
+  "recordedAt": "2026-11-09 15:05:47 UTC",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "branch": "fix/1512-daemon-fixture-executable-20261109",
+  "publishedAt": "2026-11-09 14:42:10 UTC",
+  "publishedHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "readbackRef": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "publishMethod": {
+    "force": false,
+    "expectedOldHead": "f3466ba479ef51918790f521a288feaef5160e44",
+    "apiSuccess": true,
+    "normalMergeParentsPreserved": true
+  },
+  "prepublishProofFile": "source-publication-preflight.safe.json",
+  "actualMainAtFollowup": "76537e4c2996f717cbd19589e1efae328028aa4a",
+  "actualPullRequestCheckout": {
+    "sha": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "parents": [
+      "76537e4c2996f717cbd19589e1efae328028aa4a",
+      "932bd1549942bc2a8d040c7281a37fbe851c8eb0"
+    ]
+  },
+  "mainCI": {
+    "runId": 42637270671,
+    "attempt": 1,
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "status": "in_progress",
+    "knownFailure": {
+      "job": 129229145015,
+      "target": "ci-tasks:integration-26",
+      "kind": "child15secondTimeout"
+    },
+    "overallPassed": false
+  },
+  "acceptance": {
+    "completedProductionCases": 0,
+    "productionAttemptStarted": false,
+    "nativeOriginalWindowPending": true,
+    "ownedActiveDiagnosticVMs": 0
+  },
+  "limits": [
+    "The pre-publish proof correctly records CI not yet started at14:42:09; the natural CI was created after the source CAS at14:42:10.",
+    "Factory and Native other-owner windows/merges are separate; this source publication did not write main.",
+    "Latest partial CI contains an actual failure; no green or production acceptance claim."
+  ]
+}

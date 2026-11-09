@@ -1,0 +1,130 @@
+{
+  "schema": "issue1512.ci-metadata.index.v1",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1799,
+  "candidate": {
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "actualCheckoutFromExclusiveSourceReader": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3"
+  },
+  "status": "intermediate_not_final_acceptance",
+  "assembledAt": "2026-11-09 15:07:12 UTC",
+  "observations": {
+    "lastWorkflowSnapshot": "2026-11-09T14:51:47Z",
+    "lastMainJobsSnapshot": "2026-11-09T15:01:47Z",
+    "initialCheckAssociation": "2026-11-09T14:44:58Z"
+  },
+  "summary": {
+    "workflowCount": 14,
+    "workflowConclusions": {
+      "success": 13,
+      "in_progress": 1
+    },
+    "uniqueJobCount": 45,
+    "jobConclusions": {
+      "success": 33,
+      "failure": 1,
+      "skipped": 10,
+      "in_progress": 1
+    },
+    "allRunsAttemptOne": true,
+    "onlyObservedFailure": {
+      "runId": 42637270671,
+      "jobId": 129229145015,
+      "step": 4,
+      "stepName": "Run selected integration tasks through Nx Core",
+      "rawLogOwner": "/root"
+    },
+    "onlyPendingJob": {
+      "id": 129231919498,
+      "activeStep": 17,
+      "activeStepStartedAt": "2026-11-09T14:58:07Z",
+      "rawEvidenceOwner": "/root/native_6180_review"
+    },
+    "nativeBudgets": null,
+    "nativeCleanup": null,
+    "overallGatePassed": false,
+    "productionAcceptance": null
+  },
+  "payloadCount": 3,
+  "payloadBytes": 256427,
+  "payloads": [
+    {
+      "path": "ci-932-workflow-jobs-intermediate.json",
+      "blob": "09309e086ffba5548519a893cea6c1c8da53e758",
+      "bytes": 194247,
+      "sha256": "ada70b339051b9477627a10f7dd7b049ab2226c205d0926700cb7f5c0aeb4453",
+      "exactReadback": true,
+      "mode": "100644",
+      "type": "blob",
+      "source": "Closed GitHub API metadata projection; no raw job output."
+    },
+    {
+      "path": "ci-932-check-association-initial.json",
+      "blob": "21c61968bc18b884e818b2dc5c6160d077f5a731",
+      "bytes": 56966,
+      "sha256": "bd194a88e0c75e503eca0c54370ec4f22af37530e2939dbae5c9741fbd25456a",
+      "exactReadback": true,
+      "mode": "100644",
+      "type": "blob",
+      "source": "Closed GitHub API metadata projection; no raw job output."
+    },
+    {
+      "path": "ci-932-coordination-readership.json",
+      "blob": "1f564ca346b31491f93ebcbad333d8437ebb46f1",
+      "bytes": 5214,
+      "sha256": "5c14bebde30ff19bc3ec5334d95c1c90d31f3bea478266572745095e42443f63",
+      "exactReadback": true,
+      "mode": "100644",
+      "type": "blob",
+      "source": "Closed GitHub API metadata projection; no raw job output."
+    }
+  ],
+  "references": {
+    "exclusiveSourceEvidence": {
+      "indexBlob": "c72e8a7b90dd8e5488febef6b1da8dbc1a320345",
+      "bytes": 4835,
+      "sha256": "13a29d76400da082f3a8be8a2594fade27aa0dcf65ec29f516328e7516e23a5d",
+      "owner": "/root/current_source_review",
+      "notRereadByThisAgent": true
+    },
+    "nativeEvidence": {
+      "status": "pending",
+      "owner": "/root/native_6180_review"
+    },
+    "integrationDiagnosis": {
+      "status": "pending_unique_root_reader",
+      "owner": "/root"
+    }
+  },
+  "temporalAndCountingRules": [
+    "Workflow/job states come from the stated observations, not from this index's assembly time.",
+    "The initial filter=all check snapshot contains 43 checks /21 suites and predates three later-created jobs; it is not claimed to close the current45-job check set.",
+    "Final closure requires complete current pagination and matching run/event/attempt, suiteID, checkID and job.check_run_url. No fixed101 or filter=latest total is used.",
+    "GitHub skipped jobs remain skipped; empty external app suites are not counted as executed or unfinished Actions jobs.",
+    "Core/Source successes and any later Native success do not erase the observed Integration failure."
+  ],
+  "privacy": {
+    "emails": 0,
+    "credentialPatternMatches": 0,
+    "rawJobLogFields": 0,
+    "signedDownloadUrls": 0
+  },
+  "actions": {
+    "rawJobLogReads": 0,
+    "artifactDownloads": 0,
+    "productionOrAccountActions": 0,
+    "resourcesCreated": 0,
+    "testsRun": 0,
+    "manualReruns": 0,
+    "cancellations": 0,
+    "refOrPRMutations": 0,
+    "gitObjectWrites": "Three payload blobs plus this index, unreferenced only."
+  },
+  "nextWakeConditions": [
+    "Native exclusive reader reports terminal: refresh final metadata once and bind its separate receipt.",
+    "Root explicitly requests a bounded follow-up or a new observed failure appears.",
+    "At approximately15:15UTC, one bounded Factory/1827 coordination metadata read if no actual change has already been reported."
+  ],
+  "archiveSemantics": "Intermediate immutable snapshot; append a later final receipt rather than rewriting these bytes."
+}

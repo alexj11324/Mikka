@@ -1,0 +1,1406 @@
+{
+  "version": 1,
+  "kind": "Core execution receipt",
+  "repository": "alexj11324/Mikka",
+  "runId": 42637270671,
+  "attempt": 1,
+  "jobId": 129229145030,
+  "jobName": "Core unit checks",
+  "status": "completed",
+  "conclusion": "success",
+  "completedAt": "2026-11-09T14:50:18Z",
+  "eventHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "actualCheckout": {
+    "sha": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "sourceBindingReceipt": "8caeafdef46098ee9188ffef08ec134417f921f7"
+  },
+  "original": {
+    "jobId": 129229145030,
+    "bytes": 1019383,
+    "sha256": "bb6089e9579144ee89fa8d35625b748201c3b6bf7d5fb3387cddf7e7bc022866",
+    "gitBlob": "d777c48d0a9a790f9ce9388ccabae8c41746e0ab",
+    "reads": 1
+  },
+  "runtime": {
+    "node": "v24.22.2",
+    "pnpm": "10.34.3",
+    "dependencyInstall": "pnpm install --frozen-lockfile"
+  },
+  "selection": {
+    "rawSelectionBlob": "feaf33488555ee524bfc3dbf56812e1bfcffeaa3",
+    "expectedCoreTargets": 57,
+    "actualInvocationCount": 57,
+    "uniqueActualTargets": 57,
+    "missing": [],
+    "extra": [],
+    "cache": "Skipped (--skip-nx-cache)",
+    "cacheSummaryNormalLine": 7835,
+    "nxSuccessNormalLine": 7831,
+    "targets": [
+      {
+        "normalLine": 513,
+        "target": "ci-tasks:core-2",
+        "suffix": "",
+        "selectedCommand": "pnpm test:factory-check-independence"
+      },
+      {
+        "normalLine": 516,
+        "target": "ci-tasks:core-3",
+        "suffix": "",
+        "selectedCommand": "pnpm test:factory-check-recovery"
+      },
+      {
+        "normalLine": 777,
+        "target": "ci-tasks:core-4",
+        "suffix": "",
+        "selectedCommand": "pnpm test:factory-routing"
+      },
+      {
+        "normalLine": 834,
+        "target": "ci-tasks:core-5",
+        "suffix": "",
+        "selectedCommand": "pnpm test:self-improvement-semantic-source"
+      },
+      {
+        "normalLine": 909,
+        "target": "ci-tasks:core-6",
+        "suffix": "",
+        "selectedCommand": "node --test scripts/ci-docs-only.test.mjs"
+      },
+      {
+        "normalLine": 947,
+        "target": "ci-tasks:core-7",
+        "suffix": "",
+        "selectedCommand": "pnpm test:ui-policy"
+      },
+      {
+        "normalLine": 1512,
+        "target": "ci-tasks:core-8",
+        "suffix": "",
+        "selectedCommand": "pnpm test:idle-budget"
+      },
+      {
+        "normalLine": 1525,
+        "target": "ci-tasks:core-9",
+        "suffix": "",
+        "selectedCommand": "pnpm test:motion"
+      },
+      {
+        "normalLine": 1543,
+        "target": "ci-tasks:core-10",
+        "suffix": "",
+        "selectedCommand": "pnpm test:i18n"
+      },
+      {
+        "normalLine": 1570,
+        "target": "ci-tasks:core-11",
+        "suffix": "",
+        "selectedCommand": "pnpm i18n:check"
+      },
+      {
+        "normalLine": 1583,
+        "target": "ci-tasks:core-12",
+        "suffix": "",
+        "selectedCommand": "pnpm test:ssh-target"
+      },
+      {
+        "normalLine": 1603,
+        "target": "ci-tasks:core-13",
+        "suffix": "",
+        "selectedCommand": "pnpm test:linear-sync"
+      },
+      {
+        "normalLine": 1622,
+        "target": "ci-tasks:core-14",
+        "suffix": "",
+        "selectedCommand": "pnpm check:agent-definitions"
+      },
+      {
+        "normalLine": 1671,
+        "target": "ci-tasks:core-15",
+        "suffix": "",
+        "selectedCommand": "pnpm test:release-security"
+      },
+      {
+        "normalLine": 1801,
+        "target": "ci-tasks:core-16",
+        "suffix": "",
+        "selectedCommand": "pnpm test:mailbox-verification"
+      },
+      {
+        "normalLine": 1889,
+        "target": "ci-tasks:core-17",
+        "suffix": "",
+        "selectedCommand": "pnpm test:factory-approval"
+      },
+      {
+        "normalLine": 1914,
+        "target": "ci-tasks:core-18",
+        "suffix": "",
+        "selectedCommand": "pnpm test:personal-mailbox-core"
+      },
+      {
+        "normalLine": 1960,
+        "target": "ci-tasks:core-19",
+        "suffix": "",
+        "selectedCommand": "pnpm test:factory-monitor"
+      },
+      {
+        "normalLine": 2037,
+        "target": "ci-tasks:core-20",
+        "suffix": "",
+        "selectedCommand": "pnpm test:execution-rules"
+      },
+      {
+        "normalLine": 2381,
+        "target": "ci-tasks:core-21",
+        "suffix": "",
+        "selectedCommand": "pnpm test:abuse"
+      },
+      {
+        "normalLine": 2495,
+        "target": "ci-tasks:core-22",
+        "suffix": "",
+        "selectedCommand": "pnpm test:self-hosting"
+      },
+      {
+        "normalLine": 2540,
+        "target": "ci-tasks:core-23",
+        "suffix": "",
+        "selectedCommand": "pnpm test:self-hosted-byok"
+      },
+      {
+        "normalLine": 2551,
+        "target": "ci-tasks:core-24",
+        "suffix": "",
+        "selectedCommand": "pnpm test:cloud-services"
+      },
+      {
+        "normalLine": 2607,
+        "target": "ci-tasks:core-25",
+        "suffix": "",
+        "selectedCommand": "pnpm test:hosted-usage"
+      },
+      {
+        "normalLine": 2687,
+        "target": "ci-tasks:core-26",
+        "suffix": "",
+        "selectedCommand": "pnpm test:model-admission"
+      },
+      {
+        "normalLine": 2704,
+        "target": "ci-tasks:core-27",
+        "suffix": "",
+        "selectedCommand": "pnpm test:audit"
+      },
+      {
+        "normalLine": 2756,
+        "target": "ci-tasks:core-28",
+        "suffix": "",
+        "selectedCommand": "pnpm test:agent-kit"
+      },
+      {
+        "normalLine": 2813,
+        "target": "ci-tasks:core-29",
+        "suffix": "",
+        "selectedCommand": "pnpm test:agent-kit-compat"
+      },
+      {
+        "normalLine": 2873,
+        "target": "ci-tasks:core-30",
+        "suffix": "",
+        "selectedCommand": "pnpm test:approved-writes"
+      },
+      {
+        "normalLine": 3371,
+        "target": "ci-tasks:core-31",
+        "suffix": "",
+        "selectedCommand": "pnpm test:coordinator-events"
+      },
+      {
+        "normalLine": 3656,
+        "target": "ci-tasks:core-32",
+        "suffix": "",
+        "selectedCommand": "pnpm test:schedules"
+      },
+      {
+        "normalLine": 3834,
+        "target": "ci-tasks:core-33",
+        "suffix": "",
+        "selectedCommand": "pnpm test:run-recovery"
+      },
+      {
+        "normalLine": 3869,
+        "target": "ci-tasks:core-34",
+        "suffix": "",
+        "selectedCommand": "pnpm test:mvp-fixtures"
+      },
+      {
+        "normalLine": 4249,
+        "target": "ci-tasks:core-35",
+        "suffix": "",
+        "selectedCommand": "pnpm test:credentials"
+      },
+      {
+        "normalLine": 4495,
+        "target": "ci-tasks:core-36",
+        "suffix": "",
+        "selectedCommand": "pnpm test:run-publication"
+      },
+      {
+        "normalLine": 4599,
+        "target": "ci-tasks:core-37",
+        "suffix": "",
+        "selectedCommand": "pnpm test:workflow-wakes"
+      },
+      {
+        "normalLine": 4868,
+        "target": "ci-tasks:core-38",
+        "suffix": "",
+        "selectedCommand": "pnpm --filter @mikka/protocol exec vitest run src/run.test.ts\npnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts"
+      },
+      {
+        "normalLine": 5013,
+        "target": "ci-tasks:core-39",
+        "suffix": "",
+        "selectedCommand": "pnpm test:mobile-push"
+      },
+      {
+        "normalLine": 5062,
+        "target": "ci-tasks:core-40",
+        "suffix": "",
+        "selectedCommand": "pnpm test:mobile"
+      },
+      {
+        "normalLine": 5420,
+        "target": "ci-tasks:core-41",
+        "suffix": "",
+        "selectedCommand": "pnpm test:coordinator-native-relay"
+      },
+      {
+        "normalLine": 5500,
+        "target": "ci-tasks:core-42",
+        "suffix": "",
+        "selectedCommand": "pnpm test:coordinator-native-scope"
+      },
+      {
+        "normalLine": 5587,
+        "target": "ci-tasks:core-43",
+        "suffix": "",
+        "selectedCommand": "pnpm test:coordinator-issue-tools"
+      },
+      {
+        "normalLine": 5731,
+        "target": "ci-tasks:core-44",
+        "suffix": "",
+        "selectedCommand": "pnpm test:signup-turnstile"
+      },
+      {
+        "normalLine": 5787,
+        "target": "ci-tasks:core-45",
+        "suffix": "",
+        "selectedCommand": "pnpm test:cloud-limits"
+      },
+      {
+        "normalLine": 6017,
+        "target": "ci-tasks:core-46",
+        "suffix": "",
+        "selectedCommand": "pnpm test:analytics"
+      },
+      {
+        "normalLine": 6199,
+        "target": "ci-tasks:core-47",
+        "suffix": "",
+        "selectedCommand": "pnpm test:artifacts"
+      },
+      {
+        "normalLine": 6329,
+        "target": "ci-tasks:core-48",
+        "suffix": "",
+        "selectedCommand": "pnpm test:factory-config"
+      },
+      {
+        "normalLine": 6349,
+        "target": "ci-tasks:core-49",
+        "suffix": "",
+        "selectedCommand": "pnpm test:user-message-text"
+      },
+      {
+        "normalLine": 6369,
+        "target": "ci-tasks:core-50",
+        "suffix": "",
+        "selectedCommand": "pnpm test:run-info"
+      },
+      {
+        "normalLine": 6425,
+        "target": "ci-tasks:core-51",
+        "suffix": "",
+        "selectedCommand": "pnpm test:thread-changes"
+      },
+      {
+        "normalLine": 6498,
+        "target": "ci-tasks:core-52",
+        "suffix": "",
+        "selectedCommand": "pnpm check:agent-ui"
+      },
+      {
+        "normalLine": 6509,
+        "target": "ci-tasks:core-53",
+        "suffix": "",
+        "selectedCommand": "pnpm test:dev-local"
+      },
+      {
+        "normalLine": 6603,
+        "target": "ci-tasks:core-54",
+        "suffix": "",
+        "selectedCommand": "pnpm test:lib-units"
+      },
+      {
+        "normalLine": 6825,
+        "target": "ci-tasks:core-55",
+        "suffix": "",
+        "selectedCommand": "pnpm test:project-decisions"
+      },
+      {
+        "normalLine": 7084,
+        "target": "ci-tasks:core-56",
+        "suffix": "",
+        "selectedCommand": "pnpm test:unread"
+      },
+      {
+        "normalLine": 7163,
+        "target": "ci-tasks:core-57",
+        "suffix": "",
+        "selectedCommand": "pnpm test:issue-readonly-dom"
+      },
+      {
+        "normalLine": 7504,
+        "target": "ci-tasks:core-triage",
+        "suffix": "",
+        "selectedCommand": "node --test scripts/ci/*.test.mjs"
+      }
+    ]
+  },
+  "nodeTestSummaries": [
+    {
+      "normalLine": 768,
+      "tests": 244,
+      "suites": 0,
+      "pass": 244,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 825,
+      "tests": 21,
+      "suites": 0,
+      "pass": 21,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 855,
+      "tests": 22,
+      "suites": 0,
+      "pass": 22,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 900,
+      "tests": 34,
+      "suites": 0,
+      "pass": 34,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 938,
+      "tests": 13,
+      "suites": 0,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1360,
+      "tests": 305,
+      "suites": 0,
+      "pass": 305,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1503,
+      "tests": 135,
+      "suites": 0,
+      "pass": 135,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1516,
+      "tests": 9,
+      "suites": 0,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1534,
+      "tests": 5,
+      "suites": 0,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1561,
+      "tests": 14,
+      "suites": 0,
+      "pass": 14,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1594,
+      "tests": 5,
+      "suites": 0,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1613,
+      "tests": 10,
+      "suites": 0,
+      "pass": 10,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1661,
+      "tests": 34,
+      "suites": 0,
+      "pass": 34,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1792,
+      "tests": 7,
+      "suites": 0,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1880,
+      "tests": 152,
+      "suites": 0,
+      "pass": 152,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1905,
+      "tests": 14,
+      "suites": 0,
+      "pass": 14,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 1951,
+      "tests": 17,
+      "suites": 0,
+      "pass": 17,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2028,
+      "tests": 15,
+      "suites": 0,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2261,
+      "tests": 101,
+      "suites": 0,
+      "pass": 101,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2363,
+      "tests": 191,
+      "suites": 0,
+      "pass": 191,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2372,
+      "tests": 1,
+      "suites": 0,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2486,
+      "tests": 53,
+      "suites": 0,
+      "pass": 53,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2520,
+      "tests": 8,
+      "suites": 0,
+      "pass": 8,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2531,
+      "tests": 3,
+      "suites": 0,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2598,
+      "tests": 31,
+      "suites": 0,
+      "pass": 31,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2646,
+      "tests": 11,
+      "suites": 0,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2678,
+      "tests": 18,
+      "suites": 0,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2695,
+      "tests": 3,
+      "suites": 0,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2730,
+      "tests": 14,
+      "suites": 0,
+      "pass": 14,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2747,
+      "tests": 3,
+      "suites": 0,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2804,
+      "tests": 13,
+      "suites": 0,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 2864,
+      "tests": 46,
+      "suites": 0,
+      "pass": 46,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 3079,
+      "tests": 56,
+      "suites": 0,
+      "pass": 56,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 3362,
+      "tests": 97,
+      "suites": 0,
+      "pass": 97,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 3385,
+      "tests": 10,
+      "suites": 0,
+      "pass": 10,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 3623,
+      "tests": 143,
+      "suites": 0,
+      "pass": 143,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 3647,
+      "tests": 214,
+      "suites": 0,
+      "pass": 214,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 3825,
+      "tests": 63,
+      "suites": 0,
+      "pass": 63,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 3860,
+      "tests": 13,
+      "suites": 0,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 3923,
+      "tests": 48,
+      "suites": 0,
+      "pass": 48,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4240,
+      "tests": 10,
+      "suites": 0,
+      "pass": 10,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4384,
+      "tests": 214,
+      "suites": 0,
+      "pass": 214,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4431,
+      "tests": 37,
+      "suites": 0,
+      "pass": 37,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4462,
+      "tests": 23,
+      "suites": 0,
+      "pass": 23,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4486,
+      "tests": 10,
+      "suites": 0,
+      "pass": 10,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4532,
+      "tests": 33,
+      "suites": 0,
+      "pass": 33,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4547,
+      "tests": 4,
+      "suites": 0,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4590,
+      "tests": 26,
+      "suites": 0,
+      "pass": 26,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4624,
+      "tests": 11,
+      "suites": 0,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4642,
+      "tests": 3,
+      "suites": 0,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4717,
+      "tests": 21,
+      "suites": 0,
+      "pass": 21,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4731,
+      "tests": 3,
+      "suites": 0,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 4859,
+      "tests": 148,
+      "suites": 0,
+      "pass": 148,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5004,
+      "tests": 85,
+      "suites": 0,
+      "pass": 85,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5053,
+      "tests": 11,
+      "suites": 0,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5102,
+      "tests": 34,
+      "suites": 0,
+      "pass": 34,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5197,
+      "tests": 20,
+      "suites": 0,
+      "pass": 20,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5578,
+      "tests": 259,
+      "suites": 0,
+      "pass": 259,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5615,
+      "tests": 18,
+      "suites": 0,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5722,
+      "tests": 78,
+      "suites": 0,
+      "pass": 78,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5739,
+      "tests": 4,
+      "suites": 0,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5764,
+      "tests": 22,
+      "suites": 0,
+      "pass": 22,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5778,
+      "tests": 2,
+      "suites": 0,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 5989,
+      "tests": 107,
+      "suites": 0,
+      "pass": 107,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6008,
+      "tests": 11,
+      "suites": 0,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6188,
+      "tests": 31,
+      "suites": 0,
+      "pass": 31,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6250,
+      "tests": 17,
+      "suites": 0,
+      "pass": 17,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6260,
+      "tests": 2,
+      "suites": 0,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6320,
+      "tests": 135,
+      "suites": 0,
+      "pass": 135,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6340,
+      "tests": 7,
+      "suites": 0,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6360,
+      "tests": 4,
+      "suites": 0,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6380,
+      "tests": 7,
+      "suites": 0,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6416,
+      "tests": 8,
+      "suites": 0,
+      "pass": 8,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6470,
+      "tests": 19,
+      "suites": 0,
+      "pass": 19,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6489,
+      "tests": 6,
+      "suites": 0,
+      "pass": 6,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6594,
+      "tests": 30,
+      "suites": 0,
+      "pass": 30,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6792,
+      "tests": 195,
+      "suites": 0,
+      "pass": 195,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6816,
+      "tests": 9,
+      "suites": 0,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6844,
+      "tests": 90,
+      "suites": 0,
+      "pass": 90,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6853,
+      "tests": 1,
+      "suites": 0,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 6892,
+      "tests": 21,
+      "suites": 0,
+      "pass": 21,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7075,
+      "tests": 73,
+      "suites": 0,
+      "pass": 73,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7154,
+      "tests": 11,
+      "suites": 0,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7211,
+      "tests": 186,
+      "suites": 4,
+      "pass": 186,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7234,
+      "tests": 9,
+      "suites": 0,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7279,
+      "tests": 19,
+      "suites": 0,
+      "pass": 19,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7419,
+      "tests": 129,
+      "suites": 0,
+      "pass": 129,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7495,
+      "tests": 28,
+      "suites": 0,
+      "pass": 28,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7540,
+      "tests": 34,
+      "suites": 0,
+      "pass": 34,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7554,
+      "tests": 27,
+      "suites": 0,
+      "pass": 27,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7644,
+      "tests": 64,
+      "suites": 0,
+      "pass": 64,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "normalLine": 7820,
+      "tests": 168,
+      "suites": 0,
+      "pass": 168,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  ],
+  "nodeTestSummaryTotals": {
+    "tests": 4720,
+    "pass": 4720,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "vitestSummaries": [
+    {
+      "normalLine": 2512,
+      "pass": 8,
+      "tests": 8
+    },
+    {
+      "normalLine": 2547,
+      "pass": 2,
+      "tests": 2
+    },
+    {
+      "normalLine": 4922,
+      "pass": 13,
+      "tests": 13
+    },
+    {
+      "normalLine": 5416,
+      "pass": 93,
+      "tests": 93
+    },
+    {
+      "normalLine": 5486,
+      "pass": 6,
+      "tests": 6
+    }
+  ],
+  "vitestTotals": {
+    "tests": 122,
+    "pass": 122
+  },
+  "reporterAggregateMeaning": "Sums of actual process reporter totals; repeated test execution across commands remains counted. These are not deduplicated unique repository cases.",
+  "driverCases": {
+    "count": 74,
+    "eachExactNameOncePass": true,
+    "source": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "bytes": 69119,
+        "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec",
+        "gitBlob": "104075571c73b97a985458f206dba310e4894490",
+        "expected": "104075571c73b97a985458f206dba310e4894490",
+        "match": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "bytes": 94496,
+        "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775",
+        "gitBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+        "expected": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+        "match": true
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "bytes": 14046,
+        "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5",
+        "gitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "expected": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "match": true
+      }
+    ],
+    "ledgerBlob": "59be6a5acd972b2e59919818bc4aed95f5e5958a"
+  },
+  "cleanup": {
+    "postSetupNode": "observed success",
+    "postPnpm": "observed success; pruning unnecessary",
+    "checkoutExtraHeaderUnset": "observed command",
+    "orphanProcessCleanup": "observed log marker",
+    "providerResourceDeletion": "not inferred from runner cleanup"
+  },
+  "privacy": {
+    "boundedScan": {
+      "privateKey": [],
+      "githubToken": [],
+      "providerKey": [],
+      "awsAccess": [],
+      "jwt": [],
+      "credentialURL": [],
+      "email": [],
+      "bearer": []
+    },
+    "rawNotModified": true,
+    "GitHubMaskingPreserved": true,
+    "publicCIBuildSecretFixture": "Known repository CI constant; credential-shaped matches otherwise absent or masked.",
+    "universalAbsenceClaim": false
+  },
+  "boundaries": [
+    "Integration failed separately and is owned by root; these Core results do not make the overall run successful.",
+    "No Native, Integration or PG original was read by this reviewer.",
+    "No new test, resource, production request, source/ref mutation or rerun was executed by this reviewer."
+  ]
+}

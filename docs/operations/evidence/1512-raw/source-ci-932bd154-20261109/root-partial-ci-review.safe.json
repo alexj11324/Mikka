@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "kind": "root-source-and-partial-ci-review",
+  "checkedAt": "2026-11-09 15:08:48 UTC",
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "checks": {
+    "actualGitMergeParentsAndTree": true,
+    "complete6795LeafReadbackPreviouslyPerformed": true,
+    "driver74EachExactlyOnePass": true,
+    "driverFinalThreeFilesBound": true,
+    "source361Pass0Fail0Skip": true,
+    "selection29IntegrationOnlyNotExecutionProof": true,
+    "intermediate45JobsArithmetic": true,
+    "retainedIntegrationFail": true,
+    "oldSuccessUsedAsTimingComparisonOnly": true,
+    "independentFourRefSourceReviewReadbackSha256": true
+  },
+  "sourceIndex": {
+    "gitBlob": "c72e8a7b90dd8e5488febef6b1da8dbc1a320345",
+    "bytes": 4835,
+    "sha256": "13a29d76400da082f3a8be8a2594fade27aa0dcf65ec29f516328e7516e23a5d"
+  },
+  "failureComparison": {
+    "gitBlob": "eecbef337b681105284b1256642b9452b1776a47",
+    "bytes": 16984,
+    "sha256": "2b1d8c084b36e0af6d9745c7e04f9ebe3cc862e9c6060059a2b93edb50454e48"
+  },
+  "independentReview": {
+    "gitBlob": "47ef4e9950358fda6becd1d2d75d0f9856d7d5bd",
+    "bytes": 28435,
+    "sha256": "3b19b4f2987bc0ac0d997578250ca6ac2ced621ca0f9689237eee87b7090db5f"
+  },
+  "metadataIndex": {
+    "gitBlob": "19e78de4f88a86f9e4d7e724f0ab5ee5d423c258",
+    "bytes": 4776,
+    "sha256": "85d008d9ff088d44f5483793db35bbea0277d66d0a7fac2226abb52b9d070f8f"
+  },
+  "decision": "A single exact failed-job repeat is documented after Native's original full window and first attempt terminate; no repeat has started at this checkpoint.",
+  "ownedResources": {
+    "diagnosticVMs": 0
+  },
+  "notClaimed": [
+    "Terminal whole CI",
+    "Current Native budget/cleanup",
+    "CPU throttling or blocked import phase",
+    "Production acceptance",
+    "A newly changed runtime or rerun before the recorded checkpoint"
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "kind": "Acquisition and public-log privacy receipt",
+  "repository": "alexj11324/Mikka",
+  "runId": 42637270671,
+  "attempt": 1,
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "actualCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+  "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "originals": [
+    {
+      "jobId": 129228653985,
+      "bytes": 972927,
+      "sha256": "2ba17e87f546a787cbf1e84bd659f9a3977317a5eb2dfc4a51b32dd7932bcee4",
+      "gitBlob": "c3bb9f49c0cda097a59315bb3b489749842142b6",
+      "reads": 1
+    },
+    {
+      "jobId": 129229145030,
+      "bytes": 1019383,
+      "sha256": "bb6089e9579144ee89fa8d35625b748201c3b6bf7d5fb3387cddf7e7bc022866",
+      "gitBlob": "d777c48d0a9a790f9ce9388ccabae8c41746e0ab",
+      "reads": 1
+    },
+    {
+      "jobId": 129229145060,
+      "bytes": 136458,
+      "sha256": "004e0be06a8696d1fcad879738ea26a40debc3e2a6124f7b52bd332e1e2b7055",
+      "gitBlob": "e9a634dc8ff90b697164662b2040bfd6757e4827",
+      "reads": 1
+    }
+  ],
+  "method": "One decoded GitHub job-log tool request per terminal assigned job. Original decoded strings retained byte-for-byte (including original BOM/ANSI) for UTF-8 hashes/Git blobs. Parsing uses a distinct timestamp/ANSI-normalized copy.",
+  "otherOriginalsRead": 0,
+  "artifactDownloads": 0,
+  "scan": {
+    "boundedPatterns": [
+      {
+        "jobId": 129228653985,
+        "counts": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "awsAccess": 0,
+          "jwt": 0,
+          "credentialURL": 0,
+          "email": 8,
+          "bearer": 0
+        }
+      },
+      {
+        "jobId": 129229145030,
+        "counts": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "awsAccess": 0,
+          "jwt": 0,
+          "credentialURL": 0,
+          "email": 0,
+          "bearer": 0
+        }
+      },
+      {
+        "jobId": 129229145060,
+        "counts": {
+          "privateKey": 0,
+          "githubToken": 0,
+          "providerKey": 0,
+          "awsAccess": 0,
+          "jwt": 0,
+          "credentialURL": 0,
+          "email": 0,
+          "bearer": 0
+        }
+      }
+    ],
+    "emailShapedMatches": [
+      {
+        "normalLine": 5200,
+        "selectedSourcePath": true,
+        "extension": ".patch",
+        "classification": "source filename contains an at-sign, not an email address"
+      },
+      {
+        "normalLine": 5861,
+        "selectedSourcePath": true,
+        "extension": ".png",
+        "classification": "source filename contains an at-sign, not an email address"
+      },
+      {
+        "normalLine": 5862,
+        "selectedSourcePath": true,
+        "extension": ".png",
+        "classification": "source filename contains an at-sign, not an email address"
+      },
+      {
+        "normalLine": 5864,
+        "selectedSourcePath": true,
+        "extension": ".png",
+        "classification": "source filename contains an at-sign, not an email address"
+      },
+      {
+        "normalLine": 5865,
+        "selectedSourcePath": true,
+        "extension": ".png",
+        "classification": "source filename contains an at-sign, not an email address"
+      },
+      {
+        "normalLine": 7081,
+        "selectedSourcePath": true,
+        "extension": ".png",
+        "classification": "source filename contains an at-sign, not an email address"
+      },
+      {
+        "normalLine": 7082,
+        "selectedSourcePath": true,
+        "extension": ".png",
+        "classification": "source filename contains an at-sign, not an email address"
+      },
+      {
+        "normalLine": 9360,
+        "selectedSourcePath": true,
+        "extension": ".patch",
+        "classification": "source filename contains an at-sign, not an email address"
+      }
+    ],
+    "knownPublicCIConstant": "The log contains the repository's hard-coded local CI build-secret fixture; GitHub tokens and database password material are masked. No production credential is inferred from the fixture.",
+    "unresolvedPatternMatches": 0,
+    "universalAbsenceClaim": false,
+    "originalsNotRedactedByReviewer": true
+  },
+  "extraction": {
+    "selection": "Complete JSON stdout block, normalized lines2662–10337, final newline retained; raw log separately preserved.",
+    "reportedTestCounts": "Actual per-process summary counts and exact driver-name PASS matches; no cached or skipped task is presented as executed.",
+    "coreNx": "57 target starts exactly equal 57 selected Core targets; cache explicitly skipped by --skip-nx-cache.",
+    "sourceMigrationCorrection": "Source 63-test group is test:migrations. The recovery driver's 74 names were matched separately in Core test:dev-local."
+  },
+  "localProcessingErrors": [
+    {
+      "operation": "first Source summary display",
+      "error": "ReferenceError n is not defined",
+      "afterOriginalStored": true,
+      "refetch": false
+    }
+  ],
+  "scope": {
+    "workflowReruns": 0,
+    "workflowCancellations": 0,
+    "sourceMutations": 0,
+    "refMutations": 0,
+    "commitsCreated": 0,
+    "testProcessesStartedByReviewer": 0,
+    "VMsCreated": 0,
+    "otherResourcesCreated": 0,
+    "productionRequests": 0,
+    "modelRequests": 0,
+    "onlyMutation": "Created immutable Git blobs for already-authorized evidence; no repository ref changed."
+  },
+  "boundaries": [
+    "GitHub applies masking to public job logs; a finite pattern scan is not a proof that every possible private value is absent.",
+    "All eight email-shaped candidates in Changes are selected source file paths ending in .png or .patch with at-signs, not user addresses.",
+    "Integration failed separately; root owns that original. Current receipt does not claim the whole run or Native/production acceptance succeeded.",
+    "Earlier isolated RED/GREEN tests and previous f346/Native486 attempt2 logs remain separate source-bound historical evidence."
+  ]
+}

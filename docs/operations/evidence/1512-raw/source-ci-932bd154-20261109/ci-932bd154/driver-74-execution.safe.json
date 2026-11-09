@@ -1,0 +1,1027 @@
+{
+  "version": 1,
+  "kind": "Exact recovery-driver cases observed in the combined Core command",
+  "repository": "alexj11324/Mikka",
+  "runId": 42637270671,
+  "attempt": 1,
+  "jobId": 129229145030,
+  "actualCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+  "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "rawLog": {
+    "jobId": 129229145030,
+    "bytes": 1019383,
+    "sha256": "bb6089e9579144ee89fa8d35625b748201c3b6bf7d5fb3387cddf7e7bc022866",
+    "gitBlob": "d777c48d0a9a790f9ce9388ccabae8c41746e0ab",
+    "reads": 1
+  },
+  "sourceBindings": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec",
+      "gitBlob": "104075571c73b97a985458f206dba310e4894490",
+      "expected": "104075571c73b97a985458f206dba310e4894490",
+      "match": true
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 94496,
+      "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775",
+      "gitBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "expected": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "match": true
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "bytes": 14046,
+      "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5",
+      "gitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "expected": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "match": true
+    }
+  ],
+  "target": "ci-tasks:core-53",
+  "packageCommand": "pnpm test:dev-local",
+  "commandEvidence": {
+    "normalLine": 6512,
+    "command": "node --test scripts/acceptance/run-observability.test.mjs scripts/acceptance/run-observability-workflow.test.mjs scripts/acceptance/run-observability-browser.test.mjs scripts/acceptance/model-provider-fallback.test.mjs scripts/test-model-policy.test.mjs scripts/dev-local/acceptance-check.test.mjs scripts/dev-local/transport.test.mjs scripts/dev-local/services.test.mjs scripts/dev-local/gh.test.mjs scripts/dev-local/reviewed-local-evidence.test.mjs scripts/dev-local/daemon-fault.test.mjs scripts/dev-local/factory-handoff-acceptance.test.mjs scripts/dev-local/factory-watchdog-acceptance.test.mjs && node --import tsx --test scripts/dev-local/seed-model-keys.test.ts scripts/dev-local/factory-handoff-daemon-status.test.ts"
+  },
+  "assertions": {
+    "expected": 74,
+    "originalCases": 63,
+    "newRecoveryCases": 11,
+    "eachExpectedNameExactlyOncePass": true,
+    "missing": [],
+    "duplicateMatches": [],
+    "exactOldBodyPreservationPreviouslyVerified": true
+  },
+  "cases": [
+    {
+      "ordinal": 1,
+      "name": "preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6605,
+          "duration": 82.912697,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 2,
+      "name": "preflight excludes only a version-bound Factory task proven to belong to another workspace",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6606,
+          "duration": 15.196908,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 3,
+      "name": "preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6607,
+          "duration": 80.545682,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 4,
+      "name": "preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6608,
+          "duration": 17.016904,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 5,
+      "name": "preflight does not request scope details for already settled Factory tasks",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6609,
+          "duration": 28.776084,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 6,
+      "name": "foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6610,
+          "duration": 26.006176,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 7,
+      "name": "a default team switches only this login session to its verified personal workspace before reading Coordinator",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6611,
+          "duration": 4.443379,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 8,
+      "name": "workspace selection rejects ambiguous choices, teams and another account personal membership before switching",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6612,
+          "duration": 30.049957,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 9,
+      "name": "workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6613,
+          "duration": 4.920115,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 10,
+      "name": "unsafe configuration blocks before any model call and reports only closed failure codes",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6614,
+          "duration": 10.538001,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 11,
+      "name": "two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6615,
+          "duration": 29.549564,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 12,
+      "name": "successful terminal runs close only their own machines and retain task evidence",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6616,
+          "duration": 16.987223,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 13,
+      "name": "a missing machine requires a fresh owned run and an explicit null machine read",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6617,
+          "duration": 36.481639,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 14,
+      "name": "machine failures never turn a completed task green and do not prevent closing another owned machine",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6618,
+          "duration": 152.865645,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 15,
+      "name": "legacy Factory tasks still require review and verify before the normal deliverable acceptance",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6619,
+          "duration": 9.926893,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 16,
+      "name": "missing, failed or stale Factory checks never reach approval, including legacy verify",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6620,
+          "duration": 39.96251,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 17,
+      "name": "deliverable approval requires its receipt, never accepts a repository and never retries a lost response",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6621,
+          "duration": 40.109476,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 18,
+      "name": "uncertain mutation responses never resubmit and still reconcile own temporary settings",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6622,
+          "duration": 15.290801,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 19,
+      "name": "wrong provider/model and an extra native attempt stop the case without retrying",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6623,
+          "duration": 17.491647,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 20,
+      "name": "pure source and budget guards reject shared credentials, inherited model choices and retries",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6624,
+          "duration": 0.469452,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 21,
+      "name": "cleanup preserves a concurrent model edit and reports incomplete restoration",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6625,
+          "duration": 14.469338,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 22,
+      "name": "prepare is explicit, requires execution and restores only its acknowledged settings",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6626,
+          "duration": 32.65553,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 23,
+      "name": "prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6627,
+          "duration": 4.24708,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 24,
+      "name": "a blocked case does not prevent preparation and execution of another available model",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6628,
+          "duration": 16.323381,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 25,
+      "name": "preparation failures restore acknowledged writes but never guess after a lost response",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6629,
+          "duration": 17.085724,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 26,
+      "name": "restoration failures and concurrent edits remain visible without overwriting them",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6630,
+          "duration": 91.232766,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 27,
+      "name": "issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6631,
+          "duration": 1.845528,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 28,
+      "name": "browser submission requires one executed case and does not authenticate on invalid options",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6632,
+          "duration": 0.29282,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 29,
+      "name": "browser mode publishes readiness then observes the real-shaped UI click through push without an API submission",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6633,
+          "duration": 46.461216,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 30,
+      "name": "browser waiting times out or blocks changed UI text without sending or repeating a task",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6634,
+          "duration": 12.62329,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 31,
+      "name": "live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6635,
+          "duration": 2.11322,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 32,
+      "name": "implicit default preflight requires server absence evidence and never writes a preference",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6636,
+          "duration": 3.004445,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 33,
+      "name": "implicit default restores absence with the stored binding and revision, not the catalogue option",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6637,
+          "duration": 12.036797,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 34,
+      "name": "implicit default never overwrites a preference created after preflight",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6638,
+          "duration": 3.283841,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 35,
+      "name": "implicit default stops after a lost or incomplete first selection receipt without guessing ownership",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6639,
+          "duration": 6.527705,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 36,
+      "name": "implicit default preserves a same-value concurrent rewrite when the revision no longer matches",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6640,
+          "duration": 14.672684,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 37,
+      "name": "implicit default checks absence once after a lost restoration response and does not repeat deletion",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6641,
+          "duration": 9.98954,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 38,
+      "name": "all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6642,
+          "duration": 82.606333,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 39,
+      "name": "Factory authority refusals remain failures without retrying an implicit workspace",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6643,
+          "duration": 8.891107,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 40,
+      "name": "Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6644,
+          "duration": 45.445562,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 41,
+      "name": "malformed or foreign personal workspace selection stops before any Factory call",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6645,
+          "duration": 3.540783,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 42,
+      "name": "workspace A idle cannot hide workspace B activity in either scoped reader",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6646,
+          "duration": 19.500441,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 43,
+      "name": "idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6647,
+          "duration": 22.400761,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 44,
+      "name": "workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6648,
+          "duration": 20.956047,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 45,
+      "name": "a changed workspace inventory cannot turn an incomplete scan into an idle proof",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6649,
+          "duration": 1.597502,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 46,
+      "name": "scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6650,
+          "duration": 70.430122,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 47,
+      "name": "fresh authorization failures in another workspace and during restoration remain visible",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6651,
+          "duration": 21.137448,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 48,
+      "name": "the scan rejects a 30-day row expiry at or during the scan and never filters it away",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6652,
+          "duration": 10.195708,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 49,
+      "name": "one overall scan deadline and backwards time fail closed without extending the scan per workspace",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6653,
+          "duration": 13.158004,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 50,
+      "name": "a real request AbortSignal expires within the remaining scan deadline and closes the login session",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6656,
+          "duration": 57.825374,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 51,
+      "name": "the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6657,
+          "duration": 143.590036,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 52,
+      "name": "profile preflight refuses workspace admission denied instead of treating any 404 as absence",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6658,
+          "duration": 3.013172,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 53,
+      "name": "profile cleanup refuses workspace admission denied without falsely marking an existing profile archived",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6659,
+          "duration": 13.942527,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 54,
+      "name": "profile preflight refuses profile scope denied instead of treating any 404 as absence",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6660,
+          "duration": 2.388007,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 55,
+      "name": "profile cleanup refuses profile scope denied without falsely marking an existing profile archived",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6661,
+          "duration": 11.311254,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 56,
+      "name": "profile preflight refuses unknown error instead of treating any 404 as absence",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6662,
+          "duration": 2.274043,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 57,
+      "name": "profile cleanup refuses unknown error without falsely marking an existing profile archived",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6663,
+          "duration": 13.264036,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 58,
+      "name": "profile preflight refuses nested not-found code instead of treating any 404 as absence",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6664,
+          "duration": 2.528,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 59,
+      "name": "profile cleanup refuses nested not-found code without falsely marking an existing profile archived",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6665,
+          "duration": 12.268021,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 60,
+      "name": "profile preflight refuses malformed JSON instead of treating any 404 as absence",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6666,
+          "duration": 3.774121,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 61,
+      "name": "profile cleanup refuses malformed JSON without falsely marking an existing profile archived",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6667,
+          "duration": 16.137718,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 62,
+      "name": "profile absence preflight accepts only the normal authorized missing-profile response",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6668,
+          "duration": 11.762892,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 63,
+      "name": "profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry",
+      "newRecoveryCase": false,
+      "hits": [
+        {
+          "normalLine": 6669,
+          "duration": 19.370435,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 64,
+      "name": "recovery journal refuses each new setting write when its preceding checkpoint fails",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6670,
+          "duration": 15.961191,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 65,
+      "name": "recovery journal failure after a model acknowledgement still restores explicit and implicit selections",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6671,
+          "duration": 8.250843,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 66,
+      "name": "recovery journal failure after each preparation acknowledgement does not prevent restoration",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6672,
+          "duration": 24.581188,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 67,
+      "name": "persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6673,
+          "duration": 14.429413,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 68,
+      "name": "recovery journal retains only validated recovery metadata and isolates callback mutation",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6674,
+          "duration": 34.708427,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 69,
+      "name": "failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6675,
+          "duration": 54.909908,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 70,
+      "name": "a lost temporary selection response records intent without inventing a binding receipt",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6676,
+          "duration": 9.634664,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 71,
+      "name": "an unresolved profile restore retains only the exact acknowledged version and digest",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6677,
+          "duration": 36.98242,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 72,
+      "name": "actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6687,
+          "duration": 900.691038,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 73,
+      "name": "the existing safe artifact includes only the fixed recovery filename alongside the reports",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6688,
+          "duration": 5.23657,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "ordinal": 74,
+      "name": "recovery metadata preserves the actual shared API-key menu shape and restores its explicit choice",
+      "newRecoveryCase": true,
+      "hits": [
+        {
+          "normalLine": 6689,
+          "duration": 20.201861,
+          "unit": "ms",
+          "status": "pass"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    "The job executes a combined test:dev-local command containing several files; this receipt matches this driver's 74 exact case names independently and does not relabel the combined process summary as a standalone 74-test total.",
+    "Current CI Node v24.22.2 execution is separate from the previously preserved isolated Node v24.22.1 RED/GREEN logs.",
+    "This is fixture/CLI test execution, not a production account recovery or PostHog acceptance result."
+  ]
+}

@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "kind": "Source job execution receipt",
+  "repository": "alexj11324/Mikka",
+  "runId": 42637270671,
+  "attempt": 1,
+  "jobId": 129229145060,
+  "jobName": "Source checks",
+  "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129229145060",
+  "status": "completed",
+  "conclusion": "success",
+  "completedAt": "2026-11-09T14:46:28Z",
+  "eventHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "actualCheckout": {
+    "sha": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "normalLine": 133,
+    "sourceBindingReceipt": "8caeafdef46098ee9188ffef08ec134417f921f7"
+  },
+  "original": {
+    "jobId": 129229145060,
+    "bytes": 136458,
+    "sha256": "004e0be06a8696d1fcad879738ea26a40debc3e2a6124f7b52bd332e1e2b7055",
+    "gitBlob": "e9a634dc8ff90b697164662b2040bfd6757e4827",
+    "reads": 1
+  },
+  "runtime": {
+    "node": "v24.22.2",
+    "pnpm": "10.34.3",
+    "runnerImage": "ubuntu-22.04",
+    "runnerImageVersion": "20261101.347.1",
+    "dependencies": "pnpm install --frozen-lockfile"
+  },
+  "commands": [
+    {
+      "normalLine": 278,
+      "command": "pnpm install --frozen-lockfile"
+    },
+    {
+      "normalLine": 487,
+      "command": "node scripts/ci/shadow.mjs"
+    },
+    {
+      "normalLine": 587,
+      "command": "pnpm check:cloud-boundary"
+    },
+    {
+      "normalLine": 662,
+      "command": "node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs"
+    },
+    {
+      "normalLine": 693,
+      "command": "node --test scripts/acceptance/auth-audit-production.test.mjs scripts/acceptance/cloud-lease-audit.test.mjs scripts/acceptance/cloud-lease-recovery.test.mjs scripts/acceptance/shared-account-queue.test.mjs scripts/ops/production-smoke.test.mjs"
+    },
+    {
+      "normalLine": 746,
+      "command": "pnpm lint:code"
+    },
+    {
+      "normalLine": 857,
+      "command": "node apps/api/scripts/generate-routes.mjs --check"
+    },
+    {
+      "normalLine": 874,
+      "command": "pnpm lint:runtime"
+    },
+    {
+      "normalLine": 896,
+      "command": "pnpm test:api"
+    },
+    {
+      "normalLine": 1502,
+      "command": "pnpm --filter @mikka/frontend test"
+    },
+    {
+      "normalLine": 1589,
+      "command": "pnpm typecheck"
+    },
+    {
+      "normalLine": 1614,
+      "command": "pnpm --filter @mikka/protocol typecheck"
+    },
+    {
+      "normalLine": 1634,
+      "command": "pnpm --filter @mikka/mobile typecheck"
+    },
+    {
+      "normalLine": 1654,
+      "command": "pnpm --silent lint:ui --json > ui-audit.json"
+    },
+    {
+      "normalLine": 1670,
+      "command": "node --input-type=module -e '"
+    }
+  ],
+  "testSummaries": [
+    {
+      "normalLineStart": 654,
+      "tests": 46,
+      "suites": 0,
+      "pass": 46,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "group": "cloud-boundary-policy"
+    },
+    {
+      "normalLineStart": 685,
+      "tests": 7,
+      "suites": 0,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "group": "release-credential-unit-tests"
+    },
+    {
+      "normalLineStart": 738,
+      "tests": 29,
+      "suites": 0,
+      "pass": 29,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "group": "acceptance-audit-and-production-smoke-unit-tests"
+    },
+    {
+      "normalLineStart": 844,
+      "tests": 63,
+      "suites": 0,
+      "pass": 63,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "group": "migrations"
+    },
+    {
+      "normalLineStart": 1020,
+      "tests": 102,
+      "suites": 0,
+      "pass": 102,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "group": "api-typescript-tests"
+    },
+    {
+      "normalLineStart": 1494,
+      "tests": 69,
+      "suites": 0,
+      "pass": 69,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "group": "api-build-runtime-script-tap-tests"
+    },
+    {
+      "normalLineStart": 1581,
+      "tests": 45,
+      "suites": 0,
+      "pass": 45,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "group": "frontend-script-tests"
+    }
+  ],
+  "totals": {
+    "tests": 361,
+    "pass": 361,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "checks": {
+    "codeLint": {
+      "warnings": 0,
+      "errors": 0,
+      "normalLine": 766
+    },
+    "runtimeLint": {
+      "warnings": 0,
+      "errors": 0,
+      "normalLine": 894
+    },
+    "routeGenerator": {
+      "command": "node apps/api/scripts/generate-routes.mjs --check",
+      "normalLine": 857,
+      "completed": true
+    },
+    "types": {
+      "rootAndAPIAndFrontend": true,
+      "protocol": true,
+      "mobile": true
+    },
+    "uiPolicy": {
+      "businessStyleFiles": 3224,
+      "interactionFiles": 532,
+      "libraryFilesStyleExcluded": 287,
+      "errors": 0,
+      "upstreamSourceVerification": false
+    }
+  },
+  "cleanup": {
+    "postSetupNode": "observed success",
+    "postPnpm": "observed success; pruning unnecessary",
+    "checkoutExtraHeaderUnset": "observed command",
+    "orphanProcessCleanup": "observed log marker",
+    "providerResourceDeletion": "not inferred from runner cleanup"
+  },
+  "nonfatalWarnings": [
+    "pnpm reports missing daemon dist/mikka.js bin during installation; installation and subsequent required steps succeeded.",
+    "pnpm ignored dependency build scripts according to repository configuration.",
+    "Vite reports chunk-size advisories during frontend tests.",
+    "GitHub actions runtime deprecation warnings are retained in the original log."
+  ],
+  "privacy": {
+    "patternScan": {
+      "privateKey": 0,
+      "githubToken": 0,
+      "providerKey": 0,
+      "awsAccess": 0,
+      "jwt": 0,
+      "credentialURL": 0
+    },
+    "publicGitHubMasking": true,
+    "knownPublicCIBuildSecretFixture": "Present as repository CI configuration, not a production credential.",
+    "rawNotRedactedByReviewer": true,
+    "universalAbsenceClaim": false
+  },
+  "boundaries": [
+    "The 63-test section is migrations; it is not the 74-case recovery-driver suite, which belongs to Core test:dev-local.",
+    "Shadow selection scenarios are static comparison output, not execution of those example workflows.",
+    "No production account, model, PostHog ingestion or browser acceptance is proven by Source job success.",
+    "This reviewer did not execute tests or create resources."
+  ]
+}

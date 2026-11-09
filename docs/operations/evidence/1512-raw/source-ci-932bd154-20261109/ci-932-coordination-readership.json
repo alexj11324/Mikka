@@ -1,0 +1,150 @@
+{
+  "schema": "issue1512.coordination-and-readership.readonly.v1",
+  "assembledAt": "2026-11-09 15:06:22 UTC",
+  "scope": "Bounded metadata and existing public owner receipts only; no production observation.",
+  "actualMain": {
+    "observedAt": "2026-11-09 15:01:47 UTC",
+    "ref": "refs/heads/main",
+    "sha": "76537e4c2996f717cbd19589e1efae328028aa4a",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main"
+  },
+  "native1827": {
+    "pr": {
+      "observedAt": "2026-11-09 15:01:47 UTC",
+      "number": 1827,
+      "title": "fix(ios): restore official sign-in brand and activate capture app",
+      "state": "open",
+      "draft": false,
+      "merged": false,
+      "mergedAt": null,
+      "head": "486e8542a1201c285f15e4bd51987292c91bdc8e",
+      "headRef": "batch/2026-11-09-appstore-brand",
+      "base": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "mergeCommit": "225cda55c9a86247c70fa5292f71a8290a3e0e95",
+      "mergeable": true,
+      "mergeableState": "clean",
+      "updatedAt": "2026-11-09T14:41:19Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1827"
+    },
+    "ci": {
+      "observedAt": "2026-11-09 15:02:07 UTC",
+      "id": 42628930963,
+      "name": "CI",
+      "path": ".github/workflows/ui-policy.yml",
+      "head": "486e8542a1201c285f15e4bd51987292c91bdc8e",
+      "event": "pull_request",
+      "branch": "batch/2026-11-09-appstore-brand",
+      "attempt": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "suiteId": 115457829294,
+      "createdAt": "2026-11-09T13:49:59Z",
+      "updatedAt": "2026-11-09T14:39:51Z",
+      "startedAt": "2026-11-09T14:12:44Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42628930963",
+      "pullRequests": [
+        {
+          "number": 1827,
+          "head": "486e8542a1201c285f15e4bd51987292c91bdc8e",
+          "base": "111a8dfb8b227ac0441324339ff42e4328ea609a"
+        }
+      ]
+    },
+    "mergedIntoMain": false,
+    "ownerReadyReceipt": {
+      "id": 6742819079,
+      "createdAt": "2026-11-09T14:40:58Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6742819079",
+      "statement": "Owner reports exact486 full green and awaits the first real source handoff; future request is not an active lock."
+    }
+  },
+  "factory1503": {
+    "actualWindow": {
+      "start": "2026-11-09T13:56:00Z",
+      "hardEnd": "2026-11-09T16:26:00Z",
+      "earlyReleaseObserved": false
+    },
+    "latestOwnerState": {
+      "commentId": 6743148822,
+      "createdAt": "2026-11-09T14:55:32Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6743148822",
+      "runId": 42636835234,
+      "attempt": 1,
+      "source": "7017d5f14871cbf1aeea771824d72e1d2bd90255",
+      "reportedRunStart": "2026-11-09T14:39:36Z",
+      "reportedStageObservation": "2026-11-09T14:54:37Z",
+      "stage": "Claude delivery running; Codex later",
+      "businessPassClaimed": false,
+      "nextHandoff": "Actual cleanup and entry closure; on failure close owned resources/sharing/credentials and release. No automatic extension."
+    },
+    "nativeAcknowledgment": {
+      "commentId": 6743172938,
+      "createdAt": "2026-11-09T14:56:35Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6743172938",
+      "statement": "Native owner preserves the active Factory run and waits for its stated closure."
+    }
+  },
+  "boundedCommentReads": [
+    {
+      "issue": 1752,
+      "since": "2026-11-09T14:17:00Z",
+      "observedAt": "2026-11-09 15:01:47 UTC",
+      "page": 1,
+      "perPage": 100,
+      "returned": 16,
+      "endedBeforePageLimit": true
+    },
+    {
+      "issue": 1503,
+      "since": "2026-11-09T14:17:00Z",
+      "observedAt": "2026-11-09 15:01:47 UTC",
+      "page": 1,
+      "perPage": 100,
+      "returned": 2,
+      "endedBeforePageLimit": true
+    },
+    {
+      "issue": 1827,
+      "since": "2026-11-09T14:17:00Z",
+      "observedAt": "2026-11-09 15:01:47 UTC",
+      "page": 1,
+      "perPage": 100,
+      "returned": 1,
+      "endedBeforePageLimit": true
+    }
+  ],
+  "oldIntegrationReadership": {
+    "observedAt": "2026-11-09 15:02:07 UTC",
+    "runId": 42621847483,
+    "jobId": 129176683635,
+    "thisAgent": {
+      "rawReads": 0,
+      "knownRawBlob": null
+    },
+    "currentSourceReview": {
+      "rawReads": 0,
+      "knownRawBlob": null,
+      "reportedScope": "Changes129175711149 and gate metadata"
+    },
+    "native6180Review": {
+      "rawReads": 0,
+      "knownRawBlob": null,
+      "cp33Index": "12d3700426475b3e8bf6feceb4e64756211739b0",
+      "otherJobOriginalLogReads": 0
+    },
+    "globalNoPriorReaderClaim": false,
+    "rootMayDesignateUniqueReader": true
+  },
+  "limitations": [
+    "No independently observed production Task state is inferred from a GitHub step name.",
+    "Old f346 Integration had no raw blob or prior read in the three consulted readers' records; this is not a claim about every possible reader.",
+    "Window statements are observed owner receipts, not a newly acquired source/account lock."
+  ],
+  "readerActions": {
+    "rawJobLogReads": 0,
+    "artifactDownloads": 0,
+    "productionReads": 0,
+    "resourceCreations": 0,
+    "refMutations": 0
+  }
+}

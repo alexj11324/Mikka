@@ -1,0 +1,226 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 35,
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "recordedAt": "2026-11-09 15:09:45 UTC",
+  "prefix": "docs/operations/evidence/1512-raw/source-ci-932bd154-20261109",
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "actualCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+  "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "actualMainAtSourceFollowup": "76537e4c2996f717cbd19589e1efae328028aa4a",
+  "sourcePublishedAt": "2026-11-09 14:42:10 UTC",
+  "mainCI": {
+    "run": 42637270671,
+    "attempt": 1,
+    "status": "partial-with-retained-failure",
+    "changes": "success",
+    "core": "success",
+    "source": "success",
+    "driverExactCases": 74,
+    "integration": "failure",
+    "native": "Original evidence still pending; metadata snapshot reflects15:01:47"
+  },
+  "metadataSnapshot": {
+    "workflowCount": 14,
+    "workflowConclusions": {
+      "success": 13,
+      "in_progress": 1
+    },
+    "uniqueJobCount": 45,
+    "jobConclusions": {
+      "success": 33,
+      "failure": 1,
+      "skipped": 10,
+      "in_progress": 1
+    },
+    "allRunsAttemptOne": true,
+    "onlyObservedFailure": {
+      "runId": 42637270671,
+      "jobId": 129229145015,
+      "step": 4,
+      "stepName": "Run selected integration tasks through Nx Core",
+      "rawLogOwner": "/root"
+    },
+    "onlyPendingJob": {
+      "id": 129231919498,
+      "activeStep": 17,
+      "activeStepStartedAt": "2026-11-09T14:58:07Z",
+      "rawEvidenceOwner": "/root/native_6180_review"
+    },
+    "nativeBudgets": null,
+    "nativeCleanup": null,
+    "overallGatePassed": false,
+    "productionAcceptance": null
+  },
+  "failedJob": 129229145015,
+  "failureKind": "unchanged team-import child exceeded15s deadline; exact phase unknown",
+  "repeatedJobsAtCheckpoint": 0,
+  "completedProductionCases": 0,
+  "ownedActiveDiagnosticResources": 0,
+  "evidenceParent": "22c873a4882140c361dc48abd424fb5e5087eac0",
+  "payloadFiles": 25,
+  "payloadBytes": 5478650,
+  "indexExcluded": true,
+  "files": [
+    {
+      "path": "source-publication-preflight.safe.json",
+      "gitBlob": "e5bbcf70b44f0e46b53535d96e3b3fe2d03c3c23",
+      "bytes": 8103,
+      "sha256": "9a0a7fb9c8b73a9e2537c9f5d6c1e3c5ebda6916056e8a120f2a1a5c99495e33"
+    },
+    {
+      "path": "source-publication-followup.safe.json",
+      "gitBlob": "e816d3a042704a0f851c0a206d42bfe478c3d100",
+      "bytes": 1891,
+      "sha256": "6b81df55716d83f1b311aa12d8128331bf6ef39e3684c41d91c9b398ec0a2d5f"
+    },
+    {
+      "path": "candidate-tree-leaves.safe.json",
+      "gitBlob": "5eab47b945ec0f31aa06135ccfab2731e4b524ce",
+      "bytes": 1168277,
+      "sha256": "02a78ac3a270aab58e12cf1f3b5098353c7eda22593f3e08cd4450bd64f41746"
+    },
+    {
+      "path": "root-partial-ci-review.safe.json",
+      "gitBlob": "d968b97f5259d021f04d1f238d5639f213fe18eb",
+      "bytes": 1899,
+      "sha256": "2ada6e21dff8b4b08162a629a26b0e9fd52366fad9cfd8318f24e3bbc18895c9"
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "4b020585a884f03db055671c683784538ad3105b",
+      "bytes": 2153,
+      "sha256": "e656ae750119333cecacb1b0919ea1a98a113dc39a66349e5579bf2cdb85c0f4"
+    },
+    {
+      "path": "ci-932bd154/changes.original.log",
+      "bytes": 972927,
+      "sha256": "2ba17e87f546a787cbf1e84bd659f9a3977317a5eb2dfc4a51b32dd7932bcee4",
+      "gitBlob": "c3bb9f49c0cda097a59315bb3b489749842142b6"
+    },
+    {
+      "path": "ci-932bd154/selection.original.json",
+      "bytes": 389382,
+      "sha256": "6a6bcb4bc5be98bbbebe5ecda8f2f84fed88d57f93f0a3185a001a344b0645de",
+      "gitBlob": "feaf33488555ee524bfc3dbf56812e1bfcffeaa3"
+    },
+    {
+      "path": "ci-932bd154/source-and-selection.safe.json",
+      "bytes": 3811,
+      "sha256": "05255e4842538502992c12758e734e595504f7aa3bd15dea027c461c1ef852f4",
+      "gitBlob": "8caeafdef46098ee9188ffef08ec134417f921f7"
+    },
+    {
+      "path": "ci-932bd154/source.original.log",
+      "bytes": 136458,
+      "sha256": "004e0be06a8696d1fcad879738ea26a40debc3e2a6124f7b52bd332e1e2b7055",
+      "gitBlob": "e9a634dc8ff90b697164662b2040bfd6757e4827"
+    },
+    {
+      "path": "ci-932bd154/source-execution.safe.json",
+      "bytes": 6525,
+      "sha256": "004cab0469da119810a44afec7d9c44183276fa3aa570f15c0443380891a1850",
+      "gitBlob": "7c228d5290f958419504b16c3a0d0c5c5287c14f"
+    },
+    {
+      "path": "ci-932bd154/core.original.log",
+      "bytes": 1019383,
+      "sha256": "bb6089e9579144ee89fa8d35625b748201c3b6bf7d5fb3387cddf7e7bc022866",
+      "gitBlob": "d777c48d0a9a790f9ce9388ccabae8c41746e0ab"
+    },
+    {
+      "path": "ci-932bd154/driver-74-execution.safe.json",
+      "bytes": 27864,
+      "sha256": "8a96dba6a2fadc41872938d65d31690dc4ea8c98b71cc5b266ef188c1064a749",
+      "gitBlob": "59be6a5acd972b2e59919818bc4aed95f5e5958a"
+    },
+    {
+      "path": "ci-932bd154/core-execution.safe.json",
+      "bytes": 29147,
+      "sha256": "d552deac483bba53be341c61b7b9fe561345ceadc6b74d66492ae36722e130ff",
+      "gitBlob": "2a7a4cad346b0dc559b0380ebc6aba81c4a90759"
+    },
+    {
+      "path": "ci-932bd154/acquisition-and-privacy.safe.json",
+      "bytes": 5925,
+      "sha256": "8f90804c8f3d4384e3dae11ad328f4a631dc3cfedbc0b557d51618e550d2ac3b",
+      "gitBlob": "558255fca8c0fc7779742e577fe114f6b24aeb88"
+    },
+    {
+      "path": "ci-originals-index.safe.json",
+      "gitBlob": "c72e8a7b90dd8e5488febef6b1da8dbc1a320345",
+      "bytes": 4835,
+      "sha256": "13a29d76400da082f3a8be8a2594fade27aa0dcf65ec29f516328e7516e23a5d"
+    },
+    {
+      "path": "ci-932-workflow-jobs-intermediate.json",
+      "gitBlob": "09309e086ffba5548519a893cea6c1c8da53e758",
+      "bytes": 194247,
+      "sha256": "ada70b339051b9477627a10f7dd7b049ab2226c205d0926700cb7f5c0aeb4453"
+    },
+    {
+      "path": "ci-932-check-association-initial.json",
+      "gitBlob": "21c61968bc18b884e818b2dc5c6160d077f5a731",
+      "bytes": 56966,
+      "sha256": "bd194a88e0c75e503eca0c54370ec4f22af37530e2939dbae5c9741fbd25456a"
+    },
+    {
+      "path": "ci-932-coordination-readership.json",
+      "gitBlob": "1f564ca346b31491f93ebcbad333d8437ebb46f1",
+      "bytes": 5214,
+      "sha256": "5c14bebde30ff19bc3ec5334d95c1c90d31f3bea478266572745095e42443f63"
+    },
+    {
+      "path": "metadata-index.safe.json",
+      "gitBlob": "19e78de4f88a86f9e4d7e724f0ab5ee5d423c258",
+      "bytes": 4776,
+      "sha256": "85d008d9ff088d44f5483793db35bbea0277d66d0a7fac2226abb52b9d070f8f"
+    },
+    {
+      "path": "integration-attempt1.original.log",
+      "gitBlob": "c34cdb3d06fa045aad1e0fa334d4300f28eec240",
+      "bytes": 670848,
+      "sha256": "ada8bd4b0c24623a68fd8cbc059c3233f933b2b7b28d14231068b85698223f0a"
+    },
+    {
+      "path": "historical-f346-integration.original.log",
+      "gitBlob": "bc84553abc59efe39ebb52f941096bd268c63dd1",
+      "bytes": 673313,
+      "sha256": "10e865a552d54bd106a13ccaceeb0bea6440cfac022e1047dc6d10414839e725"
+    },
+    {
+      "path": "integration-timeout-comparison.safe.json",
+      "gitBlob": "eecbef337b681105284b1256642b9452b1776a47",
+      "bytes": 16984,
+      "sha256": "2b1d8c084b36e0af6d9745c7e04f9ebe3cc862e9c6060059a2b93edb50454e48"
+    },
+    {
+      "path": "ci-932bd154/integration-timeout-independent-review.safe.json",
+      "gitBlob": "47ef4e9950358fda6becd1d2d75d0f9856d7d5bd",
+      "bytes": 28435,
+      "sha256": "3b19b4f2987bc0ac0d997578250ca6ac2ced621ca0f9689237eee87b7090db5f"
+    },
+    {
+      "path": "upstream-1810-fixed-5c705-review.safe.json",
+      "gitBlob": "2914826dd56026ddf3cd668aa8070166f2dc167a",
+      "bytes": 35505,
+      "sha256": "2b69c35d316f94b1751e3e47ebc69862cb3dd2ab3bd53958849728672574c43c"
+    },
+    {
+      "path": "v8-verification-helpers.json",
+      "gitBlob": "5cc66fff9c158dcdd23c5dacf4e84f0ef6f89128",
+      "bytes": 13782,
+      "sha256": "d2e81a0ff31f9c8c19c4efe0e0d0fb16ef0196124fe8eb2221994f64690b35ae"
+    }
+  ],
+  "limitations": [
+    "Partial metadata is frozen at its stated times; this checkpoint does not claim terminal CI success.",
+    "Successful historical integration execution is solely a source/runtime/timing comparison, never evidence that the failing new child completed.",
+    "One exact failed-job repeat is planned after the original Native evidence closes; no repeat is included.",
+    "The separately reviewed fixed upstream1810 head is not included in the candidate.",
+    "Original logs remain unchanged. Finite sensitive-pattern scans are not a guarantee that all possible sensitive content has been identified.",
+    "No production trace/model/Replay/Notebook acceptance is claimed."
+  ]
+}

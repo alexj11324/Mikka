@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "kind": "CI source and selection receipt",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1799,
+  "run": {
+    "id": 42637270671,
+    "attempt": 1,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671"
+  },
+  "eventHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "actualCheckout": {
+    "sha": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "parents": [
+      "76537e4c2996f717cbd19589e1efae328028aa4a",
+      "932bd1549942bc2a8d040c7281a37fbe851c8eb0"
+    ],
+    "ref": "refs/pull/1799/merge",
+    "logEvidence": {
+      "jobId": 129228653985,
+      "rawGitBlob": "c3bb9f49c0cda097a59315bb3b489749842142b6",
+      "normalLines": [
+        2542,
+        2561,
+        2563,
+        2564
+      ]
+    },
+    "verification": "Actual git log -1 output and independent Git commit API; actual tree equals the published event-head tree, not an assumption from head_sha."
+  },
+  "changes": {
+    "jobId": 129228653985,
+    "name": "changes / Changed files",
+    "status": "completed",
+    "conclusion": "success",
+    "completedAt": "2026-11-09T14:43:09Z",
+    "original": {
+      "jobId": 129228653985,
+      "bytes": 972927,
+      "sha256": "2ba17e87f546a787cbf1e84bd659f9a3977317a5eb2dfc4a51b32dd7932bcee4",
+      "gitBlob": "c3bb9f49c0cda097a59315bb3b489749842142b6",
+      "reads": 1
+    }
+  },
+  "selection": {
+    "bytes": 389382,
+    "sha256": "6a6bcb4bc5be98bbbebe5ecda8f2f84fed88d57f93f0a3185a001a344b0645de",
+    "gitBlob": "feaf33488555ee524bfc3dbf56812e1bfcffeaa3",
+    "normalLineRange": {
+      "normalLineStart": 2662,
+      "normalLineEnd": 10337
+    },
+    "full": true,
+    "docsOnly": false,
+    "unitTasks": 86,
+    "coreTasks": 57,
+    "integrationTasks": 29,
+    "databaseSuites": 72,
+    "dbMatrix": {
+      "shard": [
+        "1/4",
+        "2/4",
+        "3/4",
+        "4/4"
+      ]
+    },
+    "flags": {
+      "source": true,
+      "daemon": true,
+      "mobile": true,
+      "desktop": true,
+      "image": true,
+      "analytics": true
+    },
+    "completeInventoryInReferencedBlob": true,
+    "meaning": "Selected inventory, not evidence those tasks or database suites have executed."
+  },
+  "recoverySource": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec",
+      "gitBlob": "104075571c73b97a985458f206dba310e4894490",
+      "expected": "104075571c73b97a985458f206dba310e4894490",
+      "match": true
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 94496,
+      "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775",
+      "gitBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "expected": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "match": true
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "bytes": 14046,
+      "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5",
+      "gitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "expected": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "match": true
+    }
+  ],
+  "scope": {
+    "originalLogReads": {
+      "changes": 1,
+      "core": 0,
+      "source": 1
+    },
+    "otherJobLogs": 0,
+    "artifactDownloads": 0,
+    "resourceCreations": 0,
+    "refsChanged": false,
+    "testExecutionByReviewer": false
+  },
+  "boundaries": [
+    "Source/Core completion and test execution will be recorded independently from these selection counts.",
+    "Previous f346 and Native486 attempt-2 evidence retains its original source and environment; it is not this run.",
+    "This source/selection receipt is not a production deployment or PostHog acceptance result."
+  ]
+}

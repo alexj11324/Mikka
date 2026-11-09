@@ -1,0 +1,328 @@
+{
+  "schemaVersion": 1,
+  "kind": "retained-integration-timeout-comparison",
+  "recordedAt": "2026-11-09 15:04:18 UTC",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "current": {
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "checkout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "jobId": 129229145015,
+    "runId": 42637270671,
+    "attempt": 1,
+    "readAt": "2026-11-09 14:50:10 UTC",
+    "bytes": 670848,
+    "sha256": "ada8bd4b0c24623a68fd8cbc059c3233f933b2b7b28d14231068b85698223f0a",
+    "reader": "/root",
+    "gitBlob": "c34cdb3d06fa045aad1e0fa334d4300f28eec240",
+    "result": "failure",
+    "failedTarget": "ci-tasks:integration-26",
+    "failedTest": "all real team dependencies and auth export/session metadata load before the denied native SQL boundary",
+    "testDurationMs": 15114.026521,
+    "child": {
+      "timeoutMs": 15000,
+      "killed": true,
+      "signal": "SIGTERM",
+      "code": null,
+      "stdout": "",
+      "expectedBoundaryOnlyInStderr": true
+    },
+    "originalSelectedLines": [
+      "2026-11-09T14:43:18.4501083Z node: v24.22.2",
+      "2026-11-09T14:47:45.0630848Z ci-tasks: > TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import tsx --test lib/action-error-team.test.ts && TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./scripts/server-test.mjs --import ./tests/fixtures/issue-action-auth-pure-runtime.mjs --import tsx --test tests/issue-scope-action-auth.test.ts tests/issue-scope-callback.test.ts && TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./tests/fixtures/legacy-scope-runtime.mjs --import tsx --test tests/legacy-scope-action.test.ts && TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./tests/fixtures/linear-target-runtime.mjs --import tsx --test tests/linear-target-policy.test.ts && TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./tests/fixtures/claim-response-runtime.mjs --import tsx --test tests/claim-response.test.ts && TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./scripts/server-test.mjs --import tsx --import ./tests/fixtures/scope-store-runtime.mjs --test tests/issue-scope-store-policy.test.ts && pnpm test:scope-acceptance-guard",
+      "2026-11-09T14:47:53.7397655Z ci-tasks: > next-app@0.0.1 test:scope-acceptance-guard /home/runner/work/Mikka/Mikka",
+      "2026-11-09T14:48:13.4205874Z ci-tasks: ✔ actual scope suite startup and installed loader stop at the first connection boundary, offline (16102.983022ms)",
+      "2026-11-09T14:48:14.5731668Z ci-tasks: ✔ actual team suite startup and installed loader stop at the first connection boundary, offline (1152.771588ms)",
+      "2026-11-09T14:48:18.3630735Z ci-tasks: ✔ actual team-resume suite startup and installed loader stop at the first connection boundary, offline (3794.613246ms)",
+      "2026-11-09T14:48:18.4037715Z ci-tasks: ✖ all real team dependencies and auth export/session metadata load before the denied native SQL boundary (15114.026521ms)",
+      "2026-11-09T14:48:18.4088336Z ci-tasks: ✖ all real team dependencies and auth export/session metadata load before the denied native SQL boundary (15114.026521ms)"
+    ]
+  },
+  "historical": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "job": 129176683635,
+    "run": 42621847483,
+    "reader": "/root",
+    "at": "2026-11-09 15:02:03 UTC",
+    "ownership": "acceptance/current_source/native all confirm no prior read",
+    "bytes": 673313,
+    "sha256": "10e865a552d54bd106a13ccaceeb0bea6440cfac022e1047dc6d10414839e725",
+    "gitBlob": "bc84553abc59efe39ebb52f941096bd268c63dd1",
+    "result": "success",
+    "testDurationMs": 6936.428201,
+    "teamReport": {
+      "teamImportContract": true,
+      "dynamicImportOccurrences": 26,
+      "uniqueModules": 24,
+      "scenarios": 22,
+      "deniedConnections": 1,
+      "nativeTransportAttempts": 0,
+      "nativeSqlSubmissions": 0
+    },
+    "originalSelectedLines": [
+      "2026-11-09T13:04:38.9760598Z node: v24.22.2",
+      "2026-11-09T13:08:24.6544635Z ci-tasks: > TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import tsx --test lib/action-error-team.test.ts && TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./scripts/server-test.mjs --import ./tests/fixtures/issue-action-auth-pure-runtime.mjs --import tsx --test tests/issue-scope-action-auth.test.ts tests/issue-scope-callback.test.ts && TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./tests/fixtures/legacy-scope-runtime.mjs --import tsx --test tests/legacy-scope-action.test.ts && TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./tests/fixtures/linear-target-runtime.mjs --import tsx --test tests/linear-target-policy.test.ts && TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./tests/fixtures/claim-response-runtime.mjs --import tsx --test tests/claim-response.test.ts && TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./scripts/server-test.mjs --import tsx --import ./tests/fixtures/scope-store-runtime.mjs --test tests/issue-scope-store-policy.test.ts && pnpm test:scope-acceptance-guard",
+      "2026-11-09T13:08:29.1164750Z ci-tasks: > next-app@0.0.1 test:scope-acceptance-guard /home/runner/work/Mikka/Mikka",
+      "2026-11-09T13:08:38.2622154Z ci-tasks: ✔ actual scope suite startup and installed loader stop at the first connection boundary, offline (7501.186409ms)",
+      "2026-11-09T13:08:39.3429449Z ci-tasks: ✔ actual team suite startup and installed loader stop at the first connection boundary, offline (1074.616465ms)",
+      "2026-11-09T13:08:42.4144073Z ci-tasks: ✔ actual team-resume suite startup and installed loader stop at the first connection boundary, offline (3084.302263ms)",
+      "2026-11-09T13:08:42.4395601Z ci-tasks: ✔ all real team dependencies and auth export/session metadata load before the denied native SQL boundary (6936.428201ms)",
+      "2026-11-09T13:08:42.4396659Z ci-tasks: ℹ {\"teamImportContract\":true,\"dynamicImportOccurrences\":26,\"uniqueModules\":24,\"scenarios\":22,\"realAuthExports\":[\"MOBILE_APP_ORIGIN\",\"auth\",\"authBaseURL\",\"githubEnabled\",\"githubSignInEnabled\",\"googleEnabled\",\"oauthCallbackBaseURL\"],\"deniedConnections\":1,\"nativeTransportAttempts\":0,\"nativeSqlSubmissions\":0}"
+    ]
+  },
+  "runtimeComparison": {
+    "nodeBoth": "v24.22.2",
+    "pnpmBoth": "10.34.3",
+    "osBoth": "Ubuntu 22.04.5 LTS",
+    "imageBoth": "ubuntu-22.04 / 20261101.347.1",
+    "nxParallelTargets": 2,
+    "nodeTestFilesInGuardCommand": 7,
+    "explicitTestFileConcurrency": null,
+    "tsxAndNodeCompileCaches": "explicitly disabled in cold import child",
+    "durationPairs": [
+      {
+        "name": "native Apple verifies tokens, preserves verified email linking and refuses secretless browser authorization",
+        "oldMs": 1010.33287,
+        "newMs": 1159.549475,
+        "ratio": 1.1476905378719393
+      },
+      {
+        "name": "a pre-account startup log uses the real runner secret inventory and keeps missing stores fail closed",
+        "oldMs": 1116.479642,
+        "newMs": 2115.501445,
+        "ratio": 1.894796255496793
+      },
+      {
+        "name": "a failed group send survives leaving for Settings and returning, with explicit retry only",
+        "oldMs": 4519.332541,
+        "newMs": 9228.938931,
+        "ratio": 2.042102201436564
+      },
+      {
+        "name": "a refused group retry completing across a quick remount unlocks the current view",
+        "oldMs": 4665.495963,
+        "newMs": 9584.040807,
+        "ratio": 2.0542383667260284
+      },
+      {
+        "name": "Factory task and thread references in bot and agent replies are real links; sent user text keeps its existing rendering",
+        "oldMs": 4538.672638,
+        "newMs": 8567.817151,
+        "ratio": 1.887736312873949
+      },
+      {
+        "name": "a background thread read failure preserves transcript, scroll, composer focus and unsent draft",
+        "oldMs": 1723.651182,
+        "newMs": 3065.966599,
+        "ratio": 1.7787627978431657
+      },
+      {
+        "name": "停止 aborts a reply in flight on the stop push, with no per-second check (#1212)",
+        "oldMs": 1101.954219,
+        "newMs": 1101.175557,
+        "ratio": 0.9992933808078647
+      },
+      {
+        "name": "three acknowledged presence tabs still share one authorized read for the same device-state push",
+        "oldMs": 2745.593272,
+        "newMs": 2755.780179,
+        "ratio": 1.0037102753360767
+      },
+      {
+        "name": "authenticated HTTP submission reaches actual planner prompt through stored event projection",
+        "oldMs": 1576.813912,
+        "newMs": 2949.019182,
+        "ratio": 1.8702391953528121
+      },
+      {
+        "name": "real list hooks update held revisions after an asynchronous read without losing scoped focus coverage",
+        "oldMs": 5055.448091,
+        "newMs": 5058.424319,
+        "ratio": 1.0005887169537548
+      },
+      {
+        "name": "real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes",
+        "oldMs": 7599.55986,
+        "newMs": 7592.363994,
+        "ratio": 0.9990531206895448
+      },
+      {
+        "name": "a healthy mounted approval UI makes no ten-second availability, list or result poll",
+        "oldMs": 11063.524017,
+        "newMs": 11319.996216,
+        "ratio": 1.0231817817366247
+      },
+      {
+        "name": "a server-derived expiry performs one authoritative read and disables approval even when the client clock is behind",
+        "oldMs": 1615.82483,
+        "newMs": 1618.620889,
+        "ratio": 1.0017304221027474
+      },
+      {
+        "name": "a slow initial approval read followed by a fast same-expiry read still observes the real server expiry",
+        "oldMs": 2772.172693,
+        "newMs": 2778.047526,
+        "ratio": 1.0021192160989227
+      },
+      {
+        "name": "the healthy actual pending list remains idle beyond its previous ten-second poll",
+        "oldMs": 10812.324453,
+        "newMs": 10949.484481,
+        "ratio": 1.0126855264653054
+      },
+      {
+        "name": "a server five-minute deadline rechecks once despite a slow client clock, and does not extend approval",
+        "oldMs": 1614.49296,
+        "newMs": 1618.623432,
+        "ratio": 1.0025583710194685
+      },
+      {
+        "name": "a slow initial pending read does not swallow the final same-expiry authoritative read",
+        "oldMs": 2773.347809,
+        "newMs": 2785.530574,
+        "ratio": 1.0043928009896432
+      },
+      {
+        "name": "with push, a lost notification still ends the poll at its deadline with one final check, and an idle poll costs two checks, not one per 5 s",
+        "oldMs": 2004.289422,
+        "newMs": 2003.804191,
+        "ratio": 0.9997579037265407
+      },
+      {
+        "name": "healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list",
+        "oldMs": 61940.353571,
+        "newMs": 61936.900866,
+        "ratio": 0.9999442575832888
+      },
+      {
+        "name": "leaving Settings catches up a roster event that arrived while its read was paused",
+        "oldMs": 2745.133821,
+        "newMs": 2748.428329,
+        "ratio": 1.0012001265565988
+      },
+      {
+        "name": "hidden list views retain a dirty event and catch up once when visible",
+        "oldMs": 3076.955609,
+        "newMs": 3076.957882,
+        "ratio": 1.0000007387171896
+      },
+      {
+        "name": "a server-derived chat lease expiry performs one read without recreating the transport",
+        "oldMs": 2274.374722,
+        "newMs": 2277.416014,
+        "ratio": 1.0013371991741649
+      },
+      {
+        "name": "a completed-list age boundary repaints once without a data read, and a hidden boundary catches up on visibility",
+        "oldMs": 1353.705643,
+        "newMs": 1356.136585,
+        "ratio": 1.0017957685354792
+      },
+      {
+        "name": "a thread chip shows its status and opens the thread beside the chat (?thread=); only a task chip opens the task",
+        "oldMs": 1546.412595,
+        "newMs": 3146.130125,
+        "ratio": 2.034470060042417
+      },
+      {
+        "name": "a bot-list push re-reads the bot list only, never a mounted whole Coordinator chat",
+        "oldMs": 2624.528896,
+        "newMs": 2626.341809,
+        "ratio": 1.000690757492807
+      },
+      {
+        "name": "a driver that closes its input before answering rejects the action without an unhandled error",
+        "oldMs": 1508.615614,
+        "newMs": 1515.279506,
+        "ratio": 1.004417223272886
+      },
+      {
+        "name": "a 1 GiB-of-zeros gzip bomb is refused without inflating it",
+        "oldMs": 2108.260037,
+        "newMs": 4698.610063,
+        "ratio": 2.228667232950069
+      },
+      {
+        "name": "from the desktop: the browser gets a one-time token, every return re-reads, and a link shows at once",
+        "oldMs": 4075.526164,
+        "newMs": 4528.372067,
+        "ratio": 1.1111134819842614
+      },
+      {
+        "name": "偏好设置 offers 重新播放引导 in every workspace; it resets and reloads the app",
+        "oldMs": 1698.719874,
+        "newMs": 3712.881129,
+        "ratio": 2.1856935836379106
+      },
+      {
+        "name": "the real 30 second deadline cancels a response stalled after headers",
+        "oldMs": 60395.350194,
+        "newMs": 60481.964475,
+        "ratio": 1.0014341216786025
+      },
+      {
+        "name": "API redirects drop credentials on CDN and same-host path or query changes",
+        "oldMs": 2007.308842,
+        "newMs": 2090.154918,
+        "ratio": 1.0412722119618902
+      },
+      {
+        "name": "actual scope suite startup and installed loader stop at the first connection boundary, offline",
+        "oldMs": 7501.186409,
+        "newMs": 16102.983022,
+        "ratio": 2.146724817114194
+      },
+      {
+        "name": "actual team suite startup and installed loader stop at the first connection boundary, offline",
+        "oldMs": 1074.616465,
+        "newMs": 1152.771588,
+        "ratio": 1.0727283877974083
+      },
+      {
+        "name": "actual team-resume suite startup and installed loader stop at the first connection boundary, offline",
+        "oldMs": 3084.302263,
+        "newMs": 3794.613246,
+        "ratio": 1.230298758821745
+      }
+    ]
+  },
+  "assessment": {
+    "established": [
+      "The failed subprocess exceeded its unchanged 15 second bound before printing the final success report.",
+      "OFFLINE_TEAM_SQL_BOUNDARY is an intentional denial and does not by itself demonstrate the failure cause.",
+      "The same retained historical integration job completed the exact 26 dynamic imports /24 modules /22 scenarios contract in 6.936 seconds without native transport or SQL.",
+      "Several independent computation-heavy test durations rose approximately twofold while fixed waits stayed nearly constant.",
+      "The workflow launches two Nx targets, and this guard command runs seven Node test files with the runner default concurrency, including separate cold-import child processes."
+    ],
+    "hypothesis": "Runner CPU scheduling or resource contention prolonged cold imports enough to exceed the fixed timeout.",
+    "notEstablished": [
+      "Which of the 26 imports, auth-context handling, or preceding setup was active at SIGTERM.",
+      "CPU utilization, host CPU identity, scheduling latency, or a measured causal correlation.",
+      "A product source regression, auth error, SQL access, or cleanup hang."
+    ],
+    "next": "Preserve the original Native full window. After the whole attempt terminates, at most one specifically documented failed-job repeat may test repeatability without changing source, deadlines, selections or acceptance assertions. If the failure repeats, collect phase-level diagnostics before any fix.",
+    "rerunsStarted": 0,
+    "sourceChangesForTimeout": 0,
+    "diagnosticVMsCreated": 0
+  },
+  "privacy": {
+    "patternsScanned": [
+      "private-key headers",
+      "GitHub token prefixes",
+      "PostHog token prefixes",
+      "AWS access-key prefix",
+      "long bearer value",
+      "signed URL signature"
+    ],
+    "unresolvedMatches": 0,
+    "scope": "Finite pattern check, not a completeness claim."
+  },
+  "limits": [
+    "This comparison does not turn failed attempt 1 into success.",
+    "Historical pass does not validate the new head's failed Integration job.",
+    "No production acceptance claim.",
+    "Source equality is recorded separately by independent fixed-ref comparison."
+  ]
+}

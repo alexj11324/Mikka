@@ -1,0 +1,752 @@
+{
+  "version": 1,
+  "kind": "Independent source and timeout diagnosis",
+  "repository": "alexj11324/Mikka",
+  "scope": "Read-only Integration timeout analysis; no source mutation or execution",
+  "newFailure": {
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "runId": 42637270671,
+    "attempt": 1,
+    "jobId": 129229145015,
+    "actualCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "original": {
+      "gitBlob": "c34cdb3d06fa045aad1e0fa334d4300f28eec240",
+      "bytes": 670848,
+      "sha256": "ada8bd4b0c24623a68fd8cbc059c3233f933b2b7b28d14231068b85698223f0a",
+      "owner": "root; this review reused the immutable blob, no second workflow-log request"
+    },
+    "failedTarget": "ci-tasks:integration-26",
+    "command": "pnpm test:issues -> pnpm test:scope-policy -> test:scope-acceptance-guard",
+    "failedTest": "all real team dependencies and auth export/session metadata load before the denied native SQL boundary",
+    "reportedDurationMs": 15114.026521,
+    "testTimeoutMs": 20000,
+    "execFileTimeoutMs": 15000,
+    "childResult": {
+      "code": null,
+      "killed": true,
+      "signal": "SIGTERM",
+      "stdout": "",
+      "stderrClassification": "Only the expected Better Auth OFFLINE_TEAM_SQL_BOUNDARY startup warning appears in this child error receipt.",
+      "boundaryWarningEmbeddedTimestamp": "2026-11-09T14:48:00.554Z"
+    },
+    "guardProcessSummary": {
+      "tests": 53,
+      "pass": 52,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "finalImportReportAbsent": true,
+    "nativeTransportAttempts": null,
+    "nativeSqlSubmissions": null
+  },
+  "oldSuccess": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "runId": 42621847483,
+    "attempt": 1,
+    "jobId": 129176683635,
+    "actualCheckout": "3b51cf11dffdbb3a6167946a18e7302f3cb6035b",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "original": {
+      "gitBlob": "bc84553abc59efe39ebb52f941096bd268c63dd1",
+      "bytes": 673313,
+      "sha256": "10e865a552d54bd106a13ccaceeb0bea6440cfac022e1047dc6d10414839e725",
+      "owner": "root; reused immutable original only"
+    },
+    "contractDurationMs": 6936.428201,
+    "report": {
+      "dynamicImportOccurrences": 26,
+      "uniqueModules": 24,
+      "scenarios": 22,
+      "deniedConnections": 1,
+      "nativeTransportAttempts": 0,
+      "nativeSqlSubmissions": 0
+    },
+    "reportNormalLine": 4914
+  },
+  "sourceComparison": {
+    "refs": [
+      "f3466ba479ef51918790f521a288feaef5160e44",
+      "76537e4c2996f717cbd19589e1efae328028aa4a",
+      "486e8542a1201c285f15e4bd51987292c91bdc8e",
+      "932bd1549942bc2a8d040c7281a37fbe851c8eb0"
+    ],
+    "threeEntryFiles": [
+      {
+        "ref": "f3466ba479ef51918790f521a288feaef5160e44",
+        "path": "scripts/team-import-contract.test.mjs",
+        "bytes": 1785,
+        "sha256": "bcc91735116b0fc2ff8fc1e75f4de1f8caa2335b30c32edad80c8d68f31d0f35",
+        "gitBlob": "5f8ff18a692ef5e8f63a94a21ed27822e2206347"
+      },
+      {
+        "ref": "f3466ba479ef51918790f521a288feaef5160e44",
+        "path": "scripts/team-import-contract.mjs",
+        "bytes": 5911,
+        "sha256": "58c74076ab3a9c8bbbc6d2dad1da53c6ade32235699c7785c269bdaceed6047d",
+        "gitBlob": "4721b7bc7f46220c0a8408da430f69201985cb77"
+      },
+      {
+        "ref": "f3466ba479ef51918790f521a288feaef5160e44",
+        "path": "scripts/scope-acceptance-runtime.mjs",
+        "bytes": 16412,
+        "sha256": "5def3a889bb72553572ceffcf469ab9699adcb1a57cd25cec73d2645def8128d",
+        "gitBlob": "8b13fe2c6d61873f9b84e7dafcdafc4f7aa64f6d"
+      },
+      {
+        "ref": "76537e4c2996f717cbd19589e1efae328028aa4a",
+        "path": "scripts/team-import-contract.test.mjs",
+        "bytes": 1785,
+        "sha256": "bcc91735116b0fc2ff8fc1e75f4de1f8caa2335b30c32edad80c8d68f31d0f35",
+        "gitBlob": "5f8ff18a692ef5e8f63a94a21ed27822e2206347"
+      },
+      {
+        "ref": "76537e4c2996f717cbd19589e1efae328028aa4a",
+        "path": "scripts/team-import-contract.mjs",
+        "bytes": 5911,
+        "sha256": "58c74076ab3a9c8bbbc6d2dad1da53c6ade32235699c7785c269bdaceed6047d",
+        "gitBlob": "4721b7bc7f46220c0a8408da430f69201985cb77"
+      },
+      {
+        "ref": "76537e4c2996f717cbd19589e1efae328028aa4a",
+        "path": "scripts/scope-acceptance-runtime.mjs",
+        "bytes": 16412,
+        "sha256": "5def3a889bb72553572ceffcf469ab9699adcb1a57cd25cec73d2645def8128d",
+        "gitBlob": "8b13fe2c6d61873f9b84e7dafcdafc4f7aa64f6d"
+      },
+      {
+        "ref": "486e8542a1201c285f15e4bd51987292c91bdc8e",
+        "path": "scripts/team-import-contract.test.mjs",
+        "bytes": 1785,
+        "sha256": "bcc91735116b0fc2ff8fc1e75f4de1f8caa2335b30c32edad80c8d68f31d0f35",
+        "gitBlob": "5f8ff18a692ef5e8f63a94a21ed27822e2206347"
+      },
+      {
+        "ref": "486e8542a1201c285f15e4bd51987292c91bdc8e",
+        "path": "scripts/team-import-contract.mjs",
+        "bytes": 5911,
+        "sha256": "58c74076ab3a9c8bbbc6d2dad1da53c6ade32235699c7785c269bdaceed6047d",
+        "gitBlob": "4721b7bc7f46220c0a8408da430f69201985cb77"
+      },
+      {
+        "ref": "486e8542a1201c285f15e4bd51987292c91bdc8e",
+        "path": "scripts/scope-acceptance-runtime.mjs",
+        "bytes": 16412,
+        "sha256": "5def3a889bb72553572ceffcf469ab9699adcb1a57cd25cec73d2645def8128d",
+        "gitBlob": "8b13fe2c6d61873f9b84e7dafcdafc4f7aa64f6d"
+      },
+      {
+        "ref": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "path": "scripts/team-import-contract.test.mjs",
+        "bytes": 1785,
+        "sha256": "bcc91735116b0fc2ff8fc1e75f4de1f8caa2335b30c32edad80c8d68f31d0f35",
+        "gitBlob": "5f8ff18a692ef5e8f63a94a21ed27822e2206347"
+      },
+      {
+        "ref": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "path": "scripts/team-import-contract.mjs",
+        "bytes": 5911,
+        "sha256": "58c74076ab3a9c8bbbc6d2dad1da53c6ade32235699c7785c269bdaceed6047d",
+        "gitBlob": "4721b7bc7f46220c0a8408da430f69201985cb77"
+      },
+      {
+        "ref": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "path": "scripts/scope-acceptance-runtime.mjs",
+        "bytes": 16412,
+        "sha256": "5def3a889bb72553572ceffcf469ab9699adcb1a57cd25cec73d2645def8128d",
+        "gitBlob": "8b13fe2c6d61873f9b84e7dafcdafc4f7aa64f6d"
+      }
+    ],
+    "inventorySource": [
+      {
+        "ref": "f3466ba479ef51918790f521a288feaef5160e44",
+        "path": "tests/team-issue-create.db.test.ts",
+        "bytes": 51821,
+        "sha256": "87cea979890024349b18a290706c95234bd1bcef2b0c0871184d0327e1ce14c8",
+        "gitBlob": "ee7f8a4dc69364b5450a114836975968aeec31b3"
+      },
+      {
+        "ref": "76537e4c2996f717cbd19589e1efae328028aa4a",
+        "path": "tests/team-issue-create.db.test.ts",
+        "bytes": 51821,
+        "sha256": "87cea979890024349b18a290706c95234bd1bcef2b0c0871184d0327e1ce14c8",
+        "gitBlob": "ee7f8a4dc69364b5450a114836975968aeec31b3"
+      },
+      {
+        "ref": "486e8542a1201c285f15e4bd51987292c91bdc8e",
+        "path": "tests/team-issue-create.db.test.ts",
+        "bytes": 51821,
+        "sha256": "87cea979890024349b18a290706c95234bd1bcef2b0c0871184d0327e1ce14c8",
+        "gitBlob": "ee7f8a4dc69364b5450a114836975968aeec31b3"
+      },
+      {
+        "ref": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "path": "tests/team-issue-create.db.test.ts",
+        "bytes": 51821,
+        "sha256": "87cea979890024349b18a290706c95234bd1bcef2b0c0871184d0327e1ce14c8",
+        "gitBlob": "ee7f8a4dc69364b5450a114836975968aeec31b3"
+      }
+    ],
+    "allFourRefsByteIdenticalForEachOfTheseFourFiles": true,
+    "dynamicImportInventory": [
+      {
+        "specifier": "pg",
+        "normalLine": 23
+      },
+      {
+        "specifier": "../lib/auth",
+        "normalLine": 54
+      },
+      {
+        "specifier": "../lib/acting-user",
+        "normalLine": 60
+      },
+      {
+        "specifier": "../lib/tokens/principal",
+        "normalLine": 61
+      },
+      {
+        "specifier": "../lib/activity-actor",
+        "normalLine": 62
+      },
+      {
+        "specifier": "../lib/workspace-db",
+        "normalLine": 63
+      },
+      {
+        "specifier": "../lib/db",
+        "normalLine": 89
+      },
+      {
+        "specifier": "../lib/db/schema",
+        "normalLine": 90
+      },
+      {
+        "specifier": "../lib/issue-create",
+        "normalLine": 91
+      },
+      {
+        "specifier": "../lib/issue-access",
+        "normalLine": 92
+      },
+      {
+        "specifier": "../app/actions/issues",
+        "normalLine": 93
+      },
+      {
+        "specifier": "../app/actions/collaboration",
+        "normalLine": 94
+      },
+      {
+        "specifier": "next/dist/server/after/after-context",
+        "normalLine": 95
+      },
+      {
+        "specifier": "next/dist/server/app-render/work-async-storage.external",
+        "normalLine": 96
+      },
+      {
+        "specifier": "next/dist/server/app-render/work-unit-async-storage.external",
+        "normalLine": 97
+      },
+      {
+        "specifier": "next/dist/server/async-storage/request-store",
+        "normalLine": 98
+      },
+      {
+        "specifier": "next/server",
+        "normalLine": 99
+      },
+      {
+        "specifier": "yjs",
+        "normalLine": 100
+      },
+      {
+        "specifier": "../app/actions/linear-sync",
+        "normalLine": 111
+      },
+      {
+        "specifier": "../lib/linear-sync/issue-sync",
+        "normalLine": 112
+      },
+      {
+        "specifier": "../lib/linear-sync/worker",
+        "normalLine": 113
+      },
+      {
+        "specifier": "../lib/mcp/actions",
+        "normalLine": 246
+      },
+      {
+        "specifier": "../lib/db/schema",
+        "normalLine": 325
+      },
+      {
+        "specifier": "drizzle-orm",
+        "normalLine": 326
+      },
+      {
+        "specifier": "../lib/linear-sync/issue-sync",
+        "normalLine": 329
+      },
+      {
+        "specifier": "../lib/linear-sync/publication",
+        "normalLine": 337
+      }
+    ],
+    "dynamicImportOccurrences": 26,
+    "uniqueModuleSpecifiers": 24,
+    "scenarios": 22,
+    "compare": {
+      "base": "f3466ba479ef51918790f521a288feaef5160e44",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "mergeBase": "f3466ba479ef51918790f521a288feaef5160e44",
+      "totalCommits": 12,
+      "status": "ahead",
+      "changedPathCount": 18,
+      "paths": [
+        {
+          "path": ".github/workflows/run-trace-acceptance.yml",
+          "status": "modified",
+          "gitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+          "additions": 1,
+          "deletions": 0
+        },
+        {
+          "path": "apps/mobile/components/MikkaMark.tsx",
+          "status": "added",
+          "gitBlob": "ebc27114576f23ff25fb18b4e03b6155443a89c4",
+          "additions": 29,
+          "deletions": 0
+        },
+        {
+          "path": "apps/mobile/components/SignIn.tsx",
+          "status": "modified",
+          "gitBlob": "c92163359be141f59b4154059f1fde9878fac7d6",
+          "additions": 3,
+          "deletions": 2
+        },
+        {
+          "path": "apps/mobile/tests/mikka-mark.test.mts",
+          "status": "added",
+          "gitBlob": "9959b52bb3535c5ff73d168eed44a6bae55dfcfc",
+          "additions": 37,
+          "deletions": 0
+        },
+        {
+          "path": "components/workspace/issue-workspace-settings.test.tsx",
+          "status": "modified",
+          "gitBlob": "db3ea66b5755862a86f8d334ec7fbbb1aaeb2e68",
+          "additions": 1,
+          "deletions": 1
+        },
+        {
+          "path": "docs/design/brand.md",
+          "status": "modified",
+          "gitBlob": "2bc46816656149b9e760806f00ba3faa35d87386",
+          "additions": 5,
+          "deletions": 1
+        },
+        {
+          "path": "docs/design/components.md",
+          "status": "modified",
+          "gitBlob": "da7339503dc2fef5f9876157760b58b8f5bbbbbe",
+          "additions": 1,
+          "deletions": 1
+        },
+        {
+          "path": "docs/design/decisions/2026-11-09-1155-factory-human-session-authentication.md",
+          "status": "added",
+          "gitBlob": "e9541d4cf497dddbf325059c66db4e7286b26776",
+          "additions": 64,
+          "deletions": 0
+        },
+        {
+          "path": "docs/factory/494-approve-and-publish.md",
+          "status": "modified",
+          "gitBlob": "4f78c11f3bbf96779a4c0f2a4ac2f079235f85ab",
+          "additions": 6,
+          "deletions": 5
+        },
+        {
+          "path": "docs/operations/tracing.md",
+          "status": "modified",
+          "gitBlob": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+          "additions": 9,
+          "deletions": 5
+        },
+        {
+          "path": "lib/factory/approval.test.ts",
+          "status": "modified",
+          "gitBlob": "b8b065a94adf14274e8af52a3cbf89e9b79a0784",
+          "additions": 119,
+          "deletions": 59
+        },
+        {
+          "path": "lib/factory/approval.ts",
+          "status": "modified",
+          "gitBlob": "33c58f3c97c43cfa9c7cc142c8ebeb81042d0de8",
+          "additions": 6,
+          "deletions": 7
+        },
+        {
+          "path": "lib/factory/browser-human.test.ts",
+          "status": "modified",
+          "gitBlob": "2810c36beb52dc2e8d0260467ef344bfa63d793a",
+          "additions": 23,
+          "deletions": 1
+        },
+        {
+          "path": "package.json",
+          "status": "modified",
+          "gitBlob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+          "additions": 1,
+          "deletions": 1
+        },
+        {
+          "path": "scripts/acceptance/run-observability.mjs",
+          "status": "modified",
+          "gitBlob": "104075571c73b97a985458f206dba310e4894490",
+          "additions": 99,
+          "deletions": 11
+        },
+        {
+          "path": "scripts/acceptance/run-observability.test.mjs",
+          "status": "modified",
+          "gitBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+          "additions": 236,
+          "deletions": 0
+        },
+        {
+          "path": "scripts/release/mobile-screenshots.mjs",
+          "status": "modified",
+          "gitBlob": "dcfa0cf9943b7be16e95790af7229e38a75e4c90",
+          "additions": 1,
+          "deletions": 0
+        },
+        {
+          "path": "scripts/release/mobile-screenshots.test.mjs",
+          "status": "modified",
+          "gitBlob": "6c7fc8c6955837e83ef8ab68a97efe29c6921429",
+          "additions": 7,
+          "deletions": 0
+        }
+      ]
+    },
+    "dependencyLockChanged": false,
+    "packageDelta": "Only adds the mobile MikkaMark test to test:mobile; no dependency or scope-policy/integration command change.",
+    "serverRuntimeDelta": "The only changed server-runtime implementation in the complete 18-path delta is lib/factory/approval.ts. Its patch changes comments and the humanApproval SELECT inside an invoked function; no import, top-level initialization or new await is added.",
+    "frozenPathInventory": {
+      "before": 5097,
+      "after": 5098,
+      "added": [
+        "apps/mobile/components/MikkaMark.tsx"
+      ],
+      "removed": [],
+      "changed": [
+        {
+          "path": "apps/mobile/components/MikkaMark.tsx",
+          "status": "added",
+          "sha": "ebc27114576f23ff25fb18b4e03b6155443a89c4"
+        },
+        {
+          "path": "apps/mobile/components/SignIn.tsx",
+          "status": "modified",
+          "sha": "c92163359be141f59b4154059f1fde9878fac7d6"
+        },
+        {
+          "path": "components/workspace/issue-workspace-settings.test.tsx",
+          "status": "modified",
+          "sha": "db3ea66b5755862a86f8d334ec7fbbb1aaeb2e68"
+        },
+        {
+          "path": "lib/factory/approval.test.ts",
+          "status": "modified",
+          "sha": "b8b065a94adf14274e8af52a3cbf89e9b79a0784"
+        },
+        {
+          "path": "lib/factory/approval.ts",
+          "status": "modified",
+          "sha": "33c58f3c97c43cfa9c7cc142c8ebeb81042d0de8"
+        },
+        {
+          "path": "lib/factory/browser-human.test.ts",
+          "status": "modified",
+          "sha": "2810c36beb52dc2e8d0260467ef344bfa63d793a"
+        },
+        {
+          "path": "package.json",
+          "status": "modified",
+          "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+        },
+        {
+          "path": "scripts/acceptance/run-observability.mjs",
+          "status": "modified",
+          "sha": "104075571c73b97a985458f206dba310e4894490"
+        },
+        {
+          "path": "scripts/acceptance/run-observability.test.mjs",
+          "status": "modified",
+          "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f"
+        },
+        {
+          "path": "scripts/release/mobile-screenshots.mjs",
+          "status": "modified",
+          "sha": "dcfa0cf9943b7be16e95790af7229e38a75e4c90"
+        },
+        {
+          "path": "scripts/release/mobile-screenshots.test.mjs",
+          "status": "modified",
+          "sha": "6c7fc8c6955837e83ef8ab68a97efe29c6921429"
+        }
+      ],
+      "meaning": "Static git-leaf pattern match, not observed child read/transpile counts. A complete cold file read occurs before auth import; changed bytes can affect cost but their measured phase cost is unknown."
+    },
+    "supportingSource": [
+      {
+        "path": "tests/fixtures/team-auth-runtime.mjs",
+        "bytes": 1935,
+        "sha256": "fb4d6331012d09727fb1b7299be629ec1feae1e0d10d8f2e381bc524a8878d5c",
+        "gitBlob": "c8b35742b1b4a1b07d7226c2a5e8fce17f96daa0"
+      },
+      {
+        "path": "lib/auth.ts",
+        "bytes": 9403,
+        "sha256": "2f8e6794a85cfdaaae35d2d51f9dd991525d545cf7d0a942803fff6bb8038b44",
+        "gitBlob": "01ac430bc9825d313d71ffadd06525b973005e84"
+      },
+      {
+        "path": "lib/db/index.ts",
+        "bytes": 163,
+        "sha256": "090f97a2d115c16e988e69efd460966db8b76a4bca378ec5e3fbd1febea21612",
+        "gitBlob": "f3278426bc9f07a04e41f1160ecd9cf9278dac2d"
+      },
+      {
+        "path": "lib/db/pool-lifecycle.ts",
+        "bytes": 1327,
+        "sha256": "25bfe3d3803e2e299d3572ff34b932e430806efecded767cda2b201291e0bdf6",
+        "gitBlob": "5732f6a883aa55c38bd220508439670561b0b2be"
+      },
+      {
+        "path": "scripts/credential-diagnostics-offline.mjs",
+        "bytes": 790,
+        "sha256": "44007220bf974fe74372909db89d36750cb67726bcc2637ab8f688ab5ce5f476",
+        "gitBlob": "71e69f7c25e2869b7db0a8e3262187d9dd261881"
+      },
+      {
+        "path": "scripts/server-test.mjs",
+        "bytes": 408,
+        "sha256": "b58352ccee3ea3f88525bbe0acc3b606f3dfbe0f0047d7502b148d13bbf485c5",
+        "gitBlob": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae"
+      },
+      {
+        "path": "scripts/scope-native-offline.test.mjs",
+        "bytes": 13468,
+        "sha256": "634dba8b8b84c8cb225a650e54f377511e85bd16589a0dcafbd46252529a81e8",
+        "gitBlob": "dc5a7cefc7d21002824f95971573c71984c2e5cd"
+      },
+      {
+        "path": "scripts/ci/run-units.mjs",
+        "bytes": 1575,
+        "sha256": "4766b742632e01a1bd3bf8dffb22998736bdb5d7d0e4804363681330eea53036",
+        "gitBlob": "21d811ee3dadbc6560cbab70a8cf9b4ba4bd615e"
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "bytes": 22943,
+        "sha256": "7da895fd0678b08acb1667bfc92afe7228872e10631b8578aa1a6696316d025c",
+        "gitBlob": "e3938ad5c343fb14d60709e014cb3d9a3189b104"
+      },
+      {
+        "path": "lib/factory/approval.ts",
+        "bytes": 43673,
+        "sha256": "fac2e0bebac6493fbcdafe58a25373e854dab98973249b7fc70020546a604489",
+        "gitBlob": "33c58f3c97c43cfa9c7cc142c8ebeb81042d0de8"
+      }
+    ]
+  },
+  "executionModel": {
+    "sameObservedNode": "v24.22.2",
+    "sameObservedRunnerImage": "ubuntu-22.04 / 20261101.347.1",
+    "nxParallelism": 2,
+    "nxCache": "--skip-nx-cache",
+    "nodeGuardFiles": [
+      "scripts/scope-acceptance.test.mjs",
+      "scripts/scope-exec-file.test.mjs",
+      "scripts/scope-resume.test.mjs",
+      "scripts/scope-native-offline.test.mjs",
+      "scripts/scope-fresh.test.mjs",
+      "scripts/team-import-contract.test.mjs",
+      "scripts/team-resume.test.mjs"
+    ],
+    "explicitNodeFileConcurrencyOption": false,
+    "heavyChildProcesses": "scope-native-offline.test.mjs spawns real cold startup children with a 20s deadline; team-import-contract.test.mjs separately spawns its cold dependency loader with a 15s deadline.",
+    "disabledCaches": [
+      "NODE_DISABLE_COMPILE_CACHE=1",
+      "TSX_DISABLE_CACHE=1"
+    ],
+    "frozenLoader": "scope-acceptance-runtime frozenScopeModule transpiles reachable .ts/.tsx/.mts modules synchronously using TypeScript transpileModule; static frozen map initially reads tracked .ts/.tsx/.mjs/.js/.json files.",
+    "fixtureGetSession": "The replaced getSession asynchronously returns null or a synthetic identity directly; it does not wait for auth.$context.",
+    "authContext": "auth.$context is observed after auth import. Its 5s Promise.race is created only after all26 inventory import occurrences and export checks have completed."
+  },
+  "independentDurationComparisons": [
+    {
+      "name": "actual scope suite startup and installed loader stop at the first connection boundary, offline",
+      "before": {
+        "name": "actual scope suite startup and installed loader stop at the first connection boundary, offline",
+        "ms": 7501.186409,
+        "line": 4830,
+        "status": "pass"
+      },
+      "after": {
+        "name": "actual scope suite startup and installed loader stop at the first connection boundary, offline",
+        "ms": 16102.983022,
+        "line": 4905,
+        "status": "pass"
+      },
+      "ratio": 2.146724817114194
+    },
+    {
+      "name": "a 1 GiB-of-zeros gzip bomb is refused without inflating it",
+      "before": {
+        "name": "a 1 GiB-of-zeros gzip bomb is refused without inflating it",
+        "ms": 2108.260037,
+        "line": 3379,
+        "status": "pass"
+      },
+      "after": {
+        "name": "a 1 GiB-of-zeros gzip bomb is refused without inflating it",
+        "ms": 4698.610063,
+        "line": 3379,
+        "status": "pass"
+      },
+      "ratio": 2.228667232950069
+    },
+    {
+      "name": "Factory task and thread references in bot and agent replies are real links; sent user text keeps its existing rendering",
+      "before": {
+        "name": "Factory task and thread references in bot and agent replies are real links; sent user text keeps its existing rendering",
+        "ms": 4538.672638,
+        "line": 843,
+        "status": "pass"
+      },
+      "after": {
+        "name": "Factory task and thread references in bot and agent replies are real links; sent user text keeps its existing rendering",
+        "ms": 8567.817151,
+        "line": 843,
+        "status": "pass"
+      },
+      "ratio": 1.887736312873949
+    },
+    {
+      "name": "authenticated HTTP submission reaches actual planner prompt through stored event projection",
+      "before": {
+        "name": "authenticated HTTP submission reaches actual planner prompt through stored event projection",
+        "ms": 1576.813912,
+        "line": 1800,
+        "status": "pass"
+      },
+      "after": {
+        "name": "authenticated HTTP submission reaches actual planner prompt through stored event projection",
+        "ms": 2949.019182,
+        "line": 1799,
+        "status": "pass"
+      },
+      "ratio": 1.8702391953528121
+    },
+    {
+      "name": "healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list",
+      "before": {
+        "name": "healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list",
+        "ms": 61940.353571,
+        "line": 3017,
+        "status": "pass"
+      },
+      "after": {
+        "name": "healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list",
+        "ms": 61936.900866,
+        "line": 2570,
+        "status": "pass"
+      },
+      "ratio": 0.9999442575832888
+    },
+    {
+      "name": "a healthy mounted approval UI makes no ten-second availability, list or result poll",
+      "before": {
+        "name": "a healthy mounted approval UI makes no ten-second availability, list or result poll",
+        "ms": 11063.524017,
+        "line": 1842,
+        "status": "pass"
+      },
+      "after": {
+        "name": "a healthy mounted approval UI makes no ten-second availability, list or result poll",
+        "ms": 11319.996216,
+        "line": 1842,
+        "status": "pass"
+      },
+      "ratio": 1.0231817817366247
+    },
+    {
+      "name": "hidden list views retain a dirty event and catch up once when visible",
+      "before": {
+        "name": "hidden list views retain a dirty event and catch up once when visible",
+        "ms": 3076.955609,
+        "line": 3144,
+        "status": "pass"
+      },
+      "after": {
+        "name": "hidden list views retain a dirty event and catch up once when visible",
+        "ms": 3076.957882,
+        "line": 2628,
+        "status": "pass"
+      },
+      "ratio": 1.0000007387171896
+    }
+  ],
+  "diagnosis": {
+    "directFailure": "The parent execFile watchdog killed the child at15s before its success report. Expected offline SQL denial is not itself the failing assertion.",
+    "mostSupportedHypothesis": "Runner CPU/scheduling contention during the cold load/transpilation path; supported by about1.87–2.23x increases across independent CPU-sensitive cases while timer-dominated cases remain about1.00x.",
+    "confidence": "Strong environmental-slowdown evidence; exact blocked phase and CPU throttling/host scheduling cause remain unmeasured.",
+    "codeRegressionFound": false,
+    "normalCloseBoundary": "The success JSON is printed at team-import-contract.mjs:80 before runtime.close at83. A normal close-only hang would ordinarily leave that report; its absence does not support that specific cause.",
+    "remainingUnknowns": [
+      "An earlier assertion/import error followed by a blocked finally-close cannot be ruled out without phase markers.",
+      "The killed child has no final counters, so the old success native0 counts must not be attributed to this failure.",
+      "Ordered Node test reporter output can be delayed by other files; do not infer exact child start times from its displayed spec-result timestamp.",
+      "No CPU profiler, load average, cgroup throttling or current-module breadcrumb exists in these original logs."
+    ]
+  },
+  "boundedNextStep": {
+    "recommendation": "After the original Native job and its evidence are complete, one repeatability check of only this failed Integration job is justified by the existing source/duration evidence.",
+    "unchanged": [
+      "Exact original head/tree/checkout source",
+      "All29 selected Integration targets and canonical commands",
+      "15s child and20s test deadlines",
+      "Existing Nx parallelism and cache settings",
+      "SQL/transport denial and all assertions"
+    ],
+    "requiredEvidence": "Keep this original RED and its metadata; read the new job original once and verify actual checkout/version/selection. A pass adds repeatability evidence but does not erase the prior failure or prove deterministic timing stability.",
+    "ifItFailsAgain": "Add a small bounded source diagnosis before another execution: metadata-only phase/ordinal + monotonic elapsed/CPU counters before/after frozen-read, auth import, each known inventory import, final auth-context wait, report, and close. Preserve deadlines; no force-exit or automatic retry.",
+    "diagnosticLimits": "Only closed phase labels, known inventory ordinals/source specifiers, numeric counts/timings and closed outcome classifications. No SQL, credentials, user content or arbitrary error.message; no new product endpoint/DB/model operation."
+  },
+  "reviewerActions": {
+    "workflowOriginalDownloads": 0,
+    "reusedOriginalBlobs": 2,
+    "sourceReads": true,
+    "testExecutions": 0,
+    "VMsCreated": 0,
+    "workflowsTriggered": 0,
+    "refsChanged": false,
+    "sourceChanged": false
+  },
+  "corrections": [
+    {
+      "field": "uniqueModuleSpecifiers",
+      "initialInformalMessageValue": 23,
+      "verifiedValue": 24,
+      "source": "26 literal import occurrences minus2 duplicate specifiers; final receipt and old actual report both use24."
+    }
+  ]
+}

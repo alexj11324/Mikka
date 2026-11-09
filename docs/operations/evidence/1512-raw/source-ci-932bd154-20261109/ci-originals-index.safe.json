@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "kind": "Changes Core Source evidence index",
+  "repository": "alexj11324/Mikka",
+  "prefix": "ci-932bd154",
+  "runId": 42637270671,
+  "attempt": 1,
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "actualCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+  "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "parents": [
+    "76537e4c2996f717cbd19589e1efae328028aa4a",
+    "932bd1549942bc2a8d040c7281a37fbe851c8eb0"
+  ],
+  "jobs": [
+    {
+      "id": 129228653985,
+      "name": "changes / Changed files",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T14:43:09Z"
+    },
+    {
+      "id": 129229145060,
+      "name": "Source checks",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T14:46:28Z"
+    },
+    {
+      "id": 129229145030,
+      "name": "Core unit checks",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T14:50:18Z"
+    }
+  ],
+  "summary": {
+    "selection": {
+      "full": true,
+      "core": 57,
+      "integration": 29,
+      "databaseSuites": 72,
+      "meaning": "selection only"
+    },
+    "core": {
+      "selectedAndExecutedTargets": 57,
+      "nxCache": "explicitly disabled",
+      "nodeReporterPass": 4720,
+      "nodeReporterFail": 0,
+      "nodeReporterSkip": 0,
+      "vitestReporterPass": 122,
+      "driverExactCasesPass": 74,
+      "driverOldCases": 63,
+      "driverNewRecoveryCases": 11
+    },
+    "source": {
+      "tests": 361,
+      "pass": 361,
+      "fail": 0,
+      "skipped": 0,
+      "migrationCases": 63,
+      "routeGenerationCheck": true,
+      "codeRuntimeLint": true,
+      "rootAPIFrontendProtocolMobileTypes": true
+    },
+    "overallRunSuccessClaimed": false,
+    "productionAcceptanceClaimed": false
+  },
+  "files": [
+    {
+      "path": "ci-932bd154/changes.original.log",
+      "bytes": 972927,
+      "sha256": "2ba17e87f546a787cbf1e84bd659f9a3977317a5eb2dfc4a51b32dd7932bcee4",
+      "gitBlob": "c3bb9f49c0cda097a59315bb3b489749842142b6"
+    },
+    {
+      "path": "ci-932bd154/selection.original.json",
+      "bytes": 389382,
+      "sha256": "6a6bcb4bc5be98bbbebe5ecda8f2f84fed88d57f93f0a3185a001a344b0645de",
+      "gitBlob": "feaf33488555ee524bfc3dbf56812e1bfcffeaa3"
+    },
+    {
+      "path": "ci-932bd154/source-and-selection.safe.json",
+      "bytes": 3811,
+      "sha256": "05255e4842538502992c12758e734e595504f7aa3bd15dea027c461c1ef852f4",
+      "gitBlob": "8caeafdef46098ee9188ffef08ec134417f921f7"
+    },
+    {
+      "path": "ci-932bd154/source.original.log",
+      "bytes": 136458,
+      "sha256": "004e0be06a8696d1fcad879738ea26a40debc3e2a6124f7b52bd332e1e2b7055",
+      "gitBlob": "e9a634dc8ff90b697164662b2040bfd6757e4827"
+    },
+    {
+      "path": "ci-932bd154/source-execution.safe.json",
+      "bytes": 6525,
+      "sha256": "004cab0469da119810a44afec7d9c44183276fa3aa570f15c0443380891a1850",
+      "gitBlob": "7c228d5290f958419504b16c3a0d0c5c5287c14f"
+    },
+    {
+      "path": "ci-932bd154/core.original.log",
+      "bytes": 1019383,
+      "sha256": "bb6089e9579144ee89fa8d35625b748201c3b6bf7d5fb3387cddf7e7bc022866",
+      "gitBlob": "d777c48d0a9a790f9ce9388ccabae8c41746e0ab"
+    },
+    {
+      "path": "ci-932bd154/driver-74-execution.safe.json",
+      "bytes": 27864,
+      "sha256": "8a96dba6a2fadc41872938d65d31690dc4ea8c98b71cc5b266ef188c1064a749",
+      "gitBlob": "59be6a5acd972b2e59919818bc4aed95f5e5958a"
+    },
+    {
+      "path": "ci-932bd154/core-execution.safe.json",
+      "bytes": 29147,
+      "sha256": "d552deac483bba53be341c61b7b9fe561345ceadc6b74d66492ae36722e130ff",
+      "gitBlob": "2a7a4cad346b0dc559b0380ebc6aba81c4a90759"
+    },
+    {
+      "path": "ci-932bd154/acquisition-and-privacy.safe.json",
+      "bytes": 5925,
+      "sha256": "8f90804c8f3d4384e3dae11ad328f4a631dc3cfedbc0b557d51618e550d2ac3b",
+      "gitBlob": "558255fca8c0fc7779742e577fe114f6b24aeb88"
+    }
+  ],
+  "payloadFiles": 9,
+  "payloadBytes": 2591422,
+  "remoteStatus": "Every payload blob was created and its returned Git SHA checked against an independently computed UTF-8 Git blob hash; no ref was changed.",
+  "otherEvidenceOwner": "Root owns Integration failure and other assigned logs; acceptance_review owns full run/check metadata; Native and PG readers own their originals.",
+  "limitations": [
+    "92 Node reporter totals and 5 Vitest reporter totals are sums of actual process executions, not deduplicated repository case identities.",
+    "Driver74 is exact-name matching within the combined Core dev-local invocation, not an invented standalone Node summary.",
+    "Changes/source-binding receipt is an earlier acquisition snapshot; the final per-job read count is exactly1 in the acquisition receipt.",
+    "The run has a separately reported Integration failure; this package preserves only the assigned3 successful jobs and cannot establish whole-run success."
+  ]
+}

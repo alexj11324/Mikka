@@ -1,0 +1,1073 @@
+{
+  "schema": "issue1512-upstream1810-source-intersection-v1",
+  "source": {
+    "main": "76537e4c2996f717cbd19589e1efae328028aa4a",
+    "head": "5c7055870c87d6ca47154b5ba68d63e50e92e561",
+    "tree": "9199111311cb7e062c43eb310c78fc83357b70fa",
+    "parents": [
+      "3729f317411bd1749771320e346ea5deaa5744f1",
+      "76537e4c2996f717cbd19589e1efae328028aa4a",
+      "4bff6e5c00bdd43153aaca2d350b675b8df0e179"
+    ],
+    "treeComplete": true,
+    "baseLeafIndex": "c063080fc6b3d025cb8dc5e5649af0aaee721f58",
+    "mainTree": "42625ba25887f1fbf64fd025446aa9e888677232",
+    "featureHead": "f3466ba479ef51918790f521a288feaef5160e44",
+    "featureTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "nativeHead": "486e8542a1201c285f15e4bd51987292c91bdc8e",
+    "nativeTree": "f263167f4ce92cf9e487c3172ab6750714deeedc"
+  },
+  "directDelta": [
+    {
+      "path": ".github/actions/pnpm-install/action.yml",
+      "before": {
+        "path": ".github/actions/pnpm-install/action.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6563e46bec7c1a02cdbdcd90be0742fb9ecb47d9"
+      },
+      "after": {
+        "path": ".github/actions/pnpm-install/action.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "553d718ad413f0db4b12833e06ffb8f29d98e555"
+      }
+    },
+    {
+      "path": ".github/workflows/desktop.yml",
+      "before": {
+        "path": ".github/workflows/desktop.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cb418bbf2ee0fed758e37f83a9ed6401d8a921b7"
+      },
+      "after": {
+        "path": ".github/workflows/desktop.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1cfd9d8be85015b639809faedc8a68fb83609399"
+      }
+    },
+    {
+      "path": ".github/workflows/issue1415-deployed-production.yml",
+      "before": {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8ef902848aba3a2e59ce01608782697ec7f4d14c"
+      },
+      "after": {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be"
+      }
+    },
+    {
+      "path": ".github/workflows/issue1415-managed-inspection.yml",
+      "before": {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0d8cc322ddddb2bada48abff741cf7887b6631b0"
+      },
+      "after": {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9ece51fc2a39c2d362446e68df1f9bbf2076f641"
+      }
+    },
+    {
+      "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+      "before": {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "74c7dd24872ef8e02ef27d559822fb6440d01c0a"
+      },
+      "after": {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4757d62065017957f6e1e4300ab4695507ce40d8"
+      }
+    },
+    {
+      "path": ".github/workflows/read-cache-production.yml",
+      "before": {
+        "path": ".github/workflows/read-cache-production.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "82b0a711738730df3dcdc5f6e2f07beda4b7c8c1"
+      },
+      "after": {
+        "path": ".github/workflows/read-cache-production.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22"
+      }
+    },
+    {
+      "path": ".github/workflows/read-cache.yml",
+      "before": {
+        "path": ".github/workflows/read-cache.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "54464667276af18611ba083e968ce9f1672fb301"
+      },
+      "after": {
+        "path": ".github/workflows/read-cache.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "86ee0112413eae241189bb2d748a6d6901201c4f"
+      }
+    },
+    {
+      "path": ".github/workflows/self-hosted-production.yml",
+      "before": {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "77788506cdb928f64b6975483c73c6523c76d483"
+      },
+      "after": {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "862a9f7cdea8df0373207e389f3cbf3afaca46df"
+      }
+    },
+    {
+      "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+      "before": {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e90d6530e978d638d3040c0daa4ac6dc84b39767"
+      },
+      "after": {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "42ae23945f798020ec068635e7621869fb427af2"
+      }
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "before": {
+        "path": ".github/workflows/ui-policy.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "18e7c54ec507d02b12fd1131b5a8b6112ece2212"
+      },
+      "after": {
+        "path": ".github/workflows/ui-policy.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e3938ad5c343fb14d60709e014cb3d9a3189b104"
+      }
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "before": {
+        "path": ".github/workflows/web-deploy.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e15741a3ae51a294593eeb2151311378babd8ce4"
+      },
+      "after": {
+        "path": ".github/workflows/web-deploy.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba"
+      }
+    },
+    {
+      "path": ".github/workflows/workspace-governance-acceptance.yml",
+      "before": {
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c08b46d994809a80d4c764243174d423d4f5474c"
+      },
+      "after": {
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c107a7699cc0bb91ac8d9eaf258361d2f04e51a4"
+      }
+    },
+    {
+      "path": "Dockerfile",
+      "before": {
+        "path": "Dockerfile",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0de463a5b008837322a28a0edf665fa3c0ba6d53"
+      },
+      "after": {
+        "path": "Dockerfile",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "19054afe4768b3391515c7a3e0f97a0021f123ee"
+      }
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "before": {
+        "path": "apps/desktop/package.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c12c645015568434d28295fc25eb4ae75900c3b4"
+      },
+      "after": {
+        "path": "apps/desktop/package.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0e636983586e2f427797c29978c2bf7524caa18c"
+      }
+    },
+    {
+      "path": "apps/desktop/test/bundled-server-choice.mjs",
+      "before": null,
+      "after": {
+        "path": "apps/desktop/test/bundled-server-choice.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b9e9b44746a735935fcbcd6590c62ee047f27cd8"
+      }
+    },
+    {
+      "path": "apps/desktop/test/bundled-server-choice.test.mjs",
+      "before": null,
+      "after": {
+        "path": "apps/desktop/test/bundled-server-choice.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4a5efa813d28f5cf90264f74e48f9187f600f60c"
+      }
+    },
+    {
+      "path": "apps/desktop/test/bundled-smoke.mjs",
+      "before": {
+        "path": "apps/desktop/test/bundled-smoke.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9a85ff52f207ca7790bb90c0b8ab50832914ab87"
+      },
+      "after": {
+        "path": "apps/desktop/test/bundled-smoke.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2df81511184d89d773b86f7d34ae0c069a49e295"
+      }
+    },
+    {
+      "path": "apps/desktop/test/native-document.mjs",
+      "before": {
+        "path": "apps/desktop/test/native-document.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2fbdb74c81c0b4890fd52acd90cd9ae769dcaf83"
+      },
+      "after": {
+        "path": "apps/desktop/test/native-document.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56a076819caa223228cfb3c934554744dfeab358"
+      }
+    },
+    {
+      "path": "apps/desktop/test/native-document.test.mjs",
+      "before": {
+        "path": "apps/desktop/test/native-document.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f4843d21dc3ed3102ea87f9adf920f81eb0dfa4e"
+      },
+      "after": {
+        "path": "apps/desktop/test/native-document.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fc89587f2d84cb7256230c440b898d38b8524d85"
+      }
+    },
+    {
+      "path": "docs/operations/1506-official-base-conservation-control-20261109.md",
+      "before": null,
+      "after": {
+        "path": "docs/operations/1506-official-base-conservation-control-20261109.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e821895efe3a9234b8f2c8f0416b7dad5254bfee"
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-base-conservation-control-20261109.json",
+      "before": null,
+      "after": {
+        "path": "docs/operations/evidence/1506-official-base-conservation-control-20261109.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2f7d1dc33e6ee5357a8b3c531fd8aa45250015e9"
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.json",
+      "before": null,
+      "after": {
+        "path": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "081ae5d6fd6c024abb95d9d0e778b9f051e5a323"
+      }
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.md",
+      "before": null,
+      "after": {
+        "path": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4adf53c96bc15fd4cb985d410702e63eccd7554b"
+      }
+    },
+    {
+      "path": "lib/attention/store.ts",
+      "before": {
+        "path": "lib/attention/store.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "02c4a9da8ddfeb9bcf8a3ac05dbcc54e2d44f83b"
+      },
+      "after": {
+        "path": "lib/attention/store.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "62bf18c2487c207d3b64c6e508f634f6fe5ee0a0"
+      }
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "before": {
+        "path": "lib/coordinator/coordinator-bot.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b3e0fa7a5e15c9d5f53e4b76d4476d70cac469e7"
+      },
+      "after": {
+        "path": "lib/coordinator/coordinator-bot.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc"
+      }
+    },
+    {
+      "path": "lib/infisical-workload.test.ts",
+      "before": {
+        "path": "lib/infisical-workload.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "69883bf99519a29a7dd8e47fa1a05edd4608d271"
+      },
+      "after": {
+        "path": "lib/infisical-workload.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "be8768899eaf6066ff47aed58f33d4a79651fa7c"
+      }
+    },
+    {
+      "path": "lib/infisical-workload.ts",
+      "before": {
+        "path": "lib/infisical-workload.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c6b98ddf6242e2fbce9c073ed82602c98b1ad203"
+      },
+      "after": {
+        "path": "lib/infisical-workload.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "368572bb346f39274b0f1d522f773b97fd1f2764"
+      }
+    },
+    {
+      "path": "lib/subscription-access-snapshot.test.ts",
+      "before": {
+        "path": "lib/subscription-access-snapshot.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "eb5adaecc51a64eaa7454a17b51cdab6e11725cf"
+      },
+      "after": {
+        "path": "lib/subscription-access-snapshot.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cb2090125268fa8640037494fc29968d860cf5f4"
+      }
+    },
+    {
+      "path": "lib/subscription-access-snapshot.ts",
+      "before": {
+        "path": "lib/subscription-access-snapshot.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e9ecf72a9e73788811ed181698f1d26d96b5c79d"
+      },
+      "after": {
+        "path": "lib/subscription-access-snapshot.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c77d4615972370c416eaaf87e169b91849ee513b"
+      }
+    },
+    {
+      "path": "lib/subscription-workflow-model.test.ts",
+      "before": {
+        "path": "lib/subscription-workflow-model.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "895836bb6e665189009a674ac0d9a4e87ff93ff2"
+      },
+      "after": {
+        "path": "lib/subscription-workflow-model.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "96b23777317bedb29db1df3404d8b08c37cd099a"
+      }
+    },
+    {
+      "path": "lib/subscription-workflow-model.ts",
+      "before": {
+        "path": "lib/subscription-workflow-model.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c47738974f8692ebd30a1736e8d39ea7a35ff7f4"
+      },
+      "after": {
+        "path": "lib/subscription-workflow-model.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "24349e66f47d2ed935f89e509d022826fe37ffb2"
+      }
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "before": {
+        "path": "lib/tracing/sanitize.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5"
+      },
+      "after": {
+        "path": "lib/tracing/sanitize.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9857985199066a39fdc96ba73f7047d21ba6406f"
+      }
+    },
+    {
+      "path": "lib/tracing/workflow-transport.test.ts",
+      "before": null,
+      "after": {
+        "path": "lib/tracing/workflow-transport.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a92aa052db23cb4448bd73538da70d3cab0634e6"
+      }
+    },
+    {
+      "path": "package.json",
+      "before": {
+        "path": "package.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b4c7addbf7d0d147409d2f95fe41c14183edf2a0"
+      },
+      "after": {
+        "path": "package.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "568cfeee161309202699acefd0a57a8edc52bf6e"
+      }
+    },
+    {
+      "path": "patches/ffmpeg-static@5.3.0.patch",
+      "before": null,
+      "after": {
+        "path": "patches/ffmpeg-static@5.3.0.patch",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa"
+      }
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "before": {
+        "path": "pnpm-lock.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a7a956ac98dfcf7de9ebfe508853b8475fd10106"
+      },
+      "after": {
+        "path": "pnpm-lock.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4b67909739360248e279efa0c3bb7344379e04fe"
+      }
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "before": {
+        "path": "pnpm-workspace.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cc47ee1a48b9585e06c87e0f5ed6f14211601c0c"
+      },
+      "after": {
+        "path": "pnpm-workspace.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d"
+      }
+    },
+    {
+      "path": "scripts/check-analytics-ssr.mjs",
+      "before": {
+        "path": "scripts/check-analytics-ssr.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "78a3df1f4c6117087289996f72ddbd398780f526"
+      },
+      "after": {
+        "path": "scripts/check-analytics-ssr.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0fad928edefbb3b2677450f9f04778ec088a6195"
+      }
+    },
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "before": {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2ad3c6f9dd5f06c387bd22e66d4711dd39a96831"
+      },
+      "after": {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "335540475a9d8aaae8f34915e087b5a862699b95"
+      }
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "before": {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e3bc3b603578e6bcd8c5ed1db8041adeba14a40a"
+      },
+      "after": {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "16d858b40d2948ac8c4ce18188843c02960bc40e"
+      }
+    },
+    {
+      "path": "scripts/e2b/official-files.py",
+      "before": {
+        "path": "scripts/e2b/official-files.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "66d74dd81568eb8fcd6c9efed82a199bcbf695d4"
+      },
+      "after": {
+        "path": "scripts/e2b/official-files.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ea0819bf3e2d4ff83e64482b6336567050376591"
+      }
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "before": {
+        "path": "scripts/e2b/official-files.test.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b6a469a778f52179e1ce7eb4394a6242818481e1"
+      },
+      "after": {
+        "path": "scripts/e2b/official-files.test.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21"
+      }
+    },
+    {
+      "path": "scripts/ffmpeg-install.test.mjs",
+      "before": null,
+      "after": {
+        "path": "scripts/ffmpeg-install.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9ce1e3333fd3ddb10ea206f5144cc466611842a1"
+      }
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "before": {
+        "path": "tests/analytics-policy.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "74c4933788dda4e33caca2675738bc223442adda"
+      },
+      "after": {
+        "path": "tests/analytics-policy.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9fc0602f814f3d8e25ba5668f0f174a26f14718b"
+      }
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "before": {
+        "path": "tests/coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d7e15a9b10904d70294e9f9addd5ed9b3d9be82b"
+      },
+      "after": {
+        "path": "tests/coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "32a8321c981dd6a534f8859fa35f281e874466e6"
+      }
+    },
+    {
+      "path": "tests/mvp/pinned-pnpm.test.mjs",
+      "before": {
+        "path": "tests/mvp/pinned-pnpm.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b22b319424ada32e3592f7a6ea464aa49121aad0"
+      },
+      "after": {
+        "path": "tests/mvp/pinned-pnpm.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "29a96d1b50783f839175a72efe9a40bdbbdaaeab"
+      }
+    }
+  ],
+  "intersections": {
+    "directCount": 46,
+    "compareCount": 46,
+    "feature": [
+      {
+        "path": ".github/actions/pnpm-install/action.yml",
+        "upstream": "553d718ad413f0db4b12833e06ffb8f29d98e555",
+        "other": "553d718ad413f0db4b12833e06ffb8f29d98e555",
+        "equal": true
+      },
+      {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "upstream": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be",
+        "other": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be",
+        "equal": true
+      },
+      {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "upstream": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+        "other": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+        "equal": true
+      },
+      {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "upstream": "4757d62065017957f6e1e4300ab4695507ce40d8",
+        "other": "4757d62065017957f6e1e4300ab4695507ce40d8",
+        "equal": true
+      },
+      {
+        "path": ".github/workflows/read-cache-production.yml",
+        "upstream": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22",
+        "other": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22",
+        "equal": true
+      },
+      {
+        "path": ".github/workflows/read-cache.yml",
+        "upstream": "86ee0112413eae241189bb2d748a6d6901201c4f",
+        "other": "86ee0112413eae241189bb2d748a6d6901201c4f",
+        "equal": true
+      },
+      {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "upstream": "862a9f7cdea8df0373207e389f3cbf3afaca46df",
+        "other": "862a9f7cdea8df0373207e389f3cbf3afaca46df",
+        "equal": true
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "upstream": "42ae23945f798020ec068635e7621869fb427af2",
+        "other": "42ae23945f798020ec068635e7621869fb427af2",
+        "equal": true
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "upstream": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+        "other": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+        "equal": true
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "upstream": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+        "other": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+        "equal": true
+      },
+      {
+        "path": "Dockerfile",
+        "upstream": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+        "other": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+        "equal": true
+      },
+      {
+        "path": "package.json",
+        "upstream": "568cfeee161309202699acefd0a57a8edc52bf6e",
+        "other": "568cfeee161309202699acefd0a57a8edc52bf6e",
+        "equal": true
+      },
+      {
+        "path": "patches/ffmpeg-static@5.3.0.patch",
+        "upstream": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa",
+        "other": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa",
+        "equal": true
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "upstream": "4b67909739360248e279efa0c3bb7344379e04fe",
+        "other": "4b67909739360248e279efa0c3bb7344379e04fe",
+        "equal": true
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "upstream": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+        "other": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+        "equal": true
+      },
+      {
+        "path": "scripts/check-analytics-ssr.mjs",
+        "upstream": "0fad928edefbb3b2677450f9f04778ec088a6195",
+        "other": "0fad928edefbb3b2677450f9f04778ec088a6195",
+        "equal": true
+      },
+      {
+        "path": "scripts/ffmpeg-install.test.mjs",
+        "upstream": "9ce1e3333fd3ddb10ea206f5144cc466611842a1",
+        "other": "9ce1e3333fd3ddb10ea206f5144cc466611842a1",
+        "equal": true
+      },
+      {
+        "path": "tests/analytics-policy.test.mjs",
+        "upstream": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+        "other": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+        "equal": false
+      },
+      {
+        "path": "tests/mvp/pinned-pnpm.test.mjs",
+        "upstream": "29a96d1b50783f839175a72efe9a40bdbbdaaeab",
+        "other": "0306d340b38cf455facba376c2eb6dda58362c96",
+        "equal": false
+      }
+    ],
+    "native": [
+      {
+        "path": "package.json",
+        "upstream": "568cfeee161309202699acefd0a57a8edc52bf6e",
+        "other": "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b",
+        "equal": false
+      }
+    ],
+    "journal": [],
+    "journalPathsFound": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "existsInBaseline": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "existsInBaseline": true
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "existsInBaseline": true
+      }
+    ]
+  },
+  "upstreamExclusive": [
+    {
+      "path": ".github/workflows/desktop.yml",
+      "mode": "100644",
+      "blob": "1cfd9d8be85015b639809faedc8a68fb83609399"
+    },
+    {
+      "path": ".github/workflows/workspace-governance-acceptance.yml",
+      "mode": "100644",
+      "blob": "c107a7699cc0bb91ac8d9eaf258361d2f04e51a4"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "mode": "100644",
+      "blob": "0e636983586e2f427797c29978c2bf7524caa18c"
+    },
+    {
+      "path": "apps/desktop/test/bundled-server-choice.mjs",
+      "mode": "100644",
+      "blob": "b9e9b44746a735935fcbcd6590c62ee047f27cd8"
+    },
+    {
+      "path": "apps/desktop/test/bundled-server-choice.test.mjs",
+      "mode": "100644",
+      "blob": "4a5efa813d28f5cf90264f74e48f9187f600f60c"
+    },
+    {
+      "path": "apps/desktop/test/bundled-smoke.mjs",
+      "mode": "100644",
+      "blob": "2df81511184d89d773b86f7d34ae0c069a49e295"
+    },
+    {
+      "path": "apps/desktop/test/native-document.mjs",
+      "mode": "100644",
+      "blob": "56a076819caa223228cfb3c934554744dfeab358"
+    },
+    {
+      "path": "apps/desktop/test/native-document.test.mjs",
+      "mode": "100644",
+      "blob": "fc89587f2d84cb7256230c440b898d38b8524d85"
+    },
+    {
+      "path": "docs/operations/1506-official-base-conservation-control-20261109.md",
+      "mode": "100644",
+      "blob": "e821895efe3a9234b8f2c8f0416b7dad5254bfee"
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-base-conservation-control-20261109.json",
+      "mode": "100644",
+      "blob": "2f7d1dc33e6ee5357a8b3c531fd8aa45250015e9"
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.json",
+      "mode": "100644",
+      "blob": "081ae5d6fd6c024abb95d9d0e778b9f051e5a323"
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.md",
+      "mode": "100644",
+      "blob": "4adf53c96bc15fd4cb985d410702e63eccd7554b"
+    },
+    {
+      "path": "lib/attention/store.ts",
+      "mode": "100644",
+      "blob": "62bf18c2487c207d3b64c6e508f634f6fe5ee0a0"
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "mode": "100644",
+      "blob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc"
+    },
+    {
+      "path": "lib/infisical-workload.test.ts",
+      "mode": "100644",
+      "blob": "be8768899eaf6066ff47aed58f33d4a79651fa7c"
+    },
+    {
+      "path": "lib/infisical-workload.ts",
+      "mode": "100644",
+      "blob": "368572bb346f39274b0f1d522f773b97fd1f2764"
+    },
+    {
+      "path": "lib/subscription-access-snapshot.test.ts",
+      "mode": "100644",
+      "blob": "cb2090125268fa8640037494fc29968d860cf5f4"
+    },
+    {
+      "path": "lib/subscription-access-snapshot.ts",
+      "mode": "100644",
+      "blob": "c77d4615972370c416eaaf87e169b91849ee513b"
+    },
+    {
+      "path": "lib/subscription-workflow-model.test.ts",
+      "mode": "100644",
+      "blob": "96b23777317bedb29db1df3404d8b08c37cd099a"
+    },
+    {
+      "path": "lib/subscription-workflow-model.ts",
+      "mode": "100644",
+      "blob": "24349e66f47d2ed935f89e509d022826fe37ffb2"
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "mode": "100644",
+      "blob": "9857985199066a39fdc96ba73f7047d21ba6406f"
+    },
+    {
+      "path": "lib/tracing/workflow-transport.test.ts",
+      "mode": "100644",
+      "blob": "a92aa052db23cb4448bd73538da70d3cab0634e6"
+    },
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "mode": "100644",
+      "blob": "335540475a9d8aaae8f34915e087b5a862699b95"
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "mode": "100644",
+      "blob": "16d858b40d2948ac8c4ce18188843c02960bc40e"
+    },
+    {
+      "path": "scripts/e2b/official-files.py",
+      "mode": "100644",
+      "blob": "ea0819bf3e2d4ff83e64482b6336567050376591"
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "mode": "100644",
+      "blob": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21"
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "mode": "100644",
+      "blob": "32a8321c981dd6a534f8859fa35f281e874466e6"
+    }
+  ],
+  "mergeSelections": {
+    "analytics": {
+      "selectBlob": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+      "upstreamBlob": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+      "exactDifference": "Own version adds only the 1629-byte SDK browser classification bot/browser and masked Replay test; deleting that exact block produces upstream byte-for-byte.",
+      "exactOwnBlockBytes": 1629,
+      "byteForByteDeletionEqualityVerified": true
+    },
+    "pnpm": {
+      "selectBlob": "29a96d1b50783f839175a72efe9a40bdbbdaaeab",
+      "featureBlob": "0306d340b38cf455facba376c2eb6dda58362c96",
+      "exactDifference": "Upstream retains all12 feature tests, extracts installLifecyclePresence to accept an actual install step, and adds2 direct Desktop API-read-only install tests.",
+      "featureTestsPreserved": 12,
+      "addedTests": 2
+    },
+    "package": {
+      "upstreamEqualsFeature": "568cfeee161309202699acefd0a57a8edc52bf6e",
+      "native": "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b",
+      "conditionalCombinedHashFromPriorProof": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+      "changes": "Retain both test:captures ffmpeg suffix and test:mobile mark test; distinct exact lines."
+    }
+  },
+  "journalBindings": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "blob": "104075571c73b97a985458f206dba310e4894490"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "blob": "2e3c8c7aad0594df165caf8f798c72034b3d484f"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "blob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4"
+    }
+  ],
+  "limits": {
+    "sourceOnly": true,
+    "CIClaim": "Still in progress; no pass claimed.",
+    "normalMergeNotExecuted": true,
+    "noRuntimeEqualsAppGate": true,
+    "sourceRefsChanged": false,
+    "rawLogsOrArtifactsRead": false,
+    "testsRun": false,
+    "resourcesCreated": false,
+    "sourceObjectsWritten": false,
+    "evidenceWrite": "Only this unreferenced JSON Git blob, followed by byte-for-byte readback; no ref or source mutation."
+  },
+  "scopeNotes": [
+    "Machine UA token cache is process-local and bounded; parent projection GET, owner/workspace/revision/member/run lease/Stop authority query remains fresh. f346 personal-policy only changes read-batch policy memo; runMayUseCredentialSql used by snapshot is unchanged.",
+    "Coordinator skips recursive move only when all three captured execution-row lists are empty, after existing locks. Attention select is narrowed. These are new runtime work-path changes, not a source identity match for earlier complete-tree timing results.",
+    "Workflow timing now observes model preparation too while requestedAt stays immediately before provider doStream. sanitize adds only http/ws transport enum and rejects other values. No broad attribute export or carrier API change is introduced.",
+    "Native server-choice helper retains one selection, deadline, target-document check, error propagation and final cleanup. Counter/checkpoint files are unchanged, but the actual harness source changes.",
+    "E2B adds only the exact Claude directory mode rule plus kind guard and two Desktop certificate relinks. strict installation still has no finalization rules; full policy/certificate digest remains bound. No Codex mode repair is included.",
+    "Journal workflow install continues with --ignore-scripts, so the upstream installer credential additions do not introduce a new FFmpeg lifecycle call there.",
+    "Production must use the existing accepted actual App/runtime witness rules; runtime source is not required to equal App source merely by this review."
+  ],
+  "recordedAt": "2026-11-09T14:35:41Z",
+  "counts": {
+    "directPaths": 46,
+    "modified": 37,
+    "added": 9,
+    "deleted": 0,
+    "featureIntersect": 19,
+    "featureIdentical": 17,
+    "featureDifferent": 2,
+    "nativeIntersect": 1,
+    "journalIntersect": 0,
+    "upstreamExclusive": 27
+  },
+  "testSourceReadback": [
+    {
+      "key": "analyticsFeature",
+      "blob": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+      "bytes": 26926,
+      "sha256": "a6cf1eb935b3bf5aac97ce4101a3b33a09d63b25530dbf43332484d032841dc2"
+    },
+    {
+      "key": "analyticsUpstream",
+      "blob": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+      "bytes": 25297,
+      "sha256": "ae3119ef1d7dcb36d61485de4ae3ddf62fa6b8d92529728092f1814cd82dce37"
+    },
+    {
+      "key": "pnpmFeature",
+      "blob": "0306d340b38cf455facba376c2eb6dda58362c96",
+      "bytes": 12270,
+      "sha256": "adefe699f39fadddc3eb6239bb6e7aa42748cef31d5ecb2167d3e8ebf12a7dee"
+    },
+    {
+      "key": "pnpmUpstream",
+      "blob": "29a96d1b50783f839175a72efe9a40bdbbdaaeab",
+      "bytes": 13631,
+      "sha256": "0a1d47cd00245e0f4530f89c34034e1c8d47034fcad54143b6014669cf5a5a38"
+    }
+  ],
+  "ciSnapshot": {
+    "observedAt": "2026-11-09T14:35:41Z",
+    "runId": 42632804002,
+    "head": "5c7055870c87d6ca47154b5ba68d63e50e92e561",
+    "attempt": 1,
+    "status": "in_progress",
+    "conclusion": null,
+    "updatedAt": "2026-11-09T14:28:17Z",
+    "logsRead": false
+  },
+  "refSnapshot": {
+    "observedAt": "2026-11-09T14:35:41Z",
+    "main": "76537e4c2996f717cbd19589e1efae328028aa4a",
+    "upstreamHead": "5c7055870c87d6ca47154b5ba68d63e50e92e561",
+    "pullRequest": {
+      "number": 1810,
+      "state": "open",
+      "merged": false,
+      "head": "5c7055870c87d6ca47154b5ba68d63e50e92e561",
+      "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+    }
+  },
+  "invalidationConditions": [
+    "Only the exact main765, upstream5c705, featuref346, native486 and three supplied journal blobs are covered.",
+    "Any changed head, additional path, different blob/mode or different manual conflict resolution requires a new bounded direct-leaf/source comparison before applying this result.",
+    "The frozen5c705 head does not contain a Codex mode repair; a future repair must be read at its new exact head and cannot inherit this head's eventual CI result.",
+    "The proposed test/package selections are source analysis only; no combined source tree, normal merge or new test/CI was executed.",
+    "Keep the existing actual App and accepted runtime witness contract. This receipt does not require runtime.source to equal App M."
+  ],
+  "limitationsOfSourceProof": "No production, model, account, DB, VM, resource or other-owner raw-log/artifact access. Existing owner source comments and committed source were read; their execution claims were not independently rerun. In-progress CI is not green."
+}
