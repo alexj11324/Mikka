@@ -1,0 +1,806 @@
+{
+  "schema": "mikka.closed-apm-investigation.v1",
+  "investigation": {
+    "runtimeReleaseRunId": 42579094044,
+    "attempt": 1,
+    "subscriptionJobId": 129040806019,
+    "requestedSource": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "requestedWorkerPrefix": "2ee",
+    "projectId": 670821,
+    "projectName": "Mikka",
+    "windowUTC": {
+      "from": "2026-11-09T07:51:40Z",
+      "to": "2026-11-09T07:54:20Z"
+    },
+    "dataReads": 10,
+    "readCountExcludes": "skill, schema, documentation and repository-source reads",
+    "externalArtifactRead": false,
+    "productionBusinessRequest": false,
+    "sqlQuery": false,
+    "mutation": false
+  },
+  "binding": {
+    "candidateRunIdAwaitingOwnerConfirmation": true,
+    "runId": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+    "taskId": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+    "workflowRunId": "wrun_41M6ZMRKVP20ME57F9M782GX5Q",
+    "traceId": "0000000000000000137a8de31ae75357",
+    "traceUrl": "https://us.posthog.com/project/670821/tracing?trace=0000000000000000137a8de31ae75357",
+    "observedResourceIdentities": [
+      {
+        "deployment.environment": "production",
+        "deployment.environment.name": "production",
+        "service.name": "mikka-daemon",
+        "service.version": "0.0.1"
+      },
+      {
+        "deployment.environment": "production",
+        "deployment.environment.name": "production",
+        "service.name": "mikka-web",
+        "service.version": "89eae89e9e79"
+      }
+    ],
+    "exactFullAppOrWorkerBindingNotExported": true
+  },
+  "coverage": {
+    "traceStructureRows": 701,
+    "traceStructureHasNextOffset": false,
+    "daemonAttributeRows": 34,
+    "serverRunRouteAttributeRows": 2,
+    "errorSpanRows": 9,
+    "failedHttpLeafRequests": 4,
+    "initialStructureQueryCappedAt250": true,
+    "initialStructureSupersededByBoundedTraceGet": true,
+    "exportCompletenessNotProven": true,
+    "perChunkTypeSequenceByteFieldsNotObserved": true,
+    "transcriptRead": false
+  },
+  "daemonRun": {
+    "name": "daemon.run",
+    "traceId": "0000000000000000137a8de31ae75357",
+    "spanId": "e38f5f7c592d1dd5",
+    "parentSpanId": "b276f383bea48811",
+    "service": "mikka-daemon",
+    "start": "2026-11-09T07:53:53.791000Z",
+    "end": "2026-11-09T07:54:09.411603Z",
+    "durationMs": 15620.603,
+    "otelStatus": 0,
+    "attributes": {
+      "mikka.client_kind": "daemon",
+      "mikka.harness": "codex",
+      "mikka.outcome": "submitted",
+      "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+      "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+      "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+      "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+    }
+  },
+  "clientHttpSummary": {
+    "GET /v1/runs/[id]/policy-snapshot 200": 1,
+    "POST /v1/runs/[id]/events 200": 15,
+    "PATCH /v1/runs/[id] 204": 2,
+    "POST /v1/runs/[id]/checkpoint 200": 1
+  },
+  "clientHttp": [
+    {
+      "name": "GET /v1/runs/[id]/policy-snapshot",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "6236ead7222c4371",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:53:53.795000Z",
+      "end": "2026-11-09T07:53:53.961575Z",
+      "durationMs": 166.575,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/policy-snapshot",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "2a242d897c4df794",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:53:53.976000Z",
+      "end": "2026-11-09T07:53:54.224129Z",
+      "durationMs": 248.129,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "PATCH /v1/runs/[id]",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "f861dd44596f2006",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:53:54.231000Z",
+      "end": "2026-11-09T07:53:54.366340Z",
+      "durationMs": 135.34,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "PATCH",
+        "http.response.status_code": "204",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "f017a44cbe15547a",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:53:55.247000Z",
+      "end": "2026-11-09T07:53:55.373020Z",
+      "durationMs": 126.02,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "896f02e660c291e5",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:53:55.376000Z",
+      "end": "2026-11-09T07:53:55.494633Z",
+      "durationMs": 118.633,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "ae0f718d2a9afbca",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:53:56.623000Z",
+      "end": "2026-11-09T07:53:56.753357Z",
+      "durationMs": 130.357,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "149ee9207c276084",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:53:56.756000Z",
+      "end": "2026-11-09T07:53:56.871768Z",
+      "durationMs": 115.768,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "PATCH /v1/runs/[id]",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "44bba458378b781e",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:53:56.874000Z",
+      "end": "2026-11-09T07:53:56.982270Z",
+      "durationMs": 108.27,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "PATCH",
+        "http.response.status_code": "204",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "17035d1f5ca291b3",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:07.319000Z",
+      "end": "2026-11-09T07:54:07.471775Z",
+      "durationMs": 152.775,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "47c7c72a29a2d787",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:07.475000Z",
+      "end": "2026-11-09T07:54:07.591204Z",
+      "durationMs": 116.204,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "2cec30857d34b6f0",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:08.146000Z",
+      "end": "2026-11-09T07:54:08.256658Z",
+      "durationMs": 110.658,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "8572dda9c94dba62",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:08.259000Z",
+      "end": "2026-11-09T07:54:08.384537Z",
+      "durationMs": 125.537,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "c4661110ddb627a1",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:08.387000Z",
+      "end": "2026-11-09T07:54:08.511951Z",
+      "durationMs": 124.951,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "cb37ffa5539dbe8a",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:08.514000Z",
+      "end": "2026-11-09T07:54:08.697972Z",
+      "durationMs": 183.972,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "1e3c890db8d83dea",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:08.700000Z",
+      "end": "2026-11-09T07:54:08.869436Z",
+      "durationMs": 169.436,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "ba3b263932f7f060",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:08.873000Z",
+      "end": "2026-11-09T07:54:08.996617Z",
+      "durationMs": 123.617,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "4c084b8983979ffa",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:09.014000Z",
+      "end": "2026-11-09T07:54:09.131533Z",
+      "durationMs": 117.533,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/events",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "c4b04c36296fd9ed",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:09.134000Z",
+      "end": "2026-11-09T07:54:09.241771Z",
+      "durationMs": 107.771,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/events",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "POST /v1/runs/[id]/checkpoint",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "6098191ab5d5bdf8",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:09.289000Z",
+      "end": "2026-11-09T07:54:09.399458Z",
+      "durationMs": 110.458,
+      "otelStatus": 0,
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200",
+        "mikka.client_kind": "daemon",
+        "mikka.outcome": "ok",
+        "mikka.route": "/v1/runs/[id]/checkpoint",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    }
+  ],
+  "generations": [
+    {
+      "name": "daemon.ai.generation",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "fd31471cabbbe8c2",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:02.221000Z",
+      "end": "2026-11-09T07:54:02.222179Z",
+      "durationMs": 1.179,
+      "otelStatus": 0,
+      "attributes": {
+        "mikka.ai.input_tokens": "15554",
+        "mikka.ai.model": "gpt-6-luna",
+        "mikka.ai.native_unavailable_reason": "native_trace_truncated",
+        "mikka.ai.operation": "agent",
+        "mikka.ai.output_tokens": "40",
+        "mikka.ai.provider": "openai",
+        "mikka.ai.timing_basis": "app_server_usage",
+        "mikka.client_kind": "daemon",
+        "mikka.harness": "codex",
+        "mikka.outcome": "ok",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "daemon.ai.generation",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "edc9a14cbf9c941d",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:07.327000Z",
+      "end": "2026-11-09T07:54:07.327342Z",
+      "durationMs": 0.342,
+      "otelStatus": 0,
+      "attributes": {
+        "mikka.ai.input_tokens": "17034",
+        "mikka.ai.model": "gpt-6-luna",
+        "mikka.ai.native_unavailable_reason": "native_trace_truncated",
+        "mikka.ai.operation": "agent",
+        "mikka.ai.output_tokens": "158",
+        "mikka.ai.provider": "openai",
+        "mikka.ai.timing_basis": "app_server_usage",
+        "mikka.client_kind": "daemon",
+        "mikka.harness": "codex",
+        "mikka.outcome": "ok",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "daemon.ai.generation",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "101865bf651a53ed",
+      "parentSpanId": "e38f5f7c592d1dd5",
+      "service": "mikka-daemon",
+      "start": "2026-11-09T07:54:09.021000Z",
+      "end": "2026-11-09T07:54:09.021238Z",
+      "durationMs": 0.238,
+      "otelStatus": 0,
+      "attributes": {
+        "mikka.ai.input_tokens": "17236",
+        "mikka.ai.model": "gpt-6-luna",
+        "mikka.ai.native_unavailable_reason": "native_trace_truncated",
+        "mikka.ai.operation": "agent",
+        "mikka.ai.output_tokens": "38",
+        "mikka.ai.provider": "openai",
+        "mikka.ai.timing_basis": "app_server_usage",
+        "mikka.client_kind": "daemon",
+        "mikka.harness": "codex",
+        "mikka.outcome": "ok",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    }
+  ],
+  "nativeCollection": {
+    "name": "daemon.ai.collection",
+    "traceId": "0000000000000000137a8de31ae75357",
+    "spanId": "ec7f0525abec2e09",
+    "parentSpanId": "e38f5f7c592d1dd5",
+    "service": "mikka-daemon",
+    "start": "2026-11-09T07:54:09.096000Z",
+    "end": "2026-11-09T07:54:09.096296Z",
+    "durationMs": 0.296,
+    "otelStatus": 0,
+    "attributes": {
+      "mikka.ai.cli_exit_observed": "true",
+      "mikka.ai.collection_truncated": "true",
+      "mikka.ai.duplicate_completions": "0",
+      "mikka.ai.fallback_generations": "3",
+      "mikka.ai.incomplete_requests": "0",
+      "mikka.ai.invalid_spans": "0",
+      "mikka.ai.matched_fallbacks": "0",
+      "mikka.ai.missing_native": "3",
+      "mikka.ai.native_flush_confirmed": "false",
+      "mikka.ai.native_generations": "0",
+      "mikka.ai.rejected_batches": "2",
+      "mikka.client_kind": "daemon",
+      "mikka.harness": "codex",
+      "mikka.outcome": "ok",
+      "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+      "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+      "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+      "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+    }
+  },
+  "errors": [
+    {
+      "name": "hook.resume",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "2b78a1fc87f0c569",
+      "parentSpanId": "cd2aff73180d4bb0",
+      "service": "mikka-web",
+      "start": "2026-11-09T07:53:50.459000Z",
+      "end": "2026-11-09T07:53:50.602831Z",
+      "durationMs": 143.831,
+      "otelStatus": 2,
+      "attributes": {
+        "mikka.client_kind": "background",
+        "mikka.route": "after:workflow-wake",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "world.hooks.getByToken",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "17e0df76a6bd566d",
+      "parentSpanId": "2b78a1fc87f0c569",
+      "service": "mikka-web",
+      "start": "2026-11-09T07:53:50.460000Z",
+      "end": "2026-11-09T07:53:50.602547Z",
+      "durationMs": 142.547,
+      "otelStatus": 2,
+      "attributes": {
+        "mikka.client_kind": "background",
+        "mikka.route": "after:workflow-wake",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "http GET",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "fb13dab62cc2a616",
+      "parentSpanId": "17e0df76a6bd566d",
+      "service": "mikka-web",
+      "start": "2026-11-09T07:53:50.461000Z",
+      "end": "2026-11-09T07:53:50.601632Z",
+      "durationMs": 140.632,
+      "otelStatus": 2,
+      "attributes": {
+        "error.type": "not-found",
+        "http.request.method": "GET",
+        "http.response.status_code": "404",
+        "mikka.client_kind": "background",
+        "mikka.route": "after:workflow-wake",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "world.hooks.getByToken",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "ea21cc5e48ae10e5",
+      "parentSpanId": "153aa438d04a064f",
+      "service": "mikka-web",
+      "start": "2026-11-09T07:53:54.182000Z",
+      "end": "2026-11-09T07:53:54.246152Z",
+      "durationMs": 64.152,
+      "otelStatus": 2,
+      "attributes": {
+        "mikka.client_kind": "background",
+        "mikka.route": "after:workflow-wake",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "hook.resume",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "153aa438d04a064f",
+      "parentSpanId": "4683e07470060d18",
+      "service": "mikka-web",
+      "start": "2026-11-09T07:53:54.182000Z",
+      "end": "2026-11-09T07:53:54.247545Z",
+      "durationMs": 65.545,
+      "otelStatus": 2,
+      "attributes": {
+        "mikka.client_kind": "background",
+        "mikka.route": "after:workflow-wake",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "http GET",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "2c3cff1d9dbe59f2",
+      "parentSpanId": "ea21cc5e48ae10e5",
+      "service": "mikka-web",
+      "start": "2026-11-09T07:53:54.183000Z",
+      "end": "2026-11-09T07:53:54.245696Z",
+      "durationMs": 62.696,
+      "otelStatus": 2,
+      "attributes": {
+        "error.type": "not-found",
+        "http.request.method": "GET",
+        "http.response.status_code": "404",
+        "mikka.client_kind": "background",
+        "mikka.route": "after:workflow-wake",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMRKVP20ME57F9M782GX5Q"
+      }
+    },
+    {
+      "name": "workflow.stream.write",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "e573005554cc81b8",
+      "parentSpanId": "91c63591ddb75def",
+      "service": "mikka-web",
+      "start": "2026-11-09T07:54:12.485000Z",
+      "end": "2026-11-09T07:54:12.538293Z",
+      "durationMs": 53.293,
+      "otelStatus": 2,
+      "attributes": {
+        "error.type": "HTTP 409",
+        "http.request.method": "PUT",
+        "http.response.status_code": "409",
+        "mikka.client_kind": "web",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMSTAM20NHHEHSRBF08ZT0"
+      }
+    },
+    {
+      "name": "world.events.create step_started",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "efff722fa7d59259",
+      "parentSpanId": "9cc7b11f64f847d5",
+      "service": "mikka-web",
+      "start": "2026-11-09T07:54:12.539000Z",
+      "end": "2026-11-09T07:54:12.592886Z",
+      "durationMs": 53.886,
+      "otelStatus": 2,
+      "attributes": {
+        "mikka.client_kind": "web",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMSTAM20NHHEHSRBF08ZT0"
+      }
+    },
+    {
+      "name": "http POST",
+      "traceId": "0000000000000000137a8de31ae75357",
+      "spanId": "62d9be55316e05e8",
+      "parentSpanId": "efff722fa7d59259",
+      "service": "mikka-web",
+      "start": "2026-11-09T07:54:12.539000Z",
+      "end": "2026-11-09T07:54:12.592335Z",
+      "durationMs": 53.335,
+      "otelStatus": 2,
+      "attributes": {
+        "error.type": "HTTP 409",
+        "http.request.method": "POST",
+        "http.response.status_code": "409",
+        "mikka.client_kind": "web",
+        "mikka.run_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.task_id": "ed029a48-f08d-4f27-912b-70dda9c7da93",
+        "mikka.thread_id": "bcd5de6f-244c-482a-9409-fd09bca4a6ef",
+        "mikka.workflow_run_id": "wrun_41M6ZMSTAM20NHHEHSRBF08ZT0"
+      }
+    }
+  ],
+  "interpretation": [
+    "Observed client events/checkpoint HTTP success establishes transport responses, not specific reply payload contents or persistence.",
+    "Three app_server_usage generation receipts and collection truncation are telemetry facts, not a contradiction of a separately passed native runtimeEvidence/MCP adoption gate.",
+    "Native generation span duration here is receipt handling duration; it must not be presented as model latency.",
+    "Server error HTTP leaves were two hook lookups404/not-found and two Workflow writes409; parent ERROR spans repeat these failures.",
+    "Server Workflow error carries wrun_41M6ZMSTAM20NHHEHSRBF08ZT0, different from the daemon run's wrun_41M6ZMRKVP20ME57F9M782GX5Q.",
+    "Cross-host absolute timestamps are not clock-calibrated; later wall-clock stamps do not establish causal order or justify subtracting service clocks.",
+    "No per-chunk sequence/type/reply-size attributes were observed; emission, batch ingestion and final gate matching remain unresolved from this APM slice.",
+    "Existing runtime gate FAIL remains FAIL; no new model or formal sample was executed."
+  ],
+  "sourceRules": {
+    "path": "docs/operations/tracing.md",
+    "ref": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "blob": "e75e8377fbcb6f92d3446f5325d6d55cc4b294af"
+  }
+}
