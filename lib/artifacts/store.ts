@@ -16,6 +16,7 @@ import { issueVisibility } from '@/lib/issue-visibility'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactStorage, getArtifactObject, putArtifactObject } from '@/lib/artifacts/storage'
 import { artifactChanged } from '@/lib/live/artifacts'
+import { taskActivityChanged } from '@/lib/factory/activity-live'
 
 // Artifacts in Neon (who, which version, share links) with their files in R2.
 // Every read is scoped to the owner, or to a live share token.
@@ -81,6 +82,7 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
     // response interruption must not leave a visible version without its run.
     await recordCoordinatorEvent(tx, artifactSubmittedEvent(submitter, submitted))
     await artifactChanged(tx, submitter.userId, artifactId)
+    if (submitter.runId) taskActivityChanged(tx, submitter.runId)
     return submitted
   })
   if ('error' in result) return result
