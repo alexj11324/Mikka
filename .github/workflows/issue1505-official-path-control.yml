@@ -20,13 +20,13 @@ concurrency:
 jobs:
   observe:
     # Root-reviewed single official-only diagnostic window; attempt 1 only.
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
+    if: false
     runs-on: ubuntu-latest
     # Observation remains 900s; this ceiling leaves the 150s cleanup-only recheck.
     timeout-minutes: 20
     env:
       PYTHONDONTWRITEBYTECODE: '1'
-      CONTROL_GO: 'root-reviewed-1505-official-path-control-20261109-v1'
+      CONTROL_GO: 'false'
       CONTROL_NOT_BEFORE: 2026-11-09T17:52:05Z
       CONTROL_DEADLINE: 2026-11-09T18:07:05Z
     steps:
