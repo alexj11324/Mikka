@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { lstat, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { PRODUCT, PRODUCT_TREE, OVERLAY, PUBLIC_TARGETS, REQUIRED_SLOTS } from './ui-proof-1782.mjs'
+import { PRODUCT, PRODUCT_TREE, OVERLAY, PUBLIC_TARGETS, REQUIRED_SLOTS, validateWorkspaceNameCleanup } from './ui-proof-1782.mjs'
 
 try {
   const app = resolve(process.env.MIKKA_TEST_APP_DIR)
@@ -28,6 +28,7 @@ try {
     assert.equal(manifest.compiled.revision, PRODUCT); assert.equal(manifest.compiled.rendererBuild, source.build.rendererBuild)
     assert.equal(manifest.compiled.servedBuildMatches, true); assert.equal(manifest.compiled.servedOverlayMatches, true)
     assert.ok(Object.values(manifest.cleanup).every(value => value === true))
+    validateWorkspaceNameCleanup(manifest.workspaceNameCleanup)
     manifest.runtimeShutdown = 'passed'
   } else {
     manifest.result = 'failed'; manifest.runtimeShutdown = 'unproven'

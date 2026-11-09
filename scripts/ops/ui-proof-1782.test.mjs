@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { BRANCH, CONTROL_PARENT, DATABASE, OVERLAY, PRODUCT, PRODUCT_TREE, PUBLIC_TARGETS, REQUIRED_SLOTS, closedFailure, gallery, validateInventory, validateInvocation } from './ui-proof-1782.mjs'
+import { BRANCH, CONTROL_PARENT, DATABASE, OVERLAY, PRODUCT, PRODUCT_TREE, PUBLIC_TARGETS, REQUIRED_SLOTS, closedFailure, gallery, validateInventory, validateInvocation, validateWorkspaceNameCleanup } from './ui-proof-1782.mjs'
 import { CASES, freshTaskContent } from './ui-proof-1782-fixtures.mjs'
 
 const control = '1234567890abcdef1234567890abcdef12345678'
@@ -88,6 +88,37 @@ test('a generic error cannot impersonate an account code or emit an unbounded ph
     { phase: 'unknown', kind: 'Error' })
   assert.deepEqual(closedFailure('scope', { name: 'AssertionError', code: 'RESOURCE_ALREADY_EXISTS' }),
     { phase: 'scope', kind: 'AssertionError' })
+})
+
+test('cleanup exposes only the existing closed lease and generated-name failure codes', () => {
+  assert.deepEqual(closedFailure('cleanup_lease', { name: 'TestAccountError', code: 'ACCOUNT_DIRTY', message: 'private account contents' }),
+    { phase: 'cleanup_lease', kind: 'TestAccountError', code: 'ACCOUNT_DIRTY' })
+  assert.deepEqual(closedFailure('cleanup_workspaceName', { name: 'Error', code: 'WORKSPACE_NAME_CLEANUP_UNPROVEN', message: 'private workspace name' }),
+    { phase: 'cleanup_workspaceName', kind: 'Error', code: 'WORKSPACE_NAME_CLEANUP_UNPROVEN' })
+  assert.deepEqual(closedFailure('cleanup_workspaceName', { name: 'Error', code: 'WORKSPACE_NAME_PRIVATE_VALUE', message: 'private workspace name' }),
+    { phase: 'cleanup_workspaceName', kind: 'Error' })
+})
+
+test('official browser initialization keeps each finite wait identifiable', () => {
+  for (const phase of ['browser_launch', 'browser_context', 'browser_home', 'workspace_menu', 'workspace_sidebar',
+    'workspace_selection', 'workspace_navigation', 'workspace_ready', 'theme_persist', 'theme_reload', 'theme_ready']) {
+    assert.deepEqual(closedFailure(phase, { name: 'TimeoutError', message: 'private page or locator' }), { phase, kind: 'TimeoutError' })
+  }
+})
+
+test('generated-name cleanup requires both sealed account baselines and only the proven name change', () => {
+  const base = { captured: true, phase: 'unchanged', restored: false, ownerMatchesSealedBaseline: true, peerMatchesSealedBaseline: true }
+  assert.equal(validateWorkspaceNameCleanup(base), true)
+  assert.equal(validateWorkspaceNameCleanup({ ...base, phase: 'restored', restored: true, onlyGeneratedNameDifference: true }), true)
+})
+
+test('unproven, unrelated or incomplete generated-name cleanup cannot pass the gallery audit', () => {
+  const base = { captured: true, phase: 'restored', restored: true, onlyGeneratedNameDifference: true,
+    ownerMatchesSealedBaseline: true, peerMatchesSealedBaseline: true }
+  for (const patch of [{ captured: false }, { phase: 'verify' }, { restored: false }, { onlyGeneratedNameDifference: false },
+    { ownerMatchesSealedBaseline: false }, { peerMatchesSealedBaseline: false }]) {
+    assert.throws(() => validateWorkspaceNameCleanup({ ...base, ...patch }), { name: 'AssertionError' })
+  }
 })
 
 test('the finite fixture matrix includes an open Task with a successful attempt', () => {

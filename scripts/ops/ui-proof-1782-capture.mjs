@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { CASES, extendFixtures } from './ui-proof-1782-fixtures.mjs'
-import { DATABASE, PRODUCT, PRODUCT_TREE, OVERLAY, closedFailure, gallery, sourceEvidence } from './ui-proof-1782.mjs'
+import { DATABASE, PRODUCT, PRODUCT_TREE, OVERLAY, closedFailure, gallery, selectOfficialWorkspace, sourceEvidence } from './ui-proof-1782.mjs'
 
 const app = resolve(process.env.MIKKA_TEST_APP_DIR ?? '')
 const output = resolve(process.env.MIKKA_UI_PROOF_OUTPUT ?? '')
@@ -20,7 +20,7 @@ const { chromium, expect } = require('@playwright/test')
 const { acquireTestAccounts, auditEvidence } = await fromApp('scripts/test-accounts/session.mjs')
 const { loadEnvironment } = await fromApp('scripts/test-accounts/environment.mjs')
 const { createParityFixtures } = await fromApp('apps/desktop/test/parity-fixtures.mjs')
-const { selectParityWorkspace } = await fromApp('apps/desktop/test/parity-page-ready.mjs')
+const { captureGeneratedWorkspaceName } = await fromApp('apps/desktop/test/generated-workspace-name.mjs')
 const { screenshot } = await fromApp('apps/desktop/test/parity-images.mjs')
 const { encode, decode, DESKTOP_RPC_VERSION } = await fromApp('lib/desktop-rpc/wire.ts')
 const { readCompiledBuild } = await fromApp('scripts/start-app.mjs')
@@ -34,9 +34,9 @@ const report = { version: 1, product: PRODUCT, productTree: PRODUCT_TREE, overla
   scope: 'official_ui_isolated_production_build', synthetic: true, productionAcceptance: false, responseMocks: 0,
   edition: 'cloud', externalCloudServiceConfigured: false,
   startedAt: new Date().toISOString(), fixtureCases: CASES.map(({ key, taskStatus, runStatus, outcome, group, state }) => ({ key, taskStatus, runStatus, outcome, group, state })),
-  screens: [], checks: [], cleanup: { browser: false, extension: false, base: false, lease: false }, result: 'running' }
+  screens: [], checks: [], cleanup: { browser: false, extension: false, base: false, workspaceName: false, lease: false }, result: 'running' }
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
-let scope, base, extension, browser, phase = 'source', primaryError, humanAssigneeName
+let scope, base, extension, browser, workspaceName, phase = 'source', primaryError, humanAssigneeName
 const pageErrors = []
 
 async function rpc(action, args) {
@@ -219,26 +219,34 @@ try {
   phase = 'acquire'
   const started = Date.now()
   scope = await acquireTestAccounts({ runId: `ui1782-${started}`, requestId: `ui1782-${started}`, workerId: 'official-ui-proof-1782', ttlMs: 300_000 })
+  phase = 'workspace_name_baseline'
+  workspaceName = await captureGeneratedWorkspaceName(scope)
+  report.workspaceNameCleanup = workspaceName.read()
   phase = 'base_seed'
   base = await createParityFixtures(scope)
   phase = 'extension_seed'
   extension = await extendFixtures(scope, base.fixture)
   phase = 'scope'
   report.fixtureIdentity = await assertScope()
-  phase = 'browser'
+  phase = 'browser_launch'
   browser = await chromium.launch({ headless: true })
   for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     for (const theme of ['light', 'dark']) {
+      phase = 'browser_context'
       const context = await browser.newContext({ viewport, deviceScaleFactor: 1, timezoneId: 'UTC', reducedMotion: 'reduce', colorScheme: theme })
       try {
         await context.addCookies(JSON.parse(await readFile(scope.owner.storageStatePath, 'utf8')).cookies)
         const page = await context.newPage()
         page.setDefaultTimeout(45_000)
         page.on('pageerror', error => pageErrors.push({ name: ['Error', 'TypeError', 'ReferenceError', 'SyntaxError'].includes(error.name) ? error.name : 'OtherError' }))
+        phase = 'browser_home'
         await page.goto(`${environment.origin}/mikka/en`, { waitUntil: 'domcontentloaded' })
-        await selectParityWorkspace(page, { menuName: messages.Nav.workspaceMenu, workspaceName: base.fixture.workspaceName, basePath: '/mikka' })
+        await selectOfficialWorkspace(page, { workspaceName: base.fixture.workspaceName, basePath: '/mikka', onPhase: value => { phase = value } })
+        phase = 'theme_persist'
         await page.evaluate(value => localStorage.setItem('theme', value), theme)
+        phase = 'theme_reload'
         await page.reload({ waitUntil: 'domcontentloaded' })
+        phase = 'theme_ready'
         await page.waitForFunction(value => document.documentElement.classList.contains(value), theme)
         await taskList(page, theme, viewport)
         await taskDetail(page, theme, viewport)
@@ -263,12 +271,17 @@ try {
       primaryError ??= error
       report.cleanup[name] = false
       report.cleanupFailures ??= []; report.cleanupFailures.push(name)
+      report.cleanupFailureDetails ??= []; report.cleanupFailureDetails.push({ resource: name, ...closedFailure(`cleanup_${name}`, error) })
     }
   }
   await cleanup('browser', async () => { if (browser) await browser.close() })
   if (extension) await cleanup('extension', extension.cleanup)
   if (base && report.cleanup.browser && report.cleanup.extension) await cleanup('base', base.cleanup)
-  if (scope) await cleanup('lease', () => scope.release({ outcome: report.cleanup.base && report.cleanup.extension ? 'clean' : 'dirty' }))
+  if (workspaceName && report.cleanup.browser && report.cleanup.extension && report.cleanup.base) {
+    await cleanup('workspaceName', async () => { report.workspaceNameCleanup = await workspaceName.restore({ drained: true }) })
+    report.workspaceNameCleanup = workspaceName.read()
+  }
+  if (scope) await cleanup('lease', () => scope.release({ outcome: report.cleanup.browser && report.cleanup.base && report.cleanup.extension && report.cleanup.workspaceName ? 'clean' : 'dirty' }))
   if (primaryError || Object.values(report.cleanup).some(value => value !== true)) report.result = 'failed'
   report.pageErrors = pageErrors
   report.finishedAt = new Date().toISOString()
