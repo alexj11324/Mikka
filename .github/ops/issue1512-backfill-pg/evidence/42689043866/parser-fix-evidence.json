@@ -1,0 +1,27 @@
+{
+  "schema": "issue1512-pg-controller-parser-fix-v1",
+  "failureRun": 42688581877,
+  "failureMetadataBlob": "f66fa7f83e48b2b1d8bc1644559683e3ecba06c8",
+  "beforeControl": "122238cb3b8dbbd6fab65398e1fc5c1eed7dbc78",
+  "afterControl": "0b5395eb6fa5c1e2787e97c2308d7114a630607e",
+  "afterTree": "96010045c670b62c8fd1d86b354fa5c5c01fa1f4",
+  "workflowBlob": "ea28630ad0c8c9681a67589f4328b7a1dc30a11a",
+  "parser": {
+    "library": "nodeca/js-yaml 4.1.0 dist/js-yaml.js",
+    "oldFailure": {
+      "reason": "bad indentation of a mapping entry",
+      "line": 34,
+      "column": 222,
+      "message": "bad indentation of a mapping entry (34:222)\n\n 31 |  ... \n 32 |  ... \n 33 |  ... \n 34 |  ... d_commit.message == 'issue1512: backfill-pg admit 20261109' }}\n-----------------------------------------^\n 35 |  ... \n 36 |  ... "
+    },
+    "fixedSyntaxValid": true,
+    "jobNames": [
+      "red",
+      "green"
+    ],
+    "redExpression": "${{ github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-backfill-pg-20261109' && github.event_name == 'push' && github.run_attempt == '1' && github.event.head_commit.message == 'issue1512: backfill-pg admit 20261109' }}",
+    "greenExpression": "${{ github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-backfill-pg-20261109' && github.event_name == 'push' && github.run_attempt == '1' && github.event.head_commit.message == 'issue1512: backfill-pg admit 20261109' && needs.red.result == 'success' }}"
+  },
+  "scope": "Only convert the two existing job if scalars to folded scalars. All expression bytes, application/test source, driver, manifest, expiry, commands, limits, permission, isolation and cleanup remain unchanged.",
+  "refNotUpdated": true
+}

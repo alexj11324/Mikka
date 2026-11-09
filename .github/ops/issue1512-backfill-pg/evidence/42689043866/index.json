@@ -1,0 +1,744 @@
+{
+  "schema": "issue1512-isolated-pg17-failed-regression-evidence-v1",
+  "recordedAt": "2026-11-09 20:06:13 UTC",
+  "outcome": "REJECTED_EXPECTED_RED_DUE_TO_THREE_NEW_FIXTURE_SQL_ERRORS",
+  "before": {
+    "sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+    "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+    "sourceBlob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+    "testBlob": "32a8321c981dd6a534f8859fa35f281e874466e6"
+  },
+  "after": {
+    "sha": "a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4",
+    "tree": "e4f12292616357f46a981cfa92588248f1ad452b",
+    "sourceBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+    "testBlob": "13fb6f222c061d115916557b796006c2073dc628"
+  },
+  "opsControl": {
+    "sha": "0b5395eb6fa5c1e2787e97c2308d7114a630607e",
+    "tree": "96010045c670b62c8fd1d86b354fa5c5c01fa1f4",
+    "driverBlob": "4e076ee0f7e37e3a843bccad9bdbb2e32f6405d7",
+    "manifestBlob": "cd91a3303961f9631e5a6666b258db708918f433",
+    "workflowBlob": "ea28630ad0c8c9681a67589f4328b7a1dc30a11a"
+  },
+  "preExecutionParserFailure": {
+    "runId": 42688581877,
+    "metadataBlob": "f66fa7f83e48b2b1d8bc1644559683e3ecba06c8",
+    "parserFixEvidenceBlob": "eb7c37c2fe0be3447739067cebc6a11b4ff98003",
+    "jobs": 0,
+    "resources": 0
+  },
+  "run": {
+    "id": 42689043866,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42689043866",
+    "head": "0b5395eb6fa5c1e2787e97c2308d7114a630607e",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "failure"
+  },
+  "jobs": [
+    {
+      "id": 129403572490,
+      "name": "Old source, genuine regression assertion RED",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-09T20:02:12Z",
+      "completedAt": "2026-11-09T20:03:43Z",
+      "runnerName": "GitHub Actions 1000239583"
+    },
+    {
+      "id": 129404458235,
+      "name": "Candidate, complete Coordinator family GREEN",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-09T20:03:43Z",
+      "completedAt": "2026-11-09T20:03:43Z",
+      "runnerName": null
+    }
+  ],
+  "artifactMetadata": [
+    {
+      "id": 13706182044,
+      "name": "issue1512-backfill-pg-red-42689043866-1",
+      "size_in_bytes": 10768,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13706182044",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13706182044/zip",
+      "expired": false,
+      "created_at": "2026-11-09T20:03:39Z",
+      "expires_at": "2026-11-16T20:03:38Z",
+      "updated_at": "2026-11-09T20:03:39Z",
+      "digest": "sha256:5e18b766b3d49865b80140d1dfd5d139af206238ec38aac0caedc46019b8d513",
+      "workflow_run": {
+        "id": 42689043866,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "ops/1512-backfill-pg-20261109",
+        "head_sha": "0b5395eb6fa5c1e2787e97c2308d7114a630607e"
+      }
+    }
+  ],
+  "originalReader": {
+    "reader": "/root/backfill_pg_runner",
+    "jobOriginalCalls": {
+      "129403572490": 1
+    },
+    "zipOriginalCalls": 0,
+    "wrapperBlob": "74f31ea1287214da08c0f03203cdbf32ba021949",
+    "logBlob": "4181d3e513acdb9d0892b19e9b4d6decc96c81c0",
+    "persistedBeforeAnalysis": true
+  },
+  "originals": [
+    {
+      "phase": "red",
+      "label": "migration-bootstrap",
+      "stream": "stdout",
+      "file": "red-migration-bootstrap-stdout.log",
+      "bytes": 1152,
+      "sha256": "331b9af5e4ed69a51cf1059442b645daa6fcdccc6a79e32a19117b2976a067bb",
+      "gitBlobSha": "bd2db84008523ecca61e1576cca1591067137ea4",
+      "verifiedSha256": "331b9af5e4ed69a51cf1059442b645daa6fcdccc6a79e32a19117b2976a067bb"
+    },
+    {
+      "phase": "red",
+      "label": "migration-bootstrap",
+      "stream": "stderr",
+      "file": "red-migration-bootstrap-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "phase": "red",
+      "label": "e2e-setup",
+      "stream": "stdout",
+      "file": "red-e2e-setup-stdout.log",
+      "bytes": 20970,
+      "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6",
+      "gitBlobSha": "48822312808ecf4bb1e5330acc96320eeddb0dcb",
+      "verifiedSha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+    },
+    {
+      "phase": "red",
+      "label": "e2e-setup",
+      "stream": "stderr",
+      "file": "red-e2e-setup-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "phase": "red",
+      "label": "environment-bind",
+      "stream": "stdout",
+      "file": "red-environment-bind-stdout.log",
+      "bytes": 153,
+      "sha256": "b2ed5a23d87271064d2f7772bff513a77d6131e5a76f56cf8947208cffdedabc",
+      "gitBlobSha": "7eca948944082f6314fc0c85db09a864b0d0e91d",
+      "verifiedSha256": "b2ed5a23d87271064d2f7772bff513a77d6131e5a76f56cf8947208cffdedabc"
+    },
+    {
+      "phase": "red",
+      "label": "environment-bind",
+      "stream": "stderr",
+      "file": "red-environment-bind-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "phase": "red",
+      "label": "coordinator-red",
+      "stream": "stdout",
+      "file": "red-coordinator-red-stdout.log",
+      "bytes": 17918,
+      "sha256": "0836c8a69b6aff2e17872287713f71ba37298017f225bc0010d9ddc5128fb2d4",
+      "gitBlobSha": "689ae48e0efe13c9b13afe4edcc05984b32f6999",
+      "verifiedSha256": "0836c8a69b6aff2e17872287713f71ba37298017f225bc0010d9ddc5128fb2d4"
+    },
+    {
+      "phase": "red",
+      "label": "coordinator-red",
+      "stream": "stderr",
+      "file": "red-coordinator-red-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "commands": [
+    {
+      "label": "migration-bootstrap",
+      "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+      "args": [
+        "--experimental-strip-types",
+        "--test",
+        "tests/migrate-empty-db.test.mjs"
+      ],
+      "startedAt": "2026-11-09T20:03:22.004Z",
+      "finishedAt": "2026-11-09T20:03:26.951Z",
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "red-migration-bootstrap-stdout.log",
+        "bytes": 1152,
+        "sha256": "331b9af5e4ed69a51cf1059442b645daa6fcdccc6a79e32a19117b2976a067bb"
+      },
+      "stderr": {
+        "file": "red-migration-bootstrap-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "e2e-setup",
+      "executable": "pnpm",
+      "args": [
+        "test:e2e:setup"
+      ],
+      "startedAt": "2026-11-09T20:03:26.952Z",
+      "finishedAt": "2026-11-09T20:03:29.296Z",
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "red-e2e-setup-stdout.log",
+        "bytes": 20970,
+        "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+      },
+      "stderr": {
+        "file": "red-e2e-setup-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "environment-bind",
+      "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+      "args": [
+        "scripts/test-accounts/bootstrap.mjs",
+        "--output",
+        "/home/runner/work/_temp/issue1512-pg/red-environment.json"
+      ],
+      "startedAt": "2026-11-09T20:03:29.297Z",
+      "finishedAt": "2026-11-09T20:03:29.453Z",
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "red-environment-bind-stdout.log",
+        "bytes": 153,
+        "sha256": "b2ed5a23d87271064d2f7772bff513a77d6131e5a76f56cf8947208cffdedabc"
+      },
+      "stderr": {
+        "file": "red-environment-bind-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "coordinator-red",
+      "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+      "args": [
+        "--test-reporter=tap",
+        "--experimental-test-module-mocks",
+        "--test-force-exit",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/coordinator-bot.db.test.ts"
+      ],
+      "startedAt": "2026-11-09T20:03:29.454Z",
+      "finishedAt": "2026-11-09T20:03:36.803Z",
+      "code": 1,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "red-coordinator-red-stdout.log",
+        "bytes": 17918,
+        "sha256": "0836c8a69b6aff2e17872287713f71ba37298017f225bc0010d9ddc5128fb2d4"
+      },
+      "stderr": {
+        "file": "red-coordinator-red-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "database": {
+    "database": "mikka_e2e",
+    "role": "e2e",
+    "version": "170011",
+    "port": 5432
+  },
+  "node": "v24.22.2",
+  "pnpm": "10.34.3",
+  "testSummary": {
+    "tests": 47,
+    "pass": 40,
+    "fail": 7,
+    "skipped": 0,
+    "cancelled": 0,
+    "todo": 0,
+    "childTests": 46,
+    "existingChildren": 25,
+    "existingChildrenAllPassed": true,
+    "newChildren": 21,
+    "newChildFailures": 6
+  },
+  "testPreservation": {
+    "oldBlob": "32a8321c981dd6a534f8859fa35f281e874466e6",
+    "newBlob": "13fb6f222c061d115916557b796006c2073dc628",
+    "unchangedPrefixBytes": 7028,
+    "unchangedSuffixBytes": 58804,
+    "oldBytes": 65832,
+    "insertedBytes": 20740
+  },
+  "actualFailures": [
+    {
+      "name": "an empty explicit Personal Coordinator uses one Personal read",
+      "diagnostic": "\n      ---\n      duration_ms: 158.761401\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:8043'\n      failureType: 'testCodeFailure'\n      error: |-\n        empty explicit Coordinator backfill must use one Personal SELECT\n        \n        26 !== 1\n        \n      code: 'ERR_ASSERTION'\n      name: 'AssertionError'\n      expected: 1\n      actual: 26\n      operator: 'strictEqual'\n      stack: |-\n        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:155:14)\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:147:53)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n      ..."
+    },
+    {
+      "name": "an empty explicit Team Coordinator uses one Personal read",
+      "diagnostic": "\n      ---\n      duration_ms: 28.195967\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:8043'\n      failureType: 'testCodeFailure'\n      error: |-\n        empty explicit Coordinator backfill must use one Personal SELECT\n        \n        26 !== 1\n        \n      code: 'ERR_ASSERTION'\n      name: 'AssertionError'\n      expected: 1\n      actual: 26\n      operator: 'strictEqual'\n      stack: |-\n        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:155:14)\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:147:53)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n      ..."
+    },
+    {
+      "name": "a retained copied agent head still permits the empty Personal read",
+      "diagnostic": "\n      ---\n      duration_ms: 9.047933\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:9137'\n      failureType: 'testCodeFailure'\n      error: 'inconsistent types deduced for parameter $2'\n      code: '42P08'\n      name: 'error'\n      stack: |-\n        /home/runner/work/Mikka/Mikka/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:168:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:164:3)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n      ..."
+    },
+    {
+      "name": "an explicit Team read retains the real migration for legacy factory_tasks",
+      "diagnostic": "\n      ---\n      duration_ms: 16.872593\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:2:894'\n      failureType: 'testCodeFailure'\n      error: 'insert or update on table \"factory_tasks\" violates foreign key constraint \"factory_tasks_attempt_fk\"'\n      code: '23503'\n      name: 'error'\n      stack: |-\n        /home/runner/work/Mikka/Mikka/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:211:9)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:182:6)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n      ..."
+    },
+    {
+      "name": "an explicit Team read retains the real migration for legacy suggestions",
+      "diagnostic": "\n      ---\n      duration_ms: 20.72618\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:2:894'\n      failureType: 'testCodeFailure'\n      error: 'inconsistent types deduced for parameter $1'\n      code: '42P08'\n      name: 'error'\n      stack: |-\n        /home/runner/work/Mikka/Mikka/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:242:9)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:182:6)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n      ..."
+    },
+    {
+      "name": "legacy rows committed after an empty read wait for the original next pass",
+      "diagnostic": "\n      ---\n      duration_ms: 35.800724\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:10:4019'\n      failureType: 'testCodeFailure'\n      error: |-\n        empty explicit Coordinator backfill must use one Personal SELECT\n        \n        29 !== 1\n        \n      code: 'ERR_ASSERTION'\n      name: 'AssertionError'\n      expected: 1\n      actual: 29\n      operator: 'strictEqual'\n      stack: |-\n        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:395:14)\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:360:3)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n      ..."
+    },
+    {
+      "name": "the Coordinator is an ordinary bot row",
+      "diagnostic": "\n  ---\n  duration_ms: 6857.586474\n  type: 'test'\n  location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:671'\n  failureType: 'subtestsFailed'\n  error: '6 subtests failed'\n  code: 'ERR_TEST_FAILURE'\n  ..."
+    }
+  ],
+  "childResults": [
+    {
+      "status": "not ok",
+      "index": 1,
+      "name": "an empty explicit Personal Coordinator uses one Personal read"
+    },
+    {
+      "status": "not ok",
+      "index": 2,
+      "name": "an empty explicit Team Coordinator uses one Personal read"
+    },
+    {
+      "status": "not ok",
+      "index": 3,
+      "name": "a retained copied agent head still permits the empty Personal read"
+    },
+    {
+      "status": "ok",
+      "index": 4,
+      "name": "an explicit Team read retains the real migration for legacy coordinator_messages"
+    },
+    {
+      "status": "ok",
+      "index": 5,
+      "name": "an explicit Team read retains the real migration for legacy coordinator_sessions"
+    },
+    {
+      "status": "ok",
+      "index": 6,
+      "name": "an explicit Team read retains the real migration for legacy coordinator_events"
+    },
+    {
+      "status": "ok",
+      "index": 7,
+      "name": "an explicit Team read retains the real migration for legacy agent_runs"
+    },
+    {
+      "status": "not ok",
+      "index": 8,
+      "name": "an explicit Team read retains the real migration for legacy factory_tasks"
+    },
+    {
+      "status": "ok",
+      "index": 9,
+      "name": "an explicit Team read retains the real migration for legacy bot_model_choices"
+    },
+    {
+      "status": "ok",
+      "index": 10,
+      "name": "an explicit Team read retains the real migration for legacy chat_preferences"
+    },
+    {
+      "status": "ok",
+      "index": 11,
+      "name": "an explicit Team read retains the real migration for legacy user_schedules"
+    },
+    {
+      "status": "not ok",
+      "index": 12,
+      "name": "an explicit Team read retains the real migration for legacy suggestions"
+    },
+    {
+      "status": "ok",
+      "index": 13,
+      "name": "an explicit Team read retains the real migration for legacy pending_actions"
+    },
+    {
+      "status": "ok",
+      "index": 14,
+      "name": "an explicit Team read retains the real migration for legacy agent_kit_heads"
+    },
+    {
+      "status": "ok",
+      "index": 15,
+      "name": "a missing Personal workspace reuses the unsuccessful lookup"
+    },
+    {
+      "status": "ok",
+      "index": 16,
+      "name": "a missing Personal Coordinator still follows the original creation path"
+    },
+    {
+      "status": "ok",
+      "index": 17,
+      "name": "only a boolean false Personal observation can skip the migration"
+    },
+    {
+      "status": "ok",
+      "index": 18,
+      "name": "a failed Personal observation is retried on the next read"
+    },
+    {
+      "status": "ok",
+      "index": 19,
+      "name": "an inactive Personal member cannot certify an empty backfill"
+    },
+    {
+      "status": "ok",
+      "index": 20,
+      "name": "busy chat locks retain the full migration and the next-read retry"
+    },
+    {
+      "status": "not ok",
+      "index": 21,
+      "name": "legacy rows committed after an empty read wait for the original next pass"
+    },
+    {
+      "status": "ok",
+      "index": 22,
+      "name": "an empty execution family skips its recursive update after every NOWAIT read"
+    },
+    {
+      "status": "ok",
+      "index": 23,
+      "name": "a captured legacy event still runs the execution migration"
+    },
+    {
+      "status": "ok",
+      "index": 24,
+      "name": "stale attention reads only settlement fields and preserves the decision input and owner log"
+    },
+    {
+      "status": "ok",
+      "index": 25,
+      "name": "existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing"
+    },
+    {
+      "status": "ok",
+      "index": 26,
+      "name": "personal backfill preserves shared and unresolved task events, runs, Factory sources and schedules"
+    },
+    {
+      "status": "ok",
+      "index": 27,
+      "name": "one shared-tenant task retains its complete null-Bot source family, including a Personal sibling"
+    },
+    {
+      "status": "ok",
+      "index": 28,
+      "name": "a new Coordinator message and a run use the real bot id, stored where they enter"
+    },
+    {
+      "status": "ok",
+      "index": 29,
+      "name": "a legacy run with no bot finishes for an owner with no workspace; its event is kept, and moved once the Coordinator resolves"
+    },
+    {
+      "status": "ok",
+      "index": 30,
+      "name": "real null-Bot admission retains frozen identity, Factory family and repository authority after backfill"
+    },
+    {
+      "status": "ok",
+      "index": 31,
+      "name": "an unfrozen computer run retains its Factory family and ordinary retry"
+    },
+    {
+      "status": "ok",
+      "index": 32,
+      "name": "an unfrozen group run retains its Factory family and ordinary retry"
+    },
+    {
+      "status": "ok",
+      "index": 33,
+      "name": "a publication holding its issue cannot deadlock with the backfill run lock"
+    },
+    {
+      "status": "ok",
+      "index": 34,
+      "name": "migration first holds the issue through its run update; real publication continues after commit"
+    },
+    {
+      "status": "ok",
+      "index": 35,
+      "name": "a run committed after issue locking retains its family until the next pass"
+    },
+    {
+      "status": "ok",
+      "index": 36,
+      "name": "a revoked shared-workspace member run keeps its tenant without blocking unrelated Personal history"
+    },
+    {
+      "status": "ok",
+      "index": 37,
+      "name": "an in-flight null-Bot route defers migration; its unfrozen history moves after commit"
+    },
+    {
+      "status": "ok",
+      "index": 38,
+      "name": "migration first fences a stale source validation before it can create a null-Bot task"
+    },
+    {
+      "status": "ok",
+      "index": 39,
+      "name": "a task committed between migration lock statements keeps its source until the next pass"
+    },
+    {
+      "status": "ok",
+      "index": 40,
+      "name": "a completion committed after the event lock keeps its legacy run until both can move"
+    },
+    {
+      "status": "ok",
+      "index": 41,
+      "name": "a chat writer holding its session cannot deadlock against the migration chat lock"
+    },
+    {
+      "status": "ok",
+      "index": 42,
+      "name": "model choice goes through the ordinary bot path"
+    },
+    {
+      "status": "ok",
+      "index": 43,
+      "name": "the Coordinator stays outside workspace app policy; an ordinary bot does not"
+    },
+    {
+      "status": "ok",
+      "index": 44,
+      "name": "the bot list (left column and mobile home) has that workspace's own Coordinator once, as the Coordinator"
+    },
+    {
+      "status": "ok",
+      "index": 45,
+      "name": "one Coordinator per workspace; work with no workspace goes to the personal one, never the oldest"
+    },
+    {
+      "status": "ok",
+      "index": 46,
+      "name": "a leaving member's Coordinator is paused with their bots and never transferred"
+    }
+  ],
+  "guardVerdict": {
+    "schema": "issue1512-isolated-pg17-v1",
+    "phase": "red",
+    "workflowRunId": "42689043866",
+    "workflowRunAttempt": "1",
+    "controlSha": "0b5395eb6fa5c1e2787e97c2308d7114a630607e",
+    "before": {
+      "sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+      "sourceBlob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+      "testBlob": "32a8321c981dd6a534f8859fa35f281e874466e6"
+    },
+    "after": {
+      "sha": "a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4",
+      "tree": "e4f12292616357f46a981cfa92588248f1ad452b",
+      "sourceBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+      "testBlob": "13fb6f222c061d115916557b796006c2073dc628"
+    },
+    "manifestSha256": "bccb05e8ee5ce2407b1627b0ca9edcf51717f88a9ccdc9affbd1f8054c86ccc6",
+    "driverSha256": "f114b1ebf4ae0dddcc25d1babdf53c2be5b37884130bbeba299d5b55775b417f",
+    "startedAt": "2026-11-09T20:03:21.606Z",
+    "commands": [
+      {
+        "label": "migration-bootstrap",
+        "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+        "args": [
+          "--experimental-strip-types",
+          "--test",
+          "tests/migrate-empty-db.test.mjs"
+        ],
+        "startedAt": "2026-11-09T20:03:22.004Z",
+        "finishedAt": "2026-11-09T20:03:26.951Z",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "red-migration-bootstrap-stdout.log",
+          "bytes": 1152,
+          "sha256": "331b9af5e4ed69a51cf1059442b645daa6fcdccc6a79e32a19117b2976a067bb"
+        },
+        "stderr": {
+          "file": "red-migration-bootstrap-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "e2e-setup",
+        "executable": "pnpm",
+        "args": [
+          "test:e2e:setup"
+        ],
+        "startedAt": "2026-11-09T20:03:26.952Z",
+        "finishedAt": "2026-11-09T20:03:29.296Z",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "red-e2e-setup-stdout.log",
+          "bytes": 20970,
+          "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+        },
+        "stderr": {
+          "file": "red-e2e-setup-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "environment-bind",
+        "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+        "args": [
+          "scripts/test-accounts/bootstrap.mjs",
+          "--output",
+          "/home/runner/work/_temp/issue1512-pg/red-environment.json"
+        ],
+        "startedAt": "2026-11-09T20:03:29.297Z",
+        "finishedAt": "2026-11-09T20:03:29.453Z",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "red-environment-bind-stdout.log",
+          "bytes": 153,
+          "sha256": "b2ed5a23d87271064d2f7772bff513a77d6131e5a76f56cf8947208cffdedabc"
+        },
+        "stderr": {
+          "file": "red-environment-bind-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "coordinator-red",
+        "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+        "args": [
+          "--test-reporter=tap",
+          "--experimental-test-module-mocks",
+          "--test-force-exit",
+          "--import",
+          "./tests/support/server-only.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "tests/coordinator-bot.db.test.ts"
+        ],
+        "startedAt": "2026-11-09T20:03:29.454Z",
+        "finishedAt": "2026-11-09T20:03:36.803Z",
+        "code": 1,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "red-coordinator-red-stdout.log",
+          "bytes": 17918,
+          "sha256": "0836c8a69b6aff2e17872287713f71ba37298017f225bc0010d9ddc5128fb2d4"
+        },
+        "stderr": {
+          "file": "red-coordinator-red-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "control": {
+      "controlSha": "0b5395eb6fa5c1e2787e97c2308d7114a630607e",
+      "controlTree": "96010045c670b62c8fd1d86b354fa5c5c01fa1f4",
+      "workflowBlob": "ea28630ad0c8c9681a67589f4328b7a1dc30a11a",
+      "manifestSha256": "bccb05e8ee5ce2407b1627b0ca9edcf51717f88a9ccdc9affbd1f8054c86ccc6",
+      "driverSha256": "f114b1ebf4ae0dddcc25d1babdf53c2be5b37884130bbeba299d5b55775b417f",
+      "phase": "red",
+      "capturedAt": "2026-11-09T20:02:32.717Z"
+    },
+    "database": {
+      "database": "mikka_e2e",
+      "role": "e2e",
+      "version": "170011",
+      "port": 5432
+    },
+    "node": "v24.22.2",
+    "pnpm": "10.34.3",
+    "verdict": "BLOCKED_OR_UNEXPECTED_FAILURE",
+    "failure": {
+      "name": "AssertionError",
+      "message": "Only the four new empty SQL-count assertions may fail\n+ actual - expected\n\n  [\n    'a retained copied agent head still permits the empty Personal read',\n    'an empty explicit Personal Coordinator uses one Personal read',\n    'an empty explicit Team Coordinator uses one Personal read',\n+   'an explicit Team read retains the real migration for legacy factory_tasks',\n+   'an explicit Team read retains the real migration for legacy suggestions',\n    'legacy rows committed after an empty read wait for the original next pass'\n  ]\n",
+      "code": "ERR_ASSERTION"
+    },
+    "finishedAt": "2026-11-09T20:03:36.805Z"
+  },
+  "rawByteVerification": {
+    "streams": 8,
+    "bytes": 40193,
+    "allSHA256Matched": true,
+    "unexpectedFailuresPreserved": true
+  },
+  "cleanup": {
+    "phase": "red",
+    "serviceId": "08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d",
+    "startedAt": "2026-11-09T20:03:37.310Z",
+    "stopped": true,
+    "finishedAt": "2026-11-09T20:03:38.438Z",
+    "actionsRemovedContainer": true,
+    "actionsRemovedNetwork": true,
+    "greenWasNeverAllocated": true,
+    "remainingOwnedDatabaseServices": 0,
+    "actionsRemovalLines": [
+      "2026-11-09T20:03:40.5514472Z Stop and remove container: eecf71fe743646deb0475710f1bf1e9f_postgres17_d21ab8",
+      "2026-11-09T20:03:40.5520357Z ##[command]/usr/bin/docker rm --force 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d",
+      "2026-11-09T20:03:40.5709968Z ##[command]/usr/bin/docker network rm github_network_256658d7af5046d2bf1753dd4b692327"
+    ]
+  },
+  "nextStep": "Correct only actual new fixture parameter casts / deferred FK setup, independently review a new exact candidate; no retry of this unchanged source/test pair and no relaxation of the RED whitelist."
+}
