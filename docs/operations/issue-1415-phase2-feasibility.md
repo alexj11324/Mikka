@@ -1,5 +1,12 @@
 # Issue #1415: independent API feasibility checkpoint
 
+This is the fixed 2026-11-05 feasibility checkpoint and proposed work at that
+revision. Its probe results, failed attempts and baseline counts remain
+historical evidence. The application migration is implemented in
+`apps/frontend` and `apps/api`. Use [the runtime guide](web-runtime.md) and
+[deployment guide](web-deploy.md) for operating instructions, and
+[the final report](../acceptance/issue-1415/final-report.md) for later acceptance.
+
 Updated 2026-11-05. **A small Hono/Nitro application now has real Node evidence for Workflow retry, sleep, hook, return value and recovery of a pending timer after process restart.** Two integration fixes were necessary: explicit Local World startup/shutdown and preserving its actual package metadata in the output. This establishes the framework seam; it does not establish Mikka's application migration, first-phase acceptance, production durability or a performance improvement. The complete sanitized evidence, source/archive hashes and retained failures are in [workflow-runtime-feasibility.json](../acceptance/issue-1415/workflow-runtime-feasibility.json).
 
 This remains preparation for [Alex's second-phase instruction](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6664526271). First-phase acceptance precedes application migration. [The later ownership decision](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6667238449) authorizes the necessary merge, production cutover and acceptance decisions, with [resources used only as needed and stopped promptly](https://github.com/alexj11324/Mikka/issues/1415#issuecomment-6667340920). This preparation changed no product implementation, deployment, production/provider configuration, cloud identity or application database.

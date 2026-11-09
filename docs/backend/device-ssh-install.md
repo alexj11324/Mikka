@@ -1,5 +1,9 @@
 # Device SSH backend (#491)
 
+The contract sections describe the SSH integration. The dated acceptance and
+PR handoff sections preserve their original revisions and environments. Run new
+checks in cloud Linux through [the acceptance guide](../acceptance.md).
+
 Scope: backend, Electron main/preload and daemon. React and visual acceptance
 belong to #504. This change adds no frontend screen or feature flag.
 
@@ -123,8 +127,9 @@ the existing in-place npm replacement does not provide rollback.
 The cloud environment blocks direct registry access from containers. Local
 acceptance can preload public npm package bytes with
 `MIKKA_SSH_TEST_NPM_CACHE=<cache directory>`; this only affects the disposable
-test runner. CI normally installs the packed tarball directly. The public npm
-release still requires the trusted-publishing setup named in #491.
+test runner. CI normally installs the packed tarball directly. The current public npm release flow is documented in
+[the daemon package](../../packages/daemon/README.md) and implemented by
+`.github/workflows/publish-daemon.yml`; the #491 setup request is historical.
 
 A real macOS launchd host, a successful update from the public npm release,
 frontend screenshots and #504's remove flow require separate acceptance.

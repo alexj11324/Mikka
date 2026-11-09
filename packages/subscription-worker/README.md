@@ -1,18 +1,32 @@
 # CPA subscription worker
 
-The feature is disabled by default. Synthetic acceptance is not real-provider acceptance.
+Use this guide to verify the CLIProxyAPI (CPA) subscription worker and understand
+its credential custody and execution boundaries. Runtime enablement comes from
+`byosEnabled()` and `lib/deployment-switches.ts`. Community edition without a
+PostHog key defaults BYOS and provider OAuth on, unless explicitly overridden.
+Cloud edition retains its remote/legacy gate configuration. Check the effective
+deployment switches when diagnosing availability.
 
-Run on the Agent's cloud Linux machine:
+## Verify the worker
 
-    pnpm test:byos-worker
+Run the deterministic driver on the Agent's cloud Linux machine with Docker and
+the repository's dependencies installed.
 
-This verifies the exact official CPA commit, starts disposable loopback Postgres,
-applies all 34 migrations, builds the production and acceptance-only executables,
-runs Go race tests and vet, then runs application/native/browser acceptance and
-migration replay. 现状（非决定）：the script still includes a browser step,
-although no browser tests are part of acceptance any more
-([decision](../../docs/design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)). No real grant, account credentials, Infisical write, provider
-inference or E2B sandbox is used. Docker images and Go module sums are pinned.
+```sh
+pnpm test:byos-worker
+```
+
+`scripts/test-subscription-worker.mjs` verifies the CPA revision in `CPA_COMMIT`,
+starts isolated loopback PostgreSQL, applies the repository migrations, builds
+the worker, enrollment receiver, and fixture executables, then runs Go race
+tests, `go vet`, application/enrollment tests, and migration replay. Its success
+message reports the applied migration count. Docker images and Go module sums
+are pinned. It uses TLS fakes and fixture credentials. Live-provider acceptance
+requires separate evidence.
+
+The driver retains its PostgreSQL and build containers, including after failure,
+and prints the PostgreSQL container name. Follow the isolated-test cleanup rules
+in [runtime acceptance](../../docs/acceptance.md) after inspecting the result.
 
 ## Implemented path
 
@@ -67,8 +81,9 @@ own transient publication while still enforcing owner, epoch and binding.
 
 Custody children acquire/refresh grants and publish two immutable artifacts: the
 full grant and an independently validated access-only projection. Both references
-publish in one Postgres transaction. Execution children receive only the access
-reader identity; they cannot invoke custody methods or fall back to full bundles.
+publish in one Postgres transaction. Execution children receive access-only
+reader credentials or an authorized access snapshot, depending on launcher
+configuration. They cannot invoke custody methods or fall back to full bundles.
 A trusted prepare call handles refresh and upgrades legacy projections without
 another login. Go checks the owner/workspace/consumer/binding/route/model/revision
 context of the authorized custody operation, not only the TypeScript caller.
@@ -76,13 +91,17 @@ Native Agent requests then go directly to their provider; they do not invoke
 this worker for a permission check before every call. Quota HTTP stays in Go and
 returns a numeric/boolean projection without bearer tokens or raw diagnostics.
 
-`MIKKA_BYOS_ACCESS_INFISICAL_PATH` and `MIKKA_BYOS_ACCESS_INFISICAL_TOKEN` are new
-private configuration. The access path and reader identity must differ from the
-grant path/identity. Custody needs read/create/delete on both exact BYOS paths;
-the execution identity needs read-only access on the access path, no grant-path
-access. Source checks do not establish actual IAM policy. No identities, grants
-or permissions were configured during synthetic validation. Ordinary trusted
-platform custody remains readable to its authorized runtime/operators.
+`lib/subscription-runtime.ts` configures separate grant and access paths with
+`MIKKA_BYOS_INFISICAL_PATH` and `MIKKA_BYOS_ACCESS_INFISICAL_PATH`. Custody needs
+read/create/delete access on the required paths. The launcher supports separate
+static tokens or Universal Auth identities for custody and access-only execution.
+For the existing shared custody identity, `MIKKA_BYOS_SHARED_CUSTODY_IDENTITY=1`
+uses authorized access snapshots for execution children. The custody identity
+stays with the trusted launcher. `MIKKA_BYOS_ACCESS_INFISICAL_PROJECT` can locate
+the projection in its configured access project. Check the launcher's validation
+and [Infisical setup](../../docs/infisical-cloud.md) for the supported combination.
+Source checks establish these code paths. Effective IAM and credential delivery
+require evidence from the deployment being tested.
 
 Production `nativeAuth` may return the access-only lease when the trusted
 launcher explicitly sets `exportAccessLease: true` for an owner-bound run with
@@ -103,8 +122,10 @@ Cleanup protects current/recoverable artifacts, tracks late writes and reports
 pending/failed/uncertain creation states. Unknown remote commits remain queued
 after 404 rather than being declared permanently deleted. Per-artifact and
 per-connection retries rotate fairly. The authenticated BYOS cron drains bounded
-batches daily; preparing another task also drains its connection. Scheduling is
-source configuration only until an authorized deployment.
+batches through `/api/cron/subscriptions`, called hourly by the minute Worker.
+Preparing another task also drains its connection. See
+[the scheduler source](../../cloudflare/suggestions-cron/src/index.mjs) for
+delivery configuration.
 
 Enrollment source copies have their own path-aware journal. Canonical publication
 records evidence atomically; before that point the sole recovery copy is protected
@@ -121,11 +142,12 @@ claims remain for replay protection; unknown/uncertain creates stay pending afte
 and deletion failures. Cleanup/status/disconnect custody works without an inference
 reader; execution children receive none of the enrollment paths.
 
-Provider revocation is explicitly `not_implemented`; no undocumented endpoint
-is invented. Historical artifacts whose references were already lost before the
-journal cannot be attributed/deleted automatically. Known prior references are
+Provider revocation is explicitly `not_implemented`. Historical artifacts whose
+references were already lost before the journal cannot be attributed/deleted
+automatically. Known prior references are
 backfilled by the additive migration. Real deletion permission and API operation
-remain untested; logical stop and physical deletion are distinct outcomes.
+require deployment-bound acceptance. Record logical stop and physical deletion
+as separate outcomes.
 
 ## Private process boundary
 
@@ -148,27 +170,40 @@ model executors are never registered.
 The fixture executable requires its explicit build tag and a loopback test
 database. It is not a mode or registry flag in the production worker.
 
-## Unverified release gates
+## Release evidence
 
-The code now includes HTTP/OAuth, streaming and private launcher wiring. Live
-activation remains separate: provider client/redirect compatibility and
-eligibility, actual token/native CLI compatibility, provider billing controls,
-Infisical workload setup, and verified E2B owner isolation are not established.
-Codex now uses CPA device authorization with its provider-owned callback. Claude
+HTTP/OAuth, streaming, and private launcher wiring have source implementations.
+For the revision being released, record provider client/redirect compatibility,
+actual token/native CLI execution, provider billing controls, effective Infisical
+workload delivery, and E2B owner isolation under
+[runtime acceptance](../../docs/acceptance.md). This README's source review does
+not determine a deployment's acceptance status. Required subscription/model paths
+and independent-path handling follow [AGENTS.md](../../AGENTS.md).
+
+Codex uses CPA device authorization with its provider-owned callback. Claude
 preserves CPA loopback redirect with explicit owner/session/state/PKCE-bound URL
 handoff in the Mikka form. Arbitrary Mikka HTTPS redirects are not supported.
 The protocol is defined by the source in this package.
 
-Config directories are not a security boundary against a same-user shell.
-One task owns one E2B VM, and that VM is the execution boundary. The machine
-receives the credentials it needs; its Agent may read those ordinary runtime
-files. Reusable templates contain none. Revocation persists and pushes a stop
-or reclaims the VM, while local stops preserve unrelated work. This replaces
-the former requirement to hide provider credentials behind a task-side proxy;
-it does not export the custody service's refresh grants or workload identity.
+One task owns one E2B VM, which is the execution boundary. The selected CLI's
+model/subscription authentication and authorized GitHub credential use ordinary
+native runtime files. Reusable templates contain no task credentials. Revocation
+persists and pushes a stop or reclaims the VM, while local stops preserve
+unrelated work. Provider refresh grants and the custody workload identity stay
+with the trusted service.
 
-Provider revocation, pre-journal orphan discovery and deployment workload-token
-delivery/renewal remain operational integration work. Durable known-artifact
-cleanup is implemented and tested against local fakes, not real vault records. Disconnect fences Mikka
-use immediately; it does not claim provider-side revocation or undo an already
-transmitted request.
+Other task Secrets use a separate delivery policy. In
+`lib/secrets/{runtime,delivery,task-access}.ts`, ordinary environment configuration
+and explicitly approved direct Secrets enter task environment values. Protected
+Secrets require a configured HTTP policy and a run-bound capability. Missing or
+unsupported policies produce an unavailable result. Legacy metadata defaults to
+protected delivery. See the
+[credential exposure decision](../../docs/design/decisions/2026-11-08-0240-credential-exposure-boundary.md).
+These are source contracts. Effective protection on a deployed task requires
+runtime evidence for that revision and environment.
+
+Provider revocation and pre-journal orphan discovery remain implementation gaps.
+The durable known-artifact cleanup tests exercise local fakes. Verify real-vault
+deletion permission, workload-token delivery/renewal, and cleanup results in the
+authorized deployment. Disconnect fences Mikka use immediately. Provider-side
+revocation and requests already transmitted have separate outcomes.

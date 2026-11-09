@@ -1,5 +1,12 @@
 # UI consistency audit (2026-10-31)
 
+This is the 2026-10-31 audit and proposed repair order. Counts, locations and
+branch ownership describe that snapshot. Use [components](components.md) and
+[rules](rules.md) for implementation choices. In particular, R-37 and
+[the instant-panel decision](decisions/2026-11-01-2320-panels-open-instantly.md)
+supersede the panel-spring proposals in the Motion table and fix-order item 5.
+The dialog radius is 14px under R-33.
+
 Hand-built controls where a shadcn (`components/ui/`), beUI
 (`components/motion/`, `components/agents/`) or ReUI (`components/reui/`)
 primitive exists, and the same control styled differently in different places.
@@ -170,7 +177,7 @@ Owned elsewhere, not listed: the Coordinator panel on the board
 (`board-page.tsx:246-258`, `feat/resizable-coordinator-panel`), chat scroll
 (`fix/chat-scroll-jump`), OpenUI components (`feat/openui-charts`).
 
-## Proposed fix order
+## Proposed fix order recorded on 2026-10-31
 
 1. 看板 toolbar (this PR).
 2. Shared primitives, so call sites inherit: `segment` ToggleGroup for every

@@ -4,6 +4,7 @@
     "interval": "每 {minutes} 分钟"
   },
   "Common": {
+    "privacyPolicy": "隐私政策",
     "appUpdated": "Mikka 已更新",
     "refresh": "刷新",
     "close": "关闭",
@@ -269,6 +270,16 @@
     "continueGoogle": "使用 Google 继续",
     "googleLinkHint": "如果此邮箱已注册 Mikka，请先用邮箱密码登录，再到「设置 → 账户」关联 Google。",
     "continueGithub": "使用 GitHub 继续",
+    "signingIn": "登录中",
+    "sessionExpired": "登录已失效",
+    "mobileEmailNotVerified": "邮箱未验证，请先完成邮件验证。",
+    "mobileProviderUnavailable": "此登录方式暂不可用。",
+    "mobileSignInFailed": "登录失败。",
+    "appleAuthorizationTitle": "Apple 授权",
+    "appleRevocationBody": "删除账户后，请在 Apple 账户的「登录与安全」→「使用 Apple 登录」中选择 Mikka 并停止使用。",
+    "manageAppleAuthorization": "管理 Apple 授权",
+    "accountDeletionUnconfirmed": "账户删除状态未确认。",
+    "webOpenUnconfirmed": "网页打开未确认",
     "continueAs": "以 {name} 继续",
     "switchAccount": "换个账号",
     "orEmail": "或",
@@ -6193,5 +6204,81 @@
       "failed": "⚠ {count} 项检查失败",
       "running": "运行中"
     }
+  },
+  "MobileCore": {
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "hide": "隐藏",
+    "collapseRow": "收起",
+    "working": "正在工作",
+    "groupChats": "群聊",
+    "groupGlyph": "群",
+    "hiddenChats": "隐藏的聊天",
+    "restartToUpdate": "重启以更新",
+    "chatList": "对话列表",
+    "document": "文档",
+    "message": "发消息",
+    "replySelection": "回复选中的文字",
+    "messageTask": "给这个任务发消息",
+    "noTasks": "没有任务",
+    "noAttempts": "还没有尝试",
+    "allTasks": "全部任务",
+    "info": "资料",
+    "all": "全部",
+    "filter": "筛选",
+    "groups": {
+      "pending": "等待你",
+      "running": "进行中",
+      "todo": "待办",
+      "done": "已完成"
+    },
+    "states": {
+      "waiting": "等你处理",
+      "failed": "失败",
+      "blocked": "受阻",
+      "running": "运行中",
+      "queued": "排队中"
+    },
+    "board": {
+      "backlog": "暂不处理",
+      "todo": "待办",
+      "doing": "进行中",
+      "review": "评审中",
+      "done": "完成",
+      "canceled": "已取消",
+      "duplicate": "重复"
+    },
+    "attempts": {
+      "running": "运行中",
+      "paused": "等你回复",
+      "done": "完成",
+      "failed": "失败",
+      "blocked": "受阻"
+    },
+    "reasons": {
+      "needs_input": "等你回复",
+      "approval": "等你确认",
+      "pr_review": "待审阅",
+      "blocked": "受阻",
+      "quota": "额度用完",
+      "blocked_by": "等 {task}",
+      "otherTask": "等其他任务",
+      "flagged": "已标记受阻"
+    },
+    "priority": "{priority}优先级",
+    "noPriority": "无",
+    "activity": "活动",
+    "comment": "+ 评论",
+    "attemptNumber": "第 {number} 次尝试",
+    "threadReplaced": "换了新线程",
+    "taskCreatedBy": "{name} 创建了任务",
+    "taskCreated": "创建了任务",
+    "openedPullRequest": "开了 PR #{number}",
+    "steps": "{count} 步",
+    "yesterday": "昨天",
+    "tomorrow": "明天",
+    "content": "内容",
+    "readFailed": "{label}加载失败。",
+    "refreshFailed": "{label}更新失败，仍显示上次内容。"
   }
 }

@@ -2,14 +2,16 @@
 
 Mikka ships two clients over one UI:
 
-- **Web** — the Next.js app in this repository, in a browser.
+- **Web** — the shared React renderer built with Vite, served by the
+  Hono/Nitro application in `apps/api`, in a browser.
 - **Desktop** — Electron bundles the same React components, fonts and styles,
   serves them from `mikka://app/mikka`, and injects
   `window.mikka` (`packages/protocol/src/bridge.ts`).
 
 The local renderer decision is recorded in
 [`2026-11-05-1615-desktop-bundled-renderer.md`](decisions/2026-11-05-1615-desktop-bundled-renderer.md).
-Web still renders through Next.js. Desktop sends validated operations through
+The web entry is `apps/frontend/src/index.tsx`, which loads the shared
+renderer in `apps/desktop/src/renderer/`. Desktop sends validated operations through
 main; neither the application session nor live-push tickets enter its renderer.
 
 The shell owns native abilities; the UI asks for them through capabilities
@@ -20,6 +22,7 @@ platform from the user agent or from a query parameter.
 
 | Capability | Web | Desktop |
 | --- | --- | --- |
+| Server selection (`server.select`) | no | yes, bundled renderer |
 | Local daemon identity (`device.localIdentity`) | no | yes, from the daemon on this computer |
 | System notifications (`notifications.system`) | no | yes |
 | Dock/taskbar badge (`notifications.badge`) | no | yes |
@@ -33,16 +36,18 @@ ship a smaller surface without the UI claiming a feature it cannot perform.
 
 ## Rules
 
-- The server always renders the web snapshot. A desktop renderer switches to
-  the desktop snapshot after hydration; do not branch before mount.
+- The platform provider starts from the web snapshot. A desktop renderer
+  selects the desktop snapshot after mount; do not infer native capability
+  from the user agent.
 - Settings are one surface shared by both clients (`docs/settings.md`, Figma
   `503:7105`): devices live in Settings › 设备, not on a standalone page. The
   desktop shell does not add a second settings surface.
 - `本机` follows R-23 and is a product grouping, not a platform signal: it
   describes directly connected machines, on the web and on the desktop alike.
 - The desktop renderer keeps the Dock badge at the number of runs waiting for
-  the person and raises a system notification when a run enters 等你 or fails.
-  Clicking the notification opens that issue. The first snapshot after launch
+  the person. Transitions into 等你 or failure, and success when 线程完成 is on,
+  are candidates for a Decisions API judgement before a system notification
+  is shown. Clicking it opens the issue and its referenced run. The first snapshot after launch
   is a baseline, so opening the app never replays old notifications.
 - The bundled desktop keeps its bearer session in main and encrypts persisted
   state with Electron's OS-backed `safeStorage`; unavailable or insecure storage
@@ -73,7 +78,9 @@ ship a smaller surface without the UI claiming a feature it cannot perform.
   fills there (`--sidebar-accent`, `--sidebar-item`) become a black (light) or
   white (dark) overlay, and ghost buttons and the settings search field take
   `--control` instead of the opaque `muted`.
-  `tests/e2e/desktop-translucent.spec.ts` checks this over a solid page color.
+  `tests/e2e/desktop-translucent.spec.ts` records the earlier browser check.
+  Browser tests are retired from acceptance; use screenshots of the cloud
+  Linux local production build and applicable native evidence.
   Reduce transparency, Windows and Linux keep the opaque window. The setting is
   read at launch.
 - Feature flags (PostHog) gate rollout; capabilities gate possibility. Compose

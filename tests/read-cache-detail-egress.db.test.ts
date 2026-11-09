@@ -150,12 +150,36 @@ test('detail and activity revalidate current access while returning only changed
       const readWorkspace = <T>(work: () => Promise<T>) => withActivitySession(owner, () => actAs(owner, work), workspaceId) as Promise<T>
       const sharedNumber = successful(await readWorkspace(() => getIssue(id))).issue.metadata.number
       assert.equal(sharedNumber, 2, 'the shared task keeps its owner-allocated number')
+      const warmCitationPool = async (teamState: 'linked' | 'unlinked' | 'revoked') => {
+        // A single shape read can finish one concurrent query before the next
+        // acquires its client. It does not guarantee a fully warm pool: a later
+        // shape may still open a connection inside a steady-state budget.
+        // Hold the existing APP pool's full capacity until all checkouts finish;
+        // keep every startup byte in a separate, visible measurement.
+        const capacity = pool.options.max
+        assert.equal(capacity, 5, 'use the existing APP pool capacity, never change its configuration')
+        const warmup = await measured(async () => {
+          const acquired = await Promise.allSettled(Array.from({ length: capacity }, () => pool.connect()))
+          const clients = acquired.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
+          try {
+            for (const result of acquired) if (result.status === 'rejected') throw result.reason
+            return { capacity, clients: new Set(clients).size }
+          } finally {
+            for (const client of clients) client.release()
+          }
+        })
+        assert.equal(warmup.value.clients, capacity, 'each held checkout must use a distinct real connection')
+        assert.equal(warmup.statements, 0, 'pool startup issues no application SQL')
+        t.diagnostic(JSON.stringify({ event: 'identifier_pool_warmup', teamState,
+          scope: 'connection_startup_before_steady_state_budget', ...warmup.value, ...readMetrics(warmup) }))
+      }
       const citationAgent = randomUUID(), citationRun = randomUUID()
       await pool.query('insert into agents(id,"userId",name,harness) values($1,$2,$3,$4)', [citationAgent, owner, 'Citation control', 'codex'])
       await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,"agentDefinition","workspaceId") values($1,$2,$3,$4,$5,$6,$7,$8)',
         [citationRun, owner, id, citationAgent, 'succeeded', 'Citation control', JSON.stringify({ harness: 'codex', executionIdentity: { requester: owner, executionPrincipal: owner, outputOwner: owner, workspaceId } }), workspaceId])
       const issueCite = `[[issue:${id}]]`, runCite = `[[run:${citationRun}]]`
       await readWorkspace(() => listIssueConnections(id))
+      await warmCitationPool('linked')
       // Initialize both exact read shapes before recording their steady-state
       // budgets. Keep the warm-up socket costs visible, including any new
       // connections opened by concurrent run and team reads.
@@ -199,6 +223,7 @@ test('detail and activity revalidate current access while returning only changed
         assert.ok(unlinkedSave.statements <= personalSave.statements + 1,
           `default issueView statements ${unlinkedSave.statements} vs personal ${personalSave.statements} plus one team read`)
       })
+      await warmCitationPool('unlinked')
       const unlinkedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
       const unlinkedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
       t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'unlinked',
@@ -322,6 +347,12 @@ test('detail and activity revalidate current access while returning only changed
       await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, owner, 'suspended'])
       assert.equal((await readWorkspace(() => getIssue(id))).error, 'issueNotFound')
       assert.equal((await readWorkspace(() => pollIssue(id, relinked.version))).error, 'issueNotFound')
+      await warmCitationPool('revoked')
+      const revokedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const revokedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
+      t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'revoked',
+        scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(revokedDirectWarm),
+        runOnlyCitation: readMetrics(revokedRunWarm) }))
       const revokedConnections = await measured(() => readWorkspace(() => runAction(() => listIssueConnections(id))))
       const revokedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
       const revokedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))

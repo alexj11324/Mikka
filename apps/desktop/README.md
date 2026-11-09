@@ -1,7 +1,7 @@
 # @mikka/desktop
 
 The Electron desktop for Mikka. It bundles the **same React components, fonts,
-tokens and Tailwind styles** as the Next.js web client. The main window loads
+tokens and Tailwind styles** as the Vite-built web client. The main window loads
 `mikka://app/mikka` from the App, so opening the interface does not download or
 server-render a web page. Main forwards authenticated operations to the backend.
 
@@ -29,14 +29,20 @@ The bundled renderer cannot read the session token, authentication cookies or
 live socket ticket. Main stores the session using OS-backed `safeStorage`,
 scoped to the backend and app profile. Insecure Linux `basic_text` storage is
 rejected; macOS uses Keychain. See `docs/design/platforms.md`.
-Updates come from the published GitHub Release via
-`electron-updater`: the app checks on launch and from **Check for Updates…**,
-asks before downloading, and asks before restarting to install.
+Updates come from published GitHub Releases through `electron-updater`. The
+cold-start gate checks for five seconds before opening the app. When it finds
+an update, it downloads and installs it before entry. A check timeout or
+unavailable network lets the app open. Background checks download silently and
+offer a restart after the download. **Check for Updates…** reports the result
+in a native dialog.
 
 ## Run
 
+Run development and acceptance in cloud Linux with the repository's Node 24
+and pinned pnpm. The backend uses Vite and Hono/Nitro.
+
 ```bash
-# terminal 1 — the web app (Next.js at http://localhost:3000/mikka)
+# terminal 1 — application and API at http://localhost:3000/mikka
 pnpm dev
 
 # terminal 2 — the shell
@@ -46,13 +52,15 @@ pnpm desktop:dev
 The dev shell loads local assets and sends backend requests to
 `http://localhost:3000/mikka`. It uses the separate `Mikka Dev` data directory
 and `persist:mikka-dev` partition, matching the daemon's dev flavor.
-`MIKKA_DESKTOP_APP_URL` selects the backend at build time. Production acceptance
-uses `next build` and `next start`, never first-request development compilation.
+`MIKKA_DESKTOP_APP_URL` selects the backend at build time. Compiled-backend
+acceptance prepares the isolated database, runs `pnpm generate:agent-ui` and
+`pnpm build:app`, then starts the Node output with `pnpm start`. See the
+[shared runtime guide](../../docs/operations/web-runtime.md).
 
 ## Build and package
 
 ```bash
-pnpm desktop:build                 # dist/main.cjs, dist/preload.cjs
+pnpm desktop:build                 # main/preload bundles and dist/renderer/
 pnpm --filter @mikka/desktop package:dir   # unpacked app under release/
 pnpm --filter @mikka/desktop package:mac   # signed Apple Silicon dmg/zip (release)
 pnpm --filter @mikka/desktop package       # local dmg/zip, never publishes
@@ -168,7 +176,7 @@ client operation.
 
 ## Isolated acceptance
 
-The desktop CI builds the production Next.js backend against an independent
+The desktop CI builds the Vite frontend and Hono/Nitro backend against an independent
 Postgres and runs Electron with real leased test accounts. Apple Silicon CI
 reuses that compiled backend, then tests an actual packaged App before producing
 the ad-hoc signed `Mikka Dev` ZIP. The inspector-enabled acceptance bundle is a
@@ -181,18 +189,20 @@ hosted-to-bundled restart. The probe uses the real asynchronous OS storage API,
 reports only checks/counts and closed error categories, and never sends plaintext
 or ciphertext to the renderer. Availability alone does not satisfy the check.
 
-`test/environment.mjs` starts the real local live Worker plus production
-backends. `test/db-metrics.cjs` records query counts and PostgreSQL connection
-protocol bytes only, with no SQL, parameters or row data. The one-hour idle
-measurement is separate from the short fake-clock `test:idle-budget` regression.
-Screenshot and performance evidence records its exact revision and isolated
-environment. No Vercel deployment or release workflow is part of #1415.
+`test/environment.mjs` starts the local live gateway and compiled backend.
+`test/db-metrics.cjs` records query counts and PostgreSQL connection protocol
+bytes, excluding SQL, parameters and row data. The short `test:idle-budget`
+regression checks request budgets. Historical idle and performance measurements
+retain their recorded revision and environment. Current build, release and
+acceptance boundaries are in the [runtime guide](../../docs/operations/web-runtime.md).
 
 ## Release
 
-Every push to `main`, including each merged PR, runs **Desktop release** and
-publishes a signed, notarized Apple Silicon macOS GitHub Release. The workflow
-can also be run manually from `main`.
+**Desktop release** runs on `main` changes matching its application, shared
+renderer, daemon, protocol, dependency and release-tool path filters. It also
+supports manual dispatch from `main`. A successful normal run publishes a
+signed, notarized Apple Silicon macOS GitHub Release after checking its Web,
+private UI and sealed-candidate bindings.
 
 There is no version bump or tag to create. The version is
 `2026.10000.<workflow run number>` (for example `2026.10000.42` for run 42).
@@ -202,23 +212,24 @@ retries. The release is tagged `desktop-<version>` on the built commit. The
 version in `apps/desktop/package.json` is only used for local builds.
 
 The workflow attaches the DMG, ZIP, updater metadata and `SHA256SUMS.txt` to
-the published release. It requests GitHub's semantic-version latest selection
-(`make_latest: legacy`) so retrying an older run does not request a downgrade
-of the latest release. Confirm the latest tag and **Check for Updates…** after
-the first automatic release. The updater also checks published releases on launch.
+the published release. Normal notarized releases use `make_latest: true`.
+The source, matching Web overlay and sealed assets are rechecked before
+publication. Confirm the release tag and **Check for Updates…** result for the
+installed app.
 
-Runs are serialized with a queue of up to 100 pending runs, so a newer merge
-does not replace a pending release. GitHub cancels additional runs if that
-queue fills.
+New preflights cancel obsolete Web waits. The macOS signing job finishes its
+active candidate and keeps only the latest pending candidate. Publication still
+requires the source and overlay checks to pass.
 
-Repository secrets used by the workflow:
+The workflow reads existing credentials from Infisical `prod:/platform` through
+its workload identity.
 
 | Secret | Purpose |
 | --- | --- |
 | `APPLE_DEVELOPER_ID_P12_BASE64` | Developer ID Application certificate |
 | `APPLE_DEVELOPER_ID_P12_PASSWORD` | Certificate password |
-| `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` | macOS notarization |
-| `APPLE_API_KEY_P8_BASE64` / `APPLE_API_KEY_ID` / `APPLE_API_ISSUER` | Alternative notarization auth |
+| `APPLE_TEAM_ID` | Apple signing team |
+| `ASC_API_KEY_P8` / `ASC_API_KEY_ID` / `ASC_API_ISSUER_ID` | App Store Connect notarization credentials, mapped to the release tools' `APPLE_*` inputs |
 
 macOS releases fail the workflow when neither notarization credential set is
 present. The manual `skip_notarization` input is for internal builds only;
