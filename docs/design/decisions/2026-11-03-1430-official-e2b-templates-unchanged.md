@@ -1002,7 +1002,8 @@ Desktop 的 active/backup APT 节点在四阶段的摘要、大小、权限、�
 inode、device、mtime/ctime 全部相同，四个 APT unit 的已采属性也未变。
 本次没有复现 Desktop 问题，因此不增加该路径例外。未采 cron 或写者
 PID，不能从四个 unit 的静止状态证明所有后台写入均已排除。此前失败
-仍保留，后续须定位实际构建首次变化阶段与写入者。
+仍保留；若正式构建再次出现该变化，须按当轮首次变化阶段定位写入者。
+阴性对照和未激活的备用诊断不构成额外发布门槛，也不阻止完整 R7 通过后继续验收。
 
 本对照未采 immutable 官方 base/build ID 或 envd 版本，私有输出 build
 不能代替它们；控制的四个阶段名也不等于其他 R7 的失败阶段。两个私有
@@ -1015,3 +1016,19 @@ FF 关闭至 `376298951e4eee5970e2f0d00e21acb3ffba4e18`，关闭运行
 CI 发布门槛，也不替代同一 APP/DPL/runtime/worker/template 元组下
 Claude×3、Codex×3 的生产普通任务、工具与后续回复验收。#1505 仍须
 六次完整 dispatch→agent 时间各不超过5000ms，目标2000–3000ms。
+
+### 2026-11-09：发布端执行同一文件类型合同
+
+构建端的 `official-files.py` 为每条 provider 变化无条件记录外层 `kind`，
+并按策略 `_kind` 校验原节点类型；`before/after` 只包含发生变化的字段。
+发布端 `assertConservation` 必须执行同一约束：策略声明 `_kind` 时，
+外层 `change.kind` 必须精确相等，缺失、null 或错误类型均拒绝。当前
+这两条声明仅为 Claude `/usr/local/share/e2b` 的 directory 与 Codex
+根证书路径的 file。此校验不要求未变化的字段重复出现在差异中，合法的
+mode-only、mode+SHA、SHA-only 回执继续使用原合同。
+
+Codex 根证书的 `0644→0777` 已由上述官方对照支持，因此发布器旧测试
+不再将它作为非法转换；负例改用未经许可的 `0644→0755`，并覆盖真实
+对照的权限和摘要转换，以及类型缺失、错误权限、所有者和路径变化。
+这次补齐消费端既有类型约束，不修改 Python matcher 或扩大策略允许集合，
+也不替代 strict 安装前后摘要、官方 CLI、真实订阅和生产时延门槛。
