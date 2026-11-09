@@ -1,0 +1,161 @@
+{
+  "schema": "issue1512.replay-vision-preflight.v1",
+  "preparedAtUTC": "2026-11-09T04:36:28.732Z",
+  "projectId": 670821,
+  "scope": "Bounded read-only Replay Vision quota and required permission/capability preflight; no recordings or content read.",
+  "result": "quota_available_and_replay_vision_offered; AI_data_processing_approval_unknown_not_exposed",
+  "quota": {
+    "requestStartedAtUTC": "2026-11-09T04:32:25.515Z",
+    "unit": "Replay Vision credits",
+    "creditLimit": 2500,
+    "creditsUsed": 0,
+    "creditsSettled": 0,
+    "creditsReserved": 0,
+    "remaining": 2500,
+    "exhausted": false,
+    "freeMonthlyCredits": 2500,
+    "periodStartUTC": "2026-10-17T17:45:01.620000Z",
+    "periodEndUTC": "2026-11-16T17:45:01.620000Z",
+    "projectedMonthlyCredits": 0,
+    "scannersMonthlyCredits": 0,
+    "scannersPeriodCredits": 0,
+    "backfillsCommittedCredits": 0
+  },
+  "capability": {
+    "organizationReadCompletedAtUTC": "2026-11-09T04:33:48.663Z",
+    "targetProjectVisible": true,
+    "targetProjectMatchField": "teams[].id",
+    "replayVisionFeature": {
+      "key": "replay_vision",
+      "present": true,
+      "limit": null
+    },
+    "featureLimitIsNotTheCreditBudget": true
+  },
+  "permissionEvidence": {
+    "quotaReadSucceeded": true,
+    "activeOrganizationReadSucceeded": true,
+    "officialReadToolsAnnotatedReadOnly": true,
+    "aiDataProcessingApproved": null,
+    "aiDataProcessingApprovalStatus": "unknown_not_exposed_by_the_authorized_active_organization_read",
+    "approvalRelevantFieldPresent": false,
+    "inlineScanEndpointAuthorization": "not_exercised",
+    "blockerObservedInActualReadCalls": false,
+    "unknownApprovalIsNotAConfirmedBlocker": true,
+    "organizationReadProjectionKeys": [
+      "id",
+      "name",
+      "slug",
+      "created_at",
+      "updated_at",
+      "membership_level",
+      "member_count",
+      "teams",
+      "projects",
+      "available_product_features"
+    ],
+    "organizationsGetNotInvoked": "Its inspected official schema enumerates organizations; it does not supply a fuller read of this organization."
+  },
+  "plannedEstimate": {
+    "plannedSessions": 2,
+    "observationsPerSession": 1,
+    "model": "gemini-3-flash-preview",
+    "creditsPerObservation": 5,
+    "estimatedCredits": 10,
+    "usdPerCredit": 0.01,
+    "estimatedPriceEquivalentUSD": 0.1,
+    "enoughCreditsAtObservedSnapshot": true,
+    "actualAmountBilledUSD": null,
+    "actualScansExecutedByThisTask": 0,
+    "boundary": "Official previously-read model/credit contract. Estimate only; no recording render, reservation, model call or billed observation occurred."
+  },
+  "sourceEvidence": [
+    {
+      "command": "call vision-quota-get {} --json",
+      "storeKey": "replayVisionPreflight20261109:quota",
+      "exactResponseText": {
+        "bytes": 349,
+        "sha256": "72ec70f74cedf430b938e997af5da0e4d67b278d2f668f5d752a7805af29fa25",
+        "gitBlobSHA1": "3259ca624ad7a3bf4c2d4ffd3c3e7fa5414a5ef7"
+      },
+      "privateSerializedCapture": {
+        "bytes": 1088,
+        "sha256": "424c6413a9b1813e97794e105600ad7e47b2592df2d1153f1f302a7d5a2b9392",
+        "gitBlobSHA1": "48b7c1cb1ccc7d6cb3026b78c2b819f2c1fb831a"
+      }
+    },
+    {
+      "command": "call organization-get {} --json",
+      "storeKey": "replayVisionPreflight20261109:organization",
+      "exactResponseText": {
+        "bytes": 5428,
+        "sha256": "5a6feb76c07ddfef98c38086761048df22a465286bf730f97043411f5317f2d6",
+        "gitBlobSHA1": "a5750dd52a0c8f3f138e7befea985f0040f71bc7"
+      },
+      "privateSerializedCapture": {
+        "bytes": 6891,
+        "sha256": "c9ecc29e638fbb1e8caaf77538b696e15e14d1ed61b6514b22ecc5ba138d2e84",
+        "gitBlobSHA1": "ecc5322a8a69fdba559cba3ab0c43064228f18ba"
+      }
+    }
+  ],
+  "officialPriorMetadata": [
+    {
+      "name": "posthog:creating-replay-vision-scanners",
+      "command": "learn posthog:creating-replay-vision-scanners",
+      "previouslyRead": true,
+      "responseText": {
+        "bytes": 15850,
+        "sha256": "f18f6ba84950f905101fad967ea1e5b388ca99f1aec3e7320e256af237e5f082",
+        "gitBlobSHA1": "ce497c4641cfc11c75c0c89d450ee4b26df6ec7a"
+      }
+    },
+    {
+      "name": "posthog:investigating-replay",
+      "command": "learn posthog:investigating-replay",
+      "previouslyRead": true,
+      "responseText": {
+        "bytes": 9679,
+        "sha256": "f8299c2ac84a037aa7784f094207c345454f575b75dc34fe1c235c60a5a09ee8",
+        "gitBlobSHA1": "cb1729f3c14c0b2279ad1fd9ace250fde42e5814"
+      }
+    },
+    {
+      "name": "vision-scanners-inline-scan info",
+      "command": "info vision-scanners-inline-scan",
+      "previouslyRead": true,
+      "responseText": {
+        "bytes": 4464,
+        "sha256": "443f9ecc49fab2854e5c5191f482e11de4813375ac250f170a47241ac6832f9c",
+        "gitBlobSHA1": "9cd12bb5b7bbb5cef22d1df2d570821312c9c9fa"
+      }
+    }
+  ],
+  "privacy": {
+    "organizationAccountIdentifiersNamesEmailsAndMembershipMetadataOmitted": true,
+    "otherProjectMetadataOmitted": true,
+    "rawResponsesRetainedOnlyInFunctionsStore": true,
+    "rawPlatformEnvelopesIncludedInPublicReceipt": false
+  },
+  "actions": {
+    "actualDataReadCalls": 2,
+    "metadataDiscoveryCalls": 2,
+    "metadataSchemaReads": 2,
+    "recordingOrSessionEnumeration": 0,
+    "sessionScans": 0,
+    "models": 0,
+    "scheduledScanners": 0,
+    "objectOrConfigurationWrites": 0,
+    "planCapOrRetentionChanges": 0,
+    "organizationSwitches": 0,
+    "localExecCalls": 0,
+    "sandboxCommands": 0,
+    "newResources": 0
+  },
+  "productionReplayAcceptancePassed": false,
+  "boundaries": [
+    "Quota and feature availability are current readbacks, not proof that a future recording is eligible, rendered, visually inspected or masked.",
+    "AI data-processing approval remains unknown because the permitted active-organization tool omits the required flag; no user intervention or browser-auth requirement is inferred.",
+    "No production ACME case session was created or queried by this task. Reuse only the actual future case session IDs for any later authorized scan."
+  ]
+}

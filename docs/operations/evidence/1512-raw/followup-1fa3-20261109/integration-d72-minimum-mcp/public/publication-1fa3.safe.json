@@ -1,0 +1,333 @@
+{
+  "schema": 1,
+  "createdAt": "2026-11-09 04:54:58 UTC",
+  "state": "published_pr_branch_full_ci_started",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "previousHead": "548790b4676d5e43556bf62cf452c3c5aee68073",
+  "main": "93e9d5e260cf899b9a40a188cfa34f069903489d",
+  "mainTree": "bc928dae72b0c861aa9624552b0c63d3a8f1006f",
+  "merge": {
+    "sha": "eec2d4859f86a3894f507065c562227361a7c593",
+    "tree": "d12eddea1d37a9f2d3ca3981a8c094bbc4715f6f",
+    "parents": [
+      "548790b4676d5e43556bf62cf452c3c5aee68073",
+      "d72a1982bf503b34ad4bc31ab6211cfe018af483"
+    ]
+  },
+  "candidate": {
+    "sha": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "tree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+    "parents": [
+      "c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+      "93e9d5e260cf899b9a40a188cfa34f069903489d"
+    ]
+  },
+  "overlay": [
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5a4c4f8486239161b325b9774b3086afe666dfa9"
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cafa02602d36b04eb80cdb18ea1b54d8a2aa80a8"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d7cb3ee93e7de084a4001c0248fc739f00a7414c"
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "35694355877eea55393ba9299f7796c2c171ccb7"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a5157f09e8022bf9077053686d36aa02760a4e94"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47"
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "071b2243d35cd6fdd97b7be0f17f21728578c537"
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8fe53cb39985150e5fc05daa6370121cb5426d53"
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "27bbb720ac8f5bd3716787db62eb11833e9f3530"
+    },
+    {
+      "path": "lib/device-management.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c2243c5732d67b3ff5444196ce3b45e9aca67805"
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f82563e766f5c0477479b2d487e0f92e60a08b75"
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fef80337b9b5244d2e8565236c6dd96f7d329acd"
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "737fa373e4a8333a4a703bf6133f9a533d585460"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "00775a5928228262a66b12b845ee0dc18f6c6047"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "628395f91d97a64655afb80117788d70207200c0"
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "609029dde521868c00ab7eb687394ad5cacd6183"
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0e2ecce921c4b56795ad1096f2b1eae987299e95"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894"
+    }
+  ],
+  "mcp": {
+    "sourceCommit": "9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8",
+    "permission": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6732078911",
+    "files": [
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-context.mjs",
+        "old": "cd1c69afcb9c71f68171eb16fd72ba82ce065c76",
+        "sha": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+        "mode": "100644"
+      },
+      {
+        "path": "packages/daemon/test/codex-mcp-context.test.ts",
+        "old": "db3bc3b2032cba33da948fbbc16ed20282284fac",
+        "sha": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+        "mode": "100644"
+      },
+      {
+        "path": "packages/daemon/test/mcp-http-observation.test.ts",
+        "old": "a0b87e706967146ff5c1dcd7082018b34aec6ced",
+        "sha": "c569b06d61ed84855db3c5921f1a6dba05774477",
+        "mode": "100644"
+      }
+    ],
+    "unrelatedSevenPathsIncluded": false,
+    "upstreamBranchAncestryClaimed": false,
+    "peerFullCi": "failure_pg_shard_1_owned_by_original_author"
+  },
+  "generated": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "mode": "100644",
+      "gitBlobSha": "cafa02602d36b04eb80cdb18ea1b54d8a2aa80a8",
+      "bytes": 76186,
+      "sha256": "863f86e0065cef6eed66526ed3644176904915bd673718f4cc43746bfc48b0d6"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "mode": "100644",
+      "gitBlobSha": "d7cb3ee93e7de084a4001c0248fc739f00a7414c",
+      "bytes": 78570,
+      "sha256": "d1b8dd401148a5fd42b66c2d655bd7443f2e4c8c148eb5bbf85c8493a71ac8d9"
+    }
+  ],
+  "priorCi": {
+    "head": "548790b4676d5e43556bf62cf452c3c5aee68073",
+    "actualMergeSource": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+    "runId": 42556448828,
+    "status": "completed",
+    "conclusion": "success",
+    "checks": {
+      "total": 43,
+      "success": 36,
+      "conditionalSkip": 7
+    },
+    "nativeFullLogin": {
+      "native": 397,
+      "web": 412
+    },
+    "nativeFirstStartup": {
+      "bundled": 170,
+      "hosted": 204
+    }
+  },
+  "currentCandidateValidation": {
+    "localFullSuite": "not_run_execution_environment_unavailable",
+    "canonicalGenerator": "not_executed_byte_projection_checked_against_fixed_generator_contract",
+    "fullCi": {
+      "runId": 42564360573,
+      "state": "started_2026-11-09T04:55:03Z",
+      "terminalConclusion": null
+    },
+    "nativeAcceptance": "not_yet_run",
+    "productionAcceptedCases": 0
+  },
+  "invariants": {
+    "normalMerge": true,
+    "forcePush": false,
+    "directMainWrite": false,
+    "fixturesMode100755": true,
+    "mainUnrelatedPathsPreserved": 69,
+    "generatedRoutes": 243,
+    "generatedMethods": 315,
+    "metadataOnly": true,
+    "mainLateDisjointPathsPreserved": 3,
+    "ownedDeltaPaths": 28
+  },
+  "unpublishedMinimumMcpCommit": {
+    "sha": "c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+    "tree": "c519f5c169513894048e2f0881b5bf365d170f0c",
+    "parents": [
+      "eec2d4859f86a3894f507065c562227361a7c593"
+    ]
+  },
+  "lateMainDelta": [
+    {
+      "path": "scripts/release/mobile-screenshots-build.sh",
+      "sha": "8d6e543889f068efc622ea22ed1dac02624a173d",
+      "status": "modified",
+      "additions": 64,
+      "deletions": 26,
+      "overlapsOwnedPaths": false
+    },
+    {
+      "path": "scripts/release/mobile-screenshots.mjs",
+      "sha": "6c11204549b2b55a31e1203fc82f863a719db7b5",
+      "status": "modified",
+      "additions": 107,
+      "deletions": 46,
+      "overlapsOwnedPaths": false
+    },
+    {
+      "path": "scripts/release/mobile-screenshots.test.mjs",
+      "sha": "ca252f1602bca78200d3f8ad17451955d964adc7",
+      "status": "modified",
+      "additions": 73,
+      "deletions": 2,
+      "overlapsOwnedPaths": false
+    }
+  ],
+  "freshGuard": {
+    "initialMainChangedFrom": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+    "to": "93e9d5e260cf899b9a40a188cfa34f069903489d",
+    "staleCandidateRefUpdate": false,
+    "intermediateCiTriggered": false,
+    "followup": "ordinary_merge"
+  },
+  "publication": {
+    "branch": "fix/1512-daemon-fixture-executable-20261109",
+    "expectedSha": "548790b4676d5e43556bf62cf452c3c5aee68073",
+    "sha": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "force": false,
+    "successfulUpdates": 1,
+    "toolSuccess": true,
+    "refReadback": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "prReadbackHead": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "autoMerge": null,
+    "mainUpdatedByThisPublication": false,
+    "commentUrl": "https://github.com/alexj11324/Mikka/pull/1799#issuecomment-6732575696"
+  },
+  "githubSynthetic": {
+    "sha": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+    "tree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+    "parents": [
+      "93e9d5e260cf899b9a40a188cfa34f069903489d",
+      "1fa3becd9b69e27c7a0229762750b6fa7e9497fc"
+    ],
+    "matchesHeadTree": true,
+    "actualJobCheckoutVerified": false
+  },
+  "independentReviews": {
+    "sourceInterface": "ce8ebc01cfff3d17b45d868d9812506e44efec5a",
+    "generatedMetadata": "8a92740c4a5c17b483db5e894f07033b9cf3fcba",
+    "finalRouteBinding": "f667815dd89fda7d41903bfd36dedadfb804b88d",
+    "finalCommitObjects": "passed_reported_receipt_pending"
+  }
+}

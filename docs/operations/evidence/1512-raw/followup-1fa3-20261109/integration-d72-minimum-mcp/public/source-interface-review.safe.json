@@ -1,0 +1,295 @@
+{
+  "schema": "mikka.issue1512.1788-d72-minimal-interface-review.v1",
+  "recordedAt": "2026-11-09T04:39:10.248Z",
+  "source": {
+    "commonBase": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+    "baseTree": "72f1661362ceaefde626fa7402116ae8f8ad7417",
+    "ownPublicHead": "548790b4676d5e43556bf62cf452c3c5aee68073",
+    "ownHeadTree": "933f76fbff37682f2f9cfaf64e672d229531f5ff",
+    "ownActualTestedCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+    "ownActualTestedTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+    "peerHead": "9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8",
+    "peerTree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+    "main": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+    "mainTree": "d5ce228157f12aa0d40d25e4640e465cb8054de0",
+    "newMergedTree": null,
+    "warning": "Neither pull-request base.sha/merge_commit_sha nor the old actual90e result establishes a freshly merged d72 tree. No such synthetic source was queried or marked tested."
+  },
+  "intersection": {
+    "ownChangedPathCount": 25,
+    "peerChangedPathCount": 10,
+    "newMainChangedPathCount": 71,
+    "peerVsOwn": [],
+    "peerVsNewMain": [],
+    "newMainVsOwn": [
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts"
+    ]
+  },
+  "minimalReusableFix": {
+    "parent": "0a89902188e31a202153c663a2e8448feddb01f4",
+    "parentTree": "8f96bae0e397cf031741ab5f96ddad6b5bd6e710",
+    "head": "9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8",
+    "headTree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+    "files": [
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-context.mjs",
+        "parentBlob": "cd1c69afcb9c71f68171eb16fd72ba82ce065c76",
+        "headBlob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+        "parentBytes": 2747,
+        "headBytes": 2781,
+        "headSha256": "bed5e23a0a3e72d73864594aa126a8240c8a1baba4a186c29a7df74e4ea243ce",
+        "exactPatchReplay": true,
+        "patchSha256": "19bb9460a27ad20f74bf73f530bbe02cb1cab0a926bb71dc7e7100af01b5b4a7",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "packages/daemon/test/codex-mcp-context.test.ts",
+        "parentBlob": "db3bc3b2032cba33da948fbbc16ed20282284fac",
+        "headBlob": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+        "parentBytes": 4579,
+        "headBytes": 5195,
+        "headSha256": "625992d7422d38eb0d13a0ae04d89fa3b69b2f44150356fbfa345fbca2708f3e",
+        "exactPatchReplay": true,
+        "patchSha256": "4f90dcf814be9e05e7a0c90f86a36621bdfda98069b45b0e6b1cb9fd5579bf84",
+        "additions": 12,
+        "deletions": 0
+      },
+      {
+        "path": "packages/daemon/test/mcp-http-observation.test.ts",
+        "parentBlob": "a0b87e706967146ff5c1dcd7082018b34aec6ced",
+        "headBlob": "c569b06d61ed84855db3c5921f1a6dba05774477",
+        "parentBytes": 19871,
+        "headBytes": 22837,
+        "headSha256": "2387a35f2b03ebece300f7601343bfa40da9bb5ab6b4676b0bd5e6783b043599",
+        "exactPatchReplay": true,
+        "patchSha256": "62f91be73e1b71a23a56a34258c0042a81d281687cf06ddcce5a6ccaeca2c904",
+        "additions": 42,
+        "deletions": 5
+      }
+    ],
+    "exactChangeSet": "One product line plus two regression files; 3 files total, not 2. No Factory descriptions, startup timing or anonymous runner edits are part of this final single commit.",
+    "independentFromOtherPeerChanges": true,
+    "baselineProof": "For all 3 files, parent-to-head patch equals the complete common-base-to-peer patch; additions/deletions match API stats. Applying each patch in RAM to fetched parent content reproduces the exact GitHub head blob, with parent blob independently rehashed. None of these paths changes in either base-to-own-actual or base-to-d72. Thus their pre-fix parent byte state is also the unchanged common-base/own/d72 state; this last equality is derived from the complete diffs, not extra file fetches.",
+    "contentStorePrefix": "join1788.minimalContent.",
+    "preserveAllThreeContracts": "Valid and empty carrier through the real producer/writer/wrapper; unlisted env key remains refused. Omitting codex-mcp-context.test.ts would omit the new unknown-key regression.",
+    "runtimeContract": [
+      "RunContext always emits MIKKA_DECISION_MCP_TRACEPARENT as the bound carrier or empty string, replacing an inherited foreign carrier.",
+      "Reader adds exactly that key to the env allowlist. File ownership/modes/no-follow/link count/size, runId/nonce/version/top-level keys, and bounded string/NUL checks stay unchanged.",
+      "Unknown env keys still throw mcp_context_invalid; wrapper still emits fixed safe stderr and exits2.",
+      "The existing MCP backend separately validates version00 lowercase nonzero W3C IDs. Empty/invalid values produce no outgoing traceparent header; the reader itself is not a W3C validator."
+    ],
+    "regressionBoundary": "Source only. mcp-http-observation's new cases use the actual RunContext, writer and child wrapper plus actual claim catalogue for valid/absent carrier; backend calls remain zero. This proves the intended local context/catalogue contract when executed, not PostHog ingestion or actual remote header delivery. No tests executed/read as terminal results here."
+  },
+  "jointlyPreservedInterfaces": {
+    "returnedRefusalSpans": [
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "ownActualBlob": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894"
+      },
+      {
+        "path": "workflows/coordinator/factory-steps.ts",
+        "ownActualBlob": "0e2ecce921c4b56795ad1096f2b1eae987299e95"
+      }
+    ],
+    "spanContract": "Keep withRunSpan('coordinator.tool', {}, fn) inside each asToolResult try. Safe ERROR is recorded before rethrowing the original error into the existing typed returned-error catch. Peer and d72 do not change either path.",
+    "helperBlob": {
+      "path": "lib/tracing/context.ts",
+      "blob": "fe005d26c2ea903250683d9351334b95ef328383"
+    },
+    "optionalWholePeerFactoryMetadata": [
+      {
+        "path": "workflows/coordinator/tools.ts",
+        "blob": "9bcf14a127aaa09e8028d2d0040d18aef1142bb6"
+      },
+      {
+        "path": "workflows/coordinator/factory-tools.ts",
+        "blob": "77a21b83c8060b0dd9e1bcfb76fb9e7d6b7300b5"
+      }
+    ],
+    "factoryContract": "These peer-only changes clarify Factory receipt vs Issue IDs in descriptions only. UUID validation, scoped strictness/legacy stripping and execute user/scope/bot bindings are unchanged. They are compatible with owned refusal spans but are not dependencies of the 3-file MCP fix. Source test asserts non-growing serialized metadata; this review did not execute that assertion.",
+    "generatedRouteUnion": {
+      "id": "d72-generated-route-union",
+      "result": "TWO_PATH_INTERSECTION_NOT_A_PROVEN_TEXT_CONFLICT",
+      "paths": [
+        {
+          "path": "apps/api/generated/routes.json",
+          "ownBlob": "17c08e555f327646bfa01df49ab6406053dfe538",
+          "mainBlob": "29b7e32a9dc2ec660998d6258b80f2caead92745"
+        },
+        {
+          "path": "apps/api/generated/routes.ts",
+          "ownBlob": "08aaff7b3c936a3a0ede346ab51a15ebf2fd785d",
+          "mainBlob": "e0f403171f936b63a34f62cc9aad3e2394cbc2fc"
+        }
+      ],
+      "mustRetain": {
+        "ownSourceHashes": {
+          "app/v1/devices/[deviceId]/repos/route.ts": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+          "app/v1/devices/[deviceId]/runs/route.ts": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c"
+        },
+        "mainAddedEntries": {
+          "/mikka/api/factory/tasks/[taskId]/activity": {
+            "methods": [
+              "GET"
+            ],
+            "sourceHash": "edac210320cffb7eb32d34c0f51eb4f8ac9709fa7d691ba691a2900d7e6b4b6f"
+          },
+          "/mikka/api/factory/tasks/[taskId]/media/[captureId]": {
+            "methods": [
+              "GET"
+            ],
+            "sourceHash": "a0600f48f5d8b9fa5d81c75df7e20808c8a7b255efa8e031e9faf3675d3369c2"
+          },
+          "/mikka/api/factory/tasks/[taskId]/media/[captureId]/poster": {
+            "methods": [
+              "GET"
+            ],
+            "maxDuration": 30,
+            "sourceHash": "c3f4a50167504fd641299c32261c24c1da80fc4a75466b9116527717aba8be67"
+          }
+        },
+        "mainEventsHash": "0a1326bfdb882a5627d075e6e789f0ea3f2d39edc07d323ad431b62c6efe7c6c",
+        "identicalOnBoth": {
+          "enrollment": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4",
+          "mobileModel": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17"
+        }
+      },
+      "boundary": "Both generated formats must describe the resulting route union. No manual whole-file winner or automatic conflict was inferred; no generated source was written or compiled."
+    }
+  },
+  "newMainBoundary": {
+    "head": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+    "tree": "d5ce228157f12aa0d40d25e4640e465cb8054de0",
+    "noDirectChangeTo": "Owned runs/repos/enrollment helpers, device authority, readBatch/policy, daemon source, Native harness/counting/windows.",
+    "nonzeroSharedBehavior": [
+      {
+        "path": "apps/api/compat/server.ts",
+        "blob": "81e7f5b6343d2b4de01f8bdd63d7c5c7a77b296c",
+        "change": "Explicit HTTP status/statusText/headers in NextResponse.json materialization."
+      },
+      {
+        "path": "app/v1/runs/[runId]/events/route.ts",
+        "blob": "931ce04d1ddf51a3fccc940d9e9fabc2ac8ec1d4",
+        "change": "Preparing->running status update moved into persistence transaction."
+      },
+      {
+        "path": "lib/secrets/run-events.ts",
+        "blob": "c409d22e38802c5fe59ef1989b88127213fbb942",
+        "change": "Receives the status update/invalidation and schedules task activity."
+      },
+      {
+        "path": "lib/factory/activity-live.ts",
+        "blob": "574f0e07e1e7e20663f8f257ffc27a4a8cad1258",
+        "change": "Configured after-commit task lookup and Factory notification can issue SQL."
+      },
+      {
+        "path": "lib/run-completion-effects.ts",
+        "blob": "26ce33aa8613723457fdbb2e4a6f3033eb6bee95",
+        "change": "Task activity scheduling on completion."
+      }
+    ],
+    "cannotInfer": "Old actual90e Native acceptance is not a d72/combined-tree execution. Source intersections alone do not establish a regression or mandate a rerun. The shared Factory behavior and changed schema/dependencies/test inventory are real and must not be mislabeled as no runtime change."
+  },
+  "sourceReaderBlobs": [
+    {
+      "key": "peerReader",
+      "url": "https://github.com/alexj11324/Mikka/blob/9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8/packages/daemon/src/agents/mikka-mcp-context.mjs",
+      "gitBlobSha1": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+      "encoding": "utf-8",
+      "characters": 2781
+    },
+    {
+      "key": "peerWriter",
+      "url": "https://github.com/alexj11324/Mikka/blob/9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8/packages/daemon/src/codex-mcp-context.ts",
+      "gitBlobSha1": "beb35030e17a70a219ec9878701df7726bd4fddf",
+      "encoding": "utf-8",
+      "characters": 1888
+    },
+    {
+      "key": "peerProducer",
+      "url": "https://github.com/alexj11324/Mikka/blob/9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8/packages/daemon/src/agents/run-context.ts",
+      "gitBlobSha1": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f",
+      "encoding": "utf-8",
+      "characters": 30598
+    },
+    {
+      "key": "peerMcp",
+      "url": "https://github.com/alexj11324/Mikka/blob/9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8/packages/daemon/src/agents/mikka-mcp.mjs",
+      "gitBlobSha1": "e314a1c43ac0749a5a773bcef2be02a976fc166f",
+      "encoding": "utf-8",
+      "characters": 2621
+    },
+    {
+      "key": "peerBackend",
+      "url": "https://github.com/alexj11324/Mikka/blob/9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8/packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "gitBlobSha1": "308c9ed7ab78b636876fd661b55d36dd61b478d2",
+      "encoding": "utf-8",
+      "characters": 50523
+    },
+    {
+      "key": "withRunSpan",
+      "url": "https://github.com/alexj11324/Mikka/blob/90e6988338d56a5f03b09f7e956adbf7ff4daf20/lib/tracing/context.ts",
+      "gitBlobSha1": "fe005d26c2ea903250683d9351334b95ef328383",
+      "encoding": "utf-8",
+      "characters": 4360
+    }
+  ],
+  "evidence": [
+    {
+      "key": "join1788.compare0e_9ef.raw",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/compare/0e4118020311ae8f9083d0d21cfb990be0282f25...9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8",
+      "files": 10,
+      "base": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "mergeBase": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "rawJsonBytes": 60288,
+      "rawJsonSha256": "65e2cf99504c0cb61d546cd4a5fabb325f96b66797db2111375f4c0cf017fa78"
+    },
+    {
+      "key": "join1788.compare0e_d72.raw",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/compare/0e4118020311ae8f9083d0d21cfb990be0282f25...d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "files": 71,
+      "base": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "mergeBase": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "rawJsonBytes": 506955,
+      "rawJsonSha256": "7b7e9ca8f4f82ea08d01b9766010ec7ab2b9d989577002653d8261071664687f"
+    },
+    {
+      "key": "join1788.compare0e_90e.raw",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/compare/0e4118020311ae8f9083d0d21cfb990be0282f25...90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "files": 25,
+      "base": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "mergeBase": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "rawJsonBytes": 139957,
+      "rawJsonSha256": "e21fccf69b58742c3d8e4430af5b2417a767274082b171f896ad217a7e0eb974"
+    },
+    {
+      "key": "join1788.minimal-parent-to-head.raw",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/compare/0a89902188e31a202153c663a2e8448feddb01f4...9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8",
+      "files": 3,
+      "base": "0a89902188e31a202153c663a2e8448feddb01f4",
+      "mergeBase": "0a89902188e31a202153c663a2e8448feddb01f4",
+      "rawJsonBytes": 20665,
+      "rawJsonSha256": "877025c1416d2175b4f541a85dff57978fa73879ebd6d843ff707a0c45c8cc26"
+    }
+  ],
+  "statusBoundary": {
+    "ownNativePass": "Root reports full397<=412 and startup170<=204 archived CP18; not independently re-read in this task.",
+    "peerCi": "Root reports run42560334051 failed at PG shard1 Required DB suites with aggregate following. No peer job log read or root cause claimed; no CI green inherited.",
+    "pullRequestFields": "A cached PR base.sha0a/merge_commit_sha90e is not evidence of current-main d72 synthetic merge. No new pull merge ref fetched."
+  },
+  "verdict": "No must-fix interface conflict found in this bounded review. The exact final 3-file MCP fix can be retained independently of the other 7 peer paths. Generated routes must retain the union; no source/ref was changed and no untested combined tree was marked passed.",
+  "activity": {
+    "githubReadCalls": 13,
+    "businessDataReads": 0,
+    "filesystemOperations": 0,
+    "sourceOrRefWrites": 0,
+    "workflowActions": 0,
+    "productTests": 0,
+    "modelCalls": 0,
+    "newResources": 0,
+    "checksumAndPatchReplay": "Pure in-memory source-byte verification only"
+  },
+  "storage": "functions.store; not a durable repository archive or local file"
+}

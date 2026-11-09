@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "checkpoint": 19,
+  "kind": "source-integration-publication-and-ci-start",
+  "createdAtUTC": "2026-11-09 05:03:41 UTC",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pr": 1799,
+  "priorEvidenceCommit": "050fbf5a22ec8f7b72229d419ef888d712b46b6a",
+  "source": {
+    "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "tree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+    "latestMainAtPublication": "93e9d5e260cf899b9a40a188cfa34f069903489d",
+    "ordinaryMerges": [
+      "eec2d4859f86a3894f507065c562227361a7c593",
+      "1fa3becd9b69e27c7a0229762750b6fa7e9497fc"
+    ],
+    "singleParentMinimumFix": "c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+    "minimumFixUpstream": "9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8",
+    "minimumFixPaths": 3,
+    "ownTotalDeltaPaths": 28,
+    "mainD72OtherPathsPreserved": 69,
+    "main93eDisjointPathsPreserved": 3,
+    "canonicalRoutes": 243,
+    "canonicalMethods": 315,
+    "finalSourceObjectReview": "passed",
+    "generatedSourceBinding": "passed",
+    "bothFakeModes": "100755",
+    "mcpModes": "100644"
+  },
+  "publication": {
+    "timeUTC": "2026-11-09 04:54:58 UTC",
+    "expectedHead": "548790b4676d5e43556bf62cf452c3c5aee68073",
+    "force": false,
+    "successfulBranchUpdates": 1,
+    "mainWritten": false,
+    "autoMerge": false,
+    "oldMainGuardPreventedStalePush": true,
+    "intermediateCandidatesTriggeredCI": false,
+    "prComment": "https://github.com/alexj11324/Mikka/pull/1799#issuecomment-6732575696"
+  },
+  "ci": {
+    "runId": 42564360573,
+    "head": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "stateAtCheckpoint": "in_progress",
+    "conclusion": null,
+    "githubSynthetic": "f8864eb83055504ac445e07e8d94a0e8eabedee9",
+    "syntheticTree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+    "syntheticParents": [
+      "93e9d5e260cf899b9a40a188cfa34f069903489d",
+      "1fa3becd9b69e27c7a0229762750b6fa7e9497fc"
+    ],
+    "actualCheckoutConfirmedFromOriginalLogs": [
+      128987522108,
+      128987522414,
+      128987522337,
+      128987522202
+    ],
+    "requiredDatabaseSuites": 72,
+    "requiredCoreTargets": 57,
+    "requiredIntegrationTargets": 29,
+    "inventoryIsNotCompletion": true,
+    "browserGate128987521180": "echo_only_no_browser_tests",
+    "e2bPrReleaseJobs": "original_condition_skipped",
+    "newNativeResults": "pending"
+  },
+  "replayVision": {
+    "project": 670821,
+    "quotaReadAtUTC": "2026-11-09T04:32:25.515Z",
+    "quotaLimit": 2500,
+    "quotaRemaining": 2500,
+    "quotaUsed": 0,
+    "quotaReserved": 0,
+    "featurePresent": true,
+    "aiProcessingApproval": "not_exposed_unknown",
+    "inlineScanExecutionPermission": "not_tested",
+    "recordingsEnumerated": 0,
+    "scansExecuted": 0,
+    "modelsInvoked": 0,
+    "estimateForTwoSessions": {
+      "credits": 10,
+      "priceEquivalentUSD": 0.1,
+      "billedActual": "unknown"
+    }
+  },
+  "boundaries": [
+    "The immutable object and generated route reviews are source-only, not runtime acceptance.",
+    "Local execution environment is unavailable. No new local full suite or canonical generator execution is claimed.",
+    "Previous full CI and Native 397<=412 / first startup 170<=204 remain bound to 90e69883 and are not current-source success.",
+    "The reused minimum MCP fix is three exact upstream blobs, not the rest of PR1788 or its ancestry/CI conclusion.",
+    "Replay Vision quota availability does not prove real playback, scan eligibility, AI approval or execution.",
+    "Five decoded original logs preserve UTF-8 BOM/ANSI bytes; high-risk credential and email pattern scans found zero matches. No raw product model content was retrieved.",
+    "Production rollout, actual ACME Factory runs, trace/LLM/Logs/Replay/native PNG evidence and final-source overhead are not yet accepted."
+  ],
+  "resources": {
+    "activeTemporaryVercelSandboxes": 0,
+    "priorRecoveryStoppedAtUTC": "2026-11-09T04:19:50.558Z",
+    "newTemporaryVercelSandboxesCreated": 0,
+    "liveCICoverage": "GitHub Actions naturally triggered once for the new source"
+  },
+  "productionAccepted": false,
+  "acmeAcceptedCases": 0,
+  "completeReleasePublished": false,
+  "issueClosed": false,
+  "files": [
+    {
+      "path": "replay-vision-preflight-20261109/public/replay-vision-preflight.safe.json",
+      "bytes": 6080,
+      "sha256": "e57ee6710ef570b1df97db3474d028b93ec7a9a2419299905ac37407b4903270",
+      "gitBlobSha": "53f1db70516ebbf87bb82660588c9acde0789eb0"
+    },
+    {
+      "path": "integration-d72-minimum-mcp/public/source-interface-review.safe.json",
+      "bytes": 15362,
+      "sha256": "a7e881bb8589df504fcaaf03f264b9e6463e35218b3cc4628014b0498534d2fb",
+      "gitBlobSha": "ce8ebc01cfff3d17b45d868d9812506e44efec5a"
+    },
+    {
+      "path": "integration-d72-minimum-mcp/public/generated-d72-joint-metadata.safe.json",
+      "bytes": 15416,
+      "sha256": "5ef64a5b5fb32529cbb8df9eb223931bba14875ddba0a4dc7425836b15609626",
+      "gitBlobSha": "8a92740c4a5c17b483db5e894f07033b9cf3fcba"
+    },
+    {
+      "path": "integration-d72-minimum-mcp/public/final-1fa3-route-binding.safe.json",
+      "bytes": 4498,
+      "sha256": "8314a6053672354444ce45ca75128d889beea37c3e91e4a544cc891f35548f7b",
+      "gitBlobSha": "f667815dd89fda7d41903bfd36dedadfb804b88d"
+    },
+    {
+      "path": "integration-d72-minimum-mcp/public/publication-1fa3.safe.json",
+      "bytes": 10194,
+      "sha256": "68c06d93e4d345a508b1352167cb3a395201007c8f81e703150130781775b4d3",
+      "gitBlobSha": "a2a15d710624c4de76f14601a0ce8f361ccffc16"
+    },
+    {
+      "path": "integration-d72-minimum-mcp/public/final-1fa3-immutable-object-review.safe.json",
+      "bytes": 14427,
+      "sha256": "ab602ef09b4c825f9498d09fc25c26879bf0ff4fcfa2dd610f1bcd6f860428a6",
+      "gitBlobSha": "198a1dd5c95fa867a148f1523b9d3e202fbdd173"
+    },
+    {
+      "path": "ci-1fa3-20261109/public/selection.safe.json",
+      "bytes": 17590,
+      "sha256": "70fc7146d1f32fee64b040e9aa7f21e10bc77a8f078ae1cd61ee528a7c5c94e8",
+      "gitBlobSha": "7f1b9364532c97bd2b09c4428aba4ff21973a6a4"
+    },
+    {
+      "path": "ci-1fa3-20261109/nonpg/job-128987521180.original.log",
+      "bytes": 2200,
+      "sha256": "c6192fc248e3aa7b16c2b0151b44e9ddc52e6dcda88a9a5e612565f9ade0a38b",
+      "gitBlobSha": "ec315cbfa21db36f256f48bc24fd1ee5d6caadf3"
+    },
+    {
+      "path": "ci-1fa3-20261109/nonpg/job-128987522414.original.log",
+      "bytes": 50815,
+      "sha256": "c6b18ed119740ca2bb9a281fc6c379cc5284c406284c4ff4bdf40b42948d3a2c",
+      "gitBlobSha": "cadad5767ec79c6142dd484deeaa2dc4ab7e5589"
+    },
+    {
+      "path": "ci-1fa3-20261109/nonpg/job-128987522337.original.log",
+      "bytes": 35587,
+      "sha256": "c46b56350188b2a297ecfb820d647ad9353e36af502c58a2d9aa4140a2c4e8a9",
+      "gitBlobSha": "aec73e965d7ddb86e3803c4ca403d8bdb921266c"
+    },
+    {
+      "path": "ci-1fa3-20261109/nonpg/job-128987522202.original.log",
+      "bytes": 71615,
+      "sha256": "01caf7481da25830ebe8d201bcab7faffa34e66941fb4b4cc480737b440a4050",
+      "gitBlobSha": "1ee5bc18146d2de7e4751a544a3872b6c31c6804"
+    },
+    {
+      "path": "ci-1fa3-20261109/nonpg/job-128987522108.original.log",
+      "bytes": 562859,
+      "sha256": "2e57719c17084dddc4ef149d519a4d6efbe4b309fc8f0a141edf35d23abc8722",
+      "gitBlobSha": "0f072b800f367ef300c65323039889866ab04d06"
+    }
+  ]
+}

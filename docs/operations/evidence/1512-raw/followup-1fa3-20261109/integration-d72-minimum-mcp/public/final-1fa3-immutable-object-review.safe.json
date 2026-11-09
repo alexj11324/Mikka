@@ -1,0 +1,446 @@
+{
+  "schema": "mikka.issue1512.final1799-immutable-object-review.v1",
+  "recordedAt": "2026-11-09T04:56:30.222Z",
+  "result": "PASS_SOURCE_OBJECT_REVIEW_ONLY",
+  "commits": [
+    {
+      "sha": "eec2d4859f86a3894f507065c562227361a7c593",
+      "tree": "d12eddea1d37a9f2d3ca3981a8c094bbc4715f6f",
+      "parents": [
+        "548790b4676d5e43556bf62cf452c3c5aee68073",
+        "d72a1982bf503b34ad4bc31ab6211cfe018af483"
+      ]
+    },
+    {
+      "sha": "c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+      "tree": "c519f5c169513894048e2f0881b5bf365d170f0c",
+      "parents": [
+        "eec2d4859f86a3894f507065c562227361a7c593"
+      ]
+    },
+    {
+      "sha": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "tree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+      "parents": [
+        "c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+        "93e9d5e260cf899b9a40a188cfa34f069903489d"
+      ]
+    }
+  ],
+  "comparisonChecks": [
+    {
+      "key": "mergeToChild",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/compare/eec2d4859f86a3894f507065c562227361a7c593...c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+      "base": "eec2d4859f86a3894f507065c562227361a7c593",
+      "mergeBase": "eec2d4859f86a3894f507065c562227361a7c593",
+      "status": "ahead",
+      "files": 3,
+      "commits": 1,
+      "totalCommits": 1
+    },
+    {
+      "key": "d72ToChild",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/compare/d72a1982bf503b34ad4bc31ab6211cfe018af483...c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+      "base": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "mergeBase": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "status": "ahead",
+      "files": 28,
+      "commits": 5,
+      "totalCommits": 5
+    },
+    {
+      "key": "childToFinal",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/compare/c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b...1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+      "base": "c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+      "mergeBase": "c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+      "status": "ahead",
+      "files": 3,
+      "commits": 3,
+      "totalCommits": 3
+    },
+    {
+      "key": "d72To93e",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/compare/d72a1982bf503b34ad4bc31ab6211cfe018af483...93e9d5e260cf899b9a40a188cfa34f069903489d",
+      "base": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "mergeBase": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "status": "ahead",
+      "files": 3,
+      "commits": 2,
+      "totalCommits": 2
+    }
+  ],
+  "checks": {
+    "mergeToChildExactlyThreeMcpBlobs": true,
+    "d72ToChildExactlyOwned25PlusMcp3": true,
+    "allNonModeOnlyOwnedBlobsMatchActual90eExceptReviewedGeneratedUnion": true,
+    "actual90eStepsBlob": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894",
+    "generatedUnion": {
+      "apps/api/generated/routes.json": "cafa02602d36b04eb80cdb18ea1b54d8a2aa80a8",
+      "apps/api/generated/routes.ts": "d7cb3ee93e7de084a4001c0248fc739f00a7414c"
+    },
+    "d72ChangedPathCount": 71,
+    "d72Intersections": [
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts"
+    ],
+    "d72UnrelatedChangedPathsPreserved": 69,
+    "finalAddsExactlyLatestMainThreeReleaseScripts": true,
+    "latestMainScriptPathsBlobsAndCompletePatchesEqual": true,
+    "noExtraPaths": true,
+    "modeOnlyShaNullNotFilledFromCompare": true,
+    "twoExecutableFakesVerifiedByGitTree": true,
+    "threeMcpNormalFileModesVerifiedByGitTree": true
+  },
+  "d72ToChildEntries": [
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "blob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "additions": 9,
+      "deletions": 6
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "blob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "additions": 9,
+      "deletions": 12
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "blob": "cafa02602d36b04eb80cdb18ea1b54d8a2aa80a8",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "blob": "d7cb3ee93e7de084a4001c0248fc739f00a7414c",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "blob": "35694355877eea55393ba9299f7796c2c171ccb7",
+      "additions": 31,
+      "deletions": 3
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "blob": "a5157f09e8022bf9077053686d36aa02760a4e94",
+      "additions": 82,
+      "deletions": 0
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "blob": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+      "additions": 6,
+      "deletions": 2
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "blob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+      "additions": 20,
+      "deletions": 2
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "blob": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+      "additions": 53,
+      "deletions": 0
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "blob": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+      "additions": 6,
+      "deletions": 11
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "blob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+      "additions": 72,
+      "deletions": 0
+    },
+    {
+      "path": "lib/device-management.ts",
+      "blob": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+      "additions": 9,
+      "deletions": 0
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "blob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "additions": 13,
+      "deletions": 6
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "blob": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+      "additions": 25,
+      "deletions": 3
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "blob": "fef80337b9b5244d2e8565236c6dd96f7d329acd",
+      "additions": 227,
+      "deletions": 1
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "blob": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+      "additions": 5,
+      "deletions": 2
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "blob": "737fa373e4a8333a4a703bf6133f9a533d585460",
+      "additions": 135,
+      "deletions": 2
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "blob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-context.mjs",
+      "blob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "packages/daemon/test/codex-mcp-context.test.ts",
+      "blob": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+      "additions": 12,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "blob": null,
+      "additions": 0,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "blob": null,
+      "additions": 0,
+      "deletions": 0
+    },
+    {
+      "path": "packages/daemon/test/mcp-http-observation.test.ts",
+      "blob": "c569b06d61ed84855db3c5921f1a6dba05774477",
+      "additions": 42,
+      "deletions": 5
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "blob": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+      "additions": 31,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "blob": "628395f91d97a64655afb80117788d70207200c0",
+      "additions": 135,
+      "deletions": 0
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "blob": "609029dde521868c00ab7eb687394ad5cacd6183",
+      "additions": 55,
+      "deletions": 4
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "blob": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+      "additions": 2,
+      "deletions": 1
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "blob": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894",
+      "additions": 2,
+      "deletions": 1
+    }
+  ],
+  "finalModeAndBlobChecks": [
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-context.mjs",
+      "mode": "100644",
+      "sha": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+      "size": 2781
+    },
+    {
+      "path": "packages/daemon/test/codex-mcp-context.test.ts",
+      "mode": "100644",
+      "sha": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+      "size": 5195
+    },
+    {
+      "path": "packages/daemon/test/mcp-http-observation.test.ts",
+      "mode": "100644",
+      "sha": "c569b06d61ed84855db3c5921f1a6dba05774477",
+      "size": 22837
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "mode": "100755",
+      "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "size": 3767
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "mode": "100755",
+      "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "size": 4466
+    }
+  ],
+  "latestMainScripts": [
+    {
+      "path": "scripts/release/mobile-screenshots-build.sh",
+      "blob": "8d6e543889f068efc622ea22ed1dac02624a173d",
+      "patchSha256": "50e49d9606abb8be795e0718dc5dfa90dec25baa02841f2ad9bede41c9d0870a"
+    },
+    {
+      "path": "scripts/release/mobile-screenshots.mjs",
+      "blob": "6c11204549b2b55a31e1203fc82f863a719db7b5",
+      "patchSha256": "60d095e2157940a3401d490169b5efa91e3001bb2dff3acbd693981556202478"
+    },
+    {
+      "path": "scripts/release/mobile-screenshots.test.mjs",
+      "blob": "ca252f1602bca78200d3f8ad17451955d964adc7",
+      "patchSha256": "251ac38ffdc694b0347256f78b2014ee641ad0136f23370ca9c0f9f4c12418ae"
+    }
+  ],
+  "latestMain": {
+    "commit": "93e9d5e260cf899b9a40a188cfa34f069903489d",
+    "tree": "bc928dae72b0c861aa9624552b0c63d3a8f1006f"
+  },
+  "limitedTrees": [
+    {
+      "key": "finalRoot",
+      "tree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+      "truncated": false
+    },
+    {
+      "key": "packages",
+      "tree": "3ec2f70c0848dba2fa11ab146603633721038427",
+      "truncated": false
+    },
+    {
+      "key": "daemon",
+      "tree": "d0a96d4738b2e6dfa822a469a5003febbc5ea2d5",
+      "truncated": false
+    },
+    {
+      "key": "src",
+      "tree": "f9a54e915269de061a98b745e76adbbc536a5c79",
+      "truncated": false
+    },
+    {
+      "key": "test",
+      "tree": "ae54f88170fd20ea9e972484fdff4e19db283d15",
+      "truncated": false
+    },
+    {
+      "key": "agents",
+      "tree": "062544f538dde3aa9e98a309a434e7c7683f2219",
+      "truncated": false
+    },
+    {
+      "key": "fakes",
+      "tree": "fed76966734f5953de365783a3fb25f69c8384a5",
+      "truncated": false
+    }
+  ],
+  "evidence": [
+    {
+      "key": "final1799.mergeCommit.raw",
+      "jsonBytes": 1687,
+      "jsonSha256": "1a4785da5862b8bde803be4bef33229c88e81c9219a472dab4979fd97b5f97ce"
+    },
+    {
+      "key": "final1799.childCommit.raw",
+      "jsonBytes": 1766,
+      "jsonSha256": "4328f78654c2aba6a0868f367732a85ace4aca09a0e93692a57f7cd90c1d61ad"
+    },
+    {
+      "key": "final1799.finalCommit.raw",
+      "jsonBytes": 1805,
+      "jsonSha256": "868c352a6797c7d2b45dce906823c2c6520eb52d8fe8b9110ba2dc1e9e3d94c2"
+    },
+    {
+      "key": "final1799.mergeToChild.raw",
+      "jsonBytes": 21875,
+      "jsonSha256": "8c5e8a0cff30e089427809e80f8e319312090adf6e420655967328506501718b"
+    },
+    {
+      "key": "final1799.d72ToChild.raw",
+      "jsonBytes": 146496,
+      "jsonSha256": "e30804cdef2731f442635901925ea952c84d8a9fb3491dd3cd4acf1ada8eb3e6"
+    },
+    {
+      "key": "final1799.childToFinal.raw",
+      "jsonBytes": 51496,
+      "jsonSha256": "a417742e0632a7313ee6076ce0d7c7011ca8165fb0a643783c1b38ea35559de8"
+    },
+    {
+      "key": "final1799.d72To93e.raw",
+      "jsonBytes": 49366,
+      "jsonSha256": "d8d166b7caf5bae700407de140273b9fe73ad7a3dbdc3d45695fed306a2ff258"
+    },
+    {
+      "key": "final1799.finalRoot.raw",
+      "jsonBytes": 12803,
+      "jsonSha256": "d196b8c6080d787fdc7a9508af5f071b10e297ce0ce7c4f00075210639cca2e5"
+    },
+    {
+      "key": "final1799.packages.raw",
+      "jsonBytes": 1005,
+      "jsonSha256": "f991dab82fd9f854b810a4d2710eb66b1de9cb103382e60dc9920c65650eac9b"
+    },
+    {
+      "key": "final1799.daemon.raw",
+      "jsonBytes": 2500,
+      "jsonSha256": "8a673951f15da026d7dd55c1e56828527e2d628015e18cd59d1e882dc5995a92"
+    },
+    {
+      "key": "final1799.src.raw",
+      "jsonBytes": 21969,
+      "jsonSha256": "a87e79711d5c5d7a7dd43d01796b0be2a635fb9e66f68170da56c13db84dda30"
+    },
+    {
+      "key": "final1799.test.raw",
+      "jsonBytes": 28122,
+      "jsonSha256": "a43c789b41385bb2ec158fb20bb3a2aea4fdc8d64816c1bc998e5c86c8bb0a10"
+    },
+    {
+      "key": "final1799.agents.raw",
+      "jsonBytes": 7143,
+      "jsonSha256": "61ced7eb21a03aed71509ec3d09167a6500fec2d8739b20a555dda5fcfffa4dd"
+    },
+    {
+      "key": "final1799.fakes.raw",
+      "jsonBytes": 2964,
+      "jsonSha256": "f0a6d11335d0738f7645e98c63bd5dcae9278b4a936211b58c0d992f6ea2d240"
+    }
+  ],
+  "boundaries": [
+    "All reads target immutable commits/trees or fixed-SHA comparisons; no branch/main ref read or update was performed by this reviewer.",
+    "The root reports one nonforce expected548 update at04:54:58 and new CI; those are parent-reported facts, not additional platform verification in this receipt.",
+    "This validates exact source/parents/modes and absence of hidden files. It is not a new Native, database, canonical generator, typecheck, build or production result.",
+    "The final source retains the reviewed minimal3 MCP files only; other1788 timing/Factory changes are not silently imported.",
+    "No tests, model calls, new compute resources or product/ref writes; seven bounded Git-tree reads, no recursive repository-wide tree.",
+    "Safe receipt stored in functions.store only; no new GitHub blob mutation under this read-only task."
+  ],
+  "verdict": "No immutable-object blocker. Candidate1fa3/tree0ecc is consistent with the reviewed construction and is suitable for publication followed by its own CI/acceptance evidence.",
+  "activity": {
+    "githubReadCalls": 14,
+    "gitCommitReads": 3,
+    "fixedCompareReads": 4,
+    "nonrecursiveGitTreeReads": 7,
+    "refWrites": 0,
+    "workflowActions": 0,
+    "tests": 0,
+    "modelCalls": 0,
+    "newResources": 0
+  }
+}

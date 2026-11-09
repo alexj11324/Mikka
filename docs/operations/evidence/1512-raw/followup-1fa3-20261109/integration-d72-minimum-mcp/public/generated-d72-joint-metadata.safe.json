@@ -1,0 +1,398 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "purpose": "Joint generated API route metadata for own normal successor candidate",
+  "baseRevision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+  "ownTestedSyntheticRevision": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "acquisition": "GitHub MCP read-only fixed-revision UTF-8 source; no VM or local exec",
+  "instructions": [
+    {
+      "path": "AGENTS.md",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "bytes": 22701,
+      "sha256": "79b4e29734325c8129ffadad312d756e82db293086b80dc5c03ef0b08f54b34b",
+      "gitBlobSha1": "9fb491b174d3be8947347fce396a7042967b3b3b"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "bytes": 12693,
+      "sha256": "026ca951cd34feb25a06ba606af8d0d7325c46a01adbb64086cc7e30301dd8f5",
+      "gitBlobSha1": "3c38da3b2a68d84187498532e8f49cf8c4bf32fa"
+    }
+  ],
+  "generator": {
+    "path": "apps/api/scripts/generate-routes.mjs",
+    "bytes": 6166,
+    "sha256": "db8865da2530e549b83f369f2de609da9ae73a9b262b387bf3c33046c0df7433",
+    "gitBlobSha1": "2431a145d316e10fcdb74a6040efcdea2b6a9f00",
+    "sameBytesBothRevisions": true
+  },
+  "contracts": {
+    "sourceHash": "SHA256 of exact UTF-8 route source text including final newline",
+    "json": "JSON.stringify({version:1,basePath:'/mikka',routes},null,2) plus LF",
+    "typescript": "Exact generator header and per-route JSON declaration/load import lines plus LF",
+    "originalJsonAndTypescriptRoundtripBothRevisions": true,
+    "methodsOfFetchedRoutesCheckedAgainstDirectExportDeclarations": true,
+    "posterMaxDuration30Retained": true,
+    "allOtherMetadataAndLoadersPreserved": true
+  },
+  "counts": {
+    "routes": {
+      "d72": 243,
+      "actual90e": 240,
+      "candidate": 243
+    },
+    "methods": {
+      "d72": 315,
+      "actual90e": 312,
+      "candidate": 315
+    },
+    "unchangedD72Entries": 241,
+    "changedD72Entries": 2,
+    "lineChangesPerFile": 2
+  },
+  "changes": [
+    {
+      "source": "app/v1/devices/[deviceId]/repos/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "from": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9",
+      "to": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888"
+    },
+    {
+      "source": "app/v1/devices/[deviceId]/runs/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "from": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54",
+      "to": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c"
+    }
+  ],
+  "preserved": {
+    "newD72Routes": [
+      {
+        "path": "/mikka/api/factory/tasks/[taskId]/activity",
+        "template": "/api/factory/tasks/[taskId]/activity",
+        "source": "app/api/factory/tasks/[taskId]/activity/route.ts",
+        "methods": [
+          "GET"
+        ],
+        "sourceHash": "edac210320cffb7eb32d34c0f51eb4f8ac9709fa7d691ba691a2900d7e6b4b6f"
+      },
+      {
+        "path": "/mikka/api/factory/tasks/[taskId]/media/[captureId]",
+        "template": "/api/factory/tasks/[taskId]/media/[captureId]",
+        "source": "app/api/factory/tasks/[taskId]/media/[captureId]/route.ts",
+        "methods": [
+          "GET"
+        ],
+        "sourceHash": "a0600f48f5d8b9fa5d81c75df7e20808c8a7b255efa8e031e9faf3675d3369c2"
+      },
+      {
+        "path": "/mikka/api/factory/tasks/[taskId]/media/[captureId]/poster",
+        "template": "/api/factory/tasks/[taskId]/media/[captureId]/poster",
+        "source": "app/api/factory/tasks/[taskId]/media/[captureId]/poster/route.ts",
+        "methods": [
+          "GET"
+        ],
+        "maxDuration": 30,
+        "sourceHash": "c3f4a50167504fd641299c32261c24c1da80fc4a75466b9116527717aba8be67"
+      }
+    ],
+    "events": {
+      "path": "/mikka/v1/runs/[runId]/events",
+      "template": "/v1/runs/[runId]/events",
+      "source": "app/v1/runs/[runId]/events/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "0a1326bfdb882a5627d075e6e789f0ea3f2d39edc07d323ad431b62c6efe7c6c"
+    },
+    "enrollmentAndMobileAlreadyCorrect": [
+      {
+        "route": {
+          "path": "/mikka/api/devices/enrollment",
+          "template": "/api/devices/enrollment",
+          "source": "app/api/devices/enrollment/route.ts",
+          "methods": [
+            "GET",
+            "POST"
+          ],
+          "sourceHash": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4"
+        },
+        "sourceBytesEqualBetweenD72And90e": true,
+        "hashRecomputed": true
+      },
+      {
+        "route": {
+          "path": "/mikka/api/mobile/model",
+          "template": "/api/mobile/model",
+          "source": "app/api/mobile/model/route.ts",
+          "methods": [
+            "GET",
+            "POST",
+            "PUT"
+          ],
+          "sourceHash": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17"
+        },
+        "sourceBytesEqualBetweenD72And90e": true,
+        "hashRecomputed": true
+      }
+    ],
+    "removedEntries": 0,
+    "changedMethods": 0,
+    "changedDurations": 0,
+    "changedThresholds": 0,
+    "changedOrder": 0
+  },
+  "sourceProofs": [
+    {
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "bytes": 1226,
+      "sha256": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54",
+      "gitBlobSha1": "3bbb71a8a7d249eb517d75a95986cf75d1994168",
+      "metadataSourceHash": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "bytes": 1305,
+      "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+      "gitBlobSha1": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "metadataSourceHash": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "bytes": 1704,
+      "sha256": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9",
+      "gitBlobSha1": "9fe33b05a9570ab59e4bb041f9a1344c44ab31ad",
+      "metadataSourceHash": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "bytes": 1983,
+      "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+      "gitBlobSha1": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "metadataSourceHash": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "path": "app/v1/runs/[runId]/events/route.ts",
+      "bytes": 3010,
+      "sha256": "0a1326bfdb882a5627d075e6e789f0ea3f2d39edc07d323ad431b62c6efe7c6c",
+      "gitBlobSha1": "931ce04d1ddf51a3fccc940d9e9fabc2ac8ec1d4",
+      "metadataSourceHash": "0a1326bfdb882a5627d075e6e789f0ea3f2d39edc07d323ad431b62c6efe7c6c",
+      "sourceHashMatches": true,
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "path": "app/v1/runs/[runId]/events/route.ts",
+      "bytes": 3402,
+      "sha256": "905447199d1dcf030fe3ee67227dd47532adfe23dc57ea43979c841830c8aa85",
+      "gitBlobSha1": "48727800396313dfc55f807b7f876e721b269205",
+      "metadataSourceHash": "905447199d1dcf030fe3ee67227dd47532adfe23dc57ea43979c841830c8aa85",
+      "sourceHashMatches": true,
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "path": "app/api/devices/enrollment/route.ts",
+      "bytes": 2145,
+      "sha256": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4",
+      "gitBlobSha1": "ad314e0e15565b27c705d40a22181151b5157abe",
+      "metadataSourceHash": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "path": "app/api/devices/enrollment/route.ts",
+      "bytes": 2145,
+      "sha256": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4",
+      "gitBlobSha1": "ad314e0e15565b27c705d40a22181151b5157abe",
+      "metadataSourceHash": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "path": "app/api/mobile/model/route.ts",
+      "bytes": 4840,
+      "sha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+      "gitBlobSha1": "3dafb8efb5792af91aaa26a386e9426a9a2478a6",
+      "metadataSourceHash": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET",
+        "POST",
+        "PUT"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "path": "app/api/mobile/model/route.ts",
+      "bytes": 4840,
+      "sha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+      "gitBlobSha1": "3dafb8efb5792af91aaa26a386e9426a9a2478a6",
+      "metadataSourceHash": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET",
+        "POST",
+        "PUT"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "path": "app/api/factory/tasks/[taskId]/activity/route.ts",
+      "bytes": 1540,
+      "sha256": "edac210320cffb7eb32d34c0f51eb4f8ac9709fa7d691ba691a2900d7e6b4b6f",
+      "gitBlobSha1": "a796aad973034f6629e54005daea6a3b4feebed8",
+      "metadataSourceHash": "edac210320cffb7eb32d34c0f51eb4f8ac9709fa7d691ba691a2900d7e6b4b6f",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "path": "app/api/factory/tasks/[taskId]/media/[captureId]/route.ts",
+      "bytes": 450,
+      "sha256": "a0600f48f5d8b9fa5d81c75df7e20808c8a7b255efa8e031e9faf3675d3369c2",
+      "gitBlobSha1": "b57c6ed302d6bc5a3edf1c8ab7f7a7537569c074",
+      "metadataSourceHash": "a0600f48f5d8b9fa5d81c75df7e20808c8a7b255efa8e031e9faf3675d3369c2",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": null
+    },
+    {
+      "revision": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "path": "app/api/factory/tasks/[taskId]/media/[captureId]/poster/route.ts",
+      "bytes": 485,
+      "sha256": "c3f4a50167504fd641299c32261c24c1da80fc4a75466b9116527717aba8be67",
+      "gitBlobSha1": "07fd68dc01f60f515fe50cdc7974ee37ef7add90",
+      "metadataSourceHash": "c3f4a50167504fd641299c32261c24c1da80fc4a75466b9116527717aba8be67",
+      "sourceHashMatches": true,
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30
+    }
+  ],
+  "files": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "baseline": {
+        "bytes": 76186,
+        "sha256": "5c42935fd06eaf597a8b1200c6884acdf5f006cbc7b9c6e8b505f0b296003757",
+        "gitBlobSha1": "29b7e32a9dc2ec660998d6258b80f2caead92745"
+      },
+      "candidate": {
+        "bytes": 76186,
+        "sha256": "863f86e0065cef6eed66526ed3644176904915bd673718f4cc43746bfc48b0d6",
+        "gitBlobSha1": "cafa02602d36b04eb80cdb18ea1b54d8a2aa80a8"
+      },
+      "changedLineCount": 2,
+      "lineDiffs": [
+        {
+          "line": 2106,
+          "before": "      \"sourceHash\": \"7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9\"",
+          "after": "      \"sourceHash\": \"5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888\""
+        },
+        {
+          "line": 2115,
+          "before": "      \"sourceHash\": \"329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54\"",
+          "after": "      \"sourceHash\": \"0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c\""
+        }
+      ]
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "baseline": {
+        "bytes": 78570,
+        "sha256": "362c31be71608405b823742674343f366f8819683b02904ee03028c6a5567358",
+        "gitBlobSha1": "e0f403171f936b63a34f62cc9aad3e2394cbc2fc"
+      },
+      "candidate": {
+        "bytes": 78570,
+        "sha256": "d1b8dd401148a5fd42b66c2d655bd7443f2e4c8c148eb5bbf85c8493a71ac8d9",
+        "gitBlobSha1": "d7cb3ee93e7de084a4001c0248fc739f00a7414c"
+      },
+      "changedLineCount": 2,
+      "lineDiffs": [
+        {
+          "line": 224,
+          "before": "  { ...{\"path\":\"/mikka/v1/devices/[deviceId]/repos\",\"template\":\"/v1/devices/[deviceId]/repos\",\"source\":\"app/v1/devices/[deviceId]/repos/route.ts\",\"methods\":[\"GET\"],\"sourceHash\":\"7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9\"}, load: () => import(\"../../../app/v1/devices/[deviceId]/repos/route\") },",
+          "after": "  { ...{\"path\":\"/mikka/v1/devices/[deviceId]/repos\",\"template\":\"/v1/devices/[deviceId]/repos\",\"source\":\"app/v1/devices/[deviceId]/repos/route.ts\",\"methods\":[\"GET\"],\"sourceHash\":\"5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888\"}, load: () => import(\"../../../app/v1/devices/[deviceId]/repos/route\") },"
+        },
+        {
+          "line": 225,
+          "before": "  { ...{\"path\":\"/mikka/v1/devices/[deviceId]/runs\",\"template\":\"/v1/devices/[deviceId]/runs\",\"source\":\"app/v1/devices/[deviceId]/runs/route.ts\",\"methods\":[\"GET\"],\"sourceHash\":\"329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54\"}, load: () => import(\"../../../app/v1/devices/[deviceId]/runs/route\") },",
+          "after": "  { ...{\"path\":\"/mikka/v1/devices/[deviceId]/runs\",\"template\":\"/v1/devices/[deviceId]/runs\",\"source\":\"app/v1/devices/[deviceId]/runs/route.ts\",\"methods\":[\"GET\"],\"sourceHash\":\"0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c\"}, load: () => import(\"../../../app/v1/devices/[deviceId]/runs/route\") },"
+        }
+      ]
+    }
+  ],
+  "verificationBoundary": {
+    "canonicalGeneratorExecuted": false,
+    "typescriptAstExecuted": false,
+    "filesystemTraversalExecuted": false,
+    "allRouteSourcesRecomputed": false,
+    "affectedAndPreservedRouteSourceVersionsRecomputed": 13,
+    "ciExecuted": false,
+    "modelsExecuted": false,
+    "handlersInitialized": false,
+    "sourceVerifiedOnly": true,
+    "noRuntimeAcceptanceClaim": true
+  },
+  "publication": {
+    "createBlobsOnly": true,
+    "commitCreated": false,
+    "refUpdated": false
+  }
+}

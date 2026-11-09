@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "scope": "Final immutable source binding only",
+  "commit": {
+    "sha": "1fa3becd9b69e27c7a0229762750b6fa7e9497fc",
+    "tree": "0ecc16ec86a3650f85170f46bc4b996700c420d8",
+    "parents": [
+      "c1487ebf58ad13ddcbc0f59a4933dfe2183a1b3b",
+      "93e9d5e260cf899b9a40a188cfa34f069903489d"
+    ]
+  },
+  "ownFiles": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "bytes": 76186,
+      "sha256": "863f86e0065cef6eed66526ed3644176904915bd673718f4cc43746bfc48b0d6",
+      "gitBlobSha1": "cafa02602d36b04eb80cdb18ea1b54d8a2aa80a8",
+      "byteForByteMatch": true,
+      "expectedSource": "joint-d72-plus-own-runs-repos"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "bytes": 78570,
+      "sha256": "d1b8dd401148a5fd42b66c2d655bd7443f2e4c8c148eb5bbf85c8493a71ac8d9",
+      "gitBlobSha1": "d7cb3ee93e7de084a4001c0248fc739f00a7414c",
+      "byteForByteMatch": true,
+      "expectedSource": "joint-d72-plus-own-runs-repos"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "bytes": 1305,
+      "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+      "gitBlobSha1": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "byteForByteMatch": true,
+      "expectedSource": "actual90e"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "bytes": 1983,
+      "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+      "gitBlobSha1": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "byteForByteMatch": true,
+      "expectedSource": "actual90e"
+    }
+  ],
+  "preservedMainFiles": [
+    {
+      "path": "app/v1/runs/[runId]/events/route.ts",
+      "bytes": 3010,
+      "sha256": "0a1326bfdb882a5627d075e6e789f0ea3f2d39edc07d323ad431b62c6efe7c6c",
+      "gitBlobSha1": "931ce04d1ddf51a3fccc940d9e9fabc2ac8ec1d4",
+      "byteForByteMatch": true,
+      "expectedRevision": "d72a1982bf503b34ad4bc31ab6211cfe018af483"
+    },
+    {
+      "path": "app/api/factory/tasks/[taskId]/activity/route.ts",
+      "bytes": 1540,
+      "sha256": "edac210320cffb7eb32d34c0f51eb4f8ac9709fa7d691ba691a2900d7e6b4b6f",
+      "gitBlobSha1": "a796aad973034f6629e54005daea6a3b4feebed8",
+      "byteForByteMatch": true,
+      "expectedRevision": "d72a1982bf503b34ad4bc31ab6211cfe018af483"
+    },
+    {
+      "path": "app/api/factory/tasks/[taskId]/media/[captureId]/route.ts",
+      "bytes": 450,
+      "sha256": "a0600f48f5d8b9fa5d81c75df7e20808c8a7b255efa8e031e9faf3675d3369c2",
+      "gitBlobSha1": "b57c6ed302d6bc5a3edf1c8ab7f7a7537569c074",
+      "byteForByteMatch": true,
+      "expectedRevision": "d72a1982bf503b34ad4bc31ab6211cfe018af483"
+    },
+    {
+      "path": "app/api/factory/tasks/[taskId]/media/[captureId]/poster/route.ts",
+      "bytes": 485,
+      "sha256": "c3f4a50167504fd641299c32261c24c1da80fc4a75466b9116527717aba8be67",
+      "gitBlobSha1": "07fd68dc01f60f515fe50cdc7974ee37ef7add90",
+      "byteForByteMatch": true,
+      "expectedRevision": "d72a1982bf503b34ad4bc31ab6211cfe018af483"
+    },
+    {
+      "path": "app/api/devices/enrollment/route.ts",
+      "bytes": 2145,
+      "sha256": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4",
+      "gitBlobSha1": "ad314e0e15565b27c705d40a22181151b5157abe",
+      "byteForByteMatch": true,
+      "expectedRevision": "d72a1982bf503b34ad4bc31ab6211cfe018af483"
+    },
+    {
+      "path": "app/api/mobile/model/route.ts",
+      "bytes": 4840,
+      "sha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+      "gitBlobSha1": "3dafb8efb5792af91aaa26a386e9426a9a2478a6",
+      "byteForByteMatch": true,
+      "expectedRevision": "d72a1982bf503b34ad4bc31ab6211cfe018af483"
+    }
+  ],
+  "sourceAcquisition": "GitHub MCP fixed-revision file reads",
+  "previousMetadataReceipt": {
+    "blob": "8a92740c4a5c17b483db5e894f07033b9cf3fcba",
+    "sha256": "5ef64a5b5fb32529cbb8df9eb223931bba14875ddba0a4dc7425836b15609626"
+  },
+  "result": "source_binding_passed",
+  "checks": {
+    "allTenFilesByteForByteMatched": true,
+    "routeCount": 243,
+    "methodCount": 315,
+    "jointGeneratedFilesUnchanged": true,
+    "ownRunsReposActual90eUnchanged": true,
+    "mainEventsNewThreeEnrollmentMobileD72Unchanged": true
+  },
+  "boundaries": {
+    "generatorOrThirteenOldSourcesRefetched": false,
+    "canonicalGeneratorExecuted": false,
+    "ciExecuted": false,
+    "nativeArtifactsDownloaded": false,
+    "vmCreated": false,
+    "refUpdated": false,
+    "runtimeAcceptanceClaim": false
+  }
+}
