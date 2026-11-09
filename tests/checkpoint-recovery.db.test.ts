@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
@@ -21,9 +22,10 @@ test('checkpoint recovery availability persists through the actual authenticated
   const { issueDeviceToken } = await import('../lib/device-link')
   const userId = `checkpoint-${randomUUID()}`, runId = randomUUID(), deviceId = randomUUID(), agentId = randomUUID()
   await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
+  const workspaceId = await seedFixtureWorkspace(pool, userId)
   await pool.query('INSERT INTO devices (id,"ownerId",name) VALUES ($1,$2,\'Checkpoint fixture\')', [deviceId, userId])
   await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Checkpoint worker\')', [agentId, userId, deviceId])
-  await pool.query('INSERT INTO agent_runs (id,"userId","agentId","deviceId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,\'running\',$5)', [runId, userId, agentId, deviceId, new Date(Date.now() + 300_000)])
+  await pool.query('INSERT INTO agent_runs (id,"userId","agentId","deviceId","workspaceId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$6,\'running\',$5)', [runId, userId, agentId, deviceId, new Date(Date.now() + 300_000), workspaceId])
   const token = await issueDeviceToken(userId)
   t.after(async () => { await pool.end(); await (await import('../lib/db')).pool.end() })
   const checkpoint = { baseCommit: 'a'.repeat(40), patch: gzipSync(Buffer.from('initial patch fixture\n')).toString('base64'), files: 1, takenAt: '2099-01-01T00:00:00Z' }
@@ -100,11 +102,11 @@ test('checkpoint recovery availability persists through the actual authenticated
       const { parkThreadMachine, threadMachineAction, threadMachineProvider } = await import('../lib/cloud-computer/thread-machines')
       const { persistRunCompletion } = await import('../lib/run-publications')
       const id = randomUUID(), issueId = randomUUID(), cloudDevice = randomUUID(), cloudAgent = randomUUID()
-      const actor = { userId, workspaceId: randomUUID() }, sandboxId = `checkpoint-fixture-${randomUUID()}`
+      const actor = { userId, workspaceId }, sandboxId = `checkpoint-fixture-${randomUUID()}`
       await pool.query(`INSERT INTO devices(id,"ownerId",name,kind) VALUES ($1,$2,'Checkpoint retirement fixture','cloud')`, [cloudDevice, userId])
       await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [cloudAgent, userId, cloudDevice, `Unstarted checkpoint fixture ${id}`])
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Checkpoint retirement','{"type":"doc","content":[]}','doing','normal','personal')`, [issueId, userId])
-      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId","issueId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$5,'running',now()+interval '5 minutes')`, [id, userId, cloudAgent, cloudDevice, issueId])
+      await pool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES ($1,$2,$3,'bound','Checkpoint retirement','{"type":"doc","content":[]}','doing','normal','personal')`, [issueId, userId, workspaceId])
+      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId","issueId","workspaceId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$5,$6,'running',now()+interval '5 minutes')`, [id, userId, cloudAgent, cloudDevice, issueId, workspaceId])
       await pool.query(`INSERT INTO thread_machines("runId","ownerId","workspaceId","issueId","sandboxId","snapshotId","operationId",state,"deviceId")
         VALUES ($1,$2,$3,$4,$5,'checkpoint-fixture',$6,'running',$7)`, [id, userId, actor.workspaceId, issueId, sandboxId, randomUUID(), cloudDevice])
       const receipt = await acknowledge(id)

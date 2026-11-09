@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
@@ -38,9 +39,10 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
     const [agentId, runId, delivered, unrelated] = Array.from({ length: 4 }, () => randomUUID())
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','O','o@example.invalid',true,now(),now())`)
     await pool.query(`INSERT INTO agents (id,"userId",name,harness) VALUES ($1,'owner','Coder','codex')`, [agentId])
+    const workspaceId = await seedFixtureWorkspace(pool, 'owner')
     // The delivered task lists this PR and another; an unrelated task names the same URL but has no delivery for it.
-    await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Delivered',$2,'review','normal'),($3,'owner','Unrelated',$4,'todo','normal')`,
-      [delivered, content([{ url: other, state: 'open' }, { url, state: 'open', title: 'Fix the login page' }]), unrelated, content([{ url, state: 'open' }])])
+    await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,'owner',$5,'Delivered',$2,'review','normal'),($3,'owner',$5,'Unrelated',$4,'todo','normal')`,
+      [delivered, content([{ url: other, state: 'open' }, { url, state: 'open', title: 'Fix the login page' }]), unrelated, content([{ url, state: 'open' }]), workspaceId])
     await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt) VALUES ($1,'owner',$2,$3,'succeeded','Fix it')`, [runId, delivered, agentId])
     await pool.query(`INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest") VALUES ($1,'owner',$2,'https://github.com/o/r','o/r','published',$3)`,
       [runId, delivered, JSON.stringify({ url, state: 'open' })])

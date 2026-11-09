@@ -18,8 +18,9 @@ export function taskPrefixInput(ownerId: SQL) {
   return sql<TaskPrefixInput | null>`(select jsonb_build_array(p.prefix,u.email,(select array_agg(l."linearTeamKey") from linear_team_syncs l where l."ownerId"=u.id)) from "user" u left join issue_prefixes p on p."userId"=u.id where u.id=${ownerId})`
 }
 
-/** Only the reader's own tasks can be visible without an allowed team link.
- * A positive link may skip an unused prefix; its absence never proves unlinking. */
+/** Prefetch a personal prefix for the reader's own unlinked tasks. Other
+ * authorized owners use taskIdentifiers' bounded fallback read. A positive
+ * link may skip an unused prefix; its absence never proves unlinking. */
 export function taskPrefixOwner(userId: string, linkedIds: readonly string[]) {
   return sql<string | null>`case when issues."userId" = ${userId}
     and (issues.scope = 'personal' or not (issues.id = any(${`{${linkedIds.join(',')}}`}::uuid[])))
@@ -91,7 +92,7 @@ export async function taskIdentifiers(tasks: TaskRef[], executor: Executor = db,
 }
 
 /** An issue row as the client sees it: metadata plus its display identifier. */
-export async function issueView<T extends { id: string; userId: string; scope: TaskScope; content: JSONContent }>(issue: T, executor: Executor = db, knownTeams?: ReadonlyMap<string, { key: string; number: number }>) {
+export async function issueView<T extends { id: string; userId: string; scope: TaskScope; content: JSONContent; linearSyncPolicy?: string }>(issue: T, executor: Executor = db, knownTeams?: ReadonlyMap<string, { key: string; number: number }>) {
   const view = issueWithMetadata(issue)
   // The assignee is a snapshot from when they were assigned; show the person as they are now (R-36: one avatar per person).
   const assignee = view.metadata.assignee
@@ -102,14 +103,14 @@ export async function issueView<T extends { id: string; userId: string; scope: T
   const teams = knownTeams ?? await teamNumbers(issue.scope === 'workspace' ? [issue.id] : [])
   let prefixInput: TaskPrefixInput | null = null
   let linearTargetVerified = false
-  if (issue.scope === 'workspace') {
-    if (teams.has(issue.id)) {
+  if (issue.linearSyncPolicy === 'explicit') {
+    if (issue.scope === 'workspace' && teams.has(issue.id)) {
       const [verified] = await executor.select({ id: linearIssueLinks.id }).from(linearIssueLinks)
         .where(and(eq(linearIssueLinks.issueId, issue.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1)
       linearTargetVerified = Boolean(verified)
     } else {
-      // Reuse the existing verification read for this unlinked task's owner
-      // prefix. Both correlations stay qualified when Drizzle selects them.
+      // Reuse the explicit verification read for this task's personal or
+      // unlinked prefix. Both correlations stay qualified in the projection.
       const [dependencies] = await executor.select({
         prefixInput: taskPrefixInput(sql`"user".id`),
         verified: sql<boolean>`exists (select 1 from linear_issue_links v where v."issueId" = ${issue.id}

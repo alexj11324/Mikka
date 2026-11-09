@@ -3,6 +3,9 @@ import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { forbiddenOrigin, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { artifactOutsideToken } from '@/lib/tokens/scope'
 import { deleteOwnArtifact } from '@/lib/artifacts/delete'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { tokenWorkspace } from '@/lib/tokens/principal'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +26,8 @@ async function handleDELETE(request: Request, { params }: { params: Promise<{ id
   const id = z.uuid().safeParse((await params).id)
   if (!id.success) return notFound()
   if (await artifactOutsideToken(user, id.data)) return notFound()
-  if (!await deleteOwnArtifact(user.id, id.data)) return notFound()
+  const context = await loadWorkspaceContext(undefined, user)
+  if (!await deleteOwnArtifact({ id: user.id, [tokenWorkspace]: context.workspace.id, [enterprisePrincipal]: user[enterprisePrincipal] }, id.data)) return notFound()
   return new Response(null, { status: 204 })
 }
 

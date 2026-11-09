@@ -85,14 +85,17 @@ export async function syncFactorySpecArtifact(tx: PoolClient, task: FactoryTask,
     WHERE attempt.id=$1 AND attempt."taskId"=$2 AND task."userId"=$3 AND task."issueId"=$4
       AND attempt.stage='spec' AND attempt.status='passed' AND r.kind='plan' AND r.status='succeeded'
       AND r."stopReason"='submitted' AND r."sessionId" IS NOT NULL AND attempt."sessionId"=r."sessionId"
-    FOR UPDATE OF attempt`, [task.attemptId, task.id, task.userId, task.issueId]);
+      AND task."workspaceId"=$5 AND r."workspaceId"=task."workspaceId"
+      AND i."workspaceId"=task."workspaceId" AND i."ownershipState"='bound'
+    FOR UPDATE OF attempt`, [task.attemptId, task.id, task.userId, task.issueId, task.workspaceId ?? null]);
   if (!source) return null;
   const artifactId = factoryEventId('spec-artifact', `${task.id}:${task.attemptId}`);
-  const { rows: [existing] } = await tx.query<{ userId: string; issueId: string | null; runId: string | null; kind: string; sha256: string | null }>(
-    `SELECT a."userId",a."issueId",a."runId",a.kind,v.sha256 FROM artifacts a
+  const { rows: [existing] } = await tx.query<{ userId: string; workspaceId: string | null; issueId: string | null; runId: string | null; kind: string; sha256: string | null }>(
+    `SELECT a."userId",a."workspaceId",a."issueId",a."runId",a.kind,v.sha256 FROM artifacts a
       LEFT JOIN artifact_versions v ON v."artifactId"=a.id AND v.version=1 WHERE a.id=$1 FOR UPDATE OF a`, [artifactId]);
   let hash = existing?.sha256;
   if (existing) {
+    if (existing.workspaceId !== task.workspaceId) throw new FactoryError('factoryNotFound');
     if (existing.userId !== task.userId || existing.issueId !== task.issueId || existing.runId !== source.runId ||
         existing.kind !== 'markdown' || !hash) throw new FactoryError('factoryArtifactMissing');
   }
@@ -105,8 +108,8 @@ export async function syncFactorySpecArtifact(tx: PoolClient, task: FactoryTask,
     if (!options.dryRun) {
       const storage = artifactStorage(), storageKey = `${task.userId}/${artifactId}/v1-${hash.slice(0, 12)}.md`;
       if (storage === 'r2') await putArtifactObject(storageKey, rendered.content, 'text/markdown; charset=utf-8');
-      await tx.query(`INSERT INTO artifacts (id,"userId",kind,title,"runId","issueId") VALUES ($1,$2,'markdown',$3,$4,$5)`,
-        [artifactId, task.userId, rendered.title, source.runId, task.issueId]);
+      await tx.query(`INSERT INTO artifacts (id,"userId","workspaceId",kind,title,"runId","issueId") VALUES ($1,$2,$6,'markdown',$3,$4,$5)`,
+        [artifactId, task.userId, rendered.title, source.runId, task.issueId, task.workspaceId]);
       await tx.query(`INSERT INTO artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName","executionIdentity")
         VALUES ($1,$2,1,$3,$4,$5,$6,$7,$8)`, [randomUUID(), artifactId, storageKey, storage === 'inline' ? rendered.content : null,
         hash, Buffer.byteLength(rendered.content), maskFactoryNote(source.author), identity ? JSON.stringify(identity) : null]);

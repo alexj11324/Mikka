@@ -1,3 +1,4 @@
+import { withRunWorkspace } from './run-completion'
 import 'server-only'
 import { serverRunFailure } from './run-failure-details'
 import { db, pool, withDatabaseClient } from './db'
@@ -28,6 +29,9 @@ class CloudPauseUnconfirmed extends Error {}
  * admission on B, after the original run/Factory epoch is locked and fenced.
  * No destination event, credential, model or grant is inferred from B. */
 export async function readmitLostLocalRun(original: Run, target: AdmittedTakeover, now: Date, queued = false, cloudSource?: CloudRecoverySource): Promise<{ retried: boolean; blocked?: string }> {
+  const { rows: [stored] } = await pool.query<{ workspaceId: string | null }>(
+    'SELECT "workspaceId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [original.id, original.userId])
+  return await withRunWorkspace(original.userId, stored?.workspaceId ?? null, async () => {
   const tx = await pool.connect()
   try {
     await tx.query('BEGIN')
@@ -49,7 +53,7 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
         requestEpoch = task.sourceEventId
       }
       const { rows: [run] } = await tx.query<Run>('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [original.id, original.userId])
-      if (!run || run.stopRequestedAt || (queued ? run.status !== 'queued' : !LEASED_RUN_STATUSES.includes(run.status as typeof LEASED_RUN_STATUSES[number]) || !run.leaseExpiresAt || new Date(run.leaseExpiresAt) >= now)) return { retried: false }
+      if (!run || run.workspaceId !== stored?.workspaceId || run.stopRequestedAt || (queued ? run.status !== 'queued' : !LEASED_RUN_STATUSES.includes(run.status as typeof LEASED_RUN_STATUSES[number]) || !run.leaseExpiresAt || new Date(run.leaseExpiresAt) >= now)) return { retried: false }
       if (run.attempt >= MAX_RUN_ATTEMPTS) return { retried: false, blocked: 'No authorized recovery attempt remains. Choose an available device to retry this task.' }
       // Re-enter already-held policy locks after the Factory/run locks, so the
       // original frozen team/project hierarchy is checked without reversing
@@ -157,4 +161,5 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
       return { retried: false, blocked: `Recovery requires a currently authorized device, repository and unchanged execution resources (${error instanceof ActionFailureError ? error.params?.reason ?? error.code : error instanceof FactoryError ? error.code : 'executionAccountUnavailable'}). Select an available device and retry this task.` }
     throw error
   } finally { tx.release() }
+  }) ?? { retried: false, blocked: 'Recovery requires active membership in the original workspace.' }
 }

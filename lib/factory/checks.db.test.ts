@@ -28,6 +28,7 @@ import { createRequestDatabaseScope } from "../db";
 import { hostedBillingScope } from "../abuse/context";
 import { HostedUsageStore } from "../abuse/store";
 import { exerciseFactoryRecoveryEntry } from "../../tests/support/factory-recovery-entry-fixture";
+import { bindFixtureWorkspaceDatabase } from "../../tests/helpers/workspace-database";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
 import { claimLocalRun } from "../computer/claim";
@@ -92,6 +93,7 @@ test(
     const database = `factory193_consumers_${randomUUID().replaceAll("-", "")}_e2e`;
     let pool: Pool | undefined;
     let modelDatabase: ReturnType<typeof createRequestDatabaseScope> | undefined;
+    let closeWorkspaceDatabase: (() => Promise<void>) | undefined;
     let installedGatewayFixture = false;
     try {
       assert.equal(
@@ -116,6 +118,7 @@ test(
       });
       const db = pool;
       modelDatabase = createRequestDatabaseScope(isolated.toString());
+      closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(db);
       const directory = new URL("../../drizzle/", import.meta.url);
       for (const file of orderMigrations(
         (await readdir(directory)).filter((f) => f.endsWith(".sql")),
@@ -369,8 +372,8 @@ test(
         const issueId = randomUUID(),
           sourceEventId = randomUUID();
         await db.query(
-          `INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Check fixture',$2,'todo','normal')`,
-          [issueId,emitPresentation ? JSON.stringify({type:'doc',content:[]}) : '{}'],
+          `INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Check fixture',$2,'todo','normal',$3,'bound','workspace')`,
+          [issueId,emitPresentation ? JSON.stringify({type:'doc',content:[]}) : '{}',billingWorkspaceId],
         );
         await db.query(
           `INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,'owner',$3,'user_message',$2,'{"text":"Check original request"}')`,
@@ -1112,7 +1115,7 @@ test(
 
       for (const exists of [false,true]) await t.test(`two tasks on one issue keep both comments without upgrading issue SHARE locks (document exists: ${exists})`, async () => {
         const issueId=randomUUID();
-        await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,'owner','Concurrent stages','{"type":"doc","content":[]}','todo','normal')`,[issueId]);
+        await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES($1,'owner','Concurrent stages','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`,[issueId,billingWorkspaceId]);
         const tasks:FactoryTask[]=[];
         for (let i=0;i<2;i++) {
           const sourceEventId=randomUUID();
@@ -1144,7 +1147,7 @@ test(
 
       await t.test('completed specifications wait for a real browser approval receipt; stale and replayed requests cannot bypass it', async () => {
         const issueId=randomUUID(),sourceEventId=randomUUID();
-        await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,'owner','Spec fixture','{"type":"doc","content":[]}','todo','normal')`,[issueId]);
+        await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES($1,'owner','Spec fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`,[issueId,billingWorkspaceId]);
         await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,'user_message',$1::uuid::text,'{"text":"Plan first"}')`,[sourceEventId,coordinatorBot]);
         const routed = await store.route('owner',{issueId,sourceEventId,eventId:randomUUID(),rationale:'Plan first',missingInformation:[],missingPermissions:[],needsSpec:true});
         const specDispatch = createFactoryDispatch(db,store,queue,defaultFactoryDispatchAdapters);
@@ -1876,11 +1879,10 @@ test(
               const otherWorkspaceId = randomUUID(), otherBotId = randomUUID();
               await db.query(`INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,'owner','Another owned workspace',$2)`, [otherWorkspaceId, otherWorkspaceId]);
               await db.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,'owner','Other scope')`, [otherBotId, otherWorkspaceId]);
-              await db.query('UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [running.runId, otherBotId]);
-              try {
-                assert.equal((await post()).status, 409, 'same owner, different workspace runtime must not pass the new reader');
-                assert.deepEqual(await snapshot(), before);
-              } finally { await db.query('UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [running.runId, origin.botId]); }
+              await assert.rejects(db.query('UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [running.runId, otherBotId]),
+                { code: '23514', message: 'taskWorkspaceMismatch' }, 'same owner cannot bind the runtime to another workspace');
+              assert.equal((await db.query('SELECT "botId" FROM agent_runs WHERE id=$1', [running.runId])).rows[0].botId, origin.botId);
+              assert.deepEqual(await snapshot(), before, 'a rejected runtime transfer records no answer or command');
               await db.query("UPDATE factory_tasks SET status='running' WHERE id=$1", [running.task.id]);
               try { assert.equal((await post()).status, 409, 'not a waiting question'); }
               finally { await db.query("UPDATE factory_tasks SET status='waiting' WHERE id=$1", [running.task.id]); }
@@ -2406,7 +2408,7 @@ test(
         const { automaticFactoryDispatch } = await import("./automatic-dispatch");
         await t.test('approved spec starts a fresh executor role without planner read-only or continuation grants', async () => {
           const issueId=randomUUID(),sourceEventId=randomUUID(),specRepoId=randomUUID();
-          await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,'owner','Approved specification','{"type":"doc","content":[]}','todo','normal')`,[issueId]);
+          await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES($1,'owner','Approved specification','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`,[issueId,billingWorkspaceId]);
           await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,'user_message',$1::uuid::text,'{"text":"Plan before implementation"}')`,[sourceEventId,coordinatorBot]);
           await db.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,'owner','v2/github.com/example/spec','https://github.com/example/spec.git')`,[specRepoId,deviceId]);
           const routed=await store.route('owner',{issueId,sourceEventId,eventId:randomUUID(),rationale:'Plan first',missingInformation:[],missingPermissions:[],needsSpec:true});
@@ -3054,12 +3056,12 @@ test(
         assert.deepEqual([receipt.reservedFree,receipt.reservedPurchased,receipt.reservedUnpaid].map(Number),[0,0,0]);
         assert.equal((await usage.balance(billingWorkspaceId)).free,Number(allowance.remaining)-1);
       });
-      await exerciseFactoryRecoveryEntry(t, {
+      await modelDatabase!.run(() => exerciseFactoryRecoveryEntry(t, {
         db, botId: coordinatorBot, failedReview, png, sha, modelInvoke,
         callCount: () => modelCalls,
         chooseRetry: () => { chosenAction = "retry_check"; },
         latestRequest: () => networkRequests.at(-1),
-      });
+      }));
       await t.test(
         "unavailable model calls exhaust only their invocation budget, with no fixed recovery",
         async () => {
@@ -3099,8 +3101,7 @@ test(
         const { addApiKey } = await import('../model-api-keys');
         const { changeOrder } = await import('../model-order');
         const { workspacePool } = await import('../workspace-db');
-        assert.equal(workspacePool.options.connectionString, url, 'membership uses the same validated loopback service');
-        let membershipFixture: { userId: string; workspaceId: string } | undefined;
+        assert.equal(workspacePool.options.connectionString, isolated.toString(), 'membership uses this suite\'s isolated loopback database');
         const taskCreate = threadMachineProvider.create;
         const createdTaskRuns: string[] = [];
         threadMachineProvider.create = async (...args) => {
@@ -3118,14 +3119,11 @@ test(
           await modelDatabase!.run(async () => {
             const userId = `fresh-check-${randomUUID()}`, workspaceId = randomUUID(), botId = randomUUID();
             const actor = { userId, workspaceId }, scope = { ownerId: userId, workspaceId, botId };
-            membershipFixture = { userId, workspaceId };
-            // App scope is this suite's fresh database; the normal workspace
-            // adapter has its own real loopback PG pool, not the app ALS scope.
-            for (const target of [db, workspacePool]) {
-              await target.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Fresh check',$2,true,now(),now())`, [userId, `${userId}@example.invalid`]);
-              await target.query('INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,$2,\'Fresh check\',$3)', [workspaceId, userId, `fresh-${workspaceId}`]);
-              await target.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,'Fresh check',$3,'admin','active')`, [workspaceId, userId, `${userId}@example.invalid`]);
-            }
+            // APP and Workspace use independent real pools against this one
+            // isolated database, so authority rows are inserted exactly once.
+            await db.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Fresh check',$2,true,now(),now())`, [userId, `${userId}@example.invalid`]);
+            await db.query('INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,$2,\'Fresh check\',$3)', [workspaceId, userId, `fresh-${workspaceId}`]);
+            await db.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,'Fresh check',$3,'admin','active')`, [workspaceId, userId, `${userId}@example.invalid`]);
             await db.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'Fresh task Bot\')', [botId, workspaceId, userId]);
             await setE2BKey(userId, workspaceId, { apiKey: `e2b-offline-fixture-${randomUUID()}` }, { verify: async () => ({ ok: true }) });
             const key = await addApiKey(db, userId, { provider: 'deepseek', apiKey: `sk-offline-fixture-${randomUUID()}` },
@@ -3153,7 +3151,7 @@ test(
               title: 'Fresh cloud check', body: 'Offline real admission fixture', readOnly: true, ...selected,
             }, tx, context));
             const issueId = randomUUID(), sourceEventId = randomUUID();
-            await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Fresh check','{}','todo','normal')`, [issueId, userId]);
+            await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES($1,$2,'Fresh check','{}','todo','normal',$3,'bound','workspace')`, [issueId, userId, workspaceId]);
             await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,$2,$3,'user_message',$1::text,'{"text":"Fresh cloud check"}')`, [sourceEventId, userId, botId]);
             let current = await cloudStore.route(userId, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Fresh task fixture', missingInformation: [], missingPermissions: [], needsSpec: false });
             const execute = await initialDispatch(userId, { binding: factoryBinding(current.task), agentId: runtime.agentId, deviceRepoId: repository.id });
@@ -3263,12 +3261,9 @@ test(
           });
         } finally {
           machines.restore();
-          if (membershipFixture) {
-            await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [membershipFixture.workspaceId]);
-            await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=$1', [membershipFixture.workspaceId]);
-            await workspacePool.query('DELETE FROM "user" WHERE id=$1', [membershipFixture.userId]);
-          }
-          await workspacePool.end();
+          // This suite retains its isolated database, including the actual
+          // computer bindings. Do not delete their owner as if Workspace rows
+          // still lived alone in a second shared database.
           for (const name of names) { const value = saved.get(name); if (value === undefined) delete process.env[name]; else process.env[name] = value; }
         }
       });
@@ -3279,17 +3274,24 @@ test(
         // cache the real consumers before their test fixtures are installed.
         const { readArtifact } = await import('../artifacts/store');
         const { taskId, artifactId, captureId } = acceptanceReaderFixture;
-        const [ownedArtifact, foreignArtifact] = await modelDatabase!.run(() => Promise.all([
-          readArtifact('owner',artifactId),readArtifact('other',artifactId),
-        ]));
-        assert.equal(ownedArtifact?.id,artifactId,'the corresponding real Artifact remains present');
-        assert.equal(ownedArtifact?.acceptanceTaskId,taskId,'the owner can find the report task independently of its initial run');
-        assert.equal(ownedArtifact?.media?.[0].captureId,captureId);
-        assert.equal(foreignArtifact,null,'the task hint is not available to another artifact reader');
+        // Membership lives in this suite's isolated database, just like the
+        // artifact. Keep the real membership SQL on that same fixture adapter.
+        const fixtureWorkspace=(await import('drizzle-orm/node-postgres')).drizzle(db,{schema:await import('../db/workspace-schema')});
+        const workspaceRead=t.mock.method((await import('../workspace-db')).workspaceDb,'select',fixtureWorkspace.select.bind(fixtureWorkspace));
+        try {
+          const [ownedArtifact, foreignArtifact] = await modelDatabase!.run(() => Promise.all([
+            readArtifact('owner',artifactId),readArtifact('other',artifactId),
+          ]));
+          assert.equal(ownedArtifact?.id,artifactId,'the corresponding real Artifact remains present');
+          assert.equal(ownedArtifact?.acceptanceTaskId,taskId,'the owner can find the report task independently of its initial run');
+          assert.equal(ownedArtifact?.media?.[0].captureId,captureId);
+          assert.equal(foreignArtifact,null,'the task hint is not available to another artifact reader');
+        } finally { workspaceRead.mock.restore(); }
       });
     } finally {
       if (installedGatewayFixture) delete process.env.AI_GATEWAY_API_KEY;
       await modelDatabase?.close();
+      await closeWorkspaceDatabase?.();
       await pool?.end();
       await (await import("../db")).pool.end();
       // Retain this database. Closing clients does not delete the database.

@@ -3,11 +3,14 @@ import { createHash } from 'node:crypto'
 import { before, beforeEach, mock, test } from 'node:test'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import type { Pool } from 'pg'
+import { issueVisibilityPredicate } from '../lib/issue-visibility-policy'
 
 // Execute the real actions and Drizzle SQL/result mapping. Only authenticated
-// identity, Live's separate database boundary, and PostgreSQL transport are fake.
+// identity, Workspace/Live database boundaries and PostgreSQL transport are fake.
+// The real Workspace predicate and application query/result mapping stay in use.
 // PostgreSQL evaluates the same queries in action-read-egress.db.test.ts.
 const OWNER = 'task-read-owner', PEER = 'task-read-peer'
+const WORKSPACE = '42100000-0000-4000-8000-000000000009'
 const ISSUE = '42100000-0000-4000-8000-000000000001'
 const RUN = '42100000-0000-4000-8000-000000000002'
 const BOT = '42100000-0000-4000-8000-000000000003'
@@ -16,6 +19,7 @@ const SIGNATURE = '1'.repeat(32), ROW_SIGNATURE = '2'.repeat(32)
 const look = { id: BOT, name: 'Fixture bot', color: 'blue', shape: 'circle' }
 const queries: { text: string; params: unknown[] }[] = []
 const order: string[] = [], liveReads: { owner: string; expiries: unknown[] }[] = []
+const workspaceReads: string[] = []
 let viewer: string | null = OWNER, taskRows = true, threadRows = false
 let expiry: Date | null = EXPIRY
 
@@ -46,20 +50,32 @@ let actions: typeof import('../app/actions/task-runs')
 before(async () => {
   mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
   stub('../lib/auth.ts', { auth: { api: { getSession: async () => { order.push('auth'); return viewer ? { user: { id: viewer } } : null } } } })
+  stub('../lib/workspace-access.ts', { loadWorkspaceContext: async (requested: string | undefined, user: { id: string }) => {
+    assert.equal(requested, undefined); assert.equal(user.id, viewer)
+    workspaceReads.push(user.id)
+    return { workspace: { id: WORKSPACE }, user }
+  } })
+  stub('../lib/issue-visibility.ts', { issueVisibility: async (user: { id: string }, includeDeleted: boolean, workspaceId: string) => {
+    assert.equal(user.id, viewer); assert.equal(workspaceId, WORKSPACE); assert.equal(includeDeleted, false)
+    return { predicate: issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [WORKSPACE] }, includeDeleted) }
+  } })
   stub('../lib/db/index.ts', { db: database })
   stub('../lib/db/request-scope.ts', { inDatabaseTransaction: () => false })
   stub('../lib/device-presence.ts', { deviceOnlineStates: async () => new Map() })
   stub('../lib/db/egress-sample.ts', { withDatabaseOperation: async (_route: string, work: () => unknown) => work() })
-  stub('../lib/live/revision-read.ts', { beginOwnerListRead: async () => { order.push('revision'); return { revisions: {} } } })
+  stub('../lib/live/revision-read.ts', { beginWorkspaceListRead: async (owner: string, workspaceId: string) => {
+    assert.equal(owner, viewer); assert.equal(workspaceId, WORKSPACE)
+    order.push('revision'); return { revisions: {} }
+  } })
   stub('../lib/live/list-read-server.ts', { ownerListRead: async (owner: string, expiries: unknown[]) => {
-    liveReads.push({ owner, expiries }); return { ownerId: owner, workspaceId: null }
+    liveReads.push({ owner, expiries }); return { ownerId: owner, workspaceId: WORKSPACE }
   } })
   stub('../lib/live/presence-read.ts', { withDevicePresence: (live: unknown) => live })
   actions = await import('../app/actions/task-runs')
 })
 beforeEach(() => {
   viewer = OWNER; taskRows = true; threadRows = false; expiry = EXPIRY
-  queries.length = 0; order.length = 0; liveReads.length = 0
+  queries.length = 0; order.length = 0; liveReads.length = 0; workspaceReads.length = 0
 })
 
 test('task runs fetch owner bot looks with the bounded latest issue rows in one SQL statement', async () => {
@@ -72,10 +88,16 @@ test('task runs fetch owner bot looks with the bounded latest issue rows in one 
   const { text, params } = queries[0]
   assert.match(text, /from \(select distinct on \("agent_runs"\."issueId"\)/)
   assert.match(text, /order by "agent_runs"\."issueId", "agent_runs"\."createdAt" desc, "agent_runs"\."id" desc limit \$\d+\) "latest_task_runs" left join "bots"/)
-  assert.match(text, /left join "bots" on \("bots"\."id" = "botId" and "bots"\."ownerId" = \$\d+\)/)
+  assert.match(text, /left join "bots" on \("bots"\."id" = "botId" and "bots"\."ownerId" = \$\d+ and "bots"\."workspaceId" = \$\d+\)/)
   assert.equal(params.filter(value => value === OWNER).length, 2, 'both the latest rows and bot looks are owner constrained')
   assert.ok(params.includes(200), 'the original issue-row cap is applied before bot decoration')
-  assert.match(text, /where \("agent_runs"\."userId" = \$\d+ and "agent_runs"\."issueId" is not null and "agent_runs"\."createdAt" > now\(\) - interval '30 days'\)/)
+  assert.match(text, /where \("agent_runs"\."userId" = \$\d+ and "agent_runs"\."workspaceId" = \$\d+ and /)
+  assert.match(text, /"issues"\."ownershipState" = \$\d+/)
+  assert.match(text, /"issues"\."workspaceId" in \(\$\d+\)/)
+  assert.ok(params.includes('bound'))
+  assert.equal(params.filter(value => value === WORKSPACE).length, 3, 'run, task and bot all use the selected tenant')
+  assert.match(text, /and "agent_runs"\."issueId" is not null and "agent_runs"\."createdAt" > now\(\) - interval '30 days'\)/)
+  assert.deepEqual(workspaceReads, [OWNER])
   const binding = text.indexOf('from computer_run_bindings crb'), direct = text.indexOf('from bots b where b.id="agent_runs"."botId"')
   const runtime = text.indexOf('from bot_cloud_runtimes bcr')
   assert.ok(binding >= 0 && direct > binding && runtime > direct, 'the original binding → dispatch bot → runtime bot fallback remains')
@@ -92,10 +114,10 @@ test('empty task rows do not add a read or leak another owner into the bot join'
 })
 
 test('an unchanged thread list reads its exact fingerprint and expiry in one aggregate', async () => {
-  const version = createHash('sha256').update(JSON.stringify([OWNER, SIGNATURE])).digest('hex').slice(0, 32)
+  const version = createHash('sha256').update(JSON.stringify([OWNER, WORKSPACE, SIGNATURE])).digest('hex').slice(0, 32)
   const result = await actions.syncThreadList(version)
   assert.ok('snapshot' in result)
-  assert.deepEqual(result.snapshot, { unchanged: true, version, live: { ownerId: OWNER, workspaceId: null }, presenceFallback: false })
+  assert.deepEqual(result.snapshot, { unchanged: true, version, live: { ownerId: OWNER, workspaceId: WORKSPACE }, presenceFallback: false })
   assert.equal(queries.length, 1, 'expiry must share the fingerprint snapshot and statement')
   assert.deepEqual(order, ['auth', 'revision', 'query'])
   assert.match(queries[0].text, /md5\(coalesce\(string_agg\(md5\(to_jsonb\(snapshot\)::text\), ',' order by md5\(to_jsonb\(snapshot\)::text\)\), ''\)\)/)
@@ -137,6 +159,7 @@ test('authentication failures still precede every revision or main-database read
   await assert.rejects(actions.pollTaskRuns(), { code: 'authRequired' })
   assert.deepEqual(await actions.syncThreadList(), { error: 'authRequired', params: undefined })
   assert.deepEqual(order, ['auth', 'auth'])
+  assert.deepEqual(workspaceReads, [])
   assert.deepEqual(queries, [])
   assert.deepEqual(liveReads, [])
 })

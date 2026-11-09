@@ -4,14 +4,35 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database'
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 
 let locked: () => Promise<void> = async () => {}
 mock.module(new URL('./runtime.ts', import.meta.url).href, { namedExports: {
   factoryLifecycleEnabled: () => true,
   factoryRuntimeForBot: () => ({ store: { lockTask: async () => { await locked() } } }),
 } })
+const { withFactoryBackgroundWorkspace: realWorkspaceBoundary } = await import('./background-workspace')
+const unitPools = new WeakSet<object>(), unitIssues = new Set<string>()
+// The three synthetic transaction-shape cases have an explicit, exact-target
+// unit seam. The PostgreSQL case below is not enrolled and uses real membership.
+const workspaceBoundary: typeof realWorkspaceBoundary = async (pool, userId, target, work, existing) => {
+  if (!unitPools.has(pool)) return realWorkspaceBoundary(pool, userId, target, work, existing)
+  assert.equal(userId, 'owner')
+  assert.deepEqual(target, { kind: 'issue', id: target.id, botId: null })
+  assert.ok(unitIssues.has(target.id), 'only a task constructed by this unit fixture is admissible')
+  assert.equal(existing, undefined, 'the host still owns admission before its APP transaction')
+  return work()
+}
+mock.module(new URL('./background-workspace.ts', import.meta.url).href, { namedExports: {
+  withFactoryBackgroundWorkspace: workspaceBoundary,
+} })
 const { queueFactoryTask } = await import('./task-dispatch')
-const input = () => ({ issueId: randomUUID(), botId: null, agentId: randomUUID(), deviceRepoId: randomUUID(), key: randomUUID(), queue: async () => { assert.fail('a durable replay cannot enqueue') } })
+const input = () => {
+  const request = { issueId: randomUUID(), botId: null, agentId: randomUUID(), deviceRepoId: randomUUID(), key: randomUUID(), queue: async () => { assert.fail('a durable replay cannot enqueue') } }
+  unitIssues.add(request.issueId)
+  return request
+}
 const select = (rows: Record<string, unknown>[]) => ({ command: 'SELECT', rows, rowCount: rows.length, fields: [] })
 const receipt = () => select([{ same: true, status: 'pending', taskId: randomUUID(), result: { runId: 'already-queued' } }])
 const isLock = (sql: string) => sql.startsWith('SELECT pg_advisory_xact_lock')
@@ -33,7 +54,9 @@ function fixture(response?: unknown, failure?: Error) {
     },
     release: () => { released++ },
   }
-  return { pool: { connect: async () => client } as unknown as Pool, calls, released: () => released }
+  const pool = { connect: async () => client } as unknown as Pool
+  unitPools.add(pool)
+  return { pool, calls, released: () => released }
 }
 
 test('host dispatch acquires both existing locks in one ordered round trip, with BEGIN separate', async () => {
@@ -77,13 +100,20 @@ test('PG: quoted lock keys retain ordering, block their peers until commit, and 
   const parsed = new URL(dbURL!)
   assert.equal(parsed.hostname, '127.0.0.1')
   const pool = new Pool({ connectionString: dbURL, max: 4 })
+  const closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
   const runner = await pool.connect(), blocker = await pool.connect(), observer = await pool.connect()
   const owner = "owner'\\; SELECT 'not SQL' --"
   const request = input()
   const keys = [JSON.stringify(['factory-host-dispatch', owner, request.issueId]), JSON.stringify([owner, request.issueId])]
   const calls: string[] = []
   let pending: Promise<{ runId: string }> | undefined
+  let workspaceId: string | undefined
   try {
+    await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())',
+      [owner, `factory-lock-${randomUUID()}@example.invalid`])
+    workspaceId = await seedFixtureWorkspace(pool, owner, 'team')
+    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState")
+      VALUES ($1,$2,'Ordered dispatch locks','{"type":"doc","content":[]}','todo','normal','workspace',$3,'bound')`, [request.issueId, owner, workspaceId])
     const pid = (await runner.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
     await blocker.query('BEGIN')
     await blocker.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [keys[1]])
@@ -101,7 +131,7 @@ test('PG: quoted lock keys retain ordering, block their peers until commit, and 
       const { rows } = await observer.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired', [keys[0]])
       assert.equal(rows[0].acquired, false)
     }
-    pending = queueFactoryTask({ connect: async () => wrapped } as unknown as Pool, owner, request)
+    pending = queueFactoryTask({ query: pool.query.bind(pool), connect: async () => wrapped } as unknown as Pool, owner, request)
     pending.catch(() => {})
     const deadline = Date.now() + 2000
     let waiting = false
@@ -120,7 +150,14 @@ test('PG: quoted lock keys retain ordering, block their peers until commit, and 
     await pending?.catch(() => {})
     await runner.query('ROLLBACK').catch(() => {})
     runner.release(); blocker.release(); observer.release()
-    await pool.end()
+    try {
+      await pool.query('DELETE FROM issues WHERE id=$1', [request.issueId])
+      if (workspaceId) {
+        await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspaceId])
+        await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspaceId])
+      }
+      await pool.query('DELETE FROM "user" WHERE id=$1', [owner])
+    } finally { await closeWorkspace(); await pool.end() }
     locked = async () => {}
   }
 })

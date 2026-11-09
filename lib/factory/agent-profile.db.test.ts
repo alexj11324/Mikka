@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
-import { dbUrl, seedUser, seedWorkspace, seedIssue, seedBot, seedAgent } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedUser, seedWorkspace, seedIssue, seedBot, seedPersonalWorkspace, seedAgent } from '../../tests/support/workspace-admin-db'
 import type { OrderEntry, OrderHarness } from '@/lib/model-order-plan'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import type { DecisionAnswer } from '@/lib/coordinator/decision'
@@ -49,7 +49,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   }
   const scope = await person('profiles-owner'), foreign = await person('profiles-foreign')
   const store = new profiles.AgentProfileStore(pool)
-  const issueId = await seedIssue(pool, scope.ownerId)
+  const issueId = await seedIssue(pool, scope.ownerId, scope.workspaceId)
   const quota = (provider: 'claude' | 'codex', used = .1) => ({ vendor: provider === 'claude' ? 'claude_code' : 'codex', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] })
   const subscribe = async (who: typeof scope, provider: 'claude' | 'codex', models: string[]) => {
     const id = randomUUID()
@@ -178,9 +178,9 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
         const entry = selection.targetEntry, id = randomUUID()
         const binding = (await pool.query('SELECT id FROM byos_bindings WHERE "connectionId"=$1 AND "modelId"=$2', [own, entry.model])).rows[0]
         await pool.query('UPDATE model_api_keys SET "updatedAt"=now()-interval \'1 hour\' WHERE id=$1', [keys[0]])
-        await pool.query(`INSERT INTO agent_runs (id,"userId","agentId",status,"stopReason","agentDefinition",report,"startedAt","finishedAt")
-          VALUES ($1,$2,$3,'failed','provider_failure',$4,$5,now()-interval '1 second',now())`,
-        [id, who.ownerId, healthAgentId, JSON.stringify({ harness: entry.harness, executionIdentity: { workspaceId: who.workspaceId },
+        await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","workspaceId",status,"stopReason","agentDefinition",report,"startedAt","finishedAt")
+          VALUES ($1,$2,$3,$4,'failed','provider_failure',$5,$6,now()-interval '1 second',now())`,
+        [id, who.ownerId, healthAgentId, who.workspaceId, JSON.stringify({ harness: entry.harness, executionIdentity: { workspaceId: who.workspaceId },
           ...(entry.source.kind === 'subscription' ? { subscription: { bindingId: binding.id, modelId: entry.model } } : { apiKey: { keyId: entry.source.keyId, model: entry.model } }) }),
         JSON.stringify({ providerFailure: { kind: 'balance', retryable: false, status: 402, code: 'payment_required' } })])
         try { await compare(selection) } finally { await pool.query('DELETE FROM agent_runs WHERE id=$1', [id]) }
@@ -278,7 +278,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const keys = await import('@/lib/model-api-keys')
     const { entryKey } = await import('@/lib/model-order-plan')
     const who = await person('profiles-default-provider-memory')
-    const taskId = await seedIssue(pool, who.ownerId)
+    const taskId = await seedIssue(pool, who.ownerId, who.workspaceId)
     const claudeSource = await subscribe(who, 'claude', ['claude-haiku-5-5'])
     const codexSource = await subscribe(who, 'codex', ['gpt-6-luna'])
     const key = await keys.addApiKey(pool, who.ownerId, { provider: 'deepseek', apiKey: `fixture-${randomUUID()}` }, {
@@ -522,7 +522,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
         [backend.id, 'default', backend.id], [backend.id, review.id, review.id],
         [undefined, 'default', null],
       ] as const) {
-        const taskIssue = await seedIssue(pool, scope.ownerId)
+        const taskIssue = await seedIssue(pool, scope.ownerId, scope.workspaceId)
         await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [taskIssue, JSON.stringify({ type: 'doc', attrs: { mikka: { number: taskNumber++ } }, content: [] })])
         const receipt = await recordPersonalSubmission(db, scope.ownerId, 'Run this task with the default Profile.', { botId, submissionId: randomUUID(), ...(pin ? { profileId: pin } : {}) })
         const routed = await factory.route(scope.ownerId, { issueId: taskIssue, sourceEventId: receipt.eventId, eventId: randomUUID(), rationale: 'Task-form Profile admission fixture' })
@@ -569,7 +569,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   const factoryBoundary = await import('./transaction')
   const outerFixture = async (name: string, custom = false) => {
     const who = await person(`profiles-outer-${name}`), sourceId = await subscribe(who, 'codex', ['gpt-6-luna'])
-    const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId)
+    const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId)
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Outer transaction','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Outer transaction','codex')`, [agentId, who.ownerId, device])
     const profile = custom ? await store.create(who, definition('Outer role', 'codex', sourceId, 'gpt-6-luna')) : undefined
@@ -707,7 +707,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   for (const change of ['default-member', 'custom-member', 'default-source', 'custom-source', 'disabled', 'edited'] as const) await t.test(`planning ${change} change leaves no committed binding or run`, async () => {
     const who = await person(`profiles-planning-${change}`)
     const sourceId = await subscribe(who, 'codex', ['gpt-6-luna'])
-    const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId)
+    const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId)
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Planning boundary','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Planning boundary','codex')`, [agentId, who.ownerId, device])
     const input = definition('Planning role', 'codex', sourceId, 'gpt-6-luna')
@@ -745,7 +745,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'member','active')`, [who.workspaceId, sourceOwner, `${sourceOwner}@example.invalid`])
     const connectionId = await subscribe({ ...who, ownerId: sourceOwner }, 'codex', ['gpt-6-luna'])
     await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [sourceOwner, who.workspaceId])
-    const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId)
+    const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId)
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Shared source','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Shared source','codex')`, [agentId, who.ownerId, device])
     const input = definition('Shared role', 'codex', connectionId, 'gpt-6-luna')
@@ -1045,15 +1045,20 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.ok(!(await store.list(scope)).some(row => row.id === ui.id))
     assert.equal((await store.history(scope, ui.id)).at(-1)!.digest, frozen.digest)
   })
-  for (const mode of ['fixed', 'inherit', 'legacy'] as const) await t.test(mode === 'legacy' ? 'watchdog preserves historical absence of Profile through queue and first claim on B' : `watchdog ${mode} Profile uses B's real source and retains the started role through queue and first claim`, async () => {
+  for (const mode of ['fixed', 'inherit', 'legacy', 'botless'] as const) await t.test(mode === 'legacy' ? 'watchdog preserves historical absence of Profile through queue and first claim on B' : `watchdog ${mode} Profile uses B's real source and retains the started role through queue and first claim`, async () => {
     const [{ createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun }, { automaticFactoryDispatch },
       { sweepFactoryWatchdog }, { claimLocalRun }, { assertRunProfileClaim, admitProfileSelection }, { profileNativeSessionMatches },
       { DAEMON_PROTOCOL_VERSION }, { workerDefinitionDigest }] = await Promise.all([
       import('./store'), import('./dispatch'), import('../agent-runs'), import('./automatic-dispatch'), import('./watchdog'),
       import('../computer/claim'), import('./profile-admission'), import('./profile-native-session'), import('@mikka/protocol/daemon'), import('../agent-kit/worker-digest'),
     ])
-    const who = await person(`watchdog-profile-${mode}`), botId = await seedBot(pool, who.workspaceId, who.ownerId)
-    const taskIssue = await seedIssue(pool, who.ownerId), epoch = randomUUID()
+    const who = await person(`watchdog-profile-${mode}`)
+    const botId = mode === 'botless' ? null : await seedBot(pool, who.workspaceId, who.ownerId)
+    if (mode === 'botless') {
+      const personal = await seedPersonalWorkspace(pool, who.ownerId); workspaces.push(personal)
+      await pool.query('UPDATE mikka_workspaces SET "createdAt"=\'2000-01-01\' WHERE id=$1', [personal])
+    }
+    const taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId), epoch = randomUUID()
     await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [taskIssue, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1284 } }, content: [] })])
     await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,$4,'user_message',$5,'{"text":"Preserve this implementation role on recovery"}')`, [epoch, who.ownerId, botId, taskIssue, `profile-watchdog:${epoch}`])
     const primary = await subscribe(who, 'codex', ['gpt-6-luna']), alternate = await subscribe(who, 'codex', ['gpt-6-luna'])
@@ -1070,7 +1075,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     }
     const [a, b] = machines
     const profile = mode === 'legacy' ? undefined : await store.create(who, { name: `Frozen ${mode} role`, roles: ['implementation'], harness: 'codex',
-      model: mode === 'fixed' ? { mode, harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: primary } } : { mode },
+      model: mode === 'fixed' ? { mode, harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: primary } } : { mode: 'inherit' },
       effort: 'high', instructions: 'Keep the original implementation responsibility.', skills: ['systematic-debugging'] })
     const picked = await profiles.resolveAgentProfileDispatch(pool, { ...who, botId }, { issueId: taskIssue, profileId: profile?.id, location: 'local', deviceId: a.id })
     if (picked.target.kind !== 'device') assert.fail('A must be runnable')
@@ -1120,6 +1125,9 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const task = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [routed.task.id])).rows[0]
     const attempt = (await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [task.attemptId])).rows[0]
     const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [attempt.runId])).rows[0]
+    assert.equal(run.workspaceId, who.workspaceId)
+    assert.equal(run.agentDefinition.executionIdentity.workspaceId, who.workspaceId)
+    assert.equal(run.botId, botId)
     assert.equal(run.deviceId, b.id); assert.equal(run.agentId, b.agentId)
     assert.equal(run.retryOf, first.runId); assert.equal(run.continuesRunId, first.runId); assert.equal(run.sessionId, null)
     assert.equal(run.agentDefinition.profileOriginRunId, undefined)
@@ -1186,7 +1194,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     // The stored list puts Claude Code first; 优先使用的 Agent is Codex.
     await pool.query('UPDATE model_order_settings SET customized=true,"preferredHarness"=\'codex\' WHERE "ownerId"=$1 AND "workspaceId"=$2', [who.ownerId, who.workspaceId])
     for (const [index, harness, model, connection] of [[0, 'claude_code', 'claude-haiku-5-5', ownClaude], [1, 'codex', 'gpt-6-luna', ownCodex]] as const) await pool.query('INSERT INTO model_order_entries (id,"ownerId","workspaceId",position,harness,model,"sourceKind","sourceId") VALUES ($1,$2,$3,$4,$5,$6,\'subscription\',$7)', [randomUUID(), who.ownerId, who.workspaceId, index, harness, model, connection])
-    const issue = await seedIssue(pool, who.ownerId)
+    const issue = await seedIssue(pool, who.ownerId, who.workspaceId)
     const whoStore = new profiles.AgentProfileStore(pool)
     // Inherit + either Agent: Codex's list first, as 优先使用的 Agent says.
     const inherit = await whoStore.create(who, { name: 'Inherits order', harness: 'auto', model: { mode: 'inherit' } })

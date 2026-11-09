@@ -19,6 +19,7 @@ import type { FactoryActivityView } from '../lib/factory/activity'
 import { assertE2eTarget, disposableDatabase } from './helpers/e2e-target.mjs'
 import { dropTestDatabase } from './support/drop-test-database'
 import { seedAgent, seedBot, seedTeam, seedWorkspace } from './support/workspace-admin-db'
+import { WORKSPACE_SELECTION_HEADER } from '../lib/workspace-selection'
 
 const execute = promisify(execFile)
 const base = process.env.E2E_DATABASE_URL
@@ -113,13 +114,20 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   assert.notEqual(owner,peer)
   const workspace=await seedWorkspace(pool,owner,[{userId:owner,role:'admin'},{userId:peer,role:'member'}])
   const outsideWorkspace=await seedWorkspace(pool,owner,[{userId:owner,role:'admin'}])
+  const selectedRequest=(account:AccountScope['owner'],path:string,init:RequestInit={})=>{
+    const headers=new Headers(init.headers)
+    if(!headers.has(WORKSPACE_SELECTION_HEADER))headers.set(WORKSPACE_SELECTION_HEADER,workspace.id)
+    return account.request(path,{...init,headers})
+  }
+  const ownerRequest=(path:string,init:RequestInit={})=>selectedRequest(accounts!.owner,path,init)
+  const peerRequest=(path:string,init:RequestInit={})=>selectedRequest(accounts!.peer,path,init)
   const bot=await seedBot(pool,workspace.id,owner),agent=await seedAgent(pool,owner),team=await seedTeam(pool,workspace.id,owner)
   const issueId=randomUUID(),taskId=randomUUID(),source=randomUUID(),candidate=randomUUID()
   const runs=Array.from({length:24},(_,index)=>({id:randomUUID(),attemptId:randomUUID(),stage:index===0?'spec':index===2?'review':'execute'}))
-  // The task belongs to owner, while the issue belongs to the teammate. This
-  // makes workspace membership the actual grant, as in the task-detail API;
-  // issue owners intentionally retain their own issue authority.
-  await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'HTTP runtime fixture','{"type":"doc"}','todo','normal','workspace')`,[issueId,peer])
+  // The task belongs to owner, while the issue belongs to the teammate. Both
+  // are bound to the same tenant; account identity cannot replace membership.
+  await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState")
+    VALUES($1,$2,'HTTP runtime fixture','{"type":"doc"}','todo','normal','workspace',$3,'bound')`,[issueId,peer,workspace.id])
   await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)',[issueId,team.id,workspace.id,owner])
   await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
     VALUES($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"HTTP runtime fixture"}')`,[source,owner,bot,issueId])
@@ -140,9 +148,9 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
     await tx.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1',[taskId,candidate])
     await tx.query('COMMIT')
   }catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}
-  const artifact=async(runId:string,title:string)=>{
+  const artifact=async(runId:string|null,title:string,artifactIssueId:string|null=issueId)=>{
     const id=randomUUID()
-    await pool.query(`INSERT INTO artifacts(id,"userId","issueId","runId",kind,title) VALUES($1,$2,$3,$4,'markdown',$5)`,[id,owner,issueId,runId,title])
+    await pool.query(`INSERT INTO artifacts(id,"userId","issueId","runId",kind,title) VALUES($1,$2,$3,$4,'markdown',$5)`,[id,owner,artifactIssueId,runId,title])
     return id
   }
   const version=async(artifactId:string,n:number,runId:string,title:string,content:string)=>{
@@ -165,11 +173,11 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   const videoPath=join(directory,'historical.mp4')
   await execute(await capturePosterBinary(),['-nostdin','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:s=1280x720:d=0.12','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-movflags','+faststart',videoPath],{timeout:15_000})
   const video=await readFile(videoPath)
-  const capture=async(runId:string,bytes:Buffer,kind:'image'|'video')=>{
+  const capture=async(runId:string,bytes:Buffer,kind:'image'|'video',captureIssueId:string=issueId)=>{
     const id=randomUUID()
     await pool.query(`INSERT INTO run_captures(id,"userId","runId","issueId",kind,"contentType",source,status,title,"storageKey","inlineContent",size,sha256,"durationMs")
       VALUES($1,$2,$3,$4,$5,$6,'local','ready','Unreferenced HTTP media',$7,$8,$9,$10,$11)`,
-      [id,owner,runId,issueId,kind,kind==='video'?'video/mp4':'image/png',`http-fixture/${id}`,bytes,bytes.length,digest(bytes),kind==='video'?120:null])
+      [id,owner,runId,captureIssueId,kind,kind==='video'?'video/mp4':'image/png',`http-fixture/${id}`,bytes,bytes.length,digest(bytes),kind==='video'?120:null])
     return id
   }
   const images:string[]=[]
@@ -178,7 +186,13 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","botId",status) VALUES($1,$2,$3,$4,$5,'succeeded')`,[unrelatedRun,owner,issueId,agent,bot])
   const unrelated=await capture(unrelatedRun,png,'image')
   const activityPath=`/api/factory/tasks/${taskId}/activity`,mediaPath=(id:string)=>`/api/factory/tasks/${taskId}/media/${id}`
-  const anonymous=(path:string,token?:string)=>fetch(`${origin}/mikka${path}`,{redirect:'error',signal:AbortSignal.timeout(30_000),headers:token?{authorization:`Bearer ${token}`}:{}})
+  let taskPat:string|undefined,taskPatId:string|undefined
+  const anonymous=(path:string,token?:string,selectedWorkspace?:string)=>{
+    const headers=new Headers()
+    if(token)headers.set('authorization',`Bearer ${token}`)
+    if(selectedWorkspace!==undefined)headers.set(WORKSPACE_SELECTION_HEADER,selectedWorkspace)
+    return fetch(`${origin}/mikka${path}`,{redirect:'error',signal:AbortSignal.timeout(30_000),headers})
+  }
   const denied=async(response:Response,status:401|404,path:string)=>{
     if(path===activityPath){
       const body=await response.json()
@@ -190,7 +204,7 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   }
 
   await t.test('real route manifest returns all 24 attempts and every submitted version with base-path-safe links',async()=>{
-    const response=await accounts!.owner.request(activityPath)
+    const response=await ownerRequest(activityPath)
     assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store')
     const view=await response.json() as FactoryActivityView
     assert.equal(view.version,1);assert.equal(view.agents.length,24);assert.equal(view.timeline.attempts.length,24)
@@ -205,7 +219,7 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
     const original=documents.find(document=>document.artifactId===plan&&document.version===1)!
     assert.equal(original.kind,'plan');assert.equal(view.timeline.attempts[0].plan?.version,1)
     assert.ok(original.downloadUrl.startsWith('/mikka/api/artifacts/'))
-    assert.equal(await (await accounts!.owner.request(original.downloadUrl)).text(),'# Original plan')
+    assert.equal(await (await ownerRequest(original.downloadUrl)).text(),'# Original plan')
     const historical=view.artifacts.find(artifact=>artifact.id===movie)!
     assert.ok('posterUrl' in historical && historical.posterUrl?.startsWith('/mikka/api/factory/'))
     for(const privateField of ['HTTP_PRIVATE_SECOND_LINE','HTTP_PRIVATE_REPORT','storageKey','inlineContent'])assert.ok(!JSON.stringify(view).includes(privateField))
@@ -213,78 +227,108 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   await t.test('anonymous and another authenticated workspace member cannot read task-owned originals or render covers',async()=>{
     for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`]){
       await denied(await anonymous(path),401,path)
-      await denied(await accounts!.peer.request(path),404,path)
+      await denied(await peerRequest(path),404,path)
     }
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_capture_posters')).rows[0].n,0)
   })
+  await t.test('cookie workspace selection cannot cross the task-detail boundary',async()=>{
+    for(const selected of [outsideWorkspace.id,'invalid-workspace']){
+      for(const path of [`/api/factory/tasks/${taskId}`,activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])
+        await denied(await ownerRequest(path,{headers:{[WORKSPACE_SELECTION_HEADER]:selected}}),404,path)
+    }
+    assert.equal((await ownerRequest(activityPath)).status,200)
+  })
   await t.test('all-run originals retain byte ranges while a same-owner unrelated run remains inaccessible',async()=>{
     for(const id of [images[0],images[23]]){
-      const response=await accounts!.owner.request(mediaPath(id));assert.equal(response.status,200)
+      const response=await ownerRequest(mediaPath(id));assert.equal(response.status,200)
       assert.deepEqual(Buffer.from(await response.arrayBuffer()),png)
     }
-    const response=await accounts!.owner.request(mediaPath(movie),{headers:{range:'bytes=0-31'}})
+    const response=await ownerRequest(mediaPath(movie),{headers:{range:'bytes=0-31'}})
     assert.equal(response.status,206);assert.equal(response.headers.get('content-type'),'video/mp4')
     assert.deepEqual(Buffer.from(await response.arrayBuffer()),video.subarray(0,32))
-    assert.equal((await accounts!.owner.request(mediaPath(unrelated))).status,404)
+    assert.equal((await ownerRequest(mediaPath(unrelated))).status,404)
   })
   await t.test('a historical recording produces a real JPEG over HTTP and subsequently reuses its cached bytes',async()=>{
-    const path=`${mediaPath(movie)}/poster`,response=await accounts!.owner.request(path)
+    const path=`${mediaPath(movie)}/poster`,response=await ownerRequest(path)
     assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'image/jpeg')
     const bytes=Buffer.from(await response.arrayBuffer()),sharp=(await import('sharp')).default
     const metadata=await sharp(bytes).metadata()
     assert.equal(metadata.format,'jpeg');assert.equal(metadata.width,640);assert.equal(metadata.height,360)
     const {data}=await sharp(bytes).resize(1,1).raw().toBuffer({resolveWithObject:true})
     assert.ok(data[2]>180 && data[0]<40 && data[1]<40,'cover comes from the blue recording, not a placeholder')
-    assert.deepEqual(Buffer.from(await (await accounts!.owner.request(path)).arrayBuffer()),bytes)
+    assert.deepEqual(Buffer.from(await (await ownerRequest(path)).arrayBuffer()),bytes)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_capture_posters WHERE "captureId"=$1',[movie])).rows[0].n,1)
   })
   await t.test('real browser token creation grants same-workspace HTTP media and rejects another workspace PAT',async()=>{
     const token=async(workspaceId:string)=>{
-      const response=await accounts!.owner.request('/api/rpc',{method:'POST',headers:{'content-type':'application/json','x-mikka-rpc':'1'},
+      const response=await ownerRequest('/api/rpc',{method:'POST',headers:{'content-type':'application/json','x-mikka-rpc':'1',[WORKSPACE_SELECTION_HEADER]:workspaceId},
         body:JSON.stringify({version:DESKTOP_RPC_VERSION,action:'tokens.createAccessToken',args:encode([{name:'Activity HTTP acceptance'},workspaceId])})})
       assert.equal(response.status,200)
       const envelope=await response.json();assert.equal(envelope.ok,true)
-      const result=decode(envelope.result) as {token?:string;error?:string}
+      const result=decode(envelope.result) as {id?:string;token?:string;error?:string}
       assert.equal(result.error,undefined);assert.ok(typeof result.token==='string' && result.token.startsWith('mkp_'))
+      assert.ok(typeof result.id==='string')
+      if(workspaceId===workspace.id)taskPatId=result.id
       await recordAuthenticationSecrets([result.token],{environment})
       return result.token
     }
     const allowed=await token(workspace.id),outside=await token(outsideWorkspace.id)
+    taskPat=allowed
     for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`]){
       const ok=await anonymous(path,allowed);assert.equal(ok.status,200);await ok.body?.cancel()
       await denied(await anonymous(path,outside),404,path)
+      await denied(await anonymous(path,allowed,outsideWorkspace.id),404,path)
       await denied(await anonymous(path,`mkp_${'a'.repeat(43)}`),401,path)
     }
     const outsideBot=await seedBot(pool,outsideWorkspace.id,owner)
+    const outsideIssue=randomUUID()
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority)
+      VALUES($1,$2,$3,'bound','workspace','Other tenant task','{"type":"doc"}','todo','normal')`,[outsideIssue,owner,outsideWorkspace.id])
     const mixedRuns:string[]=[],mixedCaptures:string[]=[]
-    for(const [index,kind] of ['bot','binding'].entries()){
+    // Historical receipts can name a run outside the task. The run itself has
+    // a valid immutable tenant; never disable the new tenant integrity guards.
+    for(const [index,kind] of ['foreign','foreign_binding'].entries()){
       const runId=randomUUID(),attemptId=randomUUID();mixedRuns.push(runId)
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","botId",status,kind) VALUES($1,$2,$3,$4,$5,'succeeded','implement')`,
-        [runId,owner,issueId,agent,kind==='bot'?outsideBot:bot])
+        [runId,owner,outsideIssue,agent,outsideBot])
       await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason,output)
         VALUES($1,$2,'execute',$3,$3,'passed',$4,'Workspace scope fixture',$5)`,[attemptId,taskId,25+index,runId,JSON.stringify({requestEpoch:source})])
-      if(kind==='binding')await pool.query('INSERT INTO computer_run_bindings("runId","ownerId","workspaceId","botId") VALUES($1,$2,$3,$4)',
+      if(kind==='foreign_binding')await pool.query('INSERT INTO computer_run_bindings("runId","ownerId","workspaceId","botId") VALUES($1,$2,$3,$4)',
         [runId,owner,outsideWorkspace.id,outsideBot])
-      mixedCaptures.push(await capture(runId,video,'video'))
+      mixedCaptures.push(await capture(runId,video,'video',outsideIssue))
     }
     // Its original Artifact belongs to A, but this later version was submitted
-    // by a run whose Bot belongs to B. Both boundaries must apply.
+    // by a run persisted in B. Both the document and producer boundaries apply
+    // to a selected cookie session as well as a scoped PAT.
     await version(plan,3,mixedRuns[0],'Cross-workspace submission','# Hidden from the workspace A token')
-    const cookieView=await (await accounts!.owner.request(activityPath)).json() as FactoryActivityView
+    const outsideDocument=await artifact(mixedRuns[0],'Foreign document',outsideIssue)
+    const pendingDocument=await artifact(null,'Quarantined document',null)
+    // An otherwise visible producer receipt cannot grant access to a foreign
+    // or unresolved document, even when the same account owns every row.
+    await version(outsideDocument,1,runs[4].id,'Foreign receipt','# Other tenant document')
+    await version(pendingDocument,1,runs[4].id,'Pending receipt','# Unresolved tenant document')
+    const cookieView=await (await ownerRequest(activityPath)).json() as FactoryActivityView
     const patView=await (await anonymous(activityPath,allowed)).json() as FactoryActivityView
-    for(const runId of mixedRuns){
-      assert.ok(cookieView.agents.some(row=>row.runId===runId))
-      assert.ok(!patView.agents.some(row=>row.runId===runId))
+    for(const view of [cookieView,patView]){
+      for(const runId of mixedRuns)assert.ok(!view.agents.some(row=>row.runId===runId))
+      assert.ok(!view.artifacts.some(row=>'artifactId' in row && row.artifactId===plan && row.version===3))
+      for(const artifactId of [outsideDocument,pendingDocument])
+        assert.ok(!view.artifacts.some(row=>'artifactId' in row && row.artifactId===artifactId))
     }
-    assert.ok(cookieView.artifacts.some(row=>'artifactId' in row && row.artifactId===plan && row.version===3))
-    assert.ok(!patView.artifacts.some(row=>'artifactId' in row && row.artifactId===plan && row.version===3))
+    for(const artifactId of [outsideDocument,pendingDocument]){
+      const path=`/api/artifacts/${artifactId}/versions/1/download`
+      assert.equal((await ownerRequest(path)).status,404)
+      assert.equal((await anonymous(path,allowed)).status,404)
+    }
+    const foreignDownload=await ownerRequest(`/api/artifacts/${outsideDocument}/versions/1/download`,
+      {headers:{[WORKSPACE_SELECTION_HEADER]:outsideWorkspace.id}})
+    assert.equal(foreignDownload.status,200);assert.equal(await foreignDownload.text(),'# Other tenant document')
     for(const id of mixedCaptures){
-      assert.ok(cookieView.artifacts.some(row=>row.id===id))
+      assert.ok(!cookieView.artifacts.some(row=>row.id===id))
       assert.ok(!patView.artifacts.some(row=>row.id===id))
       for(const path of [mediaPath(id),`${mediaPath(id)}/poster`]){
-        assert.equal((await anonymous(path,allowed)).status,404)
-        const own=await accounts!.owner.request(path);assert.equal(own.status,200);await own.body?.cancel()
-        assert.equal((await anonymous(path,allowed)).status,404,'a cached cover retains the original run workspace boundary')
+        await denied(await anonymous(path,allowed),404,path)
+        await denied(await ownerRequest(path),404,path)
       }
     }
     // The acceptance document can remain visible while an older embedded media
@@ -295,15 +339,15 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
       {captureId:mixedCaptures[1],kind:'video',runId:mixedRuns[1],title:'Hidden report media',criterion:null,url:`/mikka${mediaPath(mixedCaptures[1])}`},
     ])])
     try {
-      const cookie=await (await accounts!.owner.request(activityPath)).json() as FactoryActivityView
+      const cookie=await (await ownerRequest(activityPath)).json() as FactoryActivityView
       const scoped=await (await anonymous(activityPath,allowed)).json() as FactoryActivityView
       assert.equal(cookie.task.acceptance?.artifactId,report);assert.equal(scoped.task.acceptance?.artifactId,report)
-      assert.deepEqual(cookie.task.acceptance?.media.map(media=>media.captureId),[movie,mixedCaptures[1]])
+      assert.deepEqual(cookie.task.acceptance?.media.map(media=>media.captureId),[movie])
       assert.deepEqual(scoped.task.acceptance?.media.map(media=>media.captureId),[movie])
     } finally { await pool.query(`UPDATE factory_acceptance_artifacts SET media='[]' WHERE "taskId"=$1`,[taskId]) }
     const hiddenProducer=mixedRuns[1],hiddenReviewer=mixedRuns[0],hiddenCandidate=randomUUID(),hiddenWait=randomUUID()
     const {rows:[producerAttempt]}=await pool.query<{id:string}>('SELECT id FROM factory_attempts WHERE "taskId"=$1 AND "runId"=$2',[taskId,hiddenProducer])
-    const hiddenReport=await artifact(hiddenProducer,'Hidden producer acceptance')
+    const hiddenReport=await artifact(hiddenProducer,'Hidden producer acceptance',outsideIssue)
     const hiddenHash=await version(hiddenReport,1,hiddenProducer,'Hidden producer acceptance','# Hidden producer evidence')
     const hiddenPr='https://github.com/fixture/hidden-workspace/pull/81'
     await pool.query(`INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId")
@@ -323,18 +367,16 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
     await pool.query(`INSERT INTO factory_events("taskId","eventId",request,result,"createdAt") VALUES($1,$2,$3,$4,'2026-11-01T04:00:00Z')`,
       [taskId,hiddenWait,JSON.stringify({change:{action:'finish'}}),JSON.stringify({task:{id:taskId,attemptId:producerAttempt.id,candidateId:hiddenCandidate,stage:'execute',status:'blocked',revision:100}})])
     try {
-      const cookie=await (await accounts!.owner.request(activityPath)).json() as FactoryActivityView
+      const cookie=await (await ownerRequest(activityPath)).json() as FactoryActivityView
       const scoped=await (await anonymous(activityPath,allowed)).json() as FactoryActivityView
-      assert.equal(cookie.task.acceptance?.artifactId,hiddenReport)
-      assert.equal(cookie.task.pullRequest?.url,hiddenPr)
-      assert.equal(cookie.task.review?.verdict,'changes_requested')
-      assert.ok(cookie.timeline.waits.some(wait=>wait.id===`event:${hiddenWait}`&&wait.runId===hiddenProducer))
       assert.equal(scoped.task.stage,cookie.task.stage);assert.deepEqual(scoped.task.needsYou,cookie.task.needsYou)
-      assert.equal(scoped.task.acceptance,null);assert.equal(scoped.task.pullRequest,null);assert.equal(scoped.task.review,null)
-      assert.ok(!scoped.timeline.waits.some(wait=>wait.attemptId===producerAttempt.id||wait.id===`event:${hiddenWait}`),
-        'neither transition waits nor the current-attention fallback expose a hidden attempt')
-      for(const value of [hiddenProducer,hiddenReviewer,hiddenReport,hiddenPr,mixedCaptures[1]])
-        assert.ok(!JSON.stringify(scoped).includes(value),'nested task flow cannot bypass producer scope')
+      for(const view of [cookie,scoped]){
+        assert.equal(view.task.acceptance,null);assert.equal(view.task.pullRequest,null);assert.equal(view.task.review,null)
+        assert.ok(!view.timeline.waits.some(wait=>wait.attemptId===producerAttempt.id||wait.id===`event:${hiddenWait}`),
+          'neither transition waits nor the current-attention fallback expose a hidden attempt')
+        for(const value of [hiddenProducer,hiddenReviewer,hiddenReport,hiddenPr,mixedCaptures[1]])
+          assert.ok(!JSON.stringify(view).includes(value),'nested task flow cannot bypass producer scope')
+      }
     } finally {
       await pool.query(`DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2`,[taskId,hiddenWait])
       await pool.query(`UPDATE factory_tasks SET "attemptId"=$2,"candidateId"=$3,stage='execute',status='passed',revision=24 WHERE id=$1`,[taskId,runs[23].attemptId,candidate])
@@ -345,10 +387,9 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
       await pool.query(`UPDATE factory_acceptance_artifacts SET "artifactId"=$2,"candidateId"=$3,"runId"=$4,sha256=$5,media='[]' WHERE "taskId"=$1`,
         [taskId,report,candidate,runs[3].id,reportHash])
     }
-    // Legacy tasks/runs can have no source Bot while their cloud binding names
-    // a workspace. The task belongs to A; the recorded VM belongs to B. Its
-    // owner cookie sees both, but A's PAT must not recover a hidden run through
-    // the computers collection after agents/attempts have already filtered it.
+    // A legacy no-Bot run retains its task's immutable tenant A. A historical
+    // computer binding in B cannot transfer the run or expose B's VM interval
+    // to either A's cookie session or its PAT.
     const legacyTask=randomUUID(),legacyAttempt=randomUUID(),legacyRun=randomUUID(),legacySource=randomUUID(),legacySession=randomUUID()
     const legacyTx=await pool.connect()
     try {
@@ -373,14 +414,15 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
       await legacyTx.query('COMMIT')
     }catch(error){await legacyTx.query('ROLLBACK');throw error}finally{legacyTx.release()}
     const legacyPath=`/api/factory/tasks/${legacyTask}/activity`
-    const legacyCookieResponse=await accounts!.owner.request(legacyPath),legacyPatResponse=await anonymous(legacyPath,allowed)
+    const legacyCookieResponse=await ownerRequest(legacyPath),legacyPatResponse=await anonymous(legacyPath,allowed)
     assert.equal(legacyCookieResponse.status,200);assert.equal(legacyPatResponse.status,200)
     const legacyCookie=await legacyCookieResponse.json() as FactoryActivityView,legacyPat=await legacyPatResponse.json() as FactoryActivityView
-    assert.ok(legacyCookie.agents.some(row=>row.runId===legacyRun))
-    assert.deepEqual(legacyCookie.timeline.computers,[{id:legacySession,runId:legacyRun,
-      startedAt:'2026-11-01T03:00:00.000Z',endedAt:'2026-11-01T03:01:00.000Z',reason:'paused',source:'running_since'}])
-    assert.equal(legacyPat.agents.length,0);assert.equal(legacyPat.timeline.attempts.length,0)
-    assert.deepEqual(legacyPat.timeline.computers,[],'PAT cannot observe a VM interval belonging to its hidden producer run')
+    assert.equal((await pool.query('SELECT "workspaceId" FROM agent_runs WHERE id=$1',[legacyRun])).rows[0].workspaceId,workspace.id)
+    for(const view of [legacyCookie,legacyPat]){
+      assert.ok(view.agents.some(row=>row.runId===legacyRun))
+      assert.deepEqual(view.timeline.computers,[],'a foreign binding never grants a different tenant VM interval')
+      assert.ok(!JSON.stringify(view).includes(legacySession))
+    }
     // More requests than the application's five connections exercise reuse of
     // the held transaction; a second pool checkout here would deadlock.
     const concurrent=await Promise.all(Array.from({length:8},()=>anonymous(`${mediaPath(movie)}/poster`,allowed)))
@@ -388,15 +430,32 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   })
   await t.test('live task-detail boundaries revoke even already-cached cover access after source or membership changes',async()=>{
     await pool.query('UPDATE coordinator_events SET "userId"=$2 WHERE id=$1',[source,peer])
-    assert.equal((await accounts!.owner.request(`/api/factory/tasks/${taskId}`)).status,404)
-    for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])await denied(await accounts!.owner.request(path),404,path)
+    assert.equal((await ownerRequest(`/api/factory/tasks/${taskId}`)).status,404)
+    for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`]){
+      await denied(await ownerRequest(path),404,path)
+      await denied(await anonymous(path,taskPat),404,path)
+    }
     await pool.query('UPDATE coordinator_events SET "userId"=$2 WHERE id=$1',[source,owner])
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[workspace.id,owner])
-    assert.equal((await accounts!.owner.request(`/api/factory/tasks/${taskId}`)).status,404)
-    for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])await denied(await accounts!.owner.request(path),404,path)
+    assert.equal((await ownerRequest(`/api/factory/tasks/${taskId}`)).status,404)
+    for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])await denied(await ownerRequest(path),404,path)
+    const revokedPatStatus=(await anonymous(`/api/factory/tasks/${taskId}`,taskPat)).status
+    assert.ok(revokedPatStatus===401||revokedPatStatus===404)
+    for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])
+      await denied(await anonymous(path,taskPat),revokedPatStatus,path)
     await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',[workspace.id,owner])
-    assert.equal((await accounts!.owner.request(`/api/factory/tasks/${taskId}`)).status,200)
-    assert.equal((await accounts!.owner.request(activityPath)).status,200)
+    assert.equal((await ownerRequest(`/api/factory/tasks/${taskId}`)).status,200)
+    assert.equal((await ownerRequest(activityPath)).status,200)
+    assert.ok(taskPatId && taskPat)
+    const revoked=await ownerRequest('/api/rpc',{method:'POST',headers:{'content-type':'application/json','x-mikka-rpc':'1'},
+      body:JSON.stringify({version:DESKTOP_RPC_VERSION,action:'tokens.revokeAccessToken',args:encode([{id:taskPatId},workspace.id])})})
+    assert.equal(revoked.status,200)
+    const revokeEnvelope=await revoked.json();assert.equal(revokeEnvelope.ok,true)
+    const revokedToken=decode(revokeEnvelope.result) as {id?:string;error?:string}
+    assert.equal(revokedToken.error,undefined);assert.equal(revokedToken.id,taskPatId)
+    for(const path of [`/api/factory/tasks/${taskId}`,activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])
+      await denied(await anonymous(path,taskPat),401,path)
+    assert.equal((await ownerRequest(activityPath)).status,200,'revoking a PAT does not revoke the active browser member')
   })
   const transport=await readFile(networkReceipt,'utf8')
   assert.match(transport,/guard-start/);assert.ok(!transport.includes('blocked'),'application made no external transport attempt')

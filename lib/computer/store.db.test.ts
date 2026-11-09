@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
+import { bindFixtureWorkspaceDatabase, createFixtureWorkspaceTables } from '../../tests/helpers/workspace-database'
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { observePoolCommits } from '../db/commit-effects'
@@ -30,14 +32,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
   const admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
-  const { workspacePool } = await import('../workspace-db')
-  const previousWorkspaceOptions = workspacePool.options.options
-  const previousWorkspaceURL = workspacePool.options.connectionString
-  // This suite declares COMPUTER_TEST_DATABASE_URL / E2E_DATABASE_URL only.
-  // The real workspace membership read must use that same disposable target,
-  // even when app/workspace database environment variables are absent in CI.
-  workspacePool.options.connectionString = databaseURL
-  workspacePool.options.options = `-c search_path=${schema}`
+  const closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
   let created = 0, failSync = false, failStart = false, epoch = 0, computerAllowed = true, computerPolicyVersion = 0
   const syncedLeases: { sandboxId: string; policyVersion: number; computerAllowed?: boolean; display: number }[] = []
   const runtime = {
@@ -56,10 +51,13 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const migration = await readFile(new URL('../../drizzle/20261027164501_cloud_computers.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
     await pool.query('ALTER TABLE bots ADD COLUMN IF NOT EXISTS "archivedAt" timestamptz')
-    await pool.query('CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text); CREATE TABLE user_e2b_keys ("userId" text PRIMARY KEY); CREATE TABLE workspace_e2b_keys ("createdBy" text)')
-    await pool.query('INSERT INTO mikka_workspace_members VALUES ($1,$2,\'active\'),($1,$3,\'active\'),($4,$2,\'active\')', [actor.workspaceId, actor.userId, bob.userId, otherWorkspace.workspaceId])
+    await createFixtureWorkspaceTables(pool)
+    await seedFixtureWorkspace(pool, actor.userId, 'team', actor.workspaceId)
+    await seedFixtureWorkspace(pool, actor.userId, 'team', otherWorkspace.workspaceId)
+    await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,\'bob@example.invalid\',\'member\',\'active\')', [actor.workspaceId, bob.userId])
+    await pool.query('CREATE TABLE user_e2b_keys ("userId" text PRIMARY KEY); CREATE TABLE workspace_e2b_keys ("createdBy" text)')
     await pool.query('INSERT INTO user_e2b_keys VALUES ($1),($2)', [actor.userId, bob.userId])
-    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz, "agentDefinition" jsonb, "dispatchFingerprint" text, "promptTaskStart" integer, "promptTaskLength" integer)')
+    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz, "agentDefinition" jsonb, "dispatchFingerprint" text, "promptTaskStart" integer, "promptTaskLength" integer, "workspaceId" uuid)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027164502_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
     await pool.query(await readFile(new URL('../../drizzle/20261030234636_run_human_control_pause.sql', import.meta.url), 'utf8'))
@@ -221,7 +219,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
       return deviceId
     }
     const cloudRun = randomUUID(), consumer = randomUUID(), cloudSubscription = randomUUID(), wrongSubscription = randomUUID()
-    await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId") VALUES ($1,$2,$3,$4,$5)', [cloudRun, actor.userId, consumer, 'queued', worker.deviceId])
+    await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId","workspaceId") VALUES ($1,$2,$3,$4,$5,$6)', [cloudRun, actor.userId, consumer, 'queued', worker.deviceId, actor.workspaceId])
     await bindComputerRun(pool, actor, cloudRun, bot.id)
     await pool.query('INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId") VALUES ($1,$2,$3,$4),($5,$6,$3,$4)', [cloudSubscription, actor.userId, actor.workspaceId, consumer, wrongSubscription, bob.userId])
     const connectionId = randomUUID()
@@ -239,7 +237,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await assert.rejects(authorizedAccessName(pool, credentialScope, credentialUse, 2))
     await assert.rejects(authorizedAccessName(pool, credentialScope, { ...credentialUse, runId: cloudRun }, 1), 'queued or unbound runs cannot read a projection')
     const snapshotRun = randomUUID()
-    await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"leaseExpiresAt") VALUES ($1,$2,$3,\'running\',now()+interval \'1 minute\')', [snapshotRun, actor.userId, consumer])
+    await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"leaseExpiresAt","workspaceId") VALUES ($1,$2,$3,\'running\',now()+interval \'1 minute\',$4)', [snapshotRun, actor.userId, consumer, actor.workspaceId])
     await pool.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [snapshotRun, cloudSubscription])
     assert.equal(await authorizedAccessName(pool, credentialScope, { ...credentialUse, runId: snapshotRun }, 1), projectionName)
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [snapshotRun])
@@ -286,9 +284,10 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await assert.rejects(queueCloudRun(pool, actor, { ...cloudInput, model: 'other-model' }), { status: 409 })
     assert.equal(await runCount(), beforeMissing, 'a run without its model writes nothing')
     const queued = await queueCloudRun(pool, actor, cloudInput)
-    const queuedBinding = (await pool.query('SELECT b."botId",r.status,r.prompt FROM computer_run_bindings b JOIN agent_runs r ON r.id=b."runId" WHERE r.id=$1', [queued.runId])).rows[0]
+    const queuedBinding = (await pool.query('SELECT b."botId",r.status,r.prompt,r."workspaceId" FROM computer_run_bindings b JOIN agent_runs r ON r.id=b."runId" WHERE r.id=$1', [queued.runId])).rows[0]
     assert.equal(queuedBinding.botId, bot.id)
     assert.equal(queuedBinding.status, 'queued')
+    assert.equal(queuedBinding.workspaceId, actor.workspaceId, 'cloud admission persists its validated tenant without relying on a fixture trigger')
     assert.match(queuedBinding.prompt, /Use the desktop/)
     assert.equal(await claimLocalRun(pool, queued.runId, worker.deviceId, new Date(Date.now() + 30000)), 'cloud-required')
     assert.equal((await pool.query('SELECT state FROM thread_machines WHERE "runId"=$1', [queued.runId])).rows[0].state, 'starting', 'enqueue writes the run\'s own thread machine')
@@ -337,7 +336,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(cloudClaims.filter(Boolean).length, 1)
     assert.deepEqual(cloudClaims.find(Boolean), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'allow' })
     const runId = randomUUID()
-    await pool.query('INSERT INTO agent_runs (id,"userId",status) VALUES ($1,$2,$3)', [runId, actor.userId, 'queued'])
+    await pool.query('INSERT INTO agent_runs (id,"userId",status,"workspaceId") VALUES ($1,$2,$3,$4)', [runId, actor.userId, 'queued', actor.workspaceId])
     await assert.rejects(bindComputerRun(pool, bob, runId, bobBot.id), { status: 404 })
     await assert.rejects(bindComputerRun(pool, otherWorkspace, runId, bot.id), { status: 404 })
     await assert.rejects(bindComputerRun(pool, actor, runId, bobBot.id), { status: 404 })
@@ -349,7 +348,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'queued')
     await bindComputerRun(pool, actor, runId, bot.id)
     const secondRunId = randomUUID()
-    await pool.query('INSERT INTO agent_runs (id,"userId",status) VALUES ($1,$2,$3)', [secondRunId, actor.userId, 'queued'])
+    await pool.query('INSERT INTO agent_runs (id,"userId",status,"workspaceId") VALUES ($1,$2,$3,$4)', [secondRunId, actor.userId, 'queued', actor.workspaceId])
     await bindComputerRun(pool, actor, secondRunId, bot.id)
     const bindings = await pool.query('SELECT "botId" FROM computer_run_bindings WHERE "runId" IN ($1,$2)', [runId, secondRunId])
     assert.equal(bindings.rowCount, 2)
@@ -357,11 +356,11 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const another = await store.createBot(actor, 'Another bot')
     await assert.rejects(bindComputerRun(pool, actor, runId, another.id), { status: 409 })
     const localRun = randomUUID()
-    await pool.query('INSERT INTO agent_runs (id,"userId",status,"deviceId") VALUES ($1,$2,$3,$4)', [localRun, actor.userId, 'queued', deviceId])
+    await pool.query('INSERT INTO agent_runs (id,"userId",status,"deviceId","workspaceId") VALUES ($1,$2,$3,$4,$5)', [localRun, actor.userId, 'queued', deviceId, actor.workspaceId])
     const localClaims = await Promise.all([claimLocalRun(pool, localRun, deviceId, new Date(Date.now() + 30000)), claimLocalRun(pool, localRun, deviceId, new Date(Date.now() + 30000))])
     assert.deepEqual(localClaims.sort(), ['claimed', 'unavailable'])
     const subscriptionRun = randomUUID(), bindingId = randomUUID()
-    await pool.query('INSERT INTO agent_runs (id,"userId",status,"deviceId") VALUES ($1,$2,$3,$4)', [subscriptionRun, actor.userId, 'queued', deviceId])
+    await pool.query('INSERT INTO agent_runs (id,"userId",status,"deviceId","workspaceId") VALUES ($1,$2,$3,$4,$5)', [subscriptionRun, actor.userId, 'queued', deviceId, actor.workspaceId])
     await assert.rejects(claimLocalRun(pool, subscriptionRun, deviceId, new Date(Date.now() + 30000), bindingId), { code: '23503' })
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [subscriptionRun])).rows[0].status, 'queued', 'failed subscription binding cannot claim the run')
     await pool.query('INSERT INTO byos_bindings(id) VALUES ($1)', [bindingId])
@@ -492,7 +491,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [runId])
     await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [review]))
     const startedId = randomUUID()
-    await pool.query('INSERT INTO agent_runs (id,"userId",status) VALUES ($1,$2,$3)', [startedId, actor.userId, 'running'])
+    await pool.query('INSERT INTO agent_runs (id,"userId",status,"workspaceId") VALUES ($1,$2,$3,$4)', [startedId, actor.userId, 'running', actor.workspaceId])
     await assert.rejects(bindComputerRun(pool, actor, startedId, bot.id), { status: 409 })
     await assert.rejects(pool.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [startedId, bobBot.id, actor.workspaceId, actor.userId]), { code: '23503' })
     await store.operate(bob,bobBot.id,'wake')
@@ -553,12 +552,12 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(computerPolicyVersion, 4)
     assert.equal((await pool.query('SELECT "approvedForRun" FROM computer_run_bindings WHERE "runId"=$1', [runId])).rows[0].approvedForRun, false, 'a policy transition revokes old run-scoped approval')
     const allowedRun = randomUUID()
-    await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId") VALUES ($1,$2,$3,$4,$5)', [allowedRun, actor.userId, consumer, 'queued', worker.deviceId])
+    await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId","workspaceId") VALUES ($1,$2,$3,$4,$5,$6)', [allowedRun, actor.userId, consumer, 'queued', worker.deviceId, actor.workspaceId])
     await bindComputerRun(pool, actor, allowedRun, bot.id)
     assert.deepEqual(await claimCloudRun(pool, actor, allowedRun, await onThreadMachine(allowedRun), new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 4, permission: 'allow' })
     const directLocal = randomUUID()
-    await pool.query(`INSERT INTO agent_runs (id,"userId","botId","deviceId",status,"machineAuthority","leaseExpiresAt")
-      VALUES ($1,$2,$3,$4,'running',true,now()+interval '5 minutes')`, [directLocal, actor.userId, bot.id, deviceId])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","botId","deviceId",status,"machineAuthority","leaseExpiresAt","workspaceId")
+      VALUES ($1,$2,$3,$4,'running',true,now()+interval '5 minutes',$5)`, [directLocal, actor.userId, bot.id, deviceId, actor.workspaceId])
     await store.setPolicy(actor.workspaceId, 'deny')
     const revokedLocal = (await pool.query('SELECT "stopRequestedAt","leaseExpiresAt"<=now() AS expired FROM agent_runs WHERE id=$1', [directLocal])).rows[0]
     assert.ok(revokedLocal.stopRequestedAt, 'policy revocation stops a direct local runner without a computer_run_binding')
@@ -571,7 +570,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     // and the owner decision must use the thread binding, never the Bot's X11.
     const threadRun = randomUUID(), threadDevice = randomUUID()
     await pool.query(`INSERT INTO devices(id,"ownerId",kind) VALUES ($1,$2,'cloud')`, [threadDevice, actor.userId])
-    await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,'running',now()+interval '5 minutes')`, [threadRun, actor.userId, consumer, threadDevice])
+    await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt","workspaceId") VALUES ($1,$2,$3,$4,'running',now()+interval '5 minutes',$5)`, [threadRun, actor.userId, consumer, threadDevice, actor.workspaceId])
     await pool.query(`INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [threadRun, later.id, actor.workspaceId, actor.userId])
     await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,$3,$4,'sandbox-thread','snapshot-thread',$5,'running',$6)`, [threadRun, actor.workspaceId, actor.userId, later.id, randomUUID(), threadDevice])
     const threadReview = makeReview(threadRun, 50)
@@ -598,8 +597,6 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(await decideComputerReview(pool, actor, askingAgain.id, askingAgain.digest, true), false)
   } finally {
     console.log(`Retained computer test schema: ${schema}`)
-    workspacePool.options.options = previousWorkspaceOptions
-    workspacePool.options.connectionString = previousWorkspaceURL
-    await workspacePool.end(); await pool.end(); await admin.end()
+    await closeWorkspace(); await pool.end(); await admin.end()
   }
 })

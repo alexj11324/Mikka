@@ -27,3 +27,8 @@ export async function beginOwnerListRead(ownerId: string, kinds: readonly LiveKi
   } catch (error) { unavailable(error); return { revisions: await readRevisions(others) } }
   return { scope, revisions: await readRevisions([...scope ? kinds.map(kind => ({ kind, id: scope.workspaceId })) : [], ...others], scope) }
 }
+
+/** The caller has authorized this effective workspace before reading its list. */
+export async function beginWorkspaceListRead(ownerId: string, workspaceId: string, kinds: readonly LiveKind[]): Promise<BegunListRead> {
+  return { scope: { ownerId, workspaceId }, revisions: await readRevisions(kinds.map(kind => ({ kind, id: workspaceId }))) }
+}

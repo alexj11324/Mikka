@@ -2,6 +2,7 @@ import { measured, readMetrics } from '../../../tests/helpers/read-metrics';
 import type { ModelMessage } from 'ai';
 import { completeAttentionQuestions } from '../../coordinator/question-attention';
 import { factoryTestLifecycle } from "../../../tests/helpers/factory-test-authority";
+import { seedFixtureWorkspace } from '../../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
@@ -152,6 +153,7 @@ test(
         selectSkill: (runId: string, issueId: string) => Promise<unknown> = (
           runId,
         ) => assignments.selectBaseline(userId, runId),
+        workspaceId?: string,
       ) => {
         // This fixture represents an online daemon. Refresh its heartbeat for
         // each case so earlier database cases cannot age it past the real
@@ -161,8 +163,8 @@ test(
           eventId = randomUUID(),
           questionId = randomUUID();
         await pool.query(
-          `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Use existing HTTP API','{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Keep the existing public API"}]}]}','todo','normal')`,
-          [issueId],
+          `INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Use existing HTTP API','{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Keep the existing public API"}]}]}','todo','normal',$2,'bound')`,
+          [issueId, workspaceId ?? await seedFixtureWorkspace(pool, userId)],
         );
         await pool.query(
           `INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey","issueId",payload) VALUES ($1,'owner','user_message',$2,$3,'{"text":"Keep the existing public API"}')`,
@@ -319,8 +321,9 @@ test(
       await t.test("cloud question answer keeps the exact task VM, frozen identity and original SID; replay dispatches once", async (t) => {
         type CloudQuestionTarget = { repoPath: string; remoteUrl: string | null; readOnly?: boolean };
         const cloudFixture = async (state = 'running', afterContinuation?: (owner:string,result:{continuationRunId:string})=>Promise<void>, withSkills = false, beforeRecovery?: Parameters<typeof createFactoryQuestions>[7], target: CloudQuestionTarget = { repoPath: '/isolated', remoteUrl: 'fixture/repo' }) => {
-          const f = await fixture('context',true,async () => undefined);
-          const workspaceId=randomUUID(),botId=randomUUID(),childDevice=randomUUID(),childRepo=randomUUID(),connectionId=randomUUID(),credentialId=randomUUID();
+          const workspaceId=await seedFixtureWorkspace(pool,userId,'team');
+          const f = await fixture('context',true,async () => undefined,workspaceId);
+          const botId=randomUUID(),childDevice=randomUUID(),childRepo=randomUUID(),connectionId=randomUUID(),credentialId=randomUUID();
           await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,'Cloud fixture')`,[botId,workspaceId,userId]);
           await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,$2,'Task VM','cloud',now(),'[{"harness":"codex","installed":true}]')`,[childDevice,userId]);
           await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,'main')`,[childRepo,childDevice,userId,target.repoPath,target.remoteUrl]);

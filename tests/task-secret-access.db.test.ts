@@ -3,9 +3,10 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
+import type { PoolClient } from 'pg'
 import type { DeviceCaller } from '../lib/device-link'
 import type { SecretHttpPolicy } from '../lib/secrets/delivery'
-import { dbUrl, seedAgent, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedIssue, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('protected task Secret claims and renewals against PostgreSQL', { skip: !dbUrl }, async t => {
   const previousKey = process.env.WORKSPACE_SECRETS_KEY
@@ -36,32 +37,32 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
   const fixture = async (options: { kind?: 'local' | 'cloud'; status?: string; personalScope?: boolean; legacy?: boolean } = {}) => {
     const owner = await seedUser(pool, 'secret-access')
     const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
-    const kind = options.kind ?? 'local', workspaceId = options.personalScope ? null : ws.id
+    const kind = options.kind ?? 'local', workspaceId = options.personalScope ? await seedPersonalWorkspace(pool, owner) : ws.id
     const now = new Date(), lease = new Date(now.getTime() + 120_000)
     const deviceId = randomUUID(), tokenId = randomUUID(), runId = randomUUID(), repoId = randomUUID()
-    const agentId = await seedAgent(pool, owner), issueId = await seedIssue(pool, owner)
+    const agentId = await seedAgent(pool, owner), issueId = await seedIssue(pool, owner, workspaceId)
     const name = 'PROTECTED_TOKEN', value = 'synthetic-canary-' + randomBytes(24).toString('hex')
     const saved = options.personalScope
       ? await personal.createUserSecret(owner, { name, kind: 'secret', value, delivery: { mode: 'protected', http } }, {})
       : await store.createWorkspaceSecret(owner, ws.id, { name, kind: 'secret', value, delivery: { mode: 'protected', http } })
     await pool.query('insert into devices (id,"ownerId",name,kind) values ($1,$2,$3,$4)', [deviceId, owner, 'secret-access-device', kind])
-    await pool.query('insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values ($1,$2,$3,$4,$5,$6)', [tokenId, owner, hashDeviceToken('dt_' + randomBytes(24).toString('hex')), kind === 'cloud' ? deviceId : null, kind === 'cloud' ? ws.id : null, lease])
+    await pool.query('insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values ($1,$2,$3,$4,$5,$6)', [tokenId, owner, hashDeviceToken('dt_' + randomBytes(24).toString('hex')), kind === 'cloud' ? deviceId : null, kind === 'cloud' ? workspaceId : null, lease])
     await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl") values ($1,$2,$3,$4,$5)', [repoId, deviceId, owner, `/tmp/${repoId}`, 'https://github.com/acme/secret-fixture.git'])
     let subscription: { id: string; modelId: string; route: string } | undefined
     if (kind === 'cloud') {
       // Cloud execution identities require their real model/runtime authority
       // rows. These synthetic fixtures never open a provider connection.
       const connection = randomUUID(), binding = randomUUID()
-      await pool.query('insert into byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") values ($1,$2,$3,\'codex\',\'connected\',1,$4,$5,\'synthetic-subject\')', [connection, owner, ws.id, `synthetic-${connection}`, 'a'.repeat(64)])
-      await pool.query('insert into byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") values ($1,$2,$3,$4,$5,1,\'codex_cli\',\'gpt-6-luna\')', [binding, owner, ws.id, agentId, connection])
+      await pool.query('insert into byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") values ($1,$2,$3,\'codex\',\'connected\',1,$4,$5,\'synthetic-subject\')', [connection, owner, workspaceId, `synthetic-${connection}`, 'a'.repeat(64)])
+      await pool.query('insert into byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") values ($1,$2,$3,$4,$5,1,\'codex_cli\',\'gpt-6-luna\')', [binding, owner, workspaceId, agentId, connection])
       const e2b = sealSecret('synthetic-e2b-fixture', userE2bKeyAad(owner), env)
       await pool.query('insert into user_e2b_keys ("userId",ciphertext,iv,"keyVersion",last4) values ($1,$2,$3,$4,\'test\')', [owner, e2b.ciphertext, e2b.iv, e2b.keyVersion])
       subscription = { id: binding, modelId: 'gpt-6-luna', route: 'codex_cli' }
     }
     const definition = freezeWorkerDefinition({ harness: 'codex', instructions: '', prompt: 'Synthetic secret fixture', parent: null, executionId: null, subscription })
     if (!options.legacy) definition.executionIdentity = await freezeExecutionIdentity(pool, { userId: owner, botId: null, deviceId, agentDefinition: definition }, pool, workspaceId)
-    await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","deviceTokenId","agentDefinition",status,"leaseExpiresAt",attempt) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,1)', [runId, owner, issueId, agentId, deviceId, repoId, tokenId, definition, options.status ?? 'running', lease])
-    const caller: DeviceCaller = { userId: owner, tokenId, ...(kind === 'cloud' ? { scopeDeviceId: deviceId, scopeWorkspaceId: ws.id } : {}) }
+    await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","deviceTokenId","agentDefinition",status,"leaseExpiresAt",attempt,"workspaceId") values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,1,$11)', [runId, owner, issueId, agentId, deviceId, repoId, tokenId, definition, options.status ?? 'running', lease, workspaceId])
+    const caller: DeviceCaller = { userId: owner, tokenId, ...(kind === 'cloud' ? { scopeDeviceId: deviceId, scopeWorkspaceId: workspaceId } : {}) }
     const injection = await runtime.taskSecretInjection(workspaceId, 'acme/secret-fixture', env, undefined, owner)
     const secret = injection.protectedSecrets.find(item => item.id === saved.id)
     assert.ok(secret?.revision)
@@ -100,6 +101,96 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
     assert.equal(claims.revision, f.grantInput.revision)
     assert.ok(!JSON.stringify(renewed).includes(f.value))
     assert.ok(!JSON.stringify(renewed).includes(f.value.slice(0, 16)))
+  })
+
+  await t.test('Task deletion serializes with Secret renewal and cannot be followed by a stale new capability', async () => {
+    const f = await fixture()
+    const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
+    const { rows: [task] } = await pool.query('select content from issues where id=$1', [f.issueId])
+    const deletedContent = withIssueMetadata(task.content, { ...readIssueMetadata(task.content), deletedAt: new Date().toISOString() })
+    const state = async () => (await pool.query('select "workspaceId","issueId",status,attempt,"leaseExpiresAt","stopRequestedAt" from agent_runs where id=$1', [f.runId])).rows[0]
+    const before = await state()
+    const writer = await pool.connect()
+    const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>()
+    const originals = new Map<PoolClient, PoolClient['query']>()
+    let intercepted = 0
+    let pending: ReturnType<typeof f.renew> | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+    // Run every query against PostgreSQL. Pause only this fixture's real
+    // execution-identity read, after renewal has obtained its authority rows.
+    const observe = (client: PoolClient) => {
+      if (originals.has(client)) return
+      const query = client.query
+      originals.set(client, query)
+      client.query = ((...args: unknown[]) => {
+        const result = Reflect.apply(query, client, args)
+        if (args[0] !== 'SELECT "ownerId",kind,enabled FROM devices WHERE id=$1'
+          || !Array.isArray(args[1]) || args[1][0] !== f.deviceId) return result
+        intercepted++
+        return Promise.resolve(result).then(async value => {
+          entered.resolve()
+          await release.promise
+          return value
+        })
+      }) as PoolClient['query']
+    }
+    appPool.on('acquire', observe)
+    try {
+      pending = f.renew({}, new Date(f.now.getTime() + 5), Date.now)
+      await Promise.race([entered.promise, pending.then(() => {
+        throw new Error('Renewal ended before the real device authorization query')
+      }), new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Renewal did not reach the real device authorization query')), 5_000)
+      })])
+      if (timer) { clearTimeout(timer); timer = undefined }
+      assert.equal(intercepted, 1)
+      await writer.query('begin')
+      await writer.query("set local lock_timeout='1s'")
+      let deletionCommitted = false
+      try {
+        // Match setIssueDeleted's Task-first lock and metadata update. The
+        // old Run-only renewal lets this commit while its Task snapshot is stale.
+        await writer.query('select id from issues where id=$1 for update', [f.issueId])
+        await writer.query('update issues set content=$2,revision=revision+1,"updatedAt"=now() where id=$1', [f.issueId, deletedContent])
+        await writer.query('commit')
+        deletionCommitted = true
+      } catch (error) {
+        await writer.query('rollback')
+        assert.equal((error as { code?: string }).code, '55P03', 'only a real PostgreSQL Task lock may defer deletion')
+      }
+      release.resolve()
+      const renewed = await pending
+      if (deletionCommitted) {
+        assert.deepEqual(renewed, { taskSecrets: {}, revoked: [f.runId] },
+          'Task deletion committed before issuance; renewal must not return a new capability from its old Task snapshot')
+      } else {
+        assert.deepEqual(renewed.revoked, [])
+        const grants = renewed.taskSecrets[f.runId].grants
+        assert.equal(grants.length, 1)
+        const claims = openEgressCapability(grants[0].capability, f.binding, Date.now(), env)
+        assert.equal(claims.secretId, f.saved.id)
+        assert.equal(claims.revision, f.grantInput.revision)
+        assert.equal(claims.secret, f.value)
+        assert.ok(!JSON.stringify(renewed).includes(f.value))
+        // Once renewal commits, the same ordinary deletion succeeds. Every
+        // subsequent renewal must observe that committed tombstone.
+        await writer.query('begin')
+        await writer.query("set local lock_timeout='1s'")
+        await writer.query('select id from issues where id=$1 for update', [f.issueId])
+        await writer.query('update issues set content=$2,revision=revision+1,"updatedAt"=now() where id=$1', [f.issueId, deletedContent])
+        await writer.query('commit')
+      }
+      await denied(f)
+      assert.deepEqual(await state(), before, 'refused Secret renewal cannot mutate the existing Run or its lease')
+    } finally {
+      if (timer) clearTimeout(timer)
+      release.resolve()
+      await writer.query('rollback')
+      writer.release()
+      await pending?.catch(() => undefined)
+      appPool.off('acquire', observe)
+      for (const [client, query] of originals) client.query = query
+    }
   })
 
   await t.test('cross-owner, device, workspace, repository, token and attempt claims are rejected', async () => {
@@ -239,15 +330,59 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
     await denied(f, { caller })
   })
 
-  await t.test('legacy cloud scope comes only from its claim token; frozen null remains personal', async () => {
+  await t.test('ordinary Personal runs keep their real tenant on local and cloud renewal', async () => {
+    for (const kind of ['local', 'cloud'] as const) {
+      const personalRun = await fixture({ kind, personalScope: true })
+      assert.notEqual(personalRun.workspaceId, personalRun.ws.id)
+      assert.equal((await pool.query('select kind from mikka_workspaces where id=$1', [personalRun.workspaceId])).rows[0].kind, 'personal')
+      assert.equal(await runtime.runWorkspaceId(personalRun.runId), personalRun.workspaceId)
+      const renewed = await personalRun.renew()
+      assert.deepEqual(renewed.revoked, [])
+      assert.equal(openEgressCapability(renewed.taskSecrets[personalRun.runId].grants[0].capability, personalRun.binding, personalRun.now.getTime() + 5, env).workspaceId, personalRun.workspaceId)
+      const wrong = issueEgressCapability({ ...personalRun.grantInput, workspaceId: personalRun.ws.id }, personalRun.now.getTime(), env)
+      await denied(personalRun, { runs: personalRun.report(wrong.capability) })
+    }
+  })
+
+  await t.test('a claim token cannot reattribute a legacy bound run and frozen null is refused', async () => {
     const legacy = await fixture({ kind: 'cloud', legacy: true })
     assert.deepEqual((await legacy.renew()).revoked, [])
-    const personalRun = await fixture({ kind: 'cloud', personalScope: true })
-    const renewed = await personalRun.renew()
-    assert.deepEqual(renewed.revoked, [])
-    assert.equal(openEgressCapability(renewed.taskSecrets[personalRun.runId].grants[0].capability, personalRun.binding, personalRun.now.getTime() + 5, env).workspaceId, null)
-    const wrong = issueEgressCapability({ ...personalRun.grantInput, workspaceId: personalRun.ws.id }, personalRun.now.getTime(), env)
-    await denied(personalRun, { runs: personalRun.report(wrong.capability) })
+    const other = await seedWorkspace(pool, legacy.owner, [{ userId: legacy.owner, role: 'admin' }])
+    await pool.query('update device_tokens set "boundWorkspaceId"=$2 where id=$1', [legacy.tokenId, other.id])
+    const state = async (runId: string) => (await pool.query('select "workspaceId",status,"leaseExpiresAt","stopRequestedAt",attempt from agent_runs where id=$1', [runId])).rows[0]
+    const beforeLegacy = await state(legacy.runId)
+    await denied(legacy, { caller: { ...legacy.caller, scopeWorkspaceId: other.id } })
+    assert.deepEqual(await state(legacy.runId), beforeLegacy, 'a refused renewal changes no run or lease')
+    assert.equal(await runtime.runWorkspaceId(legacy.runId), legacy.workspaceId)
+
+    const frozen = await fixture()
+    await pool.query(`update agent_runs set "agentDefinition"=jsonb_set("agentDefinition",'{executionIdentity,workspaceId}','null'::jsonb) where id=$1`, [frozen.runId])
+    const beforeFrozen = await state(frozen.runId)
+    await denied(frozen)
+    assert.deepEqual(await state(frozen.runId), beforeFrozen, 'frozen-null refusal issues no replacement lease')
+    assert.equal(await runtime.runWorkspaceId(frozen.runId), frozen.workspaceId)
+  })
+
+  await t.test('PostgreSQL rejects a foreign frozen tenant and unattributed runs receive no claim or renewal', async () => {
+    const f = await fixture()
+    const other = await seedWorkspace(pool, f.owner, [{ userId: f.owner, role: 'admin' }])
+    await assert.rejects(pool.query(`update agent_runs set "agentDefinition"=jsonb_set("agentDefinition",'{executionIdentity,workspaceId}',to_jsonb($2::text)) where id=$1`, [f.runId, other.id]), { code: '23514' })
+    assert.deepEqual((await f.renew()).revoked, [], 'the refused foreign write leaves the valid run unchanged')
+    const runId = randomUUID()
+    await pool.query(`insert into agent_runs (id,"userId","agentId","deviceId","deviceRepoId","deviceTokenId",status,"leaseExpiresAt",attempt)
+      values ($1,$2,$3,$4,$5,$6,'running',$7,1)`, [runId, f.owner, f.agentId, f.deviceId, f.repoId, f.tokenId, f.lease])
+    const state = async () => (await pool.query('select "workspaceId",status,"leaseExpiresAt","stopRequestedAt",attempt from agent_runs where id=$1', [runId])).rows[0]
+    const before = await state()
+    assert.equal(before.workspaceId, null)
+    const grant = issueEgressCapability({ ...f.grantInput, runId, workspaceId: null }, f.now.getTime(), env)
+    assert.deepEqual(await f.renew({ runs: [{ runId, secretCapabilities: [grant.capability] }], leases: { [runId]: f.lease.toISOString() } }), { taskSecrets: {}, revoked: [runId] })
+    let responses = 0
+    assert.equal(await authorizedClaimResponse(f.owner, { id: runId, issueId: null, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId }, f.lease.toISOString(), () => {
+      responses++
+      return Response.json({ grant })
+    }), null)
+    assert.equal(responses, 0, 'unattributed runs cannot expose prepared credentials')
+    assert.deepEqual(await state(), before, 'scope refusal changes no status, attempt or lease')
   })
 
   await t.test('a suspended or removed workspace member cannot renew legacy or frozen workspace grants', async () => {

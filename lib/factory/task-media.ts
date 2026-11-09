@@ -32,12 +32,12 @@ function tokenReader(userId: string) {
 /** All ready media for an already-authorized task, including older attempts and
  * files that were never selected for an acceptance report. No capture bytes,
  * object keys, prompts or bearer/share tokens enter the sidebar read model. */
-export async function readFactoryTaskMedia(tx: Pick<PoolClient, 'query'>, task: Pick<FactoryTask, 'id' | 'userId' | 'issueId'>): Promise<FactoryTaskMedia[]> {
+export async function readFactoryTaskMedia(tx: Pick<PoolClient, 'query'>, task: Pick<FactoryTask, 'id' | 'userId' | 'issueId' | 'workspaceId'>): Promise<FactoryTaskMedia[]> {
   const { rows } = await tx.query<MediaRow>(`SELECT c.id AS "captureId",c."runId",c.kind,c."contentType",c.source,c.title,c.size,c."durationMs",c."createdAt"
     FROM run_captures c JOIN agent_runs r ON r.id=c."runId" AND r."userId"=c."userId"
-    WHERE c."userId"=$2 AND r."issueId"=$3 AND (c."issueId" IS NULL OR c."issueId"=$3) AND c.status='ready'
+    WHERE c."userId"=$2 AND r."issueId"=$3 AND r."workspaceId"=$4 AND (c."issueId" IS NULL OR c."issueId"=$3) AND c.status='ready'
       AND EXISTS (SELECT 1 FROM factory_attempts a WHERE a."taskId"=$1 AND a."runId"=r.id)
-    ORDER BY c."createdAt",c.id`, [task.id,task.userId,task.issueId])
+    ORDER BY c."createdAt",c.id`, [task.id,task.userId,task.issueId,task.workspaceId ?? null])
   const reader=tokenReader(task.userId)
   // readFactoryActivity keeps this helper inside withDatabaseClient(tx), so
   // the existing capture/run scope reads share its repeatable-read snapshot.
@@ -60,9 +60,9 @@ export async function authorizeFactoryTaskCapture(pool: Pool, store: Pick<Return
     const task = await store.readTask(tx,userId,taskId)
     const { rows:[capture] } = await tx.query<{runId:string}>(`SELECT c."runId" FROM run_captures c
       JOIN agent_runs r ON r.id=c."runId" AND r."userId"=c."userId"
-      WHERE c.id=$1 AND c."userId"=$2 AND r."issueId"=$3 AND (c."issueId" IS NULL OR c."issueId"=$3) AND c.status='ready'
+      WHERE c.id=$1 AND c."userId"=$2 AND r."issueId"=$3 AND r."workspaceId"=$5 AND (c."issueId" IS NULL OR c."issueId"=$3) AND c.status='ready'
         AND EXISTS (SELECT 1 FROM factory_attempts a WHERE a."taskId"=$4 AND a."runId"=r.id)`,
-    [captureId,task.userId,task.issueId,task.id])
+    [captureId,task.userId,task.issueId,task.id,task.workspaceId ?? null])
     if (!capture) throw new FactoryError('factoryNotFound')
     const reader=tokenReader(task.userId)
     if(reader){

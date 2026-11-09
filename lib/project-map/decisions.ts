@@ -152,7 +152,7 @@ export async function recordProjectDecision(actor: DecisionActor, raw: RecordDec
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${workspaceId + ':' + scope.projectId}))`)
       if (observedIssue) {
         const [locked] = await tx.select().from(issues).where(eq(issues.id, observedIssue.id)).for('update')
-        try { requireLockedIssueScope(locked, userId, observedIssue.scopeVersion) } catch { unavailable() }
+        try { requireLockedIssueScope(locked, userId, observedIssue.scopeVersion, observedIssue.workspaceId) } catch { unavailable() }
         if (readIssueMetadata(locked.content).deletedAt) unavailable()
       }
       if (actor.kind === 'bot' && actor.botId) {

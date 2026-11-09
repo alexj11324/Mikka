@@ -1,3 +1,4 @@
+import { withFactoryBackgroundWorkspace } from './background-workspace'
 import 'server-only'
 import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
 import { createHash, randomUUID } from 'node:crypto'
@@ -37,6 +38,7 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
 }) {
   if (!factoryLifecycleEnabled()) throw new FactoryError('factoryLifecycleUnavailable')
   if (input.needsSpec && input.previousRunId) throw new FactoryError('factoryTransition')
+  return withFactoryBackgroundWorkspace(pool, userId, { kind: 'issue', id: input.issueId, botId: input.botId }, async () => {
   const runtime = factoryRuntimeForBot(input.botId)
   const tx = await pool.connect()
   const key = input.key ?? randomUUID()
@@ -119,4 +121,5 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
     await notifyQueuedLocalRun(tx, userId, result.runId)
     return { runId: result.runId }
   } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+  })
 }

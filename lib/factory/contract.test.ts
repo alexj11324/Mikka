@@ -37,21 +37,25 @@ test("clear authorization routes directly; only missing items clarify, spec is o
     "clarify",
   );
 });
-test("Factory teammate grants stay in their original issue generation", () => {
-  const task = { userId: "member", scopeVersion: 1 };
-  const issue = { userId: "owner", scope: "workspace", scopeVersion: 1 };
+test("Factory authority follows its immutable task workspace across provider policy changes", () => {
+  const task = { userId: "member", workspaceId: "shared", scopeVersion: 1 };
+  const issue = { userId: "owner", workspaceId: "shared", ownershipState: "bound", scope: "workspace", scopeVersion: 1 };
   assert.equal(factoryScopeAllows(task, issue), true);
-  assert.equal(factoryScopeAllows(task, { ...issue, scope: "personal", scopeVersion: 2 }), false);
-  assert.equal(factoryScopeAllows(task, { ...issue, scopeVersion: 3 }), false);
-  assert.equal(factoryScopeAllows({ ...task, scopeVersion: null }, issue), false);
+  assert.equal(factoryScopeAllows(task, { ...issue, scope: "personal", scopeVersion: 2 }), true);
+  assert.equal(factoryScopeAllows(task, { ...issue, scopeVersion: 3 }), true);
+  assert.equal(factoryScopeAllows({ ...task, scopeVersion: null }, issue), true);
+  assert.equal(factoryScopeAllows(task, { ...issue, workspaceId: "other" }), false);
+  assert.equal(factoryScopeAllows(task, { ...issue, ownershipState: "pending" }), false);
   assert.equal(factoryScopeAllows({ userId: "member" }, issue), false);
   assert.equal(factoryScopeAllows(task, undefined), false);
 });
-test("Factory issue owners keep their own authority without renewing teammate grants", () => {
+test("Factory owners cannot bypass missing or mismatched tenant bindings", () => {
   for (const scope of ["personal", "workspace"]) {
-    const issue = { userId: "owner", scope, scopeVersion: 3 };
+    const issue = { userId: "owner", workspaceId: "shared", ownershipState: "bound", scope, scopeVersion: 3 };
     for (const scopeVersion of [1, null, undefined]) {
-      assert.equal(factoryScopeAllows({ userId: "owner", scopeVersion }, issue), true);
+      assert.equal(factoryScopeAllows({ userId: "owner", scopeVersion }, issue), false);
+      assert.equal(factoryScopeAllows({ userId: "owner", workspaceId: "other", scopeVersion }, issue), false);
+      assert.equal(factoryScopeAllows({ userId: "owner", workspaceId: "shared", scopeVersion }, issue), true);
       assert.equal(factoryScopeAllows({ userId: "member", scopeVersion }, issue), false);
     }
   }

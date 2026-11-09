@@ -7,6 +7,7 @@ import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
@@ -32,11 +33,12 @@ test('the real Factory store schedules one invalidation only after its outer tra
     const dir = new URL('../../drizzle/', import.meta.url)
     for (const name of orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))) await pool.query(await readFile(new URL(name, dir), 'utf8'))
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','live@example.invalid',true,now(),now())`)
+    const workspaceId = await seedFixtureWorkspace(pool, 'owner')
     const { createFactoryStore } = await import('../factory/store')
     const store = createFactoryStore(pool, async (owner, issue, tx) => (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1, null, {})
     async function input() {
       const issueId = randomUUID(), sourceEventId = randomUUID()
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId])
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2)`, [issueId, workspaceId])
       await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [sourceEventId, sourceEventId])
       return { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Requested task', missingInformation: [], missingPermissions: [], needsSpec: false }
     }

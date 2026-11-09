@@ -44,7 +44,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
     await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Identity fixture\')', [bot, requester, workspace])
     await pool.query('INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,\'Identity fixture\')', [device, requester])
     await pool.query('INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,\'Identity fixture\',\'codex\',$3)', [agent, requester, device])
-    await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,\'Identity fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\')', [issue, requester])
+    await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,\'Identity fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\')', [issue, requester, workspace])
     const env = { WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') }
     for (const [id, owner] of [[ownKey, requester], [sharedKey, resourceOwner]]) {
       const sealed = sealSecret(`synthetic-${owner}-not-a-real-secret`, ['model_api_key', id, owner].join('\0'), env)
@@ -126,14 +126,18 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
       await pool.query('INSERT INTO bot_desktops("botId","workspaceId","ownerId",display) VALUES($1,$2,$3,1)', [bot, workspace, requester])
       await pool.query('INSERT INTO bot_cloud_runtimes("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES($1,$2,$3,\'codex\',$4,$5)', [bot, workspace, requester, cloudAgent, cloudRepo])
       await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,\'synthetic\',\'synthetic\',1,\'test\')', [requester])
-      await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,\'Cloud quota\',\'{"type":"doc","attrs":{"mikka":{"number":1163}},"content":[]}\',\'doing\',\'normal\')', [cloudIssue, requester])
-      await pool.query('INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") VALUES($1,$2,$3,\'codex\',\'connected\',1,\'synthetic\',$4,\'synthetic\')', [connection, requester, workspace, 'a'.repeat(64)])
+      await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,\'Cloud quota\',\'{"type":"doc","attrs":{"mikka":{"number":1163}},"content":[]}\',\'doing\',\'normal\')', [cloudIssue, requester, workspace])
+      await pool.query('INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES($1,$2,$3,\'codex\',\'connected\',1,\'synthetic\',$4,\'synthetic\',$5)', [connection, requester, workspace, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] })])
       await pool.query('INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,$2,$3,$4,$5,1,\'codex_cli\',\'gpt-5\')', [binding, requester, workspace, cloudAgent, connection])
       await pool.query('UPDATE model_api_keys SET models=\'["gpt-5"]\' WHERE id=$1', [ownKey])
       const machines = await fakeThreadMachines(pool, harnesses)
       try {
         const actor = { userId: requester, workspaceId: workspace }
         const source = await queueCloudRun(pool, actor, { botId: bot, issueId: cloudIssue, agentId: cloudAgent, deviceRepoId: cloudRepo, title: 'Cloud quota', body: '', model: 'gpt-5', subscriptionBindingId: binding })
+        const scheduled = (await pool.query('SELECT "workspaceId","agentDefinition" FROM agent_runs WHERE id=$1', [source.runId])).rows[0]
+        assert.equal(scheduled.workspaceId, workspace)
+        assert.equal(scheduled.agentDefinition.subscription?.bindingId, binding)
+        assert.equal(scheduled.agentDefinition.apiKey, undefined, 'the quota source starts on its subscribed model, before any API-key continuation')
         const originalChild = await machines.start(actor, source.runId)
         await pool.query('UPDATE agent_runs SET status=\'paused\',"pauseReason"=\'quota_exhausted\',"startedAt"=now(),"leaseExpiresAt"=NULL WHERE id=$1', [source.runId])
         const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [source.runId])).rows[0]

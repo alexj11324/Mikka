@@ -27,6 +27,7 @@ import { factoryMonitorDispatchAssignment } from './monitor-dispatch';
 import { appendMonitorEvidence } from './monitor-evidence';
 import { factoryMonitorWorkspaceKey,questionSkillAssignments } from './server';
 import { createFactoryQuestions } from './questions/store';
+import { bindFactoryStoreWorkspace, bindFactoryQuestionsWorkspace, factoryBackgroundReference, factoryTaskWorkspaceBoundary, withFactoryBackgroundWorkspace } from './background-workspace';
 
 export function factoryLifecycleEnabled() {
   return deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle');
@@ -35,7 +36,7 @@ export { factoryAuthorize } from './authorize';
 /** Consumer owners supply actual validators/configurators. Sixth argument is host-only recovery I/O, never tool input. Text observations need no images. */
 export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLifecycle = {}, configure: FactoryDispatchAdapters['configure'] = {}, validateCheck?: Parameters<typeof createFactoryClaim>[2], consumers: Parameters<typeof createFactoryReconciler>[3] = {}, recovery: FactoryCheckRecoveryDependencies = {}) {
   if (!factoryLifecycleEnabled()) throw new FactoryError('factoryLifecycleUnavailable');
-  const store = createFactoryStore(pool,factoryAuthorize,botId,{onTransition:syncFactoryPresentation,...lifecycle,independent:factoryCheckIndependent,gates:{...factoryCheckGates,approval:approvalGate,publish:publishGate,monitor:monitorGate,...lifecycle.gates}});
+  const store = bindFactoryStoreWorkspace(pool,createFactoryStore(pool,factoryAuthorize,botId,{onTransition:syncFactoryPresentation,...lifecycle,independent:factoryCheckIndependent,gates:{...factoryCheckGates,approval:approvalGate,publish:publishGate,monitor:monitorGate,...lifecycle.gates}}),botId);
   const validate = validateCheck ?? ((tx:PoolClient,task:import('./store').FactoryTask,id:string) => task.stage === 'monitor' ? factoryMonitorDispatchAssignment(tx,task.userId,id) : factoryCheckAssignment(tx,task.userId,id));
   const dispatch = createFactoryDispatch(pool,store,
     async (tx,userId,input,scopeBot,context) => await queueCloudQuestionContinuation(tx,userId,input,scopeBot,context) ?? await queueLocalQuestionContinuation(tx,userId,input,scopeBot,context) ?? queueFactoryRun(tx,userId,input,scopeBot,context), {
@@ -58,11 +59,20 @@ export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLif
         await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1',[id,JSON.stringify(snapshot)]);
       },
     });
-  const questions = createFactoryQuestions(pool,factoryAuthorize,store,dispatch,validate,questionSkillAssignments,
+  const questions = bindFactoryQuestionsWorkspace(pool,createFactoryQuestions(pool,factoryAuthorize,store,dispatch,validate,questionSkillAssignments,
     (userId,result)=>wakeCloudQuestionContinuation(pool,userId,result),
-    (userId,scope)=>prepareCloudQuestionRecovery(pool,userId,scope));
-  const monitor = createFactoryMonitor(pool,store,factoryAuthorize,factoryMonitorWorkspaceKey,appendMonitorEvidence,configuredMonitorProbes(process.env),botId);
-  return {store,monitor,dispatch:observeFactoryCheckDispatch(store,dispatch),questions,recoverCheck:createFactoryCheckRecovery(pool,store,recovery),reconcile:createFactoryReconciler(pool,store,questions,{review:reconcileFactoryCheck,verify:reconcileFactoryCheck,monitor:createFactoryMonitorRunConsumer(monitor),...consumers},botId,automaticFactoryDispatch(pool)),claim:createFactoryClaim(store,questions,validate)};
+    (userId,scope)=>prepareCloudQuestionRecovery(pool,userId,scope)),botId);
+  const workspace = factoryTaskWorkspaceBoundary(pool,botId);
+  const monitor = createFactoryMonitor(pool,store,factoryAuthorize,factoryMonitorWorkspaceKey,appendMonitorEvidence,configuredMonitorProbes(process.env),botId,workspace);
+  const observedDispatch = observeFactoryCheckDispatch(store,dispatch);
+  const recoverCheck = createFactoryCheckRecovery(pool,store,recovery);
+  const claim = createFactoryClaim(store,questions,validate);
+  return {store,monitor,
+    dispatch: ((...args:Parameters<typeof observedDispatch>) => workspace(args[0],factoryBackgroundReference(args[1],'taskId'),()=>observedDispatch(...args),args[2])),
+    questions,
+    recoverCheck: ((...args:Parameters<typeof recoverCheck>) => workspace(args[0],factoryBackgroundReference(args[1],'taskId'),()=>recoverCheck(...args))),
+    reconcile:createFactoryReconciler(pool,store,questions,{review:reconcileFactoryCheck,verify:reconcileFactoryCheck,monitor:createFactoryMonitorRunConsumer(monitor),...consumers},botId,automaticFactoryDispatch(pool),workspace),
+    claim: ((...args:Parameters<typeof claim>) => withFactoryBackgroundWorkspace(pool,args[1],{kind:'run',id:args[3]},()=>claim(...args),args[0]))};
 }
 
 /** Returns before any Factory SQL when default-off; ordinary claims retain their path. */

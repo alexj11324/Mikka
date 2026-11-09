@@ -201,16 +201,11 @@ export async function maskFor<T>(target: { workspaceId: string | null | undefine
   return maskDeep(value, await secretMaskerFor(target, env))
 }
 
-/** Same frozen workspace used by claim. A legacy cloud run may use only its
- * original claim token's scope; a newer token on the device cannot widen it. */
+/** Output masking follows the persisted Task/Run tenant, including Personal
+ * workspaces and retained history. A device token cannot reattribute a run. */
 export async function runWorkspaceId(runId: string): Promise<string | null> {
-  const { rows } = await guardSecretsDb(async () => (await import('@/lib/db')).pool.query<{ workspaceId: string }>(
-    `SELECT CASE WHEN r."agentDefinition" ? 'executionIdentity'
-      THEN r."agentDefinition"->'executionIdentity'->>'workspaceId'
-      WHEN d.kind='cloud' THEN t."boundWorkspaceId"::text ELSE NULL END AS "workspaceId"
-      FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
-      LEFT JOIN device_tokens t ON t.id=r."deviceTokenId" AND t."boundDeviceId"=r."deviceId" AND t."userId"=r."userId"
-      WHERE r.id=$1 LIMIT 1`, [runId]))
+  const { rows } = await guardSecretsDb(async () => (await import('@/lib/db')).pool.query<{ workspaceId: string | null }>(
+    'SELECT "workspaceId" FROM agent_runs WHERE id=$1 LIMIT 1', [runId]))
   return rows[0]?.workspaceId ?? null
 }
 

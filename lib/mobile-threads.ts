@@ -111,9 +111,10 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
 }
 
 /** The person's threads from the last 30 days, newest first, and their machines with whether each is online (R-24). */
-export async function mobileThreads(userId: string, limit = 60, homeScopeToken?: string): Promise<{ threads: MobileThread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[]; live: ListLiveRead }> {
+export async function mobileThreads(userId: string, limit = 60, homeScopeToken?: string, workspaceId?: string | null): Promise<{ threads: MobileThread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[]; live: ListLiveRead }> {
   const [threads, machines] = await Promise.all([
-    runRows(userId, sql`${agentRuns.createdAt} > now() - interval '30 days'`, limit).then(listed),
+    runRows(userId, and(sql`${agentRuns.createdAt} > now() - interval '30 days'`,
+      workspaceId === undefined ? undefined : workspaceId ? eq(agentRuns.workspaceId, workspaceId) : sql`false`), limit).then(listed),
     // A task's own cloud sandbox is not one of the person's machines (Alex, 2026-11-01).
     db.select({ id: devices.id, name: devices.name, platform: devices.platform, kind: devices.kind, lastSeenAt: devices.lastSeenAt }).from(devices)
       .where(and(eq(devices.ownerId, userId), isNull(devices.removedAt), notThreadMachineDevice)),
@@ -156,7 +157,7 @@ export type MobileArtifact = { id: string; title: string; kind: 'markdown' | 'ht
  */
 export async function mobileBot(userId: string, workspaceId: string, botId: string): Promise<{ threads: MobileThread[]; pullRequests: MobilePullRequest[]; schedules: MobileSchedule[]; library: MobileArtifact[]; pinned: boolean; muted: boolean }> {
   // An MCP client's runs are the Coordinator's too, but its page lists only the threads it dispatched, as before.
-  const own = and(eq(agentRuns.botId, botId), sql`${agentRuns.source} IS DISTINCT FROM 'mcp'`)
+  const own = and(eq(agentRuns.botId, botId), eq(agentRuns.workspaceId, workspaceId), sql`${agentRuns.source} IS DISTINCT FROM 'mcp'`)
   const [rows, schedules] = await Promise.all([
     runRows(userId, own, 60),
     pool.query<{ id: string; title: string; status: 'active' | 'paused'; next_at: Date | null }>(

@@ -38,32 +38,32 @@ test('task media uses real owner/task/run relations and private cached video cov
       PERFORM 1 FROM accounts WHERE id=owner AND writable FOR SHARE;
       IF NOT FOUND THEN RAISE EXCEPTION 'account_deletion_pending'; END IF;
     END $$;
-    CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,scope text,"scopeVersion" integer,workspace text);
-    CREATE TABLE memberships ("userId" text,workspace text,active boolean);
+    CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,scope text,"scopeVersion" integer,"workspaceId" uuid,"ownershipState" text);
+    CREATE TABLE memberships ("userId" text,workspace uuid,active boolean);
     CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text);
     CREATE TABLE coordinator_events (id uuid PRIMARY KEY,"userId" text,kind text,"botId" uuid,"issueId" uuid);
-    CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"botId" uuid,"sourceEventId" uuid,"scopeVersion" integer);
+    CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"botId" uuid,"sourceEventId" uuid,"scopeVersion" integer,"workspaceId" uuid);
     CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid);
-    CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid);
+    CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"workspaceId" uuid);
     CREATE TABLE run_captures (id uuid PRIMARY KEY,"userId" text,"runId" uuid REFERENCES agent_runs ON DELETE CASCADE,"issueId" uuid,
       kind text,"contentType" text,source text,status text,title text,size integer,"durationMs" integer,"createdAt" timestamptz NOT NULL DEFAULT now(),
       sha256 text,"storageKey" text,"inlineContent" bytea);
   `)
   await database.query(await readFile(new URL('../../drizzle/20261109010002_capture_posters.sql',import.meta.url),'utf8'))
-  const owner = 'media-owner', peer = 'media-peer', workspace = 'workspace-one'
+  const owner = 'media-owner', peer = 'media-peer', workspace = randomUUID(), otherWorkspace = randomUUID()
   const issueId = randomUUID(), otherIssue = randomUUID(), taskId = randomUUID(), otherTask = randomUUID(), botId = randomUUID(), sourceId = randomUUID()
   const runs = Array.from({length:5},()=>randomUUID())
   await database.query("INSERT INTO accounts(id) VALUES($1),($2)",[owner,peer])
   await database.query("INSERT INTO memberships VALUES($1,$2,true)",[owner,workspace])
-  await database.query("INSERT INTO issues VALUES($1,$2,'workspace',1,$3),($4,$5,'personal',1,'workspace-other')",[issueId,peer,workspace,otherIssue,owner])
+  await database.query("INSERT INTO issues VALUES($1,$2,'workspace',1,$3,'bound'),($4,$5,'personal',1,$6,'bound')",[issueId,peer,workspace,otherIssue,owner,otherWorkspace])
   await database.query('INSERT INTO bots VALUES($1,$2)',[botId,owner])
   await database.query("INSERT INTO coordinator_events VALUES($1,$2,'user_message',$3,$4)",[sourceId,owner,botId,issueId])
-  await database.query('INSERT INTO factory_tasks VALUES($1,$2,$3,$4,$5,1),($6,$2,$3,$4,$5,1)',[taskId,owner,issueId,botId,sourceId,otherTask])
-  for (const [index,id] of runs.entries()) await database.query('INSERT INTO agent_runs VALUES($1,$2,$3)',[id,index===4?peer:owner,index===3?otherIssue:issueId])
+  await database.query('INSERT INTO factory_tasks VALUES($1,$2,$3,$4,$5,1,$7),($6,$2,$3,$4,$5,1,$7)',[taskId,owner,issueId,botId,sourceId,otherTask,workspace])
+  for (const [index,id] of runs.entries()) await database.query('INSERT INTO agent_runs VALUES($1,$2,$3,$4)',[id,index===4?peer:owner,index===3?otherIssue:issueId,index===3?otherWorkspace:workspace])
   for (const [task,run] of [[taskId,runs[0]],[taskId,runs[1]],[taskId,runs[0]],[otherTask,runs[2]],[taskId,runs[4]]])
     await database.query('INSERT INTO factory_attempts VALUES($1,$2,$3)',[randomUUID(),task,run])
   const store = createFactoryHumanStore(database,bot => createFactoryStore(database,async (user,issue,tx) =>
-    (await tx.query(`SELECT 1 FROM issues i JOIN memberships m ON m.workspace=i.workspace AND m."userId"=$1 AND m.active WHERE i.id=$2`,[user,issue])).rowCount === 1,bot))
+    (await tx.query(`SELECT 1 FROM issues i JOIN memberships m ON m.workspace=i."workspaceId" AND m."userId"=$1 AND m.active WHERE i.id=$2`,[user,issue])).rowCount === 1,bot))
   const task = (await database.query<FactoryTask>('SELECT * FROM factory_tasks WHERE id=$1',[taskId])).rows[0]
   const path = join(directory,'source.mp4')
   await execute(await capturePosterBinary(),['-nostdin','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:s=96x64:d=0.12','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-movflags','+faststart',path],{timeout:15_000})
@@ -93,16 +93,25 @@ test('task media uses real owner/task/run relations and private cached video cov
     await assert.rejects(authorizeFactoryTaskCapture(database,store,peer,taskId,oldImage),error=>error instanceof FactoryError&&error.code==='factoryNotFound')
   })
 
-  await t.test('detail authorization applies to media after workspace membership, scope epoch or source ownership changes',async()=>{
+  await t.test('detail authorization applies to media after workspace membership or source ownership changes',async()=>{
     for(const [change,undo,args] of [
       ["UPDATE memberships SET active=false WHERE workspace=$1","UPDATE memberships SET active=true WHERE workspace=$1",[workspace]],
-      ['UPDATE issues SET "scopeVersion"=2 WHERE id=$1','UPDATE issues SET "scopeVersion"=1 WHERE id=$1',[issueId]],
       ["UPDATE coordinator_events SET \"userId\"='other' WHERE id=$1",'UPDATE coordinator_events SET "userId"=\'media-owner\' WHERE id=$1',[sourceId]],
     ] as const){
       await database.query(change,[...args])
       try { await assert.rejects(authorizeFactoryTaskCapture(database,store,owner,taskId,oldImage),error=>error instanceof FactoryError&&error.code==='factoryNotFound') }
       finally { await database.query(undo,[...args]) }
     }
+  })
+
+  await t.test('provider scope changes preserve the bound tenant, while unresolved run history remains private',async()=>{
+    await database.query('UPDATE issues SET "scopeVersion"=2,scope=\'personal\' WHERE id=$1',[issueId])
+    assert.deepEqual(await authorizeFactoryTaskCapture(database,store,owner,taskId,oldImage),{ownerId:owner})
+    await database.query('UPDATE agent_runs SET "workspaceId"=NULL WHERE id=$1',[runs[0]])
+    try {
+      assert.ok(!(await readFactoryTaskMedia(database,task)).some(item=>item.captureId===oldImage||item.captureId===legacyImage))
+      await assert.rejects(authorizeFactoryTaskCapture(database,store,owner,taskId,oldImage),{code:'factoryNotFound'})
+    } finally { await database.query('UPDATE agent_runs SET "workspaceId"=$2 WHERE id=$1',[runs[0],workspace]) }
   })
 
   await t.test('original videos use scoped short-lived object downloads; inline files keep byte ranges',async()=>{

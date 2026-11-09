@@ -1,5 +1,6 @@
 import { isDeviceOnline } from '@mikka/protocol/device';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import { createFactoryDispatch } from "./dispatch";
 import { factoryDispatchDatabase } from "./transaction";
@@ -67,7 +68,7 @@ test("legacy and unlinked workspace issues never collapse into a personal-owner 
     monitorWorkspacePartition(base),
     monitorWorkspacePartition({ ...base, issueId: "issue-b" }),
   );
-  assert.notEqual(
+  assert.equal(
     monitorWorkspacePartition({ ...base, linearTeamSyncId: "team-a" }),
     monitorWorkspacePartition({ ...base, linearTeamSyncId: "team-b" }),
   );
@@ -77,7 +78,7 @@ test("legacy and unlinked workspace issues never collapse into a personal-owner 
   );
   assert.equal(
     monitorWorkspacePartition({ ...base, issueScope: "personal" }),
-    "personal:owner",
+    "unresolved-issue:issue-a",
   );
 });
 
@@ -167,6 +168,7 @@ test(
       await import("../linear-sync/document");
     const { createAppIssueFromLinear } = await import("../linear-sync/issue-sync");
     const { withDatabaseClient } = await import("../db");
+    const { workspacePool } = await import("../workspace-db");
     marker.deregister();
     const fixtureURL = await isolatedPostgresURL(target!);
     const schema = `monitor_195_${randomUUID().replaceAll("-", "")}`;
@@ -178,6 +180,8 @@ test(
       options: `-c search_path=${schema}`,
     });
     const scopes = new Map<string, string>();
+    const workspaceFixtures = new Map<string, string>();
+    const authorityWorkspaces: string[] = [];
     const denied = new Set<string>();
     const authorize = async (
       userId: string,
@@ -311,9 +315,12 @@ test(
     };
     const issue = async (owner = "owner", workspace = "workspace:a", scope: "personal" | "workspace" = "personal") => {
       const id = randomUUID();
+      const key = JSON.stringify([owner, workspace]);
+      const workspaceId = workspaceFixtures.get(key) ?? await seedFixtureWorkspace(pool, owner, 'team');
+      workspaceFixtures.set(key, workspaceId);
       await pool.query(
-        'INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Monitor layer fixture\',\'{"type":"doc","content":[{"type":"paragraph"}]}\',\'todo\',\'normal\',$3)',
-        [id, owner, scope],
+        'INSERT INTO issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") VALUES ($1,$2,\'Monitor layer fixture\',\'{"type":"doc","content":[{"type":"paragraph"}]}\',\'todo\',\'normal\',$3,$4,\'bound\')',
+        [id, owner, scope, workspaceId],
       );
       scopes.set(id, workspace);
       return id;
@@ -701,27 +708,37 @@ test(
       );
       // Import the synthetic remote snapshot through the actual server path.
       // A workspace label or raw link alone is not verified Linear consent.
-      const issueId = randomUUID();
+      const linearIssueId = randomUUID();
+      let issueId: string;
       const teamId = randomUUID();
       await pool.query(
         `INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture owner','owner@example.invalid',false,now(),now())`,
       );
+      // The importer uses the real workspace authority while this suite's app
+      // rows live in its isolated schema, as in a split-database deployment.
+      const workspaceId = await seedFixtureWorkspace(workspacePool, 'owner', 'team');
+      authorityWorkspaces.push(workspaceId);
+      await seedFixtureWorkspace(pool, 'owner', 'team', workspaceId);
+      workspaceFixtures.set(JSON.stringify(['owner', 'workspace:a']), workspaceId);
       const { rows: [linearTeam] } = await pool.query<Parameters<typeof createAppIssueFromLinear>[0]>(
-        "INSERT INTO linear_team_syncs (id,\"ownerId\",\"linearTeamId\",\"linearTeamKey\",\"linearTeamName\") VALUES ($1,'owner','fixture-team','FIX','Fixture team') RETURNING *",
-        [teamId],
+        "INSERT INTO linear_team_syncs (id,\"ownerId\",\"linearTeamId\",\"linearTeamKey\",\"linearTeamName\",\"workspaceId\") VALUES ($1,'owner','fixture-team','FIX','Fixture team',$2) RETURNING *",
+        [teamId, workspaceId],
       );
       const importClient = await pool.connect();
       try {
         const imported = await withDatabaseClient(importClient, () => createAppIssueFromLinear(linearTeam, {
-          id: issueId, identifier: "FIX-195", title: "Monitor layer fixture", description: "Synthetic remote issue for monitor evidence.",
+          id: linearIssueId, identifier: "FIX-195", title: "Monitor layer fixture", description: "Synthetic remote issue for monitor evidence.",
           dueDate: null, priority: 0, url: `https://linear.app/fixture/issue/FIX-195`, updatedAt: new Date().toISOString(),
           state: { id: "fixture-state", name: "Todo", type: "unstarted" },
           team: { id: "fixture-team", key: "FIX", name: "Fixture team" }, assignee: null, labels: [],
         }));
-        assert.equal(imported?.id, issueId);
+        assert.ok(imported);
+        issueId = imported.id;
+        assert.notEqual(issueId, linearIssueId, 'the imported provider id does not choose the local task identity');
+        assert.equal(imported.workspaceId, workspaceId);
       } finally { importClient.release(); }
       scopes.set(issueId, "workspace:a");
-      assert.deepEqual((await pool.query('SELECT "externalTargetVerified","linearIssueId" FROM linear_issue_links WHERE "issueId"=$1', [issueId])).rows[0], { externalTargetVerified: true, linearIssueId: issueId });
+      assert.deepEqual((await pool.query('SELECT "externalTargetVerified","linearIssueId" FROM linear_issue_links WHERE "issueId"=$1', [issueId])).rows[0], { externalTargetVerified: true, linearIssueId });
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM linear_sync_outbox WHERE "issueId"=$1', [issueId])).rows[0].n, 0, "an incoming import must not enqueue itself");
       await t.test(
         "preparing the online fixture renews an expired heartbeat without changing its authority",
@@ -752,6 +769,7 @@ test(
       await t.test(
         "ten concurrent replays retain one observation and one original logical issue",
         async () => {
+          const issueCountBefore = (await pool.query('SELECT count(*)::int AS n FROM issues')).rows[0].n;
           const results = await Promise.all(
             Array.from({ length: 10 }, () =>
               monitor.consume("owner", first.input),
@@ -806,8 +824,10 @@ test(
                 [issueId],
               )
             ).rows[0].linearIssueId,
-            issueId,
+            linearIssueId,
           );
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM issues')).rows[0].n, issueCountBefore, 'replay keeps the original local task instead of creating a provider-id task');
+          assert.deepEqual((await pool.query('SELECT id FROM issues WHERE id=ANY($1::uuid[])', [[issueId, linearIssueId]])).rows, [{ id: issueId }]);
           assert.equal(
             (await store.read("owner", first.task.id)).task.status,
             "failed",
@@ -1629,6 +1649,10 @@ test(
         }),
       );
     } finally {
+      for (const workspaceId of authorityWorkspaces) {
+        await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspaceId]);
+        await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=$1 AND "userId"=$2', [workspaceId, 'owner']);
+      }
       await cloud.close();
       await rm(targetRoot, { recursive: true, force: true });
       await pool.end();

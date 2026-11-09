@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
@@ -57,7 +58,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
     assert.equal(artifactStorage(), 'inline')
     for (const userId of [alice, bob]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
     for (const [id, owner] of [[agentId, alice], [otherAgentId, bob]]) await pool.query(`INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,'codex','Fixture Agent')`, [id, owner])
-    for (const [id, owner] of [[issueId, alice], [otherIssueId, bob]]) await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Version fixture','{}','todo','normal')`, [id, owner])
+    for (const [id, owner] of [[issueId, alice], [otherIssueId, bob]]) await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Version fixture','{}','todo','normal')`, [id, owner, await seedFixtureWorkspace(pool, owner)])
     for (const [id, owner, agent, issue] of [[firstRun, alice, agentId, issueId], [nextRun, alice, agentId, issueId], [otherRun, bob, otherAgentId, otherIssueId]]) {
       await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","issueId",status) VALUES($1,$2,$3,$4,'succeeded')`, [id, owner, agent, issue])
     }

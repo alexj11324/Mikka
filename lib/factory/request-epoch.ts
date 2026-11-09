@@ -1,3 +1,4 @@
+import { withFactoryBackgroundWorkspace } from './background-workspace'
 import { randomUUID } from 'node:crypto'
 import { factoryChanged } from '../live/factory'
 import { runControlChanged } from '../device-gateway-notify'
@@ -117,8 +118,9 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
   if (!identity) return false
   const { factoryRuntimeForBot } = await import('./runtime')
   const store = factoryRuntimeForBot(identity.botId).store
-  const tx = await pool.connect()
   const supersededRunIds: string[] = []
+  const changed = await withFactoryBackgroundWorkspace(pool, userId, { kind: 'task', id: identity.id, botId: identity.botId }, async () => {
+  const tx = await pool.connect()
   try {
     await tx.query('BEGIN')
     const task = await store.lockTask(tx, userId, identity.id)
@@ -128,7 +130,7 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
     // Coordinator handoff can forward the dispatch's already accepted owner
     // event. It adds no new request and must not stop its current executor.
     if (sourceEventId === task.sourceEventId && !['cancelled', 'revoked'].includes(task.status)) {
-      await tx.query('COMMIT'); return true
+      await tx.query('COMMIT'); return 'replayed' as const
     }
     const id = sourceEventId ? await factoryContinuationSource(tx, task, sourceEventId, runId) : randomUUID()
     if (!sourceEventId) await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt")
@@ -139,6 +141,10 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
       VALUES($1,$2,$3,$4,'owner',-1,now()) ON CONFLICT DO NOTHING`, [id, runId, userId, text])
     await tx.query('COMMIT')
   } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+  return true
+  })
+  if (changed === 'replayed') return true
+  if (!changed) return false
   // A fenced queued run can no longer be claimed, so no executor will acknowledge
   // its stop. Use the ordinary exact-run stop after the epoch commits; its end
   // hook can then admit the current epoch through the normal reconciler. Never

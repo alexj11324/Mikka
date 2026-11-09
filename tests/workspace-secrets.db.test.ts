@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const previousKey = process.env.WORKSPACE_SECRETS_KEY
@@ -28,7 +28,7 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const stored = async (id: string) => { const { rows: [row] } = await pool.query('select * from workspace_secrets where id=$1', [id]); return secretCrypto.openSecret(row, secretCrypto.secretAad(row)) }
   const META_KEYS = ['delivery', 'id', 'kind', 'name', 'note', 'scopeRef', 'scopeType', 'updatedAt', 'updatedBy']
   const DIRECT = { mode: 'direct', exposeToAgent: true } as const
-  const consumer = async (owner: string, workspaceId: string | null | undefined, options: { repository?: string; status?: string; legacyWorkspaceId?: string } = {}) => {
+  const consumer = async (owner: string, workspaceId: string | null, options: { repository?: string; status?: string; legacyWorkspaceId?: string; legacy?: boolean } = {}) => {
     const deviceId = randomUUID(), runId = randomUUID(), agentId = await seedAgent(pool, owner)
     await pool.query('insert into devices (id,"ownerId",name,kind) values ($1,$2,$3,$4)', [deviceId, owner, 'secret-consumer', options.legacyWorkspaceId ? 'cloud' : 'local'])
     let repoId: string | null = null, tokenId: string | null = null
@@ -40,7 +40,7 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
       tokenId = randomUUID()
       await pool.query('insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId") values ($1,$2,$3,$4,$5)', [tokenId, owner, randomUUID(), deviceId, options.legacyWorkspaceId])
     }
-    await pool.query('insert into agent_runs (id,"userId","agentId","deviceId","deviceRepoId","deviceTokenId","agentDefinition",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,$7,$8,now()+interval \'10 minutes\')', [runId, owner, agentId, deviceId, repoId, tokenId, workspaceId === undefined ? null : { executionIdentity: { workspaceId } }, options.status ?? 'running'])
+    await pool.query('insert into agent_runs (id,"userId","agentId","deviceId","deviceRepoId","deviceTokenId","agentDefinition",status,"leaseExpiresAt","workspaceId") values ($1,$2,$3,$4,$5,$6,$7,$8,now()+interval \'10 minutes\',$9)', [runId, owner, agentId, deviceId, repoId, tokenId, options.legacy || workspaceId === null ? null : { executionIdentity: { workspaceId } }, options.status ?? 'running', workspaceId])
     return runId
   }
   const stopped = async (id: string) => (await pool.query('select "stopRequestedAt" is not null as stopped,"leaseExpiresAt"<=now() as expired from agent_runs where id=$1', [id])).rows[0] as { stopped: boolean; expired: boolean }
@@ -131,7 +131,7 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     await store.deleteWorkspaceSecret(admin, ws.id, { id: protectedRow.id })
   })
 
-  await t.test('secret changes stop only admitted consumers in the frozen workspace and honor personal/repository overrides', async () => {
+  await t.test('secret changes stop only admitted consumers in the persisted workspace and honor personal/repository overrides', async () => {
     const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
     const personal = await import('../lib/secrets/user-store')
     const root = await store.createWorkspaceSecret(admin, w.id, { name: 'STOP_SCOPE', kind: 'secret', value: SECRET, delivery: DIRECT })
@@ -141,15 +141,17 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const repositoryShadow = await consumer(admin, w.id, { repository: 'acme/override' })
     const personalShadow = await consumer(member, w.id), foreign = await consumer(admin, other.id)
     const queued = await consumer(admin, w.id, { status: 'queued' })
-    const frozenPersonal = await consumer(admin, null, { legacyWorkspaceId: w.id })
-    const legacy = await consumer(admin, undefined, { legacyWorkspaceId: w.id })
+    const personalRun = await consumer(admin, await seedPersonalWorkspace(pool, admin))
+    const legacy = await consumer(admin, w.id, { legacyWorkspaceId: w.id, legacy: true })
+    const tokenOnly = await consumer(admin, null, { legacyWorkspaceId: w.id, legacy: true })
+    assert.equal((await pool.query('select "workspaceId" from agent_runs where id=$1', [tokenOnly])).rows[0].workspaceId, null, 'a token cannot assign an unattributed run')
     await store.replaceWorkspaceSecret(admin, w.id, { id: root.id, note: 'metadata only' })
     assert.equal((await stopped(plain)).stopped, false, 'note-only changes do not revoke credentials')
     await assert.rejects(store.replaceWorkspaceSecret(admin, w.id, { id: root.id, delivery: { mode: 'protected' } }, async () => { throw new Error('audit rollback') }), /audit rollback/)
     assert.equal((await stopped(plain)).stopped, false, 'a failed secret write cannot stop a run')
     await store.replaceWorkspaceSecret(admin, w.id, { id: root.id, value: SECRET + '-rotated' })
     for (const id of [plain, unrelatedRepo, legacy]) assert.deepEqual(await stopped(id), { stopped: true, expired: true })
-    for (const id of [repositoryShadow, personalShadow, foreign, queued, frozenPersonal]) assert.equal((await stopped(id)).stopped, false)
+    for (const id of [repositoryShadow, personalShadow, foreign, queued, personalRun, tokenOnly]) assert.equal((await stopped(id)).stopped, false)
     await store.deleteWorkspaceSecret(admin, w.id, { id: repo.id })
     assert.deepEqual(await stopped(repositoryShadow), { stopped: true, expired: true }, 'deleting a repository override revokes its current consumers')
     assert.equal((await stopped(personalShadow)).stopped, false)
@@ -384,7 +386,7 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     assert.ok(events.every(e => !e.json.includes(value)), 'the value is never in the audit entry')
   })
 
-  await t.test('4e2 item 4: run-scoped masking resolves the cloud token workspace; checkpoint patch/files masked', async () => {
+  await t.test('4e2 item 4: run-scoped masking resolves the persisted workspace; checkpoint patch/files masked', async () => {
     const runtime = await import('../lib/secrets/runtime')
     const { maskCheckpoint } = await import('../lib/secrets/checkpoint')
     const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
@@ -396,17 +398,21 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const local = (await pool.query(`insert into devices (id,name,"ownerId") values (gen_random_uuid(),'local',$1) returning id`, [admin])).rows[0].id
     const claimTokenId = (await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values (gen_random_uuid(),$1,$2,$3,$4,now()+interval '1 hour') returning id`, [admin, randomBytes(16).toString('hex'), device, w.id])).rows[0].id
     const agent = (await pool.query(`insert into agents (id,"userId",harness,name) values (gen_random_uuid(),$1,'codex','a') returning id`, [admin])).rows[0].id
-    const run = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","deviceTokenId") values (gen_random_uuid(),$1,$2,$3,$4) returning id`, [agent, admin, device, claimTokenId])).rows[0].id
-    const localRun = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId") values (gen_random_uuid(),$1,$2,$3) returning id`, [agent, admin, local])).rows[0].id
+    const run = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","deviceTokenId","workspaceId") values (gen_random_uuid(),$1,$2,$3,$4,$5) returning id`, [agent, admin, device, claimTokenId, w.id])).rows[0].id
+    const personalWorkspaceId = await seedPersonalWorkspace(pool, admin)
+    const localRun = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId") values (gen_random_uuid(),$1,$2,$3,$4) returning id`, [agent, admin, local, personalWorkspaceId])).rows[0].id
     const unclaimedCloudRun = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId") values (gen_random_uuid(),$1,$2,$3) returning id`, [agent, admin, device])).rows[0].id
+    const tokenOnlyRun = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","deviceTokenId") values (gen_random_uuid(),$1,$2,$3,$4) returning id`, [agent, admin, device, claimTokenId])).rows[0].id
     await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values (gen_random_uuid(),$1,$2,$3,$4,now()+interval '1 hour')`, [admin, randomBytes(16).toString('hex'), device, other.id])
     assert.equal(await runtime.runWorkspaceId(run), w.id)
-    assert.equal(await runtime.runWorkspaceId(unclaimedCloudRun), null, 'a cloud device token cannot supply authority without the run\'s original claim binding')
-    assert.equal(await runtime.runWorkspaceId(localRun), null, 'local device: no injected secrets, nothing to mask')
+    assert.equal(await runtime.runWorkspaceId(unclaimedCloudRun), null, 'an unclaimed cloud run remains unattributed')
+    assert.equal(await runtime.runWorkspaceId(tokenOnlyRun), null, 'even the original claim token cannot assign a persisted tenant')
+    assert.equal(await runtime.runWorkspaceId(localRun), personalWorkspaceId, 'ordinary local runs retain their real Personal tenant')
     const out = { title: `report ${TOKEN}`, content: `b64 ${Buffer.from(TOKEN).toString('base64')} env plain-env-value` }
     assert.deepEqual(await runtime.maskForRun(run, out, off), out, 'no encryption key: identity masker')
     assert.deepEqual(await runtime.maskForRun(run, out, on), { title: 'report [secret:API_TOKEN]', content: 'b64 [secret:API_TOKEN] env plain-env-value' }, 'kind=env never masked')
-    assert.deepEqual(await runtime.maskForRun(localRun, out, on), out)
+    assert.deepEqual(await runtime.maskForRun(localRun, out, on), out, 'a Personal run never reads the Team secret set')
+    assert.deepEqual(await runtime.maskForRun(tokenOnlyRun, out, on), out, 'a token-only run cannot select Team secrets')
     assert.equal(await runtime.maskForWorkspace(w.id, `x ${encodeURIComponent(TOKEN)}`, on), 'x [secret:API_TOKEN]')
     const patch = Buffer.from(`--- a/.env\n+++ b/.env\n@@ -1 +1 @@\n-A=1\n+API_TOKEN=${TOKEN}\n`)
     const mask = await runtime.workspaceSecretMasker(w.id, on)

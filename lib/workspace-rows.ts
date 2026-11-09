@@ -52,6 +52,7 @@ export async function workspaceDeletionStatements(client: Query, workspaceId: st
   const tables = keyed.filter(row => !KEPT_WITH_WORKSPACE.has(row.table))
   // Some tables keep the id as text.
   const keyColumn = new Map(tables.map(row => [row.table, `${ident(row.column)} = $1${row.type === 'uuid' ? '::uuid' : ''}`]))
+  const nullableKey = new Map(tables.map(row => [row.table, `${ident(row.column)} IS NULL`]))
   // Rows elsewhere that point at the workspace's rows without ON DELETE CASCADE
   // (agent_runs → session_mailboxes, suggestion_executions → bot_subagents…) go first.
   const { rows: references } = await client.query<{ child: string; childColumn: string; parent: string; parentColumn: string }>(
@@ -65,9 +66,13 @@ export async function workspaceDeletionStatements(client: Query, workspaceId: st
   const statements: { table: string; text: string; values: unknown[] }[] = []
   for (const ref of references) {
     const parentKey = keyColumn.get(ref.parent)
-    if (!parentKey || keyColumn.has(ref.child) || KEPT_WITH_WORKSPACE.has(ref.child)) continue
+    if (!parentKey || KEPT_WITH_WORKSPACE.has(ref.child)) continue
+    // Newly tenant-keyed tables can still contain quarantined legacy rows.
+    // Follow their existing parent only while their own tenant is unresolved;
+    // a contradictory bound child must block deletion, never be swept away.
+    const unresolved = nullableKey.get(ref.child)
     statements.push({ table: ref.child, values: [workspaceId],
-      text: `delete from ${ident(ref.child)} where ${ident(ref.childColumn)} in (select ${ident(ref.parentColumn)} from ${ident(ref.parent)} where ${parentKey})` })
+      text: `delete from ${ident(ref.child)} where ${ident(ref.childColumn)} in (select ${ident(ref.parentColumn)} from ${ident(ref.parent)} where ${parentKey})${unresolved ? ` AND ${unresolved}` : ''}` })
   }
   for (const [table, key] of keyColumn) statements.push({ table, values: [workspaceId], text: `delete from ${ident(table)} where ${key}` })
   return statements

@@ -1,10 +1,11 @@
 import { canonicalWebServer } from './policy'
 import { probeWebServer, type WebFetch, type WebServer, type WebServerProbe } from './discovery'
 import type { DesktopSession } from '../desktop-rpc/wire'
+import { selectedWorkspaceId, WORKSPACE_SELECTION_HEADER } from '../workspace-selection'
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 export type WebServerAccount = DesktopSession & { server: string }
-type Credential = WebServerAccount & { token: string }
+type Credential = WebServerAccount & { token: string; workspaceId?: string }
 export type WebServerEntry = WebServer & { active: boolean; accounts: WebServerAccount[] }
 type Pending = { state: string; verifier: string; callback: string; server: WebServer; expiresAt: number; version: number }
 const directoryKey = 'mikka.web.servers.v1', sessionKey = 'mikka.web.sessions.v1'
@@ -14,6 +15,12 @@ const safeSession = (credential: Credential): WebServerAccount => ({ server: cre
   user: { id: credential.user.id, name: credential.user.name, email: credential.user.email, image: typeof credential.user.image === 'string' ? credential.user.image : null, emailVerified: credential.user.emailVerified },
   session: { id: credential.session.id } })
 const validText = (value: unknown, max = 200): value is string => typeof value === 'string' && value.length > 0 && value.length <= max
+const workspaceActions = new Set(['workspace.switchWorkspace', 'workspace.createWorkspace', 'workspace.acceptWorkspaceInvitation'])
+async function selectsWorkspace(request: Request, path: string) {
+  if (path !== '/api/desktop/rpc' || request.method !== 'POST') return false
+  try { return workspaceActions.has((await request.clone().json())?.action) }
+  catch { return false } // The RPC handler owns malformed-body rejection.
+}
 
 export class WebConnectionError extends Error {
   constructor(readonly code: string, options?: ErrorOptions) { super(code, options); this.name = 'WebConnectionError' }
@@ -30,6 +37,10 @@ export class WebServerDirectory {
   private pending = new Map<string, Pending>()
   private activeId: string | null = null
   private generation = 0
+  private workspaceGeneration = 0
+  private workspaceIntent = 0
+  private requestSequence = 0
+  private responseVersions = new WeakMap<Response, { account: number; workspace: number }>()
   private requests = new AbortController()
   private listeners = new Set<() => void>()
   private snapshot: { version: number; account: WebServerAccount | null } = { version: 0, account: null }
@@ -73,6 +84,7 @@ export class WebServerDirectory {
     return (this.servers.has(item.server) || pendingServer !== undefined && item.server === pendingServer) && typeof item.token === 'string' && tokenPattern.test(item.token)
       && !/^(?:mkp_|mka_|mkr_)/.test(item.token) && validText(item.user?.id) && typeof item.user.name === 'string'
       && typeof item.user.email === 'string' && typeof item.user.emailVerified === 'boolean' && validText(item.session?.id)
+      && (item.workspaceId === undefined || selectedWorkspaceId(item.workspaceId) === item.workspaceId)
   }
   private conflicts(server: string, userId: string) {
     return this.cloudUsers.has(userId) || [...this.credentials.values()].some(item => item.user.id === userId && item.server !== server)
@@ -80,6 +92,10 @@ export class WebServerDirectory {
   private updateSnapshot() { const active = this.active(); this.snapshot = { version: this.generation, account: active ? safeSession(active) : null } }
   private async changed() {
     this.generation++
+    this.workspaceGeneration++
+    this.workspaceIntent = ++this.requestSequence
+    // A server/account/session transition cannot inherit another context's choice.
+    for (const credential of this.credentials.values()) delete credential.workspaceId
     this.pending.clear()
     this.requests.abort()
     this.requests = new AbortController()
@@ -97,6 +113,11 @@ export class WebServerDirectory {
   }
   getActiveAccount(): WebServerAccount | null { return this.snapshot.account }
   getVersion() { return this.generation }
+  getWorkspaceVersion() { return this.workspaceGeneration }
+  isCurrentResponse(response: Response) {
+    const version = this.responseVersions.get(response)
+    return version?.account === this.generation && version.workspace === this.workspaceGeneration
+  }
   async readSession(): Promise<WebServerAccount | null> {
     const active = this.active()
     if (!active) return null
@@ -208,14 +229,15 @@ export class WebServerDirectory {
     // permanently trigger the cloud page's required-refresh guard.
     if (localApi && url.pathname === `${localBase}/api/version`) {
       const source = new Request(input instanceof Request ? input : url, init), headers = new Headers(source.headers)
-      for (const name of ['authorization', 'cookie', 'x-mikka-session-cache', 'x-mikka-session-token', 'x-deployment-id']) headers.delete(name)
+      for (const name of ['authorization', 'cookie', 'x-mikka-session-cache', 'x-mikka-session-token', 'x-deployment-id', WORKSPACE_SELECTION_HEADER]) headers.delete(name)
       return this.options.fetch(new Request(source, { headers, credentials: 'omit', redirect: 'error' }))
     }
     if (!account) {
       if (!localApi || url.pathname.startsWith(`${localBase}/api/auth/`)) return this.options.fetch(input, init)
-      const source = new Request(input instanceof Request ? input : url, init), version = this.generation
+      const source = new Request(input instanceof Request ? input : url, init), version = this.generation, workspace = this.workspaceGeneration
       const response = await this.options.fetch(new Request(source, { signal: AbortSignal.any([source.signal, this.requests.signal]) }))
       if (version !== this.generation) { await response.body?.cancel(); throw new WebConnectionError('web_connection_session_changed') }
+      this.responseVersions.set(response, { account: version, workspace })
       return response
     }
     const remote = new URL(account.server), remoteBase = remote.pathname.replace(/\/$/, '')
@@ -230,21 +252,54 @@ export class WebServerDirectory {
     if (new URL(target).origin !== remote.origin) throw new WebConnectionError('web_connection_origin_refused')
     const source = new Request(input instanceof Request ? input : url, init)
     const headers = new Headers(source.headers)
-    for (const name of ['cookie', 'authorization', 'x-mikka-session-cache', 'x-mikka-session-token', 'x-deployment-id', 'x-mikka-rpc']) headers.delete(name)
+    for (const name of ['cookie', 'authorization', 'x-mikka-session-cache', 'x-mikka-session-token', 'x-deployment-id', 'x-mikka-rpc', WORKSPACE_SELECTION_HEADER]) headers.delete(name)
     // A late cloud tracing wrapper can decorate the official URL before this
     // adapter selects another origin. Its person/session IDs stay on the cloud.
     if (remote.origin !== this.app.origin) {
       for (const name of ['x-posthog-session-id', 'x-posthog-window-id', 'x-posthog-distinct-id']) headers.delete(name)
     }
     headers.set('authorization', `Bearer ${account.token}`)
+    if (account.workspaceId) headers.set(WORKSPACE_SELECTION_HEADER, account.workspaceId)
     if (path === '/api/desktop/rpc') headers.set('x-mikka-desktop-protocol', '1')
-    const version = this.generation
+    const version = this.generation, workspace = this.workspaceGeneration, sequence = ++this.requestSequence
+    const selecting = path === '/api/desktop/rpc' && source.method === 'POST' ? await selectsWorkspace(source, path) : false
+    if (version !== this.generation || workspace !== this.workspaceGeneration) throw new WebConnectionError('web_connection_session_changed')
+    if (selecting) this.workspaceIntent = Math.max(this.workspaceIntent, sequence)
+    const intent = selecting ? sequence : undefined
+    if (intent !== undefined && intent !== this.workspaceIntent) throw new WebConnectionError('web_connection_session_changed')
     const signal = AbortSignal.any([source.signal, this.requests.signal])
-    const response = await this.options.fetch(new Request(new Request(target, source), { headers, credentials: 'omit', redirect: 'error', cache: 'no-store', signal }))
-    if (version !== this.generation) { await response.body?.cancel(); throw new WebConnectionError('web_connection_session_changed') }
+    let response = await this.options.fetch(new Request(new Request(target, source), { headers, credentials: 'omit', redirect: 'error', cache: 'no-store', signal }))
+    const current = () => version === this.generation && workspace === this.workspaceGeneration && (intent === undefined || intent === this.workspaceIntent)
+    if (!current()) { await response.body?.cancel(); throw new WebConnectionError('web_connection_session_changed') }
+    if (selecting && response.ok && response.headers.has(WORKSPACE_SELECTION_HEADER)) {
+      const confirmed = response.headers.get(WORKSPACE_SELECTION_HEADER)!
+      const workspaceId = confirmed === '' ? undefined : selectedWorkspaceId(confirmed)
+      if (workspaceId === null) { await response.body?.cancel(); throw new WebConnectionError('web_connection_session_invalid') }
+      if (workspaceId !== account.workspaceId) {
+        // Keep this successful switch response readable while aborting every
+        // older request/stream. A later selection intent always beats this one.
+        const body = response.body ? await response.arrayBuffer() : null
+        if (!current()) throw new WebConnectionError('web_connection_session_changed')
+        response = new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers })
+        if (workspaceId === undefined) delete account.workspaceId
+        else account.workspaceId = workspaceId
+        this.workspaceGeneration++
+        this.requests.abort()
+        this.requests = new AbortController()
+        this.persist()
+        const acknowledged = this.workspaceGeneration
+        // Retire the existing browser read/asset caches before any caller can
+        // use the new choice; this is not an account or session replacement.
+        await this.options.onChange?.()
+        if (version !== this.generation || acknowledged !== this.workspaceGeneration || intent !== this.workspaceIntent) {
+          throw new WebConnectionError('web_connection_session_changed')
+        }
+      }
+    }
     const rotated = response.headers.get('x-mikka-session-token')
     if (rotated && tokenPattern.test(rotated)) { account.token = rotated; this.persist() }
     if (response.status === 401) { this.credentials.delete(this.activeId!); this.activeId = null; await this.changed() }
+    this.responseVersions.set(response, { account: version, workspace: this.workspaceGeneration })
     return response
   }
 }

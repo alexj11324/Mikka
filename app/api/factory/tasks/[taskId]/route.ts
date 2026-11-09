@@ -1,3 +1,4 @@
+import { factoryWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { actAs } from "@/lib/acting-user";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/api-auth";
@@ -17,7 +18,7 @@ async function respond(
   context: { params: Promise<{ taskId: string }> },
 ) {
   const session = await auth.api.getSession({ headers: request.headers });
-  const scoped = async () => {
+  const scoped = () => factoryWorkspaceResponse(session?.user?.id, async () => {
     const { taskId } = await context.params;
     const result = await handleFactory(factoryHumanStore, {
       userId: session?.user?.id ?? null,
@@ -39,7 +40,7 @@ async function respond(
       status: result.status,
       headers: { "Cache-Control": "private, no-store" },
     });
-  };
+  });
   return session?.user ? actAs(session.user, scoped) : scoped();
 }
 export const GET = respond;

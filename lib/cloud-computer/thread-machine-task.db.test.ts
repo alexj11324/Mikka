@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import { REGISTRATION_COMPLETE, REGISTRATION_WAITING } from '../computer/registration-command';
 // One task, one cloud sandbox (Alex, 2026-11-01). A task's next run resumes the
 // sandbox its last run left paused; no other task, bot or repository can take
@@ -53,6 +54,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
 
     const owner = "owner", workspaceId = randomUUID(), botId = randomUUID(), otherBot = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), otherRepo = randomUUID();
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture','thr-task@example.invalid',true,now(),now())`, [owner]);
+    await seedFixtureWorkspace(pool, owner, 'team', workspaceId);
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'bot','cloud')`, [botDevice, owner]);
     await pool.query(`INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,'codex','Fixture',$3)`, [agentId, owner, botDevice]);
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,'v2/github.com/acme/app','https://github.com/acme/app.git')`, [repoId, botDevice, owner]);
@@ -63,7 +65,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     let number = 0;
     const task = async (status = "doing") => {
       const id = randomUUID();
-      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Fixture task',jsonb_build_object('type','doc','attrs',jsonb_build_object('mikka',jsonb_build_object('number',$4::int)),'content','[]'::jsonb),$3,'normal','personal')`, [id, owner, status, ++number]);
+      await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope) VALUES ($1,$2,$5,'Fixture task',jsonb_build_object('type','doc','attrs',jsonb_build_object('mikka',jsonb_build_object('number',$4::int)),'content','[]'::jsonb),$3,'normal','personal')`, [id, owner, status, ++number, workspaceId]);
       return id;
     };
     const run = async (issueId: string | null, opts: { bot?: string; repo?: string; status?: string } = {}) => {

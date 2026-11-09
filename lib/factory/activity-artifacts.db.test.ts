@@ -26,7 +26,7 @@ test('activity document versions follow the actual submitting run and pinned pla
     CREATE TABLE mikka_team_issues("issueId" uuid PRIMARY KEY,"workspaceId" uuid NOT NULL);
     CREATE TABLE mikka_workspaces(id uuid PRIMARY KEY,"userId" text NOT NULL,kind text NOT NULL);
     CREATE TABLE factory_attempts(id uuid PRIMARY KEY,"taskId" uuid NOT NULL,"runId" uuid UNIQUE,"candidateId" uuid,stage text NOT NULL,output jsonb NOT NULL DEFAULT '{}');
-    CREATE TABLE artifacts(id uuid PRIMARY KEY,"userId" text NOT NULL,"runId" uuid,"issueId" uuid,kind text NOT NULL,title text NOT NULL,"latestVersion" integer NOT NULL DEFAULT 1);
+    CREATE TABLE artifacts(id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid,"runId" uuid,"issueId" uuid,kind text NOT NULL,title text NOT NULL,"latestVersion" integer NOT NULL DEFAULT 1);
     CREATE TABLE artifact_versions("artifactId" uuid REFERENCES artifacts ON DELETE CASCADE,version integer NOT NULL,size integer NOT NULL,sha256 text NOT NULL,
       "createdAt" timestamptz NOT NULL DEFAULT now(),PRIMARY KEY("artifactId",version));
     CREATE TABLE coordinator_events(id uuid PRIMARY KEY,"userId" text NOT NULL,"runId" uuid,"issueId" uuid,kind text NOT NULL,"dedupeKey" text NOT NULL UNIQUE,payload jsonb NOT NULL);
@@ -34,17 +34,17 @@ test('activity document versions follow the actual submitting run and pinned pla
     CREATE TABLE factory_acceptance_artifacts("taskId" uuid PRIMARY KEY,"artifactId" uuid NOT NULL,"candidateId" uuid NOT NULL,"runId" uuid NOT NULL,sha256 text NOT NULL);
   `)
   const owner = 'document-owner', peer = 'document-peer', issue = randomUUID(), otherIssue = randomUUID(), taskId = randomUUID(), otherTask = randomUUID()
-  const candidate = randomUUID(), task = {id:taskId,userId:owner,issueId:issue,candidateId:candidate}
+  const candidate = randomUUID(), workspaceA=randomUUID(), task = {id:taskId,userId:owner,issueId:issue,candidateId:candidate,workspaceId:workspaceA}
   const attempts = Array.from({length:6},()=>({id:randomUUID(),runId:randomUUID()}))
   for (const [index,attempt] of attempts.entries()) {
     await pool.query('INSERT INTO agent_runs(id,"userId","issueId") VALUES($1,$2,$3)',[attempt.runId,index===3?peer:owner,index===4?otherIssue:issue])
     await pool.query('INSERT INTO factory_attempts(id,"taskId","runId",stage) VALUES($1,$2,$3,$4)',
       [attempt.id,index===5?otherTask:taskId,attempt.runId,index===0?'spec':'execute'])
   }
-  const artifact = async (run: string, options: {owner?:string;issue?:string;kind?:string}={}) => {
+  const artifact = async (run: string, options: {owner?:string;issue?:string;kind?:string;workspaceId?:string|null}={}) => {
     const id=randomUUID()
-    await pool.query('INSERT INTO artifacts(id,"userId","runId","issueId",kind,title) VALUES($1,$2,$3,$4,$5,$6)',
-      [id,options.owner??owner,run,options.issue??issue,options.kind??'markdown','Mutable latest title'])
+    await pool.query('INSERT INTO artifacts(id,"userId","runId","issueId",kind,title,"workspaceId") VALUES($1,$2,$3,$4,$5,$6,$7)',
+      [id,options.owner??owner,run,options.issue??issue,options.kind??'markdown','Mutable latest title',options.workspaceId===undefined?workspaceA:options.workspaceId])
     return id
   }
   const version = async (id:string,n:number,title:string) => {
@@ -125,39 +125,40 @@ test('activity document versions follow the actual submitting run and pinned pla
     assert.ok(!documents.some(document=>excluded.includes(document.artifactId)))
     assert.equal(documents.length,5)
   })
-  await t.test('workspace PATs follow the original Artifact scope even after a lawful same-owner cross-workspace submission',async()=>{
-    const workspaceA=randomUUID(), workspaceB=randomUUID(), personal=randomUUID(), botA=randomUUID(), botB=randomUUID()
+  await t.test('persisted Artifact tenancy rejects foreign and quarantined legacy receipts while preserving same-tenant versions',async()=>{
+    const workspaceB=randomUUID(), personal=randomUUID(), botA=randomUUID(), botB=randomUUID()
     const sameWorkspaceIssue=randomUUID(), producerB=randomUUID(), producerA=randomUUID()
     await pool.query('INSERT INTO mikka_workspaces VALUES($1,$4,\'team\'),($2,$4,\'team\'),($3,$4,\'personal\')',[workspaceA,workspaceB,personal,owner])
     await pool.query('INSERT INTO mikka_team_issues VALUES($1,$4),($2,$5),($3,$4)',[issue,otherIssue,sameWorkspaceIssue,workspaceA,workspaceB])
     await pool.query('INSERT INTO bots VALUES($1,$3),($2,$4)',[botA,botB,workspaceA,workspaceB])
     await pool.query('UPDATE agent_runs SET "botId"=$1 WHERE "issueId"=$2',[botA,issue])
     await pool.query('INSERT INTO agent_runs VALUES($1,$3,$4,$6),($2,$3,$5,$7)',[producerB,producerA,owner,otherIssue,sameWorkspaceIssue,botB,botA])
-    const crossWorkspace=await artifact(producerB,{issue:otherIssue}), sameWorkspace=await artifact(producerA,{issue:sameWorkspaceIssue})
+    const crossWorkspace=await artifact(producerB,{issue:otherIssue,workspaceId:workspaceB}), sameWorkspace=await artifact(producerA,{issue:sameWorkspaceIssue})
     for(const id of [crossWorkspace,sameWorkspace]){
       await version(id,1,'Original elsewhere'); await receipt(id,1,id===crossWorkspace?producerB:producerA,'Original elsewhere',{issue:id===crossWorkspace?otherIssue:sameWorkspaceIssue})
       await version(id,2,'Submitted to this task'); await receipt(id,2,attempts[2].runId,'Submitted to this task')
     }
-    const withoutRun=await artifact(producerB,{issue:otherIssue}), unbound=await artifact(producerB)
+    const withoutRun=await artifact(producerB,{issue:otherIssue,workspaceId:workspaceB}), unbound=await artifact(producerB,{workspaceId:null})
     for(const id of [withoutRun,unbound]){
       await version(id,1,'Owned document'); await receipt(id,1,attempts[2].runId,'Owned document')
       await pool.query('UPDATE artifacts SET "runId"=NULL WHERE id=$1',[id])
     }
     await pool.query('UPDATE artifacts SET "issueId"=NULL WHERE id=$1',[unbound])
     const browser=await readFactoryActivityDocuments(pool,task)
-    for(const id of [crossWorkspace,sameWorkspace,withoutRun,unbound]) assert.ok(browser.some(document=>document.artifactId===id))
-    let workspaceQueries=0
-    const counted={query:((...args:unknown[])=>{workspaceQueries++;return Reflect.apply(pool.query,pool,args)}) as Pool['query']}
-    const scoped=(workspaceId:string)=>actingContext.run({userId:owner,tokenWorkspaceId:workspaceId},()=>readFactoryActivityDocuments(pool,task,counted))
+    assert.ok(browser.some(document=>document.artifactId===sameWorkspace))
+    for(const id of [crossWorkspace,withoutRun,unbound]) assert.ok(!browser.some(document=>document.artifactId===id))
+    const scoped=(workspaceId:string)=>actingContext.run({userId:owner,tokenWorkspaceId:workspaceId},()=>readFactoryActivityDocuments(pool,task))
     const team=await scoped(workspaceA)
     assert.ok(team.some(document=>document.artifactId===sameWorkspace&&document.version===2),'same workspace reuse is allowed')
     for(const id of [crossWorkspace,withoutRun,unbound]) assert.ok(!team.some(document=>document.artifactId===id))
-    assert.equal(workspaceQueries,2,'one batched issue lookup plus at most one personal-workspace lookup, independent of document count')
-    assert.deepEqual((await scoped(personal)).map(document=>document.artifactId),[unbound])
+    assert.deepEqual(await scoped(personal),[],'a different selected tenant cannot read this task projection')
+    assert.deepEqual(await scoped(workspaceB),[])
+    assert.deepEqual(await readFactoryActivityDocuments(pool,{...task,workspaceId:null}),[],'unresolved task tenancy grants no document access')
     await pool.query('INSERT INTO computer_run_bindings VALUES($1,$2)',[producerA,workspaceB])
-    assert.ok(!(await scoped(workspaceA)).some(document=>document.artifactId===sameWorkspace),
-      'a conflicting computer workspace rejects access even when Bot and issue match')
-    assert.ok((await readFactoryActivityDocuments(pool,task)).some(document=>document.artifactId===sameWorkspace),
-      'owner browser sessions retain the existing owner-only Artifact route behavior')
+    assert.ok((await scoped(workspaceA)).some(document=>document.artifactId===sameWorkspace),
+      'an old computer binding cannot move an Artifact out of its immutable tenant')
+    await pool.query('UPDATE artifacts SET "runId"=NULL,"issueId"=NULL WHERE id=$1',[sameWorkspace])
+    assert.ok((await scoped(workspaceA)).some(document=>document.artifactId===sameWorkspace&&document.version===2),
+      'retiring creator links preserves the authorized historical submission and its tenant')
   })
 })

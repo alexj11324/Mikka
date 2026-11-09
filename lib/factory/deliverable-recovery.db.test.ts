@@ -1,3 +1,5 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { createFactoryStore as createCurrentFactoryStore } from './store';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
@@ -47,6 +49,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
   target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
   observePoolCommits(pool)
+  const closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
   const flags = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
   try {
     const dir = new URL('../../drizzle/', import.meta.url)
@@ -59,7 +62,8 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       const issueId = randomUUID(), sourceEventId = randomUUID(), workspaceId = randomUUID(), botId = randomUUID()
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = randomUUID(), sandboxId = `retained-${randomUUID()}`
       const repoPath = `/home/user/.mikka/bot-workspaces/${botId}`, worktreePath = `/home/user/.mikka/worker/worktrees/${randomUUID()}`
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Synthetic legacy delivery','{"type":"doc","content":[]}','todo','normal')`, [issueId])
+      await seedFixtureWorkspace(pool, 'owner', 'team', workspaceId)
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Synthetic legacy delivery','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`, [issueId, workspaceId])
       await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,'owner','Fixture Bot')`, [botId, workspaceId])
       await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture cloud','cloud',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
       await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,'owner',$3,'codex',$2)`, [agentId, deviceId, `Fixture Codex ${agentId}`])
@@ -92,9 +96,10 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       const blocked = (await store.read('owner', routed.task.id)).task
       assert.equal(blocked.status, 'blocked')
       const originId = randomUUID(), originAttemptId = randomUUID(), originalQuestionId = randomUUID(), originalQuestionEventId = randomUUID(), answerId = randomUUID()
-      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [producerRunId, JSON.stringify({ questionId: originalQuestionId, originRunId: originId, originSessionId: 'original-native-session', requireSessionResume: true, requiredSandboxId: sandboxId })])
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,"stopReason","sessionId","agentDefinition",prompt)
         SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",'stopped','asked_human','original-native-session',"agentDefinition",'Original question' FROM agent_runs WHERE id=$1`, [producerRunId, originId])
+      // The persisted parent exists before the continuation references it.
+      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [producerRunId, JSON.stringify({ questionId: originalQuestionId, originRunId: originId, originSessionId: 'original-native-session', requireSessionResume: true, requiredSandboxId: sandboxId })])
       await pool.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [producerRunId, originId])
       await pool.query('UPDATE factory_attempts SET position=2,ordinal=2 WHERE id=$1', [producerAttemptId])
       await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId","sessionId",reason) VALUES($1,$2,'execute',1,1,'waiting',$3,'original-native-session','Original question')`, [originAttemptId, blocked.id, originId])
@@ -447,6 +452,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
   } finally {
     if (flags.routing === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = flags.routing
     if (flags.lifecycle === undefined) delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED; else process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = flags.lifecycle
+    await closeWorkspace()
     await dropTestDatabase(admin, database, pool)
     await admin.end()
   }

@@ -22,11 +22,13 @@ import { openEgressCapability, EGRESS_CAPABILITY_TTL_MS } from '../lib/secrets/e
 import type { TaskSecretInjection } from '../lib/secrets/runtime'
 import type { ExecutionIdentity } from '../lib/execution-identity'
 
+const workspaceId = '53100000-0000-4000-8000-000000000002'
 function fixture() {
   const repository = normalizeRepository('https://github.com/synthetic/claim-fixture.git')
   const probe = {
-    run: { id:'run',userId:'member',issueId:'issue',agentId:'agent',deviceId:'device',deviceRepoId:'repo',botId:null,attempt:1,status:'queued',prompt:'private claim instructions',kind:'implement',retryOf:null as string|null,stopReason:null as string|null,stopRequestedAt:null as Date|null,leaseExpiresAt:null as Date|null },
-    issue: {id:'issue',userId:'owner',scope:'workspace',content:{type:'doc'}},
+    workspace: { id: workspaceId, kind: 'team', ownerId: 'owner' },
+    run: { id:'run',userId:'member',workspaceId,issueId:'issue',agentId:'agent',deviceId:'device',deviceRepoId:'repo',botId:null,attempt:1,status:'queued',prompt:'private claim instructions',kind:'implement',retryOf:null as string|null,stopReason:null as string|null,stopRequestedAt:null as Date|null,leaseExpiresAt:null as Date|null },
+    issue: {id:'issue',userId:'owner',workspaceId,ownershipState:'bound',scope:'workspace',linearSyncPolicy:'explicit',linearSyncBlocked:false,content:{type:'doc'}},
     device: {id:'device',ownerId:'member',enabled:true,kind:'local',protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]},
     agent: {id:'agent',userId:'member',deviceId:'device',harness:'codex'},
     repo: {id:'repo',userId:'member',deviceId:'device',baseBranch:'main',repoPath:repository.key,remoteUrl:repository.remoteUrl},
@@ -41,6 +43,7 @@ function fixture() {
     modelAdmissionCalls:[] as {scope:{workspaceId:string;ownerId:string};model:string}[],
     subscriptionAdmissionCalls:[] as {scope:{workspaceId:string;ownerId:string};model:string;route:string}[],
     memberAllowed:true,questionRetryBlocked:false,tokenError:false,locks:[] as string[],transactions:0,transactionErrors:[] as Error[],beforeToken:undefined as (()=>Promise<void>)|undefined,
+    appActive: 0, appCheckouts: 0, appReleases: 0,
     issueAccessError: undefined as Error | undefined,
     credentialCapability: false,
     catalogueCapability: false,
@@ -65,6 +68,8 @@ async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-pr
     // Trace the intended gate: an unrelated failed prerequisite must not
     // masquerade as a successful lineage, scope or lease rejection.
     assert.deepEqual(probe.preparation,preparation)
+    assert.equal(probe.appActive, 0, 'claim releases its APP client on success, refusal and retry')
+    assert.equal(probe.appCheckouts, probe.appReleases, 'every APP checkout is released exactly once')
   }
 }
 
@@ -84,7 +89,7 @@ test('a failed local subscription preflight ends the queued claim before policy,
     for (const detail of ['env_not_clean', 'cli_missing', 'cli_version_mismatch', 'adapter_start_failed'] as const) {
       const probe = fixture()
       Object.assign(probe.run, { agentDefinition: { harness: 'codex', subscription: { bindingId: 'binding', modelId: 'fixture-model', route: 'codex_cli' } } })
-      Object.assign(probe, { cloud: { subscription: { id: 'binding', modelId: 'fixture-model', route: 'codex_cli', consumerId: 'agent', workspaceId: 'ws' } } })
+      Object.assign(probe, { cloud: { subscription: { id: 'binding', modelId: 'fixture-model', route: 'codex_cli', consumerId: 'agent', workspaceId } } })
       Object.assign(probe.device.harnesses[0], { installed: detail !== 'cli_missing', subscriptionBroker: true, subscriptionPreflight: detail })
       const response = await claim(probe, ['skill-preflight', 'subscription-preflight'])
       assert.equal(response.status, 409)
@@ -289,18 +294,19 @@ test('a missing snapshot blocks cross-device recovery and legacy clients before 
   }
 })
 
-test('claim committed before retirement cannot return its old prompt when token issuance fails',async()=>{
+test('claim committed before membership revocation cannot return its old prompt when token issuance fails',async()=>{
   const probe=fixture()
   probe.beforeToken=async()=>{
-    probe.issue.scope='personal';probe.memberAllowed=false
-    probe.run.status='cancelled';probe.run.stopRequestedAt=new Date();probe.run.leaseExpiresAt=null
+    probe.memberAllowed=false
     probe.tokenError=true
   }
   const response=await claim(probe)
   assert.equal(response.status,409)
   const body=await response.text()
   for(const privateField of ['private claim instructions','prompt','subscriptionBinding','synthetic-only'])assert.equal(body.includes(privateField),false)
-  assert.deepEqual(probe.locks,['issues','agent_runs'])
+  assert.equal(probe.run.status,'preparing')
+  assert.ok(probe.run.leaseExpiresAt)
+  assert.deepEqual(probe.locks,['workspaces','workspace_members'])
 })
 
 test('token provisioning failure alone still permits a currently authorized claim',async()=>{
@@ -311,20 +317,33 @@ test('token provisioning failure alone still permits a currently authorized clai
   assert.equal(body.prompt,probe.run.prompt);assert.equal(body.mcp,undefined)
   assert.equal(body.policyRevision,probe.cliPolicy.revision)
   assert.equal(body.pushBranch,probe.publication.pushBranch)
-  assert.deepEqual(probe.locks,['issues','agent_runs'])
+  assert.deepEqual(probe.locks,['workspaces','workspace_members','issues','agent_runs'])
 })
 
-test('a successful token does not override membership revocation or a superseded claim lease',async()=>{
-  for(const change of ['membership','lease']){
+test('a successful token does not override membership, task tenant or claim lease fences',async()=>{
+  for(const change of ['membership','lease','workspace','ownership']){
     const probe=fixture()
     probe.beforeToken=async()=>{
       if(change==='membership')probe.memberAllowed=false
-      else probe.run.leaseExpiresAt=new Date(Date.now()+600_000)
+      else if(change==='lease')probe.run.leaseExpiresAt=new Date(Date.now()+600_000)
+      else if(change==='workspace')probe.issue.workspaceId='53100000-0000-4000-8000-000000000003'
+      else probe.issue.ownershipState='pending'
     }
     const response=await claim(probe)
     assert.equal(response.status,409)
     assert.equal((await response.text()).includes('prompt'),false)
   }
+})
+
+test('disabling provider sync preserves an authorized claim in the same task workspace',async()=>{
+  const probe=fixture()
+  probe.beforeToken=async()=>{probe.issue.linearSyncPolicy='disabled';probe.issue.linearSyncBlocked=true}
+  const response=await claim(probe)
+  assert.equal(response.status,200)
+  assert.equal((await response.json()).prompt,probe.run.prompt)
+  assert.equal(probe.issue.workspaceId,workspaceId)
+  assert.equal(probe.run.workspaceId,workspaceId)
+  assert.deepEqual(probe.locks,['workspaces','workspace_members','issues','agent_runs'])
 })
 
 test('authorized response uses the locked run rather than the initial snapshot',async()=>{
@@ -344,7 +363,7 @@ test('an owner STOP during token preparation fences the response even while its 
   for(const field of ['private claim instructions','prompt','synthetic-only'])assert.equal(body.includes(field),false)
   assert.equal(probe.run.status,'preparing')
   assert.ok(probe.run.leaseExpiresAt)
-  assert.deepEqual(probe.locks,['issues','agent_runs'])
+  assert.deepEqual(probe.locks,['workspaces','workspace_members','issues','agent_runs'])
 })
 
 test('response authorization retries only rolled-back serialization or deadlock failures, with a bound',async()=>{
@@ -369,11 +388,11 @@ test('4e3: a cloud claim reads the task secrets (workspace + repo scope) before 
   Object.assign(process.env,{MIKKA_CLOUD_COMPUTER_TASKS:'1',MIKKA_BYOS_ENABLED:'1',MIKKA_BYO_E2B_KEY:'1'})
   try{
     const probe=fixture()
-    Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:'ws'},cloud:{subscription:{id:'binding',workspaceId:'ws',route:'codex_cli',modelId:'fixture-subscription-model'}}})
+    Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:workspaceId},cloud:{subscription:{id:'binding',workspaceId,route:'codex_cli',modelId:'fixture-subscription-model'}}})
     Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
     const response=await claim(probe,['skill-preflight','policy','model-admission','secrets','claim','skill-claim','benchmark-claim','token','settings'])
     assert.equal(response.status,200)
-    assert.deepEqual(probe.subscriptionAdmissionCalls,[{scope:{workspaceId:'ws',ownerId:'member'},model:'fixture-subscription-model',route:'codex_cli'}])
+    assert.deepEqual(probe.subscriptionAdmissionCalls,[{scope:{workspaceId,ownerId:'member'},model:'fixture-subscription-model',route:'codex_cli'}])
   } finally { for(const key of ['MIKKA_CLOUD_COMPUTER_TASKS','MIKKA_BYOS_ENABLED','MIKKA_BYO_E2B_KEY'])if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key] }
 })
 
@@ -385,7 +404,7 @@ test('a capable bound cloud daemon receives its real subscription lease in the i
     const probe = fixture()
     probe.credentialCapability = true
     const nativeLease = { route: 'codex_cli', modelId: 'gpt-6-luna', revision: 1, accountId: 'fixture-account', accessToken: 'fixture-native-access', expiresAt: '2030-01-01T00:00:00.000Z' }
-    Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: 'ws' }, cloud: { subscription: { id: 'binding', workspaceId: 'ws', route: 'codex_cli', modelId: 'gpt-6-luna' } } })
+    Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId }, cloud: { subscription: { id: 'binding', workspaceId, route: 'codex_cli', modelId: 'gpt-6-luna' } } })
     Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'codex', installed: true, toolApproval: true, subscriptionBroker: true }] })
     const response = await claim(probe, ['skill-preflight', 'policy', 'model-admission', 'secrets', 'claim', 'skill-claim', 'benchmark-claim', 'token', 'settings'])
     assert.equal(response.status, 200)
@@ -411,8 +430,8 @@ test('a capable cloud claim preserves prepared full-model catalogue evidence wit
     probe.agent.harness = 'claude_code'
     const nativeLease = { route: 'claude_code_cli', modelId: 'claude-haiku-5-5', revision: 1, accountId: 'fixture-account',
       accessToken: 'fixture-native-access', expiresAt: '2030-01-01T00:00:00.000Z', modelCatalogueVerified: true }
-    Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: 'ws' },
-      cloud: { subscription: { id: 'binding', workspaceId: 'ws', route: 'claude_code_cli', modelId: 'claude-haiku-5-5' } } })
+    Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId },
+      cloud: { subscription: { id: 'binding', workspaceId, route: 'claude_code_cli', modelId: 'claude-haiku-5-5' } } })
     Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'claude_code', installed: true, toolApproval: true, subscriptionBroker: true, subscriptionModelCatalogue: true }] })
     const response = await claim(probe, ['skill-preflight', 'policy', 'model-admission', 'secrets', 'claim', 'skill-claim', 'benchmark-claim', 'token', 'settings'])
     assert.equal(response.status, 200)
@@ -436,7 +455,7 @@ test('URL repository settings reach local and cloud claims; an explicit clear su
         Object.assign(probe, { repositorySettings: settings })
         Object.assign(probe.repo, { verifyCommand: 'legacy cloud command' })
         if (cloud) {
-          Object.assign(probe, { caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: 'ws' }, cloud: { subscription: { id: 'binding', workspaceId: 'ws', route: 'codex_cli', modelId: 'fixture-subscription-model' } } })
+          Object.assign(probe, { caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId }, cloud: { subscription: { id: 'binding', workspaceId, route: 'codex_cli', modelId: 'fixture-subscription-model' } } })
           Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'codex', installed: true, toolApproval: true, computerBroker: true, subscriptionBroker: true }] })
         }
         const response = await claim(probe, cloud
@@ -449,7 +468,7 @@ test('URL repository settings reach local and cloud claims; an explicit clear su
       }
     }
     const probe = fixture()
-    Object.assign(probe, { caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: 'ws' }, cloud: { subscription: { id: 'binding', workspaceId: 'ws', route: 'codex_cli', modelId: 'fixture-subscription-model' } } })
+    Object.assign(probe, { caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId }, cloud: { subscription: { id: 'binding', workspaceId, route: 'codex_cli', modelId: 'fixture-subscription-model' } } })
     Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'codex', installed: true, toolApproval: true, computerBroker: true, subscriptionBroker: true }] })
     Object.assign(probe.repo, { remoteUrl: null, verifyCommand: 'private workspace command' })
     const response = await claim(probe, ['skill-preflight', 'policy', 'model-admission', 'secrets', 'claim', 'skill-claim', 'benchmark-claim', 'token'])
@@ -470,25 +489,32 @@ test('platform cloud claims inject the configured secret assignment with BYO off
       const probe=fixture()
       const injection=configured ? {env:{TASK_SECRET:'synthetic-task-value',TASK_MODE:'fixture'},secretNames:['TASK_SECRET']} : {env:{},secretNames:[]}
       if(!configured)delete process.env.WORKSPACE_SECRETS_KEY
-      Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:'ws'},cloud:{subscription:{id:'binding',workspaceId:'ws',route:'codex_cli',modelId:'fixture-subscription-model'}},secretInjection:injection,secretReads:[]})
+      Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:workspaceId},cloud:{subscription:{id:'binding',workspaceId,route:'codex_cli',modelId:'fixture-subscription-model'}},secretInjection:injection,secretReads:[]})
       Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
       const response=await claim(probe,['skill-preflight','policy','model-admission','secrets','claim','skill-claim','benchmark-claim','token','settings'])
       assert.equal(response.status,200)
-      assert.deepEqual(probe.subscriptionAdmissionCalls,[{scope:{workspaceId:'ws',ownerId:'member'},model:'fixture-subscription-model',route:'codex_cli'}])
+      assert.deepEqual(probe.subscriptionAdmissionCalls,[{scope:{workspaceId,ownerId:'member'},model:'fixture-subscription-model',route:'codex_cli'}])
       const body=await response.json()
       assert.deepEqual(body.taskEnv,configured ? injection.env : undefined)
       assert.deepEqual(body.taskSecretNames,configured ? injection.secretNames : undefined)
       // The run owner's own secrets join the workspace's (decision 2026-11-02-2120): the claim passes run.userId.
-      assert.deepEqual((probe as typeof probe & {secretReads:unknown[][]}).secretReads.map(args=>[args[0],args[1],args[4]]),[['ws','synthetic/claim-fixture',probe.run.userId]])
+      assert.deepEqual((probe as typeof probe & {secretReads:unknown[][]}).secretReads.map(args=>[args[0],args[1],args[4]]),[[workspaceId,'synthetic/claim-fixture',probe.run.userId]])
     }
     for(const denial of ['authentication','device-scope','workspace-scope'] as const) {
       const probe=fixture()
-      Object.assign(probe,{caller:denial==='authentication' ? null : {userId:'member',scopeDeviceId:denial==='device-scope' ? 'foreign-device' : 'device',scopeWorkspaceId:'foreign-workspace'},cloud:{subscription:{id:'binding',workspaceId:'ws',route:'codex_cli',modelId:'fixture-subscription-model'}},secretInjection:{env:{TASK_SECRET:'must-not-leave'},secretNames:['TASK_SECRET']}})
+      Object.assign(probe,{caller:denial==='authentication' ? null : {userId:'member',scopeDeviceId:denial==='device-scope' ? 'foreign-device' : 'device',scopeWorkspaceId:'foreign-workspace'},cloud:{subscription:{id:'binding',workspaceId,route:'codex_cli',modelId:'fixture-subscription-model'}},secretInjection:{env:{TASK_SECRET:'must-not-leave'},secretNames:['TASK_SECRET']}})
       Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
-      const response=await claim(probe,denial==='workspace-scope' ? ['skill-preflight','policy','model-admission'] : [])
+      // The persisted ownership gate rejects a conflicting caller before policy or Secret preparation.
+      const response=await claim(probe,[])
       assert.equal(response.status,denial==='authentication' ? 401 : denial==='device-scope' ? 404 : 409)
       assert.equal((await response.text()).includes('must-not-leave'),false)
       assert.ok(!probe.preparation.includes('secrets'))
+      assert.equal(probe.run.status,'queued')
+      assert.equal(probe.run.leaseExpiresAt,null)
+      assert.deepEqual(probe.secretReads,[])
+      assert.deepEqual(probe.secretSnapshotReads,[])
+      assert.deepEqual(probe.credentialOwners,[])
+      assert.deepEqual(probe.nativeLeaseCapabilities,[])
     }
   } finally {keys.forEach((key,i)=>{if(saved[i]===undefined)delete process.env[key];else process.env[key]=saved[i]})}
 })
@@ -532,7 +558,7 @@ test('Profile model, source or version changes keep ancestry but start a fresh n
       if (change === 'version') target.agentProfile.version++
       if (change === 'harness') target.harness = target.agentProfile.targetEntry.harness = 'claude_code'
       target.subscription.modelId = target.model
-      Object.assign(probe, { cloud: { subscription: { id: target.subscription.bindingId, modelId: target.model, route: target.subscription.route, consumerId: 'agent', workspaceId: 'ws' } } })
+      Object.assign(probe, { cloud: { subscription: { id: target.subscription.bindingId, modelId: target.model, route: target.subscription.route, consumerId: 'agent', workspaceId } } })
       probe.device.harnesses = [{ harness: target.harness, installed: true, toolApproval: true, subscriptionBroker: true } as typeof probe.device.harnesses[number]]
       const preparation = ['skill-preflight','policy','model-admission','secrets','publication','claim','skill-claim','benchmark-claim','token','settings']
       if (lineage === 'retry') preparation.unshift('question-retry','checkpoint')
@@ -594,7 +620,7 @@ function protectedFixture() {
   return { probe, canary, secret }
 }
 
-function localExecutionIdentity(workspaceId: string): ExecutionIdentity {
+function localExecutionIdentity(workspaceId: string | null): ExecutionIdentity {
   return { version: 1, requester: 'member', botId: null, botOwner: null, executionPrincipal: 'member', workspaceId,
     outputOwner: 'member', resourceBindings: [{ kind: 'device', id: 'device', ownerId: 'member', access: 'owner' }],
     billingAccount: { model: { kind: 'native_login', ownerId: 'member', resourceId: 'device', amount: 'provider_unknown' },
@@ -621,7 +647,7 @@ test('the actual claim response carries an opaque sealed task grant bound to the
   assert.equal(body.taskSecrets.grants.length, 1)
   const grant = body.taskSecrets.grants[0]
   assert.deepEqual(Object.keys(grant).sort(), ['capability', 'expiresAt', 'name', 'origin'])
-  const binding = { ownerId: 'member', workspaceId: null, repository: 'synthetic/claim-fixture', runId: 'run', deviceId: 'device', deviceTokenId: 'synthetic-device-token', attempt: 1 }
+  const binding = { ownerId: 'member', workspaceId, repository: 'synthetic/claim-fixture', runId: 'run', deviceId: 'device', deviceTokenId: 'synthetic-device-token', attempt: 1 }
   const opened = openEgressCapability(grant.capability, binding)
   assert.equal(opened.secret, canary)
   assert.equal(opened.secretId, secret.id)
@@ -633,9 +659,9 @@ test('the actual claim response carries an opaque sealed task grant bound to the
     { deviceId: 'other' }, { deviceTokenId: 'other' }, { attempt: 2 }]) {
     assert.throws(() => openEgressCapability(grant.capability, { ...binding, ...mismatch }), { code: 'task_secret_unavailable', detail: 'binding_mismatch' })
   }
-  assert.deepEqual(probe.locks, ['issues', 'agent_runs'])
-  assert.deepEqual(probe.secretReads.map(args => [args[0], args[1], args[4]]), [[null, 'synthetic/claim-fixture', 'member']])
-  assert.deepEqual(probe.secretSnapshotReads.map(args => args.slice(0, 3)), [[null, 'synthetic/claim-fixture', 'member']])
+  assert.deepEqual(probe.locks, ['workspaces', 'workspace_members', 'issues', 'agent_runs'])
+  assert.deepEqual(probe.secretReads.map(args => [args[0], args[1], args[4]]), [[workspaceId, 'synthetic/claim-fixture', 'member']])
+  assert.deepEqual(probe.secretSnapshotReads.map(args => args.slice(0, 3)), [[workspaceId, 'synthetic/claim-fixture', 'member']])
   assert.equal(typeof (probe.secretSnapshotReads[0][3] as { select: unknown }).select, 'function')
 })
 
@@ -675,7 +701,7 @@ test('final response authorization rejects changed secret metadata, repository, 
     assert.equal(response.status, 409, change)
     const wire = await response.text()
     for (const value of [canary, 'mikka-egress-v1.', 'fixture-claim-github-token', probe.run.prompt]) assert.equal(wire.includes(value), false, change)
-    assert.deepEqual(probe.locks, ['issues', 'agent_runs'])
+    assert.deepEqual(probe.locks, ['workspaces', 'workspace_members', 'issues', 'agent_runs'])
     assert.deepEqual(probe.credentialOwners, ['member'])
     assert.equal(probe.secretSnapshotReads.length, change === 'revision' ? 1 : 0)
   }
@@ -687,7 +713,7 @@ test('a changed valid frozen workspace identity cannot release a grant prepared 
   t.after(() => { if (saved === undefined) delete process.env.WORKSPACE_SECRETS_KEY; else process.env.WORKSPACE_SECRETS_KEY = saved })
   for (const changed of [false, true]) {
     const { probe, canary } = protectedFixture()
-    Object.assign(probe.run, { agentDefinition: { harness: 'codex', executionIdentity: localExecutionIdentity('initial-workspace') } })
+    Object.assign(probe.run, { agentDefinition: { harness: 'codex', executionIdentity: localExecutionIdentity(workspaceId) } })
     probe.beforeToken = async () => {
       if (changed) Object.assign(probe.run, { agentDefinition: { harness: 'codex', executionIdentity: localExecutionIdentity('other-workspace') } })
     }
@@ -695,10 +721,10 @@ test('a changed valid frozen workspace identity cannot release a grant prepared 
     assert.equal(response.status, changed ? 409 : 200)
     const wire = await response.text()
     assert.equal(wire.includes(canary), false)
-    assert.deepEqual(probe.membershipReads, [[changed ? 'other-workspace' : 'initial-workspace', ['member']]], 'real execution identity revalidation reaches the valid workspace before the secret fence')
+    assert.deepEqual(probe.membershipReads, [[changed ? 'other-workspace' : workspaceId, ['member']]], 'real execution identity revalidation reaches the valid workspace before the secret fence')
     if (changed) assert.equal(wire.includes('mikka-egress-v1.'), false)
-    else assert.equal(openEgressCapability(JSON.parse(wire).taskSecrets.grants[0].capability).workspaceId, 'initial-workspace')
-    assert.deepEqual(probe.secretReads.map(args => args[0]), ['initial-workspace'])
+    else assert.equal(openEgressCapability(JSON.parse(wire).taskSecrets.grants[0].capability).workspaceId, workspaceId)
+    assert.deepEqual(probe.secretReads.map(args => args[0]), [workspaceId])
   }
 })
 
@@ -711,15 +737,15 @@ test('cloud protected grants preserve native subscription and GitHub credentials
     const { probe, canary } = protectedFixture()
     probe.credentialCapability = true
     const nativeLease = { route: 'codex_cli', modelId: 'gpt-6-luna', revision: 1, accountId: 'fixture-account', accessToken: 'fixture-native-access', expiresAt: '2030-01-01T00:00:00.000Z' }
-    Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: 'ws' },
-      cloud: { subscription: { id: 'binding', workspaceId: 'ws', route: 'codex_cli', modelId: 'gpt-6-luna' } } })
+    Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId },
+      cloud: { subscription: { id: 'binding', workspaceId, route: 'codex_cli', modelId: 'gpt-6-luna' } } })
     Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'codex', installed: true, toolApproval: true, subscriptionBroker: true }] })
     probe.beforeToken = async () => { if (revoked) probe.workspaceMemberAllowed = false }
     const response = await claim(probe, [...preparedCloudClaim, ...(revoked ? [] : ['secret-snapshot'])])
     assert.equal(response.status, revoked ? 409 : 200)
     const wire = await response.text(), body = JSON.parse(wire)
     assert.equal(wire.includes(canary), false)
-    assert.deepEqual(probe.membershipReads, [['ws', ['member']]])
+    assert.deepEqual(probe.membershipReads, revoked ? [] : [[workspaceId, ['member']]])
     assert.deepEqual(probe.nativeLeaseCapabilities, [false])
     assert.deepEqual(probe.credentialOwners, ['member'])
     if (revoked) {
@@ -727,8 +753,49 @@ test('cloud protected grants preserve native subscription and GitHub credentials
     } else {
       assert.deepEqual(body.subscriptionLease, nativeLease)
       assert.equal(body.github.token, 'fixture-claim-github-token')
-      assert.equal(openEgressCapability(body.taskSecrets.grants[0].capability).workspaceId, 'ws')
+      assert.equal(openEgressCapability(body.taskSecrets.grants[0].capability).workspaceId, workspaceId)
       assert.deepEqual(body.taskEnv, { TASK_REGION: 'fixture' })
     }
   }
+})
+
+
+test('persisted Task and Run ownership reject missing or conflicting scope before any claim preparation', async () => {
+  for (const mismatch of ['pending-task', 'missing-run-workspace', 'foreign-task-workspace', 'frozen-null', 'frozen-workspace', 'claim-workspace'] as const) {
+    const probe = fixture()
+    if (mismatch === 'pending-task') probe.issue.ownershipState = 'pending'
+    if (mismatch === 'missing-run-workspace') Object.assign(probe.run, { workspaceId: null })
+    if (mismatch === 'foreign-task-workspace') probe.issue.workspaceId = '53100000-0000-4000-8000-000000000003'
+    if (mismatch === 'frozen-null' || mismatch === 'frozen-workspace') Object.assign(probe.run, {
+      agentDefinition: { harness: 'codex', executionIdentity: localExecutionIdentity(mismatch === 'frozen-null' ? null : 'other-workspace') },
+    })
+    if (mismatch === 'claim-workspace') Object.assign(probe, { caller: { userId: 'member', scopeWorkspaceId: 'other-workspace' } })
+    const response = await claim(probe, [])
+    assert.equal(response.status, 409, mismatch)
+    assert.deepEqual(await response.json(), { error: 'Run ownership unavailable.' }, mismatch)
+    assert.equal(probe.run.status, 'queued', mismatch)
+    assert.equal(probe.run.leaseExpiresAt, null, mismatch)
+    assert.deepEqual(probe.secretReads, [], mismatch)
+    assert.deepEqual(probe.secretSnapshotReads, [], mismatch)
+    assert.deepEqual(probe.credentialOwners, [], mismatch)
+    assert.deepEqual(probe.nativeLeaseCapabilities, [], mismatch)
+    assert.equal(probe.appCheckouts, 0, mismatch)
+  }
+})
+
+test('removing a frozen identity cannot release a grant prepared under its workspace authority', async t => {
+  const saved = process.env.WORKSPACE_SECRETS_KEY
+  process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+  t.after(() => { if (saved === undefined) delete process.env.WORKSPACE_SECRETS_KEY; else process.env.WORKSPACE_SECRETS_KEY = saved })
+  const { probe, canary } = protectedFixture()
+  probe.credentialCapability = true
+  Object.assign(probe.run, { agentDefinition: { harness: 'codex', executionIdentity: localExecutionIdentity(workspaceId) } })
+  probe.beforeToken = async () => { Object.assign(probe.run, { agentDefinition: { harness: 'codex' } }) }
+  const response = await claim(probe, preparedClaim)
+  assert.equal(response.status, 409)
+  const wire = await response.text()
+  for (const value of [canary, 'mikka-egress-v1.', 'fixture-claim-github-token', probe.run.prompt]) assert.equal(wire.includes(value), false)
+  assert.deepEqual(probe.secretSnapshotReads, [])
+  assert.deepEqual(probe.membershipReads, [])
+  assert.deepEqual(probe.locks, ['workspaces', 'workspace_members', 'issues', 'agent_runs'])
 })

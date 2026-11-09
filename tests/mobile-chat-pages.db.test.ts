@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -16,7 +17,7 @@ test('the app reads a chat a page at a time: 50 first, older pages by `through`,
   const store = await import('../lib/coordinator/store')
   const owner = `mobile-pages-${randomUUID()}`, botId = randomUUID()
   await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [owner, `${owner}@example.invalid`])
-  await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)', [botId, owner, randomUUID(), 'Coordinator'])
+  await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)', [botId, owner, await seedFixtureWorkspace(pool, owner), 'Coordinator'])
   const add = async (position: number) => {
     const text = `Turn ${position}: ${'a long report line '.repeat(80)}`
     const message = position % 2 ? { role: 'user', content: text } : { role: 'assistant', content: [{ type: 'text', text }] }
@@ -49,6 +50,8 @@ test('the app reads a chat a page at a time: 50 first, older pages by `through`,
   } finally {
     await pool.query('delete from coordinator_messages where "userId"=$1', [owner])
     await pool.query('delete from bots where id=$1', [botId])
+    await pool.query('delete from mikka_workspace_members where "userId"=$1', [owner])
+    await pool.query('delete from mikka_workspaces where "userId"=$1', [owner])
     await pool.query('delete from "user" where id=$1', [owner])
   }
 })
