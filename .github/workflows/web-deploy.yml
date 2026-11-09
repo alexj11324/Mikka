@@ -194,6 +194,7 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
       - name: Install private UI runtime dependencies without license scripts
         if: steps.skip.outputs.skip != 'true'
         run: |

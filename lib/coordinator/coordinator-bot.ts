@@ -201,6 +201,8 @@ async function moveExecutionRows(client: PoolClient, ownerId: string, botId: str
   const tasks = (await client.query<{ id: string }>('SELECT id FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
   const events = (await client.query<{ id: string }>('SELECT id FROM coordinator_events WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
   const runs = (await client.query<{ id: string }>('SELECT id FROM agent_runs WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
+  // Every write below is restricted to these captured ids; late rows are excluded too.
+  if (!tasks.length && !events.length && !runs.length) return 0
   const moved = await client.query(`WITH RECURSIVE
     own_tasks AS MATERIALIZED (SELECT id,"sourceEventId","workspaceId" FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL),
     own_runs AS MATERIALIZED (SELECT id,"botId","agentDefinition","issueId","workspaceId",kind FROM agent_runs WHERE "userId"=$1),
