@@ -5683,6 +5683,21 @@
       "pending": "Loading"
     }
   },
+  "HostedInbox": {
+    "open": "Open",
+    "send": "Send",
+    "handOver": "Hand to the Coordinator",
+    "handle": "Handle",
+    "answer": "Write your answer…",
+    "sent": "Sent. It takes it from here",
+    "caughtUp": "You're all caught up",
+    "viewTasks": "View tasks",
+    "approval": "Needs your OK",
+    "suggestion": "Suggestion",
+    "running": "{count, plural, one {# task is still running} other {# tasks are still running}}",
+    "needsReview": "Waiting for your review",
+    "needsConfirm": "Waiting for your OK"
+  },
   "HostedSettings": {
     "back": "Back",
     "general": {

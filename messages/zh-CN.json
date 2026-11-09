@@ -5683,6 +5683,21 @@
       "pending": "读取中"
     }
   },
+  "HostedInbox": {
+    "open": "待处理",
+    "send": "发送",
+    "handOver": "交给 Coordinator",
+    "handle": "去处理",
+    "answer": "写下你的回答…",
+    "sent": "已发送，它会接着做",
+    "caughtUp": "都处理完了",
+    "viewTasks": "查看任务",
+    "approval": "需要你确认",
+    "suggestion": "建议",
+    "running": "{count} 个任务还在进行",
+    "needsReview": "等你审阅",
+    "needsConfirm": "等你确认"
+  },
   "HostedSettings": {
     "back": "返回",
     "general": {
