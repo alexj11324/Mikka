@@ -2265,7 +2265,8 @@
         "default": "默认（Decision API 判断）",
         "allow": "直接做",
         "ask": "先问你",
-        "deny": "不允许"
+        "deny": "不允许",
+        "eachBot": "按各 Bot 的设置"
       },
       "run": {
         "install_dependency": "安装依赖",
@@ -5931,6 +5932,8 @@
     "unsetText": "没有单独设置：应用写操作由 Decision API 判断，Agent 动作按工作区设置",
     "runTitle": "Agent 运行权限",
     "runNote": "云端的 Claude Code、Codex 运行时不逐条确认；这些动作按这里的设置执行",
+    "workspaceTitle": "工作区写操作",
+    "workspaceNote": "对工作区里的每个 Bot 生效；比 Bot 的设置更严时以这里为准",
     "now": "现在：{value}",
     "workspace": "工作区：{value}"
   },

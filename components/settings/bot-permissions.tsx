@@ -16,6 +16,9 @@ import type { BotPermissionAction, BotPermissionApp, PermissionChoice, Permissio
 /** The app writes stored per action (lib/operations/write-schema.ts WRITE_ACTIONS), by the toolkit they act in. */
 const WRITES: Record<string, string[]> = { notion: ['append_notion_paragraph'], slack: ['send_slack_message'], googlecalendar: ['cancel_calendar_event'] }
 
+/** deny > ask > allow; with nothing stored an allow narrows nothing. */
+const STRICTNESS: Record<PermissionValue, number> = { default: 0, allow: 0, ask: 1, deny: 2 }
+
 type WritePolicy = { permissions: Record<string, PermissionChoice>; version: string }
 type AgentPolicy = { policy: { permissions: Record<string, PermissionDecision>; readOnly?: boolean }; revision: string; layers: { agent: { permissions?: Record<string, PermissionDecision>; networkAllow?: string[]; approvalMode?: 'ask' | 'read_only' } } }
 
@@ -44,7 +47,7 @@ async function agentPolicy<T>(body: unknown): Promise<T> {
  * (or none, so the Decision API judges each call), the workspace's narrower choice where it has one, and the Bot's
  * own layer of the agent run policy with the person's approval mode. Saves go back through the same routes.
  */
-export function useBotPermissions(): SettingsBotPermissionsProps {
+export function useBotPermissions({ admin = false }: { admin?: boolean } = {}): SettingsBotPermissionsProps {
   const t = useTranslations('Settings.botPermissions')
   const tAction = useTranslations('Coordinator.pendingActions')
   const tError = useTranslations('Settings.botPermissions.errors')
@@ -72,7 +75,8 @@ export function useBotPermissions(): SettingsBotPermissionsProps {
   const writeAction = (action: string): BotPermissionAction => {
     const value = stored[action] ?? 'default'
     const workspaceValue = narrower[action]
-    return { id: action, name: tAction(action as never), value, effective: workspaceValue && workspaceValue !== value ? workspaceValue : null, choices: ['default', 'allow', 'ask', 'deny'], editable: writable }
+    // The stricter of the two runs (lib/operations/write-policy.ts), so the workspace's is shown only where it narrows.
+    return { id: action, name: tAction(action as never), value, effective: workspaceValue && STRICTNESS[workspaceValue] > STRICTNESS[value] ? workspaceValue : null, choices: ['default', 'allow', 'ask', 'deny'], editable: writable }
   }
   const connected = apps.connectedToolkits().filter(id => appState(apps.accountsFor(id)).on)
   const withSettings = Object.entries(WRITES).filter(([, actions]) => actions.some(action => stored[action])).map(([id]) => id)
@@ -80,6 +84,12 @@ export function useBotPermissions(): SettingsBotPermissionsProps {
     const account = apps.accountsFor(id).find(item => item.enabled)
     return { id, name: info(id).name, account: account?.alias ?? account?.email ?? null, iconUrl: info(id).iconUrl, actions: (WRITES[id] ?? []).map(writeAction) }
   })
+
+  // A workspace admin sets the workspace's own choice for each write (the route checks the role again).
+  const workspaceActions: BotPermissionAction[] | null = !admin || !appList || !workspace.data ? null : appList.flatMap(app => (WRITES[app.id] ?? []).map(action => ({
+    id: action, app: app.id, name: tAction(action as never), value: narrower[action] ?? 'default', effective: null,
+    choices: ['default', 'allow', 'ask', 'deny'] as PermissionValue[], editable: true,
+  })))
 
   const agentLayer = run.data?.layers.agent ?? {}
   const runActions: BotPermissionAction[] | null = !run.data ? null : CONFIGURABLE_ACTIONS.map(action => {
@@ -106,6 +116,7 @@ export function useBotPermissions(): SettingsBotPermissionsProps {
     botId, onBot: id => { setChosen(id); setError(null) },
     apps: appList,
     run: runActions,
+    workspace: workspaceActions,
     approvalMode: run.data ? { value: agentLayer.approvalMode ?? 'ask', editable: true } : null,
     onApprovalMode: mode => { void save(async () => {
       if (!run.data || !agentId) return
@@ -113,7 +124,13 @@ export function useBotPermissions(): SettingsBotPermissionsProps {
       await run.mutate()
     }) },
     onAction: (kind, ids, value) => { void save(async () => {
-      if (kind === 'write') {
+      if (kind === 'workspace') {
+        if (!workspace.data) return
+        const permissions = { ...workspace.data.permissions }
+        for (const id of ids) { if (value === 'default') delete permissions[id]; else permissions[id] = value }
+        await definition(botKey, { body: { action: 'set_workspace_write_policy', permissions, expectedVersion: workspace.data.version } })
+        await workspace.mutate()
+      } else if (kind === 'write') {
         if (!write.data) return
         const permissions = { ...write.data.permissions }
         for (const id of ids) { if (value === 'default') delete permissions[id]; else permissions[id] = value }
@@ -132,14 +149,14 @@ export function useBotPermissions(): SettingsBotPermissionsProps {
   }
 }
 
-export function BotPermissionsSettings() {
-  return <BotPermissionsPage {...useBotPermissions()} />
+export function BotPermissionsSettings({ admin = false }: { admin?: boolean }) {
+  return <BotPermissionsPage {...useBotPermissions({ admin })} />
 }
 
 /** The open-source page: the rule in one line, the Bot, then each app's actions and the run actions with their values. */
-export function BotPermissionsView({ bots, botId, onBot, apps, run, approvalMode, error }: SettingsBotPermissionsProps) {
+export function BotPermissionsView({ bots, botId, onBot, apps, run, workspace, approvalMode, error }: SettingsBotPermissionsProps) {
   const t = useTranslations('Settings.botPermissions')
-  const level = (value: PermissionValue, run = false) => run && value === 'default' ? t('level.workspaceDefault') : t(`level.${value}`)
+  const level = (value: PermissionValue, unset?: string) => unset && value === 'default' ? unset : t(`level.${value}`)
   if (!apps) return <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>
   return <div className="flex flex-col gap-4">
     <p className="text-sm text-muted-foreground">{t('rule')}</p>
@@ -161,7 +178,10 @@ export function BotPermissionsView({ bots, botId, onBot, apps, run, approvalMode
         </li>)}
       </ul>}
     {run && <ul className="flex flex-col divide-y rounded-xl border">
-      {run.map(action => <li key={action.id} className="flex justify-between gap-3 px-4 py-2 text-sm"><span>{action.name}</span><span className="text-muted-foreground">{level(action.value, true)}</span></li>)}
+      {run.map(action => <li key={action.id} className="flex justify-between gap-3 px-4 py-2 text-sm"><span>{action.name}</span><span className="text-muted-foreground">{level(action.value, t('level.workspaceDefault'))}</span></li>)}
+    </ul>}
+    {workspace && <ul className="flex flex-col divide-y rounded-xl border">
+      {workspace.map(action => <li key={action.id} className="flex justify-between gap-3 px-4 py-2 text-sm"><span>{action.name}</span><span className="text-muted-foreground">{level(action.value, t('level.eachBot'))}</span></li>)}
     </ul>}
   </div>
 }

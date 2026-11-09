@@ -4,7 +4,8 @@
 //   (`/api/bots/:botId/definition`, views write_policy / workspace_write_policy, actions set_write_policy).
 // - Agent runs: the Bot's own layer of the run policy (`/api/agent-cli-policy`, readAgent / setAgent target agent),
 //   which also holds the person's approval mode (ask / read_only).
-// Red lines are the actions set to deny.
+// Red lines are the app writes set to deny. A workspace admin also sets the workspace's write policy here, which
+// narrows every Bot's (`set_workspace_write_policy`).
 
 export type PermissionChoice = 'allow' | 'ask' | 'deny'
 /** `default`: nothing stored, so an app write goes to the Decision API, an agent action to the workspace's policy. */
@@ -22,6 +23,8 @@ export type BotPermissionAction = {
   choices: PermissionValue[]
   /** False where no route saves it (computer_use is set on the computer, not here) or the person may not. */
   editable: boolean
+  /** The app a workspace write acts in, for its mark. */
+  app?: string
 }
 
 export type BotPermissionApp = {
@@ -43,11 +46,14 @@ export type SettingsBotPermissionsProps = {
   apps: BotPermissionApp[] | null
   /** The Bot's run permissions; null when there is no worker to read them through yet. */
   run: BotPermissionAction[] | null
+  /** The workspace's own write settings, for every Bot in it (`set_workspace_write_policy`); null unless the person is a
+   *  workspace admin. Others see the workspace's choice as a note on each action. */
+  workspace: BotPermissionAction[] | null
   /** The person's approval mode on this Bot; null when it cannot be read. */
   approvalMode: { value: 'ask' | 'read_only'; editable: boolean } | null
   onApprovalMode: (mode: 'ask' | 'read_only') => void
   /** Saves one or more actions of one kind to the same value. */
-  onAction: (kind: 'write' | 'run', ids: string[], value: PermissionValue) => void
+  onAction: (kind: 'write' | 'run' | 'workspace', ids: string[], value: PermissionValue) => void
   saving: boolean
   /** A failed read or save, in the person's words. */
   error: string | null

@@ -2265,7 +2265,8 @@
         "default": "Default (Decision API)",
         "allow": "On its own",
         "ask": "Asks you first",
-        "deny": "Not allowed"
+        "deny": "Not allowed",
+        "eachBot": "Each Bot's setting"
       },
       "run": {
         "install_dependency": "Install dependencies",
@@ -5931,6 +5932,8 @@
     "unsetText": "Nothing set: an app write goes to the Decision API, an agent action follows the workspace",
     "runTitle": "Agent run permissions",
     "runNote": "Claude Code and Codex in the cloud don't stop to confirm each step; these actions follow what is set here",
+    "workspaceTitle": "Workspace writes",
+    "workspaceNote": "For every Bot in the workspace; where it is stricter than a Bot's setting, this one applies",
     "now": "Now: {value}",
     "workspace": "Workspace: {value}"
   },
