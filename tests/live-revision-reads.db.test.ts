@@ -234,3 +234,43 @@ test('prepared owner-list revisions share one PostgreSQL read without duplicate 
       byteMeaning: 'UTF-8 JSON of actual pg result rows, not transport/TLS bytes' }))
   }
 })
+
+test('authorized selected-workspace revision plan co-reads exactly the requested Team keys', { skip: !enabled }, async t => {
+  const { pool } = await import('../lib/db')
+  const context = await import('../lib/desktop-rpc/read-batch-context')
+  const { bumpLiveRevisions } = await import('../lib/live/revisions')
+  const readWorkspace = context.readBatchWorkspaceRevisions ?? ((database: Parameters<typeof context.readBatchRevisions>[0], refs: Parameters<typeof context.readBatchRevisions>[1]) => context.readBatchRevisions(database, refs))
+  const teamId = randomUUID(), ownerId = `workspace-revision-${randomUUID()}`
+  const kinds = ['thread_list', 'task_run_list', 'issue_list'] as const
+  const plan = ['task-runs.syncThreadList', 'task-runs.pollTaskRuns', 'issues.syncIssueList'] as const
+  await bumpLiveRevisions(pool, kinds.map(kind => ({ kind, id: teamId })))
+  try {
+    const measure = async (planned: boolean) => {
+      const statements: { refs: number; rows: number; rowJsonBytes: number }[] = []
+      const database = { query: async (sql: string, values: string[][]) => {
+        const result = await pool.query(sql, values)
+        statements.push({ refs: values[0].length, rows: result.rows.length, rowJsonBytes: Buffer.byteLength(JSON.stringify(result.rows)) })
+        return result
+      } } as unknown as Parameters<typeof context.readBatchRevisions>[0]
+      const values = await context.withReadBatchContext(async () => {
+        const reads = []
+        for (const kind of kinds) reads.push(await readWorkspace(database, [{ kind, id: teamId }], { ownerId, workspaceId: teamId }))
+        return reads
+      }, planned ? plan : [])
+      return { statements, values }
+    }
+    const before = await measure(false), after = await measure(true)
+    assert.deepEqual(after.values, before.values)
+    assert.equal(before.statements.length, 3)
+    assert.equal(after.statements.length, 1)
+    for (const sample of [before, after]) {
+      assert.equal(sample.statements.reduce((sum, row) => sum + row.refs, 0), 3)
+      assert.equal(sample.statements.reduce((sum, row) => sum + row.rows, 0), 3)
+    }
+    assert.ok(after.statements.reduce((sum, row) => sum + row.rowJsonBytes, 0) <= before.statements.reduce((sum, row) => sum + row.rowJsonBytes, 0))
+    t.diagnostic(JSON.stringify({ scope: 'authorized-selected-workspace', before: before.statements, after: after.statements,
+      byteMeaning: 'UTF-8 JSON of actual pg result rows, not transport/TLS bytes', authorityMeaning: 'revision helper after caller authorization; not a test of membership admission' }))
+  } finally {
+    await pool.query('delete from live_revisions where id=$1', [teamId])
+  }
+})

@@ -1181,6 +1181,173 @@ for (const scenario of ['unproven-result', 'repeated-dispatch', 'multiple-captur
 }
 
 
+
+/** These two workspace settings readers return complete arrays. Exercise the
+ * production SWR middleware, live coverage and Native queue without adding
+ * revision fields to their existing unversioned response contract. */
+for (const scenario of [
+  'committed-after-ready', 'pending-after-ready', 'late-subscription',
+  'dispatch-before-ready', 'newer-push', 'workspace-change', 'identity-change',
+] as const) test('native workspace snapshot: ' + scenario, { timeout: 8_000 }, async t => {
+  const { callAction } = await import('../apps/desktop/src/renderer/rpc')
+  const { resetReadBatchScope } = await import('../apps/desktop/src/renderer/read-batch')
+  const { snapshotReadFetcher } = await import('../lib/swr/read-observer')
+  const { encode, decode } = await import('../lib/desktop-rpc/wire')
+  const actions = ['teams.listTeams', 'team-relations.listProjectTeams'] as const
+  type Action = typeof actions[number]
+  type Rows = { id: string; name: string; observation: number; owner: string }[]
+  const counts = new Map<Action, number>(actions.map(action => [action, 0]))
+  const phases: string[] = []
+  const rejected: { action: Action; code?: string; status?: number }[] = []
+  const dispatched = deferred<void>(), firstResponse = deferred<void>()
+  const beforeReady = scenario === 'dispatch-before-ready'
+  const held = ['pending-after-ready', 'newer-push', 'workspace-change', 'identity-change'].includes(scenario)
+  let physicalCalls = 0, enqueued = 0, observation = 1
+  let owner = 'owner', workspace = home
+  const initialCache = cache
+  const originalURL = window.location.href
+  const originalMessage = FakeSocket.prototype.message
+  FakeSocket.prototype.message = function (value: unknown) {
+    originalMessage.call(this, value)
+    if ((value as { type?: unknown })?.type === 'live_ready') phases.push('ready:' + this.url)
+  }
+  automaticOpen = false
+  resetReadBatchScope()
+  const fetcher = (action: Action) => snapshotReadFetcher(() => {
+    phases.push('fetcher:' + action)
+    const pending = callAction<Rows>(action, [])
+    phases.push('enqueue:' + action)
+    // Both real SWR fetchers enter before the capability acknowledgement. The
+    // real MessageChannel, not a replaced scheduler, dispatches their batch.
+    if (++enqueued % actions.length === 0 && !beforeReady) queueMicrotask(() => {
+      sockets.find(socket => socket.url.endsWith(workspace) && socket.readyState === 0)?.open()
+    })
+    return pending.catch((error: { code?: string; status?: number }) => {
+      rejected.push({ action, code: error.code, status: error.status })
+      throw error
+    })
+  })
+  const teamsFetcher = fetcher(actions[0]), projectTeamsFetcher = fetcher(actions[1])
+  function Anchor({ scope }: { scope: string }) {
+    useLiveKeys([{ kind: 'bot_list', id: scope, workspaceId: scope }], ['workspace-array-anchor'])
+    return null
+  }
+  function WorkspaceArrays({ enabled, watch, scope }: { enabled: boolean; watch: boolean; scope: string }) {
+    const teams = useSWR<Rows>(enabled ? 'teams' : null, teamsFetcher, { revalidateOnFocus: false, revalidateOnReconnect: false })
+    const relations = useSWR<Rows>(enabled ? 'project-teams' : null, projectTeamsFetcher, { revalidateOnFocus: false, revalidateOnReconnect: false })
+    useLiveKeys(watch ? [{ kind: 'workspace_settings', id: scope, workspaceId: scope }] : [], watch ? ['teams', 'project-teams'] : [])
+    return <><output data-workspace-snapshot="teams">{JSON.stringify(teams.data)}</output><output data-workspace-snapshot="project-teams">{JSON.stringify(relations.data)}</output></>
+  }
+  const renderArrays = async (enabled: boolean, watch: boolean) => {
+    await act(async () => root.render(<SWRConfig key={owner + ':' + workspace} value={{ provider: () => cache, use: [staleOnFocus], dedupingInterval: 0, shouldRetryOnError: false }}>
+      <LiveProvider ownerId={owner} workspaceId={workspace}>
+        <Anchor scope={workspace} /><WorkspaceArrays enabled={enabled} watch={watch} scope={workspace} />
+      </LiveProvider>
+    </SWRConfig>))
+  }
+  const ticketFetch = globalThis.fetch
+  globalThis.fetch = async (input, options) => {
+    const url = new URL(String(input), 'https://mikka.example')
+    if (url.pathname.endsWith('/api/live/ticket')) return ticketFetch(input, options)
+    assert.ok(url.pathname.endsWith('/api/desktop/rpc'))
+    assert.equal(options?.method, 'POST')
+    assert.equal(options?.cache, 'no-store')
+    const envelope = JSON.parse(String(options?.body))
+    assert.equal(envelope.version, 1)
+    assert.equal(envelope.action, 'desktop.readBatch')
+    const calls = (decode(envelope.args) as [{ action: Action; args: unknown[] }[]])[0]
+    assert.deepEqual(calls.map(call => call.action).sort(), [...actions].sort())
+    const request = ++physicalCalls
+    const requestOwner = owner, requestObservation = observation
+    phases.push('dispatch:' + request)
+    const results = calls.map(call => {
+      assert.deepEqual(call.args, [])
+      counts.set(call.action, counts.get(call.action)! + 1)
+      return { ok: true, result: [{ id: call.action, name: call.action, observation: requestObservation, owner: requestOwner }] satisfies Rows }
+    })
+    if (request === 1) {
+      dispatched.resolve()
+      if (held) await firstResponse.promise
+    }
+    phases.push('response:' + request)
+    return Response.json({ version: 1, ok: true, result: encode(results) })
+  }
+  const verifyRows = (expectedObservation: number, expectedOwner = owner) => {
+    for (const [index, key] of ['teams', 'project-teams'].entries()) {
+      const value = cache.get(key)?.data
+      assert.ok(Array.isArray(value), 'the existing full-array contract stays intact')
+      assert.deepEqual(value, [{ id: actions[index], name: actions[index], observation: expectedObservation, owner: expectedOwner }])
+      assert.equal(Object.hasOwn(value, 'live'), false, 'an unversioned workspace settings response gains no invented revision')
+      assert.equal(container.querySelector('[data-workspace-snapshot="' + key + '"]')?.textContent, JSON.stringify(value))
+    }
+  }
+  try {
+    await renderArrays(false, false)
+    assert.equal(sockets.length, 1)
+    await renderArrays(true, scenario !== 'late-subscription')
+    await dispatched.promise
+    if (beforeReady) {
+      observation = 2
+      await act(async () => sockets[0].open())
+    }
+    const ready = phases.findIndex(phase => phase.startsWith('ready:'))
+    const sent = phases.indexOf('dispatch:1')
+    assert.ok(ready >= 0 && sent >= 0)
+    assert.equal(sent < ready, beforeReady, 'actual dispatch, not fetcher entry, defines coverage')
+    for (const action of actions) assert.ok(phases.indexOf('fetcher:' + action) < ready)
+    if (scenario === 'pending-after-ready') {
+      await wait()
+      assert.equal(physicalCalls, 1, 'the live flush joins both pending post-ready responses')
+      await act(async () => firstResponse.resolve())
+    } else if (scenario === 'newer-push') {
+      observation = 2
+      await act(async () => emit(home, 'workspace_settings'))
+      await settled()
+      assert.equal(physicalCalls, 2, 'a newer unversioned push still needs an authoritative read')
+      verifyRows(2)
+      await act(async () => firstResponse.resolve())
+    } else if (scenario === 'workspace-change' || scenario === 'identity-change') {
+      observation = 2
+      if (scenario === 'workspace-change') {
+        workspace = otherHome
+        window.history.replaceState(null, '', '/mikka/en?workspace=' + workspace)
+      } else {
+        owner = 'next-owner'
+        resetReadBatchScope()
+      }
+      cache = new Map()
+      await renderArrays(false, false)
+      await renderArrays(true, true)
+      await settled()
+      verifyRows(2)
+      await act(async () => firstResponse.resolve())
+      await settled()
+      assert.equal(physicalCalls, 2, 'the current scope reads once while the retired result is refused')
+      assert.equal(initialCache.get('teams')?.data, undefined)
+      assert.equal(initialCache.get('project-teams')?.data, undefined)
+      assert.deepEqual(rejected.map(value => [value.action, value.code, value.status]).sort(),
+        actions.map(action => [action, 'desktop_session_changed', 409]).sort())
+    } else {
+      await settled()
+      if (scenario === 'late-subscription') {
+        verifyRows(1)
+        await renderArrays(true, true)
+      }
+    }
+    await settled()
+    const expected = beforeReady || scenario === 'newer-push' || scenario === 'workspace-change' || scenario === 'identity-change' ? 2 : 1
+    assert.equal(physicalCalls, expected)
+    assert.deepEqual([...counts.values()], [expected, expected])
+    verifyRows(expected)
+  } finally {
+    firstResponse.resolve()
+    resetReadBatchScope()
+    FakeSocket.prototype.message = originalMessage
+    window.history.replaceState(null, '', originalURL)
+    t.diagnostic(JSON.stringify({ kind: 'native_workspace_snapshot_dispatch', scenario, physicalCalls, counts: Object.fromEntries(counts), phases, rejected }))
+  }
+})
+
 /** Keep this last: a 404 capability response disables batching for this real
  * document, and resetReadBatchScope deliberately does not restore capability. */
 test('native pending dispatch: real 404 capability fallback revokes an already awaited hint', { timeout: 8_000 }, async t => {

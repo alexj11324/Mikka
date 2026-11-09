@@ -5,6 +5,8 @@ import type { Pool } from 'pg'
 import { COMMIT_EXECUTOR } from './db/commit-effects'
 import { createReadBatch } from './desktop-rpc/read-batch'
 import { withReadBatchContext } from './desktop-rpc/read-batch-context'
+import * as readContext from './desktop-rpc/read-batch-context'
+import { routeScope } from './tracing/labels'
 import { desktopActionSchemas } from './desktop-rpc/schemas'
 
 const changed = () => assert.fail('a read cannot emit an execution side effect')
@@ -279,4 +281,111 @@ test('cron and workflow jobs cannot inherit an active foreground policy observat
       assert.equal(f.calls.length, 3)
     })
   }
+})
+
+// On the fixed pre-fix source, run the real consumers without the new lifetime:
+// the RED is the duplicate policy SELECT, never a missing-export exception.
+const observePolicy: <T>(read: () => Promise<T>) => Promise<T> =
+  readContext.withReadOnlyPolicyObservation ?? (read => read())
+
+test('standalone read-only policy consumers share one observation and keep every credential read', async () => {
+  const before = policyReader(), after = policyReader()
+  const expected = await readPolicyConsumers(before.query)
+  assert.equal(before.calls.filter(call => call === 'policy').length, 2, 'ordinary callers keep their existing fresh checks')
+  assert.deepEqual(await observePolicy(() => readPolicyConsumers(after.query)), expected)
+  assert.deepEqual(after.calls, ['policy', 'own-keys', 'shared-keys', 'shared-owners'])
+})
+
+test('standalone policy refusal and absence are observed again by the next read', async () => {
+  const f = policyReader(false)
+  assert.deepEqual(await observePolicy(() => readPolicyConsumers(f.query)), {
+    keys: [{ id: '10000000-0000-4000-8000-000000000002', mine: true }], owners: [],
+  })
+  assert.deepEqual(f.calls, ['policy', 'own-keys'])
+  f.state.allowed = undefined
+  assert.equal((await observePolicy(() => readPolicyConsumers(f.query))).owners.length, 1)
+  assert.equal(f.calls.filter(call => call === 'policy').length, 2)
+})
+
+test('standalone observations isolate parallel reads, exact workspaces and actual executors', async () => {
+  const f = policyReader()
+  const read = () => observePolicy(() => Promise.all([
+    memberSubscriptionsAllowed(f.query, workspace), memberSubscriptionsAllowed(f.query, workspace),
+  ]))
+  assert.deepEqual(await Promise.all([read(), read()]), [[true, true], [true, true]])
+  assert.equal(f.calls.length, 2)
+  const other = policyReader(false)
+  const alias = { [COMMIT_EXECUTOR]: f.query, query: f.query.query.bind(f.query) }
+  assert.deepEqual(await observePolicy(() => Promise.all([
+    memberSubscriptionsAllowed(f.query, workspace),
+    memberSubscriptionsAllowed(alias, workspace),
+    memberSubscriptionsAllowed(f.query, '10000000-0000-4000-8000-000000000004'),
+    memberSubscriptionsAllowed(other.query, workspace),
+  ])), [true, true, true, false])
+  assert.equal(f.calls.length, 4)
+  assert.equal(other.calls.length, 1)
+})
+
+test('standalone policy failures retain their original cause and do not poison the next read', async () => {
+  const f = policyReader(), failure = new Error('synthetic_standalone_policy_failure')
+  f.state.error = failure
+  const settled = await observePolicy(() => Promise.allSettled([
+    memberSubscriptionsAllowed(f.query, workspace), memberSubscriptionsAllowed(f.query, workspace),
+  ]))
+  assert.equal(f.calls.length, 1)
+  for (const result of settled) {
+    assert.equal(result.status, 'rejected')
+    if (result.status === 'rejected') assert.equal(result.reason, failure)
+  }
+  f.state.error = null
+  assert.equal(await observePolicy(() => memberSubscriptionsAllowed(f.query, workspace)), true)
+  assert.equal(f.calls.length, 2)
+})
+
+test('standalone observation closes on fulfillment and rejection before bound after-work runs', async () => {
+  for (const reject of [false, true]) {
+    const f = policyReader(), failure = new Error('synthetic_standalone_read_failure')
+    let after!: () => Promise<boolean>
+    const reading = observePolicy(async () => {
+      assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
+      after = AsyncLocalStorage.bind(() => memberSubscriptionsAllowed(f.query, workspace))
+      if (reject) throw failure
+    })
+    if (reject) await assert.rejects(reading, error => error === failure)
+    else await reading
+    f.state.allowed = false
+    assert.equal(await after(), false)
+    f.state.allowed = true
+    assert.equal(await after(), true)
+    assert.equal(f.calls.length, 3)
+  }
+})
+
+test('standalone foreground observation never supplies policy to after, cron or workflow work', async () => {
+  const f = policyReader()
+  await observePolicy(async () => {
+    assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
+    for (const route of ['after:policy-fixture', 'cron:policy-fixture', 'workflow:policy-fixture/read']) {
+      await routeScope.run(route, () => observePolicy(async () => {
+        f.state.allowed = false
+        assert.equal(await memberSubscriptionsAllowed(f.query, workspace), false)
+        f.state.allowed = true
+        assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
+      }))
+    }
+    assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
+    assert.equal(f.calls.length, 7)
+  })
+})
+
+test('standalone read-only observation preserves the surrounding Native batch policy', async () => {
+  const f = policyReader()
+  await withReadBatchContext(async () => {
+    assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
+    f.state.allowed = false
+    assert.equal(await observePolicy(() => memberSubscriptionsAllowed(f.query, workspace)), true)
+    assert.equal(f.calls.length, 1)
+  })
+  assert.equal(await observePolicy(() => memberSubscriptionsAllowed(f.query, workspace)), false)
+  assert.equal(f.calls.length, 2)
 })

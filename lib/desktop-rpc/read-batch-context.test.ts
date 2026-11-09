@@ -3,6 +3,9 @@ import assert from 'node:assert/strict'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { ownerLiveReadScope, ownerLiveScope } from '../live/owner-scope'
 import { readBatchOwnerRevisions, readBatchRevisions, withReadBatchContext } from './read-batch-context'
+import * as readContext from './read-batch-context'
+import { COMMIT_EXECUTOR } from '../db/commit-effects'
+import { routeScope } from '../tracing/labels'
 
 const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const workspace = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
@@ -293,4 +296,131 @@ test('throw and cancellation release the plan as well as its earlier observation
     assert.deepEqual(await after(), { [threadKey]: 12 })
     assert.deepEqual(calls.map(values => values[0]), [['issue_list', 'thread_list'], ['thread_list'], ['thread_list']])
   }
+})
+
+// The old source executes its real per-reader queue for RED comparison, so a
+// failed count is behavioral rather than a missing new export.
+const workspaceRevisions: typeof readContext.readBatchWorkspaceRevisions =
+  readContext.readBatchWorkspaceRevisions ?? ((database, refs) => readBatchRevisions(database, refs))
+const workspacePlan = ['task-runs.syncThreadList', 'task-runs.pollTaskRuns', 'issues.syncIssueList'] as const
+const selectedTeam = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+
+function workspaceRevisionFixture(initial = 7) {
+  let revision = initial
+  const calls: string[][][] = []
+  const database = { query: async (_sql: string, values: string[][]) => {
+    calls.push(values)
+    return { rows: values[0].map((kind, index) => ({ kind, id: values[1][index], revision: String(revision) })) }
+  } } as unknown as Parameters<typeof readBatchRevisions>[0]
+  return { database, calls, setRevision: (next: number) => { revision = next } }
+}
+
+test('authorized workspace readers share their earlier Team revisions despite different readiness', async () => {
+  const f = workspaceRevisionFixture(), scope = { ownerId: owner, workspaceId: selectedTeam }
+  await withReadBatchContext(async () => {
+    for (const kind of ['thread_list', 'task_run_list', 'issue_list'] as const) {
+      assert.deepEqual(await workspaceRevisions(f.database, [{ kind, id: selectedTeam }], scope), { [`${kind}:${selectedTeam}`]: 7 })
+      f.setRevision(12)
+    }
+  }, workspacePlan)
+  assert.deepEqual(f.calls, [[['issue_list', 'task_run_list', 'thread_list'], [selectedTeam, selectedTeam, selectedTeam]]])
+  assert.deepEqual(await withReadBatchContext(() => workspaceRevisions(f.database, [{ kind: 'thread_list', id: selectedTeam }], scope), workspacePlan),
+    { [`thread_list:${selectedTeam}`]: 12 })
+  assert.equal(f.calls.length, 2, 'a later request observes current counters')
+})
+
+test('authorized Team plans do not resolve a Personal home or borrow a different workspace', async () => {
+  const f = workspaceRevisionFixture(), peerTeam = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+  await withReadBatchContext(async () => {
+    const teamScope = { ownerId: owner, workspaceId: selectedTeam }
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'thread_list', id: selectedTeam }], teamScope), { [`thread_list:${selectedTeam}`]: 7 })
+    f.setRevision(12)
+    const home = { ownerId: owner, workspaceId: workspace }
+    assert.deepEqual(await readBatchOwnerRevisions(f.database, [{ kind: 'issue_list', id: workspace }], home), { [`issue_list:${workspace}`]: 12 })
+    const peer = { ownerId: 'other-owner', workspaceId: peerTeam }
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'thread_list', id: peerTeam }], peer), { [`thread_list:${peerTeam}`]: 12 })
+  }, workspacePlan)
+  assert.equal(f.calls.length, 3)
+  assert.deepEqual(f.calls.map(call => [...new Set(call[1])]), [[selectedTeam], [workspace], [peerTeam]])
+})
+
+test('entities, unresolved scopes and mismatched workspace refs never start a Team plan', async () => {
+  const f = workspaceRevisionFixture(), scope = { ownerId: owner, workspaceId: selectedTeam }
+  await withReadBatchContext(async () => {
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'bot_chat', id: selectedTeam }], scope), { [`bot_chat:${selectedTeam}`]: 7 })
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'thread_list', id: workspace }], scope), { [threadKey]: 7 })
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'issue_list', id: workspace }], null), { [`issue_list:${workspace}`]: 7 })
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'thread_list', id: 'invalid' }], scope), {})
+  }, workspacePlan)
+  assert.deepEqual(f.calls.map(call => call[0]), [['bot_chat'], ['thread_list'], ['issue_list']])
+})
+
+test('workspace revision observations use the actual executor behind one request proxy', async () => {
+  const first = workspaceRevisionFixture(7), second = workspaceRevisionFixture(12)
+  const executors = new AsyncLocalStorage<Parameters<typeof readBatchRevisions>[0]>()
+  const proxy = {
+    get [COMMIT_EXECUTOR]() { return executors.getStore() },
+    query(...args: unknown[]) { return Reflect.apply(executors.getStore()!.query, executors.getStore(), args) },
+  } as unknown as Parameters<typeof readBatchRevisions>[0]
+  const scope = { ownerId: owner, workspaceId: selectedTeam }, refs = [{ kind: 'thread_list' as const, id: selectedTeam }]
+  await withReadBatchContext(async () => {
+    assert.deepEqual(await executors.run(first.database, () => workspaceRevisions(proxy, refs, scope)), { [`thread_list:${selectedTeam}`]: 7 })
+    assert.deepEqual(await executors.run(second.database, () => workspaceRevisions(proxy, refs, scope)), { [`thread_list:${selectedTeam}`]: 12 })
+    assert.deepEqual(await executors.run(first.database, () => workspaceRevisions(proxy, refs, scope)), { [`thread_list:${selectedTeam}`]: 7 })
+  }, workspacePlan)
+  assert.equal(first.calls.length, 1); assert.equal(second.calls.length, 1)
+})
+
+test('workspace plans never supply foreground revisions to after, cron or workflow reads', async () => {
+  const f = workspaceRevisionFixture(), scope = { ownerId: owner, workspaceId: selectedTeam }
+  const read = () => workspaceRevisions(f.database, [{ kind: 'thread_list', id: selectedTeam }], scope)
+  await withReadBatchContext(async () => {
+    assert.deepEqual(await read(), { [`thread_list:${selectedTeam}`]: 7 })
+    let revision = 8
+    for (const route of ['after:revision-fixture', 'cron:revision-fixture', 'workflow:revision-fixture/read']) {
+      f.setRevision(revision)
+      assert.deepEqual(await routeScope.run(route, read), { [`thread_list:${selectedTeam}`]: revision })
+      revision++
+    }
+    assert.deepEqual(await read(), { [`thread_list:${selectedTeam}`]: 7 })
+  }, workspacePlan)
+  assert.equal(f.calls.length, 4)
+  assert.ok(f.calls.slice(1).every(call => call[0].length === 1), 'deferred work does not inherit the plan either')
+})
+
+test('workspace plan failure and completed lifetimes never fabricate or retain revision proof', async () => {
+  const failure = new Error('synthetic_workspace_revision_failure'), f = workspaceRevisionFixture()
+  let unavailable = true, after!: () => Promise<unknown>, reads = 0
+  const database = { query: async (...args: unknown[]) => {
+    reads++
+    if (unavailable) throw failure
+    return Reflect.apply(f.database.query, f.database, args)
+  } } as unknown as Parameters<typeof readBatchRevisions>[0]
+  const scope = { ownerId: owner, workspaceId: selectedTeam }, refs = [{ kind: 'thread_list' as const, id: selectedTeam }]
+  await assert.rejects(withReadBatchContext(async () => {
+    after = AsyncLocalStorage.bind(() => workspaceRevisions(database, refs, scope))
+    await workspaceRevisions(database, refs, scope)
+  }, workspacePlan), error => error === failure)
+  unavailable = false
+  assert.deepEqual(await after(), { [`thread_list:${selectedTeam}`]: 7 })
+  f.setRevision(12)
+  assert.deepEqual(await after(), { [`thread_list:${selectedTeam}`]: 12 })
+  assert.equal(reads, 3)
+  assert.ok(f.calls.every(call => call[0].length === 1), 'the expired plan does not survive through a bound callback')
+})
+
+test('authorized Team list prefetch reduces three separately ready fixed-revision reads to one SQL', async () => {
+  const f = workspaceRevisionFixture(7), scope = { ownerId: owner, workspaceId: selectedTeam }
+  const kinds = ['thread_list', 'task_run_list', 'issue_list'] as const
+  const observed: Record<string, number>[] = []
+  await withReadBatchContext(async () => {
+    for (const kind of kinds) {
+      await Promise.resolve()
+      observed.push(await workspaceRevisions(f.database, [{ kind, id: selectedTeam }], scope))
+    }
+  }, workspacePlan)
+  assert.deepEqual(observed, kinds.map(kind => ({ [`${kind}:${selectedTeam}`]: 7 })),
+    'all three readers finish with the same counters and only their original requested key')
+  assert.equal(f.calls.length, 1, 'the old per-reader queue issues three SQL reads after separate readiness')
+  assert.deepEqual(f.calls[0], [['issue_list', 'task_run_list', 'thread_list'], [selectedTeam, selectedTeam, selectedTeam]])
 })

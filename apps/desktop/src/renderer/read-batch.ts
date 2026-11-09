@@ -2,9 +2,12 @@ import { carryReadDispatch } from '@/lib/swr/read-observer'
 import { MAX_READ_BATCH, READ_BATCH_ACTION, type BatchReadAction, type ReadBatchItem } from '@/lib/desktop-rpc/read-batch-contract'
 import type { Locale } from './location'
 
-// These hooks return their response snapshot without merging cached rows or
+// These fetchers return their response snapshot without merging cached rows or
 // issuing a second read, so its actual dispatch can prove live coverage.
-const snapshotReads: ReadonlySet<string> = new Set(['task-runs.pollTaskRuns', 'coordinator.pollBotChatSummaries', 'bots.pollBots'])
+const snapshotReads: ReadonlySet<string> = new Set([
+  'task-runs.pollTaskRuns', 'coordinator.pollBotChatSummaries', 'bots.pollBots',
+  'teams.listTeams', 'team-relations.listProjectTeams',
+])
 export const isSnapshotReadAction = (action: string) => snapshotReads.has(action)
 
 export class DesktopTransportError extends Error {

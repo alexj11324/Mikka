@@ -5,6 +5,7 @@ import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { beginOwnerListRead, readRevisions } from '@/lib/live/revision-read'
+import { withReadOnlyPolicyObservation } from '@/lib/desktop-rpc/read-batch-context'
 import type { ListLiveRead } from '@/lib/live/list-read'
 
 import { cookies, headers } from 'next/headers'
@@ -97,7 +98,7 @@ async function readFullChat(botId: string | null): Promise<CoordinatorChat> {
   const user = await getUser()
   const userId = user.id
   const bot = await ownBot(user, botId)
-  const enabled = await coordinatorEnabled(user.id, bot.id)
+  const enabled = await withReadOnlyPolicyObservation(() => coordinatorEnabled(user.id, bot.id))
   // Before the chat: a push at this revision or below is already in what follows.
   const begun = await beginBotChatRead(userId, bot)
   const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
@@ -130,7 +131,7 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   // Each request is authorized on its own: the session and its ownership of this bot.
   const user = await getUser()
   const bot = await ownBot(user, botId)
-  const enabled = await coordinatorEnabled(user.id, bot.id)
+  const enabled = await withReadOnlyPolicyObservation(() => coordinatorEnabled(user.id, bot.id))
   const parsed = versionSchema.safeParse(known)
   const proof = continuationSchema.safeParse(continuation)
   const previous = proof.success && proof.data ? { ...proof.data,
