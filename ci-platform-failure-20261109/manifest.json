@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "archivePrefix": "ci-platform-failure-20261109",
+  "evidenceParent": "f4f276b35648a1f72a7457520776888510206777",
+  "sourceFiles": [
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-platform-failure-1505/observations.json",
+      "path": "observations.json",
+      "bytes": 196922,
+      "sha256": "35360887f2e4c219731f6b64599fd54f12e8306fe43a816523e08c7ec10c257e",
+      "gitBlob": "2a42598036255198ba15e730a4dda3c61fef3746",
+      "mode": "100644"
+    }
+  ],
+  "sourceFileCount": 1,
+  "sourceBytes": 196922,
+  "sourceFilesUnchanged": true,
+  "generatedFiles": [
+    {
+      "path": "README.md",
+      "bytes": 1275,
+      "sha256": "24ca399a748f8e5401dace3e0e4a9a278bc0dc065d7af6fb352b1c93df1cf17a",
+      "gitBlob": "755dd2035448c7f1e6a419403563b078a1f18312",
+      "mode": "100644"
+    }
+  ],
+  "newOriginalLogOrArtifactDownloads": 0,
+  "newTests": 0,
+  "newCiRuns": 0,
+  "productionActions": 0,
+  "refMutations": 0,
+  "newFormalSamples": 0,
+  "newCompleteCiPassAsserted": false,
+  "laterOperatorResultsIncluded": false
+}
