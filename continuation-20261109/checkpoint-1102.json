@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-09T11:02:34Z",
+  "issue": 1505,
+  "complete": false,
+  "newFormalSamples": 0,
+  "repository": "alexj11324/Mikka",
+  "readyPr": {
+    "number": 1805,
+    "head": "37ffccac0e76bd32885178eef9a300dedcb9315f",
+    "tree": "447a9a83f86860494364382a3b5d545d95748f40",
+    "files": 7,
+    "ciObservedAt": "2026-11-09T10:19:42Z",
+    "checks": {
+      "success": 34,
+      "skipped": 7,
+      "active": 0,
+      "failed": 0
+    },
+    "allEightWorkflowsSuccess": true,
+    "mainCi": 42595963558,
+    "mergeabilityLastRead": {
+      "atMinute": "2026-11-09T10:40Z",
+      "mergeable": true,
+      "state": "clean"
+    },
+    "bodyAndRiskAlreadyUpdated": true
+  },
+  "application": {
+    "main": "a2198c8c2f608f7b8169329b9da853067618dba6",
+    "tree": "d3c86f905a0ff548720f54a9c73bf92a4764e033",
+    "originalWeb": {
+      "run": 42600269460,
+      "attempt": 1,
+      "conclusion": "success",
+      "rootReadRunMetadata": true,
+      "runUpdatedAt": "2026-11-09T10:51:06Z"
+    },
+    "publicVersion": {
+      "source": "a2198c8c2f608f7b8169329b9da853067618dba6",
+      "overlay": "485736e7acfe729dcb9821c093ee774ba110922b",
+      "ownerReceipt": 6738218460,
+      "rootReadReceipt": true,
+      "rootDidNotRepeatPublicProbe": true
+    }
+  },
+  "activeExternalWindow": {
+    "ownerIssue": 1503,
+    "start": "2026-11-09T10:26:04Z",
+    "hardEnd": "2026-11-09T12:56:04Z",
+    "entryReceipt": 6737702351,
+    "lastKnownSetup": "Not activated as of owner10:53:05; four post-Web consumers awaiting closure",
+    "noOwnWindowActive": true,
+    "doNotInterpretFutureReadinessAsLock": true
+  },
+  "latestRuntime": {
+    "run": 42600269541,
+    "attempt": 1,
+    "source": "a2198c8c2f608f7b8169329b9da853067618dba6",
+    "conclusion": "failure",
+    "failure": "matchingWebRunFailed:42601138019",
+    "waiterGuardIsExistingDocumentedContract": true,
+    "noWaiterCodeChange": true,
+    "subscriptions": "skipped",
+    "publish": "skipped",
+    "cleanupOwnerReceipt": 6738071504,
+    "allThreeCandidatesDeleted": true,
+    "originalCleanupReadByRoot": false,
+    "awaitLogOriginalReadByRootExactlyOnce": true,
+    "awaitLogBytes": 13334,
+    "awaitLogSha256": "a3f47301994175326fa1c8e1e8435116ef1311a161f905a083e41d821ad2275d"
+  },
+  "noOwnedRunningResources": true,
+  "readonlyPreparation": {
+    "reviewCommit": "1678d0966ed961ac6bc91f82140c712b74550540",
+    "tree": "eca30bbea5d26099e8d6683705f7de852519acb6",
+    "parent": "a2198c8c2f608f7b8169329b9da853067618dba6",
+    "expiredDraftDeadline": "2026-11-09T10:45:00Z",
+    "neverCreatedRefOrRun": true,
+    "neverReadProductionCredentials": true,
+    "neverMintedChild": true,
+    "tests": {
+      "baseline": "30/30 PASS",
+      "sameExpandedOld": "32 PASS /7 FAIL",
+      "new": "39/39 PASS",
+      "node": "24.22.1",
+      "notRealPostgresOrOAuth": true
+    },
+    "futureUse": "Rebind source/deadline on actual handoff; never execute this expired workflow. Inspect normal method compatibility on actual new main.",
+    "sourceDirectory": "readonly-owner-refresh-20261109/source",
+    "workflowArchive": "readonly-owner-refresh-20261109/workflow-1678-unexecuted.yml.txt"
+  },
+  "formalPreparation": {
+    "frozenDirectory": "evidence/1505-startup-timing-20261108/formal-renderer",
+    "all16RequiredFieldsStillUnfilled": true,
+    "pins": 15,
+    "observations": 14,
+    "stages": 39,
+    "samples": 6,
+    "models": [
+      "claude-haiku-5-5",
+      "gpt-6-luna"
+    ],
+    "samplesPerModel": 3,
+    "thresholdMs": 5000,
+    "formula": "Date.parse(agentStart.storedAt)-Date.parse(timing.dispatchStartedAt)+Math.max(0,runtime.agentAccepted.ms-runtime.executionStartMs)",
+    "requiresRealIndependentToolThenCorrectReply": true,
+    "ordinaryTasksOnly": true,
+    "originalInfisicalSmokeIdentityAndTeam": true,
+    "botId": "fdeea45f-8cb2-450a-96a4-d9a682f71482",
+    "scopeKey": "MIKKA_CLOUD_DIAGNOSTIC_WINDOW",
+    "scopeMinutes": 120,
+    "entryScopeRemainingMinutes": 45,
+    "jobMinutes": 40,
+    "outerConcurrency": "production-smoke-owner-acceptance",
+    "jobConcurrency": "web-deploy-production",
+    "dplResolveOnce": true,
+    "upstreamSevenJobsAllActualSuccessRequired": true,
+    "rawValidatorsPreserved": true
+  },
+  "scopeHelper": {
+    "path": "scripts/ops/issue1505-diagnostic-window.mjs",
+    "workflowPath": ".github/workflows/issue1505-diagnostic-window.yml",
+    "reviewSource": "f997dbe4f97829cd54f96705ec4e56d624f61c52",
+    "reviewHelperBytes": 27870,
+    "reviewHelperSha256": "8b19d8f763a49a3813d104d3adb57b34f718db515da008df1f915c364b546f4c",
+    "reviewWorkflowBytes": 48948,
+    "reviewWorkflowSha256": "5677069be25e9ff59f50149fee5bea453ccb34d1eafa8968c1336b8e36f8f15a",
+    "newEnabledCommitMustBeSoleDirectChildOf": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+    "allowOnlyFourHelperLiteralBindings": [
+      "SOURCE",
+      "TREE",
+      "BRANCH",
+      "GO"
+    ],
+    "oldPinsMustNotBeReused": true,
+    "prepareAfterActualRuntimePublished": true,
+    "appAtPreparationMustEqualPinnedApplicationAndSource": true,
+    "dispatchWebOnlyOnceWithActualReturnedRunId": true,
+    "noWaitingForWebChildWhileHoldingSharedSmokeLease": true
+  },
+  "artifacts": {
+    "exactHeadCi": "tool-proof-regression-20261109/remote-ci-37ff-closed.json",
+    "readonlyRefresh": "readonly-owner-refresh-20261109",
+    "runtimeFailure": "runtime-a219-await-web-20261109",
+    "historicSlowSamplesV2": "evidence/1505-startup-timing-20261108/formal-78c-bottlenecks-20261109/observed-v2.json",
+    "historicApmReuseBoundary": "formal-78c-bottlenecks-20261109/existing-apm-reuse-boundary.json",
+    "toolProofRegression": "evidence/1505-startup-timing-20261108/tool-proof-regression-20261109",
+    "nativeMcpSourceReview": "runtime89-reply-diagnosis-20261109/anonymous-mcp-static-review.json"
+  },
+  "remaining": [
+    "Fresh actual handoff, main/writer/account/CI check",
+    "New normal readonly GitHub child with exact child cleanup receipt",
+    "Merge own ready PR; watch actual Web and full runtime gates/publication/cleanup",
+    "Fresh bounded diagnostic scope and APP deployment capture",
+    "Bind actual A/DPL/R/W/templates/helper/scope and run CCx3/CXx3 ordinary fresh Tasks",
+    "All six unrounded full startup values<=5000ms with valid tool/reply and version fences; cleanup and close1505 only after success"
+  ],
+  "communication": {
+    "issueLatest": 6738225763,
+    "coordDiagnosis": 6738137683,
+    "coordClarificationNoWaiterFix": 6738325663
+  },
+  "stateRecovery": {
+    "scratchExecutorUnavailable": true,
+    "inMemoryToolStoreResetObserved": "2026-11-09T10:57:12Z",
+    "allNewRawEvidenceAlreadyVersionedBeforeReset": true,
+    "sourceRecoveredFromImmutableGit": true,
+    "neverRedownloadProductionOriginalsForRecovery": true
+  }
+}
