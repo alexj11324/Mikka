@@ -373,11 +373,16 @@ export async function runInboxProduction({ env = process.env, event, attestation
     const integration = await request('github_connection', '/api/integrations/github', {}, [200, 401, 403, 409, 502, 503])
     const connection = integration.body
     check(connection?.viewerId === ownerId, 'identity_failed')
+    check(connection.githubAccountId === undefined || connection.githubAccountId === null
+      || /^[1-9]\d{0,15}$/.test(connection.githubAccountId), 'identity_failed')
     report.inventory.github = { httpStatus: integration.status, connected: connection.connected === true,
       configured: connection.configured === true, installed: connection.installed === true,
       testRepositoryAuthorized: connection.repositories?.some(row => row.fullName === REPOSITORY) === true,
       source: connection.source === 'cloud' ? 'cloud' : 'local', recipients: [...recipientIds].map(id => ({ id, source: 'sign_in' })) }
-    if (connection.connected === true && typeof connection.login === 'string' && /^[a-zA-Z0-9-]{1,39}$/.test(connection.login)) {
+    if (connection.connected === true && typeof connection.githubAccountId === 'string' && /^[1-9]\d{0,15}$/.test(connection.githubAccountId)) {
+      recipientIds.add(connection.githubAccountId)
+      report.inventory.github.recipients.push({ id: connection.githubAccountId, source: 'verified_integration' })
+    } else if (connection.connected === true && typeof connection.login === 'string' && /^[a-zA-Z0-9-]{1,39}$/.test(connection.login)) {
       const githubUser = await githubRead('/users/' + connection.login)
       check(positive(githubUser?.id) && githubUser.login?.toLowerCase() === connection.login.toLowerCase(), 'identity_failed')
       recipientIds.add(String(githubUser.id))

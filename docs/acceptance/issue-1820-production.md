@@ -56,6 +56,12 @@ metadata, including already linked numeric GitHub IDs and whether the test
 repository is already authorized. It neither connects a provider nor grants a
 repository permission.
 
+The existing owner-only GitHub integration response now includes the verified
+public numeric `githubAccountId` already returned by its authorized discovery.
+This adds no provider request or grant and exposes no token. Cloud connections
+intentionally have a null login and may have no GitHub sign-in account; they can
+therefore be inventoried without misreporting an existing binding as missing.
+
 It also reads recent team tasks through normal owner APIs. Existing tasks and
 suggestions remain unchanged. A Factory task with a PR must expose the cached
 `flow.review.summary`, with branch, head, added/deleted lines, changed files, and

@@ -77,8 +77,10 @@ function fixture(options = {}) {
     }
     if (path === '/api/workspace') return response({ currentUserId: OWNER, workspace: { id: selected, kind: selected === HOME ? 'personal' : 'team' },
       choices: [{ id: HOME, kind: 'personal' }, { id: TEAM, kind: 'team' }] })
-    if (path === '/api/auth/list-accounts') return response(options.noGitHub ? [] : [{ providerId: 'github', accountId: '42', userId: OWNER }])
-    if (path === '/api/integrations/github') return response({ viewerId: OWNER, connected: false, configured: true, installed: false, repositories: [] })
+    if (path === '/api/auth/list-accounts') return response(options.noGitHub || options.cloudIdentity ? [] : [{ providerId: 'github', accountId: '42', userId: OWNER }])
+    if (path === '/api/integrations/github') return response({ ...(options.cloudIdentity ? { githubAccountId: '42', source: 'cloud', login: null } : {}),
+      viewerId: OWNER, connected: Boolean(options.cloudIdentity), configured: true, installed: Boolean(options.cloudIdentity),
+      repositories: options.cloudIdentity ? [{ fullName: 'alexj11324/Mikka-handoff' }] : [] })
     if (path === '/api/issues/search') return response({ items: [{ id: ISSUE }], nextCursor: null, truncated: false })
     if (path === '/api/factory/tasks') return response({ issueId: ISSUE, tasks: options.noFactory ? [] : [{ id: TASK_PR }, { id: TASK_EMPTY }] })
     const task = /^\/api\/factory\/tasks\/([^/]+)\/flow$/.exec(path)
@@ -194,6 +196,15 @@ test('source recipient cannot be substituted; missing existing GitHub authority 
     assert.equal(report.status, 'failed'); assert.equal(report.failure.code, 'fixture_binding_failed')
     assert.equal(f.calls.some(call => call.path === '/api/suggestions'), false); assert.equal(f.mutations.length, 0); noLeaks(report)
   }
+})
+
+test('the owner-only verified cloud identity binds a real recipient without a GitHub sign-in account or credential export', async () => {
+  const f = fixture({ cloudIdentity: true }), report = await runInboxProduction(f.args)
+  assert.equal(report.status, 'passed', JSON.stringify(report.failure))
+  assert.deepEqual(report.inventory.github.recipients, [{ id: '42', source: 'verified_integration' }])
+  assert.equal(report.inventory.github.source, 'cloud'); assert.equal(report.inventory.github.testRepositoryAuthorized, true)
+  assert.equal(f.calls.some(call => call.path.startsWith('/users/')), false)
+  noLeaks(report)
 })
 
 test('wrong exact URL or Decision suppression never falls back to another suggestion or title', async () => {
