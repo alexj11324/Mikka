@@ -203,8 +203,10 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   stays.
 - **R-62** A task's 活动 lists its creation, its events and one row per Agent
   stretch, oldest first: consecutive runs by the same Agent are one row, and
-  where the Agent changes the row reads 「换 Codex」 ([2026-11-09-0045](decisions/2026-11-09-0045-no-attempt-word.md)).
-  There is no per-run thread list. A row shows the stretch's latest state and
+  every row is labelled with its Agent's mark and name, never a 「换」 verb, as
+  Warp labels runs ([2026-11-09-0045](decisions/2026-11-09-0045-no-attempt-word.md)).
+  There is no per-run thread list. A row shows its stretch's latest run in the
+  run-result words (glossary: Run result) and
   opens the task's single conversation at the stretch's first run (R-81),
   ending in the shared composer (R-10). The task properties
   show its dispatching bot, Agent/model and execution location. A reader who
