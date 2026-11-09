@@ -611,3 +611,63 @@ jobs:
           path: .artifacts/root-native-delivery-cleanup.json
           if-no-files-found: warn
           retention-days: 14
+
+
+  self-hosted-wallet-settings-audit:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
+      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final wallet settings audit')
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    concurrency:
+      group: production-smoke-owner-acceptance
+      queue: max
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Validate exact source before credentials
+        run: node scripts/ops/self-hosted-wallet-settings-audit.mjs
+        env:
+          MIKKA_WALLET_AUDIT_PREFLIGHT: '1'
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Observe normal wallet and card settings without model or billing writes
+        run: node scripts/ops/self-hosted-wallet-settings-audit.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: self-hosted-wallet-settings-audit
+          path: artifacts/self-hosted-wallet-settings-audit.json
+          if-no-files-found: error
+          retention-days: 7
