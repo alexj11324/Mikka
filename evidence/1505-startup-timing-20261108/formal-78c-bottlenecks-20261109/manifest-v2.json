@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "status": "frozen",
+  "raw": {
+    "path": "/vercel/ops-1505/formal-78c-42430097946/artifact/Mikka/Mikka/acceptance-results/cloud-startup-acceptance.json",
+    "bytes": 312085,
+    "sha256": "8a33c1d6470655b845cf4c271019cceca64291536e7af5f5fa44643a3350ca8a"
+  },
+  "members": [
+    {
+      "path": "observed-v2.json",
+      "bytes": 59264,
+      "sha256": "904cfcf8f9eed5ae8392dd521d7e6deaf4d5bbdeeb834f19f3dfa5a137b2f5ff"
+    },
+    {
+      "path": "review-v2.md",
+      "bytes": 3953,
+      "sha256": "4c658445138982a98a0b73d3fcdfe46f0feed66702ff9b0c79809744c9aa63e3"
+    }
+  ],
+  "initialProjectionRetained": [
+    "observed.json",
+    "review.md",
+    "manifest.json"
+  ],
+  "initialProjectionSuperseded": true,
+  "noNewMeasurements": true
+}

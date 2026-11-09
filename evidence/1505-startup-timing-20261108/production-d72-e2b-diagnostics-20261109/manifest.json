@@ -1,0 +1,36 @@
+{
+  "source": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+  "runId": 42560686591,
+  "attempt": 1,
+  "retrievedAt": "2026-11-09T04:51:37.170895+00:00",
+  "files": [
+    {
+      "kind": "diagnostics",
+      "artifactId": 13649949947,
+      "zipBytes": 2476,
+      "zipSha256": "8f6d22a63d21f4538e9bd4b9e027a5090070408327f81a5c1528fd3cad9b3d73",
+      "members": [
+        {
+          "path": "/vercel/ops-1505/production-d72-e2b-diagnostics/subscription-diagnostics.json",
+          "name": "subscription-diagnostics.json",
+          "bytes": 6211,
+          "sha256": "ab618b384804a6b9be72e07b0d865a41a8fe49629e632d806862ef51b653cdb9"
+        }
+      ]
+    },
+    {
+      "kind": "cleanup",
+      "artifactId": 13650915563,
+      "zipBytes": 416,
+      "zipSha256": "ba9a67e017eea04e8e3e7f14fee54ee72cfc4ac3f1af89faf7426e562f1d9b79",
+      "members": [
+        {
+          "path": "/vercel/ops-1505/production-d72-e2b-diagnostics/release-cleanup.json",
+          "name": "release-cleanup.json",
+          "bytes": 639,
+          "sha256": "55b224f83e1a01d38a6f2251f077f4513408ac14f78841363db906d637added5"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2290 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-09T04:53:17.615Z",
+  "historicalFormalRun": "42430097946/1",
+  "raw": {
+    "path": "/vercel/ops-1505/formal-78c-42430097946/artifact/Mikka/Mikka/acceptance-results/cloud-startup-acceptance.json",
+    "bytes": 312085,
+    "sha256": "8a33c1d6470655b845cf4c271019cceca64291536e7af5f5fa44643a3350ca8a"
+  },
+  "originalOverallStatus": "failed",
+  "maxStartupMs": 5000,
+  "formula": "Date.parse(agentStart.storedAt)-Date.parse(timing.dispatchStartedAt)+Math.max(0,runtimeTiming.agentAccepted.ms-runtimeTiming.executionStartMs)",
+  "rows": [
+    {
+      "case": 1,
+      "harness": "claude_code",
+      "originalStatus": "execution_proved_awaiting_server_timing",
+      "originalPhase": "execution_receipt",
+      "replyVerifiedAfterTool": true,
+      "withinTarget": false,
+      "wallDispatchToAgentStartMs": 17324,
+      "executionStartMs": 5457.507,
+      "agentAcceptedMs": 6979.205,
+      "nativeAckOffsetMs": 1521.6980000000003,
+      "originalUnroundedTotalMs": 18845.698,
+      "fiveSegmentsMs": {
+        "beforeEnsure": null,
+        "ensure": null,
+        "ensureToDispatchReturn": null,
+        "dispatchReturnToStoredAgentStart": 7782,
+        "laterNativeAckOffset": 1521.6980000000003
+      },
+      "serverObserved": {
+        "ensureMs": 8109,
+        "createMs": 1862,
+        "credentialsMs": 9,
+        "claimMs": 2084,
+        "nativeCredentialsMs": 991,
+        "githubCredentialsMs": 264,
+        "resolveRepositoryMs": [
+          729
+        ],
+        "readWorkerMs": [
+          1352
+        ],
+        "startWorkerMs": [
+          1669
+        ],
+        "workerRegisterMs": [
+          2864
+        ],
+        "acquireLeaseMs": [
+          846
+        ]
+      },
+      "threadPhases": [
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098747907,
+          "endedAt": 1794098748004,
+          "ms": 97,
+          "outcome": null
+        },
+        {
+          "name": "execution_identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098748004,
+          "endedAt": 1794098748039,
+          "ms": 35,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098748040,
+          "endedAt": 1794098748042,
+          "ms": 2,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098748042,
+          "endedAt": 1794098748063,
+          "ms": 21,
+          "outcome": null
+        },
+        {
+          "name": "connect",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098748063,
+          "endedAt": 1794098749938,
+          "ms": 1875,
+          "outcome": null
+        },
+        {
+          "name": "record_sandbox",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098749938,
+          "endedAt": 1794098749942,
+          "ms": 4,
+          "outcome": null
+        },
+        {
+          "name": "post_connect_admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098749942,
+          "endedAt": 1794098749949,
+          "ms": 7,
+          "outcome": null
+        },
+        {
+          "name": "runtime_configuration",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098749949,
+          "endedAt": 1794098749949,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "read_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098749950,
+          "endedAt": 1794098751302,
+          "ms": 1352,
+          "outcome": null
+        },
+        {
+          "name": "verify_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098751302,
+          "endedAt": 1794098751303,
+          "ms": 1,
+          "outcome": null
+        },
+        {
+          "name": "read_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098751303,
+          "endedAt": 1794098751303,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "verify_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098751303,
+          "endedAt": 1794098751303,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "start_desktop",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098751303,
+          "endedAt": 1794098751303,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "credential_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098751303,
+          "endedAt": 1794098751352,
+          "ms": 49,
+          "outcome": null
+        },
+        {
+          "name": "publish_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098751352,
+          "endedAt": 1794098751461,
+          "ms": 109,
+          "outcome": null
+        },
+        {
+          "name": "start_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098751461,
+          "endedAt": 1794098753130,
+          "ms": 1669,
+          "outcome": null
+        },
+        {
+          "name": "worker_register",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098753130,
+          "endedAt": 1794098755994,
+          "ms": 2864,
+          "outcome": null
+        },
+        {
+          "name": "verify_runtime",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098755994,
+          "endedAt": 1794098755994,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "finish",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098755995,
+          "endedAt": 1794098756006,
+          "ms": 11,
+          "outcome": null
+        }
+      ],
+      "claimPhases": [
+        {
+          "name": "authorize",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098756143,
+          "endedAt": 1794098756152,
+          "ms": 9,
+          "outcome": null
+        },
+        {
+          "name": "identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098756152,
+          "endedAt": 1794098756164,
+          "ms": 12,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098756164,
+          "endedAt": 1794098756255,
+          "ms": 91,
+          "outcome": null
+        },
+        {
+          "name": "acquire_lease",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098756255,
+          "endedAt": 1794098757101,
+          "ms": 846,
+          "outcome": null
+        },
+        {
+          "name": "provenance",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098757102,
+          "endedAt": 1794098757199,
+          "ms": 97,
+          "outcome": null
+        },
+        {
+          "name": "assignment_context",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098757199,
+          "endedAt": 1794098757595,
+          "ms": 396,
+          "outcome": null
+        },
+        {
+          "name": "credentials_wait",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098757595,
+          "endedAt": 1794098758191,
+          "ms": 596,
+          "outcome": null
+        },
+        {
+          "name": "response_fence",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098758191,
+          "endedAt": 1794098758224,
+          "ms": 33,
+          "outcome": null
+        }
+      ],
+      "daemonStartup": {
+        "ms": 3195.721,
+        "phases": []
+      },
+      "daemonPreparation": {
+        "ms": 10363.326,
+        "source": "bootstrap_claude_start",
+        "phases": [
+          {
+            "name": "daemon.adapter.cli_init.prewarm",
+            "startMs": 68.091,
+            "endMs": 4448.38,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 4380.289,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.model_report",
+            "startMs": 5765.851,
+            "endMs": 5766.774,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.923,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.cli_init.prewarm",
+            "startMs": 6834.751,
+            "endMs": 10015.466,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 3180.715,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.cli_init",
+            "startMs": 10359.408,
+            "endMs": 10361.01,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 1.602,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.account_check.account_info",
+            "startMs": 10361.056,
+            "endMs": 10361.624,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.568,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.account_check",
+            "startMs": 10361.643,
+            "endMs": 10362.02,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.377,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "gitIntervalsAvailable": false
+    },
+    {
+      "case": 2,
+      "harness": "codex",
+      "originalStatus": "execution_proved_awaiting_server_timing",
+      "originalPhase": "execution_receipt",
+      "replyVerifiedAfterTool": true,
+      "withinTarget": false,
+      "wallDispatchToAgentStartMs": 15448,
+      "executionStartMs": 7132.403,
+      "agentAcceptedMs": 7131.817,
+      "nativeAckOffsetMs": 0,
+      "originalUnroundedTotalMs": 15448,
+      "fiveSegmentsMs": {
+        "beforeEnsure": null,
+        "ensure": null,
+        "ensureToDispatchReturn": null,
+        "dispatchReturnToStoredAgentStart": 9098,
+        "laterNativeAckOffset": 0
+      },
+      "serverObserved": {
+        "ensureMs": 4678,
+        "createMs": 1417,
+        "credentialsMs": 10,
+        "claimMs": 1734,
+        "nativeCredentialsMs": 515,
+        "githubCredentialsMs": 244,
+        "resolveRepositoryMs": [
+          830
+        ],
+        "readWorkerMs": [
+          925
+        ],
+        "startWorkerMs": [
+          811
+        ],
+        "workerRegisterMs": [
+          1142
+        ],
+        "acquireLeaseMs": [
+          890
+        ]
+      },
+      "threadPhases": [
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098805130,
+          "endedAt": 1794098805170,
+          "ms": 40,
+          "outcome": null
+        },
+        {
+          "name": "execution_identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098805170,
+          "endedAt": 1794098805208,
+          "ms": 38,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098805208,
+          "endedAt": 1794098805210,
+          "ms": 2,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098805210,
+          "endedAt": 1794098805246,
+          "ms": 36,
+          "outcome": null
+        },
+        {
+          "name": "connect",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098805246,
+          "endedAt": 1794098806675,
+          "ms": 1429,
+          "outcome": null
+        },
+        {
+          "name": "record_sandbox",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098806675,
+          "endedAt": 1794098806679,
+          "ms": 4,
+          "outcome": null
+        },
+        {
+          "name": "post_connect_admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098806679,
+          "endedAt": 1794098806698,
+          "ms": 19,
+          "outcome": null
+        },
+        {
+          "name": "runtime_configuration",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098806698,
+          "endedAt": 1794098806699,
+          "ms": 1,
+          "outcome": null
+        },
+        {
+          "name": "read_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098806699,
+          "endedAt": 1794098807624,
+          "ms": 925,
+          "outcome": null
+        },
+        {
+          "name": "verify_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098807624,
+          "endedAt": 1794098807625,
+          "ms": 1,
+          "outcome": null
+        },
+        {
+          "name": "read_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098807625,
+          "endedAt": 1794098807625,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "verify_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098807625,
+          "endedAt": 1794098807625,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "start_desktop",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098807625,
+          "endedAt": 1794098807625,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "credential_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098807625,
+          "endedAt": 1794098807684,
+          "ms": 59,
+          "outcome": null
+        },
+        {
+          "name": "publish_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098807684,
+          "endedAt": 1794098807790,
+          "ms": 106,
+          "outcome": null
+        },
+        {
+          "name": "start_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098807790,
+          "endedAt": 1794098808601,
+          "ms": 811,
+          "outcome": null
+        },
+        {
+          "name": "worker_register",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098808601,
+          "endedAt": 1794098809743,
+          "ms": 1142,
+          "outcome": null
+        },
+        {
+          "name": "verify_runtime",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098809743,
+          "endedAt": 1794098809743,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "finish",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098809743,
+          "endedAt": 1794098809757,
+          "ms": 14,
+          "outcome": null
+        }
+      ],
+      "claimPhases": [
+        {
+          "name": "authorize",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098809819,
+          "endedAt": 1794098809876,
+          "ms": 57,
+          "outcome": null
+        },
+        {
+          "name": "identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098809876,
+          "endedAt": 1794098809886,
+          "ms": 10,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098809886,
+          "endedAt": 1794098809965,
+          "ms": 79,
+          "outcome": null
+        },
+        {
+          "name": "acquire_lease",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098809965,
+          "endedAt": 1794098810855,
+          "ms": 890,
+          "outcome": null
+        },
+        {
+          "name": "provenance",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098810855,
+          "endedAt": 1794098810872,
+          "ms": 17,
+          "outcome": null
+        },
+        {
+          "name": "assignment_context",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098810872,
+          "endedAt": 1794098811232,
+          "ms": 360,
+          "outcome": null
+        },
+        {
+          "name": "credentials_wait",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098811232,
+          "endedAt": 1794098811388,
+          "ms": 156,
+          "outcome": null
+        },
+        {
+          "name": "response_fence",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098811388,
+          "endedAt": 1794098811553,
+          "ms": 165,
+          "outcome": null
+        }
+      ],
+      "daemonStartup": {
+        "ms": 4126.894,
+        "phases": [
+          {
+            "name": "daemon.adapter.model_report",
+            "startMs": 3.359,
+            "endMs": 4.808,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 1.45,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.cli_init",
+            "startMs": 180.509,
+            "endMs": 1787.893,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 1607.383,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.auth.token",
+            "startMs": 1788.71,
+            "endMs": 1789.49,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.781,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.account_check.login",
+            "startMs": 1789.769,
+            "endMs": 2866.619,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 1076.85,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "daemonPreparation": {
+        "ms": null,
+        "source": null,
+        "phases": []
+      },
+      "gitIntervalsAvailable": false
+    },
+    {
+      "case": 3,
+      "harness": "claude_code",
+      "originalStatus": "execution_proved_awaiting_server_timing",
+      "originalPhase": "execution_receipt",
+      "replyVerifiedAfterTool": true,
+      "withinTarget": false,
+      "wallDispatchToAgentStartMs": 15297,
+      "executionStartMs": 3423.338,
+      "agentAcceptedMs": 4636.815,
+      "nativeAckOffsetMs": 1213.4769999999994,
+      "originalUnroundedTotalMs": 16510.477,
+      "fiveSegmentsMs": {
+        "beforeEnsure": null,
+        "ensure": null,
+        "ensureToDispatchReturn": null,
+        "dispatchReturnToStoredAgentStart": 6735,
+        "laterNativeAckOffset": 1213.4769999999994
+      },
+      "serverObserved": {
+        "ensureMs": 7302,
+        "createMs": 1572,
+        "credentialsMs": 15,
+        "claimMs": 3080,
+        "nativeCredentialsMs": 700,
+        "githubCredentialsMs": 284,
+        "resolveRepositoryMs": [
+          731
+        ],
+        "readWorkerMs": [
+          1142
+        ],
+        "startWorkerMs": [
+          1433
+        ],
+        "workerRegisterMs": [
+          2889
+        ],
+        "acquireLeaseMs": [
+          2146
+        ]
+      },
+      "threadPhases": [
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098854397,
+          "endedAt": 1794098854422,
+          "ms": 25,
+          "outcome": null
+        },
+        {
+          "name": "execution_identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098854422,
+          "endedAt": 1794098854447,
+          "ms": 25,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098854447,
+          "endedAt": 1794098854451,
+          "ms": 4,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098854451,
+          "endedAt": 1794098854489,
+          "ms": 38,
+          "outcome": null
+        },
+        {
+          "name": "connect",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098854489,
+          "endedAt": 1794098856079,
+          "ms": 1590,
+          "outcome": null
+        },
+        {
+          "name": "record_sandbox",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098856079,
+          "endedAt": 1794098856083,
+          "ms": 4,
+          "outcome": null
+        },
+        {
+          "name": "post_connect_admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098856083,
+          "endedAt": 1794098856087,
+          "ms": 4,
+          "outcome": null
+        },
+        {
+          "name": "runtime_configuration",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098856088,
+          "endedAt": 1794098856088,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "read_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098856088,
+          "endedAt": 1794098857230,
+          "ms": 1142,
+          "outcome": null
+        },
+        {
+          "name": "verify_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098857230,
+          "endedAt": 1794098857231,
+          "ms": 1,
+          "outcome": null
+        },
+        {
+          "name": "read_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098857231,
+          "endedAt": 1794098857231,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "verify_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098857231,
+          "endedAt": 1794098857231,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "start_desktop",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098857231,
+          "endedAt": 1794098857231,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "credential_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098857231,
+          "endedAt": 1794098857257,
+          "ms": 26,
+          "outcome": null
+        },
+        {
+          "name": "publish_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098857258,
+          "endedAt": 1794098857361,
+          "ms": 103,
+          "outcome": null
+        },
+        {
+          "name": "start_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098857361,
+          "endedAt": 1794098858794,
+          "ms": 1433,
+          "outcome": null
+        },
+        {
+          "name": "worker_register",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098858794,
+          "endedAt": 1794098861683,
+          "ms": 2889,
+          "outcome": null
+        },
+        {
+          "name": "verify_runtime",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098861683,
+          "endedAt": 1794098861683,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "finish",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098861683,
+          "endedAt": 1794098861691,
+          "ms": 8,
+          "outcome": null
+        }
+      ],
+      "claimPhases": [
+        {
+          "name": "authorize",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098861773,
+          "endedAt": 1794098861801,
+          "ms": 28,
+          "outcome": null
+        },
+        {
+          "name": "identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098861801,
+          "endedAt": 1794098861809,
+          "ms": 8,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098861809,
+          "endedAt": 1794098861900,
+          "ms": 91,
+          "outcome": null
+        },
+        {
+          "name": "acquire_lease",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098861900,
+          "endedAt": 1794098864046,
+          "ms": 2146,
+          "outcome": null
+        },
+        {
+          "name": "provenance",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098864047,
+          "endedAt": 1794098864062,
+          "ms": 15,
+          "outcome": null
+        },
+        {
+          "name": "assignment_context",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098864062,
+          "endedAt": 1794098864336,
+          "ms": 274,
+          "outcome": null
+        },
+        {
+          "name": "credentials_wait",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098864336,
+          "endedAt": 1794098864762,
+          "ms": 426,
+          "outcome": null
+        },
+        {
+          "name": "response_fence",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098864762,
+          "endedAt": 1794098864850,
+          "ms": 88,
+          "outcome": null
+        }
+      ],
+      "daemonStartup": {
+        "ms": 310.408,
+        "phases": []
+      },
+      "daemonPreparation": {
+        "ms": 9308.871,
+        "source": "bootstrap_claude_start",
+        "phases": [
+          {
+            "name": "daemon.adapter.cli_init.prewarm",
+            "startMs": 111.593,
+            "endMs": 5782.206,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 5670.614,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.model_report",
+            "startMs": 6545.143,
+            "endMs": 6546.084,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.94,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.cli_init.prewarm",
+            "startMs": 6787.42,
+            "endMs": 8639.485,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 1852.065,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.cli_init",
+            "startMs": 9305.149,
+            "endMs": 9306.525,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 1.375,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.account_check.account_info",
+            "startMs": 9306.577,
+            "endMs": 9307.111,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.534,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.account_check",
+            "startMs": 9307.128,
+            "endMs": 9308.183,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 1.056,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "gitIntervalsAvailable": false
+    },
+    {
+      "case": 4,
+      "harness": "codex",
+      "originalStatus": "failed",
+      "originalPhase": "execution_watch",
+      "replyVerifiedAfterTool": false,
+      "withinTarget": false,
+      "wallDispatchToAgentStartMs": 14497,
+      "executionStartMs": 6985.034,
+      "agentAcceptedMs": 6982.94,
+      "nativeAckOffsetMs": 0,
+      "originalUnroundedTotalMs": 14497,
+      "fiveSegmentsMs": {
+        "beforeEnsure": null,
+        "ensure": null,
+        "ensureToDispatchReturn": null,
+        "dispatchReturnToStoredAgentStart": 9067,
+        "laterNativeAckOffset": 0
+      },
+      "serverObserved": {
+        "ensureMs": 3950,
+        "createMs": 889,
+        "credentialsMs": 8,
+        "claimMs": 1718,
+        "nativeCredentialsMs": 482,
+        "githubCredentialsMs": 237,
+        "resolveRepositoryMs": [
+          793
+        ],
+        "readWorkerMs": [
+          1105
+        ],
+        "startWorkerMs": [
+          822
+        ],
+        "workerRegisterMs": [
+          803
+        ],
+        "acquireLeaseMs": [
+          1106
+        ]
+      },
+      "threadPhases": [
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098910425,
+          "endedAt": 1794098910446,
+          "ms": 21,
+          "outcome": null
+        },
+        {
+          "name": "execution_identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098910447,
+          "endedAt": 1794098910494,
+          "ms": 47,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098910494,
+          "endedAt": 1794098910500,
+          "ms": 6,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098910500,
+          "endedAt": 1794098910525,
+          "ms": 25,
+          "outcome": null
+        },
+        {
+          "name": "connect",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098910525,
+          "endedAt": 1794098911423,
+          "ms": 898,
+          "outcome": null
+        },
+        {
+          "name": "record_sandbox",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098911423,
+          "endedAt": 1794098911427,
+          "ms": 4,
+          "outcome": null
+        },
+        {
+          "name": "post_connect_admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098911427,
+          "endedAt": 1794098911439,
+          "ms": 12,
+          "outcome": null
+        },
+        {
+          "name": "runtime_configuration",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098911439,
+          "endedAt": 1794098911439,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "read_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098911439,
+          "endedAt": 1794098912544,
+          "ms": 1105,
+          "outcome": null
+        },
+        {
+          "name": "verify_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098912544,
+          "endedAt": 1794098912545,
+          "ms": 1,
+          "outcome": null
+        },
+        {
+          "name": "read_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098912545,
+          "endedAt": 1794098912545,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "verify_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098912545,
+          "endedAt": 1794098912545,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "start_desktop",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098912545,
+          "endedAt": 1794098912545,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "credential_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098912545,
+          "endedAt": 1794098912609,
+          "ms": 64,
+          "outcome": null
+        },
+        {
+          "name": "publish_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098912609,
+          "endedAt": 1794098912692,
+          "ms": 83,
+          "outcome": null
+        },
+        {
+          "name": "start_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098912692,
+          "endedAt": 1794098913514,
+          "ms": 822,
+          "outcome": null
+        },
+        {
+          "name": "worker_register",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098913515,
+          "endedAt": 1794098914318,
+          "ms": 803,
+          "outcome": null
+        },
+        {
+          "name": "verify_runtime",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098914318,
+          "endedAt": 1794098914319,
+          "ms": 1,
+          "outcome": null
+        },
+        {
+          "name": "finish",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098914319,
+          "endedAt": 1794098914332,
+          "ms": 13,
+          "outcome": null
+        }
+      ],
+      "claimPhases": [
+        {
+          "name": "authorize",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098914374,
+          "endedAt": 1794098914382,
+          "ms": 8,
+          "outcome": null
+        },
+        {
+          "name": "identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098914382,
+          "endedAt": 1794098914390,
+          "ms": 8,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098914390,
+          "endedAt": 1794098914453,
+          "ms": 63,
+          "outcome": null
+        },
+        {
+          "name": "acquire_lease",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098914453,
+          "endedAt": 1794098915559,
+          "ms": 1106,
+          "outcome": null
+        },
+        {
+          "name": "provenance",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098915559,
+          "endedAt": 1794098915579,
+          "ms": 20,
+          "outcome": null
+        },
+        {
+          "name": "assignment_context",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098915579,
+          "endedAt": 1794098915816,
+          "ms": 237,
+          "outcome": null
+        },
+        {
+          "name": "credentials_wait",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098915816,
+          "endedAt": 1794098916062,
+          "ms": 246,
+          "outcome": null
+        },
+        {
+          "name": "response_fence",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098916062,
+          "endedAt": 1794098916092,
+          "ms": 30,
+          "outcome": null
+        }
+      ],
+      "daemonStartup": {
+        "ms": 4716.635,
+        "phases": [
+          {
+            "name": "daemon.adapter.model_report",
+            "startMs": 2.927,
+            "endMs": 3.491,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.564,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.cli_init",
+            "startMs": 19.438,
+            "endMs": 2791.151,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 2771.714,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.auth.token",
+            "startMs": 2791.809,
+            "endMs": 2792.512,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.703,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.account_check.login",
+            "startMs": 2792.765,
+            "endMs": 3122.467,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 329.702,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "daemonPreparation": {
+        "ms": null,
+        "source": null,
+        "phases": []
+      },
+      "gitIntervalsAvailable": false
+    },
+    {
+      "case": 5,
+      "harness": "claude_code",
+      "originalStatus": "execution_proved_awaiting_server_timing",
+      "originalPhase": "execution_receipt",
+      "replyVerifiedAfterTool": true,
+      "withinTarget": false,
+      "wallDispatchToAgentStartMs": 13344,
+      "executionStartMs": 4700.489,
+      "agentAcceptedMs": 5765.458,
+      "nativeAckOffsetMs": 1064.969,
+      "originalUnroundedTotalMs": 14408.969000000001,
+      "fiveSegmentsMs": {
+        "beforeEnsure": null,
+        "ensure": null,
+        "ensureToDispatchReturn": null,
+        "dispatchReturnToStoredAgentStart": 6040,
+        "laterNativeAckOffset": 1064.969
+      },
+      "serverObserved": {
+        "ensureMs": 5629,
+        "createMs": 1325,
+        "credentialsMs": 12,
+        "claimMs": 1222,
+        "nativeCredentialsMs": 434,
+        "githubCredentialsMs": 223,
+        "resolveRepositoryMs": [
+          756
+        ],
+        "readWorkerMs": [
+          993
+        ],
+        "startWorkerMs": [
+          1254
+        ],
+        "workerRegisterMs": [
+          1568
+        ],
+        "acquireLeaseMs": [
+          623
+        ]
+      },
+      "threadPhases": [
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098955631,
+          "endedAt": 1794098955660,
+          "ms": 29,
+          "outcome": null
+        },
+        {
+          "name": "execution_identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098955660,
+          "endedAt": 1794098955711,
+          "ms": 51,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098955711,
+          "endedAt": 1794098955718,
+          "ms": 7,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098955718,
+          "endedAt": 1794098955754,
+          "ms": 36,
+          "outcome": null
+        },
+        {
+          "name": "connect",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098955754,
+          "endedAt": 1794098957093,
+          "ms": 1339,
+          "outcome": null
+        },
+        {
+          "name": "record_sandbox",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098957093,
+          "endedAt": 1794098957097,
+          "ms": 4,
+          "outcome": null
+        },
+        {
+          "name": "post_connect_admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098957097,
+          "endedAt": 1794098957105,
+          "ms": 8,
+          "outcome": null
+        },
+        {
+          "name": "runtime_configuration",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098957105,
+          "endedAt": 1794098957105,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "read_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098957105,
+          "endedAt": 1794098958098,
+          "ms": 993,
+          "outcome": null
+        },
+        {
+          "name": "verify_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098958098,
+          "endedAt": 1794098958099,
+          "ms": 1,
+          "outcome": null
+        },
+        {
+          "name": "read_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098958099,
+          "endedAt": 1794098958099,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "verify_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098958099,
+          "endedAt": 1794098958099,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "start_desktop",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098958099,
+          "endedAt": 1794098958099,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "credential_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098958099,
+          "endedAt": 1794098958142,
+          "ms": 43,
+          "outcome": null
+        },
+        {
+          "name": "publish_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098958142,
+          "endedAt": 1794098958379,
+          "ms": 237,
+          "outcome": null
+        },
+        {
+          "name": "start_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098958379,
+          "endedAt": 1794098959633,
+          "ms": 1254,
+          "outcome": null
+        },
+        {
+          "name": "worker_register",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098959633,
+          "endedAt": 1794098961201,
+          "ms": 1568,
+          "outcome": null
+        },
+        {
+          "name": "verify_runtime",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098961201,
+          "endedAt": 1794098961201,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "finish",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098961201,
+          "endedAt": 1794098961214,
+          "ms": 13,
+          "outcome": null
+        }
+      ],
+      "claimPhases": [
+        {
+          "name": "authorize",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098961316,
+          "endedAt": 1794098961324,
+          "ms": 8,
+          "outcome": null
+        },
+        {
+          "name": "identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098961324,
+          "endedAt": 1794098961335,
+          "ms": 11,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098961335,
+          "endedAt": 1794098961413,
+          "ms": 78,
+          "outcome": null
+        },
+        {
+          "name": "acquire_lease",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098961413,
+          "endedAt": 1794098962036,
+          "ms": 623,
+          "outcome": null
+        },
+        {
+          "name": "provenance",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098962036,
+          "endedAt": 1794098962059,
+          "ms": 23,
+          "outcome": null
+        },
+        {
+          "name": "assignment_context",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098962059,
+          "endedAt": 1794098962322,
+          "ms": 263,
+          "outcome": null
+        },
+        {
+          "name": "credentials_wait",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098962322,
+          "endedAt": 1794098962494,
+          "ms": 172,
+          "outcome": null
+        },
+        {
+          "name": "response_fence",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794098962494,
+          "endedAt": 1794098962535,
+          "ms": 41,
+          "outcome": null
+        }
+      ],
+      "daemonStartup": {
+        "ms": 3038.876,
+        "phases": []
+      },
+      "daemonPreparation": {
+        "ms": 7480.965,
+        "source": "bootstrap_claude_start",
+        "phases": [
+          {
+            "name": "daemon.adapter.cli_init.prewarm",
+            "startMs": 52.53,
+            "endMs": 5986.294,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 5933.764,
+            "outcome": "error"
+          },
+          {
+            "name": "daemon.adapter.model_report",
+            "startMs": 3129.953,
+            "endMs": 3131.261,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 1.308,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.cli_init.prewarm",
+            "startMs": 5986.775,
+            "endMs": 6987.167,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 1000.392,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.cli_init",
+            "startMs": 7476.611,
+            "endMs": 7479.469,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 2.858,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.account_check.account_info",
+            "startMs": 7479.51,
+            "endMs": 7479.871,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.361,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.account_check",
+            "startMs": 7479.883,
+            "endMs": 7480.441,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.559,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "gitIntervalsAvailable": false
+    },
+    {
+      "case": 6,
+      "harness": "codex",
+      "originalStatus": "execution_proved_awaiting_server_timing",
+      "originalPhase": "execution_receipt",
+      "replyVerifiedAfterTool": true,
+      "withinTarget": false,
+      "wallDispatchToAgentStartMs": 17929,
+      "executionStartMs": 8802.16,
+      "agentAcceptedMs": 8800.903,
+      "nativeAckOffsetMs": 0,
+      "originalUnroundedTotalMs": 17929,
+      "fiveSegmentsMs": {
+        "beforeEnsure": null,
+        "ensure": null,
+        "ensureToDispatchReturn": null,
+        "dispatchReturnToStoredAgentStart": 11261,
+        "laterNativeAckOffset": 0
+      },
+      "serverObserved": {
+        "ensureMs": 5016,
+        "createMs": 1223,
+        "credentialsMs": 9,
+        "claimMs": 1414,
+        "nativeCredentialsMs": 366,
+        "githubCredentialsMs": 208,
+        "resolveRepositoryMs": [
+          851
+        ],
+        "readWorkerMs": [
+          1220
+        ],
+        "startWorkerMs": [
+          1287
+        ],
+        "workerRegisterMs": [
+          892
+        ],
+        "acquireLeaseMs": [
+          878
+        ]
+      },
+      "threadPhases": [
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099018438,
+          "endedAt": 1794099018473,
+          "ms": 35,
+          "outcome": null
+        },
+        {
+          "name": "execution_identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099018473,
+          "endedAt": 1794099018556,
+          "ms": 83,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099018556,
+          "endedAt": 1794099018562,
+          "ms": 6,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099018562,
+          "endedAt": 1794099018580,
+          "ms": 18,
+          "outcome": null
+        },
+        {
+          "name": "connect",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099018580,
+          "endedAt": 1794099019814,
+          "ms": 1234,
+          "outcome": null
+        },
+        {
+          "name": "record_sandbox",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099019814,
+          "endedAt": 1794099019818,
+          "ms": 4,
+          "outcome": null
+        },
+        {
+          "name": "post_connect_admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099019818,
+          "endedAt": 1794099019824,
+          "ms": 6,
+          "outcome": null
+        },
+        {
+          "name": "runtime_configuration",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099019824,
+          "endedAt": 1794099019825,
+          "ms": 1,
+          "outcome": null
+        },
+        {
+          "name": "read_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099019825,
+          "endedAt": 1794099021045,
+          "ms": 1220,
+          "outcome": null
+        },
+        {
+          "name": "verify_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099021045,
+          "endedAt": 1794099021045,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "read_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099021045,
+          "endedAt": 1794099021046,
+          "ms": 1,
+          "outcome": null
+        },
+        {
+          "name": "verify_refreshed_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099021046,
+          "endedAt": 1794099021046,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "start_desktop",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099021046,
+          "endedAt": 1794099021046,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "credential_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099021046,
+          "endedAt": 1794099021084,
+          "ms": 38,
+          "outcome": null
+        },
+        {
+          "name": "publish_bootstrap",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099021084,
+          "endedAt": 1794099021222,
+          "ms": 138,
+          "outcome": null
+        },
+        {
+          "name": "start_worker",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099021222,
+          "endedAt": 1794099022509,
+          "ms": 1287,
+          "outcome": null
+        },
+        {
+          "name": "worker_register",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099022509,
+          "endedAt": 1794099023401,
+          "ms": 892,
+          "outcome": null
+        },
+        {
+          "name": "verify_runtime",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099023401,
+          "endedAt": 1794099023401,
+          "ms": 0,
+          "outcome": null
+        },
+        {
+          "name": "finish",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099023401,
+          "endedAt": 1794099023413,
+          "ms": 12,
+          "outcome": null
+        }
+      ],
+      "claimPhases": [
+        {
+          "name": "authorize",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099023494,
+          "endedAt": 1794099023517,
+          "ms": 23,
+          "outcome": null
+        },
+        {
+          "name": "identity",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099023517,
+          "endedAt": 1794099023527,
+          "ms": 10,
+          "outcome": null
+        },
+        {
+          "name": "admission",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099023527,
+          "endedAt": 1794099023614,
+          "ms": 87,
+          "outcome": null
+        },
+        {
+          "name": "acquire_lease",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099023614,
+          "endedAt": 1794099024492,
+          "ms": 878,
+          "outcome": null
+        },
+        {
+          "name": "provenance",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099024492,
+          "endedAt": 1794099024512,
+          "ms": 20,
+          "outcome": null
+        },
+        {
+          "name": "assignment_context",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099024512,
+          "endedAt": 1794099024772,
+          "ms": 260,
+          "outcome": null
+        },
+        {
+          "name": "credentials_wait",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099024772,
+          "endedAt": 1794099024878,
+          "ms": 106,
+          "outcome": null
+        },
+        {
+          "name": "response_fence",
+          "startMs": null,
+          "endMs": null,
+          "startedAt": 1794099024878,
+          "endedAt": 1794099024908,
+          "ms": 30,
+          "outcome": null
+        }
+      ],
+      "daemonStartup": {
+        "ms": 4459.406,
+        "phases": [
+          {
+            "name": "daemon.adapter.model_report",
+            "startMs": 3.034,
+            "endMs": 4.007,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.973,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.cli_init",
+            "startMs": 34.379,
+            "endMs": 2757.17,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 2722.791,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.auth.token",
+            "startMs": 2757.863,
+            "endMs": 2758.533,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 0.67,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.account_check.login",
+            "startMs": 2758.786,
+            "endMs": 3072.872,
+            "startedAt": null,
+            "endedAt": null,
+            "ms": 314.086,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "daemonPreparation": {
+        "ms": null,
+        "source": null,
+        "phases": []
+      },
+      "gitIntervalsAvailable": false
+    }
+  ],
+  "ranges": {
+    "ensureMs": {
+      "min": 3950,
+      "max": 8109,
+      "observations": [
+        8109,
+        4678,
+        7302,
+        3950,
+        5629,
+        5016
+      ]
+    },
+    "createMs": {
+      "min": 889,
+      "max": 1862,
+      "observations": [
+        1862,
+        1417,
+        1572,
+        889,
+        1325,
+        1223
+      ]
+    },
+    "credentialsMs": {
+      "min": 8,
+      "max": 15,
+      "observations": [
+        9,
+        10,
+        15,
+        8,
+        12,
+        9
+      ]
+    },
+    "claimMs": {
+      "min": 1222,
+      "max": 3080,
+      "observations": [
+        2084,
+        1734,
+        3080,
+        1718,
+        1222,
+        1414
+      ]
+    },
+    "nativeCredentialsMs": {
+      "min": 366,
+      "max": 991,
+      "observations": [
+        991,
+        515,
+        700,
+        482,
+        434,
+        366
+      ]
+    },
+    "githubCredentialsMs": {
+      "min": 208,
+      "max": 284,
+      "observations": [
+        264,
+        244,
+        284,
+        237,
+        223,
+        208
+      ]
+    },
+    "resolveRepositoryMs": {
+      "min": 729,
+      "max": 851,
+      "observations": [
+        729,
+        830,
+        731,
+        793,
+        756,
+        851
+      ]
+    },
+    "readWorkerMs": {
+      "min": 925,
+      "max": 1352,
+      "observations": [
+        1352,
+        925,
+        1142,
+        1105,
+        993,
+        1220
+      ]
+    },
+    "startWorkerMs": {
+      "min": 811,
+      "max": 1669,
+      "observations": [
+        1669,
+        811,
+        1433,
+        822,
+        1254,
+        1287
+      ]
+    },
+    "workerRegisterMs": {
+      "min": 803,
+      "max": 2889,
+      "observations": [
+        2864,
+        1142,
+        2889,
+        803,
+        1568,
+        892
+      ]
+    },
+    "acquireLeaseMs": {
+      "min": 623,
+      "max": 2146,
+      "observations": [
+        846,
+        890,
+        2146,
+        1106,
+        623,
+        878
+      ]
+    }
+  },
+  "timingFixSource": {
+    "localCommit": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+    "tree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+    "files": [
+      {
+        "path": "packages/daemon/src/tracing.ts",
+        "blob": "0eed0277c933b0d2457909851bab458a482c184d",
+        "bytes": 27723,
+        "sha256": "80d1f31fecb82659a88c5d2a001d14b87235f58ce8a8fe9768e42b640fcdc5b3"
+      },
+      {
+        "path": "packages/daemon/src/subscription-hosted-runner.ts",
+        "blob": "62a2d8edd244293b511a00da618849638a943ac0",
+        "bytes": 26481,
+        "sha256": "f517f5711da1fb01c17ea3222bb233b624875572557cbb6000596ec370a6beed"
+      },
+      {
+        "path": "packages/daemon/src/tracing.test.ts",
+        "blob": "2c1bdc5fc6896cbe1c1fd54054b98d1845535196",
+        "bytes": 25860,
+        "sha256": "d54f8cf78b74c7ceabe86bf9313ccfe3256a02e2c87e15b28b77b1f742f438ee"
+      },
+      {
+        "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+        "blob": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c",
+        "bytes": 13467,
+        "sha256": "3730a8b054fe913d8075dc510c188c66d2cfcadb51f8868beca2e633a3d824d0"
+      }
+    ],
+    "changesAgainstMain0e": "7\t2\tpackages/daemon/src/subscription-hosted-runner.ts\n24\t0\tpackages/daemon/src/tracing.test.ts\n8\t0\tpackages/daemon/src/tracing.ts\n41\t0\tpackages/daemon/test/anonymous-codex-hosted.test.ts"
+  },
+  "references": [
+    {
+      "path": "/vercel/ops-1505/formal-78c-residual-ff2-review/review.md",
+      "bytes": 6480,
+      "sha256": "8de93792d664a026a9665022b1bc81094544328789f199ad31f70c22aba4f40f"
+    },
+    {
+      "path": "/vercel/ops-1505/formal-78c-residual-ff2-review/source-delta.json",
+      "bytes": 2863,
+      "sha256": "49810c15b8781dfaf13d92ab8e96c7a23c956d8bbfb47bcee1de584b47251ee1"
+    },
+    {
+      "path": "/vercel/ops-1505/native-late-timing-context-peer/review.json",
+      "bytes": 9400,
+      "sha256": "4d5df26d6a477f1bcfcfe25eb9a91000e29ea0636094bbcdd3a4dd0b0d00d9f0"
+    },
+    {
+      "path": "/vercel/ops-1505/candidate-420-native-tail-review/review.json",
+      "bytes": 12128,
+      "sha256": "7564b35a12b0784b3a71a6d59d35123e37d10665bba141f12290133c9349cad1"
+    },
+    {
+      "path": "/vercel/ops-1505/candidate-420-native-tail-review/observed-timing.json",
+      "bytes": 5116,
+      "sha256": "8823de3a62b41baf3a8e266b80b7cfe4ae1ab9b4b9074d1b796ffe7f83352a12"
+    }
+  ],
+  "boundaries": [
+    "Six historical formal FAILs, not new source measurements.",
+    "Only the five top-level intervals partition the original formal formula; nested ensure/create/read/start/register and claim credentials must not be added to parents.",
+    "Daemon preparation/startup use their own observed monotonic origin; do not align them to server UTC or sum them into server wall time.",
+    "E2B create is the observed server API interval; restore,boot,Node preload and worker-ready internal durations are not separately measured by this historical raw.",
+    "No new performance benchmark, SQL, model, resource, renderer or pins changes."
+  ]
+}
