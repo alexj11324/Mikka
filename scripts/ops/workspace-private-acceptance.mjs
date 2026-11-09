@@ -35,6 +35,17 @@ export const P0 = Object.freeze({
     'packages/daemon/scripts/workspace-ingress.py': 'e56ef2aa5cc34fdd8ac8572a05614093b29c2c06cfc4eab139959fdc3c42fc49',
   },
 })
+// Copied only from the verified, closed creation journal in this exact artifact.
+// This target is already deleted; the diagnostic must never create a replacement.
+export const FINALIZE_DIAGNOSTIC = Object.freeze({
+  runId: '42539385597', runAttempt: '1',
+  opsSource: '4b330dff25a74c66a92530e9d12e6e91485e3797',
+  sourceCommit: '37b0e55ddfca6646bc3beea7531048e6e63331c1',
+  sourceTree: '2167f94b74c1ede4b8d37054fb407a462c0b470d',
+  workerSha: '0537b0c49fe197240632ec7c74875c3af0c53260',
+  templateId: '9k8a4ls6uimaeyvbipz4', buildId: 'dff39bb4-ce38-412f-8451-7dd75967a4fa',
+  artifactId: 13641406353, artifactSha256: '6fc38ac8f6ba22cbdbb3dc39cc510ac4898b83d1256910e0ada27b74966e24b5',
+})
 const SOURCE_DIRECTORY = 'workspace-acceptance-source'
 const SHA = /^[a-f0-9]{40}$/, DIGEST = /^[a-f0-9]{64}$/
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
@@ -156,6 +167,133 @@ function buildDiagnostic(value) {
         truncated: row.truncated === true, events: events(row.events) }]
     })),
   }
+}
+
+function providerReason(message, step) {
+  const text = typeof message === 'string' && message.length <= 65_536 ? message : ''
+  // Fixed error prefixes from runtime@438a79cf finalize/builder.go and ready.go.
+  // Their presence is an observation, not proof the deployed provider uses that revision.
+  const patterns = {
+    configuration_failed: /(?:^|: )configuration script failed:/,
+    ready_failed: /(?:^|: )ready command failed:/,
+    ready_timeout: /\bready command timed out after [0-9.hmsµ]+(?:\s|$)/,
+    start_confirmation_failed: /(?:^|: )waiting for start command failed:/,
+    start_failed: /(?:^|: )(?:error running )?start command failed:|(?:^|: )error running start command:/,
+    process_start_failed: /(?:^|: )error starting process:/,
+    sync_failed: /(?:^|: )error running sync command:/,
+    deadline_exceeded: /\bcontext deadline exceeded\b/,
+  }
+  const codes = [...text.matchAll(/\bexit (?:status|code):?\s+(-?[0-9]{1,3})(?=$|[\s,;)])/gi)]
+    .map(match => Number(match[1])).filter(number => exitCode(number) !== null)
+  const unique = [...new Set(codes)]
+  return { phase: one(step, ['base', 'finalize'], null),
+    categories: Object.entries(patterns).filter(([, pattern]) => pattern.test(text)).map(([code]) => code).sort(),
+    exitCode: unique.length === 1 ? unique[0] : null }
+}
+
+async function diagnosticJson(response) {
+  const chunks = []; let bytes = 0
+  for await (const chunk of response.body ?? []) {
+    bytes += chunk.length
+    check(bytes <= 1_048_576, 'workspace_build_diagnostic_body_limit')
+    chunks.push(chunk)
+  }
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')) }
+  catch (error) { throw new Error('workspace_build_diagnostic_response_refused', { cause: error }) }
+}
+
+/** Finite pages from one completed build, not another build wait or retry loop.
+ * The SDK 2.62.0 generated status endpoint supports level/limit/logsOffset;
+ * its high-level Template.get_build_status does not expose the level argument. */
+export async function diagnoseExistingBuild(apiKey, { fetchImpl = fetch, now = () => performance.now() } = {}) {
+  const result = { version: 1, scope: 'existing_deleted_build_read_only', target: FINALIZE_DIAGNOSTIC,
+    resourcesCreated: false, mutationsPerformed: false, runtimeAcceptance: false,
+    outcome: 'unavailable', complete: false, identityMatched: false, status: null, failure: null,
+    limits: { pages: 6, entriesPerPage: 100, totalMs: 90_000, requestMs: 15_000 },
+    requests: 0, pages: 0, entries: 0, reasonLogEntries: 0, ignoredLines: 0, oversizedEntries: 0,
+    levels: { debug: 0, info: 0, warn: 0, error: 0 },
+    reason: { phase: null, categories: [], exitCode: null }, events: [], eventsTruncated: false,
+    signals: { startAnnounced: false, readyAnnounced: false, templateReady: false, readyRejected: 0 } }
+  const fail = (code, httpStatus = null) => {
+    result.failure = { code, httpStatus }; result.outcome = result.pages ? 'partial' : 'unavailable'; return result
+  }
+  if (typeof apiKey !== 'string' || apiKey.length === 0) return fail('credential_missing')
+  const deadline = now() + result.limits.totalMs, observed = new Map()
+  const event = value => {
+    const key = JSON.stringify(value), previous = observed.get(key)
+    if (previous) { previous.count++; return }
+    if (observed.size === 64) { result.eventsTruncated = true; return }
+    const row = { ...value, count: 1 }; observed.set(key, row); result.events.push(row)
+  }
+  const consume = entry => {
+    if (!entry || !Object.hasOwn(result.levels, entry.level)) { result.ignoredLines++; return }
+    result.levels[entry.level]++
+    if (typeof entry.message !== 'string' || entry.message.length > 65_536) { result.oversizedEntries++; return }
+    for (const raw of entry.message.split('\n')) {
+      let line = raw.trim()
+      if (line.startsWith('Running start command: ')) { result.signals.startAnnounced = true; continue }
+      if (line.startsWith('Waiting for template to be ready: ')) { result.signals.readyAnnounced = true; continue }
+      if (line === 'Template is ready') { result.signals.templateReady = true; continue }
+      if (line.startsWith('Template is not ready: ')) {
+        result.signals.readyRejected++; event({ kind: 'ready_rejected', ...providerReason(line.slice(23), 'finalize') }); continue
+      }
+      const wrapped = /^\[(?:builder ([1-9][0-9]?)\/([1-9][0-9]?)|start|ready)\] \[(?:stdout|stderr)\]: (.*)$/.exec(line)
+      if (wrapped && (wrapped[1] === undefined || Number(wrapped[1]) <= Number(wrapped[2]))) line = wrapped[3]
+      const phase = /^mikka-bootstrap-phase ([a-z]+) ([0-9]{1,9})$/.exec(line)
+      if (phase && BOOTSTRAP_PHASES.includes(phase[1])) {
+        event({ kind: 'bootstrap', detail: phase[1], elapsedMs: Number(phase[2]) }); continue
+      }
+      if (line === 'Cloud worker unavailable') { event({ kind: 'host_failure', detail: 'anonymous_worker_unavailable' }); continue }
+      const failure = /^(?:ValueError|RuntimeError): ([a-z_]+)(?: |$)/.exec(line)
+      const detail = failure?.[1] ?? line
+      if (BUILD_HOST_ERRORS.includes(detail)) { event({ kind: 'host_failure', detail }); continue }
+      let value
+      try { value = line.startsWith('{') ? JSON.parse(line) : null } catch { value = null }
+      if (value && typeof value === 'object' && value.ok === false && INGRESS_DETAILS.includes(value.detail)
+        && Object.keys(value).every(key => ['ok', 'detail', 'command'].includes(key))) {
+        const command = value.detail === 'command' ? ingressCommand(value.command) : null
+        event({ kind: 'ingress', detail: value.detail, ...(command ? { command } : {}) }); continue
+      }
+      result.ignoredLines++
+    }
+  }
+  for (let page = 0; page < result.limits.pages; page++) {
+    const remaining = deadline - now()
+    if (remaining <= 0) return fail('time_limit')
+    const url = `https://api.e2b.dev/templates/${FINALIZE_DIAGNOSTIC.templateId}/builds/${FINALIZE_DIAGNOSTIC.buildId}/status?level=debug&logsOffset=${result.entries}&limit=100`
+    let response, data
+    try {
+      result.requests++
+      response = await fetchImpl(url, { method: 'GET', redirect: 'error',
+        headers: { Accept: 'application/json', 'X-API-Key': apiKey },
+        signal: AbortSignal.timeout(Math.max(1, Math.floor(Math.min(result.limits.requestMs, remaining)))) })
+      if ([401, 403, 404].includes(response.status)) {
+        await response.body?.cancel()
+        return fail({ 401: 'unauthorized', 403: 'forbidden', 404: 'not_found' }[response.status], response.status)
+      }
+      if (response.status !== 200 && response.status !== 400) { await response.body?.cancel(); return fail('http_error', response.status) }
+      data = await diagnosticJson(response)
+    } catch (error) {
+      const code = ['TimeoutError', 'AbortError'].includes(error?.name) ? 'request_timeout'
+        : error?.message === 'workspace_build_diagnostic_body_limit' ? 'body_limit'
+          : error?.message === 'workspace_build_diagnostic_response_refused' ? 'response_refused' : 'network_error'
+      return fail(code)
+    }
+    if (response.status === 400) return fail(data?.message === `Build '${FINALIZE_DIAGNOSTIC.buildId}' not found` ? 'not_found' : 'http_error', 400)
+    if (data?.templateID !== FINALIZE_DIAGNOSTIC.templateId || data?.buildID !== FINALIZE_DIAGNOSTIC.buildId
+      || !['waiting', 'building', 'ready', 'error'].includes(data.status)
+      || !Array.isArray(data.logEntries) || data.logEntries.length > 100) return fail('response_refused')
+    if (result.status !== null && data.status !== result.status) return fail('status_changed')
+    result.identityMatched = true; result.status = data.status; result.pages++
+    if (data.status === 'waiting' || data.status === 'building') return fail('not_terminal')
+    if (page === 0) result.reason = providerReason(data.reason?.message, data.reason?.step)
+    result.reasonLogEntries += Array.isArray(data.reason?.logEntries) ? Math.min(data.reason.logEntries.length, 100) : 0
+    result.entries += data.logEntries.length
+    for (const entry of data.logEntries) consume(entry)
+    if (now() >= deadline) return fail('time_limit')
+    if (data.logEntries.length < 100) { result.outcome = 'available'; result.complete = true; return result }
+  }
+  return fail('page_limit')
 }
 
 export function assertSourceIdentity({ source, tree, dirty, opsDirty, files }) {
@@ -359,10 +497,32 @@ async function save(path, value) {
 }
 
 async function main([operation, sourceDirectory, ...extra]) {
-  check(extra.length === 0 && ['check', 'dependencies', 'verdict'].includes(operation) && sourceDirectory, 'workspace_ops_arguments')
-  const directory = resolve(sourceDirectory), evidence = resolve(process.env.RUNNER_TEMP, 'workspace-private/evidence')
+  check(extra.length === 0 && ['check', 'dependencies', 'verdict', 'diagnostic-check', 'diagnose'].includes(operation) && sourceDirectory, 'workspace_ops_arguments')
+  const diagnostic = operation === 'diagnostic-check' || operation === 'diagnose'
+  const directory = resolve(sourceDirectory), evidence = resolve(process.env.RUNNER_TEMP, diagnostic ? 'workspace-private-diagnostic/evidence' : 'workspace-private/evidence')
   const source = await verifySources(directory)
   if (operation === 'check') { console.log(JSON.stringify(source)); return }
+  if (diagnostic) {
+    check(P0.source === FINALIZE_DIAGNOSTIC.sourceCommit && P0.tree === FINALIZE_DIAGNOSTIC.sourceTree
+      && P0.workerSha === FINALIZE_DIAGNOSTIC.workerSha && process.versions.node.split('.')[0] === '24', 'workspace_diagnostic_source_refused')
+    if (operation === 'diagnostic-check') {
+      const workerSha = execFileSync('python3', ['scripts/e2b/build-template.py', '--worker-hash', '--source-ref', P0.source], { cwd: directory, encoding: 'utf8' }).trim()
+      assertWorkerIdentity(workerSha)
+      await save(resolve(evidence, 'source.json'), { ...source, workerSha, scope: 'existing_deleted_build_read_only', target: FINALIZE_DIAGNOSTIC })
+      console.log(JSON.stringify({ sourceVerified: true, workerVerified: true, scope: 'existing_deleted_build_read_only' })); return
+    }
+    const saved = await optionalJson(resolve(evidence, 'source.json'))
+    check(saved?.sourceCommit === P0.source && saved.sourceTree === P0.tree && saved.workerSha === P0.workerSha
+      && saved.opsSource === source.opsSource && saved.runId === source.runId && saved.runAttempt === source.runAttempt
+      && JSON.stringify(saved.target) === JSON.stringify(FINALIZE_DIAGNOSTIC), 'workspace_saved_source_refused')
+    const report = { diagnosticSource: source.opsSource, diagnosticRunId: source.runId, diagnosticRunAttempt: source.runAttempt,
+      ...await diagnoseExistingBuild(process.env.E2B_API_KEY) }
+    await save(resolve(evidence, 'diagnostic.json'), report)
+    console.log(JSON.stringify({ scope: report.scope, outcome: report.outcome, complete: report.complete,
+      failure: report.failure, requests: report.requests, pages: report.pages, entries: report.entries }))
+    if (report.outcome !== 'available') process.exitCode = 1
+    return
+  }
   if (operation === 'dependencies') {
     const require = createRequire(resolve(directory, 'package.json'))
     const python = resolve(process.env.RUNNER_TEMP, 'e2b-private/bin/python')

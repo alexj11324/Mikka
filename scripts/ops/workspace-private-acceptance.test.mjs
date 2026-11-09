@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
-import { P0, assertDependencies, assertSourceIdentity, assertWorkerIdentity, summarizeAcceptance } from './workspace-private-acceptance.mjs'
+import { P0, FINALIZE_DIAGNOSTIC, assertDependencies, assertSourceIdentity, assertWorkerIdentity, diagnoseExistingBuild, summarizeAcceptance } from './workspace-private-acceptance.mjs'
 
 const context = { opsSource: 'a'.repeat(40), workerSha: P0.workerSha, runId: '123', runAttempt: '2' }
 const identity = { sourceCommit: P0.source, workerSha: context.workerSha, workflowCommit: context.opsSource,
@@ -275,7 +275,154 @@ test('a failed status lookup preserves the original failure and only exact-ident
   assert.equal(JSON.stringify(result).includes(privateText), false)
 })
 
-test('workflow retains the original sole credential and gives cleanup time outside the production lane', () => {
+function diagnosticPage(entries = [], reason = null, extra = {}) {
+  return { templateID: FINALIZE_DIAGNOSTIC.templateId, buildID: FINALIZE_DIAGNOSTIC.buildId,
+    status: 'error', logs: [], logEntries: entries, reason, ...extra }
+}
+const logEntry = (message, level = 'debug') => ({ timestamp: '2026-11-09T00:31:00Z', level, message, step: 'finalize' })
+const jsonResponse = (value, status = 200) => new Response(JSON.stringify(value), { status })
+
+test('the diagnostic reads only the frozen build with debug-level finite pages and closed evidence', async () => {
+  const privateText = 'synthetic-private-diagnostic-key-and-command'
+  const requests = []
+  const pages = [diagnosticPage(Array.from({ length: 100 }, () => logEntry(privateText)),
+    { step: 'finalize', message: `ready command failed: ready command timed out after 10m0s ${privateText}`, logEntries: [] }),
+  diagnosticPage([logEntry('Running start command: ' + privateText, 'info'),
+    logEntry('Waiting for template to be ready: ' + privateText, 'info'),
+    logEntry('Template is not ready: exit status 1 ' + privateText),
+    logEntry('[ready] [stderr]: {"ok":false,"detail":"worker_order"}'),
+    logEntry('[start] [stderr]: Cloud worker unavailable', 'info')])]
+  const result = await diagnoseExistingBuild(privateText, { fetchImpl: async (url, init) => {
+    requests.push({ url, init }); return jsonResponse(pages[requests.length - 1])
+  } })
+  assert.equal(requests.length, 2)
+  for (const [index, request] of requests.entries()) {
+    const url = new URL(request.url)
+    assert.equal(url.origin, 'https://api.e2b.dev')
+    assert.equal(url.pathname, `/templates/${FINALIZE_DIAGNOSTIC.templateId}/builds/${FINALIZE_DIAGNOSTIC.buildId}/status`)
+    assert.equal(url.search, `?level=debug&logsOffset=${index * 100}&limit=100`)
+    assert.equal(request.init.method, 'GET')
+    assert.equal(request.init.redirect, 'error')
+    assert.equal(request.init.headers['X-API-Key'], privateText)
+    assert.ok(request.init.signal instanceof AbortSignal)
+    assert.equal(request.init.body, undefined)
+  }
+  assert.equal(result.outcome, 'available')
+  assert.equal(result.complete, true)
+  assert.equal(result.entries, 105)
+  assert.equal(result.identityMatched, true)
+  assert.deepEqual(result.reason.categories, ['ready_failed', 'ready_timeout'])
+  assert.equal(result.signals.startAnnounced, true)
+  assert.equal(result.signals.readyAnnounced, true)
+  assert.equal(result.signals.readyRejected, 1)
+  assert.ok(result.events.some(row => row.kind === 'ingress' && row.detail === 'worker_order'))
+  assert.ok(result.events.some(row => row.kind === 'host_failure' && row.detail === 'anonymous_worker_unavailable'))
+  assert.equal(result.resourcesCreated, false)
+  assert.equal(result.runtimeAcceptance, false)
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+})
+
+test('deleted or unauthorized exact builds stop immediately and remain unavailable', async () => {
+  for (const [httpStatus, body, expected] of [[400, { message: `Build '${FINALIZE_DIAGNOSTIC.buildId}' not found` }, 'not_found'],
+    [400, { message: 'another failure' }, 'http_error'], [401, {}, 'unauthorized'], [403, {}, 'forbidden'], [404, {}, 'not_found'], [429, {}, 'http_error']]) {
+    let calls = 0
+    const result = await diagnoseExistingBuild('synthetic-key', { fetchImpl: async () => { calls++; return jsonResponse(body, httpStatus) } })
+    assert.equal(calls, 1)
+    assert.equal(result.outcome, 'unavailable')
+    assert.equal(result.failure.code, expected)
+    assert.equal(result.failure.httpStatus, httpStatus)
+    assert.equal(result.identityMatched, false)
+    assert.equal(result.complete, false)
+    assert.equal(result.reason.phase, null)
+  }
+})
+
+test('foreign identity and malformed provider data are never treated as target evidence', async () => {
+  for (const change of [{ templateID: 'foreign-template' }, { buildID: '00000000-0000-4000-8000-000000000000' },
+    { status: 'private-provider-text' }, { logEntries: {} }, { logEntries: Array.from({ length: 101 }, () => logEntry('private-text')) }]) {
+    const result = await diagnoseExistingBuild('synthetic-key', { fetchImpl: async () => jsonResponse(diagnosticPage([], null, change)) })
+    assert.equal(result.outcome, 'unavailable')
+    assert.equal(result.failure.code, 'response_refused')
+    assert.equal(result.entries, 0)
+    assert.equal(JSON.stringify(result).includes('private-provider-text'), false)
+  }
+})
+
+test('terminal history never becomes complete from a waiting or building response', async () => {
+  for (const status of ['waiting', 'building']) {
+    let calls = 0
+    const result = await diagnoseExistingBuild('synthetic-key', { fetchImpl: async () => {
+      calls++; return jsonResponse(diagnosticPage([], null, { status }))
+    } })
+    assert.equal(calls, 1)
+    assert.equal(result.outcome, 'partial')
+    assert.equal(result.complete, false)
+    assert.equal(result.identityMatched, true)
+    assert.equal(result.status, status)
+    assert.equal(result.failure.code, 'not_terminal')
+    assert.equal(result.pages, 1)
+    assert.equal(result.entries, 0)
+  }
+})
+
+test('terminal history rejects status changes between pages without consuming the changed page', async () => {
+  for (const status of ['ready', 'waiting', 'building']) {
+    let calls = 0
+    const result = await diagnoseExistingBuild('synthetic-key', { fetchImpl: async () => {
+      calls++
+      return jsonResponse(calls === 1
+        ? diagnosticPage(Array.from({ length: 100 }, () => logEntry('ignored')))
+        : diagnosticPage([], null, { status }))
+    } })
+    assert.equal(calls, 2)
+    assert.equal(result.outcome, 'partial')
+    assert.equal(result.complete, false)
+    assert.equal(result.status, 'error')
+    assert.equal(result.failure.code, 'status_changed')
+    assert.equal(result.pages, 1)
+    assert.equal(result.entries, 100)
+  }
+})
+
+test('the read-only reader has six-page and total-time ceilings without retrying', async () => {
+  let calls = 0
+  let result = await diagnoseExistingBuild('synthetic-key', { fetchImpl: async () => {
+    calls++; return jsonResponse(diagnosticPage(Array.from({ length: 100 }, () => logEntry('ignored'))))
+  } })
+  assert.equal(calls, 6)
+  assert.equal(result.entries, 600)
+  assert.equal(result.complete, false)
+  assert.equal(result.outcome, 'partial')
+  assert.equal(result.failure.code, 'page_limit')
+  assert.deepEqual(result.limits, { pages: 6, entriesPerPage: 100, totalMs: 90_000, requestMs: 15_000 })
+  let time = 0
+  calls = 0
+  result = await diagnoseExistingBuild('synthetic-key', { now: () => time, fetchImpl: async () => {
+    calls++; time = 90_001; return jsonResponse(diagnosticPage(Array.from({ length: 100 }, () => logEntry('ignored'))))
+  } })
+  assert.equal(calls, 1)
+  assert.equal(result.failure.code, 'time_limit')
+  assert.equal(result.complete, false)
+})
+
+test('provider body, error and command text never escape diagnostic failures', async () => {
+  const privateText = 'synthetic-private-provider-response'
+  for (const fetchImpl of [async () => new Response(privateText),
+    async () => { throw new Error(privateText) },
+    async () => { throw new DOMException(privateText, 'TimeoutError') },
+    async () => new Response(privateText.repeat(40_000))]) {
+    const result = await diagnoseExistingBuild('synthetic-key', { fetchImpl })
+    assert.equal(result.outcome, 'unavailable')
+    assert.equal(JSON.stringify(result).includes(privateText), false)
+    assert.equal(result.complete, false)
+  }
+  let calls = 0
+  const result = await diagnoseExistingBuild('', { fetchImpl: async () => { calls++; throw new Error(privateText) } })
+  assert.equal(calls, 0)
+  assert.equal(result.failure.code, 'credential_missing')
+})
+
+test('the temporary diagnostic carrier keeps the original trust and cannot allocate or mutate resources', () => {
   const workflow = readFileSync(new URL('../../.github/workflows/self-hosted-vault-closeout.yml', import.meta.url), 'utf8')
   assert.match(workflow, /branches: \[ops\/self-hosted-vault-closeout-20261108\]/)
   assert.match(workflow, /group: coding-workspace-private-candidates/)
@@ -286,14 +433,12 @@ test('workflow retains the original sole credential and gives cleanup time outsi
     'project-id: 89850d6a-f020-4936-863e-df77380dfe40', 'secret-path: /vercel', 'env-slug: prod',
     'recursive: false', 'include-imports: false', `P0_SOURCE: ${P0.source}`, `ref: ${P0.source}`]) assert.ok(workflow.includes(exact))
   assert.equal(workflow.split(P0.source).length - 1, 2)
-  assert.ok(workflow.indexOf('mjs dependencies workspace-acceptance-source') < workflow.indexOf('uses: Infisical/secrets-action'))
-  assert.ok(workflow.indexOf('id: vm_cleanup') < workflow.indexOf('id: template_cleanup'))
-  assert.equal([...workflow.matchAll(/if: always\(\) && steps.source.outcome == 'success' && steps.credential.outcome == 'success' && steps.build.outcome != 'skipped'/g)].length, 2)
-  assert.match(workflow, /pnpm install --frozen-lockfile/)
-  assert.match(workflow, /timeout --signal=TERM --kill-after=1m 30m/)
-  assert.match(workflow, /timeout --signal=TERM --kill-after=30s 12m/)
-  assert.match(workflow, /path: \$\{\{ runner.temp \}\}\/workspace-private\/evidence\/\*\.json/)
+  assert.ok(workflow.indexOf('mjs diagnostic-check workspace-acceptance-source') < workflow.indexOf('uses: Infisical/secrets-action'))
+  assert.doesNotMatch(workflow, /workspace-candidates\.py|workspace-ingress-acceptance\.mjs|--cleanup|e2b-private\/bin/)
+  assert.match(workflow, /timeout --signal=TERM --kill-after=5s 100s/)
+  assert.match(workflow, /mjs diagnose workspace-acceptance-source/)
+  assert.match(workflow, /path: \$\{\{ runner.temp \}\}\/workspace-private-diagnostic\/evidence\/\*\.json/)
   const timeouts = [...workflow.matchAll(/^\s+timeout-minutes: (\d+)$/gm)].map(match => Number(match[1]))
-  assert.equal(timeouts[0], 75)
-  assert.ok(timeouts.slice(1).reduce((sum, value) => sum + value, 0) <= 75, 'step ceilings must leave cleanup inside the job limit')
+  assert.equal(timeouts[0], 12)
+  assert.ok(timeouts.slice(1).reduce((sum, value) => sum + value, 0) <= 12)
 })
