@@ -1,0 +1,11 @@
+# Closed provider diagnostics, after actual failed preparation
+
+Original production failure: source 209926afed03da2049d95099f879cc71bb8b8f68, run 42619584651/1, post-mint provider_http. The new uninstalled token was revoked with DELETE /token 204. Source/closure/original log evidence is committed at 75b9deb0ec74e49c49dc9c9c8155ed1737f87aa2.
+
+Exact Node v24.22.1 results: original provider/helper with the same expanded 47-test suite: 39 passed, 8 failed. Revised provider/helper: 47 passed, 0 failed. No tests skipped. Full original stdout/stderr logs are captured byte-for-byte, with metadata and source inventory. External production services were not called; the provider HTTP adapter uses controlled Response fixtures. This is not live PostgreSQL/OAuth proof.
+
+Changes preserve all HTTP methods, paths, bodies, auth, requested read-only permissions and validation behavior. Only the two installation-repository listing phases gain unambiguous fixed labels. The helper copies only an allowlisted provider error class/code, a closed request phase and (for provider_http) an integer 100–599 status. Raw detail objects, response bodies, credentials, headers, URLs and causes are never copied. Existing orchestration report.stage remains unchanged. Real-provider fault tests cover all five post-mint HTTP routes, exact new-child revocation and no installation; adversarial diagnostics and cleanup retention are also tested.
+
+The tested files use the existing v4 GO binding. Fresh unreferenced source e2dbc0d58667aab415ca6e4b84c8e16ce9143ab2 uses the new v5 GO only in runner/test, a new exact closed OPS parent, and a 13:20 UTC entry deadline. No business change beyond the reviewed diagnostics is included. The actual Actions entry repeats all 47 tests before credentials. Two original queues, five OIDC secret imports, eight idle checks, double vacancy, normal Owner getter and exact cleanup gates remain.
+
+Development VM sbx_Y4r0VwIA8FbjksSlTIrKNfKIqQVo was stopped and independently read back stopped at 2026-11-09T12:57:07.843Z, duration 149385 ms. No production credential was available to that VM. The failed original fetch of aggregated development logs was not accepted as evidence; complete streamed frames were reassembled and independently SHA256/byte-count checked.

@@ -1,0 +1,32 @@
+{
+  "result": {
+    "session": {
+      "id": "sbx_Y4r0VwIA8FbjksSlTIrKNfKIqQVo",
+      "runtime": "node24",
+      "architecture": "amd64",
+      "requestedAt": 1794228878420,
+      "startedAt": 1794228878458,
+      "requestedStopAt": 1794229027598,
+      "stoppedAt": 1794229027843,
+      "status": "stopped",
+      "duration": 149385,
+      "vcpus": 1,
+      "memory": 2048,
+      "timeout": 600000,
+      "region": "iad1",
+      "cwd": "/vercel/sandbox",
+      "workloadType": "sandbox",
+      "createdAt": 1794228878420,
+      "updatedAt": 1794228878469,
+      "interactivePort": 26661,
+      "activeCpuDurationMs": 3666,
+      "networkTransfer": {
+        "ingress": 118843,
+        "egress": 51320
+      },
+      "sourceSandboxName": "issue1505-provider-diagnostic-20261109",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+    },
+    "routes": []
+  }
+}

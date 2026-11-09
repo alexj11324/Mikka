@@ -1,0 +1,235 @@
+✔ fresh child requests exactly two read permissions; role push=true is not token authority (109.627835ms)
+✔ provider rejects write permission (2.095502ms)
+✔ provider rejects extra permission (10.264814ms)
+✔ provider rejects all repositories (6.325677ms)
+✔ provider rejects wrong App (1.276203ms)
+✔ provider rejects wrong principal (0.404805ms)
+✔ provider rejects wrong repository (0.66373ms)
+✔ provider rejects expired child (5.401177ms)
+✔ provider rejects same source child (7.761911ms)
+✔ provider rejects unexpected OAuth scope (1.410762ms)
+✔ successful repair uses normal readback, retains new child and emits no secrets (1.769755ms)
+✔ existing connection fails before obtaining Owner source or minting (4.643407ms)
+✔ a failed post-resolution Owner source stops minting (0.495252ms)
+✔ precommit refusal revokes only the newly minted token (0.988438ms)
+✔ ambiguous COMMIT preserves safe recovery state and never blindly revokes (2.782405ms)
+✔ readback failure cleans only the known installed child (1.5254ms)
+✔ foreign connection blocks cleanup without revoking or deleting it (0.552196ms)
+✔ changed App rejects cleanup before reading a token (0.255278ms)
+✔ wrong state principal rejects cleanup before storage/provider IO (0.980986ms)
+✔ normal repository readback must match exact GitHub subject and installation (0.270633ms)
+✔ store holds Owner lock, rechecks vacancy and uses normal scoped-client save before COMMIT (1.755712ms)
+✔ store concurrent existing Smoke row refuses before save and rolls back (3.338574ms)
+✔ store changed Owner refuses before saving child (0.318579ms)
+✔ store failed COMMIT retains checkpoint, closes broken client, does not delete row (0.444059ms)
+✔ runner default disabled fails before loading any credential or application dependency (5.14042ms)
+✔ runner exact execution guard rejects rerun, foreign repo, branch and missing GO (0.367527ms)
+✔ lost mint response records unknown outcome and performs no retry or speculative revocation (0.566339ms)
+✔ normal repository readback binds only provider-verified public App ID and restores its environment (0.264464ms)
+✔ normal repository readback rejects conflicting App configuration and restores after failure (0.261763ms)
+✔ closed diagnostics reject identifier-shaped foreign messages and preserve only listed codes (0.558001ms)
+✔ an expired original Owner source resolves under its lock and only the committed reread reaches the child provider (1.30167ms)
+✔ refusal at identity never resolves Owner credentials or mints (0.556564ms)
+✔ refusal at idle never resolves Owner credentials or mints (0.238464ms)
+✔ refusal at assertVacant never resolves Owner credentials or mints (0.163351ms)
+✔ the locked Owner identity and finite dates are checked before any normal getter (0.691346ms)
+✔ an unpersisted refresh intent stops before the getter (0.352544ms)
+✔ getterError preserves possible refresh evidence without mint, retry or Owner revocation (0.591935ms)
+✔ commitError preserves possible refresh evidence without mint, retry or Owner revocation (0.256454ms)
+✔ cleanup never resolves or refreshes an Owner connection (0.265096ms)
+✖ provider diagnostics copy only closed request phases and integer HTTP status, never raw details (1.413411ms)
+✖ provider diagnostics reject foreign error objects, unknown phases, invalid statuses and unrelated codes (0.328895ms)
+✖ post-mint scoped_identity HTTP failure records safe detail and revokes only the uninstalled new child (3.819555ms)
+✖ post-mint check_scoped_token HTTP failure records safe detail and revokes only the uninstalled new child (1.803274ms)
+✖ post-mint scoped_repository HTTP failure records safe detail and revokes only the uninstalled new child (2.160469ms)
+✖ post-mint scoped_installations HTTP failure records safe detail and revokes only the uninstalled new child (2.344401ms)
+✖ post-mint scoped_installation_repositories HTTP failure records safe detail and revokes only the uninstalled new child (2.052231ms)
+✖ cleanup HTTP failure keeps exact state and connection without leaking provider details (0.594858ms)
+ℹ tests 47
+ℹ suites 0
+ℹ pass 39
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 437.274301
+
+✖ failing tests:
+
+test at red/scripts/ops/issue1505/github-readonly.test.mjs:375:1
+✖ provider diagnostics copy only closed request phases and integer HTTP status, never raw details (1.413411ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'undefined'
+  - 'function'
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/red/scripts/ops/issue1505/github-readonly.test.mjs:377:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at red/scripts/ops/issue1505/github-readonly.test.mjs:389:1
+✖ provider diagnostics reject foreign error objects, unknown phases, invalid statuses and unrelated codes (0.328895ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'undefined'
+  - 'function'
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/red/scripts/ops/issue1505/github-readonly.test.mjs:391:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at red/scripts/ops/issue1505/github-readonly.test.mjs:408:4
+✖ post-mint scoped_identity HTTP failure records safe detail and revokes only the uninstalled new child (3.819555ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   stage: 'scoped_identity',
+  -   status: 401
+  - }
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/red/scripts/ops/issue1505/github-readonly.test.mjs:419:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { stage: 'scoped_identity', status: 401 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at red/scripts/ops/issue1505/github-readonly.test.mjs:408:4
+✖ post-mint check_scoped_token HTTP failure records safe detail and revokes only the uninstalled new child (1.803274ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   stage: 'check_scoped_token',
+  -   status: 404
+  - }
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/red/scripts/ops/issue1505/github-readonly.test.mjs:419:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { stage: 'check_scoped_token', status: 404 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at red/scripts/ops/issue1505/github-readonly.test.mjs:408:4
+✖ post-mint scoped_repository HTTP failure records safe detail and revokes only the uninstalled new child (2.160469ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   stage: 'scoped_repository',
+  -   status: 403
+  - }
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/red/scripts/ops/issue1505/github-readonly.test.mjs:419:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { stage: 'scoped_repository', status: 403 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at red/scripts/ops/issue1505/github-readonly.test.mjs:408:4
+✖ post-mint scoped_installations HTTP failure records safe detail and revokes only the uninstalled new child (2.344401ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   stage: 'scoped_installations',
+  -   status: 500
+  - }
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/red/scripts/ops/issue1505/github-readonly.test.mjs:419:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { stage: 'scoped_installations', status: 500 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at red/scripts/ops/issue1505/github-readonly.test.mjs:408:4
+✖ post-mint scoped_installation_repositories HTTP failure records safe detail and revokes only the uninstalled new child (2.052231ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   stage: 'scoped_installation_repositories',
+  -   status: 403
+  - }
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/red/scripts/ops/issue1505/github-readonly.test.mjs:419:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { stage: 'scoped_installation_repositories', status: 403 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at red/scripts/ops/issue1505/github-readonly.test.mjs:427:1
+✖ cleanup HTTP failure keeps exact state and connection without leaking provider details (0.594858ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   stage: 'revoke_scoped_token',
+  -   status: 503
+  - }
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/red/scripts/ops/issue1505/github-readonly.test.mjs:433:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { stage: 'revoke_scoped_token', status: 503 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

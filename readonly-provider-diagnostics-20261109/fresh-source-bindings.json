@@ -1,0 +1,62 @@
+{
+  "source": "e2dbc0d58667aab415ca6e4b84c8e16ce9143ab2",
+  "tree": "81640aa4e40b49c2f1d433253446cafc48ff36f4",
+  "parents": [
+    "e78fccffd9dd878edd490b113ea80efcff1525e7",
+    "01ef3fa435380f23fbd3cd7cfbe77839cc5511d9"
+  ],
+  "entries": [
+    {
+      "path": "scripts/ops/issue1505/github-readonly-provider.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d097f62e62ca64a72220bb26cf7966db2acf4b43"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-helper.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "595eee67850779b2bde4597306e6a1c83beee245"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-store.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0455da9dcc58015184edd734987c2f0d711cdf8a"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-runner.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "17d7e57fb62f5ad7353a4a00a8934a65e6599b2c"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2d25d4b7ea03b3143cb7ee22be8f68304240788d"
+    },
+    {
+      "path": ".github/workflows/issue1505-smoke-github-readonly.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b30a15b1c3898ade6bb9b839cc5c20d857b15001"
+    }
+  ],
+  "bindings": {
+    "source": "e78fccffd9dd878edd490b113ea80efcff1525e7",
+    "tree": "48b0d459ca1c9087e8abab29e7c3ccf9428fbbcc",
+    "closedOpsHead": "01ef3fa435380f23fbd3cd7cfbe77839cc5511d9",
+    "branch": "ops/1505-smoke-github-readonly-20261109",
+    "go": "root-reviewed-1505-github-http-v5",
+    "observedAt": "2026-11-09T12:57:00Z",
+    "deadline": "2026-11-09T13:20:00+00:00"
+  },
+  "sourceSha256": {
+    "github-readonly-provider.mjs": "23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e",
+    "github-readonly-helper.mjs": "cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742",
+    "github-readonly-store.mjs": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+    "github-readonly-runner.mjs": "d1f6d4d5be8382a83ec2dda9c3a0835e36a9ddc0f2fc4a4d5b5af6a3dade6afc",
+    "github-readonly.test.mjs": "6a47beed6b4f0817a51e6cdd603d85276459c6de4c95df76fca9de51be248cee"
+  }
+}
