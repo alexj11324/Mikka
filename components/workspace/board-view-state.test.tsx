@@ -33,6 +33,7 @@ mock.module('@/components/ui/dropdown-menu', { namedExports: {
 } })
 mock.module('./issue-board', { namedExports: { IssueBoard: ({ issues }: { issues: Issue[] }) => <div data-board-view="board">{issues.map(issue => <p key={issue.id} data-shown-issue>{issue.title}</p>)}</div> } })
 mock.module('./issue-list', { namedExports: { IssueList: ({ issues }: { issues: Issue[] }) => <div data-board-view="list">{issues.map(issue => <p key={issue.id} data-shown-issue>{issue.title}</p>)}</div> } })
+mock.module('./board-screen', { namedExports: { BoardScreen: null, BoardScreenView: empty } })
 
 let BoardPage: typeof import('./board-page')['BoardPage']
 let createRoot: typeof import('react-dom/client')['createRoot']

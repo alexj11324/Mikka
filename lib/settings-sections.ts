@@ -4,7 +4,7 @@
  * exists in one place only.
  */
 export type SettingsSectionId =
-  | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'models'
+  | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'bot-permissions' | 'models'
   | 'logins' | 'privacy' | 'computers' | 'developer'
   | 'general' | 'members' | 'teams' | 'permissions' | 'secrets' | 'audit' | 'usage' | 'billing' | 'cloud'
 
@@ -32,6 +32,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
+  // One Bot's permissions: app writes, run permissions and approval mode (affectUI Agent / Permissions).
+  { id: 'bot-permissions', group: 'personal', title: 'Bot permissions' },
   // 模型与订阅 (decision 2026-11-02-1400): subscriptions, API keys, 运行位置 and 优先使用的模型 (was API 与订阅 and Bot 与 Agents).
   { id: 'models', group: 'personal', title: 'Models and subscriptions' },
   { id: 'logins', group: 'personal', title: 'Secrets and logins' },
