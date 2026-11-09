@@ -4,7 +4,7 @@ import { singleFlight } from '@/lib/single-flight'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
 import { ownerListRead } from '@/lib/live/list-read-server'
-import { beginOwnerListRead } from '@/lib/live/revision-read'
+import { beginOwnerListRead, readRevisions } from '@/lib/live/revision-read'
 import type { ListLiveRead } from '@/lib/live/list-read'
 
 import { cookies, headers } from 'next/headers'
@@ -81,6 +81,13 @@ async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string |
   return bot
 }
 
+/** ownBot has already authorized the actor in this persisted bot workspace.
+ * Match the writer's tenant channel without resolving a different personal home. */
+async function beginBotChatRead(ownerId: string, bot: { id: string; workspaceId: string }) {
+  const scope = { ownerId, workspaceId: bot.workspaceId }
+  return { scope, revisions: await readRevisions([{ kind: 'bot_chat', id: bot.id }]) }
+}
+
 /** The person's chat with their Coordinator, or with one of their bots: every bot runs on the same harness. */
 export async function getCoordinatorChat(botId: string | null = null): Promise<CoordinatorChat> {
   return withDatabaseOperation('/actions/coordinator/chat', () => readFullChat(botId))
@@ -92,9 +99,9 @@ async function readFullChat(botId: string | null): Promise<CoordinatorChat> {
   const bot = await ownBot(user, botId)
   const enabled = await coordinatorEnabled(user.id, bot.id)
   // Before the chat: a push at this revision or below is already in what follows.
-  const begun = await beginOwnerListRead(userId, [], [{ kind: 'bot_chat', id: bot.id }])
+  const begun = await beginBotChatRead(userId, bot)
   const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
-  // The legacy/mobile full reader retains the same authorized home and
+  // The legacy/mobile full reader retains the same authorized bot tenant and
   // deadline as incremental reads; web sidebars use chat summaries instead.
   const live = await ownerListRead(userId, expiries, observedAt, begun)
   // Without a Coordinator here nothing is coming, so do not show one working.
@@ -131,9 +138,9 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   } : undefined
   const heldVersion = parsed.success ? parsed.data : undefined
   // Before the chat: a push at this revision or below is already in what follows.
-  const begun = await beginOwnerListRead(user.id, [], [{ kind: 'bot_chat', id: bot.id }])
+  const begun = await beginBotChatRead(user.id, bot)
   const { expiries, observedAt, ...current } = await chatVersionState(user.id, 200, bot.id)
-  // The owner's home channel says when to read again; a lease running out is the one change with no write.
+  // The bot's tenant channel says when to read again; a lease running out is the one change with no write.
   const live = await ownerListRead(user.id, expiries, observedAt, begun)
   // Each request observes the current version before joining: a deletion or a
   // new turn cannot join an older transcript still being read. Normalize only
