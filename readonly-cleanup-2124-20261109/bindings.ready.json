@@ -1,0 +1,78 @@
+{
+  "status": "offline_original_provenance_bound_disabled",
+  "branch": "ops/1505-smoke-github-readonly-20261109",
+  "go": "root-reviewed-1505-github-r7-20261109-v1",
+  "values": {
+    "prepareRunId": 42689909155,
+    "prepareRunAttempt": 1,
+    "prepareWorkflowId": 411645081,
+    "prepareHeadSha": "683b5010bec31bb8515fba73dfaa0f68bc1898df",
+    "prepareBranch": "ops/1505-smoke-github-readonly-20261109",
+    "artifactId": 13705908471,
+    "artifactName": "issue1505-github-readonly-fresh-42689909155-1",
+    "artifactBytes": 928,
+    "artifactDigest": "sha256:b9ab6be00c2b6430030a6d0696380b1b0af7b2dce3aa6f6f4a925b7ed8b88e40",
+    "zipSha256": "b9ab6be00c2b6430030a6d0696380b1b0af7b2dce3aa6f6f4a925b7ed8b88e40",
+    "receiptBytes": 2132,
+    "receiptSha256": "64fd08cb121a8edcbdc3bf58f6e79657cef6bb54eb17f43a4946e37047eb6b5c",
+    "cleanupClosedCommit": "170ab83489cd81935d32a0fc96a4213b72745cdf",
+    "cleanupClosedTree": "98d549e2c85545127880d08ef98688243c75eaae",
+    "currentMainSha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "windowStartUtc": "2026-11-09T21:24:11.000Z",
+    "entryDeadlineUtc": "2026-11-09T21:29:11.000Z",
+    "hardEndUtc": "2026-11-09T21:39:11.000Z",
+    "jobMinutes": 10
+  },
+  "markers": {
+    "prepareRunId": "__REQUIRED_PREPARE_RUN_ID__",
+    "prepareRunAttempt": "__REQUIRED_PREPARE_RUN_ATTEMPT__",
+    "prepareWorkflowId": "__REQUIRED_PREPARE_WORKFLOW_ID__",
+    "prepareHeadSha": "__REQUIRED_PREPARE_HEAD_SHA__",
+    "prepareBranch": "__REQUIRED_PREPARE_BRANCH__",
+    "artifactId": "__REQUIRED_ARTIFACT_ID__",
+    "artifactName": "__REQUIRED_ARTIFACT_NAME__",
+    "artifactBytes": "__REQUIRED_ARTIFACT_BYTES__",
+    "artifactDigest": "__REQUIRED_ARTIFACT_DIGEST__",
+    "zipSha256": "__REQUIRED_ZIP_SHA256__",
+    "receiptBytes": "__REQUIRED_RECEIPT_BYTES__",
+    "receiptSha256": "__REQUIRED_RECEIPT_SHA256__",
+    "cleanupClosedCommit": "__REQUIRED_CLEANUP_CLOSED_COMMIT__",
+    "cleanupClosedTree": "__REQUIRED_CLEANUP_CLOSED_TREE__",
+    "currentMainSha": "__REQUIRED_CLEANUP_CURRENT_MAIN_SHA__",
+    "windowStartUtc": "__REQUIRED_CLEANUP_WINDOW_START_UTC__",
+    "entryDeadlineUtc": "__REQUIRED_CLEANUP_ENTRY_DEADLINE_UTC__",
+    "hardEndUtc": "__REQUIRED_CLEANUP_HARD_END_UTC__",
+    "jobMinutes": "__REQUIRED_CLEANUP_JOB_MINUTES__"
+  },
+  "requiredPrepareBranch": "ops/1505-smoke-github-readonly-20261109",
+  "requiredPrepareRunAttempt": 1,
+  "closedParentMeaning": "actual currently closed owned carrier head at cleanup handoff, possibly after H prepare/cleanup; exact second parent, never implicitly the child prepare-close head",
+  "currentMainMeaning": "actual APP/main commit at cleanup handoff; exact first parent and complete tree base; may differ from original child prepare source",
+  "jobMinutesPermittedByOriginalGuard": {
+    "min": 1,
+    "max": 15
+  },
+  "originalReviewedJobMinutes": 10,
+  "workflowJobIf": false,
+  "reviewedJobIfAfterBinding": "github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1",
+  "activationAuthorizedByThisPackage": false,
+  "sourceShape": {
+    "orderedParentsDerivedFromPins": [
+      "currentMainSha",
+      "cleanupClosedCommit"
+    ],
+    "baseTreeDerivedFromExactCommitPin": "currentMainSha^{tree}",
+    "carrierTreePinnedBy": "cleanupClosedTree",
+    "relativeToApp": "exact six additions, mode 100644, no modifications/deletions/renames or inherited carrier files",
+    "workflowPath": ".github/workflows/issue1505-smoke-github-readonly.yml",
+    "helperPaths": [
+      "scripts/ops/issue1505/github-readonly-provider.mjs",
+      "scripts/ops/issue1505/github-readonly-helper.mjs",
+      "scripts/ops/issue1505/github-readonly-store.mjs",
+      "scripts/ops/issue1505/github-readonly-runner.mjs",
+      "scripts/ops/issue1505/github-readonly.test.mjs"
+    ],
+    "soleParentFallbackAllowed": false
+  },
+  "provenanceMeaning": "prepareRun/head/attempt/artifact/receipt pins refer only to this child original prepare; never rewrite them to cleanup APP or H source"
+}

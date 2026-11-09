@@ -1,0 +1,292 @@
+{
+  "status": "original_masked_log_locally_reviewed_without_edits",
+  "originalCachePath": "readonly-cleanup-expired-2052-1505/job-129432331990.log",
+  "originalBytes": 367705,
+  "originalSha256": "d334ab46ba5981373c1825c02a69f4151b248aa80e70ebc16ca0fd6b73be43bd",
+  "knownPrefixMinimumSuffix8Count": 54,
+  "knownPrefixMinimumSuffix20Count": 8,
+  "classifiedFalsePositives": [
+    {
+      "line": 189,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 189,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 190,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 190,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 359,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 359,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 402,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 402,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 481,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 481,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 482,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 482,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 584,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 584,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 599,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 599,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 723,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 723,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 728,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 728,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 742,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 742,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 852,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 852,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 873,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 873,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1341,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1341,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1353,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1353,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1552,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1552,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1553,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1553,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1577,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1577,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1677,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1677,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1773,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1773,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1837,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1837,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1903,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1903,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1915,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1915,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1960,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 1960,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 2002,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 2002,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 2273,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 2273,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 2284,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 2284,
+      "classification": "public_checkout_branch_name",
+      "patternValuePrinted": false
+    }
+  ],
+  "unclassifiedCredentialCandidates": 0,
+  "otherScans": {
+    "jwtShaped": 0,
+    "bearerValue": 0,
+    "databaseCredentialUrl": 0,
+    "privateKeyMarker": 0,
+    "credentialAssignmentLiteral": 0
+  },
+  "maskTriples": 3,
+  "newActionsLogDownloads": 0,
+  "originalBytesAltered": false,
+  "limits": "These bounded pattern and context checks describe the review performed; they are not a universal guarantee about arbitrary log content."
+}

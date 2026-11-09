@@ -1,0 +1,26 @@
+{
+  "sourceCommit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "runId": "42695935772",
+  "sandboxes": [],
+  "templates": [
+    {
+      "name": "mikka-12458fe22e12-42695935772-1-desktop",
+      "kind": "desktop",
+      "templateId": "ipcvgm9336zqe2zv9upv",
+      "status": "deleted"
+    },
+    {
+      "name": "mikka-12458fe22e12-42695935772-1-claude",
+      "kind": "claude",
+      "templateId": "lkzo1t6b60n00fohkh7l",
+      "status": "deleted"
+    },
+    {
+      "name": "mikka-12458fe22e12-42695935772-1-codex",
+      "kind": "codex",
+      "templateId": "rv0ynz59zc1ufkd6pgsb",
+      "status": "deleted"
+    }
+  ],
+  "errors": []
+}

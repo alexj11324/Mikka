@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "source": "Read-only authenticated GitHub Actions metadata; no original archive or log download",
+  "run": {
+    "id": 42695935772,
+    "run_attempt": 1,
+    "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "head_branch": "main",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "failure",
+    "workflow_id": 405833668,
+    "path": ".github/workflows/e2b-official-runtime.yml",
+    "created_at": "2026-11-09T20:45:11Z",
+    "updated_at": "2026-11-09T21:21:56Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42695935772"
+  },
+  "jobs": [
+    {
+      "id": 129428949477,
+      "run_id": 42695935772,
+      "run_attempt": 1,
+      "name": "test",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T20:47:32Z",
+      "completed_at": "2026-11-09T20:47:49Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42695935772/job/129428949477"
+    },
+    {
+      "id": 129429132057,
+      "run_id": 42695935772,
+      "run_attempt": 1,
+      "name": "check",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T20:47:52Z",
+      "completed_at": "2026-11-09T20:48:09Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42695935772/job/129429132057"
+    },
+    {
+      "id": 129429312566,
+      "run_id": 42695935772,
+      "run_attempt": 1,
+      "name": "validate / build",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T20:48:12Z",
+      "completed_at": "2026-11-09T20:56:19Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42695935772/job/129429312566"
+    },
+    {
+      "id": 129433803533,
+      "run_id": 42695935772,
+      "run_attempt": 1,
+      "name": "await-web",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T20:56:21Z",
+      "completed_at": "2026-11-09T21:14:00Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42695935772/job/129433803533"
+    },
+    {
+      "id": 129443739610,
+      "run_id": 42695935772,
+      "run_attempt": 1,
+      "name": "subscriptions",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-11-09T21:18:57Z",
+      "completed_at": "2026-11-09T21:21:34Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42695935772/job/129443739610"
+    },
+    {
+      "id": 129447943112,
+      "run_id": 42695935772,
+      "run_attempt": 1,
+      "name": "cleanup",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T21:21:36Z",
+      "completed_at": "2026-11-09T21:21:55Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42695935772/job/129447943112"
+    },
+    {
+      "id": 129447945340,
+      "run_id": 42695935772,
+      "run_attempt": 1,
+      "name": "publish",
+      "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-09T21:21:34Z",
+      "completed_at": "2026-11-09T21:21:34Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42695935772/job/129447945340"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 13711592570,
+      "name": "e2b-template-subscription-diagnostics-42695935772-1",
+      "size_in_bytes": 2467,
+      "digest": "sha256:9a2bbdb155f1ddcba0cfc5111a4fd1b92060794a8628afb2d61ebc2f5099cd50",
+      "expired": false,
+      "created_at": "2026-11-09T21:21:32Z",
+      "updated_at": "2026-11-09T21:21:32Z",
+      "workflow_run": {
+        "id": 42695935772,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "main",
+        "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72"
+      }
+    },
+    {
+      "id": 13710659613,
+      "name": "e2b-runtime-release-cleanup-42695935772-1",
+      "size_in_bytes": 415,
+      "digest": "sha256:374380ec888dbb0b8e3ded2a0358de2132da86587e8b6cd834e5c0cb138535ed",
+      "expired": false,
+      "created_at": "2026-11-09T21:21:53Z",
+      "updated_at": "2026-11-09T21:21:53Z",
+      "workflow_run": {
+        "id": 42695935772,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "main",
+        "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72"
+      }
+    },
+    {
+      "id": 13708794006,
+      "name": "e2b-candidate-build-cleanup-42695935772-1",
+      "size_in_bytes": 266,
+      "digest": "sha256:e2f3841c20d863847616ee8f580495d22c81fd4cfa180986af1d9ebf80f9999c",
+      "expired": false,
+      "created_at": "2026-11-09T20:56:15Z",
+      "updated_at": "2026-11-09T20:56:15Z",
+      "workflow_run": {
+        "id": 42695935772,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "main",
+        "head_sha": "12458fe22e1217f644e8b28f82ab856211e73b72"
+      }
+    }
+  ]
+}

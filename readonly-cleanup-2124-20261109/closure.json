@@ -1,0 +1,23 @@
+{
+  "activeCommit": "d524135bb8799d82b626d65fcf1f9de6b4a745f8",
+  "activeTree": "ea77173ec02fc64f31c901e7ea00057487399979",
+  "closedCommit": "816874b4d522d97d674539468a7cbd7a7ca1f71c",
+  "closedTree": "e0e5f2b286330f324245e990b3c150df8c1096c4",
+  "rootRefReadBack": true,
+  "closureRun": 42702785973,
+  "closureConclusion": "skipped",
+  "actualSegmentReleasedAt": "2026-11-09T21:29:14Z",
+  "releaseComment": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751944010",
+  "run": 42702404636,
+  "attempt": 1,
+  "job": 129450264779,
+  "result": "success",
+  "receipt": {
+    "bytes": 321,
+    "sha256": "a47f43718704a215276f864471844b5f2719588ea4c2920fff9cd7e3d273c16c",
+    "revoked": true,
+    "disconnected": true,
+    "revocationStatus": 204
+  },
+  "cleanupCompletedAt": "2026-11-09T21:26:45.391Z"
+}

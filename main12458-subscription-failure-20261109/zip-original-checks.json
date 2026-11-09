@@ -1,0 +1,44 @@
+[
+  {
+    "artifactId": 13711592570,
+    "artifactName": "e2b-template-subscription-diagnostics-42695935772-1",
+    "originalName": "subscription-diagnostics-original.zip",
+    "storedAs": "subscription-diagnostics-original.zip.base64.txt",
+    "zipBytes": 2467,
+    "zipSha256": "9a2bbdb155f1ddcba0cfc5111a4fd1b92060794a8628afb2d61ebc2f5099cd50",
+    "member": "subscription-diagnostics.json",
+    "memberBytes": 6099,
+    "memberSha256": "1b5852b2a66a35edb23ac0041fd278e4901444f8374700d67769b221f923f7c7",
+    "crc": "passed",
+    "memberEqualsCachedOriginal": true,
+    "strictBase64Reconstruction": true
+  },
+  {
+    "artifactId": 13708794006,
+    "artifactName": "e2b-candidate-build-cleanup-42695935772-1",
+    "originalName": "build-cleanup-original.zip",
+    "storedAs": "build-cleanup-original.zip.base64.txt",
+    "zipBytes": 266,
+    "zipSha256": "e2f3841c20d863847616ee8f580495d22c81fd4cfa180986af1d9ebf80f9999c",
+    "member": "build-cleanup.json",
+    "memberBytes": 145,
+    "memberSha256": "812ef2ca8cab33161e702d825ce1a0b23f423b556aad09d781816d39f8f92591",
+    "crc": "passed",
+    "memberEqualsCachedOriginal": true,
+    "strictBase64Reconstruction": true
+  },
+  {
+    "artifactId": 13710659613,
+    "artifactName": "e2b-runtime-release-cleanup-42695935772-1",
+    "originalName": "release-cleanup-original.zip",
+    "storedAs": "release-cleanup-original.zip.base64.txt",
+    "zipBytes": 415,
+    "zipSha256": "374380ec888dbb0b8e3ded2a0358de2132da86587e8b6cd834e5c0cb138535ed",
+    "member": "release-cleanup.json",
+    "memberBytes": 639,
+    "memberSha256": "ab5e8546452f9ea35b5efc0cafc2390893f20bfe3c4fb41704895214e1ab3670",
+    "crc": "passed",
+    "memberEqualsCachedOriginal": true,
+    "strictBase64Reconstruction": true
+  }
+]

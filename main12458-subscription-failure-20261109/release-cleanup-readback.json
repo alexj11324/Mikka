@@ -1,0 +1,12 @@
+{
+  "id": 13710659613,
+  "name": "release-cleanup",
+  "size": 415,
+  "sha": "374380ec888dbb0b8e3ded2a0358de2132da86587e8b6cd834e5c0cb138535ed",
+  "run": 42695935772,
+  "attempt": 1,
+  "zipCrcPassed": true,
+  "singleMember": "release-cleanup.json",
+  "memberBytes": 639,
+  "memberSha256": "ab5e8546452f9ea35b5efc0cafc2390893f20bfe3c4fb41704895214e1ab3670"
+}

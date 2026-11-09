@@ -1,0 +1,151 @@
+{
+  "sourceCommit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "runId": 42695935772,
+  "runAttempt": 1,
+  "workerSha": "aa7efbbe2969d8b1578bdba093e6400a26749e07",
+  "claudeCompleteCandidateGate": "passed",
+  "codex": {
+    "candidateGate": "failed",
+    "code": "template_gate_execution_failed",
+    "sampleError": "startup_ended_before_execution_proof",
+    "sharedSubscriptionExecutionFullyPassed": false,
+    "observation": {
+      "lastStatus": "stopped",
+      "agentStart": true,
+      "providerChunk": true,
+      "agentStartStage": {
+        "ok": true,
+        "ms": 1546
+      },
+      "cliInit": {
+        "outcome": "ok",
+        "ms": 65.662
+      },
+      "replyVerified": false,
+      "replyVerifiedAfterTool": false,
+      "successfulTool": true,
+      "runtimeTimingStatus": "complete",
+      "expectedAgentAck": true,
+      "runtimeEvidence": {
+        "status": "passed",
+        "reason": null
+      }
+    },
+    "candidateProof": {
+      "sourceCommit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "workerSha": "aa7efbbe2969d8b1578bdba093e6400a26749e07",
+      "templateId": "rv0ynz59zc1ufkd6pgsb",
+      "harness": "codex",
+      "deviceId": "ff0ce94e-faf2-4434-9486-aefcf78f3fad",
+      "binary": "/usr/local/lib/node_modules/@openai/codex/bin/codex.js",
+      "binarySha256": "e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af",
+      "version": "0.167.0"
+    },
+    "bootstrapDiagnostics": {
+      "version": 1,
+      "runIdHash": "a18972ad3b3fa09b",
+      "harness": "codex",
+      "startupTimingStatus": "complete",
+      "preparationTimingStatus": "unavailable",
+      "startupTiming": {
+        "version": 1,
+        "runIdHash": "a18972ad3b3fa09b",
+        "harness": "codex",
+        "startedAt": 1794259276792,
+        "endedAt": 1794259278338,
+        "ms": 1545.723,
+        "outcome": "ok",
+        "phases": [
+          {
+            "name": "daemon.adapter.cli_init",
+            "startMs": 13.266,
+            "endMs": 78.928,
+            "ms": 65.662,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.auth.token",
+            "startMs": 79.447,
+            "endMs": 79.894,
+            "ms": 0.447,
+            "outcome": "ok"
+          },
+          {
+            "name": "daemon.adapter.account_check.login",
+            "startMs": 80.132,
+            "endMs": 180.394,
+            "ms": 100.262,
+            "outcome": "ok"
+          }
+        ],
+        "truncated": false
+      },
+      "preparationTiming": null,
+      "adoptionChecks": {
+        "startupTimingStatus": true,
+        "preparationTimingStatus": false,
+        "startupReceipt": true,
+        "preparationReceipt": false,
+        "startupUntruncated": true,
+        "preparationUntruncated": false,
+        "startupOutcome": true,
+        "preparationOutcome": false,
+        "preparationSource": false,
+        "preparationPhases": false,
+        "prewarmPhaseCount": false,
+        "cliInitPhaseCount": false,
+        "claimAuthentication": true,
+        "observedAuthSource": true
+      },
+      "bindingChecks": null,
+      "projectionTruncated": false
+    },
+    "successfulToolEvidenceScope": "Only broad tool outcome=ok; no claim that a particular README was read.",
+    "stopActor": "unknown"
+  },
+  "previousRunDistinction": {
+    "runId": 42690423873,
+    "previousCode": "template_gate_bootstrap_adoption_missing",
+    "thisRunDoesNotPassReplyOrAdoptionGates": true
+  },
+  "cleanup": {
+    "allThreePrivateCandidatesDeleted": true,
+    "errors": [],
+    "build": {
+      "sourceCommit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "runId": "42695935772",
+      "sandboxes": [],
+      "templates": [],
+      "errors": []
+    },
+    "release": {
+      "sourceCommit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "runId": "42695935772",
+      "sandboxes": [],
+      "templates": [
+        {
+          "name": "mikka-12458fe22e12-42695935772-1-desktop",
+          "kind": "desktop",
+          "templateId": "ipcvgm9336zqe2zv9upv",
+          "status": "deleted"
+        },
+        {
+          "name": "mikka-12458fe22e12-42695935772-1-claude",
+          "kind": "claude",
+          "templateId": "lkzo1t6b60n00fohkh7l",
+          "status": "deleted"
+        },
+        {
+          "name": "mikka-12458fe22e12-42695935772-1-codex",
+          "kind": "codex",
+          "templateId": "rv0ynz59zc1ufkd6pgsb",
+          "status": "deleted"
+        }
+      ],
+      "errors": []
+    }
+  },
+  "published": false,
+  "newFormalSamples": 0,
+  "limits": "Candidate injection checks do not constitute ordinary production Tasks or dispatch-to-agent timing acceptance. The present diagnostics do not establish why Codex stopped before its required reply."
+}

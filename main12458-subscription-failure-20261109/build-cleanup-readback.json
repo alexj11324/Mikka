@@ -1,0 +1,13 @@
+{
+  "key": 1,
+  "id": 13708794006,
+  "name": "build-cleanup",
+  "size": 266,
+  "sha": "e2f3841c20d863847616ee8f580495d22c81fd4cfa180986af1d9ebf80f9999c",
+  "run": 42695935772,
+  "attempt": 1,
+  "zipCrcPassed": true,
+  "singleMember": "build-cleanup.json",
+  "memberBytes": 145,
+  "memberSha256": "812ef2ca8cab33161e702d825ce1a0b23f423b556aad09d781816d39f8f92591"
+}

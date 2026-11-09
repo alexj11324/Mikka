@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "status": "locally_verified_archive_payload",
+  "directory": "main12458-subscription-failure-20261109",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3225,
+      "sha256": "7dd05cdaeeee0d690a85f1227fd9e30f198504b38a183f676abb2ff4e36f1b45",
+      "gitBlobOid": "a2003a436c6be53b363bfbe5c5138778fbffdfa4",
+      "mode": "100644"
+    },
+    {
+      "path": "build-cleanup-original.zip.base64.txt",
+      "bytes": 357,
+      "sha256": "e50354d7b2e9ef25b2789106ad6ca80b2f05537ed31cf204814ac1f48e65a66a",
+      "gitBlobOid": "a51b49f864b72422b2ec451b61c8a5d3e34f5092",
+      "mode": "100644"
+    },
+    {
+      "path": "build-cleanup-readback.json",
+      "bytes": 365,
+      "sha256": "133d8bb951dffb3a94bc45d5ff40ed919079afcee1e5a3a81a1a575733e12364",
+      "gitBlobOid": "d153147a046e28bdbcbfe2e551e972a1b16e3687",
+      "mode": "100644"
+    },
+    {
+      "path": "build-cleanup.json",
+      "bytes": 145,
+      "sha256": "812ef2ca8cab33161e702d825ce1a0b23f423b556aad09d781816d39f8f92591",
+      "gitBlobOid": "91a5981f02aed6102cfa7fe59e971698a23d171e",
+      "mode": "100644"
+    },
+    {
+      "path": "log-publication-review.json",
+      "bytes": 1061,
+      "sha256": "54f9ef0fda04357cca05b6698e8a83b073d661a10029f6b29d3b413a05608ddb",
+      "gitBlobOid": "c53d9cfdd1a84e80f25101d2e00cc2cc8f6f422d",
+      "mode": "100644"
+    },
+    {
+      "path": "release-cleanup-original.zip.base64.txt",
+      "bytes": 557,
+      "sha256": "8aedba4a52440e7623a4621993dcd78c9d37bea60e5148b869be7a0fdc3f68a9",
+      "gitBlobOid": "8cdf4c9ee98229a6915020db5d28d5a86ac3b276",
+      "mode": "100644"
+    },
+    {
+      "path": "release-cleanup-readback.json",
+      "bytes": 357,
+      "sha256": "c9c70eba804a76a8d297768769e333d2f68cd60d780ec6e883264afb2dc99532",
+      "gitBlobOid": "7315fa4f154ed2622aa679d86d1f84506f0cecd7",
+      "mode": "100644"
+    },
+    {
+      "path": "release-cleanup.json",
+      "bytes": 639,
+      "sha256": "ab5e8546452f9ea35b5efc0cafc2390893f20bfe3c4fb41704895214e1ab3670",
+      "gitBlobOid": "218ce0e8a1cb588872adbeb5865932832d008752",
+      "mode": "100644"
+    },
+    {
+      "path": "subscription-diagnostics-original.zip.base64.txt",
+      "bytes": 3293,
+      "sha256": "9c7cf6917632150ce0cba0d7c1143bc958589f1f7135ae9ea4b7056e85d2743a",
+      "gitBlobOid": "7000963121216d316563fea559354c9eea916f0d",
+      "mode": "100644"
+    },
+    {
+      "path": "subscription-diagnostics-readback.json",
+      "bytes": 389,
+      "sha256": "f6b4267c5443aa2802f888e80d25a9ffce207351a1962ad8c22be83aa2504b35",
+      "gitBlobOid": "e3a62e8cb136d1c2012d45e55bf59e5253984a8d",
+      "mode": "100644"
+    },
+    {
+      "path": "subscription-diagnostics-safe.json",
+      "bytes": 4736,
+      "sha256": "7a236340260f93f85c268f831217bfccb64d16af20c83d8a0eff5c692df56fd1",
+      "gitBlobOid": "468e61275f7db9a0c4746e83d88fbd0883ba437a",
+      "mode": "100644"
+    },
+    {
+      "path": "subscription-diagnostics.json",
+      "bytes": 6099,
+      "sha256": "1b5852b2a66a35edb23ac0041fd278e4901444f8374700d67769b221f923f7c7",
+      "gitBlobOid": "d55eb5cdb8438cf82a9e57045baaded81522c363",
+      "mode": "100644"
+    },
+    {
+      "path": "subscriptions-original.log",
+      "bytes": 37028,
+      "sha256": "587d7a3e57421055b0602b7fb1544984fbdab4b709f0ced0d470c7bff83a5508",
+      "gitBlobOid": "33f09173c203cff90eed2b77b4b96057c4727f81",
+      "mode": "100644"
+    },
+    {
+      "path": "terminal-metadata.json",
+      "bytes": 5330,
+      "sha256": "ef4561f5363776b3cd2c55f637f2136dd8a3fcc8dbb124fa0aa61ea9c44a2499",
+      "gitBlobOid": "4f71e3c41c2813371ede84ceb56ddb2c812c6328",
+      "mode": "100644"
+    },
+    {
+      "path": "zip-original-checks.json",
+      "bytes": 1752,
+      "sha256": "a1e40daefe38b6ed82826b7c33fe860fc872af592097c527f50fd90e82eda627",
+      "gitBlobOid": "f1f6106e718e4bd801f4a151b151a34adff33168",
+      "mode": "100644"
+    }
+  ],
+  "payloadFiles": 15,
+  "payloadBytes": 65333,
+  "originalFilesAltered": false,
+  "originalDownloads": 0,
+  "productionCallsByArchiveTask": 0,
+  "gitObjectsCreatedDuringLocalPreparation": 0,
+  "refUpdates": 0,
+  "formalSamples": 0
+}

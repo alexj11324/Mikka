@@ -1,0 +1,13 @@
+{
+  "key": 0,
+  "id": 13711592570,
+  "name": "subscription-diagnostics",
+  "size": 2467,
+  "sha": "9a2bbdb155f1ddcba0cfc5111a4fd1b92060794a8628afb2d61ebc2f5099cd50",
+  "run": 42695935772,
+  "attempt": 1,
+  "zipCrcPassed": true,
+  "singleMember": "subscription-diagnostics.json",
+  "memberBytes": 6099,
+  "memberSha256": "1b5852b2a66a35edb23ac0041fd278e4901444f8374700d67769b221f923f7c7"
+}

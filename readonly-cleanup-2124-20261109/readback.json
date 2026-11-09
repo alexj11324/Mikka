@@ -1,0 +1,13 @@
+{
+  "id": 13712555437,
+  "name": "issue1505-github-readonly-cleanup-42702404636-1",
+  "bytes": 324,
+  "digest": "sha256:965524d77c6b7f9b107677a97d89fd16d4b9b4a4dea59de3e7c884f1eaff0b39",
+  "run": 42702404636,
+  "attempt": 1,
+  "head": "d524135bb8799d82b626d65fcf1f9de6b4a745f8",
+  "zipCrcPassed": true,
+  "singleMember": "receipt.json",
+  "memberBytes": 321,
+  "memberSha256": "a47f43718704a215276f864471844b5f2719588ea4c2920fff9cd7e3d273c16c"
+}

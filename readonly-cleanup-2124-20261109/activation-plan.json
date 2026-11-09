@@ -1,0 +1,61 @@
+{
+  "branch": "ops/1505-smoke-github-readonly-20261109",
+  "baseTree": "3f804659ce05591aefb6d080ea873ba88e32ad46",
+  "parents": [
+    "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "170ab83489cd81935d32a0fc96a4213b72745cdf"
+  ],
+  "expectedRef": "170ab83489cd81935d32a0fc96a4213b72745cdf",
+  "workflowPath": ".github/workflows/issue1505-smoke-github-readonly.yml",
+  "active": {
+    "bytes": 29040,
+    "sha256": "91e893f438b4e4562e1185dda03f9ecb99568bb3ac78097f47b0f3193ea5db2c",
+    "blob": "cb984369030505fb151a73239537238a3d29bbb6"
+  },
+  "closed": {
+    "bytes": 28943,
+    "sha256": "02fbb76fc27a8e6ffa2e90c182dbd3566750238a1d1136db1181595bd7d1a929",
+    "blob": "4a7421c909f14520635cd199909f5575e3de58c8"
+  },
+  "helpers": [
+    {
+      "path": "scripts/ops/issue1505/github-readonly-provider.mjs",
+      "bytes": 14619,
+      "sha256": "23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e",
+      "gitBlobOid": "d097f62e62ca64a72220bb26cf7966db2acf4b43"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-helper.mjs",
+      "bytes": 11192,
+      "sha256": "cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742",
+      "gitBlobOid": "595eee67850779b2bde4597306e6a1c83beee245"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-store.mjs",
+      "bytes": 8858,
+      "sha256": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+      "gitBlobOid": "0455da9dcc58015184edd734987c2f0d711cdf8a"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-runner.mjs",
+      "bytes": 6220,
+      "sha256": "7859cff4714d5367a29322357bd9945ab8c9c49376c3312d4b8643facaff0f57",
+      "gitBlobOid": "1ff5d0fc6120069bdedac3dcc28d6dc1cf1fe409"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly.test.mjs",
+      "bytes": 29368,
+      "sha256": "a29271758aaa0cc9ed3eac3a8e9ae05f96c91bf955ef48cb97f8490ff8f6a1c2",
+      "gitBlobOid": "1faf094767d0a1802fe6c8ab0b5faae017b77fef"
+    }
+  ],
+  "times": {
+    "windowStartUtc": "2026-11-09T21:24:11.000Z",
+    "entryDeadlineUtc": "2026-11-09T21:29:11.000Z",
+    "hardEndUtc": "2026-11-09T21:39:11.000Z"
+  },
+  "activeCommit": "d524135bb8799d82b626d65fcf1f9de6b4a745f8",
+  "activeTree": "ea77173ec02fc64f31c901e7ea00057487399979",
+  "closedCommit": "816874b4d522d97d674539468a7cbd7a7ca1f71c",
+  "closedTree": "e0e5f2b286330f324245e990b3c150df8c1096c4"
+}

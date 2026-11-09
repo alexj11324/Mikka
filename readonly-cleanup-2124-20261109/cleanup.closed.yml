@@ -1,0 +1,507 @@
+# OFFLINE UNBOUND TEMPLATE. Exact new child cleanup on the owned trusted carrier.
+name: Issue 1505 exact read-only child cleanup
+on:
+  push:
+    branches: [ops/1505-smoke-github-readonly-20261109]
+    paths:
+      - .github/workflows/issue1505-smoke-github-readonly.yml
+      - scripts/ops/issue1505/github-readonly-*.mjs
+      - scripts/ops/issue1505/github-readonly.test.mjs
+permissions:
+  contents: read
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+  queue: max
+jobs:
+  cleanup:
+    if: false # OFFLINE_UNBOUND_DO_NOT_ACTIVATE
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: web-deploy-production
+      cancel-in-progress: false
+      queue: max
+    env:
+      MIKKA_EDITION: cloud
+      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-r7-20261109-v1'
+      MIKKA_1505_CLEANUP_WINDOW_START: '2026-11-09T21:24:11.000Z'
+      MIKKA_1505_CLEANUP_ENTRY_DEADLINE: '2026-11-09T21:29:11.000Z'
+      MIKKA_1505_CLEANUP_HARD_END: '2026-11-09T21:39:11.000Z'
+      MIKKA_1505_CLEANUP_JOB_MINUTES: '10'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify the actual window, closed source and unchanged cleanup implementation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import datetime,os
+          required_bindings={"prepareRunId":"42689909155","prepareRunAttempt":"1","prepareWorkflowId":"411645081","prepareHeadSha":"683b5010bec31bb8515fba73dfaa0f68bc1898df","prepareBranch":"ops/1505-smoke-github-readonly-20261109","artifactId":"13705908471","artifactName":"issue1505-github-readonly-fresh-42689909155-1","artifactBytes":"928","artifactDigest":"sha256:b9ab6be00c2b6430030a6d0696380b1b0af7b2dce3aa6f6f4a925b7ed8b88e40","zipSha256":"b9ab6be00c2b6430030a6d0696380b1b0af7b2dce3aa6f6f4a925b7ed8b88e40","receiptBytes":"2132","receiptSha256":"64fd08cb121a8edcbdc3bf58f6e79657cef6bb54eb17f43a4946e37047eb6b5c","cleanupClosedCommit":"170ab83489cd81935d32a0fc96a4213b72745cdf","cleanupClosedTree":"98d549e2c85545127880d08ef98688243c75eaae","currentMainSha":"12458fe22e1217f644e8b28f82ab856211e73b72","windowStartUtc":"2026-11-09T21:24:11.000Z","entryDeadlineUtc":"2026-11-09T21:29:11.000Z","hardEndUtc":"2026-11-09T21:39:11.000Z","jobMinutes":"10"}
+          if any(not value or '__REQUIRED_' in value for value in required_bindings.values()):
+            raise SystemExit('issue1505_cleanup_binding_unfilled')
+          assert required_bindings['prepareBranch']=='ops/1505-smoke-github-readonly-20261109'
+          assert required_bindings['prepareRunAttempt']=='1'
+          def stamp(name):
+            value=os.environ.get(name,'')
+            try:
+              result=datetime.datetime.fromisoformat(value.replace('Z','+00:00'))
+            except ValueError:
+              raise SystemExit('issue1505_cleanup_window_unbound') from None
+            if not value.endswith('Z') or result.tzinfo is None:
+              raise SystemExit('issue1505_cleanup_window_unbound')
+            return result
+          start=stamp('MIKKA_1505_CLEANUP_WINDOW_START')
+          entry=stamp('MIKKA_1505_CLEANUP_ENTRY_DEADLINE')
+          hard=stamp('MIKKA_1505_CLEANUP_HARD_END')
+          minutes=int(os.environ['MIKKA_1505_CLEANUP_JOB_MINUTES'])
+          def check_window():
+            now=datetime.datetime.now(datetime.timezone.utc)
+            if not (1<=minutes<=15 and start<entry and entry+datetime.timedelta(minutes=minutes)<=hard and start<=now<entry):
+              raise SystemExit('issue1505_cleanup_window_closed')
+          check_window()
+          import hashlib,json,pathlib,subprocess
+          root=pathlib.Path('.')
+          assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-r7-20261109-v1'
+          assert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'
+          assert os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
+          assert os.environ.get('GITHUB_REF')=='refs/heads/ops/1505-smoke-github-readonly-20261109'
+          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+          assert git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
+          app='12458fe22e1217f644e8b28f82ab856211e73b72'
+          base='170ab83489cd81935d32a0fc96a4213b72745cdf'
+          def verify_source_shape(git,app,closed,closed_tree,expected):
+            assert app!=closed,'cleanup_parents_not_distinct'
+            assert git('rev-parse',app+'^{commit}')==app,'cleanup_app_not_exact_commit'
+            assert git('rev-parse',closed+'^{tree}')==closed_tree,'cleanup_closed_tree_changed'
+            assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==[app,closed],'cleanup_ordered_parents_changed'
+            allowed=set(expected)|{'.github/workflows/issue1505-smoke-github-readonly.yml'}
+            assert set(git('diff','--name-only','--no-renames',app,'HEAD').splitlines())==allowed,'cleanup_paths_changed'
+            entries=[line.split('\t',1) for line in git('diff','--raw','--no-renames','--abbrev=40',app,'HEAD').splitlines()]
+            assert len(entries)==len(allowed) and all(len(entry)==2 for entry in entries),'cleanup_raw_entries_changed'
+            assert {entry[1] for entry in entries}==allowed,'cleanup_raw_paths_changed'
+            for header,path in entries:
+              fields=header.split()
+              assert (len(fields)==5 and fields[0]==':000000' and fields[1]=='100644'
+                and fields[2]=='0'*40 and len(fields[3])==40 and all(char in '0123456789abcdef' for char in fields[3])
+                and fields[3]!='0'*40 and fields[4]=='A'),path
+            return git('rev-parse',app+'^{tree}')
+          expected={"scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly-runner.mjs":"7859cff4714d5367a29322357bd9945ab8c9c49376c3312d4b8643facaff0f57","scripts/ops/issue1505/github-readonly.test.mjs":"a29271758aaa0cc9ed3eac3a8e9ae05f96c91bf955ef48cb97f8490ff8f6a1c2"}
+          app_tree=verify_source_shape(git,app,base,'98d549e2c85545127880d08ef98688243c75eaae',expected)
+          assert not git('status','--porcelain=v1','--untracked-files=no')
+          for path,want in expected.items():
+            item=root/path
+            assert item.is_file() and not item.is_symlink(),path
+            assert hashlib.sha256(item.read_bytes()).hexdigest()==want,path
+          import json,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          try:
+            request=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+            with urllib.request.build_opener(NoRedirect()).open(request,timeout=20) as response:
+              if response.status!=200: raise ValueError()
+              actual=json.load(response)
+            if actual.get('object',{}).get('sha')!='12458fe22e1217f644e8b28f82ab856211e73b72': raise ValueError()
+          except Exception:
+            raise SystemExit('issue1505_cleanup_current_main_changed_or_unavailable') from None
+          check_window()
+          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'app':app,'appTree':app_tree,'closedCarrier':base,'orderedParents':[app,base],'unchangedExecutionFiles':len(expected),'operatorAdditionsOnly':True,'currentMain':'12458fe22e1217f644e8b28f82ab856211e73b72'}))
+          PY
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - run: node --test scripts/ops/issue1505/github-readonly.test.mjs
+      - run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+      - name: Recheck the actual window and current main after dependency installation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import datetime,os
+          def stamp(name):
+            value=os.environ.get(name,'')
+            try:
+              result=datetime.datetime.fromisoformat(value.replace('Z','+00:00'))
+            except ValueError:
+              raise SystemExit('issue1505_cleanup_window_unbound') from None
+            if not value.endswith('Z') or result.tzinfo is None:
+              raise SystemExit('issue1505_cleanup_window_unbound')
+            return result
+          start=stamp('MIKKA_1505_CLEANUP_WINDOW_START')
+          entry=stamp('MIKKA_1505_CLEANUP_ENTRY_DEADLINE')
+          hard=stamp('MIKKA_1505_CLEANUP_HARD_END')
+          minutes=int(os.environ['MIKKA_1505_CLEANUP_JOB_MINUTES'])
+          def check_window():
+            now=datetime.datetime.now(datetime.timezone.utc)
+            if not (1<=minutes<=15 and start<entry and entry+datetime.timedelta(minutes=minutes)<=hard and start<=now<entry):
+              raise SystemExit('issue1505_cleanup_window_closed')
+          check_window()
+          import json,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          try:
+            request=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+            with urllib.request.build_opener(NoRedirect()).open(request,timeout=20) as response:
+              if response.status!=200: raise ValueError()
+              actual=json.load(response)
+            if actual.get('object',{}).get('sha')!='12458fe22e1217f644e8b28f82ab856211e73b72': raise ValueError()
+          except Exception:
+            raise SystemExit('issue1505_cleanup_current_main_changed_or_unavailable') from None
+          check_window()
+          PY
+      - name: Bind the original successful source attempt and artifact before downloading
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          def read(path):
+            try:
+              request=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/'+path,
+                headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json',
+                  'X-GitHub-Api-Version':'2022-11-28','User-Agent':'Mikka-Issue-1505-Exact-Child-Cleanup'})
+              with urllib.request.build_opener(NoRedirect()).open(request,timeout=20) as response:
+                if response.status!=200: raise ValueError()
+                return json.load(response)
+            except Exception:
+              raise SystemExit('issue1505_cleanup_artifact_metadata_unavailable') from None
+          def source_matches(run):
+            return (run.get('id')==int('42689909155') and run.get('run_attempt')==int('1')
+              and run.get('workflow_id')==int('411645081')
+              and run.get('path')=='.github/workflows/issue1505-smoke-github-readonly.yml'
+              and run.get('event')=='push'
+              and run.get('head_sha')=='683b5010bec31bb8515fba73dfaa0f68bc1898df'
+              and run.get('head_branch')=='ops/1505-smoke-github-readonly-20261109'
+              and run.get('repository',{}).get('id')==1427517699
+              and run.get('repository',{}).get('full_name')=='alexj11324/Mikka'
+              and run.get('head_repository',{}).get('id')==1427517699
+              and run.get('head_repository',{}).get('full_name')=='alexj11324/Mikka'
+              and run.get('status')=='completed' and run.get('conclusion')=='success')
+          if not source_matches(read('actions/runs/42689909155')):
+            raise SystemExit('issue1505_cleanup_source_run_changed')
+          if not source_matches(read('actions/runs/42689909155/attempts/1')):
+            raise SystemExit('issue1505_cleanup_source_attempt_changed')
+          artifact=read('actions/artifacts/13705908471')
+          run=artifact.get('workflow_run') or {}
+          expected_digest='sha256:b9ab6be00c2b6430030a6d0696380b1b0af7b2dce3aa6f6f4a925b7ed8b88e40'
+          if not (artifact.get('id')==int('13705908471')
+            and artifact.get('name')=='issue1505-github-readonly-fresh-42689909155-1'
+            and artifact.get('size_in_bytes')==int('928') and artifact.get('digest')==expected_digest
+            and artifact.get('expired') is False and run.get('id')==int('42689909155')
+            and run.get('head_sha')=='683b5010bec31bb8515fba73dfaa0f68bc1898df'
+            and run.get('head_branch')=='ops/1505-smoke-github-readonly-20261109'
+            and run.get('repository_id')==1427517699 and run.get('head_repository_id')==1427517699):
+            raise SystemExit('issue1505_cleanup_artifact_identity_changed')
+          print(json.dumps({'status':'bound','artifactId':int('13705908471'),'sourceRun':int('42689909155'),'sourceAttempt':int('1'),'zipBytes':int('928'),'zipDigest':expected_digest}))
+          PY
+      - name: Download the exact fresh prepare ZIP without forwarding authorization
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,re,urllib.error,urllib.parse,urllib.request
+          
+          class DownloadRejected(Exception):
+            pass
+          
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+              return None
+          
+          def download_archive(token, artifact_id, expected_size, expected_sha256, opener=None):
+            code='issue1505_cleanup_archive_download_unavailable'
+            try:
+              if not isinstance(token,str) or not token:
+                raise ValueError()
+              opener=opener or urllib.request.build_opener(NoRedirect())
+              request=urllib.request.Request(
+                'https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/'+str(artifact_id)+'/zip',
+                headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json',
+                  'X-GitHub-Api-Version':'2022-11-28','User-Agent':'Mikka-Issue-1505-Exact-Child-Cleanup'},
+                method='GET')
+              try:
+                response=opener.open(request,timeout=20)
+              except urllib.error.HTTPError as error:
+                response=error
+              try:
+                code='issue1505_cleanup_archive_redirect_invalid'
+                if response.code!=302:
+                  raise ValueError()
+                location=response.headers.get('Location')
+              finally:
+                response.close()
+              if not isinstance(location,str) or not location.startswith('https://') or '\\' in location:
+                raise ValueError()
+              if any(ord(char)<=32 or ord(char)==127 for char in location):
+                raise ValueError()
+              destination=urllib.parse.urlsplit(location)
+              host=destination.hostname or ''
+              allowed=(host=='results-receiver.actions.githubusercontent.com'
+                or re.fullmatch(r'[a-z0-9][a-z0-9-]*\.blob\.core\.windows\.net',host) is not None)
+              if (destination.scheme!='https' or not allowed or destination.username is not None
+                or destination.password is not None or destination.port not in (None,443)
+                or destination.fragment or not destination.query):
+                raise ValueError()
+              code='issue1505_cleanup_archive_download_unavailable'
+              # Use the original signed Location unchanged, without Authorization; no further redirect is followed.
+              request=urllib.request.Request(location,
+                headers={'User-Agent':'Mikka-Issue-1505-Exact-Child-Cleanup'},method='GET')
+              with opener.open(request,timeout=20) as response:
+                if response.code!=200:
+                  raise ValueError()
+                archive=response.read(expected_size+1)
+              code='issue1505_cleanup_archive_size_changed'
+              if len(archive)!=expected_size:
+                raise ValueError()
+              code='issue1505_cleanup_archive_digest_changed'
+              if hashlib.sha256(archive).hexdigest()!=expected_sha256:
+                raise ValueError()
+              return archive,host
+            except Exception:
+              raise DownloadRejected(code) from None
+          
+          if __name__=='__main__':
+            try:
+              archive,host=download_archive(os.environ.get('GITHUB_TOKEN'),int('13705908471'),int('928'),
+                'b9ab6be00c2b6430030a6d0696380b1b0af7b2dce3aa6f6f4a925b7ed8b88e40')
+              directory=pathlib.Path(os.environ['RUNNER_TEMP'])/'issue1505-readonly-original'
+              directory.mkdir(mode=0o700,exist_ok=False)
+              target=directory/'archive.zip'
+              fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+              with os.fdopen(fd,'wb') as output:
+                output.write(archive)
+                output.flush()
+                os.fsync(output.fileno())
+              print(json.dumps({'status':'downloaded_immutable_zip','artifactId':int('13705908471'),
+                'zipBytes':len(archive),'zipSha256':hashlib.sha256(archive).hexdigest(),
+                'downloadHost':host,'redirectAuthorizationForwarded':False}))
+            except DownloadRejected as error:
+              raise SystemExit(str(error)) from None
+            except Exception:
+              raise SystemExit('issue1505_cleanup_archive_save_failed') from None
+          PY
+      - name: Verify the single original archive member and copy only exact receipt.json
+        run: |
+          python3 - <<'PY'
+          import hashlib,io,json,os,pathlib,stat,zipfile
+          
+          class ArchiveRejected(Exception):
+            pass
+          
+          def reject(code):
+            raise ArchiveRejected('issue1505_cleanup_'+code)
+          
+          def verified_receipt(archive, expected_size, expected_sha256, members):
+            if not isinstance(archive,bytes) or len(archive)!=expected_size:
+              reject('archive_size_changed')
+            if hashlib.sha256(archive).hexdigest()!=expected_sha256:
+              reject('archive_digest_changed')
+            if set(members)!={'receipt.json'}:
+              reject('archive_manifest_invalid')
+            try:
+              with zipfile.ZipFile(io.BytesIO(archive),'r') as source:
+                entries=source.infolist()
+                seen=set()
+                for entry in entries:
+                  name=entry.orig_filename
+                  if name!=entry.filename or '/' in name or '\\' in name or '\x00' in name or name in ('.','..'):
+                    reject('archive_member_path_invalid')
+                  if name in seen:
+                    reject('archive_member_duplicate')
+                  seen.add(name)
+                  mode=(entry.external_attr>>16)&0xffff
+                  if entry.is_dir() or entry.external_attr&0x10 or stat.S_IFMT(mode) not in (0,stat.S_IFREG):
+                    reject('archive_member_not_regular')
+                  if entry.flag_bits&1:
+                    reject('archive_member_encrypted')
+                if len(entries)!=1 or seen!=set(members):
+                  reject('archive_member_set_changed')
+                checked={}
+                for entry in entries:
+                  name=entry.filename
+                  expected=members[name]
+                  if entry.file_size!=expected['bytes']:
+                    reject('archive_member_size_changed')
+                  with source.open(entry,'r') as stream:
+                    body=stream.read(expected['bytes']+1)
+                  if len(body)!=expected['bytes']:
+                    reject('archive_member_size_changed')
+                  if hashlib.sha256(body).hexdigest()!=expected['sha256']:
+                    reject('archive_member_digest_changed')
+                  checked[name]=body
+                return checked['receipt.json']
+            except ArchiveRejected:
+              raise
+            except Exception:
+              reject('archive_invalid')
+          
+          if __name__=='__main__':
+            try:
+              source=pathlib.Path(os.environ['RUNNER_TEMP'])/'issue1505-readonly-original'/'archive.zip'
+              if not source.is_file() or source.is_symlink():
+                reject('input_not_regular')
+              archive=source.read_bytes()
+              members={
+                'receipt.json':{'bytes':int('2132'),'sha256':'64fd08cb121a8edcbdc3bf58f6e79657cef6bb54eb17f43a4946e37047eb6b5c'},
+              }
+              original=verified_receipt(archive,int('928'),
+                'b9ab6be00c2b6430030a6d0696380b1b0af7b2dce3aa6f6f4a925b7ed8b88e40',members)
+              wanted='64fd08cb121a8edcbdc3bf58f6e79657cef6bb54eb17f43a4946e37047eb6b5c'
+              directory=pathlib.Path(os.environ['RUNNER_TEMP'])/'issue1505-cleanup-input'
+              directory.mkdir(mode=0o700,exist_ok=False)
+              target=directory/'receipt.json'
+              fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+              with os.fdopen(fd,'wb') as output:
+                output.write(original)
+                output.flush()
+                os.fsync(output.fileno())
+              if target.read_bytes()!=original:
+                reject('input_copy_changed')
+              print(json.dumps({'status':'verified','artifactId':int('13705908471'),'archiveMembersVerified':1,
+                'selectedMember':'receipt.json','originalReceiptBytes':len(original),
+                'originalReceiptSha256':wanted,'byteIdenticalInput':True}))
+            except ArchiveRejected as error:
+              raise SystemExit(str(error)) from None
+            except Exception:
+              raise SystemExit('issue1505_cleanup_archive_validation_failed') from None
+          PY
+      - name: Recheck the actual window immediately before production OIDC imports
+        run: |
+          python3 - <<'PY'
+          import datetime,os
+          def stamp(name):
+            value=os.environ.get(name,'')
+            try:
+              result=datetime.datetime.fromisoformat(value.replace('Z','+00:00'))
+            except ValueError:
+              raise SystemExit('issue1505_cleanup_window_unbound') from None
+            if not value.endswith('Z') or result.tzinfo is None:
+              raise SystemExit('issue1505_cleanup_window_unbound')
+            return result
+          start=stamp('MIKKA_1505_CLEANUP_WINDOW_START')
+          entry=stamp('MIKKA_1505_CLEANUP_ENTRY_DEADLINE')
+          hard=stamp('MIKKA_1505_CLEANUP_HARD_END')
+          minutes=int(os.environ['MIKKA_1505_CLEANUP_JOB_MINUTES'])
+          def check_window():
+            now=datetime.datetime.now(datetime.timezone.utc)
+            if not (1<=minutes<=15 and start<entry and entry+datetime.timedelta(minutes=minutes)<=hard and start<=now<entry):
+              raise SystemExit('issue1505_cleanup_window_closed')
+          check_window()
+          PY
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /neon
+          secret-name: DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: BETTER_AUTH_SECRET
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_ID
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_SECRET
+          recursive: false
+          include-imports: false
+
+      - name: Recheck the actual window and clean only the saved exact child
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NODE_ENV: production
+          VERCEL_ENV: production
+          BETTER_AUTH_URL: https://app.aspectlylabs.com
+          NEXT_PUBLIC_APP_URL: https://app.aspectlylabs.com
+        run: |
+          python3 - <<'PY'
+          import datetime,os
+          def stamp(name):
+            value=os.environ.get(name,'')
+            try:
+              result=datetime.datetime.fromisoformat(value.replace('Z','+00:00'))
+            except ValueError:
+              raise SystemExit('issue1505_cleanup_window_unbound') from None
+            if not value.endswith('Z') or result.tzinfo is None:
+              raise SystemExit('issue1505_cleanup_window_unbound')
+            return result
+          start=stamp('MIKKA_1505_CLEANUP_WINDOW_START')
+          entry=stamp('MIKKA_1505_CLEANUP_ENTRY_DEADLINE')
+          hard=stamp('MIKKA_1505_CLEANUP_HARD_END')
+          minutes=int(os.environ['MIKKA_1505_CLEANUP_JOB_MINUTES'])
+          def check_window():
+            now=datetime.datetime.now(datetime.timezone.utc)
+            if not (1<=minutes<=15 and start<entry and entry+datetime.timedelta(minutes=minutes)<=hard and start<=now<entry):
+              raise SystemExit('issue1505_cleanup_window_closed')
+          check_window()
+          import json,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          try:
+            request=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+            with urllib.request.build_opener(NoRedirect()).open(request,timeout=20) as response:
+              if response.status!=200: raise ValueError()
+              actual=json.load(response)
+            if actual.get('object',{}).get('sha')!='12458fe22e1217f644e8b28f82ab856211e73b72': raise ValueError()
+          except Exception:
+            raise SystemExit('issue1505_cleanup_current_main_changed_or_unavailable') from None
+          check_window()
+          PY
+          node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --cleanup "$RUNNER_TEMP/issue1505-cleanup-input/receipt.json" 64fd08cb121a8edcbdc3bf58f6e79657cef6bb54eb17f43a4946e37047eb6b5c
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1505-github-readonly-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: issue1505-github-readonly-report/receipt.json
+          if-no-files-found: error
+          retention-days: 3

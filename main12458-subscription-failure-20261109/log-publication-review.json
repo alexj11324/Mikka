@@ -1,0 +1,32 @@
+{
+  "status": "original_masked_log_locally_reviewed_without_edits",
+  "originalCachePath": "main12458-r7-failure-1505/subscriptions-original.log",
+  "originalBytes": 37028,
+  "originalSha256": "587d7a3e57421055b0602b7fb1544984fbdab4b709f0ced0d470c7bff83a5508",
+  "knownPrefixMinimumSuffix8Count": 2,
+  "knownPrefixMinimumSuffix20Count": 0,
+  "classifiedFalsePositives": [
+    {
+      "line": 213,
+      "classification": "public_python_wheel_filename",
+      "patternValuePrinted": false
+    },
+    {
+      "line": 248,
+      "classification": "public_python_wheel_filename",
+      "patternValuePrinted": false
+    }
+  ],
+  "unclassifiedCredentialCandidates": 0,
+  "otherScans": {
+    "jwtShaped": 0,
+    "bearerValue": 0,
+    "databaseCredentialUrl": 0,
+    "privateKeyMarker": 0,
+    "credentialAssignmentLiteral": 0
+  },
+  "maskTriples": 13,
+  "newActionsLogDownloads": 0,
+  "originalBytesAltered": false,
+  "limits": "These bounded pattern and context checks describe the review performed; they are not a universal guarantee about arbitrary log content."
+}

@@ -1,0 +1,45 @@
+{
+  "status": "active_ref_read_back",
+  "observedAt": "2026-11-09 21:25:43 UTC",
+  "active": "d524135bb8799d82b626d65fcf1f9de6b4a745f8",
+  "tree": "ea77173ec02fc64f31c901e7ea00057487399979",
+  "closed": "816874b4d522d97d674539468a7cbd7a7ca1f71c",
+  "closedTree": "e0e5f2b286330f324245e990b3c150df8c1096c4",
+  "parents": [
+    "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "170ab83489cd81935d32a0fc96a4213b72745cdf"
+  ],
+  "unchangedAppBlobs": 6820,
+  "additions": [
+    {
+      "path": "scripts/ops/issue1505/github-readonly-provider.mjs",
+      "sha": "d097f62e62ca64a72220bb26cf7966db2acf4b43"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-helper.mjs",
+      "sha": "595eee67850779b2bde4597306e6a1c83beee245"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-store.mjs",
+      "sha": "0455da9dcc58015184edd734987c2f0d711cdf8a"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-runner.mjs",
+      "sha": "1ff5d0fc6120069bdedac3dcc28d6dc1cf1fe409"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly.test.mjs",
+      "sha": "1faf094767d0a1802fe6c8ab0b5faae017b77fef"
+    },
+    {
+      "path": ".github/workflows/issue1505-smoke-github-readonly.yml",
+      "sha": "cb984369030505fb151a73239537238a3d29bbb6"
+    }
+  ],
+  "fullActiveAndClosedWorkflowReadback": true,
+  "times": {
+    "windowStartUtc": "2026-11-09T21:24:11.000Z",
+    "entryDeadlineUtc": "2026-11-09T21:29:11.000Z",
+    "hardEndUtc": "2026-11-09T21:39:11.000Z"
+  }
+}

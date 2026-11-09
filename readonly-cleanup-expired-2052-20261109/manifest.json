@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "status": "locally_verified_archive_payload",
+  "directory": "readonly-cleanup-expired-2052-20261109",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 2046,
+      "sha256": "5952b65b38c505cc9f192798c80bf1183175bbf102fb23d1c6931a6e6da72787",
+      "gitBlobOid": "354f9c18d8a7026cde72d3c499a47b4753b6a75b",
+      "mode": "100644"
+    },
+    {
+      "path": "job-129432331990.log",
+      "bytes": 367705,
+      "sha256": "d334ab46ba5981373c1825c02a69f4151b248aa80e70ebc16ca0fd6b73be43bd",
+      "gitBlobOid": "b937499d7a3e68a3f6c34199b70e128c583aeea0",
+      "mode": "100644"
+    },
+    {
+      "path": "log-publication-review.json",
+      "bytes": 7435,
+      "sha256": "b4f981b895bfae4e723b0c065d1ad75e9ce699ae361674f3cc87ced89b44b4d1",
+      "gitBlobOid": "922084cd345a6d82b9e9f59f37c1d2d29a44c5b1",
+      "mode": "100644"
+    },
+    {
+      "path": "status.safe.json",
+      "bytes": 22326,
+      "sha256": "dac245ad5041fd21f5a8d9ae700ef205a28d54836e2f32cfb3566155eb827040",
+      "gitBlobOid": "0cd9104dfb0476e9e41d8c1ec45475f0e04d9557",
+      "mode": "100644"
+    }
+  ],
+  "payloadFiles": 4,
+  "payloadBytes": 399512,
+  "originalFilesAltered": false,
+  "originalDownloads": 0,
+  "productionCallsByArchiveTask": 0,
+  "gitObjectsCreatedDuringLocalPreparation": 0,
+  "refUpdates": 0,
+  "formalSamples": 0
+}
