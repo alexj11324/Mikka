@@ -81,11 +81,12 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
     assert.ok(!process.env[key],`HTTP fixture cannot use ${key}`)
   const environment=await bootstrapEnvironment({connectionString:target.toString(),origin,deploymentSha:revision,
     id:`activity-http-${randomUUID()}`,outputFile:descriptor,authorizeDatabase:async (database:Pool)=>{
-      // inet::text retains /32 or /128; host() returns the IP we compare with
-      // the same exact loopback allowlist used by the existing bootstrap.
+      // assertE2eTarget already requires a loopback client URL, and this harness
+      // created the exact database above. A mapped Docker service reports its
+      // container address here; match bootstrapLocal's connected-server check.
       const {rows:[actual]}=await database.query('SELECT current_database() AS name,host(inet_server_addr()) AS address')
       if(actual.name!==name)throw new EnvironmentError('ACTUAL_DATABASE_MISMATCH')
-      if(!['127.0.0.1','::1'].includes(actual.address))throw new EnvironmentError('LOCAL_DATABASE_UNVERIFIED')
+      if(!actual.address)throw new EnvironmentError('LOCAL_DATABASE_UNVERIFIED')
     }})
   await recordRunnerEvidenceSecrets(environment)
   let stdoutBytes=0,stderrBytes=0
