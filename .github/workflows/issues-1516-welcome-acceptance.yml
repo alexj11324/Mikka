@@ -25,6 +25,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Bind deterministic SDK regressions to the deployed business source
         env:
           APPLICATION_SHA: ${{ inputs.application_sha }}
@@ -55,6 +57,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Read application database through the existing workload identity
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:

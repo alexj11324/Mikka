@@ -46,6 +46,13 @@ test('only login inputs use secret placeholders and post-authentication flows on
   assert.doesNotMatch(workspaceFlow(), /inputText|runScript|http/)
 })
 
+test('login activates Mikka after driver startup before waiting for or typing into the form', () => {
+  const flow = loginFlow()
+  assert.match(flow, /^appId: com\.aspectlylabs\.mikka\n---\n- launchApp\n- extendedWaitUntil:/)
+  assert.ok(flow.indexOf('- launchApp') < flow.indexOf('id: signin-email'))
+  assert.ok(flow.indexOf('id: signin-email') < flow.indexOf('- inputText:'))
+})
+
 test('workflow credentials follow source and CI validation and exports remain allowlisted', () => {
   const workflow = readFileSync(new URL('../../.github/workflows/mobile-screenshots.yml', import.meta.url), 'utf8')
   const source = workflow.indexOf('run: node scripts/release/mobile-screenshots.mjs source')
