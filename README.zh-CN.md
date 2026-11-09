@@ -7,7 +7,9 @@
 
 # Mikka
 
-**让 AI Agent 在你的电脑与云端协同工作。**
+### 为大事而生的 AI lead。
+
+从本地到云端，所有 Agent 协作如一。
 
 Mikka 为 Claude Code、Codex 和受支持的 Cursor 运行环境组织工作：Bot 负责协调任务，Agent 负责执行。
 
@@ -23,7 +25,7 @@ Mikka 为 Claude Code、Codex 和受支持的 Cursor 运行环境组织工作：
 
 ## 开始使用
 
-**Mikka Cloud（早期体验）。** [打开应用](https://app.aspectlylabs.com/mikka)。如需获取使用资格，可发送邮件至 [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com)，再按照[快速入门指南](https://aspectlylabs.com/mikka/docs/quickstart)操作。
+**Mikka Cloud。** [打开应用](https://app.aspectlylabs.com/mikka)，直接注册账号即可开始使用 Mikka。具体步骤参见[快速入门指南](https://aspectlylabs.com/mikka/docs/quickstart)。
 
 **自托管服务器。** 你可以使用 Docker 和 PostgreSQL 在自己的 Linux 主机上运行 Mikka。按照[自托管指南](docs/self-hosting.md)配置所需信息，下载匹配版本的 Compose 文件，然后启动服务器：
 
