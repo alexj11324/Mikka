@@ -6,6 +6,7 @@ import { endLostSession } from '@/lib/session'
 import { apiCache } from './api-cache'
 import { mobileTraceHeaders } from './tracing'
 import { accountStorageKey } from './server-store'
+import { workspaceFromCookie } from './workspace-cookie'
 import { presenceScope } from './presence-scope'
 
 export class ApiError extends Error {
@@ -16,9 +17,12 @@ export class ApiError extends Error {
 export const apiConnection = () => ({ account: currentAccount(), client: authClient })
 export type ApiConnection = ReturnType<typeof apiConnection>
 
-/** The workspace the person picked in Settings; the server reads it as its `mikka-workspace` cookie. */
+/**
+ * The workspace the person picked in Settings; the server reads it as its `mikka-workspace` cookie. On web that cookie
+ * is the saved pick (saveWorkspace writes it), so a pushed task's read (lib/task-push.ts) can compare against it.
+ */
 export async function savedWorkspace(account = currentAccount()): Promise<string | null> {
-  if (Platform.OS === 'web') return null
+  if (Platform.OS === 'web') return typeof document === 'undefined' ? null : workspaceFromCookie(document.cookie)
   return SecureStore.getItemAsync(accountStorageKey(account.id, 'workspace'))
 }
 
