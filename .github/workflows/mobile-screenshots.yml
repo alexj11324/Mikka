@@ -23,7 +23,7 @@ jobs:
       github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963'
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 120
     permissions:
       contents: read
       actions: read
@@ -54,11 +54,18 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter @mikka/mobile...
       - run: pnpm --filter @mikka/mobile typecheck
       - name: Install pinned native UI driver
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/mikka-maestro"
           cd "$RUNNER_TEMP/mikka-maestro"
-          curl -fsSLO https://github.com/mobile-dev-inc/maestro/releases/download/cli-2.12.1/maestro.zip
-          curl -fsSLO https://github.com/mobile-dev-inc/maestro/releases/download/cli-2.12.1/checksums_sha256.txt
+          if gh release download cli-2.12.1 --repo mobile-dev-inc/Maestro --pattern maestro.zip --pattern checksums_sha256.txt > download.log 2>&1; then
+            :
+          else
+            status=$?
+            echo "::error::Pinned Maestro asset download failed (exit $status)."
+            exit "$status"
+          fi
           shasum -a 256 -c checksums_sha256.txt
           unzip -q maestro.zip
           echo "$RUNNER_TEMP/mikka-maestro/maestro/bin" >> "$GITHUB_PATH"
@@ -127,3 +134,45 @@ jobs:
           path: ${{ runner.temp }}/mikka-app-store-export/
           if-no-files-found: error
           retention-days: 14
+
+  driver-preflight:
+    name: Credential-free native driver preflight
+    if: >-
+      github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') &&
+      github.ref != 'refs/heads/main' && github.repository == 'alexj11324/Mikka' &&
+      github.repository_id == '1427517699' && github.repository_owner_id == '183887963'
+    runs-on: macos-26
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      CI: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install pinned native UI driver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/mikka-maestro"
+          cd "$RUNNER_TEMP/mikka-maestro"
+          if gh release download cli-2.12.1 --repo mobile-dev-inc/Maestro --pattern maestro.zip --pattern checksums_sha256.txt > download.log 2>&1; then
+            :
+          else
+            status=$?
+            echo "::error::Pinned Maestro asset download failed (exit $status)."
+            exit "$status"
+          fi
+          shasum -a 256 -c checksums_sha256.txt
+          unzip -q maestro.zip
+          echo "$RUNNER_TEMP/mikka-maestro/maestro/bin" >> "$GITHUB_PATH"
+      - name: Boot English simulator and check stock Settings accessibility
+        run: bash scripts/release/mobile-screenshots-build.sh --preflight-only
+      - name: Remove owned simulator and private driver output
+        if: always()
+        run: node scripts/release/mobile-screenshots.mjs cleanup
