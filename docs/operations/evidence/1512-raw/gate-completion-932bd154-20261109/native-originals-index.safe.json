@@ -1,0 +1,467 @@
+{
+  "version": 1,
+  "purpose": "Exact originals and closed verification for Native attempt 1 of natural source update 932bd1",
+  "repository": "alexj11324/Mikka",
+  "runId": 42637270671,
+  "runAttempt": 1,
+  "jobId": 129231919498,
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "actualRevision": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+  "actualTree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "nativeJobConclusion": "success",
+  "budget": {
+    "nativeLogin": 433,
+    "webLogin": 435,
+    "firstNativeStartup": 209,
+    "firstHostedStartup": 234,
+    "fullLoginPassed": true,
+    "firstPairPassed": true,
+    "nativeLoginSegments": [
+      19,
+      15,
+      399
+    ],
+    "webLoginSegments": [
+      19,
+      0,
+      416
+    ]
+  },
+  "conservation": {
+    "records": 24,
+    "checkpoints": 12,
+    "segments": 8,
+    "operationBuckets": 17,
+    "sourceBuckets": 78,
+    "projectedWindowOrdinals": 1311,
+    "strictOrdinalAndScope": true
+  },
+  "diagnosticsStatus": "incomplete",
+  "diagnosticsUnknowns": {
+    "nativeLogin": {
+      "status": "incomplete",
+      "context": 94,
+      "statement": 133,
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ]
+    },
+    "webLogin": {
+      "status": "incomplete",
+      "context": 87,
+      "statement": 132,
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ]
+    },
+    "startup-bundled": {
+      "status": "incomplete",
+      "context": 53,
+      "statement": 75,
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ]
+    },
+    "startup-hosted": {
+      "status": "incomplete",
+      "context": 53,
+      "statement": 79,
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ]
+    }
+  },
+  "diagnosticsDroppedQueries": 0,
+  "diagnosticsOverflow": false,
+  "windowRpcCounts": {
+    "nativeLogin": {
+      "physicalStarted": 15,
+      "physicalCompleted": 15,
+      "logicalStarted": 40,
+      "logicalCompleted": 40,
+      "crossesStart": 0,
+      "crossesEnd": 0,
+      "completionNotObserved": 0,
+      "completionWithoutStart": 0
+    },
+    "webLogin": {
+      "physicalStarted": 35,
+      "physicalCompleted": 35,
+      "logicalStarted": 35,
+      "logicalCompleted": 35,
+      "crossesStart": 0,
+      "crossesEnd": 0,
+      "completionNotObserved": 0,
+      "completionWithoutStart": 0
+    },
+    "startup-bundled": {
+      "physicalStarted": 6,
+      "physicalCompleted": 6,
+      "logicalStarted": 19,
+      "logicalCompleted": 19,
+      "crossesStart": 0,
+      "crossesEnd": 0,
+      "completionNotObserved": 0,
+      "completionWithoutStart": 0
+    },
+    "startup-hosted": {
+      "physicalStarted": 19,
+      "physicalCompleted": 19,
+      "logicalStarted": 19,
+      "logicalCompleted": 19,
+      "crossesStart": 0,
+      "crossesEnd": 0,
+      "completionNotObserved": 0,
+      "completionWithoutStart": 0
+    }
+  },
+  "installedDaemon": [
+    {
+      "mode": "bundled",
+      "daemonVersion": "0.0.562",
+      "protocolVersion": 3,
+      "installedVersion": "0.0.562",
+      "installedRevision": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "ready": true,
+      "elapsedMs": 3688,
+      "reads": 11,
+      "profileMatches": true,
+      "overrideMatches": true
+    },
+    {
+      "mode": "hosted",
+      "daemonVersion": "0.0.562",
+      "protocolVersion": 3,
+      "installedVersion": "0.0.562",
+      "installedRevision": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "ready": true,
+      "elapsedMs": 12,
+      "reads": 1,
+      "profileMatches": true,
+      "overrideMatches": true
+    }
+  ],
+  "coldStart": {
+    "pairs": 5,
+    "bundledMedianMs": 2194.5,
+    "hostedMedianMs": 2129.91,
+    "differenceMs": 64.59000000000015,
+    "bundledFaster": false,
+    "improvementPercent": -3.03
+  },
+  "lifecycleWorkspaceNameRestored": false,
+  "smokeWorkspaceNameRestored": true,
+  "parityWorkspaceNameRestored": true,
+  "smokeAndLifecycleBaselinesSeparated": true,
+  "baselines": {
+    "lifecycle": {
+      "owner": {
+        "matchesSealedBaselineBefore": false,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 1
+      },
+      "peer": {
+        "matchesSealedBaselineBefore": false,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 1
+      }
+    },
+    "smoke": {
+      "owner": {
+        "matchesSealedBaselineBefore": true,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 0
+      },
+      "peer": {
+        "matchesSealedBaselineBefore": true,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 0
+      }
+    }
+  },
+  "originalJsonFiles": 5,
+  "recoveredPayloadFiles": 13,
+  "completeArtifactFileIndexCount": 310,
+  "productionAcceptance": false,
+  "wholeCiAcceptanceNotClaimed": true,
+  "payloadFiles": 22,
+  "payloadBytes": 1332713,
+  "indexExcludedFromPayloadCount": true,
+  "files": [
+    {
+      "path": "native-932bd1/arithmetic.safe.json",
+      "kind": "closed-verification",
+      "mode": "100644",
+      "bytes": 23633,
+      "sha256": "b958306114e3457d59c460ce49fa70e59a37ffdeb17908c55195c720009ca855",
+      "gitBlob": "374f3dbf54e36cdf18952b232af59290222e2efa",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/cleanup-package.safe.json",
+      "kind": "closed-verification",
+      "mode": "100644",
+      "bytes": 10103,
+      "sha256": "8a1f538b65f7e30c9068ef4a95185bd363a92c8e3437bee1f0fb4e6c8d612611",
+      "gitBlob": "5541ae7fad02386e84b6ad754c0562b0152a26ea",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/first-read.safe.json",
+      "kind": "closed-verification",
+      "mode": "100644",
+      "bytes": 1588,
+      "sha256": "e3216df3297bf874db478b8c811a8c0030f55186fc99b010b092f39a59be2e45",
+      "gitBlob": "344b95ba8b3f5933361a38bd07d3d11b5ae0e7e5",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/original-files-manifest.safe.json",
+      "kind": "closed-verification",
+      "mode": "100644",
+      "bytes": 85387,
+      "sha256": "092920e675711a37c0b41382658c14bba2f6e2f96a6abc0fdf3b5f74407fa8b0",
+      "gitBlob": "8a00f3f5201826ef398754f9f05c6d7ab354ae0a",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/original/lifecycle.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 703638,
+      "sha256": "71a3af6ff1cd5d55bb30853185f42e2fdd4eab63e214bc0a331eab81eb03b4c5",
+      "gitBlob": "6faded5bdfab689789efaa592a14796204ac577e",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/original/mac-acceptance-package.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 957,
+      "sha256": "1221f7d189d0cfa051b538feb19ff148c2598259fb517b4feea7a126e746c787",
+      "gitBlob": "3249afc4a6d6925619f795e009335531142c5205",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/original/native-crypto.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 2868,
+      "sha256": "ef50837b7312bcba2293411ece8d9e78e7699978949453d6049e82bb94494987",
+      "gitBlob": "2470aaf2a5d388f6a2e4d1f7ff50fde6d94f5fe2",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/original/parity.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 116389,
+      "sha256": "fc47c532f51a584f886bf542fec16773e711467c317f6bf80a6a24c942f68aae",
+      "gitBlob": "086302172c2942de9c18f520300b3eed7c104da4",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/original/smoke.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 3144,
+      "sha256": "9a0c0160fde0b1051b1d58aab25232b446ac1629dfc0f399e0c55af8693a9b0d",
+      "gitBlob": "4847e5c8e1bc8e57d75ed432d5fa47f12e9ebbff",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/rpc-diagnostics.safe.json",
+      "kind": "closed-verification",
+      "mode": "100644",
+      "bytes": 41666,
+      "sha256": "f07438c8a25b02a084879cd8409d2e0fb2b4c4a40d15dd4e25ff952ea6476442",
+      "gitBlob": "b911dd926075c3eeb29aaf9dc2d77ab06eecea61",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/verification-run.safe.json",
+      "kind": "closed-verification",
+      "mode": "100644",
+      "bytes": 887,
+      "sha256": "076129c68e0175f56e12fcd28dd3fcd7dbf520f2439757f34c48c91674a88303",
+      "gitBlob": "814f30685c20747ff381aa4a52fa7809296263ab",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/verify-artifact-download.py",
+      "kind": "verification-script",
+      "mode": "100644",
+      "bytes": 2785,
+      "sha256": "de86f5a04f369969ecd5029478319eb3470f146a2dbdd52d94c62cab83bfa736",
+      "gitBlob": "d41a58e8921bb865b8d56f4a522dc2ea81ba7107",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/verify-native-originals.py",
+      "kind": "verification-script",
+      "mode": "100644",
+      "bytes": 16015,
+      "sha256": "7ed1aacc92ef3a413cb3940d30a648972e7654deb8c0c8c38f0b824a337bfebf",
+      "gitBlob": "6628c28a5a0aabf8e48a1594cfbae07576eb7169",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/job-129231919498.original.log",
+      "kind": "exact-original-log",
+      "mode": "100644",
+      "bytes": 258549,
+      "sha256": "389c4cd992be537851ac952d63c5b69bcac19754b789b8ef4a3e5c8b2987be1d",
+      "gitBlob": "6190627f3ae89f38bed69fdceaaf0e8d8a6435fe",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/job.safe.json",
+      "kind": "closed-metadata",
+      "mode": "100644",
+      "bytes": 6959,
+      "sha256": "1ef99b5a92ab735b2af92f3fbb89eb046ccd553030480ecdf07361612f1d1074",
+      "gitBlob": "6dc0a767222484807fca584df09849baf40fe808",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/source-binding.safe.json",
+      "kind": "source-binding",
+      "mode": "100644",
+      "bytes": 3156,
+      "sha256": "0749b006c0bb12f8775c2d1994a05fd518cc1dc27e41474e9b73782288340b17",
+      "gitBlob": "3303485558e3c9f1fa915bf90d84a69dd31d8b25",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/artifact-transfer.safe.json",
+      "kind": "artifact-integrity",
+      "mode": "100644",
+      "bytes": 4308,
+      "sha256": "726f497e74387acdb37572fa634f1407ca3cfab0731a4170f8b2b04d58881e80",
+      "gitBlob": "068b9b62ae2550c57df6b15149b7e218217500ac",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/vm-cleanup.safe.json",
+      "kind": "resource-cleanup",
+      "mode": "100644",
+      "bytes": 1476,
+      "sha256": "733a15e2983beb4d5ec996d28c41b7f0c0d51045673975ef8af3cde826d0c1f0",
+      "gitBlob": "62dd90ff059554348d002b0addea2ab6fd3d0294",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/read-ledger.safe.json",
+      "kind": "single-read-ledger",
+      "mode": "100644",
+      "bytes": 1190,
+      "sha256": "39722790055a4f438189c2e97714f7f9d445922888198435ecf22f76e7f076a4",
+      "gitBlob": "4a758e47696219342ecc0b5db67f86ddca5147c3",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/terminal-review.safe.json",
+      "kind": "closed-verification",
+      "mode": "100644",
+      "bytes": 36603,
+      "sha256": "63d1a8f9c2925003ee82fbdb02b854dc260c4c0f25f90e172aec8d87cf04a62b",
+      "gitBlob": "2f69b5b4ca739cce44755cf4e88ab28645d4d3c3",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/README.md",
+      "kind": "archive-boundaries",
+      "mode": "100644",
+      "bytes": 6523,
+      "sha256": "8760f0ecf491f89e6d30cd85c3953443d5dd46323551f30da047fd4f8920bf5d",
+      "gitBlob": "ad3a3461ac25266ca5d7fc5763beb9e04d0e3bbb",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-932bd1/privacy-scan.safe.json",
+      "kind": "privacy-scan",
+      "mode": "100644",
+      "bytes": 4889,
+      "sha256": "77857447b748ea260cd4cea0ef42bfc1316574f13f7cbced01f601a444c84fed",
+      "gitBlob": "3f8d0e72fcbefea699f9344ebe3ea9331ca1d356",
+      "remoteConfirmed": true
+    }
+  ],
+  "readLedger": {
+    "path": "native-932bd1/read-ledger.safe.json",
+    "kind": "single-read-ledger",
+    "mode": "100644",
+    "bytes": 1190,
+    "sha256": "39722790055a4f438189c2e97714f7f9d445922888198435ecf22f76e7f076a4",
+    "gitBlob": "4a758e47696219342ecc0b5db67f86ddca5147c3",
+    "remoteConfirmed": true
+  },
+  "resources": {
+    "version": 1,
+    "purpose": "Read-only artifact recovery and arithmetic verification for completed Native run 42637270671; no Native/model/browser/test execution",
+    "name": "issue1512-native-932bd1-42637270671",
+    "sessionId": "sbx_9BP66nPu2T835HL0WvmWOQeNMFN8",
+    "limits": {
+      "vcpus": 1,
+      "memoryMiB": 2048,
+      "timeoutMs": 900000,
+      "persistent": false,
+      "publicPorts": [],
+      "runtime": "node22",
+      "architecture": "amd64",
+      "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+      "networkPolicy": {
+        "mode": "custom",
+        "allowedDomains": [
+          "*.blob.core.windows.net",
+          "*.amazonaws.com",
+          "*.oaiusercontent.com",
+          "chatgpt.com"
+        ]
+      }
+    },
+    "startedAt": "2026-11-09T15:12:22.644Z",
+    "requestedStopAt": "2026-11-09T15:16:07.041Z",
+    "stoppedAt": "2026-11-09T15:16:07.282Z",
+    "durationMs": 224638,
+    "activeCpuDurationMs": 9143,
+    "networkTransfer": {
+      "ingress": 14885640,
+      "egress": 368489
+    },
+    "stop": {
+      "status": "stopped"
+    },
+    "delete": {
+      "sameName": true,
+      "returnedStoppedSandbox": true
+    },
+    "exactGet": {
+      "sameName": true,
+      "resume": false,
+      "status": 404,
+      "code": "not_found"
+    },
+    "extensions": 0,
+    "remainingOwnedResources": 0,
+    "allOriginalJsonRecoveredAndRemoteConfirmedBeforeStop": true,
+    "costUsd": null,
+    "costBoundary": "Duration, CPU and traffic are measured; no zero-cost assertion.",
+    "receipt": {
+      "path": "native-932bd1/vm-cleanup.safe.json",
+      "kind": "resource-cleanup",
+      "mode": "100644",
+      "bytes": 1476,
+      "sha256": "733a15e2983beb4d5ec996d28c41b7f0c0d51045673975ef8af3cde826d0c1f0",
+      "gitBlob": "62dd90ff059554348d002b0addea2ab6fd3d0294",
+      "remoteConfirmed": true
+    }
+  },
+  "noRefWrites": true,
+  "originalBytesPreserved": true,
+  "frozenAt": "2026-11-09 15:19:48 UTC"
+}

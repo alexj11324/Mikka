@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "artifacts": [
+    {
+      "kind": "NATIVE",
+      "artifactId": 13686080609,
+      "filename": "native-932bd1-original.zip",
+      "bytes": 14606918,
+      "sha256": "e013196bf04a61df3d54b162da13372fb2085537a1b63c1bd33e34f152000ec7",
+      "name": "desktop-native-evidence-86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+      "createdAt": "2026-11-09T15:07:08Z",
+      "updatedAt": "2026-11-09T15:07:08Z",
+      "apiDigest": "sha256:e013196bf04a61df3d54b162da13372fb2085537a1b63c1bd33e34f152000ec7",
+      "bytesEqualApi": true,
+      "sha256EqualApi": true,
+      "zipCrcPassed": true,
+      "archivePathAndSymlinkChecksPassed": true,
+      "downloadReferenceRequests": 1,
+      "httpMaterializations": 1,
+      "refreshes": 0
+    },
+    {
+      "kind": "PACKAGE",
+      "artifactId": 13685985727,
+      "filename": "package-932bd1-original.zip",
+      "bytes": 1597,
+      "sha256": "667355d714257d690f8ec264434c1ee0053735cf957d2a9b776451d5e90bf688",
+      "name": "desktop-package-evidence-86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+      "createdAt": "2026-11-09T15:07:05Z",
+      "updatedAt": "2026-11-09T15:07:05Z",
+      "apiDigest": "sha256:667355d714257d690f8ec264434c1ee0053735cf957d2a9b776451d5e90bf688",
+      "bytesEqualApi": true,
+      "sha256EqualApi": true,
+      "zipCrcPassed": true,
+      "archivePathAndSymlinkChecksPassed": true,
+      "downloadReferenceRequests": 1,
+      "httpMaterializations": 1,
+      "refreshes": 0
+    }
+  ],
+  "originalFileCounts": {
+    "native": 308,
+    "package": 2,
+    "total": 310
+  },
+  "fileHashIndex": {
+    "path": "original-files-manifest.safe.json",
+    "bytes": 85387,
+    "sha256": "092920e675711a37c0b41382658c14bba2f6e2f96a6abc0fdf3b5f74407fa8b0",
+    "gitBlob": "8a00f3f5201826ef398754f9f05c6d7ab354ae0a"
+  },
+  "bundle": {
+    "compressedBytes": 171649,
+    "compressedSha256": "7cb31091c256a241bbe2174bc89cf79f8ef05163ff7c6b58fcd73a6592e719a3",
+    "uncompressedBytes": 1348022,
+    "uncompressedSha256": "da6acaa5278cd4b7b7aedb2a28834429bc058b1cdad6ae7a33aaf16251afb39b",
+    "chunkSize": 1455,
+    "chunks": 118,
+    "fileCount": 13,
+    "missingOriginals": []
+  },
+  "transfer": {
+    "chunkBytes": 1455,
+    "chunks": 118,
+    "compressedShaVerified": true,
+    "uncompressedShaVerified": true,
+    "gzipCrcAndISizeVerified": true,
+    "allFileBytesSha256AndGitSha1Verified": true
+  },
+  "decoderPreparation": {
+    "byteHelpersStandardVectors": {
+      "sha256abc": true,
+      "sha1abc": true,
+      "sha256empty": true,
+      "sha1empty": true,
+      "base64abc": true
+    },
+    "gzipVectors": {
+      "empty": true,
+      "abc": true,
+      "badCrcRejected": true,
+      "dynamicCodeLengths": true
+    },
+    "scope": "Utility checks only; not application or Native tests."
+  },
+  "verificationScripts": [
+    {
+      "name": "verify-artifact-download.py",
+      "baselineBlob": "f2ebb80c9a6aeaa4438d1c1f9a5d227938c806f5",
+      "baselineSha256": "e5a835df784a02f897bbb856bec3fcddcbc7bec55a2c547617f2c6272b4e924a",
+      "adaptation": "Only fixed archive/root path tokens replaced; no assertion/window/budget changes",
+      "replacements": [
+        [
+          "native-reopen-42621847483",
+          "native-932bd1"
+        ],
+        [
+          "package-reopen-42621847483",
+          "package-932bd1"
+        ]
+      ],
+      "sha256": "de86f5a04f369969ecd5029478319eb3470f146a2dbdd52d94c62cab83bfa736",
+      "bytes": 2785
+    },
+    {
+      "name": "verify-native-originals.py",
+      "baselineBlob": "33e4f338d63796a4682426b2d3019b1174f98be0",
+      "baselineSha256": "1db096175ff1927155dbd1502a7612a45db98f4d46c81a59aca06a86e4ecca02",
+      "adaptation": "Only fixed archive/root path tokens replaced; no assertion/window/budget changes",
+      "replacements": [
+        [
+          "native-reopen-42621847483",
+          "native-932bd1"
+        ],
+        [
+          "package-reopen-42621847483",
+          "package-932bd1"
+        ]
+      ],
+      "sha256": "7ed1aacc92ef3a413cb3940d30a648972e7654deb8c0c8c38f0b824a337bfebf",
+      "bytes": 16015
+    }
+  ],
+  "zipRetention": "Temporary ZIPs were destroyed with the sandbox. GitHub artifact IDs/digests, the complete 310-file hash index and selected five original JSON files are retained.",
+  "signedUrlsPublished": false,
+  "oldArtifactDownloads": 0
+}

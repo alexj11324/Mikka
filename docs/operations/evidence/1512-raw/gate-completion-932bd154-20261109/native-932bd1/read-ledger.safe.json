@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "runId": 42637270671,
+  "runAttempt": 1,
+  "jobId": 129231919498,
+  "metadataCalls": 22,
+  "metadataErrors": 1,
+  "metadataErrorBoundary": "One direct actions/jobs GET was rejected by the connector endpoint allowlist (400). Subsequent reads used the established allowed actions/runs/{run_id}/jobs collection; no permission or endpoint bypass.",
+  "nativeOriginalLogReads": 1,
+  "otherJobOriginalLogReads": 0,
+  "artifactMetadataLists": 1,
+  "artifactDownloadReferences": [
+    {
+      "artifactId": 13686080609,
+      "requests": 1,
+      "materializations": 1,
+      "refreshes": 0
+    },
+    {
+      "artifactId": 13685985727,
+      "requests": 1,
+      "materializations": 1,
+      "refreshes": 0
+    }
+  ],
+  "sameArtifactRepeatDownloads": 0,
+  "oldArtifactReads": 0,
+  "oldJobLogsRead": 0,
+  "previousPublicVerifierScriptReads": 2,
+  "actualCheckoutCommitReads": 1,
+  "vmCreates": 1,
+  "vmExtensions": 0,
+  "vmStops": 1,
+  "vmDeletes": 1,
+  "vmExactNotFoundReads": 1,
+  "productSourceEdits": 0,
+  "refWrites": 0,
+  "reruns": 0,
+  "cancellations": 0,
+  "productionRequests": 0,
+  "modelsInvoked": 0,
+  "browsersLaunchedByReader": 0,
+  "remainingOwnedResources": 0
+}

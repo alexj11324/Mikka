@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-09 15:26:12 UTC",
+  "kind": "native-independent-review-crosscheck",
+  "candidate": {
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "checkout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5"
+  },
+  "rootProofFile": "root-native-original-review.safe.json",
+  "peerIndex": {
+    "gitBlob": "a816eb02cfdba67fe62fb40fd813f62945474aff",
+    "bytes": 14455,
+    "sha256": "c55dfa46beea40b6ddce1997138de654a2918c28cb85ff47677ec89f61e32d00"
+  },
+  "sameFiveOriginalBlobHashes": true,
+  "rootArithmetic": {
+    "records": 24,
+    "checkpoints": 12,
+    "segments": 8,
+    "bucketCells": 2280,
+    "ordinalRows": 1311,
+    "errors": 0
+  },
+  "fullWindow": {
+    "native": 433,
+    "web": 435,
+    "passed": true
+  },
+  "firstPair": {
+    "native": 209,
+    "hosted": 234,
+    "pair": 1,
+    "passed": true
+  },
+  "noWindowsMoved": true,
+  "noBackgroundExcluded": true,
+  "rawDiagnosticStatus": "incomplete",
+  "unknownAttributionNotSubtracted": true,
+  "allCurrentRpcCrossingsAndUnobservedCompletionsZero": true,
+  "coldMedian": {
+    "bundledMs": 2194.5,
+    "hostedMs": 2129.91,
+    "bundledFaster": false,
+    "existingPerformanceThreshold": "none"
+  },
+  "restored": {
+    "lifecycle": false,
+    "smoke": true,
+    "parity": true
+  },
+  "lifecycleBaseline": "false before / true after",
+  "smokeBaseline": "true before / true after",
+  "installedDaemon": {
+    "version": "0.0.562",
+    "revision": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+    "protocol": 3
+  },
+  "resourceCleanup": {
+    "version": 1,
+    "purpose": "Read-only artifact recovery and arithmetic verification for completed Native run 42637270671; no Native/model/browser/test execution",
+    "name": "issue1512-native-932bd1-42637270671",
+    "sessionId": "sbx_9BP66nPu2T835HL0WvmWOQeNMFN8",
+    "limits": {
+      "vcpus": 1,
+      "memoryMiB": 2048,
+      "timeoutMs": 900000,
+      "persistent": false,
+      "publicPorts": [],
+      "runtime": "node22",
+      "architecture": "amd64",
+      "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+      "networkPolicy": {
+        "mode": "custom",
+        "allowedDomains": [
+          "*.blob.core.windows.net",
+          "*.amazonaws.com",
+          "*.oaiusercontent.com",
+          "chatgpt.com"
+        ]
+      }
+    },
+    "startedAt": "2026-11-09T15:12:22.644Z",
+    "requestedStopAt": "2026-11-09T15:16:07.041Z",
+    "stoppedAt": "2026-11-09T15:16:07.282Z",
+    "durationMs": 224638,
+    "activeCpuDurationMs": 9143,
+    "networkTransfer": {
+      "ingress": 14885640,
+      "egress": 368489
+    },
+    "stop": {
+      "status": "stopped"
+    },
+    "delete": {
+      "sameName": true,
+      "returnedStoppedSandbox": true
+    },
+    "exactGet": {
+      "sameName": true,
+      "resume": false,
+      "status": 404,
+      "code": "not_found"
+    },
+    "extensions": 0,
+    "remainingOwnedResources": 0,
+    "allOriginalJsonRecoveredAndRemoteConfirmedBeforeStop": true,
+    "costUsd": null,
+    "costBoundary": "Duration, CPU and traffic are measured; no zero-cost assertion."
+  },
+  "rootViewedParityPngPixels": false,
+  "productionAcceptance": false
+}

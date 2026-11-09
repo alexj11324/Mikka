@@ -1,0 +1,265 @@
+{
+  "schema": "issue1512.ci-final-attempt2-index.v1",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1799,
+  "candidate": {
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "actualCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "actualCheckoutEvidence": "Original Changes/Core/Source reader plus Root's new Integration/strict raw reads agree."
+  },
+  "assembledAt": "2026-11-09 15:27:03 UTC",
+  "observation": {
+    "finalMainJobs": "2026-11-09T15:23:27Z",
+    "finalAllHeadRunsChecksSuitesAndPR": "2026-11-09T15:23:55Z"
+  },
+  "status": "current_required_workflow_records_success_original_failure_history_preserved",
+  "mainRun": {
+    "id": 42637270671,
+    "attempt": 2,
+    "status": "completed",
+    "conclusion": "success",
+    "startedAt": "2026-11-09T15:17:59Z",
+    "updatedAt": "2026-11-09T15:22:44Z",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671"
+  },
+  "request": {
+    "by": "/root",
+    "count": 1,
+    "requestedAt": "2026-11-09T15:17:58Z",
+    "originalIntegrationJobId": 129229145015,
+    "reportedToolSuccess": true,
+    "metadataAgentRequests": 0
+  },
+  "actualNewExecutions": [
+    {
+      "id": 129249611752,
+      "priorId": 129229145015,
+      "name": "Integration unit checks",
+      "startedAt": "2026-11-09T15:18:04Z",
+      "completedAt": "2026-11-09T15:22:25Z"
+    },
+    {
+      "id": 129252219384,
+      "priorId": 129245022698,
+      "name": "UI policy (strict)",
+      "startedAt": "2026-11-09T15:22:28Z",
+      "completedAt": "2026-11-09T15:22:43Z"
+    }
+  ],
+  "carryForward": {
+    "count": 20,
+    "displayedNewJobIDs": true,
+    "newExecutions": false,
+    "exactAllFieldsMatches": 19,
+    "exactStepsMatches": 20,
+    "oidcSkippedTimestampAnomalyPreserved": true,
+    "nativeOriginalJobId": 129231919498,
+    "nativeNewDisplayJobId": 129249619409,
+    "nativeActuallyExecutedAttempt": 1
+  },
+  "counts": {
+    "currentWorkflows": 14,
+    "currentWorkflowConclusions": {
+      "success": 14
+    },
+    "mainAttempt2DisplayedJobs": 22,
+    "mainAttempt2DisplayedConclusions": {
+      "success": 21,
+      "skipped": 1
+    },
+    "currentEffectiveJobAndActionsCheckRecords": 46,
+    "currentEffectiveConclusions": {
+      "success": 36,
+      "skipped": 10
+    },
+    "allHistoricalJobRecords": 68,
+    "allFilterAllCheckRecords": 69,
+    "allFilterAllCheckConclusions": {
+      "success": 56,
+      "skipped": 11,
+      "failure": 2
+    },
+    "externalSuccessfulGitGuardianChecks": 1,
+    "checkSuites": 21,
+    "emptyQueuedExternalSuites": 6,
+    "commitStatuses": 0
+  },
+  "enumeration": {
+    "completePagination": true,
+    "filter": "all",
+    "latestFilterNotUsed": true,
+    "jobCheckSuiteBijection": true,
+    "allExactHead": true,
+    "allEnumeratedJobsAndChecksTerminal": true,
+    "other13WorkflowsRemainAttempt1": true,
+    "sourceOrHeadChangeObserved": false
+  },
+  "priorAttempt": {
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "failure",
+    "failedIntegrationJobId": 129229145015,
+    "failedStrictJobId": 129245022698,
+    "indexBlob": "c200e42449ab9dcd2e60ef8b1fac9955de0422e0",
+    "indexBytes": 8127,
+    "indexSha256": "e8640e93f68701a99c0abff80cef00f7140bd8db55e44372dcb79bd4b8c61b41",
+    "oldChecksStillPresentInFilterAll": true,
+    "rewritten": false
+  },
+  "rawReferences": {
+    "owner": "/root",
+    "rawReadByMetadataAgent": false,
+    "integration": {
+      "jobId": 129249611752,
+      "blob": "5700abba001111877345e18ad860f0141585591b",
+      "bytes": 673437,
+      "sha256": "ece4e036ddb4cdb11f4dbd16d075800a2a9d1eef5e9c24c820045d9e6bd8688f",
+      "reportedCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+      "reportedNode": "24.22.2",
+      "reportedNxTargets": 29,
+      "reportedTargetSetIdenticalToAttempt1": true,
+      "reportedAllTargetsSuccessful": true,
+      "reportedTeamImportMs": 8876.366829,
+      "reportedScopeLoaderMs": 9972.596827
+    },
+    "strict": {
+      "jobId": 129252219384,
+      "blob": "e72cdeb4847d6940bd4b92204873219dae37d9c9",
+      "bytes": 14087,
+      "sha256": "14e39f3a637eeee28012cc59ab92fdfc5b9c69064b52c4c11aafc977b168a2b8",
+      "reportedCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+      "reportedAllExpectedGatesSuccessful": true
+    },
+    "scope": "Reported verified by Root's unique raw reads; this metadata agent did not fetch these logs."
+  },
+  "nativeOriginalReference": {
+    "owner": "/root/native_6180_review",
+    "indexBlob": "a816eb02cfdba67fe62fb40fd813f62945474aff",
+    "bytes": 14455,
+    "sha256": "c55dfa46beea40b6ddce1997138de654a2918c28cb85ff47677ec89f61e32d00",
+    "actualCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "executedAttempt": 1,
+    "originalJobId": 129231919498,
+    "reportedBudgets": {
+      "login": {
+        "native": 433,
+        "web": 435,
+        "relation": "<="
+      },
+      "firstStartup": {
+        "native": 209,
+        "hosted": 234,
+        "relation": "<="
+      }
+    },
+    "reportedCounts": {
+      "records": 24,
+      "checkpoints": 12,
+      "segments": 8,
+      "operationBuckets": 17,
+      "sourceBuckets": 78,
+      "ordinals": 1311
+    },
+    "rootIndependentOriginalRecomputeErrors": 0,
+    "reportedCleanupFlags": {
+      "lifecycleRestored": false,
+      "smoke": true,
+      "parity": true
+    },
+    "artifactRecoveryVm": {
+      "stoppedDeletedExact404": true,
+      "closedAt": "2026-11-09T15:16:07.282Z"
+    },
+    "unknownsPreserved": true,
+    "sourceOfThisReference": "Exclusive reader message; raw artifacts not reread by this metadata agent.",
+    "notWholeCIOrProductionPass": true
+  },
+  "originalSourceReference": {
+    "owner": "/root/current_source_review",
+    "indexBlob": "c72e8a7b90dd8e5488febef6b1da8dbc1a320345",
+    "bytes": 4835,
+    "sha256": "13a29d76400da082f3a8be8a2594fade27aa0dcf65ec29f516328e7516e23a5d",
+    "payloadCount": 9,
+    "payloadBytes": 2591422,
+    "checkout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "readByThisAgent": false,
+    "reportedVerification": {
+      "coreNxTargets": {
+        "passed": 57,
+        "total": 57,
+        "cacheDisabled": true
+      },
+      "driverNamedTests": {
+        "passed": 74,
+        "eachOnce": true
+      },
+      "source": {
+        "passed": 361,
+        "total": 361
+      },
+      "migration": 63
+    },
+    "scope": "These successes do not override the separate Integration job failure."
+  },
+  "payloadCount": 3,
+  "payloadBytes": 321229,
+  "payloads": [
+    {
+      "path": "ci-932-attempt2-workflow-jobs-final.json",
+      "blob": "a986f149ab3fbfdb36449ef4b92332825823e0bd",
+      "bytes": 190716,
+      "sha256": "56eb1f51ed0b9e537a68dc6a48eca387351eb70746e9dd258a7977866fc0b232",
+      "exactReadback": true,
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "ci-932-attempt2-check-history-final.json",
+      "blob": "c679a6755492e5550897e58daf4d9db5d6406a84",
+      "bytes": 84455,
+      "sha256": "2840d45b90ddc42b015262b8549a3fc88287d078e75ab5aa32022b63d91dadaf",
+      "exactReadback": true,
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "ci-932-attempt2-carry-forward.json",
+      "blob": "64d2453333c72b724c087838584b37eb987f6a60",
+      "bytes": 46058,
+      "sha256": "249b7f149aa2de1caf5621ca0bf9844fe280a287a7f0a768a4aa4779d20a279c",
+      "exactReadback": true,
+      "mode": "100644",
+      "type": "blob"
+    }
+  ],
+  "interpretation": [
+    "Only Integration and its automatically rerun strict dependency executed anew. The20 carried-forward results did not rerun Source/Core/PG/Native/image/analytics jobs.",
+    "The new Integration executed the same29 targets on the same actual86f8 checkout according to Root's unique raw read; this is one successful repeatability observation, not a code fix or erasure of the initial timeout.",
+    "Native budgets433<=435 and FIRST209<=234 remain bound to the original attempt1 Native job, its original windows, and its separate original-evidence index. This rerun produced no new Native measurement.",
+    "All14 latest workflow records are successful, while complete check history still contains the two attempt1 failures.",
+    "Production acceptance and source-window release are outside this CI metadata conclusion."
+  ],
+  "privacy": {
+    "emailMatches": 0,
+    "credentialPatternMatches": 0,
+    "signedDownloadUrls": 0,
+    "rawJobOutputIncluded": 0
+  },
+  "readerActions": {
+    "rawJobLogReads": 0,
+    "artifactDownloads": 0,
+    "resourcesCreated": 0,
+    "testsRun": 0,
+    "productionOrAccountActions": 0,
+    "rerunRequests": 0,
+    "cancellations": 0,
+    "refOrPRMutations": 0,
+    "gitObjectWrites": "Three unreferenced safe metadata payloads and this unreferenced index only."
+  },
+  "productionAcceptance": null,
+  "mergeApproval": false,
+  "nextAction": "Root archives with Native and repeatability originals; no further polling or repeat request by this reader."
+}

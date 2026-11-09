@@ -1,0 +1,244 @@
+{
+  "schema": "issue1512.ci-metadata.final-attempt-index.v1",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1799,
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "attempt": 1,
+  "status": "terminal_failure",
+  "observedAt": "2026-11-09T15:11:58Z",
+  "assembledAt": "2026-11-09 15:14:35 UTC",
+  "mainRun": {
+    "id": 42637270671,
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "failure",
+    "updatedAt": "2026-11-09T15:10:40Z",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671"
+  },
+  "counts": {
+    "workflows": 14,
+    "workflowConclusions": {
+      "success": 13,
+      "failure": 1
+    },
+    "jobs": 46,
+    "jobConclusions": {
+      "success": 34,
+      "skipped": 10,
+      "failure": 2
+    },
+    "checks": 47,
+    "checkConclusions": {
+      "failure": 2,
+      "success": 35,
+      "skipped": 10
+    },
+    "currentActionsChecks": 46,
+    "externalChecks": 1,
+    "suites": 21,
+    "emptyQueuedExternalSuites": 6,
+    "commitStatuses": 0
+  },
+  "identityAndCompleteness": {
+    "allExactHead": true,
+    "allPullRequestEvents": true,
+    "allAttemptsOne": true,
+    "uniqueJobIDs": 46,
+    "jobCheckSuiteBijection": true,
+    "allRelevantPagesComplete": true,
+    "checksFilter": "all",
+    "latestFilterNeverUsed": true,
+    "oldAttemptJobsReused": 0,
+    "foreignHeadChecks": 0,
+    "allActionsJobsAndChecksTerminal": true
+  },
+  "failures": [
+    {
+      "jobId": 129229145015,
+      "name": "Integration unit checks",
+      "step": 4,
+      "conclusion": "failure",
+      "rawEvidenceOwner": "/root",
+      "diagnosticOriginals": "CP35; not reread by this metadata agent"
+    },
+    {
+      "jobId": 129245022698,
+      "name": "UI policy (strict)",
+      "step": 2,
+      "conclusion": "failure",
+      "meaning": "Exact aggregation of known Integration failure according to Root's unique raw read; retained as an actual second failed job.",
+      "rawEvidence": {
+        "owner": "/root",
+        "rawBlob": "9ba58b5d33404a45a86efa09bf9b699a9fbbb045",
+        "bytes": 14167,
+        "sha256": "1a2dd88645c6579682e6e0ae6b71aefa071d48edaa9e075ec3f93638cf6872d7",
+        "reportedCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+        "reportedClosedResult": {
+          "allExpectFlags": true,
+          "core": "success",
+          "source": "success",
+          "daemon": "success",
+          "image": "success",
+          "desktop": "success",
+          "analytics": "success",
+          "integration": "failure",
+          "guardExitCode": 1
+        },
+        "meaning": "Root's unique raw read identifies exact propagation of the known Integration failure, not a separate independent test failure.",
+        "rawNotReadByThisAgent": true
+      }
+    }
+  ],
+  "native": {
+    "jobId": 129231919498,
+    "status": "completed",
+    "conclusion": "success",
+    "completedAt": "2026-11-09T15:10:23Z",
+    "acceptanceStep": {
+      "number": 17,
+      "startedAt": "2026-11-09T14:58:07Z",
+      "completedAt": "2026-11-09T15:07:03Z",
+      "conclusion": "success"
+    },
+    "budgetAndCleanupEvidence": "Owned by /root/native_6180_review; original artifact analysis pending at this index assembly.",
+    "budgets": null,
+    "cleanup": null,
+    "jobSuccessIsNotBudgetProof": true
+  },
+  "actualSourceReference": {
+    "provenance": "Reported by exclusive current_source_review reader; raw log not read by this agent.",
+    "checkout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "parents": [
+      "76537e4c2996f717cbd19589e1efae328028aa4a",
+      "932bd1549942bc2a8d040c7281a37fbe851c8eb0"
+    ],
+    "sourceJobId": 129228653985,
+    "selector": {
+      "unit": 86,
+      "db": 72,
+      "full": true
+    },
+    "immutableReceipt": {
+      "blob": "8caeafdef46098ee9188ffef08ec134417f921f7",
+      "bytes": 3811,
+      "sha256": "05255e4842538502992c12758e734e595504f7aa3bd15dea027c461c1ef852f4"
+    },
+    "exclusiveReaderFinal": {
+      "owner": "/root/current_source_review",
+      "indexBlob": "c72e8a7b90dd8e5488febef6b1da8dbc1a320345",
+      "bytes": 4835,
+      "sha256": "13a29d76400da082f3a8be8a2594fade27aa0dcf65ec29f516328e7516e23a5d",
+      "payloadCount": 9,
+      "payloadBytes": 2591422,
+      "checkout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+      "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+      "readByThisAgent": false,
+      "reportedVerification": {
+        "coreNxTargets": {
+          "passed": 57,
+          "total": 57,
+          "cacheDisabled": true
+        },
+        "driverNamedTests": {
+          "passed": 74,
+          "eachOnce": true
+        },
+        "source": {
+          "passed": 361,
+          "total": 361
+        },
+        "migration": 63
+      },
+      "scope": "These successes do not override the separate Integration job failure."
+    }
+  },
+  "priorCheckpoint": {
+    "commit": "e33e458fc389de82dee197919284162e7aed8308",
+    "tree": "39151f2006e63211a076b9465315fa04903a68ac",
+    "prefix": "docs/operations/evidence/1512-raw/source-ci-932bd154-20261109",
+    "reportedBy": "/root",
+    "metadataIndex": "19e78de4f88a86f9e4d7e724f0ab5ee5d423c258",
+    "payloadCount": 25,
+    "payloadBytes": 5478650,
+    "status": "intermediate_red_pending",
+    "includesRootUniqueIntegrationOriginals": true
+  },
+  "payloadCount": 2,
+  "payloadBytes": 256369,
+  "payloads": [
+    {
+      "path": "ci-932-attempt1-workflow-jobs-final.json",
+      "blob": "9cb438b6b688b7d62afd4dc55cddc0f710f1a9b7",
+      "bytes": 193290,
+      "sha256": "63880d0aa61145b07ae69dbff7c96753fdd706db299a8ec508a7ef7c0d63b0f9",
+      "exactReadback": true,
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "path": "ci-932-attempt1-check-association-final.json",
+      "blob": "8e36c084297268e9ee1a83b236baae4d5d90b93f",
+      "bytes": 63079,
+      "sha256": "4690d8385b3738aebf8edb12a88ebf464d593a5163cc1ebfa279410611166692",
+      "exactReadback": true,
+      "type": "blob",
+      "mode": "100644"
+    }
+  ],
+  "coordinationRead": {
+    "observedAt": "2026-11-09T15:09:27Z",
+    "actualMain": "76537e4c2996f717cbd19589e1efae328028aa4a",
+    "native1827": {
+      "head": "486e8542a1201c285f15e4bd51987292c91bdc8e",
+      "open": true,
+      "merged": false,
+      "latestKnownCI": {
+        "runId": 42628930963,
+        "attempt": 2,
+        "conclusion": "success",
+        "updatedAt": "2026-11-09T14:39:51Z"
+      }
+    },
+    "factory": {
+      "actualWindowStart": "2026-11-09T13:56:00Z",
+      "hardEnd": "2026-11-09T16:26:00Z",
+      "earlyReleaseObserved": false,
+      "latestPublicMetadataOnlyCoordination": {
+        "commentId": 6743442942,
+        "createdAt": "2026-11-09T15:08:25Z",
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6743442942",
+        "claudeStep": "failure at15:00:48Z",
+        "codexStep": "in_progress since15:00:50Z",
+        "taskState": null,
+        "rootCause": null
+      },
+      "limits": "No Factory raw logs/artifacts or production state read; no task state or cause inferred from step names."
+    }
+  },
+  "readerActions": {
+    "rawJobLogReads": 0,
+    "artifactDownloads": 0,
+    "resourcesCreated": 0,
+    "testsRun": 0,
+    "productionOrAccountActions": 0,
+    "rerunRequests": 0,
+    "cancellations": 0,
+    "refOrPRMutations": 0,
+    "gitWrites": "Only these unreferenced evidence blobs."
+  },
+  "privacy": {
+    "emails": 0,
+    "credentialPatternMatches": 0,
+    "rawLogFields": 0,
+    "signedUrls": 0
+  },
+  "outcome": {
+    "overallCI": "failed",
+    "productionAcceptance": null,
+    "mergeApproval": false
+  },
+  "laterAttemptPolicy": "Do not rewrite attempt1 failures. If Root sends one rerun request for the Integration original job, record the actual resulting jobs/attempt, including any automatically rerun dependent strict job. No claim that only one job executed.",
+  "nextWake": "Root reports the authorized repeatability run/attempt, or Native exclusive reader supplies its separate final original-evidence index. No repeated whole-head polling is needed for this completed attempt."
+}

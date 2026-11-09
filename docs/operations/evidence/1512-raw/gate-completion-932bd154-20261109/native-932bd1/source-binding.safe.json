@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pr": 1799,
+  "runId": 42637270671,
+  "runAttempt": 1,
+  "jobId": 129231919498,
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "expectedHeadTree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "actualCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+  "actualTree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "parents": [
+    "76537e4c2996f717cbd19589e1efae328028aa4a",
+    "932bd1549942bc2a8d040c7281a37fbe851c8eb0"
+  ],
+  "sameTreeAsExpectedHead": true,
+  "exactCommitApiRead": true,
+  "ownNativeLog": {
+    "bytes": 258549,
+    "sha256": "389c4cd992be537851ac952d63c5b69bcac19754b789b8ef4a3e5c8b2987be1d",
+    "gitBlob": "6190627f3ae89f38bed69fdceaaf0e8d8a6435fe",
+    "sourceLines": [
+      "2026-11-09T14:49:13.1005760Z HEAD is now at 86f8f6c Merge 932bd1549942bc2a8d040c7281a37fbe851c8eb0 into 76537e4c2996f717cbd19589e1efae328028aa4a",
+      "2026-11-09T14:49:13.1409100Z 86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+      "2026-11-09T14:56:45.9025570Z {\"status\":\"built\",\"revision\":\"86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3\",\"preset\":\"node-server\",\"functions\":0,\"resources\":51}",
+      "2026-11-09T14:58:17.5046440Z {\"status\":\"ready\",\"revision\":\"86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3\",\"origin\":\"http://localhost:3000\",\"gateway\":\"http://127.0.0.1:49305\"}"
+    ]
+  },
+  "originals": {
+    "lifecycleRevision": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "smokeRevision": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "parityAppRevision": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "parityHarnessRevision": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "parityHarnessSha256": "595f222d7ad053d785068fe632a842e5a0e10217a6b65352e0b5bc581149c061",
+    "querySourceRevision": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3"
+  },
+  "worker": {
+    "jobLabels": [
+      "macos-26"
+    ],
+    "packageArchitecture": "arm64",
+    "queryPlatform": "darwin",
+    "queryArchitecture": "arm64",
+    "standaloneWorkerHashObserved": false,
+    "standaloneWorkerHash": null,
+    "recoveryVmIsNativeSource": false
+  },
+  "daemon": [
+    {
+      "mode": "bundled",
+      "daemonVersion": "0.0.562",
+      "protocolVersion": 3,
+      "installedVersion": "0.0.562",
+      "installedRevision": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "ready": true,
+      "elapsedMs": 3688,
+      "reads": 11,
+      "profileMatches": true,
+      "overrideMatches": true
+    },
+    {
+      "mode": "hosted",
+      "daemonVersion": "0.0.562",
+      "protocolVersion": 3,
+      "installedVersion": "0.0.562",
+      "installedRevision": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "ready": true,
+      "elapsedMs": 12,
+      "reads": 1,
+      "profileMatches": true,
+      "overrideMatches": true
+    }
+  ],
+  "trigger": {
+    "description": "natural source update reported by root at 2026-11-09T14:42:10Z",
+    "manualRerunByReader": false,
+    "headMutationByReader": false,
+    "priorMeasurementsReused": false
+  },
+  "limits": "Binds this exact Native run and its own installed daemon. No production deployment or PostHog acceptance claim."
+}

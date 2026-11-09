@@ -1,0 +1,5380 @@
+{
+  "schema": "issue1512.ci-latest-attempt-workflow-jobs.v1",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1799,
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "assembledAt": "2026-11-09 15:26:13 UTC",
+  "workflowObservation": "2026-11-09T15:23:55Z",
+  "mainJobObservation": "2026-11-09T15:23:27Z",
+  "status": "current_workflow_gates_success_prior_attempt_failures_retained",
+  "counts": {
+    "currentWorkflowRecords": 14,
+    "currentWorkflowConclusions": {
+      "success": 14
+    },
+    "currentJobRecords": 46,
+    "currentJobRecordConclusions": {
+      "success": 36,
+      "skipped": 10
+    },
+    "mainAttempt2JobRecords": 22,
+    "mainAttempt2JobRecordConclusions": {
+      "success": 21,
+      "skipped": 1
+    },
+    "actualNewExecutions": 2,
+    "mainCarriedForwardResults": 20
+  },
+  "workflowPage": {
+    "observedAt": "2026-11-09 15:23:55 UTC",
+    "page": 1,
+    "perPage": 100,
+    "totalCount": 14,
+    "runs": [
+      {
+        "id": 42637270403,
+        "name": "SSH device backend",
+        "path": ".github/workflows/ssh-device-backend.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480391883,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:48:11Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270403",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270505,
+        "name": "Site search read contract",
+        "path": ".github/workflows/site-search.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480392228,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:49:08Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270505",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270363,
+        "name": "Mikka cloud core compatibility",
+        "path": ".github/workflows/self-hosted-production.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480391729,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:43:21Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270363",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270733,
+        "name": "Workspace governance acceptance",
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480392842,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:44:03Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270733",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270696,
+        "name": "Unattended sandbox acceptance",
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480392709,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:44:00Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270696",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270450,
+        "name": "Self-hosting UI evidence",
+        "path": ".github/workflows/self-hosting-ui.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480392056,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:44:58Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270450",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270455,
+        "name": "Mobile OTA update",
+        "path": ".github/workflows/mobile-update.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480392090,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:44:49Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270455",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270579,
+        "name": "Cloud computer backend",
+        "path": ".github/workflows/cloud-computer.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480392409,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:45:17Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270579",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270709,
+        "name": "E2B additive runtime release",
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480392733,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:42:41Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270709",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270557,
+        "name": "Browser gate",
+        "path": ".github/workflows/browser-gate.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480392262,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:42:21Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270557",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270500,
+        "name": "Read cache production acceptance",
+        "path": ".github/workflows/read-cache-production.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480392202,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:43:32Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270500",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270379,
+        "name": "Read cache API acceptance",
+        "path": ".github/workflows/read-cache.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480391791,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:46:09Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270379",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270375,
+        "name": "E2B subscription custody",
+        "path": ".github/workflows/e2b-byos.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480391768,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T14:47:03Z",
+        "startedAt": "2026-11-09T14:42:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270375",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      },
+      {
+        "id": 42637270671,
+        "name": "CI",
+        "path": ".github/workflows/ui-policy.yml",
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "event": "pull_request",
+        "branch": "fix/1512-daemon-fixture-executable-20261109",
+        "attempt": 2,
+        "status": "completed",
+        "conclusion": "success",
+        "suiteId": 115480392633,
+        "createdAt": "2026-11-09T14:42:16Z",
+        "updatedAt": "2026-11-09T15:22:44Z",
+        "startedAt": "2026-11-09T15:17:59Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671",
+        "pullRequests": [
+          {
+            "number": 1799,
+            "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+            "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+          }
+        ]
+      }
+    ],
+    "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?head_sha=932bd1549942bc2a8d040c7281a37fbe851c8eb0&per_page=100&page=1"
+  },
+  "jobPages": [
+    {
+      "runId": 42637270671,
+      "attempt": 2,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 22,
+      "returned": 22,
+      "complete": true,
+      "observedAt": "2026-11-09 15:23:27 UTC",
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270671/attempts/2/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270403,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 1,
+      "returned": 1,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270403/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270505,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 1,
+      "returned": 1,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270505/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270363,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 2,
+      "returned": 2,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270363/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270733,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 1,
+      "returned": 1,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270733/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270696,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 1,
+      "returned": 1,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270696/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270450,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 1,
+      "returned": 1,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270450/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270455,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 1,
+      "returned": 1,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270455/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270579,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 3,
+      "returned": 3,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270579/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270709,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 7,
+      "returned": 7,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270709/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270557,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 1,
+      "returned": 1,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270557/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270500,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 3,
+      "returned": 3,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270500/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270379,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 1,
+      "returned": 1,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270379/attempts/1/jobs?per_page=100&page=1"
+    },
+    {
+      "runId": 42637270375,
+      "attempt": 1,
+      "page": 1,
+      "perPage": 100,
+      "totalCount": 1,
+      "returned": 1,
+      "complete": true,
+      "reusedTerminalMetadata": true,
+      "sameRunHeadAttemptAndFinalChecksVerified": true,
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42637270375/attempts/1/jobs?per_page=100&page=1"
+    }
+  ],
+  "jobs": [
+    {
+      "id": 129228650915,
+      "runId": 42637270379,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Read cache API and CLI",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:18Z",
+      "completedAt": "2026-11-09T14:46:08Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270379/job/129228650915",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228650915",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228650915",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:20Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:37Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:37Z",
+          "completedAt": "2026-11-09T14:42:42Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:42Z",
+          "completedAt": "2026-11-09T14:43:52Z"
+        },
+        {
+          "number": 5,
+          "name": "Verify the bounded read-only driver",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:52Z",
+          "completedAt": "2026-11-09T14:43:53Z"
+        },
+        {
+          "number": 6,
+          "name": "Generate ephemeral test-only authentication secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:53Z",
+          "completedAt": "2026-11-09T14:43:53Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:53Z",
+          "completedAt": "2026-11-09T14:43:56Z"
+        },
+        {
+          "number": 8,
+          "name": "Bind the isolated database and application to this checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:56Z",
+          "completedAt": "2026-11-09T14:43:56Z"
+        },
+        {
+          "number": 9,
+          "name": "Build this isolated application for production-mode acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:56Z",
+          "completedAt": "2026-11-09T14:45:57Z"
+        },
+        {
+          "number": 10,
+          "name": "Accept real incremental Server Actions and Settings GET",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:57Z",
+          "completedAt": "2026-11-09T14:46:03Z"
+        },
+        {
+          "number": 11,
+          "name": "Check the public evidence for authentication material",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:03Z",
+          "completedAt": "2026-11-09T14:46:03Z"
+        },
+        {
+          "number": 12,
+          "name": "Retain only the aggregate acceptance summary",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:03Z",
+          "completedAt": "2026-11-09T14:46:05Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:05Z",
+          "completedAt": "2026-11-09T14:46:05Z"
+        },
+        {
+          "number": 23,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:05Z",
+          "completedAt": "2026-11-09T14:46:05Z"
+        },
+        {
+          "number": 24,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:05Z",
+          "completedAt": "2026-11-09T14:46:06Z"
+        },
+        {
+          "number": 25,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:06Z",
+          "completedAt": "2026-11-09T14:46:06Z"
+        }
+      ]
+    },
+    {
+      "id": 129228651005,
+      "runId": 42637270579,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "backend",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:19Z",
+      "completedAt": "2026-11-09T14:45:16Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270579/job/129228651005",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228651005",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228651005",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:21Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:21Z",
+          "completedAt": "2026-11-09T14:42:34Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:34Z",
+          "completedAt": "2026-11-09T14:42:36Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:36Z",
+          "completedAt": "2026-11-09T14:42:38Z"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:38Z",
+          "completedAt": "2026-11-09T14:43:00Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:00Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:44:01Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm exec oxlint --deny-warnings lib/computer app/api/bots",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:01Z",
+          "completedAt": "2026-11-09T14:44:01Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @mikka/protocol exec vitest run src/computer.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:01Z",
+          "completedAt": "2026-11-09T14:44:02Z"
+        },
+        {
+          "number": 10,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/handler.test.ts lib/computer/policy-route.test.ts lib/computer/permission.test.ts lib/computer/local-authority.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:02Z",
+          "completedAt": "2026-11-09T14:44:04Z"
+        },
+        {
+          "number": 11,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/cua/local-review.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:04Z",
+          "completedAt": "2026-11-09T14:44:04Z"
+        },
+        {
+          "number": 12,
+          "name": "Run node --test packages/daemon/src/computer/broker.test.mjs packages/daemon/src/computer/driver.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:04Z",
+          "completedAt": "2026-11-09T14:44:06Z"
+        },
+        {
+          "number": 13,
+          "name": "Run python3 scripts/e2b/lease-driver.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:06Z",
+          "completedAt": "2026-11-09T14:44:06Z"
+        },
+        {
+          "number": 14,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test packages/daemon/src/computer/web-review.node.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:06Z",
+          "completedAt": "2026-11-09T14:44:07Z"
+        },
+        {
+          "number": 15,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:07Z",
+          "completedAt": "2026-11-09T14:45:09Z"
+        },
+        {
+          "number": 16,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/local-reviews.db.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:09Z",
+          "completedAt": "2026-11-09T14:45:10Z"
+        },
+        {
+          "number": 17,
+          "name": "Run node --test tests/device-computer-migration.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:10Z",
+          "completedAt": "2026-11-09T14:45:10Z"
+        },
+        {
+          "number": 18,
+          "name": "Run node --test tests/computer-policy-default-allow-migration.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:10Z",
+          "completedAt": "2026-11-09T14:45:10Z"
+        },
+        {
+          "number": 19,
+          "name": "Run node --test packages/daemon/src/computer/local-grant.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:10Z",
+          "completedAt": "2026-11-09T14:45:10Z"
+        },
+        {
+          "number": 20,
+          "name": "Run cd packages/daemon && node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:10Z",
+          "completedAt": "2026-11-09T14:45:13Z"
+        },
+        {
+          "number": 37,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:13Z",
+          "completedAt": "2026-11-09T14:45:14Z"
+        },
+        {
+          "number": 38,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:14Z",
+          "completedAt": "2026-11-09T14:45:14Z"
+        },
+        {
+          "number": 39,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:14Z",
+          "completedAt": "2026-11-09T14:45:14Z"
+        },
+        {
+          "number": 40,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:14Z",
+          "completedAt": "2026-11-09T14:45:14Z"
+        },
+        {
+          "number": 41,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:14Z",
+          "completedAt": "2026-11-09T14:45:14Z"
+        }
+      ]
+    },
+    {
+      "id": 129228651030,
+      "runId": 42637270403,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "ssh",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:18Z",
+      "completedAt": "2026-11-09T14:48:10Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270403/job/129228651030",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228651030",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228651030",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:20Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:33Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:33Z",
+          "completedAt": "2026-11-09T14:42:35Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:35Z",
+          "completedAt": "2026-11-09T14:42:36Z"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:36Z",
+          "completedAt": "2026-11-09T14:42:59Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:59Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 7,
+          "name": "Desktop state-machine and service tests",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:45Z"
+        },
+        {
+          "number": 8,
+          "name": "Enrollment and command isolation against PostgreSQL",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:45Z",
+          "completedAt": "2026-11-09T14:44:21Z"
+        },
+        {
+          "number": 9,
+          "name": "Packaged daemon over real SSH and systemd through the preload IPC",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:21Z",
+          "completedAt": "2026-11-09T14:48:07Z"
+        },
+        {
+          "number": 15,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:07Z",
+          "completedAt": "2026-11-09T14:48:07Z"
+        },
+        {
+          "number": 16,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:07Z",
+          "completedAt": "2026-11-09T14:48:07Z"
+        },
+        {
+          "number": 17,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:07Z",
+          "completedAt": "2026-11-09T14:48:07Z"
+        },
+        {
+          "number": 18,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:07Z",
+          "completedAt": "2026-11-09T14:48:08Z"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:08Z",
+          "completedAt": "2026-11-09T14:48:08Z"
+        }
+      ]
+    },
+    {
+      "id": 129228651097,
+      "runId": 42637270557,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Browser tests (before merge)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:18Z",
+      "completedAt": "2026-11-09T14:42:21Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270557/job/129228651097",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228651097",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228651097",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:19Z"
+        },
+        {
+          "number": 2,
+          "name": "Run echo \"Browser tests are not run in CI (decision 2026-11-01-1520).\"",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:19Z"
+        },
+        {
+          "number": 3,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:19Z"
+        }
+      ]
+    },
+    {
+      "id": 129228651186,
+      "runId": 42637270455,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "EAS Update",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:19Z",
+      "completedAt": "2026-11-09T14:44:48Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270455/job/129228651186",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228651186",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228651186",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:21Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:21Z",
+          "completedAt": "2026-11-09T14:42:26Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:26Z",
+          "completedAt": "2026-11-09T14:42:27Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:27Z",
+          "completedAt": "2026-11-09T14:43:02Z"
+        },
+        {
+          "number": 5,
+          "name": "Verify production credential delivery boundaries",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:02Z",
+          "completedAt": "2026-11-09T14:43:02Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile --filter @mikka/mobile...",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:02Z",
+          "completedAt": "2026-11-09T14:43:18Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm --filter @mikka/mobile typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:18Z",
+          "completedAt": "2026-11-09T14:43:24Z"
+        },
+        {
+          "number": 8,
+          "name": "Read the existing production Expo credential through OIDC",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:43:24Z",
+          "completedAt": "2026-11-09T14:43:24Z"
+        },
+        {
+          "number": 9,
+          "name": "Read the private UI checkout credential through OIDC",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:43:24Z",
+          "completedAt": "2026-11-09T14:43:24Z"
+        },
+        {
+          "number": 10,
+          "name": "Check out the private UI",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:43:24Z",
+          "completedAt": "2026-11-09T14:43:24Z"
+        },
+        {
+          "number": 11,
+          "name": "Use the private UI's mobile layer",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:43:24Z",
+          "completedAt": "2026-11-09T14:43:24Z"
+        },
+        {
+          "number": 12,
+          "name": "Publish to production",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:43:24Z",
+          "completedAt": "2026-11-09T14:43:24Z"
+        },
+        {
+          "number": 13,
+          "name": "Publish to pr-1799",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:24Z",
+          "completedAt": "2026-11-09T14:44:46Z"
+        },
+        {
+          "number": 24,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:46Z",
+          "completedAt": "2026-11-09T14:44:46Z"
+        },
+        {
+          "number": 25,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:46Z",
+          "completedAt": "2026-11-09T14:44:46Z"
+        },
+        {
+          "number": 26,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:46Z",
+          "completedAt": "2026-11-09T14:44:46Z"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:46Z",
+          "completedAt": "2026-11-09T14:44:46Z"
+        }
+      ]
+    },
+    {
+      "id": 129228651260,
+      "runId": 42637270450,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Production bundle screenshots (synthetic records)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:18Z",
+      "completedAt": "2026-11-09T14:44:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270450/job/129228651260",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228651260",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228651260",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:19Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:24Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:24Z",
+          "completedAt": "2026-11-09T14:43:08Z"
+        },
+        {
+          "number": 4,
+          "name": "Check evidence failure diagnostics remain secret-free",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:08Z",
+          "completedAt": "2026-11-09T14:43:08Z"
+        },
+        {
+          "number": 5,
+          "name": "Build the existing settings components in production mode",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:08Z",
+          "completedAt": "2026-11-09T14:43:12Z"
+        },
+        {
+          "number": 6,
+          "name": "Export the actual mobile application",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:44:00Z"
+        },
+        {
+          "number": 7,
+          "name": "Install Chromium for visual capture",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:00Z",
+          "completedAt": "2026-11-09T14:44:32Z"
+        },
+        {
+          "number": 8,
+          "name": "Capture views and open dialogs only",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:32Z",
+          "completedAt": "2026-11-09T14:44:43Z"
+        },
+        {
+          "number": 9,
+          "name": "Create a new evidence branch for this source and run",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:43Z",
+          "completedAt": "2026-11-09T14:44:56Z"
+        },
+        {
+          "number": 17,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:56Z",
+          "completedAt": "2026-11-09T14:44:56Z"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:56Z",
+          "completedAt": "2026-11-09T14:44:56Z"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:56Z",
+          "completedAt": "2026-11-09T14:44:56Z"
+        }
+      ]
+    },
+    {
+      "id": 129228651383,
+      "runId": 42637270505,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "site-search",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:18Z",
+      "completedAt": "2026-11-09T14:49:07Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270505/job/129228651383",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228651383",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228651383",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:20Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:33Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:33Z",
+          "completedAt": "2026-11-09T14:42:38Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:38Z",
+          "completedAt": "2026-11-09T14:42:39Z"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:39Z",
+          "completedAt": "2026-11-09T14:42:59Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:59Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:integrations",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:44:04Z"
+        },
+        {
+          "number": 8,
+          "name": "Run node apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:04Z",
+          "completedAt": "2026-11-09T14:45:08Z"
+        },
+        {
+          "number": 9,
+          "name": "Provision only the isolated application test database from existing schema",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:08Z",
+          "completedAt": "2026-11-09T14:45:11Z"
+        },
+        {
+          "number": 10,
+          "name": "Provision only the separate workspace test database from existing schema",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:11Z",
+          "completedAt": "2026-11-09T14:45:14Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm build",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:14Z",
+          "completedAt": "2026-11-09T14:48:39Z"
+        },
+        {
+          "number": 12,
+          "name": "Real compiled HTTP, Better Auth and PG title read regression (HTTP API only, no browser, no providers)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:39Z",
+          "completedAt": "2026-11-09T14:49:04Z"
+        },
+        {
+          "number": 13,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:04Z",
+          "completedAt": "2026-11-09T14:49:05Z"
+        },
+        {
+          "number": 23,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:05Z",
+          "completedAt": "2026-11-09T14:49:05Z"
+        },
+        {
+          "number": 24,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:05Z",
+          "completedAt": "2026-11-09T14:49:05Z"
+        },
+        {
+          "number": 25,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:05Z",
+          "completedAt": "2026-11-09T14:49:05Z"
+        },
+        {
+          "number": 26,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:05Z",
+          "completedAt": "2026-11-09T14:49:06Z"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:06Z",
+          "completedAt": "2026-11-09T14:49:06Z"
+        }
+      ]
+    },
+    {
+      "id": 129228651579,
+      "runId": 42637270375,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "custody",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:18Z",
+      "completedAt": "2026-11-09T14:47:02Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270375/job/129228651579",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228651579",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228651579",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:20Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:26Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:26Z",
+          "completedAt": "2026-11-09T14:42:27Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:27Z",
+          "completedAt": "2026-11-09T14:42:49Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:49Z",
+          "completedAt": "2026-11-09T14:43:02Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm test:byos",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:02Z",
+          "completedAt": "2026-11-09T14:43:10Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm --filter @mikka/protocol exec vitest run src/subscription.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:10Z",
+          "completedAt": "2026-11-09T14:43:11Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm --filter @mikka/daemon exec vitest run test/subscription-hosted-runner.test.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:11Z",
+          "completedAt": "2026-11-09T14:43:17Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm test:byos-worker",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:17Z",
+          "completedAt": "2026-11-09T14:46:59Z"
+        },
+        {
+          "number": 16,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:59Z",
+          "completedAt": "2026-11-09T14:46:59Z"
+        },
+        {
+          "number": 17,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:59Z",
+          "completedAt": "2026-11-09T14:46:59Z"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:59Z",
+          "completedAt": "2026-11-09T14:47:00Z"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:00Z",
+          "completedAt": "2026-11-09T14:47:00Z"
+        }
+      ]
+    },
+    {
+      "id": 129228651632,
+      "runId": 42637270579,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Local driver (macOS permissions, nonblocking)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:19Z",
+      "completedAt": "2026-11-09T14:42:56Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270579/job/129228651632",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228651632",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228651632",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:20Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:29Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:29Z",
+          "completedAt": "2026-11-09T14:42:30Z"
+        },
+        {
+          "number": 4,
+          "name": "Cache pinned standalone driver archive",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:30Z",
+          "completedAt": "2026-11-09T14:42:31Z"
+        },
+        {
+          "number": 5,
+          "name": "Install the pinned MIT standalone driver",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:31Z",
+          "completedAt": "2026-11-09T14:42:32Z"
+        },
+        {
+          "number": 6,
+          "name": "Observe native screenshot, input and click through the run broker",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:32Z",
+          "completedAt": "2026-11-09T14:42:52Z"
+        },
+        {
+          "number": 7,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:52Z",
+          "completedAt": "2026-11-09T14:42:53Z"
+        },
+        {
+          "number": 12,
+          "name": "Post Cache pinned standalone driver archive",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:53Z",
+          "completedAt": "2026-11-09T14:42:53Z"
+        },
+        {
+          "number": 13,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:53Z",
+          "completedAt": "2026-11-09T14:42:53Z"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:53Z",
+          "completedAt": "2026-11-09T14:42:54Z"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:54Z",
+          "completedAt": "2026-11-09T14:42:54Z"
+        }
+      ]
+    },
+    {
+      "id": 129228652053,
+      "runId": 42637270733,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Workspace governance HTTP (Item 11)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:18Z",
+      "completedAt": "2026-11-09T14:44:02Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270733/job/129228652053",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228652053",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228652053",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:20Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:32Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:32Z",
+          "completedAt": "2026-11-09T14:42:38Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:38Z",
+          "completedAt": "2026-11-09T14:43:20Z"
+        },
+        {
+          "number": 5,
+          "name": "Verify the exact hosted checkout and create a test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:20Z",
+          "completedAt": "2026-11-09T14:43:21Z"
+        },
+        {
+          "number": 6,
+          "name": "Apply every tracked migration to the isolated PostgreSQL service",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:21Z",
+          "completedAt": "2026-11-09T14:43:24Z"
+        },
+        {
+          "number": 7,
+          "name": "Bind the disposable database to this exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:24Z",
+          "completedAt": "2026-11-09T14:43:24Z"
+        },
+        {
+          "number": 8,
+          "name": "Run real HTTP Item 11 with its ordinary owner and peer sessions",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:24Z",
+          "completedAt": "2026-11-09T14:43:58Z"
+        },
+        {
+          "number": 9,
+          "name": "Preserve only audited acceptance metadata",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:58Z",
+          "completedAt": "2026-11-09T14:43:59Z"
+        },
+        {
+          "number": 16,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:59Z",
+          "completedAt": "2026-11-09T14:43:59Z"
+        },
+        {
+          "number": 17,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:59Z",
+          "completedAt": "2026-11-09T14:44:00Z"
+        },
+        {
+          "number": 18,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:00Z",
+          "completedAt": "2026-11-09T14:44:00Z"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:00Z",
+          "completedAt": "2026-11-09T14:44:00Z"
+        }
+      ]
+    },
+    {
+      "id": 129228652247,
+      "runId": 42637270500,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Read cache production guards",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:19Z",
+      "completedAt": "2026-11-09T14:43:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270500/job/129228652247",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228652247",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228652247",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:21Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:21Z",
+          "completedAt": "2026-11-09T14:42:26Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:26Z",
+          "completedAt": "2026-11-09T14:43:26Z"
+        },
+        {
+          "number": 4,
+          "name": "Run node --import tsx --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/read-cache-production.test.mjs scripts/acceptance/workflow-migration-production.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:26Z",
+          "completedAt": "2026-11-09T14:43:28Z"
+        },
+        {
+          "number": 5,
+          "name": "Check whether the one-time migration acceptance is still open",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:43:28Z",
+          "completedAt": "2026-11-09T14:43:28Z"
+        },
+        {
+          "number": 9,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:28Z",
+          "completedAt": "2026-11-09T14:43:29Z"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:29Z",
+          "completedAt": "2026-11-09T14:43:29Z"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:29Z",
+          "completedAt": "2026-11-09T14:43:29Z"
+        }
+      ]
+    },
+    {
+      "id": 129228652473,
+      "runId": 42637270696,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "runtime",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:19Z",
+      "completedAt": "2026-11-09T14:44:00Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270696/job/129228652473",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228652473",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228652473",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:20Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:25Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:25Z",
+          "completedAt": "2026-11-09T14:42:26Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:26Z",
+          "completedAt": "2026-11-09T14:42:50Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:50Z",
+          "completedAt": "2026-11-09T14:43:06Z"
+        },
+        {
+          "number": 6,
+          "name": "Visual model, scoped policy and network contracts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:06Z",
+          "completedAt": "2026-11-09T14:43:23Z"
+        },
+        {
+          "number": 7,
+          "name": "Install isolated browser acceptance dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:23Z",
+          "completedAt": "2026-11-09T14:43:53Z"
+        },
+        {
+          "number": 8,
+          "name": "Real Chromium observation, action, replay and credential guards",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:53Z",
+          "completedAt": "2026-11-09T14:43:57Z"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:57Z",
+          "completedAt": "2026-11-09T14:43:57Z"
+        },
+        {
+          "number": 15,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:57Z",
+          "completedAt": "2026-11-09T14:43:57Z"
+        },
+        {
+          "number": 16,
+          "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:57Z",
+          "completedAt": "2026-11-09T14:43:57Z"
+        },
+        {
+          "number": 17,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:57Z",
+          "completedAt": "2026-11-09T14:43:57Z"
+        }
+      ]
+    },
+    {
+      "id": 129228652493,
+      "runId": 42637270579,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Local driver (Linux Xvfb)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:16Z",
+      "startedAt": "2026-11-09T14:42:18Z",
+      "completedAt": "2026-11-09T14:42:48Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270579/job/129228652493",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228652493",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228652493",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:20Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:25Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:25Z",
+          "completedAt": "2026-11-09T14:42:26Z"
+        },
+        {
+          "number": 4,
+          "name": "Cache pinned standalone driver archive",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:26Z",
+          "completedAt": "2026-11-09T14:42:27Z"
+        },
+        {
+          "number": 5,
+          "name": "Install isolated X11 and pinned MIT driver",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:27Z",
+          "completedAt": "2026-11-09T14:42:42Z"
+        },
+        {
+          "number": 6,
+          "name": "Real default-allow driver through the run broker",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:42Z",
+          "completedAt": "2026-11-09T14:42:44Z"
+        },
+        {
+          "number": 7,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:44Z",
+          "completedAt": "2026-11-09T14:42:45Z"
+        },
+        {
+          "number": 12,
+          "name": "Post Cache pinned standalone driver archive",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:45Z",
+          "completedAt": "2026-11-09T14:42:45Z"
+        },
+        {
+          "number": 13,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:45Z",
+          "completedAt": "2026-11-09T14:42:45Z"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:45Z",
+          "completedAt": "2026-11-09T14:42:45Z"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:45Z",
+          "completedAt": "2026-11-09T14:42:45Z"
+        }
+      ]
+    },
+    {
+      "id": 129228652867,
+      "runId": 42637270709,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "test",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:17Z",
+      "startedAt": "2026-11-09T14:42:19Z",
+      "completedAt": "2026-11-09T14:42:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270709/job/129228652867",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228652867",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228652867",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:20Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:26Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:26Z",
+          "completedAt": "2026-11-09T14:42:29Z"
+        },
+        {
+          "number": 4,
+          "name": "Install only the offline gate test dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:29Z",
+          "completedAt": "2026-11-09T14:42:33Z"
+        },
+        {
+          "number": 5,
+          "name": "Run node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:33Z",
+          "completedAt": "2026-11-09T14:42:35Z"
+        },
+        {
+          "number": 6,
+          "name": "Run python3 scripts/e2b/build-template.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:35Z",
+          "completedAt": "2026-11-09T14:42:36Z"
+        },
+        {
+          "number": 7,
+          "name": "Run python3 scripts/e2b/official-files.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:36Z",
+          "completedAt": "2026-11-09T14:42:37Z"
+        },
+        {
+          "number": 8,
+          "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:37Z",
+          "completedAt": "2026-11-09T14:42:37Z"
+        },
+        {
+          "number": 9,
+          "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:37Z",
+          "completedAt": "2026-11-09T14:42:37Z"
+        },
+        {
+          "number": 10,
+          "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:37Z",
+          "completedAt": "2026-11-09T14:42:37Z"
+        },
+        {
+          "number": 19,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:37Z",
+          "completedAt": "2026-11-09T14:42:37Z"
+        },
+        {
+          "number": 20,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:37Z",
+          "completedAt": "2026-11-09T14:42:37Z"
+        },
+        {
+          "number": 21,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:37Z",
+          "completedAt": "2026-11-09T14:42:37Z"
+        }
+      ]
+    },
+    {
+      "id": 129228655057,
+      "runId": 42637270363,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Core production offline guards",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T14:42:17Z",
+      "startedAt": "2026-11-09T14:42:19Z",
+      "completedAt": "2026-11-09T14:43:20Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270363/job/129228655057",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228655057",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228655057",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:21Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:21Z",
+          "completedAt": "2026-11-09T14:42:26Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:26Z",
+          "completedAt": "2026-11-09T14:43:16Z"
+        },
+        {
+          "number": 4,
+          "name": "Run node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:16Z",
+          "completedAt": "2026-11-09T14:43:17Z"
+        },
+        {
+          "number": 7,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:17Z",
+          "completedAt": "2026-11-09T14:43:18Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:18Z",
+          "completedAt": "2026-11-09T14:43:18Z"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:18Z",
+          "completedAt": "2026-11-09T14:43:18Z"
+        }
+      ]
+    },
+    {
+      "id": 129228873469,
+      "runId": 42637270709,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "check",
+      "status": "completed",
+      "conclusion": "skipped",
+      "createdAt": "2026-11-09T14:42:40Z",
+      "startedAt": "2026-11-09T14:42:40Z",
+      "completedAt": "2026-11-09T14:42:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270709/job/129228873469",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228873469",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228873469",
+      "steps": []
+    },
+    {
+      "id": 129228874871,
+      "runId": 42637270709,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "validate",
+      "status": "completed",
+      "conclusion": "skipped",
+      "createdAt": "2026-11-09T14:42:40Z",
+      "startedAt": "2026-11-09T14:42:40Z",
+      "completedAt": "2026-11-09T14:42:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270709/job/129228874871",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228874871",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228874871",
+      "steps": []
+    },
+    {
+      "id": 129228877211,
+      "runId": 42637270709,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "await-web",
+      "status": "completed",
+      "conclusion": "skipped",
+      "createdAt": "2026-11-09T14:42:40Z",
+      "startedAt": "2026-11-09T14:42:40Z",
+      "completedAt": "2026-11-09T14:42:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270709/job/129228877211",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228877211",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228877211",
+      "steps": []
+    },
+    {
+      "id": 129228879223,
+      "runId": 42637270709,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "subscriptions",
+      "status": "completed",
+      "conclusion": "skipped",
+      "createdAt": "2026-11-09T14:42:41Z",
+      "startedAt": "2026-11-09T14:42:41Z",
+      "completedAt": "2026-11-09T14:42:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270709/job/129228879223",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228879223",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228879223",
+      "steps": []
+    },
+    {
+      "id": 129228879348,
+      "runId": 42637270709,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "publish",
+      "status": "completed",
+      "conclusion": "skipped",
+      "createdAt": "2026-11-09T14:42:41Z",
+      "startedAt": "2026-11-09T14:42:41Z",
+      "completedAt": "2026-11-09T14:42:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270709/job/129228879348",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228879348",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228879348",
+      "steps": []
+    },
+    {
+      "id": 129228880055,
+      "runId": 42637270709,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "cleanup",
+      "status": "completed",
+      "conclusion": "skipped",
+      "createdAt": "2026-11-09T14:42:41Z",
+      "startedAt": "2026-11-09T14:42:41Z",
+      "completedAt": "2026-11-09T14:42:40Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270709/job/129228880055",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129228880055",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129228880055",
+      "steps": []
+    },
+    {
+      "id": 129229253511,
+      "runId": 42637270363,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Core production API and gateway acceptance",
+      "status": "completed",
+      "conclusion": "skipped",
+      "createdAt": "2026-11-09T14:43:21Z",
+      "startedAt": "2026-11-09T14:43:21Z",
+      "completedAt": "2026-11-09T14:43:20Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270363/job/129229253511",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129229253511",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129229253511",
+      "steps": []
+    },
+    {
+      "id": 129229354727,
+      "runId": 42637270500,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Read cache production reads",
+      "status": "completed",
+      "conclusion": "skipped",
+      "createdAt": "2026-11-09T14:43:32Z",
+      "startedAt": "2026-11-09T14:43:32Z",
+      "completedAt": "2026-11-09T14:43:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270500/job/129229354727",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129229354727",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129229354727",
+      "steps": []
+    },
+    {
+      "id": 129229356024,
+      "runId": 42637270500,
+      "runAttempt": 1,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Issue 1415 production reads and managed reminder",
+      "status": "completed",
+      "conclusion": "skipped",
+      "createdAt": "2026-11-09T14:43:32Z",
+      "startedAt": "2026-11-09T14:43:32Z",
+      "completedAt": "2026-11-09T14:43:32Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270500/job/129229356024",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129229356024",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129229356024",
+      "steps": []
+    },
+    {
+      "id": 129249611752,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:01Z",
+      "startedAt": "2026-11-09T15:18:04Z",
+      "completedAt": "2026-11-09T15:22:25Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249611752",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249611752",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249611752",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:18:04Z",
+          "completedAt": "2026-11-09T15:18:05Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:18:05Z",
+          "completedAt": "2026-11-09T15:18:10Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:18:10Z",
+          "completedAt": "2026-11-09T15:18:55Z"
+        },
+        {
+          "number": 4,
+          "name": "Run selected integration tasks through Nx Core",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:18:55Z",
+          "completedAt": "2026-11-09T15:22:22Z"
+        },
+        {
+          "number": 7,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:22:22Z",
+          "completedAt": "2026-11-09T15:22:22Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:22:22Z",
+          "completedAt": "2026-11-09T15:22:22Z"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:22:22Z",
+          "completedAt": "2026-11-09T15:22:22Z"
+        }
+      ]
+    },
+    {
+      "id": 129249613550,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:42:18Z",
+      "completedAt": "2026-11-09T14:43:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249613550",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249613550",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249613550",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:19Z",
+          "completedAt": "2026-11-09T14:42:20Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:20Z",
+          "completedAt": "2026-11-09T14:42:29Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:29Z",
+          "completedAt": "2026-11-09T14:42:30Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:30Z",
+          "completedAt": "2026-11-09T14:42:31Z"
+        },
+        {
+          "number": 5,
+          "name": "Run git fetch origin main --no-tags",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:42:31Z",
+          "completedAt": "2026-11-09T14:43:06Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:06Z",
+          "completedAt": "2026-11-09T14:43:06Z"
+        },
+        {
+          "number": 9,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:06Z",
+          "completedAt": "2026-11-09T14:43:06Z"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:06Z",
+          "completedAt": "2026-11-09T14:43:06Z"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:06Z",
+          "completedAt": "2026-11-09T14:43:06Z"
+        }
+      ]
+    },
+    {
+      "id": 129249613912,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T15:18:02Z",
+      "completedAt": "2026-11-09T14:43:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249613912",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249613912",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249613912",
+      "steps": []
+    },
+    {
+      "id": 129249614987,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:46:10Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249614987",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249614987",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249614987",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:26Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:26Z",
+          "completedAt": "2026-11-09T14:43:28Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:28Z",
+          "completedAt": "2026-11-09T14:44:15Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:15Z",
+          "completedAt": "2026-11-09T14:44:15Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:15Z",
+          "completedAt": "2026-11-09T14:44:15Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:15Z",
+          "completedAt": "2026-11-09T14:44:17Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:44:17Z",
+          "completedAt": "2026-11-09T14:44:17Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:17Z",
+          "completedAt": "2026-11-09T14:44:18Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:18Z",
+          "completedAt": "2026-11-09T14:44:21Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:21Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:23Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:44:23Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:44:23Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:23Z",
+          "completedAt": "2026-11-09T14:46:06Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:06Z",
+          "completedAt": "2026-11-09T14:46:06Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:06Z",
+          "completedAt": "2026-11-09T14:46:06Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:06Z",
+          "completedAt": "2026-11-09T14:46:06Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:06Z",
+          "completedAt": "2026-11-09T14:46:07Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:07Z",
+          "completedAt": "2026-11-09T14:46:07Z"
+        }
+      ]
+    },
+    {
+      "id": 129249615558,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "desktop-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:43:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249615558",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249615558",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249615558",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:22Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:22Z",
+          "completedAt": "2026-11-09T14:43:23Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:23Z",
+          "completedAt": "2026-11-09T14:43:24Z"
+        },
+        {
+          "number": 5,
+          "name": "Run git fetch origin main --no-tags",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:24Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:55Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        },
+        {
+          "number": 9,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:55Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:55Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:55Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        }
+      ]
+    },
+    {
+      "id": 129249615614,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:46:28Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249615614",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249615614",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249615614",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:15Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:15Z",
+          "completedAt": "2026-11-09T14:43:51Z"
+        },
+        {
+          "number": 4,
+          "name": "Shadow selection against full baseline scenarios",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:51Z",
+          "completedAt": "2026-11-09T14:44:00Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm check:cloud-boundary",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:00Z",
+          "completedAt": "2026-11-09T14:44:10Z"
+        },
+        {
+          "number": 6,
+          "name": "Verify all production release credentials use existing Infisical OIDC",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:10Z",
+          "completedAt": "2026-11-09T14:44:10Z"
+        },
+        {
+          "number": 7,
+          "name": "Verify production auth and lease acceptance drivers without credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:10Z",
+          "completedAt": "2026-11-09T14:44:11Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm lint:code",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:11Z",
+          "completedAt": "2026-11-09T14:44:14Z"
+        },
+        {
+          "number": 9,
+          "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:14Z",
+          "completedAt": "2026-11-09T14:44:15Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm lint:runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:15Z",
+          "completedAt": "2026-11-09T14:44:15Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:api",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:15Z",
+          "completedAt": "2026-11-09T14:44:39Z"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm --filter @mikka/frontend test",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:39Z",
+          "completedAt": "2026-11-09T14:45:12Z"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:12Z",
+          "completedAt": "2026-11-09T14:46:03Z"
+        },
+        {
+          "number": 14,
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:03Z",
+          "completedAt": "2026-11-09T14:46:04Z"
+        },
+        {
+          "number": 15,
+          "name": "Run pnpm --filter @mikka/mobile typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:04Z",
+          "completedAt": "2026-11-09T14:46:13Z"
+        },
+        {
+          "number": 16,
+          "name": "Audit business UI composition",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:13Z",
+          "completedAt": "2026-11-09T14:46:25Z"
+        },
+        {
+          "number": 17,
+          "name": "Show audit summary",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:25Z",
+          "completedAt": "2026-11-09T14:46:25Z"
+        },
+        {
+          "number": 18,
+          "name": "Upload detailed audit",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:25Z",
+          "completedAt": "2026-11-09T14:46:26Z"
+        },
+        {
+          "number": 35,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:26Z",
+          "completedAt": "2026-11-09T14:46:27Z"
+        },
+        {
+          "number": 36,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:27Z",
+          "completedAt": "2026-11-09T14:46:27Z"
+        },
+        {
+          "number": 37,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:27Z",
+          "completedAt": "2026-11-09T14:46:27Z"
+        }
+      ]
+    },
+    {
+      "id": 129249615649,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:50:08Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249615649",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249615649",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249615649",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:25Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:25Z",
+          "completedAt": "2026-11-09T14:43:28Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:28Z",
+          "completedAt": "2026-11-09T14:44:11Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:11Z",
+          "completedAt": "2026-11-09T14:44:11Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:11Z",
+          "completedAt": "2026-11-09T14:44:12Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:12Z",
+          "completedAt": "2026-11-09T14:44:14Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:44:14Z",
+          "completedAt": "2026-11-09T14:44:14Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:14Z",
+          "completedAt": "2026-11-09T14:44:14Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:14Z",
+          "completedAt": "2026-11-09T14:44:20Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:20Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:23Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:44:23Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:44:23Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:23Z",
+          "completedAt": "2026-11-09T14:50:05Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:05Z",
+          "completedAt": "2026-11-09T14:50:05Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:05Z",
+          "completedAt": "2026-11-09T14:50:05Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:05Z",
+          "completedAt": "2026-11-09T14:50:05Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:05Z",
+          "completedAt": "2026-11-09T14:50:06Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:06Z",
+          "completedAt": "2026-11-09T14:50:06Z"
+        }
+      ]
+    },
+    {
+      "id": 129249615722,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:50:11Z",
+      "completedAt": "2026-11-09T14:50:21Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249615722",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249615722",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249615722",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:11Z",
+          "completedAt": "2026-11-09T14:50:12Z"
+        },
+        {
+          "number": 2,
+          "name": "Require every selected database shard",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:12Z",
+          "completedAt": "2026-11-09T14:50:12Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:12Z",
+          "completedAt": "2026-11-09T14:50:18Z"
+        },
+        {
+          "number": 4,
+          "name": "Record actual completed job timings",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:18Z",
+          "completedAt": "2026-11-09T14:50:19Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:19Z",
+          "completedAt": "2026-11-09T14:50:19Z"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:19Z",
+          "completedAt": "2026-11-09T14:50:19Z"
+        }
+      ]
+    },
+    {
+      "id": 129249616555,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "analytics-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:43:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249616555",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249616555",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249616555",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:22Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:22Z",
+          "completedAt": "2026-11-09T14:43:23Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:23Z",
+          "completedAt": "2026-11-09T14:43:23Z"
+        },
+        {
+          "number": 5,
+          "name": "Run git fetch origin main --no-tags",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:23Z",
+          "completedAt": "2026-11-09T14:43:54Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:54Z",
+          "completedAt": "2026-11-09T14:43:54Z"
+        },
+        {
+          "number": 9,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:54Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:55Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:55Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        }
+      ]
+    },
+    {
+      "id": 129249617123,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "image-checks / image",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:44:01Z",
+      "completedAt": "2026-11-09T15:00:55Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249617123",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249617123",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249617123",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:02Z",
+          "completedAt": "2026-11-09T14:44:03Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:03Z",
+          "completedAt": "2026-11-09T14:44:09Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:09Z",
+          "completedAt": "2026-11-09T14:44:10Z"
+        },
+        {
+          "number": 4,
+          "name": "Verify disposable acceptance target guards and model fixture",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:10Z",
+          "completedAt": "2026-11-09T14:44:10Z"
+        },
+        {
+          "number": 5,
+          "name": "Build the public standalone application",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:10Z",
+          "completedAt": "2026-11-09T14:48:57Z"
+        },
+        {
+          "number": 6,
+          "name": "Verify packaged subscription binaries without network or credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:57Z",
+          "completedAt": "2026-11-09T14:48:58Z"
+        },
+        {
+          "number": 7,
+          "name": "Start with an empty database and no Mikka credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:58Z",
+          "completedAt": "2026-11-09T14:48:58Z"
+        },
+        {
+          "number": 8,
+          "name": "Build the pinned upstream MinIO fixture",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:58Z",
+          "completedAt": "2026-11-09T14:51:06Z"
+        },
+        {
+          "number": 9,
+          "name": "Apply migrations and wait for health",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:51:06Z",
+          "completedAt": "2026-11-09T14:51:27Z"
+        },
+        {
+          "number": 10,
+          "name": "Verify runtime edition, sign-in document, API and compiled assets",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:51:27Z",
+          "completedAt": "2026-11-09T14:51:27Z"
+        },
+        {
+          "number": 11,
+          "name": "Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:51:27Z",
+          "completedAt": "2026-11-09T14:55:43Z"
+        },
+        {
+          "number": 12,
+          "name": "Reclaim intermediate build cache before installing source dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:55:43Z",
+          "completedAt": "2026-11-09T14:57:11Z"
+        },
+        {
+          "number": 13,
+          "name": "Install the same-revision source daemon dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:57:11Z",
+          "completedAt": "2026-11-09T14:57:52Z"
+        },
+        {
+          "number": 14,
+          "name": "Exercise the real daemon against the registered community user",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:57:52Z",
+          "completedAt": "2026-11-09T14:57:56Z"
+        },
+        {
+          "number": 15,
+          "name": "Install the native desktop runtime dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:57:56Z",
+          "completedAt": "2026-11-09T14:58:37Z"
+        },
+        {
+          "number": 16,
+          "name": "Build one packaged acceptance desktop with an independent default server",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:58:37Z",
+          "completedAt": "2026-11-09T14:59:01Z"
+        },
+        {
+          "number": 17,
+          "name": "Verify packaged desktop email login, chat and built-in live against the actual image",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:59:01Z",
+          "completedAt": "2026-11-09T14:59:13Z"
+        },
+        {
+          "number": 18,
+          "name": "Remove private desktop fixture material",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:59:13Z",
+          "completedAt": "2026-11-09T14:59:13Z"
+        },
+        {
+          "number": 19,
+          "name": "Remove private daemon fixture material",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:59:13Z",
+          "completedAt": "2026-11-09T14:59:13Z"
+        },
+        {
+          "number": 20,
+          "name": "Retain secret-free application acceptance evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:59:13Z",
+          "completedAt": "2026-11-09T14:59:13Z"
+        },
+        {
+          "number": 21,
+          "name": "Upload isolated acceptance receipt",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:59:13Z",
+          "completedAt": "2026-11-09T14:59:15Z"
+        },
+        {
+          "number": 22,
+          "name": "Verify the same persistent installation restarts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:59:15Z",
+          "completedAt": "2026-11-09T14:59:38Z"
+        },
+        {
+          "number": 23,
+          "name": "Verify the older built-in UI remains opt-in with the same data",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:59:38Z",
+          "completedAt": "2026-11-09T15:00:30Z"
+        },
+        {
+          "number": 24,
+          "name": "Publish the tested revision",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T15:00:30Z",
+          "completedAt": "2026-11-09T15:00:30Z"
+        },
+        {
+          "number": 25,
+          "name": "Retain startup diagnostics on failure",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T15:00:30Z",
+          "completedAt": "2026-11-09T15:00:30Z"
+        },
+        {
+          "number": 26,
+          "name": "Stop disposable services",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:00:30Z",
+          "completedAt": "2026-11-09T15:00:51Z"
+        },
+        {
+          "number": 50,
+          "name": "Post Install the same-revision source daemon dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:00:51Z",
+          "completedAt": "2026-11-09T15:00:52Z"
+        },
+        {
+          "number": 51,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:00:52Z",
+          "completedAt": "2026-11-09T15:00:52Z"
+        },
+        {
+          "number": 52,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:00:52Z",
+          "completedAt": "2026-11-09T15:00:52Z"
+        },
+        {
+          "number": 53,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:00:52Z",
+          "completedAt": "2026-11-09T15:00:52Z"
+        }
+      ]
+    },
+    {
+      "id": 129249617254,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "desktop-checks / checks",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:44:00Z",
+      "completedAt": "2026-11-09T14:46:34Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249617254",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249617254",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249617254",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:01Z",
+          "completedAt": "2026-11-09T14:44:02Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:02Z",
+          "completedAt": "2026-11-09T14:44:08Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:08Z",
+          "completedAt": "2026-11-09T14:44:09Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:09Z",
+          "completedAt": "2026-11-09T14:44:37Z"
+        },
+        {
+          "number": 5,
+          "name": "Install dependencies without the Electron runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:37Z",
+          "completedAt": "2026-11-09T14:44:51Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm --filter @mikka/desktop typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:51Z",
+          "completedAt": "2026-11-09T14:45:32Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm --filter @mikka/desktop lint",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:32Z",
+          "completedAt": "2026-11-09T14:45:32Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm --filter @mikka/desktop test",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:32Z",
+          "completedAt": "2026-11-09T14:45:54Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @mikka/desktop build",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:54Z",
+          "completedAt": "2026-11-09T14:46:05Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:05Z",
+          "completedAt": "2026-11-09T14:46:06Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:platform",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:06Z",
+          "completedAt": "2026-11-09T14:46:09Z"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm test:idle-budget",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:09Z",
+          "completedAt": "2026-11-09T14:46:19Z"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm lint:ui",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:19Z",
+          "completedAt": "2026-11-09T14:46:30Z"
+        },
+        {
+          "number": 24,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:30Z",
+          "completedAt": "2026-11-09T14:46:30Z"
+        },
+        {
+          "number": 25,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:30Z",
+          "completedAt": "2026-11-09T14:46:30Z"
+        },
+        {
+          "number": 26,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:30Z",
+          "completedAt": "2026-11-09T14:46:30Z"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:30Z",
+          "completedAt": "2026-11-09T14:46:31Z"
+        }
+      ]
+    },
+    {
+      "id": 129249617484,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "analytics-checks / Analytics SSR (full)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:44:00Z",
+      "completedAt": "2026-11-09T14:48:47Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249617484",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249617484",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249617484",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:01Z",
+          "completedAt": "2026-11-09T14:44:02Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:02Z",
+          "completedAt": "2026-11-09T14:44:15Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:15Z",
+          "completedAt": "2026-11-09T14:44:18Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:18Z",
+          "completedAt": "2026-11-09T14:44:19Z"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:19Z",
+          "completedAt": "2026-11-09T14:44:38Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:38Z",
+          "completedAt": "2026-11-09T14:44:51Z"
+        },
+        {
+          "number": 7,
+          "name": "Apply tracked SQL only to the disposable CI database",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:51Z",
+          "completedAt": "2026-11-09T14:44:52Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm build",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:52Z",
+          "completedAt": "2026-11-09T14:48:16Z"
+        },
+        {
+          "number": 9,
+          "name": "Verify compiled runtime resources and browser analytics assets",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:16Z",
+          "completedAt": "2026-11-09T14:48:18Z"
+        },
+        {
+          "number": 10,
+          "name": "Install the pinned browser into this job's temporary directory",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:18Z",
+          "completedAt": "2026-11-09T14:48:37Z"
+        },
+        {
+          "number": 11,
+          "name": "Permit the installed Chromium sandbox in this disposable runner",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:37Z",
+          "completedAt": "2026-11-09T14:48:37Z"
+        },
+        {
+          "number": 12,
+          "name": "Render real compiled HTTP pages with browser analytics enabled",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:37Z",
+          "completedAt": "2026-11-09T14:48:43Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:43Z",
+          "completedAt": "2026-11-09T14:48:43Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:43Z",
+          "completedAt": "2026-11-09T14:48:43Z"
+        },
+        {
+          "number": 23,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:43Z",
+          "completedAt": "2026-11-09T14:48:43Z"
+        },
+        {
+          "number": 24,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:43Z",
+          "completedAt": "2026-11-09T14:48:45Z"
+        },
+        {
+          "number": 25,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:45Z",
+          "completedAt": "2026-11-09T14:48:45Z"
+        }
+      ]
+    },
+    {
+      "id": 129249617628,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "desktop-checks / smoke",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:44:00Z",
+      "completedAt": "2026-11-09T14:47:59Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249617628",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249617628",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249617628",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:00Z",
+          "completedAt": "2026-11-09T14:44:02Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:02Z",
+          "completedAt": "2026-11-09T14:44:17Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:17Z",
+          "completedAt": "2026-11-09T14:44:22Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:22Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:23Z",
+          "completedAt": "2026-11-09T14:44:48Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:48Z",
+          "completedAt": "2026-11-09T14:45:03Z"
+        },
+        {
+          "number": 7,
+          "name": "Install Chromium system dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:03Z",
+          "completedAt": "2026-11-09T14:45:20Z"
+        },
+        {
+          "number": 8,
+          "name": "Run sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:20Z",
+          "completedAt": "2026-11-09T14:45:28Z"
+        },
+        {
+          "number": 9,
+          "name": "Install the pinned Electron runtime and its Linux sandbox helper",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:28Z",
+          "completedAt": "2026-11-09T14:45:31Z"
+        },
+        {
+          "number": 10,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:31Z",
+          "completedAt": "2026-11-09T14:45:31Z"
+        },
+        {
+          "number": 11,
+          "name": "Apply tracked migrations to the disposable database",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:31Z",
+          "completedAt": "2026-11-09T14:45:31Z"
+        },
+        {
+          "number": 12,
+          "name": "Prepare the isolated E2E schema",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:31Z",
+          "completedAt": "2026-11-09T14:45:33Z"
+        },
+        {
+          "number": 13,
+          "name": "Build the production web backend",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:45:33Z",
+          "completedAt": "2026-11-09T14:47:11Z"
+        },
+        {
+          "number": 14,
+          "name": "Archive the compiled Linux backend",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:11Z",
+          "completedAt": "2026-11-09T14:47:16Z"
+        },
+        {
+          "number": 15,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:16Z",
+          "completedAt": "2026-11-09T14:47:19Z"
+        },
+        {
+          "number": 16,
+          "name": "Build the dev Electron shell",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:19Z",
+          "completedAt": "2026-11-09T14:47:26Z"
+        },
+        {
+          "number": 17,
+          "name": "Isolated Electron authentication and runtime acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:26Z",
+          "completedAt": "2026-11-09T14:47:54Z"
+        },
+        {
+          "number": 18,
+          "name": "Audit runtime evidence before upload",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:54Z",
+          "completedAt": "2026-11-09T14:47:54Z"
+        },
+        {
+          "number": 19,
+          "name": "Keep audited Electron evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:54Z",
+          "completedAt": "2026-11-09T14:47:55Z"
+        },
+        {
+          "number": 35,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:55Z",
+          "completedAt": "2026-11-09T14:47:55Z"
+        },
+        {
+          "number": 36,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:55Z",
+          "completedAt": "2026-11-09T14:47:55Z"
+        },
+        {
+          "number": 37,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:55Z",
+          "completedAt": "2026-11-09T14:47:55Z"
+        },
+        {
+          "number": 38,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:55Z",
+          "completedAt": "2026-11-09T14:47:56Z"
+        },
+        {
+          "number": 39,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:56Z",
+          "completedAt": "2026-11-09T14:47:56Z"
+        }
+      ]
+    },
+    {
+      "id": 129249617681,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "image-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:43:58Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249617681",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249617681",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249617681",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:22Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:22Z",
+          "completedAt": "2026-11-09T14:43:23Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:23Z",
+          "completedAt": "2026-11-09T14:43:23Z"
+        },
+        {
+          "number": 5,
+          "name": "Run git fetch origin main --no-tags",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:23Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:55Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        },
+        {
+          "number": 9,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:55Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:55Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:55Z",
+          "completedAt": "2026-11-09T14:43:55Z"
+        }
+      ]
+    },
+    {
+      "id": 129249617954,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "desktop-checks / icon",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:44:00Z",
+      "completedAt": "2026-11-09T14:44:26Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249617954",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249617954",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249617954",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:01Z",
+          "completedAt": "2026-11-09T14:44:02Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:02Z",
+          "completedAt": "2026-11-09T14:44:09Z"
+        },
+        {
+          "number": 3,
+          "name": "Select Xcode 26 for actool",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:09Z",
+          "completedAt": "2026-11-09T14:44:16Z"
+        },
+        {
+          "number": 4,
+          "name": "Compile build/icon.icon as electron-builder does",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:16Z",
+          "completedAt": "2026-11-09T14:44:20Z"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:20Z",
+          "completedAt": "2026-11-09T14:44:22Z"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:22Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:23Z",
+          "completedAt": "2026-11-09T14:44:23Z"
+        }
+      ]
+    },
+    {
+      "id": 129249619409,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:49:01Z",
+      "completedAt": "2026-11-09T15:10:23Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249619409",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249619409",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249619409",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:02Z",
+          "completedAt": "2026-11-09T14:49:04Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:04Z",
+          "completedAt": "2026-11-09T14:49:13Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:13Z",
+          "completedAt": "2026-11-09T14:49:15Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:15Z",
+          "completedAt": "2026-11-09T14:49:17Z"
+        },
+        {
+          "number": 5,
+          "name": "Run test \"$(uname -m)\" = arm64",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:17Z",
+          "completedAt": "2026-11-09T14:49:17Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:49:17Z",
+          "completedAt": "2026-11-09T14:52:05Z"
+        },
+        {
+          "number": 7,
+          "name": "Keep setup-node 24 in the native installer login shell",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:52:05Z",
+          "completedAt": "2026-11-09T14:52:06Z"
+        },
+        {
+          "number": 8,
+          "name": "Prepare the pinned native Electron and builder checksum cache",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:52:06Z",
+          "completedAt": "2026-11-09T14:52:11Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm exec playwright install chromium",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:52:11Z",
+          "completedAt": "2026-11-09T14:52:23Z"
+        },
+        {
+          "number": 10,
+          "name": "Start an independent local PostgreSQL",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:52:23Z",
+          "completedAt": "2026-11-09T14:52:46Z"
+        },
+        {
+          "number": 11,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:52:46Z",
+          "completedAt": "2026-11-09T14:52:46Z"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm migrate && pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:52:46Z",
+          "completedAt": "2026-11-09T14:52:51Z"
+        },
+        {
+          "number": 13,
+          "name": "Build the production API for the native ARM64 runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:52:51Z",
+          "completedAt": "2026-11-09T14:56:46Z"
+        },
+        {
+          "number": 14,
+          "name": "Select Xcode 26",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:56:46Z",
+          "completedAt": "2026-11-09T14:56:46Z"
+        },
+        {
+          "number": 15,
+          "name": "Package an inspector-enabled harness input",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:56:46Z",
+          "completedAt": "2026-11-09T14:57:48Z"
+        },
+        {
+          "number": 16,
+          "name": "Real Keychain encryption across three independent packaged processes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:57:48Z",
+          "completedAt": "2026-11-09T14:58:07Z"
+        },
+        {
+          "number": 17,
+          "name": "Real packaged Apple Silicon native acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:58:07Z",
+          "completedAt": "2026-11-09T15:07:03Z"
+        },
+        {
+          "number": 18,
+          "name": "Keep final package integrity evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:07:03Z",
+          "completedAt": "2026-11-09T15:07:03Z"
+        },
+        {
+          "number": 19,
+          "name": "Audit closed package and crypto reports",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:07:03Z",
+          "completedAt": "2026-11-09T15:07:04Z"
+        },
+        {
+          "number": 20,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:07:04Z",
+          "completedAt": "2026-11-09T15:07:05Z"
+        },
+        {
+          "number": 21,
+          "name": "Audit native evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:07:05Z",
+          "completedAt": "2026-11-09T15:07:06Z"
+        },
+        {
+          "number": 22,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:07:06Z",
+          "completedAt": "2026-11-09T15:07:08Z"
+        },
+        {
+          "number": 42,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:07:08Z",
+          "completedAt": "2026-11-09T15:10:17Z"
+        },
+        {
+          "number": 43,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:10:17Z",
+          "completedAt": "2026-11-09T15:10:17Z"
+        },
+        {
+          "number": 44,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:10:17Z",
+          "completedAt": "2026-11-09T15:10:18Z"
+        },
+        {
+          "number": 45,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:10:18Z",
+          "completedAt": "2026-11-09T15:10:21Z"
+        }
+      ]
+    },
+    {
+      "id": 129249620651,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "analytics-checks / analytics-ssr",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:02Z",
+      "startedAt": "2026-11-09T14:48:49Z",
+      "completedAt": "2026-11-09T14:48:51Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249620651",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249620651",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249620651",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:50Z",
+          "completedAt": "2026-11-09T14:48:50Z"
+        },
+        {
+          "number": 2,
+          "name": "Require classification and full regression unless docs-only",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:50Z",
+          "completedAt": "2026-11-09T14:48:50Z"
+        },
+        {
+          "number": 3,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:48:50Z",
+          "completedAt": "2026-11-09T14:48:50Z"
+        }
+      ]
+    },
+    {
+      "id": 129249682618,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:09Z",
+      "startedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:47:03Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249682618",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249682618",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249682618",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:28Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:28Z",
+          "completedAt": "2026-11-09T14:43:31Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:31Z",
+          "completedAt": "2026-11-09T14:44:21Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:21Z",
+          "completedAt": "2026-11-09T14:44:21Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:21Z",
+          "completedAt": "2026-11-09T14:44:22Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:22Z",
+          "completedAt": "2026-11-09T14:44:24Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:44:24Z",
+          "completedAt": "2026-11-09T14:44:24Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:24Z",
+          "completedAt": "2026-11-09T14:44:24Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:24Z",
+          "completedAt": "2026-11-09T14:44:29Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:29Z",
+          "completedAt": "2026-11-09T14:44:31Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:31Z",
+          "completedAt": "2026-11-09T14:44:31Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:44:31Z",
+          "completedAt": "2026-11-09T14:44:31Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:44:31Z",
+          "completedAt": "2026-11-09T14:44:31Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:31Z",
+          "completedAt": "2026-11-09T14:46:57Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:57Z",
+          "completedAt": "2026-11-09T14:46:59Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:59Z",
+          "completedAt": "2026-11-09T14:46:59Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:59Z",
+          "completedAt": "2026-11-09T14:46:59Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:59Z",
+          "completedAt": "2026-11-09T14:47:00Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:47:00Z",
+          "completedAt": "2026-11-09T14:47:00Z"
+        }
+      ]
+    },
+    {
+      "id": 129249687095,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:09Z",
+      "startedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:50:18Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249687095",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249687095",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249687095",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:16Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:16Z",
+          "completedAt": "2026-11-09T14:43:59Z"
+        },
+        {
+          "number": 4,
+          "name": "Run selected core tasks through Nx Core",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:59Z",
+          "completedAt": "2026-11-09T14:50:15Z"
+        },
+        {
+          "number": 7,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:15Z",
+          "completedAt": "2026-11-09T14:50:15Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:15Z",
+          "completedAt": "2026-11-09T14:50:15Z"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:50:15Z",
+          "completedAt": "2026-11-09T14:50:15Z"
+        }
+      ]
+    },
+    {
+      "id": 129249687366,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:09Z",
+      "startedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:46:44Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249687366",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249687366",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249687366",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:16Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:16Z",
+          "completedAt": "2026-11-09T14:44:05Z"
+        },
+        {
+          "number": 4,
+          "name": "Daemon unit and transport regression tests",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:05Z",
+          "completedAt": "2026-11-09T14:46:11Z"
+        },
+        {
+          "number": 5,
+          "name": "Existing mailbox CLI integration tests",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:11Z",
+          "completedAt": "2026-11-09T14:46:14Z"
+        },
+        {
+          "number": 6,
+          "name": "Daemon repository identity, GitHub credential and trusted endpoint tests",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:14Z",
+          "completedAt": "2026-11-09T14:46:16Z"
+        },
+        {
+          "number": 7,
+          "name": "Local computer authority through actual daemon and adapter protocol",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:16Z",
+          "completedAt": "2026-11-09T14:46:19Z"
+        },
+        {
+          "number": 8,
+          "name": "Preserve daemon unit evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:19Z",
+          "completedAt": "2026-11-09T14:46:20Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @mikka/daemon typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:20Z",
+          "completedAt": "2026-11-09T14:46:25Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter @mikka/daemon build",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:25Z",
+          "completedAt": "2026-11-09T14:46:25Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm --filter @mikka/daemon test:package",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:25Z",
+          "completedAt": "2026-11-09T14:46:41Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:41Z",
+          "completedAt": "2026-11-09T14:46:41Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:41Z",
+          "completedAt": "2026-11-09T14:46:41Z"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:41Z",
+          "completedAt": "2026-11-09T14:46:41Z"
+        }
+      ]
+    },
+    {
+      "id": 129249689866,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:18:09Z",
+      "startedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:46:17Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129249689866",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129249689866",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129249689866",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:12Z",
+          "completedAt": "2026-11-09T14:43:13Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:13Z",
+          "completedAt": "2026-11-09T14:43:26Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:26Z",
+          "completedAt": "2026-11-09T14:43:28Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:43:28Z",
+          "completedAt": "2026-11-09T14:44:11Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:11Z",
+          "completedAt": "2026-11-09T14:44:11Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:11Z",
+          "completedAt": "2026-11-09T14:44:12Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:12Z",
+          "completedAt": "2026-11-09T14:44:14Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-09T14:44:14Z",
+          "completedAt": "2026-11-09T14:44:14Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:14Z",
+          "completedAt": "2026-11-09T14:44:14Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:14Z",
+          "completedAt": "2026-11-09T14:44:17Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:17Z",
+          "completedAt": "2026-11-09T14:44:19Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:19Z",
+          "completedAt": "2026-11-09T14:44:19Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:19Z",
+          "completedAt": "2026-11-09T14:44:19Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:19Z",
+          "completedAt": "2026-11-09T14:44:43Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:44:43Z",
+          "completedAt": "2026-11-09T14:46:12Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:12Z",
+          "completedAt": "2026-11-09T14:46:13Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:13Z",
+          "completedAt": "2026-11-09T14:46:13Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:13Z",
+          "completedAt": "2026-11-09T14:46:13Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:13Z",
+          "completedAt": "2026-11-09T14:46:13Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T14:46:13Z",
+          "completedAt": "2026-11-09T14:46:13Z"
+        }
+      ]
+    },
+    {
+      "id": 129252219384,
+      "runId": 42637270671,
+      "runAttempt": 2,
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T15:22:26Z",
+      "startedAt": "2026-11-09T15:22:28Z",
+      "completedAt": "2026-11-09T15:22:43Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671/job/129252219384",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129252219384",
+      "checkRunUrl": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129252219384",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:22:29Z",
+          "completedAt": "2026-11-09T15:22:30Z"
+        },
+        {
+          "number": 2,
+          "name": "Require every selected source, unit and daemon job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:22:30Z",
+          "completedAt": "2026-11-09T15:22:30Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:22:30Z",
+          "completedAt": "2026-11-09T15:22:36Z"
+        },
+        {
+          "number": 4,
+          "name": "Record actual completed job timings",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:22:36Z",
+          "completedAt": "2026-11-09T15:22:41Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:22:41Z",
+          "completedAt": "2026-11-09T15:22:41Z"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T15:22:41Z",
+          "completedAt": "2026-11-09T15:22:41Z"
+        }
+      ]
+    }
+  ],
+  "freshPullRequest": {
+    "observedAt": "2026-11-09 15:23:55 UTC",
+    "number": 1799,
+    "state": "open",
+    "merged": false,
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "headRef": "fix/1512-daemon-fixture-executable-20261109",
+    "base": "76537e4c2996f717cbd19589e1efae328028aa4a",
+    "mergeCommit": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "mergeable": true,
+    "mergeableState": "clean",
+    "url": "https://github.com/alexj11324/Mikka/pull/1799"
+  },
+  "attempt1": {
+    "indexBlob": "c200e42449ab9dcd2e60ef8b1fac9955de0422e0",
+    "bytes": 8127,
+    "sha256": "e8640e93f68701a99c0abff80cef00f7140bd8db55e44372dcb79bd4b8c61b41",
+    "originalConclusion": "failure",
+    "failedJobIds": [
+      129229145015,
+      129245022698
+    ],
+    "unchanged": true
+  },
+  "actualNewExecutionJobs": [
+    {
+      "id": 129249611752,
+      "priorId": 129229145015,
+      "name": "Integration unit checks",
+      "startedAt": "2026-11-09T15:18:04Z",
+      "completedAt": "2026-11-09T15:22:25Z"
+    },
+    {
+      "id": 129252219384,
+      "priorId": 129245022698,
+      "name": "UI policy (strict)",
+      "startedAt": "2026-11-09T15:22:28Z",
+      "completedAt": "2026-11-09T15:22:43Z"
+    }
+  ],
+  "rawOriginalReferences": {
+    "owner": "/root",
+    "rawReadByMetadataAgent": false,
+    "integration": {
+      "jobId": 129249611752,
+      "blob": "5700abba001111877345e18ad860f0141585591b",
+      "bytes": 673437,
+      "sha256": "ece4e036ddb4cdb11f4dbd16d075800a2a9d1eef5e9c24c820045d9e6bd8688f",
+      "reportedCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+      "reportedNode": "24.22.2",
+      "reportedNxTargets": 29,
+      "reportedTargetSetIdenticalToAttempt1": true,
+      "reportedAllTargetsSuccessful": true,
+      "reportedTeamImportMs": 8876.366829,
+      "reportedScopeLoaderMs": 9972.596827
+    },
+    "strict": {
+      "jobId": 129252219384,
+      "blob": "e72cdeb4847d6940bd4b92204873219dae37d9c9",
+      "bytes": 14087,
+      "sha256": "14e39f3a637eeee28012cc59ab92fdfc5b9c69064b52c4c11aafc977b168a2b8",
+      "reportedCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+      "reportedAllExpectedGatesSuccessful": true
+    },
+    "scope": "Reported verified by Root's unique raw reads; this metadata agent did not fetch these logs."
+  },
+  "nativeOriginalReference": {
+    "owner": "/root/native_6180_review",
+    "indexBlob": "a816eb02cfdba67fe62fb40fd813f62945474aff",
+    "bytes": 14455,
+    "sha256": "c55dfa46beea40b6ddce1997138de654a2918c28cb85ff47677ec89f61e32d00",
+    "actualCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "executedAttempt": 1,
+    "originalJobId": 129231919498,
+    "reportedBudgets": {
+      "login": {
+        "native": 433,
+        "web": 435,
+        "relation": "<="
+      },
+      "firstStartup": {
+        "native": 209,
+        "hosted": 234,
+        "relation": "<="
+      }
+    },
+    "reportedCounts": {
+      "records": 24,
+      "checkpoints": 12,
+      "segments": 8,
+      "operationBuckets": 17,
+      "sourceBuckets": 78,
+      "ordinals": 1311
+    },
+    "rootIndependentOriginalRecomputeErrors": 0,
+    "reportedCleanupFlags": {
+      "lifecycleRestored": false,
+      "smoke": true,
+      "parity": true
+    },
+    "artifactRecoveryVm": {
+      "stoppedDeletedExact404": true,
+      "closedAt": "2026-11-09T15:16:07.282Z"
+    },
+    "unknownsPreserved": true,
+    "sourceOfThisReference": "Exclusive reader message; raw artifacts not reread by this metadata agent.",
+    "notWholeCIOrProductionPass": true
+  },
+  "limits": [
+    "All14 current workflow records are successful; only the main workflow advanced to attempt2. The other13 workflows were not rerun.",
+    "The22 main attempt2 job records include20 carried-forward results with new display/check IDs. Only Integration and dependent strict executed anew.",
+    "Native executed once in attempt1. The new Native display ID does not represent another account/resource/measurement window.",
+    "Original attempt1 Integration and strict failures remain valid historical evidence.",
+    "Current CI success is not production acceptance or permission to merge."
+  ],
+  "readerActions": {
+    "rawLogReads": 0,
+    "artifactDownloads": 0,
+    "resourcesCreated": 0,
+    "productionActions": 0,
+    "rerunRequests": 0,
+    "cancellations": 0,
+    "refOrPRMutations": 0
+  }
+}

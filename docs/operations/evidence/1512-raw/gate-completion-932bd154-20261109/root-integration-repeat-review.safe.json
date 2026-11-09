@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "kind": "root-single-integration-repeat-original-review",
+  "checkedAt": "2026-11-09 15:24:36 UTC",
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "checkout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+  "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "request": {
+    "at": "2026-11-09 15:17:58 UTC",
+    "request": {
+      "job_id": 129229145015,
+      "repo_full_name": "alexj11324/Mikka"
+    },
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "reason": "One documented repeatability check after independent unchanged-source and systematic timing comparison; Native original full window verified and VM closed.",
+    "priorRunAttempt": 1,
+    "priorFailurePreserved": true,
+    "requestCount": 1
+  },
+  "originals": [
+    {
+      "key": "retryIntegration",
+      "at": "2026-11-09 15:23:52 UTC",
+      "reader": "/root",
+      "jobId": 129249611752,
+      "runId": 42637270671,
+      "attempt": 2,
+      "bytes": 673437,
+      "sha256": "ece4e036ddb4cdb11f4dbd16d075800a2a9d1eef5e9c24c820045d9e6bd8688f",
+      "gitBlob": "5700abba001111877345e18ad860f0141585591b",
+      "scan": {
+        "pem": 0,
+        "githubToken": 0,
+        "posthogKey": 0,
+        "awsKey": 0,
+        "bearer": 0,
+        "signedUrl": 0
+      }
+    },
+    {
+      "key": "retryStrict",
+      "at": "2026-11-09 15:23:52 UTC",
+      "reader": "/root",
+      "jobId": 129252219384,
+      "runId": 42637270671,
+      "attempt": 2,
+      "bytes": 14087,
+      "sha256": "14e39f3a637eeee28012cc59ab92fdfc5b9c69064b52c4c11aafc977b168a2b8",
+      "gitBlob": "e72cdeb4847d6940bd4b92204873219dae37d9c9",
+      "scan": {
+        "pem": 0,
+        "githubToken": 0,
+        "posthogKey": 0,
+        "awsKey": 0,
+        "bearer": 0,
+        "signedUrl": 0
+      }
+    }
+  ],
+  "actualTargets": [
+    "integration-2",
+    "integration-3",
+    "integration-4",
+    "integration-5",
+    "integration-6",
+    "integration-7",
+    "integration-8",
+    "integration-9",
+    "integration-10",
+    "integration-11",
+    "integration-12",
+    "integration-13",
+    "integration-14",
+    "integration-15",
+    "integration-16",
+    "integration-17",
+    "integration-18",
+    "integration-19",
+    "integration-20",
+    "integration-21",
+    "integration-22",
+    "integration-23",
+    "integration-24",
+    "integration-25",
+    "integration-26",
+    "integration-27",
+    "integration-28",
+    "integration-29",
+    "integration-factory-activity"
+  ],
+  "expectedTargetsMatch": true,
+  "actualNxCache": "--skip-nx-cache",
+  "node": "v24.22.2",
+  "pnpm": "10.34.3",
+  "teamImportContract": {
+    "teamImportContract": true,
+    "dynamicImportOccurrences": 26,
+    "uniqueModules": 24,
+    "scenarios": 22,
+    "realAuthExports": [
+      "MOBILE_APP_ORIGIN",
+      "auth",
+      "authBaseURL",
+      "githubEnabled",
+      "githubSignInEnabled",
+      "googleEnabled",
+      "oauthCallbackBaseURL"
+    ],
+    "deniedConnections": 1,
+    "nativeTransportAttempts": 0,
+    "nativeSqlSubmissions": 0
+  },
+  "testDurationMs": 8876.366829,
+  "scopeLoaderDurationMs": 9972.596827,
+  "strictResults": {
+    "CHANGES_RESULT": "success",
+    "CORE": "success",
+    "INTEGRATION": "success",
+    "SOURCE": "success",
+    "DAEMON": "success",
+    "IMAGE": "success",
+    "DESKTOP": "success",
+    "ANALYTICS": "success"
+  },
+  "allTargetSuccessLine": " NX   Successfully ran targets integration-2, integration-3, integration-4, integration-5, integration-6, integration-7, integration-8, integration-9, integration-10, integration-11, integration-12, integration-13, integration-14, integration-15, integration-16, integration-17, integration-18, integration-19, integration-20, integration-21, integration-22, integration-23, integration-24, integration-25, integration-26, integration-27, integration-28, integration-29, integration-factory-activity for project ci-tasks",
+  "priorFailures": {
+    "integration": {
+      "jobId": 129229145015,
+      "gitBlob": "c34cdb3d06fa045aad1e0fa334d4300f28eec240",
+      "status": "retained failure"
+    },
+    "strict": {
+      "jobId": 129245022698,
+      "gitBlob": "9ba58b5d33404a45a86efa09bf9b699a9fbbb045",
+      "status": "retained failure"
+    }
+  },
+  "sourceChanges": 0,
+  "deadlineChanges": 0,
+  "additionalRetryRequests": 0,
+  "interpretation": "One unchanged-source repetition passed under the original15s bound. It strengthens the observed environmental timing-variation explanation but does not establish CPU throttling, the exact stopped phase, or deterministic timing stability.",
+  "productionAcceptance": false
+}

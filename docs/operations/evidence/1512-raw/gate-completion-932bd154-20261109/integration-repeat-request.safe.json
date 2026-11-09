@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "request": {
+    "at": "2026-11-09 15:17:58 UTC",
+    "request": {
+      "job_id": 129229145015,
+      "repo_full_name": "alexj11324/Mikka"
+    },
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "reason": "One documented repeatability check after independent unchanged-source and systematic timing comparison; Native original full window verified and VM closed.",
+    "priorRunAttempt": 1,
+    "priorFailurePreserved": true,
+    "requestCount": 1
+  },
+  "response": {
+    "success": true
+  },
+  "observedNewExecution": {
+    "jobId": 129249611752,
+    "runId": 42637270671,
+    "attempt": 2,
+    "startedAt": "2026-11-09T15:18:04Z",
+    "step4StartedAt": "2026-11-09T15:18:55Z",
+    "reader": "/root",
+    "originalRead": false
+  },
+  "carryForwardApiBoundary": {
+    "observedAt": "2026-11-09T15:18:57Z",
+    "apiListedRows": 21,
+    "actuallyStartedIntegration": 1,
+    "carriedHistoricalRows": 20,
+    "nativeDisplayId": 129249619409,
+    "nativeOriginalId": 129231919498,
+    "nativeOriginalStartedAt": "2026-11-09T14:49:01Z",
+    "nativeOriginalCompletedAt": "2026-11-09T15:10:23Z",
+    "meaning": "New API job IDs and run_attempt2 labels do not alone imply new execution. Actual time/step/source matching required."
+  },
+  "limitedToOneRequest": true,
+  "sourceChanged": false,
+  "originalFailurePreservedInCheckpoint35": true,
+  "nativeOriginalVerifiedBeforeRequest": true,
+  "nativeResourceCleanup": {
+    "gitBlob": "62dd90ff059554348d002b0addea2ab6fd3d0294",
+    "bytes": 1476,
+    "sha256": "733a15e2983beb4d5ec996d28c41b7f0c0d51045673975ef8af3cde826d0c1f0"
+  },
+  "resultPending": true
+}

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "kind": "root-attempt2-final-metadata-review",
+  "checkedAt": "2026-11-09 15:28:37 UTC",
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "currentWorkflows": 14,
+  "workflowConclusions": {
+    "success": 14
+  },
+  "effectiveJobs": 46,
+  "effectiveJobConclusions": {
+    "success": 36,
+    "skipped": 10
+  },
+  "completeHistoricalChecks": 69,
+  "historicalCheckConclusions": {
+    "success": 56,
+    "skipped": 11,
+    "failure": 2
+  },
+  "actualNewJobs": [
+    {
+      "id": 129249611752,
+      "priorId": 129229145015,
+      "name": "Integration unit checks",
+      "startedAt": "2026-11-09T15:18:04Z",
+      "completedAt": "2026-11-09T15:22:25Z"
+    },
+    {
+      "id": 129252219384,
+      "priorId": 129245022698,
+      "name": "UI policy (strict)",
+      "startedAt": "2026-11-09T15:22:28Z",
+      "completedAt": "2026-11-09T15:22:43Z"
+    }
+  ],
+  "carried": {
+    "count": 20,
+    "fullStepsNameHeadResultTimesEqual": 19,
+    "explicitSkippedInvertedTimeRows": 1,
+    "originalCompletedTimesAllRetainedBeforeRequest": true
+  },
+  "exactEffectiveCheckRunSuiteMapping": true,
+  "badMappings": [],
+  "oldFailedCheckIds": [
+    129245022698,
+    129229145015
+  ],
+  "rootRawRepeatProof": {
+    "path": "root-integration-repeat-review.safe.json",
+    "gitBlob": "b9156015a938d59b4c6c58ddb094d27ca05119cd",
+    "bytes": 4633,
+    "sha256": "de4a866df42d6387aa676a008199af52cd786144e2cbf97708d6eca700edefb2"
+  },
+  "nativeOriginalJob": 129231919498,
+  "nativeOriginalNotRerun": true,
+  "allCurrentWorkflowsPassed": true,
+  "limitations": [
+    "Historical filter=all69 checks include2 retained failed attempt1 checks; they are not all green.",
+    "Current46 Actions gates include10 conditionally skipped jobs, not46 executed passing jobs.",
+    "One repeat proves that this unchanged execution completed under its bound; the original slowdown phase is unknown.",
+    "These CI results do not constitute production acceptance."
+  ]
+}

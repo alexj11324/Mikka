@@ -1,0 +1,1217 @@
+{
+  "schema": "issue1512.ci-single-job-rerun-carry-forward.v1",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1799,
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "assembledAt": "2026-11-09 15:26:13 UTC",
+  "authorization": {
+    "requestedBy": "/root",
+    "requestedAt": "2026-11-09T15:17:58Z",
+    "tool": "github_rerun_workflow_job",
+    "originalJobId": 129229145015,
+    "reportedSuccess": true,
+    "requestsByThisAgent": 0,
+    "preconditionsReportedByRoot": {
+      "prHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "prState": "open_unmerged",
+      "attempt1": "terminal_failure",
+      "nativeOriginalVerificationErrors": 0,
+      "temporaryVm": "stop/delete404 complete"
+    },
+    "attempt1ImmutableIndex": "c200e42449ab9dcd2e60ef8b1fac9955de0422e0"
+  },
+  "requestCountByRoot": 1,
+  "rerunRequestOriginalJob": 129229145015,
+  "requestsByThisAgent": 0,
+  "actualRun": {
+    "observedAt": "2026-11-09 15:23:27 UTC",
+    "id": 42637270671,
+    "name": "CI",
+    "path": ".github/workflows/ui-policy.yml",
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "event": "pull_request",
+    "branch": "fix/1512-daemon-fixture-executable-20261109",
+    "attempt": 2,
+    "status": "completed",
+    "conclusion": "success",
+    "suiteId": 115480392633,
+    "createdAt": "2026-11-09T14:42:16Z",
+    "updatedAt": "2026-11-09T15:22:44Z",
+    "startedAt": "2026-11-09T15:17:59Z",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671",
+    "pullRequests": [
+      {
+        "number": 1799,
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+      }
+    ],
+    "completedUpdatedAt": "2026-11-09T15:22:44Z"
+  },
+  "classifications": {
+    "displayedAttempt2Jobs": 22,
+    "actualNewExecuted": 2,
+    "carriedForward": 20,
+    "fullProjectionExactlyEqualAmongCarried": 19,
+    "stepsExactlyEqualAmongCarried": 20,
+    "apiTimestampAnomalies": 1
+  },
+  "jobMappings": [
+    {
+      "jobId": 129249611752,
+      "priorJobId": 129229145015,
+      "name": "Integration unit checks",
+      "classification": "actual_new_execution",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T15:18:04Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T15:22:25Z",
+      "priorCompletedAt": "2026-11-09T14:48:20Z",
+      "stepsEqual": false,
+      "stepsSha256": "f3c78a4300be68eed13ee2b1a5a060eb55be18e367f60a8fee8f00990473308b",
+      "priorStepsSha256": "f018f8de9aed4a9059d6283f89ba18981b8c9605daa93f571a248d744aad6c00",
+      "completeProjectionSha256": "1a1c56bce36b23c1025af3737b2a823e553dc9fb0a9a6c7f9b7884e1303d10e2",
+      "priorCompleteProjectionSha256": "a72b336b35151581c8d5102a684ad00e93512dc5d5696ef8f605c67e361c7f2d",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249613550,
+      "priorJobId": 129228653985,
+      "name": "changes / Changed files",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:42:18Z",
+      "priorStartedAt": "2026-11-09T14:42:18Z",
+      "completedAt": "2026-11-09T14:43:09Z",
+      "priorCompletedAt": "2026-11-09T14:43:09Z",
+      "stepsEqual": true,
+      "stepsSha256": "0510e5ce9222ebb08c8184bce4ecf024297e346b7c97c9487f149b4f4a411051",
+      "priorStepsSha256": "0510e5ce9222ebb08c8184bce4ecf024297e346b7c97c9487f149b4f4a411051",
+      "completeProjectionSha256": "590ea3ef2f8922aa573a450b7abd81abb168f19d2e193992ba8f255e927c2ddd",
+      "priorCompleteProjectionSha256": "590ea3ef2f8922aa573a450b7abd81abb168f19d2e193992ba8f255e927c2ddd",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249613912,
+      "priorJobId": 129229147866,
+      "name": "Cloud credential access (OIDC)",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T15:18:02Z",
+      "priorStartedAt": "2026-11-09T14:43:09Z",
+      "completedAt": "2026-11-09T14:43:09Z",
+      "priorCompletedAt": "2026-11-09T14:43:09Z",
+      "stepsEqual": true,
+      "stepsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "priorStepsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "completeProjectionSha256": "7b96b2532a639d3cd022a203543483d821dc4d963e33396a74d84ab40bcc8152",
+      "priorCompleteProjectionSha256": "668cff657eeff0e2df86fe5711851c7af5d88972c09864b1f9215820de0e1a7a",
+      "apiStartAfterCompletion": true
+    },
+    {
+      "jobId": 129249614987,
+      "priorJobId": 129229146938,
+      "name": "Database checks (2/4)",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:43:11Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:46:10Z",
+      "priorCompletedAt": "2026-11-09T14:46:10Z",
+      "stepsEqual": true,
+      "stepsSha256": "7c258ebb4358d9e40b42c9cee11706e4877341d589191fae29ee7017e3d862de",
+      "priorStepsSha256": "7c258ebb4358d9e40b42c9cee11706e4877341d589191fae29ee7017e3d862de",
+      "completeProjectionSha256": "5fc9ec01f6060265f9e0eb70974f07898b1da96e73d94dd1d77b1c534435c538",
+      "priorCompleteProjectionSha256": "5fc9ec01f6060265f9e0eb70974f07898b1da96e73d94dd1d77b1c534435c538",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249615558,
+      "priorJobId": 129229146394,
+      "name": "desktop-checks / changes / Changed files",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:43:11Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:43:57Z",
+      "priorCompletedAt": "2026-11-09T14:43:57Z",
+      "stepsEqual": true,
+      "stepsSha256": "31ff5134e0a1b8a624cfb2cb57408eca6d7cdc059df686467e42aad9046aa5db",
+      "priorStepsSha256": "31ff5134e0a1b8a624cfb2cb57408eca6d7cdc059df686467e42aad9046aa5db",
+      "completeProjectionSha256": "c655e69dab1124fc78d561c4c989d97052e68fc35130b4fafd21440a8b982aba",
+      "priorCompleteProjectionSha256": "c655e69dab1124fc78d561c4c989d97052e68fc35130b4fafd21440a8b982aba",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249615614,
+      "priorJobId": 129229145060,
+      "name": "Source checks",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:43:11Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:46:28Z",
+      "priorCompletedAt": "2026-11-09T14:46:28Z",
+      "stepsEqual": true,
+      "stepsSha256": "89a64b50355f04fe048dad05796d2ae13af95ab49dd27d0577fa9f3412df1287",
+      "priorStepsSha256": "89a64b50355f04fe048dad05796d2ae13af95ab49dd27d0577fa9f3412df1287",
+      "completeProjectionSha256": "6fb16cbcc949c17f81c1098e55e37063cc91ec4e52eb9a2769d01115f6ed846d",
+      "priorCompleteProjectionSha256": "6fb16cbcc949c17f81c1098e55e37063cc91ec4e52eb9a2769d01115f6ed846d",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249615649,
+      "priorJobId": 129229145280,
+      "name": "Database checks (3/4)",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:43:11Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:50:08Z",
+      "priorCompletedAt": "2026-11-09T14:50:08Z",
+      "stepsEqual": true,
+      "stepsSha256": "7991023677dbcff6ca2bab89a135422c2d98d0b33711b2723d1e3fe53a569f0e",
+      "priorStepsSha256": "7991023677dbcff6ca2bab89a135422c2d98d0b33711b2723d1e3fe53a569f0e",
+      "completeProjectionSha256": "048bd7c9ce85cbcc59d3cf0b6cbbe8b5a6f3799a017d4e17aaf115b040916bb9",
+      "priorCompleteProjectionSha256": "048bd7c9ce85cbcc59d3cf0b6cbbe8b5a6f3799a017d4e17aaf115b040916bb9",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249615722,
+      "priorJobId": 129233153817,
+      "name": "Production build and browser interactions",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:50:11Z",
+      "priorStartedAt": "2026-11-09T14:50:11Z",
+      "completedAt": "2026-11-09T14:50:21Z",
+      "priorCompletedAt": "2026-11-09T14:50:21Z",
+      "stepsEqual": true,
+      "stepsSha256": "8da1fe7b4ec8cdbe05e7aa7ceb9c39c8a7a70c2db0e8b314ca87217ab58a349c",
+      "priorStepsSha256": "8da1fe7b4ec8cdbe05e7aa7ceb9c39c8a7a70c2db0e8b314ca87217ab58a349c",
+      "completeProjectionSha256": "5abe85b48d1f7ad56ff38bf62c6e7b115bcf6ae75ef4ee3fb33e540ac33103fa",
+      "priorCompleteProjectionSha256": "5abe85b48d1f7ad56ff38bf62c6e7b115bcf6ae75ef4ee3fb33e540ac33103fa",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249616555,
+      "priorJobId": 129229146841,
+      "name": "analytics-checks / changes / Changed files",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:43:11Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:43:57Z",
+      "priorCompletedAt": "2026-11-09T14:43:57Z",
+      "stepsEqual": true,
+      "stepsSha256": "047442419354800b51ceebdad6283f78401a0c30ed8cba2314c663813258ae00",
+      "priorStepsSha256": "047442419354800b51ceebdad6283f78401a0c30ed8cba2314c663813258ae00",
+      "completeProjectionSha256": "45bac727d0d3302e889658e7e749d64256841eed2c477349a9945617b589e33e",
+      "priorCompleteProjectionSha256": "45bac727d0d3302e889658e7e749d64256841eed2c477349a9945617b589e33e",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249617123,
+      "priorJobId": 129229605672,
+      "name": "image-checks / image",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:44:01Z",
+      "priorStartedAt": "2026-11-09T14:44:01Z",
+      "completedAt": "2026-11-09T15:00:55Z",
+      "priorCompletedAt": "2026-11-09T15:00:55Z",
+      "stepsEqual": true,
+      "stepsSha256": "1a64bd65a7ac85311b9f183efdfe70e3f56c21ccb18caba05346df9adbf91e8c",
+      "priorStepsSha256": "1a64bd65a7ac85311b9f183efdfe70e3f56c21ccb18caba05346df9adbf91e8c",
+      "completeProjectionSha256": "181299335b393290943f21927c158f29aee283a35f361907edbbf2b587a8ce81",
+      "priorCompleteProjectionSha256": "181299335b393290943f21927c158f29aee283a35f361907edbbf2b587a8ce81",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249617254,
+      "priorJobId": 129229597112,
+      "name": "desktop-checks / checks",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:44:00Z",
+      "priorStartedAt": "2026-11-09T14:44:00Z",
+      "completedAt": "2026-11-09T14:46:34Z",
+      "priorCompletedAt": "2026-11-09T14:46:34Z",
+      "stepsEqual": true,
+      "stepsSha256": "bb18d6b7cc4296f3ff25f1988de909abe52d8207bc5872274ad2bcede09840bd",
+      "priorStepsSha256": "bb18d6b7cc4296f3ff25f1988de909abe52d8207bc5872274ad2bcede09840bd",
+      "completeProjectionSha256": "1a77132f0bc968a1173b61417fb1b092dc1bcd2b2c2b2637a2ff3cf2120b30fd",
+      "priorCompleteProjectionSha256": "1a77132f0bc968a1173b61417fb1b092dc1bcd2b2c2b2637a2ff3cf2120b30fd",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249617484,
+      "priorJobId": 129229591529,
+      "name": "analytics-checks / Analytics SSR (full)",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:44:00Z",
+      "priorStartedAt": "2026-11-09T14:44:00Z",
+      "completedAt": "2026-11-09T14:48:47Z",
+      "priorCompletedAt": "2026-11-09T14:48:47Z",
+      "stepsEqual": true,
+      "stepsSha256": "4ae176b1e8d0ffc138ba697989ac234925b4aa9438aa18c6ded52f76f4f4bec6",
+      "priorStepsSha256": "4ae176b1e8d0ffc138ba697989ac234925b4aa9438aa18c6ded52f76f4f4bec6",
+      "completeProjectionSha256": "856b013ffdf4d2c807299f078bd137a57b0c35c0dae7e833cc671aaff4c23cf1",
+      "priorCompleteProjectionSha256": "856b013ffdf4d2c807299f078bd137a57b0c35c0dae7e833cc671aaff4c23cf1",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249617628,
+      "priorJobId": 129229596675,
+      "name": "desktop-checks / smoke",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:44:00Z",
+      "priorStartedAt": "2026-11-09T14:44:00Z",
+      "completedAt": "2026-11-09T14:47:59Z",
+      "priorCompletedAt": "2026-11-09T14:47:59Z",
+      "stepsEqual": true,
+      "stepsSha256": "0321515980d7d94964bb8b2c04ff7adf0c350ada02eb2e6e1ded3583dc0cb345",
+      "priorStepsSha256": "0321515980d7d94964bb8b2c04ff7adf0c350ada02eb2e6e1ded3583dc0cb345",
+      "completeProjectionSha256": "40d9c174e3f2fa3f9c82a2100c03a32da8473bd81f55f7bdef8aba7e9cb76c57",
+      "priorCompleteProjectionSha256": "40d9c174e3f2fa3f9c82a2100c03a32da8473bd81f55f7bdef8aba7e9cb76c57",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249617681,
+      "priorJobId": 129229146426,
+      "name": "image-checks / changes / Changed files",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:43:11Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:43:58Z",
+      "priorCompletedAt": "2026-11-09T14:43:58Z",
+      "stepsEqual": true,
+      "stepsSha256": "06c40247ca7d3961e709f2991033da4b1c0086084999f4575d8dcf5d7baf609e",
+      "priorStepsSha256": "06c40247ca7d3961e709f2991033da4b1c0086084999f4575d8dcf5d7baf609e",
+      "completeProjectionSha256": "1480767b1e2dcc50b1bfa8f285fa5c0ccb10a29a42c24d180c63dae467c47acf",
+      "priorCompleteProjectionSha256": "1480767b1e2dcc50b1bfa8f285fa5c0ccb10a29a42c24d180c63dae467c47acf",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249617954,
+      "priorJobId": 129229596712,
+      "name": "desktop-checks / icon",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:44:00Z",
+      "priorStartedAt": "2026-11-09T14:44:00Z",
+      "completedAt": "2026-11-09T14:44:26Z",
+      "priorCompletedAt": "2026-11-09T14:44:26Z",
+      "stepsEqual": true,
+      "stepsSha256": "2b2e01d402d8859c7dd044cf332e90b61253d9f8d86442d40a77e465987c1844",
+      "priorStepsSha256": "2b2e01d402d8859c7dd044cf332e90b61253d9f8d86442d40a77e465987c1844",
+      "completeProjectionSha256": "353f2c4f7a8d400d26beea7e436ddfb858b0429e2a44887ae4001c4c4feb125c",
+      "priorCompleteProjectionSha256": "353f2c4f7a8d400d26beea7e436ddfb858b0429e2a44887ae4001c4c4feb125c",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249619409,
+      "priorJobId": 129231919498,
+      "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:49:01Z",
+      "priorStartedAt": "2026-11-09T14:49:01Z",
+      "completedAt": "2026-11-09T15:10:23Z",
+      "priorCompletedAt": "2026-11-09T15:10:23Z",
+      "stepsEqual": true,
+      "stepsSha256": "bb11adbf5326375b86f9884d27fe7f008ac1ec49fc4ad2cb150687e325f22339",
+      "priorStepsSha256": "bb11adbf5326375b86f9884d27fe7f008ac1ec49fc4ad2cb150687e325f22339",
+      "completeProjectionSha256": "c252d7e3e4c7b7691f774fd26e040efbf7ef841a1fa30a035fc209701c8737c2",
+      "priorCompleteProjectionSha256": "c252d7e3e4c7b7691f774fd26e040efbf7ef841a1fa30a035fc209701c8737c2",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249620651,
+      "priorJobId": 129232386347,
+      "name": "analytics-checks / analytics-ssr",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:48:49Z",
+      "priorStartedAt": "2026-11-09T14:48:49Z",
+      "completedAt": "2026-11-09T14:48:51Z",
+      "priorCompletedAt": "2026-11-09T14:48:51Z",
+      "stepsEqual": true,
+      "stepsSha256": "33cce6ddebaff07fcbb16ee08ca3865e42c94fe5e94328d5a3ce7f72b540c027",
+      "priorStepsSha256": "33cce6ddebaff07fcbb16ee08ca3865e42c94fe5e94328d5a3ce7f72b540c027",
+      "completeProjectionSha256": "4c5e231a86c73e63e3ef2d87bd068e045c8bcd42ab8679b114260600d4183b81",
+      "priorCompleteProjectionSha256": "4c5e231a86c73e63e3ef2d87bd068e045c8bcd42ab8679b114260600d4183b81",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249682618,
+      "priorJobId": 129229145499,
+      "name": "Database checks (4/4)",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:43:11Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:47:03Z",
+      "priorCompletedAt": "2026-11-09T14:47:03Z",
+      "stepsEqual": true,
+      "stepsSha256": "e03009527e1dcf322f40827e808927ae76f69b2f8e2f1452b840f507cf2e8209",
+      "priorStepsSha256": "e03009527e1dcf322f40827e808927ae76f69b2f8e2f1452b840f507cf2e8209",
+      "completeProjectionSha256": "0605c942658bbbec6219f6f8fb487b16d49165e28e88f186073a8bc1fbe5eaab",
+      "priorCompleteProjectionSha256": "0605c942658bbbec6219f6f8fb487b16d49165e28e88f186073a8bc1fbe5eaab",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249687095,
+      "priorJobId": 129229145030,
+      "name": "Core unit checks",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:43:11Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:50:18Z",
+      "priorCompletedAt": "2026-11-09T14:50:18Z",
+      "stepsEqual": true,
+      "stepsSha256": "f198ba2710ec9283d16eb0666efecba6db0da747e4cf7526b4ca6bcaf76a9b6c",
+      "priorStepsSha256": "f198ba2710ec9283d16eb0666efecba6db0da747e4cf7526b4ca6bcaf76a9b6c",
+      "completeProjectionSha256": "1f20a07ef8204e257202f2237bfd740fbaeff2abf2ab7c507e2e20f4c768bb1b",
+      "priorCompleteProjectionSha256": "1f20a07ef8204e257202f2237bfd740fbaeff2abf2ab7c507e2e20f4c768bb1b",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249687366,
+      "priorJobId": 129229144954,
+      "name": "Daemon checks",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:43:11Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:46:44Z",
+      "priorCompletedAt": "2026-11-09T14:46:44Z",
+      "stepsEqual": true,
+      "stepsSha256": "4a02ba78ea4cf99ac6129dd77ef3006df2b90f052eaf2caa856051b67c6f848b",
+      "priorStepsSha256": "4a02ba78ea4cf99ac6129dd77ef3006df2b90f052eaf2caa856051b67c6f848b",
+      "completeProjectionSha256": "2fd17f4fdd9da2d86d721fa2cb8af88f734a7b2f14c69e17e510ce9cd6db1838",
+      "priorCompleteProjectionSha256": "2fd17f4fdd9da2d86d721fa2cb8af88f734a7b2f14c69e17e510ce9cd6db1838",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129249689866,
+      "priorJobId": 129229145457,
+      "name": "Database checks (1/4)",
+      "classification": "carried_forward",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T14:43:11Z",
+      "priorStartedAt": "2026-11-09T14:43:11Z",
+      "completedAt": "2026-11-09T14:46:17Z",
+      "priorCompletedAt": "2026-11-09T14:46:17Z",
+      "stepsEqual": true,
+      "stepsSha256": "58d426ec739f485808373ee6353d58955421b1b21a01ea10127bbffe764893bb",
+      "priorStepsSha256": "58d426ec739f485808373ee6353d58955421b1b21a01ea10127bbffe764893bb",
+      "completeProjectionSha256": "b4ff6ef442f659b0a7cfccadc025ffad02fa6f573d5d1c64306d564539cf4120",
+      "priorCompleteProjectionSha256": "b4ff6ef442f659b0a7cfccadc025ffad02fa6f573d5d1c64306d564539cf4120",
+      "apiStartAfterCompletion": false
+    },
+    {
+      "jobId": 129252219384,
+      "priorJobId": 129245022698,
+      "name": "UI policy (strict)",
+      "classification": "actual_new_execution",
+      "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "priorHead": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "sourceBinding": "API head equal; no new execution or new actual checkout claimed for a carried result.",
+      "runAttempt": 2,
+      "priorAttempt": 1,
+      "startedAt": "2026-11-09T15:22:28Z",
+      "priorStartedAt": "2026-11-09T15:10:28Z",
+      "completedAt": "2026-11-09T15:22:43Z",
+      "priorCompletedAt": "2026-11-09T15:10:39Z",
+      "stepsEqual": false,
+      "stepsSha256": "9897cb1dec1d2d3f8b9e9cbe6c5d97389d7245ee95315f543796a9bbba000ac4",
+      "priorStepsSha256": "2c72a3cbb048edcaa7b7d0c6c5c44736a69b83d9541076f24f4ae20f364a7d27",
+      "completeProjectionSha256": "6b8bed730269d2288cf888197906c168511217d8707e9293059708103f02dd7e",
+      "priorCompleteProjectionSha256": "4cb250940fa6ed3d1f6785d706f42018ef5391b480b103579b0aea735fe0afde",
+      "apiStartAfterCompletion": false
+    }
+  ],
+  "carriedResultProof": {
+    "comparisonFields": [
+      "unique job name",
+      "same API head",
+      "status",
+      "conclusion",
+      "full steps array",
+      "started_at",
+      "completed_at"
+    ],
+    "carriedCompletionBeforeRequest": true,
+    "nineteenSuccessfulRowsMatchAllFieldsExactly": true,
+    "oidcSkippedException": {
+      "newId": 129249613912,
+      "priorId": 129229147866,
+      "newStartedAt": "2026-11-09T15:18:02Z",
+      "priorStartedAt": "2026-11-09T14:43:09Z",
+      "sameCompletedAt": "2026-11-09T14:43:09Z",
+      "sameEmptySteps": true,
+      "sameSkippedConclusion": true,
+      "meaning": "The API re-presents a skipped result with an inverted time interval. These original fields are preserved; this is not treated as execution."
+    }
+  },
+  "actualSource": {
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "tree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+    "originalActualCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "newActualCheckoutReportedByRoot": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+    "headAndPrUnchanged": true,
+    "rootOriginalReferences": {
+      "owner": "/root",
+      "rawReadByMetadataAgent": false,
+      "integration": {
+        "jobId": 129249611752,
+        "blob": "5700abba001111877345e18ad860f0141585591b",
+        "bytes": 673437,
+        "sha256": "ece4e036ddb4cdb11f4dbd16d075800a2a9d1eef5e9c24c820045d9e6bd8688f",
+        "reportedCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+        "reportedNode": "24.22.2",
+        "reportedNxTargets": 29,
+        "reportedTargetSetIdenticalToAttempt1": true,
+        "reportedAllTargetsSuccessful": true,
+        "reportedTeamImportMs": 8876.366829,
+        "reportedScopeLoaderMs": 9972.596827
+      },
+      "strict": {
+        "jobId": 129252219384,
+        "blob": "e72cdeb4847d6940bd4b92204873219dae37d9c9",
+        "bytes": 14087,
+        "sha256": "14e39f3a637eeee28012cc59ab92fdfc5b9c69064b52c4c11aafc977b168a2b8",
+        "reportedCheckout": "86f8f6c1d05719db00de89f2ec3c4adf3b4d4fb3",
+        "reportedAllExpectedGatesSuccessful": true
+      },
+      "scope": "Reported verified by Root's unique raw reads; this metadata agent did not fetch these logs."
+    },
+    "carriedResultSourceMeaning": "Same API head and exact historical step/time projections; no new actual checkout claimed for carried rows."
+  },
+  "originalAttempt": {
+    "indexBlob": "c200e42449ab9dcd2e60ef8b1fac9955de0422e0",
+    "bytes": 8127,
+    "sha256": "e8640e93f68701a99c0abff80cef00f7140bd8db55e44372dcb79bd4b8c61b41",
+    "originalConclusion": "failure",
+    "failedJobIds": [
+      129229145015,
+      129245022698
+    ],
+    "unchanged": true
+  },
+  "observations": [
+    {
+      "observedAt": "2026-11-09 15:18:57 UTC",
+      "totalCount": 21,
+      "jobs": [
+        {
+          "id": 129249611752,
+          "runAttempt": 2,
+          "name": "Integration unit checks",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 129249613550,
+          "runAttempt": 2,
+          "name": "changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249613912,
+          "runAttempt": 2,
+          "name": "Cloud credential access (OIDC)",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "id": 129249614987,
+          "runAttempt": 2,
+          "name": "Database checks (2/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615558,
+          "runAttempt": 2,
+          "name": "desktop-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615614,
+          "runAttempt": 2,
+          "name": "Source checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615649,
+          "runAttempt": 2,
+          "name": "Database checks (3/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615722,
+          "runAttempt": 2,
+          "name": "Production build and browser interactions",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249616555,
+          "runAttempt": 2,
+          "name": "analytics-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617123,
+          "runAttempt": 2,
+          "name": "image-checks / image",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617254,
+          "runAttempt": 2,
+          "name": "desktop-checks / checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617484,
+          "runAttempt": 2,
+          "name": "analytics-checks / Analytics SSR (full)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617628,
+          "runAttempt": 2,
+          "name": "desktop-checks / smoke",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617681,
+          "runAttempt": 2,
+          "name": "image-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617954,
+          "runAttempt": 2,
+          "name": "desktop-checks / icon",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249619409,
+          "runAttempt": 2,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249620651,
+          "runAttempt": 2,
+          "name": "analytics-checks / analytics-ssr",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249682618,
+          "runAttempt": 2,
+          "name": "Database checks (4/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249687095,
+          "runAttempt": 2,
+          "name": "Core unit checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249687366,
+          "runAttempt": 2,
+          "name": "Daemon checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249689866,
+          "runAttempt": 2,
+          "name": "Database checks (1/4)",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-09 15:20:36 UTC",
+      "totalCount": 21,
+      "jobs": [
+        {
+          "id": 129249611752,
+          "runAttempt": 2,
+          "name": "Integration unit checks",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 129249613550,
+          "runAttempt": 2,
+          "name": "changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249613912,
+          "runAttempt": 2,
+          "name": "Cloud credential access (OIDC)",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "id": 129249614987,
+          "runAttempt": 2,
+          "name": "Database checks (2/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615558,
+          "runAttempt": 2,
+          "name": "desktop-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615614,
+          "runAttempt": 2,
+          "name": "Source checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615649,
+          "runAttempt": 2,
+          "name": "Database checks (3/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615722,
+          "runAttempt": 2,
+          "name": "Production build and browser interactions",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249616555,
+          "runAttempt": 2,
+          "name": "analytics-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617123,
+          "runAttempt": 2,
+          "name": "image-checks / image",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617254,
+          "runAttempt": 2,
+          "name": "desktop-checks / checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617484,
+          "runAttempt": 2,
+          "name": "analytics-checks / Analytics SSR (full)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617628,
+          "runAttempt": 2,
+          "name": "desktop-checks / smoke",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617681,
+          "runAttempt": 2,
+          "name": "image-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617954,
+          "runAttempt": 2,
+          "name": "desktop-checks / icon",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249619409,
+          "runAttempt": 2,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249620651,
+          "runAttempt": 2,
+          "name": "analytics-checks / analytics-ssr",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249682618,
+          "runAttempt": 2,
+          "name": "Database checks (4/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249687095,
+          "runAttempt": 2,
+          "name": "Core unit checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249687366,
+          "runAttempt": 2,
+          "name": "Daemon checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249689866,
+          "runAttempt": 2,
+          "name": "Database checks (1/4)",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-09 15:21:55 UTC",
+      "totalCount": 21,
+      "jobs": [
+        {
+          "id": 129249611752,
+          "runAttempt": 2,
+          "name": "Integration unit checks",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 129249613550,
+          "runAttempt": 2,
+          "name": "changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249613912,
+          "runAttempt": 2,
+          "name": "Cloud credential access (OIDC)",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "id": 129249614987,
+          "runAttempt": 2,
+          "name": "Database checks (2/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615558,
+          "runAttempt": 2,
+          "name": "desktop-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615614,
+          "runAttempt": 2,
+          "name": "Source checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615649,
+          "runAttempt": 2,
+          "name": "Database checks (3/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615722,
+          "runAttempt": 2,
+          "name": "Production build and browser interactions",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249616555,
+          "runAttempt": 2,
+          "name": "analytics-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617123,
+          "runAttempt": 2,
+          "name": "image-checks / image",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617254,
+          "runAttempt": 2,
+          "name": "desktop-checks / checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617484,
+          "runAttempt": 2,
+          "name": "analytics-checks / Analytics SSR (full)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617628,
+          "runAttempt": 2,
+          "name": "desktop-checks / smoke",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617681,
+          "runAttempt": 2,
+          "name": "image-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617954,
+          "runAttempt": 2,
+          "name": "desktop-checks / icon",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249619409,
+          "runAttempt": 2,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249620651,
+          "runAttempt": 2,
+          "name": "analytics-checks / analytics-ssr",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249682618,
+          "runAttempt": 2,
+          "name": "Database checks (4/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249687095,
+          "runAttempt": 2,
+          "name": "Core unit checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249687366,
+          "runAttempt": 2,
+          "name": "Daemon checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249689866,
+          "runAttempt": 2,
+          "name": "Database checks (1/4)",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-09 15:23:27 UTC",
+      "totalCount": 22,
+      "jobs": [
+        {
+          "id": 129249611752,
+          "runAttempt": 2,
+          "name": "Integration unit checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249613550,
+          "runAttempt": 2,
+          "name": "changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249613912,
+          "runAttempt": 2,
+          "name": "Cloud credential access (OIDC)",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "id": 129249614987,
+          "runAttempt": 2,
+          "name": "Database checks (2/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615558,
+          "runAttempt": 2,
+          "name": "desktop-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615614,
+          "runAttempt": 2,
+          "name": "Source checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615649,
+          "runAttempt": 2,
+          "name": "Database checks (3/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249615722,
+          "runAttempt": 2,
+          "name": "Production build and browser interactions",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249616555,
+          "runAttempt": 2,
+          "name": "analytics-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617123,
+          "runAttempt": 2,
+          "name": "image-checks / image",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617254,
+          "runAttempt": 2,
+          "name": "desktop-checks / checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617484,
+          "runAttempt": 2,
+          "name": "analytics-checks / Analytics SSR (full)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617628,
+          "runAttempt": 2,
+          "name": "desktop-checks / smoke",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617681,
+          "runAttempt": 2,
+          "name": "image-checks / changes / Changed files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249617954,
+          "runAttempt": 2,
+          "name": "desktop-checks / icon",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249619409,
+          "runAttempt": 2,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249620651,
+          "runAttempt": 2,
+          "name": "analytics-checks / analytics-ssr",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249682618,
+          "runAttempt": 2,
+          "name": "Database checks (4/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249687095,
+          "runAttempt": 2,
+          "name": "Core unit checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249687366,
+          "runAttempt": 2,
+          "name": "Daemon checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129249689866,
+          "runAttempt": 2,
+          "name": "Database checks (1/4)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 129252219384,
+          "runAttempt": 2,
+          "name": "UI policy (strict)",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "A single successful repeatability run does not rewrite or explain away the original15s timeout.",
+    "Root uniquely reads new Integration and strict originals; no old source/native originals were fetched again here.",
+    "This request created two actual executions because GitHub also reran the dependent strict job. It did not rerun all22 displayed records."
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "checkedAt": "2026-11-09 15:15:47 UTC",
+  "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+  "workflowCount": 14,
+  "workflowConclusions": {
+    "success": 13,
+    "failure": 1
+  },
+  "jobCount": 46,
+  "jobConclusions": {
+    "success": 34,
+    "skipped": 10,
+    "failure": 2
+  },
+  "checkCount": 47,
+  "checkConclusions": {
+    "failure": 2,
+    "success": 35,
+    "skipped": 10
+  },
+  "actions": 46,
+  "duplicateJobs": 0,
+  "failedMappings": [],
+  "unmatchedActions": [],
+  "externals": [
+    {
+      "id": 129228625900,
+      "app": "gitguardian",
+      "conclusion": "success"
+    }
+  ],
+  "mainRun": {
+    "id": 42637270671,
+    "name": "CI",
+    "path": ".github/workflows/ui-policy.yml",
+    "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "event": "pull_request",
+    "branch": "fix/1512-daemon-fixture-executable-20261109",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "failure",
+    "suiteId": 115480392633,
+    "createdAt": "2026-11-09T14:42:16Z",
+    "updatedAt": "2026-11-09T15:10:40Z",
+    "startedAt": "2026-11-09T14:42:16Z",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42637270671",
+    "pullRequests": [
+      {
+        "number": 1799,
+        "head": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "base": "76537e4c2996f717cbd19589e1efae328028aa4a"
+      }
+    ]
+  },
+  "strictRaw": {
+    "job": 129245022698,
+    "reader": "/root",
+    "at": "2026-11-09 15:12:49 UTC",
+    "bytes": 14167,
+    "sha256": "1a2dd88645c6579682e6e0ae6b71aefa071d48edaa9e075ec3f93638cf6872d7",
+    "gitBlob": "9ba58b5d33404a45a86efa09bf9b699a9fbbb045",
+    "expectedAllSelected": true,
+    "soleUpstreamFailure": "INTEGRATION",
+    "result": "failure"
+  },
+  "overallGatePassed": false
+}
