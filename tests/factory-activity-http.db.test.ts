@@ -115,7 +115,10 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   const bot=await seedBot(pool,workspace.id,owner),agent=await seedAgent(pool,owner),team=await seedTeam(pool,workspace.id,owner)
   const issueId=randomUUID(),taskId=randomUUID(),source=randomUUID(),candidate=randomUUID()
   const runs=Array.from({length:24},(_,index)=>({id:randomUUID(),attemptId:randomUUID(),stage:index===0?'spec':index===2?'review':'execute'}))
-  await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'HTTP runtime fixture','{"type":"doc"}','todo','normal','workspace')`,[issueId,owner])
+  // The task belongs to owner, while the issue belongs to the teammate. This
+  // makes workspace membership the actual grant, as in the task-detail API;
+  // issue owners intentionally retain their own issue authority.
+  await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'HTTP runtime fixture','{"type":"doc"}','todo','normal','workspace')`,[issueId,peer])
   await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)',[issueId,team.id,workspace.id,owner])
   await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
     VALUES($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"HTTP runtime fixture"}')`,[source,owner,bot,issueId])
@@ -384,11 +387,14 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   })
   await t.test('live task-detail boundaries revoke even already-cached cover access after source or membership changes',async()=>{
     await pool.query('UPDATE coordinator_events SET "userId"=$2 WHERE id=$1',[source,peer])
+    assert.equal((await accounts!.owner.request(`/api/factory/tasks/${taskId}`)).status,404)
     for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])await denied(await accounts!.owner.request(path),404,path)
     await pool.query('UPDATE coordinator_events SET "userId"=$2 WHERE id=$1',[source,owner])
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[workspace.id,owner])
+    assert.equal((await accounts!.owner.request(`/api/factory/tasks/${taskId}`)).status,404)
     for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])await denied(await accounts!.owner.request(path),404,path)
     await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',[workspace.id,owner])
+    assert.equal((await accounts!.owner.request(`/api/factory/tasks/${taskId}`)).status,200)
     assert.equal((await accounts!.owner.request(activityPath)).status,200)
   })
   const transport=await readFile(networkReceipt,'utf8')

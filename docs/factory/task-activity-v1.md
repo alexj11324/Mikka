@@ -8,7 +8,7 @@
 
 响应头为 `Cache-Control: private, no-store`。权限沿用任务详情的 owner、Bot/source、issue 和工作区边界；知道 task、run 或 capture ID 不授予访问权。支持与任务详情相同的 PAT 认证。受限 PAT 只返回其工作区可见的运行、电脑区间、等待记录、产物及 flow 内嵌引用；文档同时检查版本提交者和原 Artifact 的范围。原文件及封面采用相同限制。
 
-首次进入读取一次。沿用 `useLiveKey('factory_task', taskId, [activityKey], liveWorkspaceId)` 使现有 live 通道失效缓存；`liveWorkspaceId` 来自本响应，可以为 `null`。VM 区间与媒体就绪写入在提交后通知同一任务 key，无需逐个订阅 run 或猜测其工作区，不增加 `refreshInterval`、定时 fetch 或轮询。等待时长需要持续显示时，在客户端按 `observedAt` 推进时钟。
+首次进入读取一次。沿用 `useLiveKey('factory_task', taskId, [activityKey], liveWorkspaceId)` 使现有 live 通道失效缓存；`liveWorkspaceId` 来自本响应，可以为 `null`。运行领取、首次开始输出、完成、文档提交、VM 区间与媒体就绪写入在提交后通知同一任务 key；逐个文本片段不会刷新整个右栏。无需逐个订阅 run 或猜测其工作区，不增加 `refreshInterval`、定时 fetch 或轮询。等待时长需要持续显示时，在客户端按 `observedAt` 推进时钟。
 
 ## 响应结构
 
