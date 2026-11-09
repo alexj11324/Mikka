@@ -35,7 +35,8 @@ FAILURES = frozenset(('listener', 'boot', 'identity', 'state', 'receipt', 'provi
 COMMAND_OPERATIONS = frozenset(('new_chain', 'provider_rule', 'reply_rule', 'output_jump', 'check_output',
                                 'check_provider', 'check_reply', 'list_output', 'list_chain',
                                 'create_table', 'base_chain', 'install_policy', 'list_ruleset', 'list_table'))
-INSTALL_OPERATIONS = ('create_table', 'new_chain', 'base_chain', 'provider_rule', 'reply_rule', 'output_jump')
+INSTALL_OPERATIONS = ('create_table', 'new_chain', 'base_chain', 'provider_rule', 'provider_rule',
+                      'provider_rule', 'reply_rule', 'output_jump')
 
 
 class IngressError(Exception):
@@ -180,9 +181,9 @@ def execute(program, arguments, *, family, operation, check=True, script=None):
         raise IngressCommandError(family, operation, 'output_limit', result.returncode, result.stderr)
     if check and result.returncode != 0:
         if family == 'inet' and operation == 'install_policy':
-            # Only locations in our fixed six-line stdin script may refine the
+            # Only locations in our fixed eight-line stdin script may refine the
             # operation. No source line, arbitrary path or tool text escapes.
-            lines = re.findall(rb'(?m)^(?:/dev/stdin|<stdin>|stdin|-):([1-6]):[0-9]{1,6}(?:-[0-9]{1,6})?:[ \t]*Error:',
+            lines = re.findall(rb'(?m)^(?:/dev/stdin|<stdin>|stdin|-):([1-8]):[0-9]{1,6}(?:-[0-9]{1,6})?:[ \t]*Error:',
                                result.stderr[:16384])
             operations = {INSTALL_OPERATIONS[int(line) - 1] for line in lines}
             if len(operations) == 1:
@@ -202,21 +203,80 @@ def program():
     return executable
 
 
+def ack_header_tuples(family):
+    if family == 'ipv4':
+        return sorted((4 * (ihl + doff), 4 * (ihl + doff), ihl, doff)
+                      for ihl in range(5, 16) for doff in range(5, 16))
+    refuse(family == 'ipv6', 'runtime')
+    return [(40 + 4 * doff, 4 * doff, doff) for doff in range(5, 16)]
+
+
 def policy(ports):
     refuse(ports in ([49983], [49983, 50005]), 'provider')
     source_ports = str(ports[0]) if len(ports) == 1 else '{ ' + ', '.join(str(port) for port in ports) + ' }'
-    # Native socket UID matching avoids the unavailable xt_owner extension.
-    # Priority -1 is after conntrack (-200), before the usual filter (0).
-    # Returning to this base chain's accept policy still visits later hooks.
-    # Keep this six-line order aligned with INSTALL_OPERATIONS diagnostics.
+    tuples = lambda family: '{ ' + ', '.join(' . '.join(str(value) for value in row)
+                                            for row in ack_header_tuples(family)) + ' }'
+    prefix = f'add rule inet {TABLE} {CHAIN}'
+    # Before accept() attaches a socket file, kernel ACKs have no skuid.
+    # Only zero-payload ACKs on actual provider ports may bypass that lookup.
+    # Both skb and IP lengths must equal the complete headers; SYN/FIN/RST
+    # and application data still require the original UID or socket mark.
     return '\n'.join((
         f'create table inet {TABLE}',
         f'add chain inet {TABLE} {CHAIN}',
         f'add chain inet {TABLE} output {{ type filter hook output priority -1; policy accept; }}',
-        f'add rule inet {TABLE} {CHAIN} meta l4proto tcp meta skuid 0 tcp sport {source_ports} return',
-        f'add rule inet {TABLE} {CHAIN} meta l4proto tcp ct direction reply meta mark != {SOCKET_MARK} reject with tcp reset',
+        f'{prefix} meta l4proto tcp meta skuid 0 tcp sport {source_ports} return',
+        f'{prefix} meta nfproto ipv4 meta l4proto tcp ct direction reply tcp sport {source_ports} tcp flags == ack '
+        f'ip frag-off & 0x3fff == 0 meta length . ip length . ip hdrlength . tcp doff {tuples("ipv4")} return',
+        f'{prefix} meta nfproto ipv6 meta l4proto tcp ct direction reply tcp sport {source_ports} tcp flags == ack '
+        f'ip6 nexthdr tcp meta length . ip6 length . tcp doff {tuples("ipv6")} return',
+        f'{prefix} meta l4proto tcp ct direction reply meta mark != {SOCKET_MARK} reject with tcp reset',
         f'add rule inet {TABLE} output oifname != "lo" meta l4proto tcp jump {CHAIN}',
     )) + '\n'
+
+
+def check_ack_rule(rule, family, ports):
+    payload = lambda protocol, field: {'payload': {'protocol': protocol, 'field': field}}
+    meta = lambda key: {'meta': {'key': key}}
+    match = lambda left, right: {'match': {'op': '==', 'left': left, 'right': right}}
+    nfproto = match(meta('nfproto'), 2 if family == 'ipv4' else 10)
+    tcp = match(meta('l4proto'), 6)
+    expr = [match({'ct': {'key': 'direction'}}, 1),
+            match(payload('tcp', 'sport'), ports[0] if len(ports) == 1 else {'set': ports}),
+            match(payload('tcp', 'flags'), 16)]
+    if family == 'ipv4':
+        expr.append(match({'&': [payload('ip', 'frag-off'), 0x3fff]}, 0))
+        fields = [meta('length'), payload('ip', 'length'), payload('ip', 'hdrlength'), payload('tcp', 'doff')]
+    else:
+        expr.append(match(payload('ip6', 'nexthdr'), 6))
+        fields = [meta('length'), payload('ip6', 'length'), payload('tcp', 'doff')]
+    expected_tuples = ack_header_tuples(family)
+    expr.extend([match({'concat': fields}, {'set': [{'concat': list(row)} for row in expected_tuples]}),
+                 {'return': None}])
+    # Anonymous set element ordering has no semantics. Validate every key/type,
+    # the full tuple set, its cardinality and lack of duplicates before sorting.
+    value = json.loads(json.dumps(rule))
+    actual_expr = value.get('expr')
+    refuse(isinstance(actual_expr, list) and len(actual_expr) >= 2, 'rule_order')
+    tail = actual_expr[-2]
+    refuse(isinstance(tail, dict) and set(tail) == {'match'} and isinstance(tail['match'], dict), 'rule_order')
+    right = tail['match'].get('right')
+    refuse(isinstance(right, dict) and set(right) == {'set'} and isinstance(right['set'], list), 'rule_order')
+    tuples = []
+    for item in right['set']:
+        refuse(isinstance(item, dict) and set(item) == {'concat'} and isinstance(item['concat'], list)
+               and len(item['concat']) == len(fields) and all(type(number) is int for number in item['concat']), 'rule_order')
+        tuples.append(tuple(item['concat']))
+    refuse(len(tuples) == len(expected_tuples) and len(set(tuples)) == len(tuples)
+           and sorted(tuples) == expected_tuples, 'rule_order')
+    tail['match']['right']['set'] = [{'concat': list(row)} for row in sorted(tuples)]
+    canonical = lambda item: json.dumps(item, sort_keys=True, separators=(',', ':'))
+    binding = {'family': 'inet', 'table': TABLE, 'chain': CHAIN}
+    # Only protocol dependencies implied by mandatory IP/TCP payload fields may
+    # be omitted by nft's delinearizer. No other expression is normalized away.
+    variants = [{**binding, 'expr': [*prefix, *expr]}
+                for prefix in ([nfproto, tcp], [nfproto], [tcp], [])]
+    refuse(canonical(value) in tuple(map(canonical, variants)), 'rule_order')
 
 
 def ruleset_rows(raw):
@@ -275,13 +335,16 @@ def check_rules(executable, ports):
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(',', ':'))
     refuse(canonical(objects['table']) == canonical([{'family': 'inet', 'name': TABLE}])
            and sorted(map(canonical, objects['chain'])) == sorted(map(canonical, chains))
-           and len(objects['rule']) == 3, 'rule_order')
+           and len(objects['rule']) == 5, 'rule_order')
     actual = {name: [row for row in objects['rule'] if row.get('chain') == name] for name in (CHAIN, 'output')}
     expected = lambda name, expr: {**binding, 'chain': name, 'expr': expr}
-    # nft 1.0.6/1.0.9 may omit a protocol dependency already implied by the
-    # complete TCP sport payload. Accept only these two exact safe forms.
-    refuse(canonical(actual[CHAIN]) in (canonical([expected(CHAIN, provider), expected(CHAIN, reply)]),
-                                       canonical([expected(CHAIN, [tcp, *provider]), expected(CHAIN, reply)]))
+    refuse(len(actual[CHAIN]) == 4, 'rule_order')
+    check_ack_rule(actual[CHAIN][1], 'ipv4', ports)
+    check_ack_rule(actual[CHAIN][2], 'ipv6', ports)
+    # The root provider exemption and final reply rejection are unchanged.
+    reduced = [actual[CHAIN][0], actual[CHAIN][3]]
+    refuse(canonical(reduced) in (canonical([expected(CHAIN, provider), expected(CHAIN, reply)]),
+                                 canonical([expected(CHAIN, [tcp, *provider]), expected(CHAIN, reply)]))
            and canonical(actual['output']) == canonical([expected('output', jump)]), 'rule_order')
 
 

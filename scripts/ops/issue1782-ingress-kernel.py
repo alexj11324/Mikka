@@ -41,7 +41,7 @@ class HarnessError(RuntimeError):
 def run(argv, input_text=None):
     result = subprocess.run(argv, input=input_text, text=True, capture_output=True, timeout=10)
     if result.returncode:
-        raise HarnessError(f'{argv[0]} failed ({result.returncode}): {result.stderr[-1200:]}')
+        raise HarnessError(f'{argv[0]} failed ({result.returncode}): {result.stderr[-8000:]}')
     return result.stdout
 
 
@@ -358,7 +358,18 @@ if __name__ == '__main__':
         ports = guard.provider_ports()
         if ports != [PROVIDER_PORT]:
             raise RuntimeError('fixture provider discovery mismatch')
-        guard.check_rules(shutil.which('nft'), ports)
+        try:
+            guard.check_rules(shutil.which('nft'), ports)
+        except Exception:
+            rows = json.loads(run(['nft', '-j', '-n', 'list', 'table', 'inet', guard.TABLE]))['nftables']
+            for row in rows:
+                expressions = row.get('rule', {}).get('expr', [])
+                for expr in expressions:
+                    right = expr.get('match', {}).get('right')
+                    if isinstance(right, dict) and isinstance(right.get('set'), list) and len(right['set']) > 3:
+                        right['set'] = {'count': len(right['set']), 'first': right['set'][:2], 'last': right['set'][-1:]}
+            print(json.dumps({'syntheticPolicyReadback': rows}), file=sys.stderr)
+            raise
     else:
         if not args.guard:
             parser.error('--guard is required')
