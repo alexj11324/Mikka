@@ -2,6 +2,12 @@
 set -euo pipefail
 umask 077
 
+test "$#" -le 1
+case "${1:-}" in
+  ''|--preflight-only) ;;
+  *) exit 2 ;;
+esac
+
 mkdir -p "$RUNNER_TEMP/mikka-screenshots-private"
 
 run_build_phase() {
@@ -63,6 +69,10 @@ try {
   })
 } catch { process.exitCode = 1 }
 JS
+
+node scripts/release/mobile-screenshots.mjs driver-preflight
+
+if [ "${1:-}" = --preflight-only ]; then exit 0; fi
 
 cd apps/mobile
 run_build_phase expo-prebuild pnpm exec expo prebuild --platform ios --no-install
