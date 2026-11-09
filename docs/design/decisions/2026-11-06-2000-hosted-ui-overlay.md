@@ -4,6 +4,7 @@
 - Source: Alex, 2026-11-06, relayed by the coordinator and in issue #1527: the hosted product (the official web app and the official desktop installers) moves to the paid BoardUI interface, 「我要的就是他们的 UI」, bot avatars included (BoardUI's paper `agent-avatar`). The open-source repository's interface stays as it is.
 - Rule: —
 - Replaces: —
+- Superseded in part by: [2026-11-08-2133 one UI](2026-11-08-2133-one-ui.md). The slot mechanism stays; "the open-source repository's interface stays as it is" and the hosted vs open-source framing no longer apply.
 
 The paid BoardUI code lives only in the private repository
 `alexj11324/mikka-hosted-ui`. This repository never imports BoardUI code, and

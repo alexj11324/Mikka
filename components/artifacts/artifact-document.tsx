@@ -57,12 +57,12 @@ const components = (title: string, media: readonly ArtifactMedia[]): Components 
   hr: () => <div role="separator" className="h-6" />,
   a: ({ href, children }) => {
     const capture = ownCapture(href, media, pageOrigin())
-    if (capture?.kind === 'video') return <video src={capturePath(capture)} controls playsInline preload="metadata" aria-label={plain(children) || capture.title} className="my-3 block max-h-[28rem] w-full rounded-xl bg-muted" />
+    if (capture?.kind === 'video') return <video data-capture src={capturePath(capture)} controls playsInline preload="metadata" aria-label={plain(children) || capture.title} className="my-3 block max-h-[28rem] w-full rounded-xl bg-muted" />
     return href && SAFE_URL.test(href) ? <a href={href} target={href.startsWith('#') ? undefined : '_blank'} rel="noopener noreferrer nofollow" className="text-sidebar-primary underline-offset-4 hover:underline">{children}</a> : <span>{children}</span>
   },
   img: ({ src, alt }) => {
     const capture = ownCapture(src, media, pageOrigin())
-    if (capture?.kind === 'image') return <img src={capturePath(capture)} alt={alt ?? ''} loading="lazy" className="my-3 max-w-full rounded-xl" />
+    if (capture?.kind === 'image') return <img data-capture src={capturePath(capture)} alt={alt ?? ''} loading="lazy" className="my-3 max-w-full rounded-xl" />
     return typeof src === 'string' && SAFE_IMAGE.test(src) ? <img src={src} alt={alt ?? ''} referrerPolicy="no-referrer" loading="lazy" className="my-3 max-w-full rounded-xl" /> : null
   },
   code: ({ className, children }) => className ? <code>{children}</code> : <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs">{children}</code>,
@@ -130,13 +130,13 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
     return () => document.removeEventListener('selectionchange', clear)
   }, [])
 
-  return <div className="min-h-0 flex-1 overflow-y-auto" onMouseUp={readSelection} onKeyUp={readSelection}>
+  return <div className="min-h-0 flex-1 overflow-y-auto scroll-fade-y" onMouseUp={readSelection} onKeyUp={readSelection}>
     <article className="group/doc mx-auto w-full max-w-[40rem] px-6 pt-10 pb-16 md:px-10 has-[[data-slot=artifact-lead]:not(:empty)]:max-w-[56rem]">
       {lead}
       <h1 className="text-2xl font-semibold text-foreground group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:hidden">{title}</h1>
       <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:hidden">{author.authorName && <ArtifactAuthorAvatar author={author} />}{meta}</p>
-      {/* Under a PR report lead the report's opening paragraph (the agent's summary) is already in 改动: shown once. */}
-      <div ref={articleRef} data-slot="artifact-document" className="mt-6 group-has-[[data-changes-open]]/doc:hidden group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:[&>p:first-child]:hidden">
+      {/* Under a PR report lead the report's opening paragraph (the agent's summary) is already in 改动, and its captures in 证据: shown once. */}
+      <div ref={articleRef} data-slot="artifact-document" className="mt-6 group-has-[[data-changes-open]]/doc:hidden group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:[&>p:first-child]:hidden group-has-[[data-slot=report-evidence]]/doc:[&_[data-capture]]:hidden">
         <Markdown remarkPlugins={plugins} components={parts}>{source}</Markdown>
       </div>
     </article>

@@ -157,6 +157,9 @@ function FollowSentMessages({ count }: { count: number | null }) {
 /** A thread card or chip opens the thread in the right column; the chat stays (R-66, R-82). */
 const showThread = ({ runId }: { runId: string }) => openThread(runId)
 
+/** Starting goals offered in an empty Coordinator chat (coordinator's choice, 2026-11-08). */
+const STARTERS = ['fixBug', 'reviewPullRequests', 'summarizeToday', 'dailyBriefing'] as const
+
 export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string }) {
   const t = useTranslations('Coordinator')
   const cloudErrors = useTranslations('RunErrors')
@@ -491,7 +494,16 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             {welcomeFailed && !items.length && <div data-message-failure="welcome" className="flex w-full max-w-md flex-col gap-2 self-start">{failureNotice}</div>}
             {data && !items.length && !stream.replies.length && !data.error && (data.enabled
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
-              : <p className="m-auto text-sm text-muted-foreground">{t('empty', { name })}</p>)}
+              : <div className="m-auto flex flex-col items-center gap-3">
+                <p className="text-sm text-muted-foreground">{t('empty', { name })}</p>
+                {/* The Coordinator's first chat offers a starting move: a chip fills the composer, the person sends it (states-05). */}
+                {!bot && !embedded && <div className="flex max-w-md flex-wrap justify-center gap-2">{STARTERS.map(key => <Button key={key} variant="outline" size="sm" className="rounded-full font-normal" onClick={() => {
+                  const text = t(`starters.${key}`)
+                  setDraft(text)
+                  const input = inputRef.current
+                  if (input) { input.focus(); input.setSelectionRange(text.length, text.length) }
+                }}>{t(`starters.${key}`)}</Button>)}</div>}
+              </div>)}
             {/* Stored and streamed replies are one list: a stored reply takes the key of the stream it was shown from, so
                 storing it keeps its row, text and chips in place instead of mounting them again (the chat flashed). */}
             {[...items.filter(item => !staleEvents.has(item.position)).map(item => ({ item, live: undefined, key: item.pending ? `pending-${item.position}` : item.streamId ?? item.position })),
