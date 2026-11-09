@@ -20,6 +20,23 @@ Node、Mikka worker 源码与构建产物、daemon 依赖、gh 和 desktop 额�
 向 Agent 批量注入所有 Secret。任何订阅凭证、设备身份、签名密钥或工作区数据均
 不得进入可复用模板。
 
+模板依赖安装使用同一 release 内新增的私有构建工作区，只选择 daemon、protocol、
+config 三个 worker 工作区；保留这些包的完整源码及生产、开发依赖。原始源码归档
+不改写，原 workspace 安装策略、overrides、patches 和锁定版本继续生效。派生根项目
+不带 Web 依赖，安装锁只投影所需 importer；包与 snapshot 记录不重新解析版本。
+正常 `--frozen-lockfile` 安装及获准的生命周期脚本仍须成功，再通过相对
+`node_modules` 链接供原 worker 构建入口和 CLI manifest 读取。工作区与链接均在
+该 release 内，整体 staging 发布移动后仍须可解析，并可供正常 worker 用户读取。
+
+这一区分来自 2026-11-09 的两次实际构建失败：
+[第一次](https://github.com/alexj11324/Mikka/actions/runs/42566225093/attempts/1)
+在根项目专用的 `ffmpeg-static` 二进制下载收到 HTTP 504，
+[第二次](https://github.com/alexj11324/Mikka/actions/runs/42566225093/attempts/2)
+则在 desktop 的同包 LICENSE 下载失败。该包原安装器仅凭二进制已存在就可提前
+返回成功，因此原地重试不能证明下载文件齐全。修复针对 worker 的安装集合，
+不通过禁用脚本、忽略缺文件或降低校验门槛放行。原失败与清理回执继续保留；
+隔离构建通过也不替代新模板的完整文件守恒、双真实订阅及生产五秒验收。
+
 ## 发布门槛
 
 `scripts/e2b/build-template.py` 使用 E2B 的 `Template.from_template` 在构建时执行
@@ -71,7 +88,7 @@ worker digest、CLI manifest 和实际选择。CI 从新建的无身份候选实
 的 Java trust store。[该阶段的收据](../research/2026-11-06-e2b-fresh-create-certificates.json)
 与 `scripts/e2b/e2b-certificate-relinks.json` 固定每一条原路径、原 SHA-256、精确
 链接目标、权限变化和适用模板；普通证书解析链接后的内容也必须保持原摘要。
-仅 Codex 已观测到的两条 E2B root 引用可指向本次 provider 注入的 root。
+该次控制仅在 Codex 观测到两条 E2B root 引用指向本次 provider 注入的 root。
 未列出的证书路径或目标也拒绝，不豁免整个证书目录。
 
 2026-11-07，主线候选的 fresh 检查拦下 Claude 的
@@ -90,6 +107,19 @@ Codex 已有的规则保持不变。
 原 CLI 和普通证书内容继续严格校验。此控制不代表全文件发布保全、真实订阅通过
 或生产时延达标；本次 Claude 控制模板和实例均已回收。
 
+2026-11-09 的[纯官方定点控制](https://github.com/alexj11324/Mikka/actions/runs/42628079564)
+又证明 Desktop 在 fresh 阶段将两个原普通文件重新链接：
+`/etc/ssl/certs/1560546e.0` 在 fresh 阶段的精确 symlink target 为 `e2b-ca.pem`，
+`/etc/ssl/certs/e2b-ca.pem` 在 fresh 阶段的精确 symlink target 为 `/usr/local/share/ca-certificates/e2b-ca.crt`。
+两条规则仅适用于 `desktop`，原文件 SHA-256 均须为
+`4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1`，
+解析终点必须是该精确根路径的普通文件，内容与同阶段 provider root 一致。
+本轮 mode 和 uid/gid 均未变化，不增加 mode 例外，不改变 Codex 规则；
+strict 安装阶段仍拒绝原文件转链接，仅显式 finalization 接受这两条受控变换。
+[原控制收据](../../operations/evidence/1506-official-desktop-certificate-relinks-20261109.json)
+及[范围说明](../../operations/evidence/1506-official-desktop-certificate-relinks-20261109.md)
+保留 Codex 的阴性结果；该定点控制不代表全量文件保全、真实订阅或发布通过。
+
 构建记录轻量 CLI manifest，包含构建前官方 CLI 的真实路径和摘要；官方原本缺少
 某个 harness 时，才记录 `/opt/mikka` 内补装的位置。每个 worker release 保存
 自己的 `.mikka-original-cli.json`，与 worker symlink 一起切换和回退。生产 worker、
@@ -99,6 +129,10 @@ HOME 或 session；新 manifest 完整后才标记 worker ready。
 
 CI 还必须在候选模板上用真实订阅分别完成 Claude Code (`claude-haiku-5-5`) 和
 Codex (`gpt-6-luna`) 的一次执行，使用正常的设备注册、任务绑定与订阅授权。
+每条路径至少完成一次独立于 handoff 的成功工具执行，并在工具完成后给出正确回复；
+`submit` 等 handoff 只证明交付，submit-only 不算执行证明。
+Codex 原生 `bash` 必须 `exitCode === 0`，`apply_patch` 必须 `status === 'completed'` 才计成功；
+Codex MCP 的 `status === 'failed'` 即使 `error` 为空也保留为工具错误，显式 `error` 同样如此。
 只探测 CLI 版本、模型列表或启动进程不足以通过验收。两个结果和文件保全收据
 都必须绑定同一候选模板、source commit 和 worker digest。没有完整收据就不能
 公开候选模板或更新生产模板 ID。

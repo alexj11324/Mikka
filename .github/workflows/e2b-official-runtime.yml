@@ -80,6 +80,7 @@ jobs:
           ln -s "$GITHUB_WORKSPACE/packages/protocol" node_modules/@mikka/protocol
       - run: node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
       - run: python3 scripts/e2b/build-template.test.py
+      - run: python3 packages/daemon/scripts/prepare-worker-install.test.py
       - run: python3 scripts/e2b/official-files.test.py
       - run: python3 scripts/e2b/cleanup-template-candidates.test.py
       - run: python3 scripts/e2b/workspace-candidates.test.py
@@ -146,7 +147,7 @@ jobs:
   await-web:
     needs: validate
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 95
     permissions:
       contents: read
       actions: read

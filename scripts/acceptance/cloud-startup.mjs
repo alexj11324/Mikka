@@ -20,6 +20,7 @@ const MODELS = { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' }
 const ROUTES = { claude_code: 'claude_code_cli', codex: 'codex_cli' }
 const REPOSITORY = 'alexj11324/Mikka-handoff'
 const TERMINAL = new Set(['succeeded', 'completed', 'failed', 'stopped', 'cancelled'])
+const HANDOFF_TOOLS = new Set(['mcp__mikka__submit', 'mcp__mikka__request_help', 'mcp__mikka__ask_human', 'mcp__mikka__report_blocked'])
 // Kept closed like the daemon collector: never copy arbitrary chunk fields.
 const STARTUP_PHASES = new Set(['daemon.adapter.model_report', 'daemon.adapter.auth', 'daemon.adapter.auth.gate',
   'daemon.adapter.auth.context', 'daemon.adapter.auth.access', 'daemon.adapter.auth.token', 'daemon.adapter.auth.native_auth',
@@ -481,6 +482,29 @@ export function observeChunks(record, detail, observedAt) {
   // getIssueThread replays the stream. Derive ordering afresh from this read,
   // never from toolCalls retained by an earlier read of the same chunks.
   const toolInputs = new Set()
+  const successfulExecutionTools = new Set()
+  // A successful handoff is delivery, not evidence that the task was read or
+  // executed. Resolve known handoff identities across this replay first: an
+  // input-start can omit the name that a later input-available supplies.
+  const handoffCalls = new Set()
+  const codexNativeCalls = new Map()
+  const codexInputs = new Set()
+  let codexStarted = false
+  for (const { chunk } of detail.chunks ?? []) {
+    if (chunk?.type === 'data-run-stage' && chunk.data?.stage === 'agent_start'
+      && Number.isFinite(chunk.data.ms) && chunk.data.ok === true) codexStarted = true
+    if (['tool-input-start', 'tool-input-available'].includes(chunk?.type)
+      && typeof chunk.toolCallId === 'string' && chunk.toolCallId.length > 0 && chunk.toolCallId.length <= 512) {
+      const toolCallHash = sha(chunk.toolCallId).slice(0, 16)
+      if (HANDOFF_TOOLS.has(chunk.toolName)) handoffCalls.add(toolCallHash)
+      // Match the execution pass's first 64 inputs, while accepting a later
+      // name for an already admitted call. Never downgrade a known native tool.
+      if (record.harness === 'codex' && codexStarted && (codexInputs.has(toolCallHash) || codexInputs.size < 64)) {
+        codexInputs.add(toolCallHash)
+        if (!codexNativeCalls.has(toolCallHash) && ['bash', 'apply_patch'].includes(chunk.toolName)) codexNativeCalls.set(toolCallHash, chunk.toolName)
+      }
+    }
+  }
   const submittedReplies = new Set()
   let submittedAt = null
   let started = false, reply = '', completedTool = false, replyAfterTool = '', replyVerifiedAfterTool = false
@@ -529,7 +553,15 @@ export function observeChunks(record, detail, observedAt) {
           && typeof chunk.input?.summary === 'string' && chunk.input.summary.includes(`STARTUP_OK_${record.sampleId}`)) submittedReplies.add(toolCallHash)
         if (chunk.type === 'tool-output-available' && submittedReplies.has(toolCallHash) && Number.isFinite(at)) submittedAt = at
         if (chunk.type.startsWith('tool-input-') && toolInputs.size < 64) toolInputs.add(toolCallHash)
-        if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash)) completedTool = true
+        if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash) && !handoffCalls.has(toolCallHash)) {
+          const native = codexNativeCalls.get(toolCallHash)
+          const succeeded = native === 'bash' ? chunk.output?.exitCode === 0
+            : native === 'apply_patch' ? chunk.output?.status === 'completed' : true
+          if (succeeded) successfulExecutionTools.add(toolCallHash)
+          else successfulExecutionTools.delete(toolCallHash)
+        }
+        if (chunk.type === 'tool-output-error') successfulExecutionTools.delete(toolCallHash)
+        completedTool = successfulExecutionTools.size > 0
         let tool = toolCalls.find(call => call.toolCallHash === toolCallHash)
         if (!tool && chunk.type.startsWith('tool-input-') && toolCalls.length < 64) {
           tool = { toolCallHash, startedAt: Number.isFinite(at) ? iso(at) : null, outcome: 'pending' }; toolCalls.push(tool)
@@ -574,7 +606,7 @@ export function observeChunks(record, detail, observedAt) {
   record.replyVerifiedAfterTool = replyVerifiedAfterTool
   record.lastStatus = typeof detail.thread?.status === 'string' && /^[a-z_]+$/.test(detail.thread.status) ? detail.thread.status : null
   return Boolean(record.agentStart && record.firstProviderChunk && (!record.requireReply || record.replyVerified)
-    && toolCalls.filter(tool => tool.outcome === 'ok').length >= (record.minToolCalls ?? 0)
+    && successfulExecutionTools.size >= (record.minToolCalls ?? 0)
     && (!record.requireReplyAfterTool || record.replyVerifiedAfterTool)
     && (!record.requireRuntimeReceipt || record.runtimeTimingStatus === 'complete')
     && (!record.requireTerminal || (detail.thread?.id === record.runId && TERMINAL.has(record.lastStatus))))

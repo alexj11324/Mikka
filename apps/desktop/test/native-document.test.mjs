@@ -234,26 +234,19 @@ function serverSelectionPage({ initialServer = builtInServer, deliveredServer = 
   const page = new EventEmitter(), calls = [], selected = []
   const oldReady = Promise.withResolvers()
   if (!oldDocumentLoading) oldReady.resolve()
-  let current = initialServer, url = 'mikka://app/mikka/sign-in', reads = 0, rejectNavigation
+  let current = initialServer, url = 'mikka://app/mikka/sign-in', reads = 0, lastBudget = 137
   page.url = () => url
   page._page = { context: () => ({ _options: {} }) }
   page.waitForURL = waitForURL
   page.waitForLoadState = async (state, options) => {
-    assert.equal(state, 'domcontentloaded'); assert.equal(options.timeout, 137)
+    assert.equal(state, 'domcontentloaded'); assert.ok(options.timeout > 0 && options.timeout <= lastBudget)
+    lastBudget = options.timeout
     calls.push('current-domcontentloaded'); await oldReady.promise
   }
-  page.waitForEvent = (event, options) => {
-    assert.equal(event, 'domcontentloaded'); assert.equal(options.timeout, 137)
-    calls.push('arm-new-document')
-    const result = Promise.withResolvers()
-    const ready = () => {
-      page.off(event, ready); rejectNavigation = undefined; result.resolve(page)
-    }
-    page.once(event, ready)
-    rejectNavigation = error => {
-      page.off(event, ready); rejectNavigation = undefined; result.reject(error)
-    }
-    return result.promise
+  const on = page.on
+  page.on = function (event, listener) {
+    if (event === 'domcontentloaded') calls.push('arm-new-document')
+    return on.call(this, event, listener)
   }
   const main = { _page: page, _parentFrame: null, _loadStates: new Set(oldDocumentLoading ? [] : ['domcontentloaded']), _eventEmitter: new EventEmitter() }
   const child = { ...main, _parentFrame: main, _loadStates: new Set(), _eventEmitter: new EventEmitter() }
@@ -288,7 +281,6 @@ function serverSelectionPage({ initialServer = builtInServer, deliveredServer = 
       frameLoadState.call(main, { add: 'domcontentloaded' })
       oldReady.resolve()
     },
-    rejectNavigation: error => rejectNavigation?.(error),
     get reads() { return reads },
     get listeners() { return page.listenerCount('domcontentloaded') },
   }
@@ -344,21 +336,20 @@ test('server selection preserves unknown failures even when a target document ex
     await assert.rejects(selectBundledServer(state.page, selectedServer, selectedServer, { timeout: 137 }), error => error === failure)
     assert.deepEqual(state.selected, [selectedServer])
     assert.equal(state.reads, 0)
-    // Promise.all already observes a later close rejection during owner cleanup.
-    state.rejectNavigation(new Error('Target page, context or browser has been closed'))
+    // The candidate removes its own listeners immediately; late close is harmless.
+    state.page.emit('close')
     await new Promise(setImmediate)
     assert.equal(state.listeners, 0)
   })
 })
 
-test('a destroyed server-select reply without a new document keeps timeout and close failures', async t => {
+test('a destroyed server-select reply without a new document reports owned deadline and close failures', async t => {
   for (const kind of ['TimeoutError', 'PageClosedError']) await t.test(kind, async () => {
     const state = serverSelectionPage({ transportFailure: selectionContextError() })
-    const failure = Object.assign(new Error(kind), { name: kind })
     const pending = selectBundledServer(state.page, selectedServer, selectedServer, { timeout: 137 }).then(() => null, error => error)
     await new Promise(setImmediate)
-    state.rejectNavigation(failure)
-    assert.equal(await pending, failure)
+    if (kind === 'PageClosedError') state.page.emit('close')
+    assert.match((await pending).message, kind === 'TimeoutError' ? /NATIVE_SERVER_CHOICE_TIMEOUT/ : /NATIVE_SERVER_CHOICE_PAGE_CLOSED/)
     assert.deepEqual(state.selected, [selectedServer])
     assert.equal(state.reads, 0); assert.equal(state.listeners, 0)
   })

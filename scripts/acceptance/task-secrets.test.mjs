@@ -90,7 +90,8 @@ function goodReceipt() {
 }
 function toolPair(value, command) {
   return { chunks: [{ chunk: { type: 'tool-input-available', toolCallId: `${runId}:tool1`, toolName: 'bash', input: { command } } },
-    { chunk: { type: 'tool-output-available', toolCallId: `${runId}:tool1`, output: `MIKKA_1712_NATIVE ${JSON.stringify(value)}\n` } }] }
+    { chunk: { type: 'tool-output-available', toolCallId: `${runId}:tool1`,
+      output: { exitCode: 0, output: `MIKKA_1712_NATIVE ${JSON.stringify(value)}\n` } } }] }
 }
 
 test('only the exact native tool input/output pair can supply a receipt; model prose and other runs cannot', () => {
@@ -421,9 +422,13 @@ test('a protected request plus stopped run cannot replace the exact native comma
   assert.equal(report.productionCanary.cleanup.deleted, true)
 })
 
-test('optional diagnostics cannot replace the native tool, post-tool reply, matching terminal run or external proof', async () => {
+test('optional diagnostics cannot replace a successful native tool, post-tool reply, matching terminal run or external proof', async () => {
   const changes = {
     missingTool: detail => { detail.chunks = detail.chunks.filter(item => !item.chunk.type.startsWith('tool-')) },
+    failedNativeExit: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode = 1 },
+    unknownNativeExit: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode = null },
+    missingNativeExit: detail => { delete detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode },
+    stringNativeExit: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode = '0' },
     missingReply: detail => { detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta') },
     replyBeforeTool: detail => { detail.chunks.splice(1, 0, detail.chunks.pop()) },
     notTerminal: detail => { detail.thread.status = 'running' },
@@ -432,7 +437,7 @@ test('optional diagnostics cannot replace the native tool, post-tool reply, matc
     succeeded: detail => { detail.thread.status = 'succeeded' },
     completed: detail => { detail.thread.status = 'completed' },
     foreignTerminal: detail => { detail.thread.id = caseId },
-    missingNativeProof: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output = 'done' },
+    missingNativeProof: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output = { exitCode: 0, output: 'done' } },
     missingAgentStart: detail => { detail.chunks.shift() },
   }
   for (const [name, change] of Object.entries(changes)) {

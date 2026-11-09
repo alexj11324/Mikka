@@ -38,15 +38,51 @@ export async function selectWorkspaceMenuItem(page, item) {
  * Arm the next main-frame DOMContentLoaded before selecting once, then verify
  * the completed bundled document's immutable preload target. */
 export async function selectBundledServer(page, selection, expectedServerUrl, { timeout = 30_000 } = {}) {
-  assert.ok(Number.isFinite(timeout) && timeout > 0)
-  await page.waitForURL(bundledDocument, { waitUntil: 'domcontentloaded', timeout })
-  const document = page.waitForEvent('domcontentloaded', { timeout })
-  const selected = page.evaluate(url => window.mikka.bundled.server.select(url), selection).catch(error => {
-    if (error?.message !== 'page.evaluate: Execution context was destroyed, most likely because of a navigation.') throw error
+  if (typeof expectedServerUrl !== 'string' || !expectedServerUrl || !Number.isFinite(timeout) || timeout <= 0) throw new Error('NATIVE_SERVER_CHOICE_OPTIONS_INVALID')
+  const expires = performance.now() + timeout
+  const timeoutError = new Error('NATIVE_SERVER_CHOICE_TIMEOUT')
+  let timer, fail, onDocument, onClose, onCrash, finished = false
+  const active = () => {
+    if (finished || performance.now() >= expires) throw timeoutError
+  }
+  const remaining = () => { active(); return Math.max(1, expires - performance.now()) }
+  const deadline = new Promise((_, reject) => {
+    fail = reject
+    timer = setTimeout(() => reject(timeoutError), timeout)
   })
-  await Promise.all([document, selected])
-  assert.ok(bundledDocument(new URL(page.url())), 'server selection must load a bundled application document')
-  assert.equal(await page.evaluate(() => window.mikka?.app.serverUrl), expectedServerUrl)
+  const operation = (async () => {
+    await page.waitForURL(bundledDocument, { waitUntil: 'domcontentloaded', timeout: remaining() })
+    active()
+    const document = new Promise(resolve => {
+      onDocument = () => { page.off('domcontentloaded', onDocument); resolve() }
+      onClose = () => fail(new Error('NATIVE_SERVER_CHOICE_PAGE_CLOSED'))
+      onCrash = () => fail(new Error('NATIVE_SERVER_CHOICE_PAGE_CRASHED'))
+      page.on('domcontentloaded', onDocument)
+      page.on('close', onClose)
+      page.on('crash', onCrash)
+    })
+    const selected = Promise.resolve().then(() => {
+      active()
+      return page.evaluate(url => window.mikka.bundled.server.select(url), selection)
+    }).catch(error => {
+      if (!/^(?:page\.evaluate: )?Execution context was destroyed, most likely because of a navigation\.?$/.test(error?.message ?? '')) throw error
+    })
+    await Promise.all([document, selected])
+    active()
+    assert.ok(bundledDocument(new URL(page.url())), 'server selection must load a bundled application document')
+    const actual = await page.evaluate(() => window.mikka?.app.serverUrl)
+    active()
+    assert.equal(actual, expectedServerUrl)
+  })()
+  try {
+    await Promise.race([operation, deadline])
+  } finally {
+    finished = true
+    clearTimeout(timer)
+    if (onDocument) page.off('domcontentloaded', onDocument)
+    if (onClose) page.off('close', onClose)
+    if (onCrash) page.off('crash', onCrash)
+  }
 }
 
 const route = value => {
