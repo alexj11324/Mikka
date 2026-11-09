@@ -64,12 +64,12 @@ test('missing packaged auth data is classified without printing its filesystem p
 
 // Metering-only mode uses the existing verified personal workspace and does not mint extra GitHub tokens.
 
-test('community staging source guard accepts the six reviewed operations files and rejects product edits',()=>{
+test('community staging source guard accepts the five reviewed operations files and rejects product edits',()=>{
  const head='a'.repeat(40),env={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:TARGET.repo,GITHUB_REPOSITORY_ID:'1427517699',GITHUB_REPOSITORY_OWNER_ID:'183887963',GITHUB_ACTOR:'alexj11324',GITHUB_EVENT_NAME:'push',GITHUB_REF:TARGET.ref,GITHUB_SHA:head}
  const event={repository:{full_name:TARGET.repo},ref:TARGET.ref,after:head,forced:false}
- const paths=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs','scripts/ops/self-hosting-cloud-acceptance.mjs','scripts/ops/self-hosting-subscription-acceptance.mjs','scripts/ops/self-hosting-subscription-acceptance.test.mjs']
+ const paths=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs','scripts/ops/self-hosting-subscription-acceptance.mjs','scripts/ops/self-hosting-subscription-acceptance.test.mjs']
  assert.doesNotThrow(()=>assertExecution(env,event,head,TARGET.base,paths))
- assert.throws(()=>assertExecution(env,event,head,TARGET.base,[...paths.slice(0,5),'lib/auth.ts']),/EXECUTION_SCOPE/)
+ assert.throws(()=>assertExecution(env,event,head,TARGET.base,[...paths.slice(0,4),'lib/auth.ts']),/EXECUTION_SCOPE/)
  assert.throws(()=>assertExecution(env,event,head,'b'.repeat(40),paths),/EXECUTION_SCOPE/)
 })
 
