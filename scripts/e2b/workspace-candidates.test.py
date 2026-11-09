@@ -566,6 +566,65 @@ class Candidates(unittest.TestCase):
         self.assertEqual(journal['templates']['claude'], {})
         self.assertFalse(log.value['events'])
 
+    def test_fixed_provider_build_failures_require_exact_public_literals(self):
+        known = {
+            'An internal error occurred. Please try again or contact support with the build ID.': 'provider_internal_error',
+            'build was cancelled': 'build_cancelled', 'build timed out': 'build_timed_out',
+        }
+        for message, category in known.items():
+            for text in (message, 'Build failed: ' + message):
+                self.assertEqual(candidates.provider_reason(text), {'categories': [category], 'exitCode': None})
+            for text in (PRIVATE + message, message + PRIVATE, message + '\n' + PRIVATE,
+                         '[start] [stderr]: Build failed: ' + message, 'Build failed: ' + message + 'x' * 65536):
+                self.assertEqual(candidates.provider_reason(text), {'categories': [], 'exitCode': None})
+            for cls in (candidates.BuildDiagnostics, candidates.DebugDiagnostics):
+                log = cls() if cls is candidates.DebugDiagnostics else cls({'templates': {'claude': {}}}, self.output, 'claude')
+                for text, level in ((message, 'error'), ('Build failed: ' + message, 'info'),
+                                    ('[start] [stderr]: Build failed: ' + message, 'error'),
+                                    ('[start] [stderr]: guest continuation\nBuild failed: ' + message, 'error'),
+                                    ('Build failed: ' + message + '\n' + PRIVATE, 'error'),
+                                    (' Build failed: ' + message, 'error'),
+                                    ('Build failed: ' + message + PRIVATE, 'error')):
+                    log(SimpleNamespace(level=level, message=text))
+                self.assertEqual(log.value['events'], [])
+                log(SimpleNamespace(level='error', message='Build failed: ' + message))
+                event = {'phase': 'provider_failure', 'detail': category}
+                self.assertEqual(log.value['events'], [{**event, 'count': 1}] if cls is candidates.DebugDiagnostics else [event])
+                self.assertNotIn(PRIVATE, json.dumps(log.value))
+            for level in ('info', 'error'):
+                log = candidates.DebugDiagnostics()
+                log(SimpleNamespace(level=level, message='Template is not ready: ' + message))
+                self.assertEqual(log.value['events'], [
+                    {'phase': 'ready_rejected', 'categories': [], 'exitCode': None, 'count': 1}])
+                self.assertEqual(log.value['signals']['readyRejected'], 1)
+
+    def test_early_provider_error_remains_failed_with_exact_cleanup_and_closed_evidence(self):
+        self.fixture.fail_build = True
+        self.fixture.build_failure = type('BuildException', (Exception,), {})(PRIVATE)
+        message = 'An internal error occurred. Please try again or contact support with the build ID.'
+        self.fixture.status_override = {
+            'reason': SimpleNamespace(step=None, message=message, log_entries=[]),
+            'log_entries': [SimpleNamespace(level='info', message=PRIVATE)] * 3
+                          + [SimpleNamespace(level='error', message='Build failed: ' + message)],
+        }
+        with self.assertRaises(candidates.CandidateError):
+            self.build()
+        report = json.loads((self.output / 'build-report.json').read_text())
+        lookup = report['diagnostic']['statusLookup']
+        self.assertEqual((report['status'], report['code']), ('failed', 'template_build_failed'))
+        self.assertEqual((lookup['step'], lookup['categories'], lookup['exitCode']),
+                         ({'phase': 'unknown', 'index': None}, ['provider_internal_error'], None))
+        self.assertEqual((lookup['requests'], lookup['pages'], lookup['entries']), (1, 1, 4))
+        self.assertEqual(lookup['debugLogs']['events'], [
+            {'phase': 'provider_failure', 'detail': 'provider_internal_error', 'count': 1}])
+        self.assertEqual(lookup['debugLogs']['ignoredLines'], 3)
+        self.assertFalse(lookup['debugLogs']['signals']['startAnnounced'])
+        self.assertFalse(lookup['debugLogs']['signals']['readyAnnounced'])
+        self.assertEqual(self.fixture.status_calls, [('private-claude', 'build-claude')])
+        self.assertFalse(self.fixture.templates)
+        self.assertFalse(self.fixture.created)
+        self.assertNotIn(PRIVATE, ''.join(path.read_text() for path in self.output.iterdir()))
+
     def test_failed_build_reads_its_exact_status_once_before_cleanup_without_retaining_provider_text(self):
         self.fixture.fail_build = True
         self.fixture.status_override = {'reason': SimpleNamespace(step='9',

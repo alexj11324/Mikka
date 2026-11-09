@@ -17,7 +17,6 @@ import stat
 import subprocess
 import sys
 import time
-from types import SimpleNamespace
 from urllib.error import HTTPError
 from uuid import uuid4
 
@@ -265,6 +264,13 @@ class BuildDiagnostics:
             write_private(self.output / JOURNAL, self.journal)
             self.event({'phase': 'template_created'})
             return
+        provider_failure = fixed_provider_failure(message) if message.startswith('Build failed: ') else None
+        if getattr(entry, 'level', None) == 'error' and provider_failure is not None:
+            self.event({'phase': 'provider_failure', 'detail': provider_failure})
+            return
+        self._consume_lines(message)
+
+    def _consume_lines(self, message):
         for line in message.splitlines():
             line = line.strip()
             # runtime@438a79cf sandboxtools/command.go wraps process output in
@@ -359,7 +365,20 @@ def reason_exit_code(message):
     return next(iter(values)) if len(values) == 1 and all(-255 <= value <= 255 for value in values) else None
 
 
-def provider_reason(message):
+def fixed_provider_failure(message):
+    # Exact public literals from runtime@438a79cf builderrors/errors.go, with
+    # builder.go's log envelope. This does not identify the deployed revision.
+    if not isinstance(message, str) or len(message) > MAX_LOG_MESSAGE:
+        return None
+    value = message[14:] if message.startswith('Build failed: ') else message
+    return {
+        'An internal error occurred. Please try again or contact support with the build ID.': 'provider_internal_error',
+        'build was cancelled': 'build_cancelled',
+        'build timed out': 'build_timed_out',
+    }.get(value)
+
+
+def provider_reason(message, *, include_fixed=True):
     # Fixed error prefixes from runtime@438a79cf finalize/builder.go/ready.go.
     # Classify observed text, without asserting the deployed provider revision.
     message = message if isinstance(message, str) and len(message) <= MAX_LOG_MESSAGE else ''
@@ -373,7 +392,9 @@ def provider_reason(message):
         'sync_failed': r'(?:^|: )error running sync command:',
         'deadline_exceeded': r'\bcontext deadline exceeded\b',
     }
-    return {'categories': sorted(code for code, pattern in patterns.items() if re.search(pattern, message)),
+    fixed = fixed_provider_failure(message) if include_fixed else None
+    return {'categories': sorted([code for code, pattern in patterns.items() if re.search(pattern, message)]
+                                 + ([fixed] if fixed is not None else [])),
             'exitCode': reason_exit_code(message)}
 
 
@@ -409,6 +430,10 @@ class DebugDiagnostics(BuildDiagnostics):
         if not isinstance(message, str) or len(message) > MAX_LOG_MESSAGE:
             self.value['oversizedEntries'] += 1
             return
+        provider_failure = fixed_provider_failure(message) if message.startswith('Build failed: ') else None
+        if level == 'error' and provider_failure is not None:
+            self.event({'phase': 'provider_failure', 'detail': provider_failure})
+            return
         for line in message.splitlines():
             line = line.strip()
             # Historical provider logs cannot be mistaken for SDK creation
@@ -425,14 +450,14 @@ class DebugDiagnostics(BuildDiagnostics):
                 signals['templateReady'] = True
             elif line.startswith('Template is not ready: '):
                 signals['readyRejected'] += 1
-                self.event({'phase': 'ready_rejected', **provider_reason(line[23:])})
+                self.event({'phase': 'ready_rejected', **provider_reason(line[23:], include_fixed=False)})
             else:
                 wrapped = PROVIDER_OUTPUT.fullmatch(line)
                 host = wrapped[3] if wrapped and (wrapped[1] is None or int(wrapped[1]) <= int(wrapped[2])) else line
                 if host == 'Cloud worker unavailable':
                     self.event({'phase': 'host_failure', 'detail': 'anonymous_worker_unavailable'})
                 else:
-                    super().__call__(SimpleNamespace(level=level, message=line))
+                    super()._consume_lines(line)
         self.value['entries'] = entries
 
 

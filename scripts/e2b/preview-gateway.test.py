@@ -385,6 +385,56 @@ class PreviewAcceptance(unittest.IsolatedAsyncioTestCase):
                 await writer.wait_closed()
             await asyncio.wait_for(serving, timeout=2)
 
+    async def test_late_shutdown_preserves_replacement_control_socket(self):
+        async with self.control_daemon() as serving:
+            await self.open()
+            socket_path = self.root / 'control.sock'
+            reader, writer = await asyncio.open_unix_connection(str(socket_path))
+            replacement = None
+            old_inode_fd = None
+
+            async def new_control(incoming, outgoing):
+                try:
+                    message = json.loads(await asyncio.wait_for(incoming.readline(), timeout=1))
+                    self.assertEqual(message, {'operation': 'version'})
+                    outgoing.write(json.dumps({'version': 'replacement-control'}).encode() + b'\n')
+                    await outgoing.drain()
+                finally:
+                    outgoing.close()
+                    await outgoing.wait_closed()
+
+            try:
+                # Keep the old inode alive while comparing the two distinct
+                # listeners, including after the old pathname is unlinked.
+                old_inode_fd = os.open(socket_path, os.O_PATH | os.O_NOFOLLOW)
+                self.assertEqual(await self.unix_control({'operation': 'shutdown'}), {'stopped': True})
+                self.assertFalse(serving.done(), 'the old accepted connection still belongs to the stopping daemon')
+                self.assertFalse(socket_path.exists())
+                # A new ensure can now publish its listener while the old
+                # accepted request has not yet supplied its command.
+                replacement = await asyncio.start_unix_server(new_control, path=str(socket_path), limit=16384)
+                replacement_inode = socket_path.stat().st_ino
+                self.assertNotEqual(replacement_inode, os.fstat(old_inode_fd).st_ino)
+                writer.write(json.dumps({'operation': 'shutdown'}).encode() + b'\n')
+                await writer.drain()
+                reply = json.loads(await asyncio.wait_for(reader.readline(), timeout=1))
+                self.assertTrue(socket_path.exists(), 'late shutdown must not unlink the replacement control socket')
+                self.assertEqual(socket_path.stat().st_ino, replacement_inode)
+                self.assertEqual(reply, {'error': 'control_unavailable', 'status': 503})
+                writer.close()
+                await writer.wait_closed()
+                await asyncio.wait_for(serving, timeout=2)
+                self.assertEqual(socket_path.stat().st_ino, replacement_inode)
+                self.assertEqual(await self.unix_control({'operation': 'version'}), {'version': 'replacement-control'})
+            finally:
+                writer.close()
+                await writer.wait_closed()
+                if replacement is not None:
+                    replacement.close()
+                    await replacement.wait_closed()
+                if old_inode_fd is not None:
+                    os.close(old_inode_fd)
+
     async def test_slow_discovery_never_delays_revocation_or_reopens_a_stopped_run(self):
         await self.open()
         websocket = await self.client.ws_connect(self.url('/hmr'), headers=self.headers(Origin=self.origin))

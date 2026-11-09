@@ -592,6 +592,8 @@ async def serve(ready_fd=None):
             shutdown = message.get('operation') == 'shutdown'
             if shutdown:
                 async with gateway.lock:
+                    if gateway.stopping:
+                        raise PreviewFailure('control_unavailable', 503)
                     # A discovery already outside this lock must not reactivate
                     # after the stopped ACK; its final locked check sees this.
                     gateway.stopping = True
