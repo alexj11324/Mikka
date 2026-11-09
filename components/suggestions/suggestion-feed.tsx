@@ -47,6 +47,27 @@ function useSuggestionsKey() {
   return withBasePath(`/api/suggestions?tz=${encodeURIComponent(timeZone)}&locale=${encodeURIComponent(locale)}`)
 }
 
+/**
+ * The 建议 list and 交给 Coordinator (R-21), shared with a UI layer's inbox (docs/ui-overlay.md).
+ * `send` resolves to the error to show, or null once the Coordinator has it.
+ */
+export function useSuggestions() {
+  const actionError = useActionError()
+  const { mutate: mutateAll } = useSWRConfig()
+  const { data, error, mutate } = useSWR(useSuggestionsKey(), fetchJson<SuggestionsView>)
+  // One list, newest first (R-21); the API still groups by app.
+  const items = data?.groups.flatMap(group => group.items) ?? []
+  async function send(id: string): Promise<string | null> {
+    try {
+      const result = await sendSuggestion(id)
+      if (result.error && result.error !== 'suggestionNotFound') return actionError(result.error)
+      await Promise.all([mutate(), mutateAll(coordinatorChatKey()), mutateAll(key => key === 'threads' || Array.isArray(key) && key[0] === 'threads')])
+      return null
+    } catch { return actionError() }
+  }
+  return { data, items, error, mutate, send }
+}
+
 /** Re-reads the suggestions: beside the title on wide screens, among the phone header's actions otherwise. */
 export function SuggestionsRefresh({ phoneHidden = false }: { phoneHidden?: boolean }) {
   const t = useTranslations('SuggestionsPage')
@@ -65,17 +86,13 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
   const t = useTranslations('SuggestionsPage')
   const tNav = useTranslations('Nav')
   const tCommon = useTranslations('Common')
-  const actionError = useActionError()
-  const { mutate: mutateAll } = useSWRConfig()
-  const { data, error, mutate } = useSWR(useSuggestionsKey(), fetchJson<SuggestionsView>)
+  const { data, items, error, mutate, send } = useSuggestions()
   const empty = !!data && !data.groups.some(group => group.items.length)
   // 「连接应用」 only for someone with no app connected yet; an unknown answer shows nothing.
   const { data: connections } = useSWR(empty ? withBasePath('/api/integrations/composio') : null, fetchJson<Connections>, { revalidateOnFocus: false, shouldRetryOnError: false })
   const noConnection = !!connections && !connections.accounts.some(account => account.status === 'ACTIVE')
   const [sending, setSending] = useState<string | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
-  // One list, newest first (R-21); the API still groups by app.
-  const items = data?.groups.flatMap(group => group.items) ?? []
   const scroll = useViewScroll<HTMLDivElement>('suggestions', !!data)
 
   async function pick(item: SuggestionItem) {
@@ -83,11 +100,10 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
     setSending(item.id)
     setSendError(null)
     try {
-      const result = await sendSuggestion(item.id)
-      if (result.error && result.error !== 'suggestionNotFound') { setSendError(actionError(result.error)); return }
-      await Promise.all([mutate(), mutateAll(coordinatorChatKey()), mutateAll(key => key === 'threads' || Array.isArray(key) && key[0] === 'threads')])
+      const failed = await send(item.id)
+      if (failed) { setSendError(failed); return }
       onSent?.()
-    } catch { setSendError(actionError()) } finally { setSending(null) }
+    } finally { setSending(null) }
   }
 
   // min-w-0 on both halves: one long unbroken line in a card must not widen its half and push the chat off screen.

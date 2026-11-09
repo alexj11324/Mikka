@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import type { ChatNavEntry, ChatTarget } from './bot-list'
 import { Columns3, House, Lightbulb } from 'lucide-react'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactFilled, Columns3Filled, HouseFilled, LightbulbFilled, PlugCircle, PlugCircleFilled } from '@/components/icons/rail-filled-icons'
@@ -25,4 +26,8 @@ export type RailProps = {
   onSignOut: () => void
   signingOut: boolean
   onBeforeChange?: (action: () => Promise<void>) => void
+  /** The bot list's rows as data, for a frame that lists them itself (the hosted App Shell); the open-source rail ignores it. */
+  chats?: { entries: ChatNavEntry[]; onOpen: (target: ChatTarget) => void; onNewBot: () => void; onNewGroup: () => void }
+  /** Opens the ⌘K search, for a frame with its own search field. */
+  onSearch?: () => void
 }
