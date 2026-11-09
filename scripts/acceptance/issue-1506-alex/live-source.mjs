@@ -8,7 +8,7 @@ import { dirname, join, resolve, posix } from 'node:path'
 import { stripTypeScriptTypes } from 'node:module'
 
 // Local content review base, not a claim that this commit has been published.
-export const LIVE_SOURCE_CONTENT_BASE = '0e4118020311ae8f9083d0d21cfb990be0282f25'
+export const LIVE_SOURCE_CONTENT_BASE = '1c7698655405b289d7fdbd814713d15e542cc2bb'
 // Exact explicitly supplied application source; no deployment claim. The future workflow/control remain disabled
 // until the separately verified production application SHA is supplied.
 export const LIVE_SOURCE_COMMIT = '5ba1f9e2359ce714d83cd16fc040f2567c40a6d0'
@@ -22,7 +22,7 @@ export const LIVE_SOURCE_HASHES = Object.freeze({
   'lib/swr/cache-policy.ts': 'b87b7847e2ea02cf4d25b8d106dc33ba30b2e8b3862d1843a7d6ada4b93e51a0',
   'lib/swr/indexed-db.ts': 'a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809',
   'hooks/use-live-key.tsx': '5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857',
-  'components/coordinator/coordinator-chat.tsx': 'd30805df38c0d3a6f8413dae6d7b4f79f280ac60682a742de5bbaa67b6e499f9',
+  'components/coordinator/coordinator-chat.tsx': '0a08f40ee2430fdae1eec6165a8bb3af36b85d886ce69327d4eb1ebd45d0f5b0',
   'lib/swr/read-observer.ts': '2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b',
   'components/swr-defaults.tsx': 'cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33',
 })
