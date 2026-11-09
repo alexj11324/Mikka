@@ -69,7 +69,7 @@ jobs:
           assert.match(operation.requestId, /^[0-9a-f-]{36}$/)
           const input = operation.inputs
           assert.ok(input && Object.keys(input).every(key => ['mode','expected-deployment-sha','model-case','prepare','browser-submit','export-target','export-id','session-id','trace-id'].includes(key)))
-          assert.ok(['preflight','execute','export'].includes(input.mode))
+          assert.ok(['preflight','execute','export','controlled-failure'].includes(input.mode))
           assert.ok(['all','claude','codex'].includes(input['model-case']))
           assert.match(input['expected-deployment-sha'], /^[0-9a-f]{40}$/)
           for (const key of ['prepare','browser-submit']) assert.ok(['true','false'].includes(input[key]))

@@ -1,10 +1,14 @@
 {
-  "requestId": "dd62eab8-c6e6-45be-a376-ba74a61123e7",
+  "requestId": "ff0c7964-6603-4bb5-8f7d-740cf9e1899d",
   "inputs": {
-    "mode": "preflight",
-    "expected-deployment-sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "mode": "controlled-failure",
+    "expected-deployment-sha": "1d1261b607c8d60a27e2131ef59b463156d346d1",
     "model-case": "all",
     "prepare": "false",
-    "browser-submit": "false"
+    "browser-submit": "false",
+    "export-target": "dashboard",
+    "export-id": "",
+    "session-id": "",
+    "trace-id": ""
   }
 }
