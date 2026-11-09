@@ -14,7 +14,7 @@ concurrency:
   queue: max
 jobs:
   diagnose:
-    if: true
+    if: false
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
@@ -27,7 +27,7 @@ jobs:
     env:
       MIKKA_EDITION: cloud
       MIKKA_EXPECTED_DEPLOYMENT_SHA: 'd8e09ac218f5656763a5bc42a75e45fc385caede'
-      MIKKA_1503_PRIVATE_FAILURE_DIAGNOSTIC_GO: 'read_and_seal_two_failed_targets_once'
+      MIKKA_1503_PRIVATE_FAILURE_DIAGNOSTIC_GO: ''
       MIKKA_1503_START_FIXTURE_SHA256: 0da23cbb104014a36e130c82c3ae583f01a16825686da1393fb572bc8b199791
       MIKKA_1503_CREDIT_SHARE_SHA256: 5a80cc31ab5a4d219fdb77cc90e259dede9ba970ca055d517174d3d2de4786b6
     steps:
