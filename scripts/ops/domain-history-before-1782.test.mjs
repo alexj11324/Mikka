@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { guardContext, guardMain, MAIN, projectRows, publicFailure, selectScope, snapshot, SQL, verifyScope } from './domain-history-before-1782.mjs'
+import { candidateInventory, guardContext, guardMain, MAIN, projectRows, publicFailure, selectScope, snapshot, SQL, verifyScope } from './domain-history-before-1782.mjs'
 
 const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const scope = { ownerId: 'smoke-owner', workspaceId: id(90), taskIds: [id(1), id(2)], candidateTaskIds: [id(1), id(2)] }
@@ -64,7 +64,7 @@ test('snapshot contains only closed projections and sorted finite UUIDs; no raw 
 for (const [name, change] of [
   ['different owner', rows => { rows.task[0].owner = 'other' }],
   ['different workspace', rows => { rows.task[0].workspace = id(99) }],
-  ['private task', rows => { rows.task[0].scope = 'private' }],
+  ['unknown legacy scope', rows => { rows.task[0].scope = 'private' }],
   ['missing task', rows => { rows.task.pop() }],
   ['duplicate task', rows => { rows.task[1] = rows.task[0] }],
   ['unrelated run', rows => { rows.run[0].issueId = id(99) }],
@@ -73,6 +73,16 @@ for (const [name, change] of [
   ['truncated run set', rows => { rows.run = Array(1001).fill(rows.run[0]) }],
   ['invalid digest', rows => { rows.run[0].frozenDigest = 'raw-content' }],
 ]) test('refuses ' + name, () => { const rows = fixture(); change(rows); assert.throws(() => projectRows(scope, rows)) })
+
+test('a same-owner same-workspace personal compatibility label is a legal historical Task', () => {
+  const rows = fixture(); rows.task[0].scope = 'personal'
+  const result = projectRows(scope, rows)
+  assert.deepEqual(result.task.map(row => row.id), scope.taskIds)
+  rows.task[0].workspace = id(99)
+  assert.throws(() => projectRows(scope, rows))
+  rows.task[0].workspace = scope.workspaceId; rows.task[0].owner = 'other'
+  assert.throws(() => projectRows(scope, rows))
+})
 
 test('at most ten explicit Task UUIDs, not an arbitrary SQL or all-tenant scan', () => {
   assert.throws(() => projectRows({ ...scope, taskIds: Array.from({ length: 11 }, (_, i) => id(i + 1)) }, fixture()))
@@ -126,7 +136,7 @@ test('one hundred authorized candidate UUIDs produce only the fixed historical s
   assert.match(SQL.select, /r.status IN \('succeeded','stopped','failed','cancelled'\)/)
   assert.match(SQL.select, /i\."userId"=\$2/)
   assert.match(SQL.select, /workspaceId',''\)=\$3/)
-  assert.match(SQL.select, /i.scope='workspace'/)
+  assert.match(SQL.select, /i.scope IN \('workspace','personal'\)/)
   assert.match(SQL.select, /LIMIT 10$/)
 })
 
@@ -146,12 +156,49 @@ test('refuses more than one hundred API candidates before opening any transactio
   assert.equal(db.calls.length, 0)
 })
 
+test('normal API candidates admit both owned labels and emit counts without raw identity or content', () => {
+  const rows = [
+    { id: id(1), ownerId: scope.ownerId, scope: 'workspace', status: 'completed', title: 'sensitive-title' },
+    { id: id(2), ownerId: scope.ownerId, scope: 'personal', status: 'stopped', content: 'sensitive-body' },
+    { id: id(3), ownerId: 'other-owner', scope: 'personal', status: 'active' },
+    { id: id(4), ownerId: scope.ownerId, scope: 'unknown' },
+    { id: id(5), userId: scope.ownerId, scope: 'personal' },
+  ]
+  const result = candidateInventory(rows, scope.ownerId)
+  assert.deepEqual(result.candidateTaskIds, [id(1), id(2)])
+  assert.deepEqual(result.counts, { returned: 5, ownerIdFieldPresent: 4, own: 3, ownWorkspace: 1, ownPersonal: 1,
+    ownUnknownScope: 1, workspaceLabel: 1, personalLabel: 3, unknownScope: 1, listCapacityReached: false })
+  const output = JSON.stringify(result.counts)
+  for (const privateValue of [scope.ownerId, 'other-owner', 'sensitive-title', 'sensitive-body', id(1)]) assert.ok(!output.includes(privateValue))
+  assert.equal(candidateInventory([], scope.ownerId).counts.returned, 0)
+  assert.deepEqual(candidateInventory(rows.filter(row => row.ownerId !== scope.ownerId), scope.ownerId).candidateTaskIds, [])
+})
+
+test('normal API capacity is reported without claiming a complete scan or adding pagination', () => {
+  const rows = Array.from({ length: 100 }, (_, i) => ({ id: id(i + 1), ownerId: scope.ownerId, scope: 'personal' }))
+  assert.equal(candidateInventory(rows, scope.ownerId).counts.listCapacityReached, true)
+  assert.equal(candidateInventory(rows, scope.ownerId).candidateTaskIds.length, 100)
+  assert.throws(() => candidateInventory([...rows, { id: id(101), ownerId: scope.ownerId, scope: 'personal' }], scope.ownerId))
+  assert.throws(() => candidateInventory([rows[0], rows[0]], scope.ownerId))
+})
+
 test('post-query API authorization loss invalidates evidence', async () => {
   const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : {
     currentUserId: scope.ownerId, workspace: { id: scope.workspaceId }, role: 'member',
   }, rpc: async () => scope.taskIds.map(value => ({ id: value, ownerId: scope.ownerId, scope: 'workspace' })) }
   await verifyScope(client, scope)
   client.rpc = async () => []
+  await assert.rejects(verifyScope(client, scope))
+})
+
+test('post-query API verifies the same owner and Workspace for a personal-label Task', async () => {
+  const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : {
+    currentUserId: scope.ownerId, workspace: { id: scope.workspaceId }, role: 'member',
+  }, rpc: async () => scope.taskIds.map(value => ({ id: value, ownerId: scope.ownerId, scope: 'personal' })) }
+  await verifyScope(client, scope)
+  client.rpc = async () => scope.taskIds.map(value => ({ id: value, ownerId: 'other', scope: 'personal' }))
+  await assert.rejects(verifyScope(client, scope))
+  client.rpc = async () => scope.taskIds.map(value => ({ id: value, ownerId: scope.ownerId, scope: 'unknown' }))
   await assert.rejects(verifyScope(client, scope))
 })
 

@@ -14,6 +14,7 @@ export const ORIGIN = 'https://app.aspectlylabs.com'
 const ADMIN_HASH = '0049e13c050f799070a7d1a95bb843f2a0519b5e8732bf6986e2e1613b8941c3'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const SHA = /^[0-9a-f]{40}$/
+const LABELS = new Set(['workspace', 'personal'])
 const CODES = new Set(['source_refused', 'main_changed', 'build_changed', 'http_failed', 'response_invalid', 'account_refused',
   'workspace_refused', 'sample_missing', 'sample_invalid', 'sample_changed', 'database_binding', 'database_readonly',
   'sample_too_large', 'history_missing', 'migration_already_applied', 'database_failed', 'signout_failed', 'before_failed'])
@@ -51,7 +52,22 @@ export async function guardMain(env, fetchImpl = fetch) {
 
 /** Only ordinary account API choices can nominate a workspace. No switch is
  * necessary: listWorkspaceIssues accepts an explicitly authorized workspace. */
-export async function selectScope(client, email) {
+export function candidateInventory(rows, ownerId) {
+  check(Array.isArray(rows) && rows.length <= 100 && rows.every(row => UUID.test(row?.id))
+    && new Set(rows.map(row => row.id)).size === rows.length && typeof ownerId === 'string' && ownerId.length > 0, 'sample_invalid')
+  const own = rows.filter(row => row.ownerId === ownerId)
+  const count = (values, label) => values.filter(row => row.scope === label).length
+  return {
+    candidateTaskIds: own.filter(row => LABELS.has(row.scope)).map(row => row.id).sort(),
+    counts: { returned: rows.length, ownerIdFieldPresent: rows.filter(row => typeof row.ownerId === 'string').length,
+      own: own.length, ownWorkspace: count(own, 'workspace'), ownPersonal: count(own, 'personal'),
+      ownUnknownScope: own.filter(row => !LABELS.has(row.scope)).length,
+      workspaceLabel: count(rows, 'workspace'), personalLabel: count(rows, 'personal'),
+      unknownScope: rows.filter(row => !LABELS.has(row.scope)).length, listCapacityReached: rows.length === 100 },
+  }
+}
+
+export async function selectScope(client, email, observeInventory = () => {}) {
   const session = await client.json('/api/auth/get-session')
   const ownerId = session?.user?.id
   check(typeof ownerId === 'string' && ownerId.length > 0 && session.user.email?.trim().toLowerCase() === email.trim().toLowerCase(), 'account_refused')
@@ -73,11 +89,11 @@ export async function selectScope(client, email) {
   check(matches.length === 1, 'workspace_refused')
   const workspaceId = matches[0]
   const rows = await client.rpc('issues.listWorkspaceIssues', [workspaceId])
-  check(Array.isArray(rows) && rows.length <= 100 && rows.every(row => UUID.test(row.id))
-    && new Set(rows.map(row => row.id)).size === rows.length, 'sample_invalid')
   // The API's bounded recent list is a sample, not a claim of complete history.
-  // Prefer owned workspace Tasks; no other account's raw body is requested.
-  const candidateTaskIds = rows.filter(row => row.ownerId === ownerId && row.scope === 'workspace').map(row => row.id).sort()
+  // Main's scope is a compatibility label, not the tenant. Both valid labels
+  // remain owned by this account and constrained to this authorized Workspace.
+  const { candidateTaskIds, counts } = candidateInventory(rows, ownerId)
+  observeInventory(counts)
   check(candidateTaskIds.length > 0, 'sample_missing')
   return { ownerId, workspaceId, candidateTaskIds }
 }
@@ -89,7 +105,7 @@ export async function verifyScope(client, scope) {
     && workspace.workspace?.id === scope.workspaceId && ['member', 'admin'].includes(workspace.role), 'sample_changed')
   const rows = await client.rpc('issues.listWorkspaceIssues', [scope.workspaceId])
   check(Array.isArray(rows) && scope.taskIds.every(id => rows.some(row => row.id === id
-    && row.ownerId === scope.ownerId && row.scope === 'workspace')), 'sample_changed')
+    && row.ownerId === scope.ownerId && LABELS.has(row.scope))), 'sample_changed')
 }
 
 // Constant SQL only. Parameters are the already frozen API UUIDs and owner.
@@ -100,7 +116,7 @@ export const SQL = Object.freeze({
   ledger: `SELECT count(*) FILTER (WHERE name LIKE '202611091430%')::int AS epic,
     md5(coalesce(string_agg(name, E'\\n' ORDER BY name),'')) AS digest FROM schema_migrations`,
   select: `SELECT i.id FROM issues i WHERE i.id=ANY($1::uuid[]) AND i."userId"=$2
-    AND coalesce(to_jsonb(i)->>'workspaceId','')=$3 AND i.scope='workspace'
+    AND coalesce(to_jsonb(i)->>'workspaceId','')=$3 AND i.scope IN ('workspace','personal')
     AND EXISTS (SELECT 1 FROM run_publications p WHERE p."issueId"=i.id AND p.status='published')
     AND EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=i.id AND r.status IN ('succeeded','stopped','failed','cancelled'))
     ORDER BY EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=i.id
@@ -121,7 +137,7 @@ export function projectRows(scope, rows) {
   check(Array.isArray(scope.taskIds) && scope.taskIds.length > 0 && scope.taskIds.length <= 10
     && scope.taskIds.every(id => UUID.test(id)) && new Set(scope.taskIds).size === scope.taskIds.length, 'sample_invalid')
   check(rows.task.length === scope.taskIds.length && rows.task.every(row => scope.taskIds.includes(row.id)
-    && row.owner === scope.ownerId && row.workspace === scope.workspaceId && row.scope === 'workspace')
+    && row.owner === scope.ownerId && row.workspace === scope.workspaceId && LABELS.has(row.scope))
     && new Set(rows.task.map(row => row.id)).size === scope.taskIds.length, 'database_binding')
   check(rows.publication.length > 0 && rows.run.length > 0, 'history_missing')
   for (const kind of ['publication', 'run']) {
@@ -196,7 +212,7 @@ async function main(operation) {
   try {
     const login = await client.request('/api/auth/sign-in/email', post({ email, password, rememberMe: false }))
     signedIn = true; check(login.ok, 'account_refused')
-    const scope = await selectScope(client, email)
+    const scope = await selectScope(client, email, counts => { report.apiTaskInventory = counts })
     report.candidateCount = scope.candidateTaskIds.length
     report.workspaceId = scope.workspaceId
     report.ownerSha256 = hash(scope.ownerId)
