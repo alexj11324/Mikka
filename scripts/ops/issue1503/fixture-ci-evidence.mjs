@@ -37,8 +37,11 @@ export const EXTERNAL_CRITERIA = Object.freeze({
   'Validator unit tests pass.': 'validator_tests',
   "The 'verify' job of the Factory fixture checks and every other check on the pushed commit complete successfully.": 'exact_head_checks',
 })
+export const IMPLEMENTATION_CRITERION = 'Run a small command that reads the file and verifies these requirements.'
 export const FIXTURE_CI_CONTRACT = immutable({ repository, workflowPath, files, requiredSteps })
 const verifiedReceipts = new WeakSet()
+const verifiedImplementationReceipts = new WeakSet()
+const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value)
 const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
 const nonempty = value => typeof value === 'string' && value.trim().length > 0
 const integer = value => Number.isSafeInteger(value) && value > 0
@@ -226,26 +229,74 @@ export async function collectFixtureCiEvidence(read, { candidateSha, pullRequest
   return receipt
 }
 
+
+const requireImplementation = (condition, code) => { if (!condition) throw new Error('issue1503_' + code) }
+
+/** One existing producer-artifact read, bound to the exact task/run/head. The
+ * daemon's successful command and exact file bytes are not a reviewer claim. */
+export async function collectFixtureImplementationEvidence(readArtifact, {
+  taskId, producerRunId, candidateSha, expectedBranch, command, filePath, expectedText, expectedState,
+}) {
+  requireEvidence(typeof readArtifact === 'function' && uuid(taskId) && uuid(producerRunId) && sha(candidateSha)
+    && typeof expectedBranch === 'string' && /^mikka\/f1503-[a-z0-9-]+$/.test(expectedBranch)
+    && nonempty(command) && typeof filePath === 'string' && /^docs\/issue-1503\/[a-zA-Z0-9_-]+\.txt$/.test(filePath)
+    && typeof expectedText === 'string' && ['initial', 'revised'].includes(expectedState), 'implementation_binding_invalid')
+  const artifact = await readArtifact('/api/factory/tasks/' + taskId + '/approval?artifact='
+    + encodeURIComponent('run-report:' + producerRunId))
+  const publish = artifact?.raw?.publish
+  requireImplementation(publish?.pushed === true && publish.branch === expectedBranch
+    && publish.commit === candidateSha && publish.remote === 'origin', 'publication_report_mismatch')
+  const verifiedContent = verifiedFileBytes(artifact?.raw, command, filePath, expectedText, expectedState)
+  const receipt = immutable({ source: 'mikka_daemon_fixture_verification', taskId, producerRunId, candidateSha,
+    branch: expectedBranch, filePath, expectedState, bytes: verifiedContent.bytes, sha256: verifiedContent.sha256,
+    commandSha256: verifiedContent.commandSha256, reportSha256: digest(JSON.stringify(artifact.raw)) })
+  verifiedImplementationReceipts.add(receipt)
+  return { artifact, verifiedContent, receipt }
+}
+
+export function verifiedFileBytes(report, command, filePath, expectedText, expectedState) {
+  const verify = report?.verify
+  requireImplementation(verify?.status === 'passed' && verify.command === command && verify.exitCode === 0
+    && verify.timedOut === false && verify.signal === null, 'implementation_command_verification_missing')
+  let receipt
+  try { receipt = JSON.parse(verify.output?.trim().split('\n').at(-1)) } catch {}
+  const matches = receipt?.issue === 1503 && Array.isArray(receipt.files) ? receipt.files.filter(item => item.path === filePath) : []
+  requireImplementation(matches.length === 1 && matches[0].state === expectedState && matches[0].bytes === Buffer.byteLength(expectedText)
+    && matches[0].sha256 === digest(expectedText), 'implementation_file_bytes_mismatch')
+  return { ...matches[0], source: 'daemon_verify', commandSha256: digest(command) }
+}
+
 /** Preserve original review fields. Only the three exact, separately proven
  * fixture execution/CI requirements may remain honestly unverified. No scope,
  * unknown, failed, malformed, duplicate or missing-evidence item is waived. */
-export function reviewCriteriaEvidence(criteria, candidateSha, receipt, { requireExplicitStatus = false } = {}) {
+export function reviewCriteriaEvidence(criteria, candidateSha, receipt, { requireExplicitStatus = false, implementationReceipt = null } = {}) {
   if (!Array.isArray(criteria) || !criteria.length || criteria.length > 200) return null
   const covered = [], seenExternal = new Set()
   for (const [index, criterion] of criteria.entries()) {
     if (!criterion || typeof criterion !== 'object' || Array.isArray(criterion)) return null
     const externalId = typeof criterion.text === 'string' && Object.hasOwn(EXTERNAL_CRITERIA, criterion.text) ? EXTERNAL_CRITERIA[criterion.text] : null
-    if (externalId) {
-      if (seenExternal.has(externalId)) return null
-      seenExternal.add(externalId)
+    const implementationId = criterion.text === IMPLEMENTATION_CRITERION ? 'implementation_file_command' : null
+    const observationId = externalId ?? implementationId
+    if (observationId) {
+      if (seenExternal.has(observationId)) return null
+      seenExternal.add(observationId)
     }
     if (criterion.passed === true && (criterion.status ?? (requireExplicitStatus ? null : 'passed')) === 'passed'
       && nonempty(criterion.evidence)) continue
-    if (!externalId || criterion.passed !== false || criterion.status !== 'unverified'
-      || !nonempty(criterion.reason) || criterion.reason.length > 2000
-      || !receipt || !verifiedReceipts.has(receipt) || receipt.candidateSha !== candidateSha) return null
-    covered.push({ index: index + 1, criterion: externalId, source: receipt.source,
-      candidateSha, workflowRunId: receipt.run.id, jobId: receipt.job.id })
+    if (!observationId || criterion.passed !== false || criterion.status !== 'unverified'
+      || !nonempty(criterion.reason) || criterion.reason.length > 2000) return null
+    if (implementationId) {
+      if (!implementationReceipt || !verifiedImplementationReceipts.has(implementationReceipt)
+        || implementationReceipt.candidateSha !== candidateSha) return null
+      covered.push({ index: index + 1, criterion: implementationId, source: implementationReceipt.source,
+        taskId: implementationReceipt.taskId, producerRunId: implementationReceipt.producerRunId, candidateSha,
+        fileSha256: implementationReceipt.sha256, commandSha256: implementationReceipt.commandSha256,
+        reportSha256: implementationReceipt.reportSha256 })
+    } else {
+      if (!receipt || !verifiedReceipts.has(receipt) || receipt.candidateSha !== candidateSha) return null
+      covered.push({ index: index + 1, criterion: externalId, source: receipt.source,
+        candidateSha, workflowRunId: receipt.run.id, jobId: receipt.job.id })
+    }
   }
   return { covered }
 }

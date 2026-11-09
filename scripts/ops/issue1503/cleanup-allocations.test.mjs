@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { loadAllocationScope, allocationTargets, allocationIdentity, findLegacyCreated,
-  confirmAllocationAbsence, assertAllocationPostcondition, PINNED_HISTORY } from './cleanup-allocations.mjs'
+  confirmAllocationAbsence, assertAllocationPostcondition, PINNED_HISTORY,
+  loadFailedAllocationScope, FAILED_RELEASE_HISTORY, FAILED_RELEASE_INPUTS } from './cleanup-allocations.mjs'
 
 const fixture = JSON.parse(await readFile(new URL('./cleanup-allocation-scope.json', import.meta.url), 'utf8'))
 const clone = value => structuredClone(value)
@@ -52,7 +53,7 @@ async function state() {
     runId: item.runId, ownerId: OWNER, workspaceId: WORKSPACE, issueId: item.issueId,
     operationId: item.operationId ?? id(200 + index), phase: index === 0 ? null : 'retired',
     sandboxId: null, state: 'ended', pending: false, runOwnerId: OWNER, runIssueId: item.issueId,
-    runStatus: 'succeeded', runFinishedAt: index === 0 ? '2026-11-06T19:56:45.867+00:00' : '2026-11-07T10:30:00.000Z',
+    runStatus: 'succeeded', runFinishedAt: index === 0 ? '2026-11-06T19:56:45.867476+00:00' : '2026-11-07T10:30:00.000Z',
     runLeaseLive: false, legacyTerminalAtMatches: index === 0,
   }))
   const inventory = { tasks, threads, runs: [], subagents: [], clouds: [], other_sandboxes: [],
@@ -89,7 +90,7 @@ test('null future reports remain non-executable before any raw read', async () =
 test('actual raw hashes, single-harness success, chronological latest and continuation closure are required', async () => {
   const input = inputs()
   const scope = await loadAllocationScope(input.config, 'latest.json', input.read)
-  assert.equal(scope.allocations.length, 14)
+  assert.equal(scope.allocations.length, 24)
   for (const n of [110, 111, 112, 113]) assert.ok(scope.allocations.some(item => item.runId === id(n)))
   const changed = inputs(); changed.files.set('claude_code.json', Buffer.from('{}'))
   await assert.rejects(loadAllocationScope(changed.config, 'latest.json', changed.read), /passed_raw_sha_mismatch/)
@@ -156,7 +157,7 @@ test('all identity lookups precede own-only kill, then exact same ID missing; nu
     assert.match(event[3], /^[0-9a-f-]{36}$/)
   }
   assert.equal(result.receipts.filter(item => item.result === 'killed_and_exact_id_missing').length, 1)
-  assert.equal(result.receipts.filter(item => item.result === 'no_matching_active_allocation').length, 13)
+  assert.equal(result.receipts.filter(item => item.result === 'no_matching_active_allocation').length, 23)
   assert.equal(result.receipts.filter(item => item.result === 'no_matching_active_allocation').some(item => 'sandboxId' in item), false)
 })
 
@@ -220,4 +221,136 @@ test('already-scheduled post inventory rejects a new cleared row or operation dr
     const { scope, inventory } = await state(); const after = clone(inventory); change(after)
     await assert.rejects(finish(scope, inventory, providers(), after), /issue1503_cleanup_/)
   })
+})
+
+
+// Historical UUIDs below are admitted identities. The inputs() cases and id()
+// values are memory-only unit fixtures, never future production input pins.
+const history17Digest = value => digest(Buffer.from(JSON.stringify(value, null, 2) + '\n'))
+function history17Rewrite(input, index, change) {
+  const entry = input.config.passedReports[index]
+  const raw = JSON.parse(input.files.get(entry.path))
+  change(raw)
+  const bytes = Buffer.from(JSON.stringify(raw))
+  input.files.set(entry.path, bytes)
+  entry.sha256 = digest(bytes)
+  if (index === 1) input.files.set('latest.json', bytes)
+}
+
+test('history17: admitted identities stay exact and failed history remains independently thirteen', () => {
+  assert.equal(PINNED_HISTORY.length, 17)
+  assert.equal(history17Digest(PINNED_HISTORY),
+    'f14e717eda762a735a56a05918ac38049ec59b766b86b213a483cee94fb6ce4a')
+  assert.deepEqual(fixture.historicalAllocations, PINNED_HISTORY)
+  assert.equal(new Set(PINNED_HISTORY.map(item => item.runId)).size, 17)
+  assert.ok(PINNED_HISTORY.every(item => typeof item.operationId === 'string'))
+  assert.equal(FAILED_RELEASE_HISTORY.length, 13)
+  assert.equal(history17Digest(FAILED_RELEASE_HISTORY),
+    '282c896ff1c9f1b49ebb3668814bd5a752d8f9da6388554140c168659b5db50c')
+  assert.deepEqual(fixture.failedHistoricalAllocations, FAILED_RELEASE_HISTORY)
+  assert.deepEqual(PINNED_HISTORY.slice(0, 7), FAILED_RELEASE_HISTORY.slice(0, 7))
+  assert.deepEqual(PINNED_HISTORY.map(item => item.lookup),
+    [...Array(3).fill('legacy_run_metadata'), ...Array(14).fill('operation_metadata')])
+})
+
+test('history17: default final mode requires new passed cases beyond the complete history', async () => {
+  const input = inputs()
+  assert.equal(input.config.mode, 'failed_release') // This field belongs to the unchanged failed loader.
+  const scope = await loadAllocationScope(input.config, 'latest.json', input.read)
+  assert.equal(scope.mode, 'final_delivery')
+  assert.equal(scope.allocations.length, 24)
+  assert.deepEqual(scope.allocations.slice(0, 17), PINNED_HISTORY)
+  for (const mode of ['final_delivery', undefined]) {
+    const onlyHistory = { ...scope, mode, allocations: clone(PINNED_HISTORY) }
+    assert.throws(() => allocationTargets(onlyHistory, {}), /allocation_scope_invalid/)
+  }
+  assert.throws(() => allocationTargets({ ...scope, mode: 'unknown_mode' }, {}),
+    /allocation_scope_invalid/)
+})
+
+test('history17: complete history does not fill future receipt placeholders', async () => {
+  let reads = 0
+  assert.deepEqual(fixture.passedReports.map(item => [item.path, item.sha256]),
+    [[null, null], [null, null]])
+  await assert.rejects(loadAllocationScope(fixture, 'latest.json', async () => {
+    reads++; throw new Error('must not read any unpinned future input')
+  }), /passed_inputs_missing/)
+  assert.equal(reads, 0)
+})
+
+test('history17: failed receipts and reused historical run IDs cannot authorize final PASS', async () => {
+  const failed = inputs()
+  history17Rewrite(failed, 1, raw => {
+    raw.status = 'failed'
+    raw.cases[0].status = 'failed'
+  })
+  await assert.rejects(loadAllocationScope(failed.config, 'latest.json', failed.read),
+    /passed_report_scope/)
+  const reused = inputs()
+  history17Rewrite(reused, 0, raw => raw.cases[0].runIdsSeen.push(PINNED_HISTORY[10].runId))
+  await assert.rejects(loadAllocationScope(reused.config, 'latest.json', reused.read),
+    /allocation_run_overlap/)
+})
+
+test('history17: changed historical operations or duplicate old35c4 tuples fail before reads', async () => {
+  for (const change of [
+    config => { config.historicalAllocations[13].operationId = id(999) },
+    config => { config.historicalAllocations.push(clone(config.historicalAllocations[10])) },
+  ]) {
+    const config = clone(fixture); change(config)
+    let reads = 0
+    await assert.rejects(loadAllocationScope(config, 'latest.json', async () => {
+      reads++; throw new Error('must not read a mismatched scope')
+    }), /allocation_scope_invalid/)
+    assert.equal(reads, 0)
+  }
+})
+
+test('history17: failed-source hashes, scope headers and stale latest sources remain rejected', async () => {
+  const wrongHash = inputs()
+  wrongHash.config.passedReports[0].sha256 = FAILED_RELEASE_INPUTS[0].sha256
+  await assert.rejects(loadAllocationScope(wrongHash.config, 'latest.json', wrongHash.read),
+    /passed_raw_sha_mismatch/)
+  const wrongHeader = inputs()
+  history17Rewrite(wrongHeader, 0, raw => { raw.workspaceId = id(998) })
+  await assert.rejects(loadAllocationScope(wrongHeader.config, 'latest.json', wrongHeader.read),
+    /passed_report_scope/)
+  const stale = inputs(); stale.files.set('latest.json', stale.files.get('claude_code.json'))
+  await assert.rejects(loadAllocationScope(stale.config, 'latest.json', stale.read),
+    /latest_passed_not_chronological/)
+})
+
+test('history17: old failed mode retains its thirteen-plus-four identities and threshold', async () => {
+  let reads = 0
+  await assert.rejects(loadFailedAllocationScope(fixture, 'latest-failed.json', async () => {
+    reads++; return Buffer.alloc(0)
+  }), /failed_raw_sha_mismatch/)
+  assert.equal(reads, 1) // Configuration reached the unchanged exact-original-byte guard.
+  const allocations = [
+    ...clone(FAILED_RELEASE_HISTORY),
+    ...FAILED_RELEASE_INPUTS.flatMap(item => item.runIds.map(runId => ({
+      issueId: item.issueId, taskId: item.taskId, runId, operationId: null, lookup: 'operation_metadata',
+    }))),
+  ]
+  assert.equal(allocations.length, 17)
+  const failed = { version: 1, ownerId: OWNER, workspaceId: WORKSPACE,
+    mode: 'failed_release', acceptancePassed: false, allocations }
+  const { inventory } = await state()
+  const runs = new Set(allocations.map(item => item.runId))
+  const tasks = new Set(allocations.map(item => item.taskId))
+  inventory.threads = inventory.threads.filter(item => runs.has(item.runId))
+  inventory.tasks = inventory.tasks.filter(item => tasks.has(item.id))
+  const targets = allocationTargets(failed, inventory)
+  assert.deepEqual(targets.map(({ issueId, taskId, runId, operationId, lookup }) =>
+    ({ issueId, taskId, runId, operationId, lookup })), PINNED_HISTORY)
+  assert.throws(() => allocationTargets({ ...failed, mode: 'final_delivery' }, inventory),
+    /allocation_scope_invalid/)
+})
+
+test('history17: newly bound operation IDs remain exact at inventory binding', async () => {
+  const { scope, inventory } = await state()
+  assert.equal(inventory.threads[0].runFinishedAt, '2026-11-06T19:56:45.867476+00:00')
+  const target = inventory.threads.find(item => item.runId === PINNED_HISTORY[13].runId)
+  target.operationId = id(997)
+  assert.throws(() => allocationTargets(scope, inventory), /allocation_binding_changed/)
 })

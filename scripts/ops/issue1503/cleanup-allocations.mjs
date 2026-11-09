@@ -65,6 +65,76 @@ export const PINNED_HISTORY = Object.freeze([
     "runId": "ed6723b7-f39f-4cf4-8243-9e5e9a94225f",
     "operationId": "c6524fbd-4a9e-44d0-9b0d-d24b97b038f7",
     "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "6fa2a3e8-1f4c-4ef4-9057-1d00fff5d4bf",
+    "taskId": "e1a83dea-fe74-4a90-bf17-6c7ab5260e89",
+    "runId": "4d6b0daf-346b-4e9f-8e71-a767bc6100de",
+    "operationId": "86f9926b-0a15-49a8-9f0d-e279977aa0fa",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "6fa2a3e8-1f4c-4ef4-9057-1d00fff5d4bf",
+    "taskId": "e1a83dea-fe74-4a90-bf17-6c7ab5260e89",
+    "runId": "4491cf36-8828-4096-8a13-578b7ca3d807",
+    "operationId": "1d773195-07ff-4a75-b6cd-7bda75745f0e",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "11ba8fa4-9919-4387-8b72-a0e279d41d5f",
+    "taskId": "e722dc29-d451-4e4f-a96c-949c6647f460",
+    "runId": "5ea7dad6-d3bc-4e9c-83fd-967fb58fa85a",
+    "operationId": "999a6cba-584e-443b-888f-54fbb4240e59",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "4fb0b4ec-3a0f-47b4-a3db-4a37fc7f281c",
+    "taskId": "7fe4108d-8722-411a-9f7f-ebd1391ab54e",
+    "runId": "338b908a-1ada-4791-8cc0-868db7f47afa",
+    "operationId": "f7dd8c0c-0fd7-4ae6-9672-fe4d97090bb2",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "45b22130-bc9c-4d62-9553-3b7d847e4120",
+    "taskId": "a4f5844c-7c4f-46d9-a304-2cf84598742f",
+    "runId": "032f5180-1a44-42bb-82cd-70b0637b16d4",
+    "operationId": "a101d3c7-31af-49d4-9bdd-3c655db4e389",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "45b22130-bc9c-4d62-9553-3b7d847e4120",
+    "taskId": "a4f5844c-7c4f-46d9-a304-2cf84598742f",
+    "runId": "4ad9064f-af19-4e1d-bd2c-e835d6c7b159",
+    "operationId": "69684576-232b-4e43-b49e-4375edfc3a13",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "626ffdfd-f24b-4b35-8682-84167a45ffe5",
+    "taskId": "77927ba7-096d-4ee2-8b20-9ffc7ae9f539",
+    "runId": "5a2fefa4-c7d0-4920-8718-bf8d79cc2e91",
+    "operationId": "6538d7b1-fa88-4429-8773-d0e2035776ba",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "626ffdfd-f24b-4b35-8682-84167a45ffe5",
+    "taskId": "77927ba7-096d-4ee2-8b20-9ffc7ae9f539",
+    "runId": "e33db713-68e5-4e18-8fe3-ee3e1a210c50",
+    "operationId": "476f458e-c234-433f-9502-4b61af57dd1e",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "fc33fd19-3482-415c-8e41-2b64b261b27e",
+    "taskId": "337bbcf4-d127-4772-9332-e7ced061c621",
+    "runId": "8d0667f4-02ac-4205-8014-bfec1a920a9d",
+    "operationId": "f391dacd-2b86-4eba-ac15-b408f6bfa8b6",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "fc33fd19-3482-415c-8e41-2b64b261b27e",
+    "taskId": "337bbcf4-d127-4772-9332-e7ced061c621",
+    "runId": "eee445ca-1eeb-429d-bf8e-8635362ff241",
+    "operationId": "ef484e80-2089-4817-92a3-4d8fdada5e89",
+    "lookup": "operation_metadata"
   }
 ].map(Object.freeze))
 const check = (condition, code) => { if (!condition) throw new Error(`issue1503_cleanup_${code}`) }
@@ -145,13 +215,16 @@ export async function loadAllocationScope(config, latestPath, read = readFile) {
   for (const item of cases) for (const runId of item.runIds)
     allocations.push({ issueId: item.issueId, taskId: item.taskId, runId, operationId: null, lookup: 'operation_metadata' })
   check(new Set(allocations.map(item => item.runId)).size === allocations.length, 'allocation_run_overlap')
-  return { version: 1, ownerId: OWNER, workspaceId: WORKSPACE, allocations, receipts,
+  return { version: 1, ownerId: OWNER, workspaceId: WORKSPACE, mode: 'final_delivery', allocations, receipts,
     latestSuccessfulRawSha256: ordered[1].sha256 }
 }
 
 function requireScope(scope) {
-  check(scope?.ownerId === OWNER && scope.workspaceId === WORKSPACE && Array.isArray(scope.allocations)
-    && scope.allocations.length > PINNED_HISTORY.length, 'allocation_scope_invalid')
+  const mode = scope?.mode === undefined ? 'final_delivery' : scope.mode
+  const historyLength = mode === 'final_delivery' ? PINNED_HISTORY.length
+    : mode === 'failed_release' ? FAILED_RELEASE_HISTORY.length : null
+  check(historyLength !== null && scope?.ownerId === OWNER && scope.workspaceId === WORKSPACE
+    && Array.isArray(scope.allocations) && scope.allocations.length > historyLength, 'allocation_scope_invalid')
 }
 
 /** Whole own-workspace set, including ended/cleared/transferred rows; never filter by phase. */
