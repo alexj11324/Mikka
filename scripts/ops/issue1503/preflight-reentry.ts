@@ -75,7 +75,9 @@ try {
     await session.rpc('model-order.checkModelOrderQuota', [connectionId, workspaceId])
   }
   report.stage = 'factory_catalog'
-  const profiles = await session.json(`/api/factory/agent-profiles?workspaceId=${workspaceId}&location=cloud`)
+  const profiles = await session.json(`/api/factory/agent-profiles?workspaceId=${workspaceId}&location=cloud`, {
+    headers: { 'x-mikka-workspace-id': workspaceId },
+  })
   report.catalog = { keys: Object.keys(profiles.catalog ?? {}), models: (profiles.catalog?.models ?? []).filter((model: any) =>
     JSON.stringify(model).includes('claude-haiku-5-5') || JSON.stringify(model).includes('gpt-6-luna')) }
   report.existingProfiles = profiles.profiles?.map((profile: any) => ({ id: profile.id, version: profile.version, name: profile.definition?.name ?? profile.name }))
