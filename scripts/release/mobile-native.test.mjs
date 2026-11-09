@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, copyFileSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { requireAscInputs, selectNativeSource, validateNativeBuild, withAscProfile } from './mobile-native.mjs'
+import { requireAscInputs, selectNativeSource, validateNativeBuild, withAscProfile, verifyHostedArchive, excludedFromNativeArchive } from './mobile-native.mjs'
 
 const SOURCE = 'e'.repeat(40)
 const DRIVER = 'd'.repeat(40)
@@ -128,4 +128,75 @@ test('invalid P8 error does not reveal its contents or alter the checkout', () =
     assert.equal(readFileSync(easPath, 'utf8'), original)
     assert.equal(existsSync(join(dir, 'mikka-asc-submit')), false)
   } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+
+test('official profile requires a matching archive proof and never accepts it as the public profile', () => {
+  const archiveProof = { sourceSha: SOURCE, overlaySha: 'a'.repeat(40), archiveDigest: 'b'.repeat(64), files: 10, overlayFiles: 3 }
+  const hosted = { ...build, buildProfile: 'hosted-production' }
+  assert.throws(() => validateNativeBuild(hosted, identity, app), /nativeBuildIdentityMismatch/)
+  assert.throws(() => validateNativeBuild(hosted, { ...identity, expectedProfile: 'hosted-production' }, app), /hostedBuildArchiveProofRequired/)
+  assert.throws(() => validateNativeBuild(hosted, { ...identity, expectedProfile: 'hosted-production', archiveProof: { ...archiveProof, sourceSha: DRIVER } }, app), /hostedBuildArchiveProofRequired/)
+  const report = validateNativeBuild(hosted, { ...identity, expectedProfile: 'hosted-production', archiveProof }, app)
+  assert.deepEqual(report.archiveProof, archiveProof)
+})
+
+test('archive preserves transitive tracked UI bytes and rejects missing, extra, changed or excluded files', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mikka-archive-unit-'))
+  const archive = join(dir, 'archive'), overlay = join(dir, 'overlay')
+  const files = ['mobile/slots/bot-avatar.tsx', 'components/mikka/bot-paper.tsx']
+  const write = (root, file, text) => {
+    mkdirSync(join(root, file, '..'), { recursive: true })
+    writeFileSync(join(root, file), text)
+  }
+  try {
+    for (const file of files) {
+      write(overlay, file, `synthetic ${file}`)
+      write(archive, `.hosted-ui/${file}`, `synthetic ${file}`)
+    }
+    write(archive, 'apps/mobile/eas.json', JSON.stringify({ build: { 'hosted-production': {
+      extends: 'production', env: { MIKKA_MOBILE_OVERLAY_DIR: '.hosted-ui/mobile' },
+    } } }))
+    const check = () => verifyHostedArchive({ archive, overlay, trackedFiles: [...files, 'docs/private.md'], sourceSha: SOURCE, overlaySha: DRIVER })
+    const proof = check()
+    assert.equal(proof.overlayFiles, 2)
+    assert.equal(proof.files, 3)
+    assert.match(proof.archiveDigest, /^[a-f0-9]{64}$/)
+    mkdirSync(join(archive, 'docs'), { recursive: true })
+    mkdirSync(join(archive, '.hosted-ui/docs'), { recursive: true })
+    assert.equal(check().archiveDigest, proof.archiveDigest)
+    rmSync(join(archive, '.hosted-ui', files[1]))
+    assert.throws(check, /nativeArchiveOverlayTrackedSetMismatch/)
+    copyFileSync(join(overlay, files[1]), join(archive, '.hosted-ui', files[1]))
+    write(archive, '.hosted-ui/extra.tsx', 'unexpected')
+    write(overlay, 'extra.tsx', 'unexpected')
+    assert.throws(check, /nativeArchiveOverlayTrackedSetMismatch/)
+    rmSync(join(archive, '.hosted-ui/extra.tsx'))
+    write(archive, `.hosted-ui/${files[1]}`, 'changed')
+    assert.throws(check, /nativeArchiveOverlayBytesMismatch/)
+    copyFileSync(join(overlay, files[1]), join(archive, '.hosted-ui', files[1]))
+    for (const file of ['.git/config', '.env.production', '.hosted-ui/.git/config', '.hosted-ui/.env', 'AuthKey.p8', 'bundle.js.map', 'node_modules/module.js', '.hosted-ui/docs/private.md']) {
+      assert.equal(excludedFromNativeArchive(file), true)
+      write(archive, file, 'synthetic blocked file')
+      assert.throws(check, /nativeArchiveExcludedFilePresent/)
+      rmSync(join(archive, file), { force: true })
+      assert.equal(check().archiveDigest, proof.archiveDigest)
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('official packaging keeps public profiles and ignored paths while adding the complete protected checkout', () => {
+  const root = new URL('../../', import.meta.url)
+  const eas = JSON.parse(readFileSync(new URL('apps/mobile/eas.json', root), 'utf8'))
+  assert.equal(eas.build.production.env, undefined)
+  assert.equal(eas.build['hosted-production'].extends, 'production')
+  assert.equal(eas.build['hosted-production'].env.MIKKA_MOBILE_OVERLAY_DIR, '.hosted-ui/mobile')
+  const ignore = readFileSync(new URL('.easignore', root), 'utf8')
+  assert.ok(ignore.startsWith(readFileSync(new URL('.gitignore', root), 'utf8')))
+  assert.ok(ignore.includes('!/.hosted-ui/**'))
+  const workflow = readFileSync(new URL('.github/workflows/mobile-native.yml', root), 'utf8')
+  assert.ok(workflow.indexOf('mobile-native.mjs source') < workflow.indexOf('Read existing HOSTED_UI_READ_KEY'))
+  assert.ok(workflow.indexOf('mobile-native.mjs archive') < workflow.indexOf('build --platform ios --profile hosted-production'))
+  assert.ok(workflow.includes('ssh-key: ${{ env.HOSTED_UI_READ_KEY }}'))
+  assert.ok(workflow.includes("echo 'HOSTED_UI_READ_KEY='"))
 })

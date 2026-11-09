@@ -17,7 +17,7 @@ import { blockLabel } from './block-label'
 const LIST_COLUMNS: ReadonlySet<CardProperty> = new Set(['identifier', 'priority', 'assignee'])
 
 /** The board's list view: one row per task, its columns the same 显示 properties as the cards. */
-export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, searching, onOpen, onCreate }: {
+export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, searching, onOpen, onCreate, onClearFilters }: {
   issues: Awaited<ReturnType<typeof listIssues>>
   /** 受阻 tasks group under 受阻, as on the board, each row naming why (lib/task-blocked.ts). */
   blocks?: ReadonlyMap<string, TaskBlock>
@@ -27,6 +27,8 @@ export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, s
   searching: boolean
   onOpen: (id: string) => void
   onCreate: () => void
+  /** Filters hide every task: the empty state offers to clear them. */
+  onClearFilters?: () => void
 }) {
   const t = useTranslations('Issue.list')
   const tCard = useTranslations('Shell.board.card')
@@ -42,6 +44,7 @@ export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, s
       <EmptyTitle>{searching ? t('noResults') : t('emptyTitle')}</EmptyTitle>
     </EmptyHeader>
     {!searching && <EmptyContent><Button size="sm" onClick={onCreate}><Plus data-icon="inline-start" />{t('newTask')}</Button></EmptyContent>}
+    {searching && onClearFilters && <EmptyContent><Button size="sm" variant="outline" onClick={onClearFilters}>{t('clearFilters')}</Button></EmptyContent>}
   </Empty>
 
   return <div aria-label={t('label')} className="flex flex-col">
@@ -65,8 +68,11 @@ export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, s
                 {properties.has('priority') && <PriorityIcon priority={issue.priority} label={priorityLabel(issue.priority)} />}
                 <status.icon className={cn('size-3.5 shrink-0', indicatorClassName)} />
                 {showIdentifier && <span className="hidden w-20 shrink-0 text-xs text-muted-foreground tabular-nums sm:block">{issue.identifier}</span>}
-                <span className="min-w-0 flex-1 truncate font-medium" title={issue.title}>{displayTaskTitle(issue)}</span>
-                {column.value === BLOCKED_COLUMN && blocks?.get(issue.id) && <span className="hidden shrink-0 text-xs text-destructive-foreground sm:block">{blockLabel(tCard, blocks.get(issue.id)!)}</span>}
+                {/* What blocks it stays at every width: under the title on a phone, beside it otherwise. */}
+                <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
+                  <span className="min-w-0 flex-1 truncate font-medium" title={issue.title}>{displayTaskTitle(issue)}</span>
+                  {column.value === BLOCKED_COLUMN && blocks?.get(issue.id) && <span className="truncate text-xs text-destructive-foreground sm:shrink-0">{blockLabel(tCard, blocks.get(issue.id)!)}</span>}
+                </span>
                 {/* The card's avatar group (R-25): the Bot on top, then the person; empty when nobody owns the task. The rings take the row's colour instead of the card's. */}
                 {properties.has('assignee') && <span data-slot="list-assignee" className="flex min-w-[18px] shrink-0 justify-end [&_[data-avatar]]:ring-background" title={issue.metadata.assignee?.name}>{assigneeGroupOf({ assignee: issue.metadata.assignee, owner: owners?.get(issue.id) })}{issue.metadata.assignee && <span className="sr-only">{issue.metadata.assignee.name}</span>}</span>}
                 <time suppressHydrationWarning dateTime={new Date(issue.updatedAt).toISOString()} className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground md:block">{format.dateTime(new Date(issue.updatedAt), { month: 'numeric', day: 'numeric' })}</time>

@@ -130,6 +130,14 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     const overview = page.getByRole('complementary', { name: messages.Shell.panel.label, exact: true })
     await overview.getByRole('heading', { name: messages.Nav.coordinator, exact: true }).waitFor()
     await overview.getByRole('tab', { name: messages.Shell.panel.computer, exact: true }).waitFor()
+    // A restored chat conservatively retains a history cursor. Complete this
+    // two-message fixture through the ordinary UI before comparing its layout.
+    const conversation = page.getByRole('region', { name: messages.Coordinator.conversation, exact: true })
+    const earlier = conversation.getByRole('button', { name: messages.Common.loadMore, exact: true })
+    if (await earlier.isVisible()) await earlier.click()
+    await earlier.waitFor({ state: 'hidden' })
+    await conversation.getByText('What should we review today?', { exact: true }).waitFor()
+    await conversation.getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
   } else if (name === 'all-threads' || name === 'bot-thread-list') {
     await threadRows(page.getByRole('region', { name: messages.Shell.panel.allThreads, exact: true }))
   } else if (name === 'projects' || name === 'team-projects') {
