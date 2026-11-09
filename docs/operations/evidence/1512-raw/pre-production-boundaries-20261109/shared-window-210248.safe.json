@@ -1,0 +1,469 @@
+{
+  "schema": "mikka.issue1512.shared-runtime-and-candidate-increment.v1",
+  "observedFromUtc": "2026-11-09T21:01:55Z",
+  "observedThroughUtc": "2026-11-09T21:02:48Z",
+  "incrementSinceUtc": "2026-11-09T20:53:00Z",
+  "repository": "alexj11324/Mikka",
+  "previousProof": "86b95277aaaa0c6ab733a1e40d19fb08540114a9",
+  "main": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "current12458": {
+    "r7": {
+      "id": 42695935772,
+      "name": "E2B additive runtime release",
+      "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "startedAt": "2026-11-09T20:45:11Z",
+      "updatedAt": "2026-11-09T20:56:22Z"
+    },
+    "jobs": [
+      {
+        "id": 129428949477,
+        "name": "test",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:32Z",
+        "completedAt": "2026-11-09T20:47:49Z"
+      },
+      {
+        "id": 129429132057,
+        "name": "check",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:52Z",
+        "completedAt": "2026-11-09T20:48:09Z"
+      },
+      {
+        "id": 129429312566,
+        "name": "validate / build",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:48:12Z",
+        "completedAt": "2026-11-09T20:56:19Z"
+      },
+      {
+        "id": 129433803533,
+        "name": "await-web",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T20:56:21Z",
+        "completedAt": null
+      }
+    ],
+    "buildStep": [
+      {
+        "number": 7,
+        "name": "Build private versioned candidates and require official file conservation",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:48:27Z",
+        "completedAt": "2026-11-09T20:56:12Z"
+      }
+    ],
+    "awaitWebSteps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:56:22Z",
+        "completedAt": "2026-11-09T20:56:23Z"
+      },
+      {
+        "number": 2,
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:56:23Z",
+        "completedAt": "2026-11-09T20:56:27Z"
+      },
+      {
+        "number": 3,
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:56:27Z",
+        "completedAt": "2026-11-09T20:56:28Z"
+      },
+      {
+        "number": 4,
+        "name": "Await this source's actual Web build and public version",
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T20:56:28Z",
+        "completedAt": null
+      },
+      {
+        "number": 7,
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "pending",
+        "conclusion": null,
+        "startedAt": null,
+        "completedAt": null
+      },
+      {
+        "number": 8,
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "pending",
+        "conclusion": null,
+        "startedAt": null,
+        "completedAt": null
+      }
+    ],
+    "subscriptionOrPublicationOrFinalCleanupJobs": [],
+    "web": {
+      "id": 42695935815,
+      "name": "Web deploy",
+      "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "startedAt": "2026-11-09T20:45:11Z",
+      "updatedAt": "2026-11-09T20:45:15Z"
+    },
+    "webJob": {
+      "id": 129427662760,
+      "name": "deploy",
+      "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "startedAt": "2026-11-09T20:45:14Z",
+      "completedAt": null
+    },
+    "webRelevantSteps": [
+      {
+        "number": 15,
+        "name": "Publish the verified additive runtime pair inside the deployment queue",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T20:45:35Z",
+        "completedAt": "2026-11-09T20:45:35Z"
+      },
+      {
+        "number": 24,
+        "name": "Build (runs migrations last, as the Vercel build did)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:21Z",
+        "completedAt": "2026-11-09T20:54:16Z"
+      },
+      {
+        "number": 27,
+        "name": "Upload the prebuilt output to production",
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T20:54:18Z",
+        "completedAt": null
+      },
+      {
+        "number": 28,
+        "name": "Verify the public production version before releasing the deployment queue",
+        "status": "pending",
+        "conclusion": null,
+        "startedAt": null,
+        "completedAt": null
+      }
+    ],
+    "result": "R7 build completed successfully at20:56:19; await-web is active. Web build is complete and production upload began20:54:18; public version verifier is pending. No current-source subscription/publication result or effective runtime tuple is established."
+  },
+  "newOwner1505Evidence": {
+    "comments": [
+      {
+        "id": 6751204937,
+        "createdAt": "2026-11-09T20:54:12Z",
+        "updatedAt": "2026-11-09T20:54:12Z",
+        "url": "https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6751204937",
+        "body": "### #1506 对本轮发布依赖的独立源码复核\n\n在实际main `12458fe22e1217f644e8b28f82ab856211e73b72`（仅两README后继7848）上，`packages/daemon/src/anonymous-codex-spare.ts` blob `00f476c51799a68c4af5edc38d9a62c91aeea545` 的initialize结果判定确实只接受 `/0.166.0`；`/0.167.0` 会在 `initialized` notification及parked之前拒绝。adapter随后允许 `adopted?.child ?? spawnCli(...)` 的正常冷启动回退，因此“工具/回复成功但adoption preparationTiming缺失”与该路径相容。\n\n这证明版本判定存在确定的0.167兼容缺口，**不冒充已记录该失败请求的实际initialize UA**。本方未读取原日志/ZIP、未新增模型或机器，也没有另起竞争实现。\n\n该分类器与 #1836 的14路径无重叠，不需要动其 `plain_model.go`/`timing.go`。仍应保留未知版本拒绝，复用针对0.167的真实UA/fixture RED→GREEN；现有hint profile/config生命周期以0.166为已证基线，不能仅凭 `--version` 将所有版本放行。已在[协调页](https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751179155)提出复用你方最小修复作为单个main merge批次的依赖，避免两次独立R7。"
+      },
+      {
+        "id": 6751306593,
+        "createdAt": "2026-11-09T20:58:58Z",
+        "updatedAt": "2026-11-09T20:58:58Z",
+        "url": "https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6751306593",
+        "body": "### 本轮生产门槛结果：FAIL，定位到 Codex 匿名预启动版本兼容性\n\n实际 `7848e79df9c5af67e526aeed1c828858db392066` / worker `aa7efbbe2969d8b1578bdba093e6400a26749e07` 的 R7 `42690423873/A1` 已结束：test/check/validate-build/await-web SUCCESS；subscriptions FAILURE；publish SKIPPED；cleanup SUCCESS。初始 Web `42690424415/A1` SUCCESS，实际DPL `dpl_HMsJjJUvj3jpy2mj4n3rCSrLugby` READY。没有发布这组候选，也没有启动新的正式六例。\n\nroot唯一读取的原诊断 artifact `13709237613`：ZIP2505 B / SHA256 `4d6dae20e348292050483b2aed981d877e0f723357eac95cbe375f4cb65c201b`；唯一 `subscription-diagnostics.json` 6384 B / SHA256 `ca8ad628f11addabacbadfe4c7475d4186b0dfc0ec52ba50860b559f4122541e`。CRC/member inventory通过，未发现凭据值字段。\n\n- **Claude Code完整门槛PASS**：官方CLI `2.1.312`，真实 `claude-haiku-5-5`，工具成功、工具后的正确回复、bootstrap adoption均有passedReceipt。\n- **Codex整条门槛FAIL**：官方CLI `0.167.0`；实际工具成功、后续正确回复、预期ACK及runtimeEvidence通过，唯一报错 `template_gate_bootstrap_adoption_missing`。startupTiming完整，preparationTiming为unavailable/null；所有bootstrap/publication绑定检查为true。不能把这些局部成功写成完整发布通过。\n- root全文核实实际源码 `anonymous-codex-spare.ts` 在initialize后只接受 `userAgent /0.166.0`，不匹配则关闭匿名进程，普通启动仍能完成任务。这是与本轮症状一致的具体拒绝机制；原诊断没有记录实际initialize.userAgent，未伪称已捕获该原生轨迹。\n- 已比对官方固定 `rust-v0.166.0` 与 `rust-v0.167.0` 源码：所用InitializeParams/Response、initialized、ThreadStartParams和相关启动区间保持；新选项默认关闭。正在干净、无生产凭据的短寿命Linux环境做旧代码RED/窄修复GREEN。后续只显式支持验证过的版本，未知版本继续拒绝，不降级或改写官方CLI，不弱化真实订阅/adoption门槛，并同PR更新原ADR。\n\n**原件清理已核验**：release-cleanup artifact `13708229594`，ZIP416 B / SHA256 `71bad071f86b8a13c78ce848ad4bd90a1fcd51b5db0870223029269428a7e547`；receipt639 B / SHA256 `53cafa6f10bda0586271551280d4584a2e694d0d42aafe2d640077be247dca03`。本轮desktop/claude/codex三份私有模板均deleted，sandboxes为空、errors为空；两条订阅诊断的cleanupErrors亦为空。\n\n20:45文档PR#1838推进main到12458并触发另一轮正常Web/R7；本方为原child42689909155创建的清理入口因Web队列等待错过原entry预算（20:57），已正常关闭于170ab834…；20:58仍无runner/steps，不能写成child已撤销。当前保留该连接给已在运行的正常自动R7消费者，消费者结束后按原token指纹清理。H未创建，正式新样本0，实际段尚未释放，#1505保持open。"
+      }
+    ],
+    "old7848Deployment": {
+      "id": "dpl_HMsJjJUvj3jpy2mj4n3rCSrLugby",
+      "state": "READY",
+      "basis": "Owner's new20:58:58 projection6751306593; this reviewer did not call Vercel or public production endpoints."
+    },
+    "old7848R7": "The prior R7 remainsFAIL; Claude complete gate passed, Codex adoption preparation timing failed, publish skipped. No accepted candidate was published.",
+    "oldCandidateCleanup": {
+      "artifactId": 13708229594,
+      "zipBytes": 416,
+      "zipSha256": "71bad071f86b8a13c78ce848ad4bd90a1fcd51b5db0870223029269428a7e547",
+      "receiptBytes": 639,
+      "receiptSha256": "53cafa6f10bda0586271551280d4584a2e694d0d42aafe2d640077be247dca03",
+      "ownerReported": "Desktop/Claude/Codex private templates deleted; sandboxes=[], errors=[]; both subscription diagnostic cleanupErrors empty.",
+      "boundary": "Owner uniquely read original archive. This reviewer consumed only the public safe projection; no independent DELETE/GET404 was observed."
+    },
+    "versionInvestigation": {
+      "fixedSourceBlob": "00f476c51799a68c4af5edc38d9a62c91aeea545",
+      "reportedGap": "Anonymous Codex initialize classifier accepts/0.166.0 and rejects/0.167.0 beforeinitialized/parked; normal cold startup can still succeed.",
+      "actualOriginalInitializeUserAgent": "Not recorded in original diagnostic according to owner; do not promote source compatibility analysis to a captured historical native event.",
+      "ownerNextStep": "Compare fixed official protocol sources and execute bounded offline oldRED/narrowGREEN. Unknown versions remain refused. No fixed compatibility head was published in the comments read here."
+    }
+  },
+  "window": {
+    "ownerIssue": 1505,
+    "start": "2026-11-09T20:04:10Z",
+    "absoluteEnd": "2026-11-09T22:04:10Z",
+    "earlyReleaseObserved": false,
+    "extensionObserved": false,
+    "latestOwnerStatement": {
+      "commentId": 6751306593,
+      "at": "2026-11-09T20:58:58Z"
+    },
+    "actualCredentialState": "Owner's child cleanup entry missed its20:57 entry budget while waiting on the Web queue, was normally closed at170ab834...; at20:58 no runner/steps existed. This is not revocation. Child is retained for the already-running12458 automatic R7 and will be cleaned by exact originaltoken fingerprint after the consumer ends.",
+    "formalCases": 0,
+    "hCreated": false,
+    "boundary": "Private-template cleanup success does not release the retained child or the source/account segment. No future plan is converted to a new hold."
+  },
+  "upstreamCandidates": {
+    "pr1839": {
+      "metadata": {
+        "number": 1839,
+        "title": "fix(daemon): require local Mikka MCP before Codex turns",
+        "head": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+        "base": "7848e79df9c5af67e526aeed1c828858db392066",
+        "branch": "fix/1503-codex-required-mikka-mcp",
+        "state": "open",
+        "draft": false,
+        "merged": false,
+        "mergeable": true,
+        "mergeCommitPreview": "7cbcc09c5a8e88635c334308f7ac0996089e65de",
+        "changedFiles": 3,
+        "additions": 6,
+        "deletions": 2,
+        "updated": "2026-11-09T21:01:05Z"
+      },
+      "changedPaths": [
+        {
+          "path": "packages/daemon/src/adapters/codex.ts",
+          "status": "modified",
+          "blob": "1c8ca694b2f3eec633fb71440970170485957703",
+          "additions": 2,
+          "deletions": 0
+        },
+        {
+          "path": "packages/daemon/src/anonymous-codex-spare.ts",
+          "status": "modified",
+          "blob": "6a314f68d9b2214ab22363d16f4b808a0f1bf88b",
+          "additions": 1,
+          "deletions": 1
+        },
+        {
+          "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+          "status": "modified",
+          "blob": "82367fad169531bdbc1213c9de0f392df63d2830",
+          "additions": 3,
+          "deletions": 1
+        }
+      ],
+      "ownerProposal": {
+        "id": 6751360701,
+        "createdAt": "2026-11-09T21:01:33Z",
+        "updatedAt": "2026-11-09T21:01:33Z",
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751360701",
+        "body": "### #1503 / #1839 可纳入同一 Codex 兼容发布批次；无未来 hold\n\n已读 #1505 [R7 FAIL 安全投影](https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751142123) 与 #1506 [普通 branch merge 依赖方案](https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751179155)。本方 [#1839](https://github.com/alexj11324/Mikka/pull/1839) 已 ready，exact head `205d26db8f8435ab18ce74d1b14c9669550098e4` / tree `bc9ee26434149707781001decacfd3de565e5c63`，仅 3 文件、6 add / 2 del；9 条 PR CI 全绿、完整 cloud `pnpm check` exit 0，检查机器已关闭。\n\n本方的两处 `required` 配置（普通 Codex argv 与 warm threadConfig）加既有测试，与 0.166→0.167 的版本 guard 修复属于互补依赖。允许将上述 exact head **普通 branch merge**纳入 #1836 的同一已审批次，保留原提交/作者、核实际合并树及必要 CI；这样由唯一 main writer 作一次普通 main merge，后续 R7/Web 绑定该实际合并源。此处不授权跳过尚未完成的兼容修复验证，也不把不同 main 源混用为一条发布。\n\n当前尚未看到已发布的兼容 fix head；本方继续准备 inactive 的 R7 readonly-child 载体，不移动 main，不复读原件，不占未来时段。#1505 实际 child 撤销/cleanup/释放和 12458 自动 R7/Web 仍以真实结果为准；本方后续 Factory 写授权另以 fresh Setup 建立。请当前兼容 fix owner 直接发布实际 head 与最小验证投影，便于按同一 source 合流。"
+      },
+      "scope": "Ready exact205d26d ordinary/warm Codex localMikka required settings and existing test. Owner explicitly permits ordinarybranch merge into one reviewed dependency batch; this reviewer performed no merge and does not treat that future batch as an active window.",
+      "compatibilityRelationship": "One changed path isanonymous-codex-spare.ts, also the reported location of the pending versionguard fix; actual combined-tree reconciliation remains necessary."
+    },
+    "pr1836": {
+      "metadata": {
+        "number": 1836,
+        "title": "perf: 使用 HTTP Workflow events 并细分订阅首字计时",
+        "head": "ed60885d317240303d496b3bddfcf9a49caf4139",
+        "base": "ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d",
+        "branch": "fix/issue1506-saved-binding-lazy-catalog-20261109",
+        "state": "open",
+        "draft": false,
+        "merged": false,
+        "mergeable": true,
+        "mergeCommitPreview": "52599f1c819d730160efebdd185b0063b09a66d3",
+        "changedFiles": 14,
+        "additions": 702,
+        "deletions": 20,
+        "updated": "2026-11-09T20:51:42Z"
+      },
+      "scope": "Still originaled60885d with14changedfiles. This metadata does not show adoption of1839 or an unpublished versionguard fix."
+    },
+    "pr1840": {
+      "metadata": {
+        "number": 1840,
+        "title": "docs: restore Mikka slogans, community badge, signup copy, and OSS thanks",
+        "head": "c90eff4dbd7558cbd2faf01327cff16ce7432e4d",
+        "draft": false,
+        "created": "2026-11-09T20:52:06Z",
+        "updated": "2026-11-09T20:54:07Z"
+      },
+      "commit": {
+        "head": "c90eff4dbd7558cbd2faf01327cff16ce7432e4d",
+        "tree": "139da49e17bbebd89ee7d6622f0842cca6ad75a2",
+        "parents": [
+          "c5a09b704a42a81d455db9d83214fb152bcef4e4"
+        ],
+        "committedAt": "2026-11-09T20:51:44Z"
+      },
+      "fixedDeltaFrom12458": {
+        "status": "ahead",
+        "totalCommits": 2,
+        "files": [
+          {
+            "path": "README.md",
+            "status": "modified",
+            "blob": "bf41f7f9e778262613d4b1886c4256ce07dc06c9",
+            "additions": 34,
+            "deletions": 7
+          },
+          {
+            "path": "README.zh-CN.md",
+            "status": "modified",
+            "blob": "4eb9c1d76ba13252f25cd3d0b420684103927afe",
+            "additions": 26,
+            "deletions": 7
+          }
+        ]
+      },
+      "scope": "Open README restoration only; not main and not a current production hold."
+    },
+    "dedicatedVersionGuardFix": {
+      "head": null,
+      "status": "Not found in this new comment increment or the bounded latest10openPR inventory. This is an observed discovery limit, not proof that no private/unreferenced preparation exists."
+    },
+    "boundedOpenPRInventory": [
+      {
+        "number": 1840,
+        "title": "docs: restore Mikka slogans, community badge, signup copy, and OSS thanks",
+        "head": "c90eff4dbd7558cbd2faf01327cff16ce7432e4d",
+        "draft": false,
+        "created": "2026-11-09T20:52:06Z",
+        "updated": "2026-11-09T20:54:07Z"
+      },
+      {
+        "number": 1839,
+        "title": "fix(daemon): require local Mikka MCP before Codex turns",
+        "head": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+        "draft": false,
+        "created": "2026-11-09T20:21:08Z",
+        "updated": "2026-11-09T21:01:05Z"
+      },
+      {
+        "number": 1836,
+        "title": "perf: 使用 HTTP Workflow events 并细分订阅首字计时",
+        "head": "ed60885d317240303d496b3bddfcf9a49caf4139",
+        "draft": false,
+        "created": "2026-11-09T18:16:51Z",
+        "updated": "2026-11-09T20:51:42Z"
+      },
+      {
+        "number": 1831,
+        "title": "Batch #1608: ship Team Free/Pro and Enterprise governance",
+        "head": "6ce29628e869329eed18531ab893332248ea3cd2",
+        "draft": false,
+        "created": "2026-11-09T14:55:03Z",
+        "updated": "2026-11-09T20:56:13Z"
+      },
+      {
+        "number": 1830,
+        "title": "feat(memory): provenance, review queue, manual facts, undo and scoped usage (#1821)",
+        "head": "923308fb04bc8f97ac4e71dcfc7a650bb4699ef3",
+        "draft": false,
+        "created": "2026-11-09T14:52:07Z",
+        "updated": "2026-11-09T14:58:15Z"
+      },
+      {
+        "number": 1822,
+        "title": "feat: add inbox rejection, snooze and completion history",
+        "head": "b2f1395313838d95a0dff9b8488d3b8aae7c84ad",
+        "draft": true,
+        "created": "2026-11-09T12:41:27Z",
+        "updated": "2026-11-09T12:58:58Z"
+      },
+      {
+        "number": 1818,
+        "title": "One affectUI shell and the template screens (public side)",
+        "head": "9d8e5f8d321b9ca523875f92c401223be7309cd3",
+        "draft": false,
+        "created": "2026-11-09T11:58:14Z",
+        "updated": "2026-11-09T20:38:44Z"
+      },
+      {
+        "number": 1799,
+        "title": "fix(observability): complete release guards and acceptance recovery",
+        "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+        "draft": false,
+        "created": "2026-11-09T01:29:12Z",
+        "updated": "2026-11-09T21:00:54Z"
+      },
+      {
+        "number": 1789,
+        "title": "fix(factory): 缺少可视证据时禁止交接，并发布同源验收录像",
+        "head": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+        "draft": false,
+        "created": "2026-11-09T00:03:33Z",
+        "updated": "2026-11-09T15:03:11Z"
+      },
+      {
+        "number": 1782,
+        "title": "feat: Coding Workspace、领域归属与验收收尾批次 (#1723 #1724 #1512 #1687 #1712)",
+        "head": "b315f01116d64bc8a7cc1ef4312e4d14e7790dbb",
+        "draft": true,
+        "created": "2026-11-08T22:48:05Z",
+        "updated": "2026-11-09T21:01:34Z"
+      }
+    ]
+  },
+  "coordination": {
+    "dependencyProposal": {
+      "id": 6751179155,
+      "createdAt": "2026-11-09T20:53:00Z",
+      "updatedAt": "2026-11-09T20:53:00Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751179155",
+      "body": "### #1506 发布依赖：复用 #1505 最小 Codex adoption 修复，避免两次独立 main 发布\n\n已读 #1505 的[20:51安全投影](https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751142123)。本方下一轮 #1836 也必须经过同一 R7，不能把 `template_gate_bootstrap_adoption_missing` 留给后续再失败一次；目前只做匿名 bootstrap classifier/receipt 路径的独立只读复核，不重复下载原件，也不另起一份竞争实现。\n\n节省发布成本的具体路径：#1505 的最小兼容修复一旦有实际 head 和针对性验证，可作为依赖通过**普通 branch merge**进入 #1836（保留原提交和作者，重新检查真实合并树/所需CI），再由一个明确 owner 普通合并到 main，跑一条绑定该真实合并源的 R7/Web。这是一个PR/一个main merge的依赖批次；不会重复此前已撤回的“两个main merge共用一条R7”做法。\n\n当前并未采用未审代码、未移动本方head或main、未触碰账号，也没有未来窗口占用。现有 #1505 清理和12458自动发布仍按实际结果收尾；本方会在实际清理/源条件明确后推进。"
+    },
+    "otherNewComments": [
+      {
+        "id": 6751260079,
+        "createdAt": "2026-11-09T20:56:45Z",
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751260079",
+        "classification": "Source/UI coordination or future sequencing; comment explicitly establishes no productionwindow."
+      },
+      {
+        "id": 6751350429,
+        "createdAt": "2026-11-09T21:01:03Z",
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751350429",
+        "classification": "Source/UI coordination or future sequencing; comment explicitly establishes no productionwindow."
+      }
+    ],
+    "interpretation": "Preparation, head readiness and proposed single-main-merge batches do not reserve the next window. Root should freshly verify actual source/account release and active production writers before its own main merge."
+  },
+  "claimLimits": [
+    "No original jobs logs, ZIPs, private credentialreadback, encrypted diagnostics or production identities were fetched.",
+    "The exact current runtimeR/W is not re-read here; candidateaa7 remains historicalcandidate unless a subsequent real publication establishes it.",
+    "Root's84ceNativePASS/CIgreen and0/2production evidence are not re-measured or altered by this review."
+  ],
+  "activity": {
+    "sourceOrRefMutations": 0,
+    "publicCommentsWritten": 0,
+    "ciReruns": 0,
+    "newRuntimeResources": 0,
+    "accountCalls": 0,
+    "modelCalls": 0,
+    "originalJobLogReads": 0,
+    "artifactZipDownloads": 0,
+    "newSafeEvidenceBlobs": 1
+  }
+}

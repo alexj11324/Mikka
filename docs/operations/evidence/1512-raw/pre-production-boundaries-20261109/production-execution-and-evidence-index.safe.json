@@ -1,0 +1,456 @@
+{
+  "schema": "mikka.issue1512.production-execution-index-readonly.v1",
+  "preparedAtUtc": "2026-11-09T20:59:21.824Z",
+  "status": "source_contract_only_not_executed",
+  "scope": {
+    "issue": 1512,
+    "repository": "alexj11324/Mikka",
+    "formalProductionCasesCompleted": 0,
+    "formalProductionCasesPlanned": 2,
+    "newResourceCount": 0
+  },
+  "sources": [
+    {
+      "kind": "workflow",
+      "gitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "bytes": 14046,
+      "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5",
+      "verified": true,
+      "path": ".github/workflows/run-trace-acceptance.yml"
+    },
+    {
+      "kind": "driver",
+      "gitBlob": "104075571c73b97a985458f206dba310e4894490",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec",
+      "verified": true,
+      "path": "scripts/acceptance/run-observability.mjs"
+    },
+    {
+      "kind": "browser",
+      "gitBlob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "bytes": 25516,
+      "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606",
+      "verified": true,
+      "path": "scripts/acceptance/run-observability-browser.mjs"
+    },
+    {
+      "kind": "opsWorkflow",
+      "gitBlob": "7429381cee94f6188303ac997cb4e0c89906672a",
+      "bytes": 7630,
+      "sha256": "610dc8cc67aff5e6cb7cd7c778be9fc4cf8d2ab4b69b4ed170ccc79853ad7b8a",
+      "verified": true,
+      "path": ".github/workflows/issue1512-git-transport.yml"
+    },
+    {
+      "kind": "wrapper",
+      "sourceCommit": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "gitBlob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+      "bytes": 11693,
+      "sha256": "811ba05e172f6a896867949d701911b845289db290950339b29a0a8c5463ec6a",
+      "verified": "fixed-commit-read plus locally computed blob",
+      "path": "scripts/acceptance/run-observability-workflow.mjs"
+    },
+    {
+      "kind": "runDoc",
+      "sourceCommit": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "gitBlob": "4ca2cf35c1f499b338469556836ae0505649e82a",
+      "bytes": 19730,
+      "sha256": "b7440f5402350d0c3513576dbddc60978bb7b37d701632e1247b73725d93aa1a",
+      "verified": "fixed-commit-read plus locally computed blob",
+      "path": "scripts/acceptance/run-observability.md"
+    },
+    {
+      "kind": "existingDispatch",
+      "sourceCommit": "a0dd581c5b573e9809ef7cc362da93f1429dee13",
+      "gitBlob": "4bbf01d4a1401d6756c26a0ea31342ca4ce95ee6",
+      "bytes": 362,
+      "sha256": "bafc34be2469b84a9d0c3ba69d7b2cff5cdd6414ff97d821ffdfdbc2ac948568",
+      "historicalOnly": true,
+      "path": ".github/issue1512-dispatch.json"
+    }
+  ],
+  "frozenComponentsBoundary": "This index is bound to the supplied workflow/driver/browser blobs. Wrapper and guide were read at fixed candidate 84ce7f876817f0d73c34a1ef89797fc27ba8661e. At actual activation, bind the real main/served revision and verify the deployed source contains the reviewed components; this is not a claim that the candidate has merged or deployed.",
+  "existingOps": {
+    "branch": "ops/1512-git-transport",
+    "observedHead": "a0dd581c5b573e9809ef7cc362da93f1429dee13",
+    "workflowBlob": "7429381cee94f6188303ac997cb4e0c89906672a",
+    "activation": "An owner-authorized normal commit on this owned branch, changing a watched path and using the selected commit-message prefix. No activation occurred in this review.",
+    "watchedPaths": [
+      ".github/workflows/issue1512-git-transport.yml",
+      ".github/issue1512-source.json",
+      ".github/issue1512-dispatch.json"
+    ],
+    "dispatch": {
+      "commitPrefix": "issue1512:dispatch ",
+      "manifestPath": ".github/issue1512-dispatch.json",
+      "manifestShape": {
+        "requestId": "<fresh-UUID>",
+        "inputs": "one explicit input template below"
+      },
+      "sourceGuards": "GET main ref must equal expected-deployment-sha, and GET fixed production /mikka/api/version build must equal it; then POST run-trace-acceptance.yml dispatches with ref main.",
+      "operationTimeoutMinutes": 3,
+      "requestTimeoutMs": 15000,
+      "outcome": "HTTP 204 plus closed stdout dispatched/requestId/mode/modelCase/revision. This does not prove a downstream run completed or return its run ID.",
+      "downstreamBinding": "Identify the actual run by workflow path, workflow_dispatch event, expected head SHA and creation window; keep ops run ID distinct from acceptance run ID and application workflowRunIds.",
+      "historicalManifest": {
+        "requestId": "ff0c7964-6603-4bb5-8f7d-740cf9e1899d",
+        "mode": "controlled-failure",
+        "revision": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "reuseForNextExecution": false
+      }
+    },
+    "shutdown": {
+      "commitPrefix": "issue1512:cleanup ",
+      "activationRequirement": "The cleanup commit must change a watched path; a message-only/empty commit does not satisfy this workflow's paths filter.",
+      "deletesExactly": [
+        "ops/1512-source-objects",
+        "ops/1512-git-transport"
+      ],
+      "acceptedDeleteStatuses": [
+        204,
+        404
+      ],
+      "timeoutMinutes": 3,
+      "doesNotDelete": [
+        "main",
+        "feature/PR branch",
+        "evidence branch",
+        "production settings",
+        "application tasks",
+        "E2B machines"
+      ],
+      "boundary": "Deleting the refs prevents new branch-triggered work but is not cancellation or proof of cleanup for an already queued/running job.",
+      "sequencing": "After all owned acceptance/export operations and artifact preservation finish, and required source objects are reachable from a durable commit, Root can use this existing owned cleanup path once. Record actual cleanup job outcome and exact ref absence; do not treat a planned cleanup as completed.",
+      "noNewPermissionOrWorkflowNeeded": true
+    }
+  },
+  "minimalSequence": [
+    {
+      "order": 1,
+      "name": "Read-only business preflight",
+      "inputs": {
+        "mode": "preflight",
+        "expected-deployment-sha": "<actual-main-and-served-40hex>",
+        "model-case": "all",
+        "prepare": "false",
+        "browser-submit": "false",
+        "export-target": "dashboard",
+        "export-id": "",
+        "session-id": "",
+        "trace-id": ""
+      },
+      "purpose": "Normal own sign-in/session workspace selection, deployment check, both exact models, subscription/cloud availability, idle state and live readiness. No model task or browser.",
+      "sideEffects": "Creates/closes its own authentication session; existing model-order discovery can persist a missing catalogue without inference. This is not a claim of zero application writes.",
+      "expectedOutcome": "report.status=ready with both cases ready, or a closed blocked reason. Prepare-required blockers must be understood rather than bypassed."
+    },
+    {
+      "order": 2,
+      "name": "One real Claude browser case",
+      "inputs": {
+        "mode": "execute",
+        "expected-deployment-sha": "<actual-main-and-served-40hex>",
+        "model-case": "claude",
+        "prepare": "<true-or-false-selected-from-preflight>",
+        "browser-submit": "true",
+        "export-target": "dashboard",
+        "export-id": "",
+        "session-id": "",
+        "trace-id": ""
+      },
+      "exactModel": "claude-haiku-5-5",
+      "harness": "claude_code",
+      "expectedAction": "Runner independently signs in and clicks New task / Coordinator / Mikka Cloud / exact temporary Profile once; no manual duplicate click.",
+      "nextBoundary": "Retain original report/recovery/browser receipt and confirm owned cleanup and settings restoration before the next model."
+    },
+    {
+      "order": 3,
+      "name": "One real Codex browser case",
+      "inputs": {
+        "mode": "execute",
+        "expected-deployment-sha": "<actual-main-and-served-40hex>",
+        "model-case": "codex",
+        "prepare": "<true-or-false-selected-from-preflight>",
+        "browser-submit": "true",
+        "export-target": "dashboard",
+        "export-id": "",
+        "session-id": "",
+        "trace-id": ""
+      },
+      "exactModel": "gpt-6-luna",
+      "harness": "codex",
+      "expectedAction": "Same ordinary browser path for this case; one click, no submission retry.",
+      "nextBoundary": "Retain independent exact-case evidence and complete cleanup; this case does not inherit the previous case's success."
+    },
+    {
+      "order": 4,
+      "name": "Existing PostHog verification and native exports",
+      "action": "Use the already frozen 14 queries/normalizer/reconciler unchanged, with real retained IDs and time windows. Only after actual evidence readback use export mode with a real positive numeric dashboard or insight ID; optional session-id/trace-id must both be real and belong together.",
+      "productionAcceptanceInferredFromRuntimeVerified": false
+    },
+    {
+      "order": 5,
+      "name": "Preserve evidence and close owned ops",
+      "action": "One original reader verifies immutable run/attempt/head, artifacts and their digests, writes the evidence index; only then use the existing two-ref cleanup mechanism when Root no longer needs the transport."
+    }
+  ],
+  "workflowContract": {
+    "trigger": "workflow_dispatch",
+    "ref": "refs/heads/main",
+    "expectedShaEqualsGithubSha": true,
+    "concurrency": {
+      "group": "run-trace-production-acceptance",
+      "cancelInProgress": false,
+      "queue": "max"
+    },
+    "acceptanceTimeoutMinutes": 25,
+    "caseTimeoutMsDefault": 480000,
+    "caseTimeoutMsAllowed": [
+      60000,
+      600000
+    ],
+    "normalRequestTimeoutMs": 30000,
+    "terminalSettlementWaitMs": 60000,
+    "browserCleanupBudgetMs": 30000,
+    "credentials": "Existing ACME account from existing prod:/ identity, loaded only after source guards and offline tests. No new account or identity.",
+    "workspaceGuard": "Unique owned admin personal workspace and own subscription/runtime are driver implementation guards; ACME itself is the issue-specified account. This does not reinterpret the issue as a new authorization restriction.",
+    "prepareMeaning": "Only execute may enable prepare. It temporarily disables enabled Profiles/API-key fallback through normal APIs and restores acknowledged versions/values in finally; it is not an exemption from the case gates.",
+    "submissionBudget": "One UI submission per deployment/model, zero paid resubmissions. Factory v2 permits one execute and one independent review native run; historical flow permits verify too. Coordinator/model requests within that workflow are not claimed to be exactly one inference.",
+    "rerunBoundary": "Deterministic fixture Profile blocks repeated execution for the same deployment/model. Do not automatically rerun a blocked, failed, timed-out or uncertain-click case.",
+    "readinessComment": "Wrapper posts one checked fixed-fixture progress comment to #1512 before the actor starts. Runner mode explicitly says not to submit manually."
+  },
+  "artifacts": {
+    "acceptance": {
+      "name": "run-trace-acceptance-${github.run_id}",
+      "retentionDays": 7,
+      "configuredPaths": [
+        "production-run-observability-report/report.json",
+        "production-run-observability-report/recovery.json",
+        "production-run-observability-report/browser-actor.receipt.json"
+      ],
+      "normalPreflightFiles": [
+        "report.json",
+        "recovery.json"
+      ],
+      "normalBrowserExecuteFiles": [
+        "report.json",
+        "recovery.json",
+        "browser-actor.receipt.json"
+      ],
+      "zipMemberBoundary": "These are configured file paths and expected basenames under their common upload root. The unique artifact reader must verify the actual ZIP member list before extraction.",
+      "earlyFailure": "Artifact upload is always() with if-no-files-found=warn. A failure before the driver or a killed process may omit files; a successful upload step alone does not prove a complete report."
+    },
+    "export": {
+      "name": "run-trace-posthog-${github.run_id}",
+      "retentionDays": 7,
+      "timeoutMinutes": 8,
+      "configuredPaths": [
+        "production-run-observability-report/posthog-*.png",
+        "production-run-observability-report/posthog-*.receipt.json"
+      ],
+      "inputs": "mode=export; actual expected-deployment-sha; export-target dashboard|insight; positive numeric export-id. Optional real session-id and matching nonzero 32hex trace-id are supplied together.",
+      "boundary": "A native PNG/export receipt and one segment readback do not by themselves replace actual Replay playback or the full trace/AI/Logs evaluation."
+    },
+    "controlledFailure": {
+      "name": "run-trace-controlled-failure-${github.run_id}",
+      "configuredPaths": [
+        "production-run-observability-report/controlled-failure.receipt.json",
+        "production-run-observability-report/overhead.receipt.json"
+      ],
+      "includedInNewMinimalSequence": false,
+      "reason": "Existing immutable controlled-failure/overhead applicability review is retained. This preparation does not require or perform another probe."
+    }
+  },
+  "fieldIndex": {
+    "deploymentAndSource": [
+      {
+        "file": "report.json",
+        "path": "revision",
+        "meaning": "Expected 40hex main build; /api/version build equality checked before and throughout the case, and at end."
+      },
+      {
+        "file": "report.json",
+        "path": "startedAt / finishedAt / mode / modelCase / status / code",
+        "meaning": "Case invocation and closed outcome; not an infrastructure release receipt."
+      },
+      {
+        "file": "browser-actor.receipt.json",
+        "path": "revision / sourceVerified / versionBefore / versionBeforeSubmit",
+        "meaning": "Actor exact workflow source and production version checks."
+      },
+      {
+        "file": "browser-actor.receipt.json",
+        "path": "cloudBackendConfirmed / officialBusinessResponses / foreignBusinessRequests",
+        "meaning": "Actual ordinary browser business-origin checks; the shell build alone does not prove the selected backend."
+      }
+    ],
+    "applicationIds": [
+      {
+        "file": "report.json",
+        "path": "workspaceId / botId / workspaceSelection",
+        "meaning": "Selected ordinary workspace and Coordinator."
+      },
+      {
+        "file": "report.json",
+        "path": "recovery.scope.ownerId / workspaceId / botId",
+        "meaning": "Closed opaque ownership scope for recovery; no email or credentials."
+      },
+      {
+        "file": "report.json",
+        "path": "cases[*].case / model / profileId",
+        "meaning": "Exact model case and temporary Profile identity."
+      },
+      {
+        "file": "report.json",
+        "path": "cases[*].taskId / issueId / task.{stage,status,revision}",
+        "meaning": "Actual Factory task and issue observed through normal owner APIs."
+      },
+      {
+        "file": "report.json",
+        "path": "cases[*].runs[*].runId",
+        "meaning": "Actual native runs; the driver uses these IDs in the normal thread/machine routes. There is no separate serialized threadId field; do not fabricate one for PostHog."
+      },
+      {
+        "file": "report.json",
+        "path": "cases[*].workflowRunIds[*]",
+        "meaning": "Observed application wrun_* Coordinator workflow identifiers, not GitHub workflow run IDs."
+      },
+      {
+        "file": "report.json",
+        "path": "cases[*].submission.{source,observed,position,locale}",
+        "meaning": "Exact persisted actual browser human message matched after baseline; no raw message retained."
+      }
+    ],
+    "traceAndReplay": [
+      {
+        "file": "browser-actor.receipt.json",
+        "path": "replay.sessionId",
+        "meaning": "Actual browser PostHog Replay session UUID, not its login cookie/session token."
+      },
+      {
+        "file": "browser-actor.receipt.json",
+        "path": "replay.{sdkLoaded,recordingStarted,snapshotObserved,sessionObservedAt,snapshotObservedAt,checkedAt,uploadAcknowledged}",
+        "meaning": "Before-click readiness; uploadAcknowledged remains unknown until independent backend evidence."
+      },
+      {
+        "file": "report.json",
+        "path": "cases[*].requestTrace",
+        "meaning": "Only API submission mode creates a client-parent trace receipt. Browser mode does not create this field or invent a traceparent."
+      },
+      {
+        "file": "independent PostHog raw response",
+        "path": "actual trace ID via retained task/run/workflow IDs and browser session",
+        "meaning": "Real browser trace must be discovered/read back through the existing frozen queries. No driver/browser receipt directly proves its full parent tree."
+      },
+      {
+        "file": "report.json",
+        "path": "browserReplayVerified / posthogIngestionVerified",
+        "meaning": "Remain false; runtime_verified is not PostHog verification."
+      }
+    ],
+    "runtimeAndResult": [
+      {
+        "file": "report.json",
+        "path": "cases[*].runs[*].{status,harness,model,subscriptionRoute,profileId,ownSubscription,ownCloudRuntime}",
+        "meaning": "Normal evidence checked exact subscription route, requester/owner/workspace and owned E2B runtime."
+      },
+      {
+        "file": "report.json",
+        "path": "cases[*].flowVersion / checks[*].{stage,runId,status}",
+        "meaning": "Distinct required native checks for the current candidate/request epoch."
+      },
+      {
+        "file": "report.json",
+        "path": "cases[*].artifact.{id,version,bytes,sha256}",
+        "meaning": "Downloaded exact fixed artifact bytes, without content in the report."
+      },
+      {
+        "file": "report.json",
+        "path": "cases[*].acceptance.{status,id,stage}",
+        "meaning": "Normal Owner acceptance and passed no-repository deliverable approval receipt."
+      },
+      {
+        "file": "not present in these receipts",
+        "path": "workerFingerprint W / templateId / templateBuildId / sandboxId / Vercel deploymentId",
+        "meaning": "No direct field. Preserve the already accepted release-config mapping plus successful startup/registration and run-identity inference; do not invent fields or impose AppSHA==runtimeSHA."
+      }
+    ],
+    "cleanup": [
+      {
+        "file": "report.json",
+        "path": "cases[*].cleanup.{state,ownRunsStopped,ownMachinesEnded,profileArchived,modelRestored,evidence}",
+        "meaning": "All required booleans must support complete; evidence is retained."
+      },
+      {
+        "file": "report.json",
+        "path": "cases[*].cleanup.machines[*].{runId,status,error}",
+        "meaning": "ended requires normal end API HTTP200 with exact runId/state; not_created requires specified404 plus owned terminal run and explicit null machine. This is not a provider-ID404 receipt."
+      },
+      {
+        "file": "report.json",
+        "path": "preparation.{requested,profilesDisabled,profilesRestored,fallbackChanged,restoration,restoreFailures,restoreError,fallbackRestored}",
+        "meaning": "Only fields reached by execution appear; absence is not automatic success."
+      },
+      {
+        "file": "report.json",
+        "path": "sessionClosed / recovery.checkpointFailures",
+        "meaning": "Driver normal sign-out and recovery-write status."
+      },
+      {
+        "file": "browser-actor.receipt.json",
+        "path": "cleanup.{status,signOutAttempted,signOutSucceeded,anonymousAfterLogout,pageClosed,contextClosed,browserClosed,pendingResourcesSettled}",
+        "meaning": "Actor stops pending UI, signs out using its own context, verifies anonymous state and closes resources. Wrapper waits and fails if browser cleanup fails."
+      },
+      {
+        "file": "recovery.json",
+        "path": "revision / scope / sequence / checkpointFailures / preparation / cases",
+        "meaning": "Atomic 0600 write-ahead metadata snapshots; intent/acknowledged/rejected/restored and temporary binding+revision receipts. Full private Profile definitions are not persisted; no automatic replay or permission to guess a lost write."
+      }
+    ]
+  },
+  "closingRules": [
+    "Let the owned driver and actor run their normal finally paths; a force kill/job timeout does not prove restoration.",
+    "Any cleanup-incomplete state halts later model cases. Do not automatically repeat a paid submission.",
+    "Preserve accepted task/thread/artifact evidence; archive only the owned temporary Profile and end only the exact owned case machines.",
+    "Do not conflate Git transport cleanup, application cleanup, browser cleanup and provider resource evidence."
+  ],
+  "existingPostHogComponents": {
+    "queries": "07f2013526784be3bff29fd23073f5320a980cf3",
+    "normalizer": "8bd8d631b24cb134e1581e48eca86e8f16d3f557",
+    "reconciler": "521ef985cd815b19b5220025adbd053879ccb41e",
+    "rewritten": false,
+    "executed": false,
+    "preservedContract": "Actual IDs/time window, six paged queries of 500 with genuine empty last page after exact-full pages, two stable complete snapshots, unmodified raw MCP results. Reconciler overallAcceptance remains null and final actual judgment remains separate."
+  },
+  "originalReaderPlan": {
+    "proposed": "Root is the single original reader for each acceptance/export run and its artifact; other reviewers consume immutable Git evidence projections.",
+    "assignmentBeforeRead": "Record workflow run/attempt, job IDs, actual source SHA, input manifest/requestId, artifact ID/digest/size and original-reader owner.",
+    "collection": "Read each original log/ZIP only once after terminal status as necessary, preserve original safe JSON bytes, verify ZIP digest/members and report source bindings, then archive a path/size/SHA256/Gitblob manifest.",
+    "rawLogBoundary": "Use only safe reports/closed error metadata in chat; never echo account credentials, cookies, upstream free-form errors or account content.",
+    "readByThisTask": {
+      "jobLogs": 0,
+      "zips": 0,
+      "artifacts": 0
+    }
+  },
+  "concreteUnknownsBeforeActivation": [
+    "Actual approved source/account window and the final main/served revision M; not queried or reserved here.",
+    "Actual preflight outcome and therefore whether prepare is needed.",
+    "Actual downstream workflow run IDs and artifact IDs, allocated only after authorized dispatch.",
+    "Actual task/run/workflow/Replay IDs, full browser trace and PostHog ingestion/playback evidence; formal cases remain 0/2.",
+    "Direct per-run W/template/sandbox fields are absent from the frozen report schema; retain the previously approved evidence-inference boundary."
+  ],
+  "operations": {
+    "productionRequests": 0,
+    "accountSignIns": 0,
+    "settingsWrites": 0,
+    "taskSubmissions": 0,
+    "modelCalls": 0,
+    "workflowDispatches": 0,
+    "resourcesCreated": 0,
+    "testsRun": 0,
+    "posthogQueries": 0,
+    "refWrites": 0,
+    "evidenceOnly": "One unreferenced proof blob with exact readback."
+  }
+}

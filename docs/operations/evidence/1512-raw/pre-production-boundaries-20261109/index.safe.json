@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 46,
+  "prefix": "docs/operations/evidence/1512-raw/pre-production-boundaries-20261109",
+  "parentCheckpointCommit": "4bd0cfff84ab3297de1143770af0edf3f6857dcf",
+  "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "payloadFileCount": 5,
+  "payloadBytes": 393022,
+  "indexAndReadmeExcludedFromPayload": true,
+  "scope": "Read-only observed Native diff, exact production execution contract, CP45 publication and shared-window snapshot; no production case or new test.",
+  "productionCases": 0,
+  "ownedActiveResources": 0,
+  "files": [
+    {
+      "path": "e093-to-84ce-native-observed-diff.safe.json",
+      "mode": "100644",
+      "bytes": 327264,
+      "sha256": "bd5d4008d778f08c62ccb7d3c83dfd437b3bfc456a108559d97713b7144c7fb0",
+      "gitBlob": "e204e71a3b5b23b34d77b08c341077bdf51c210f"
+    },
+    {
+      "path": "production-execution-and-evidence-index.safe.json",
+      "mode": "100644",
+      "bytes": 22970,
+      "sha256": "92ca9d89b1c708a182d8a3ded9f2ac368773acd720c52a97c78f7da94f4a5321",
+      "gitBlob": "02dbf8f0ec063a6a8488fc83ad4e11525d00c0a6"
+    },
+    {
+      "path": "pr1799-after-cp45.md",
+      "mode": "100644",
+      "bytes": 17048,
+      "sha256": "7a6003040a683052c05240d1b7328aa4ef53e6edb37cf808e2f57d1b814fd77a",
+      "gitBlob": "395f557777eaf75b25b6a28ec78ea4e18609977d"
+    },
+    {
+      "path": "cp45-publication.safe.json",
+      "mode": "100644",
+      "bytes": 863,
+      "sha256": "46ec8326053276fccc335be9caf70b647abc97ad04f2c8997685144c43e869bc",
+      "gitBlob": "15ad0b95e72857012bfbcb14793b61c7ce65cc5d"
+    },
+    {
+      "path": "shared-window-210248.safe.json",
+      "mode": "100644",
+      "bytes": 24877,
+      "sha256": "901d0a6fd5e0a108db826513ad1d56d870963f86537faf32e3a292ce0c2345b7",
+      "gitBlob": "add0e05e0d528f9519818bbe2ec5a471e9933da1"
+    }
+  ]
+}

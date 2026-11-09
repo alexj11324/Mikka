@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "cp45": {
+    "commit": "4bd0cfff84ab3297de1143770af0edf3f6857dcf",
+    "tree": "3d3c44924e2a03193274e6f52002776d6ea6974d",
+    "subtree": "46c498075a7e05e54d72d4e6cea4c44342f28404",
+    "payloadFiles": 31,
+    "payloadBytes": 1807502,
+    "totalFiles": 33,
+    "allPathsModesBlobsVerified": true,
+    "refReadbackAt": "2026-11-09T20:59:11Z"
+  },
+  "pr": {
+    "number": 1799,
+    "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+    "updatedAt": "2026-11-09T21:00:54Z",
+    "bodyReadbackAt": "2026-11-09T21:00:56Z",
+    "state": "open",
+    "merged": false
+  },
+  "issue": {
+    "number": 1512,
+    "commentId": 6751352913,
+    "commentCreatedAt": "2026-11-09T21:01:11Z",
+    "commentReadbackAt": "2026-11-09T21:02:06Z",
+    "state": "open"
+  },
+  "productionAcceptance": false,
+  "productionCases": 0,
+  "ownedActiveResources": 0
+}
