@@ -1,5 +1,5 @@
 // Real hosted adapter + real IPC processes; all OAuth values and RPC responses are synthetic.
-// Native initialize/config semantics are separately verified with fixed 0.166 bytes.
+// Native initialize/config contracts are compared separately at fixed upstream commits.
 import { afterEach, expect, it } from 'vitest'
 import { chmodSync, existsSync, lstatSync, mkdirSync, renameSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -19,7 +19,7 @@ import { worktreeGitWritePaths } from '../src/agents/publish'
 import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
 const closing: Array<() => Promise<unknown>> = []
 afterEach(async () => { for (const close of closing.splice(0).reverse()) await close(); cleanupTempDirs() })
-async function fixture(diagnostics = false, hostOnly = false) {
+async function fixture(diagnostics = false, hostOnly = false, version = '0.166.0') {
   const root = tempDir('codex-bootstrap-hosted-'), home = join(root, 'home'), stateDir = join(home, '.mikka', 'worker', 'adapters')
   mkdirSync(home); mkdirSync(stateDir, { recursive: true })
   const repositoryRoot = join(home, '.mikka', 'repos', 'repo'); mkdirSync(join(home, '.mikka', 'repos'), { recursive: true }); renameSync(await makeRepo(), repositoryRoot)
@@ -33,7 +33,7 @@ async function fixture(diagnostics = false, hostOnly = false) {
     .replace('  if (!method) {', "  appendFileSync(process.env.FIXTURE_WIRE, JSON.stringify({ method, pid: process.pid, cwd: params?.cwd, config: params?.config }) + '\\n')\n  if (!method) {")
   writeFileSync(binary, fake); chmodSync(binary, 0o700)
   const env = Object.fromEntries(Object.entries({ ...process.env, HOME: home,
-    FAKE_CODEX_USER_AGENT: 'mikka/0.166.0 (offline fixture)', FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+    FAKE_CODEX_USER_AGENT: `mikka/${version} (offline fixture)`, FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
   const policy = defaultRunPolicy(), policyHash = policySnapshotHash(policy), decisionCatalogue = {
     version: 1 as const, tool: { name: 'record_decision' as const, title: 'Decision', description: 'Offline catalogue',
       inputSchema: { type: 'object' as const }, annotations: { idempotentHint: true as const } } }
@@ -91,8 +91,8 @@ it.each([false, true, 'host'] as const)('adopts one initialized child, retains o
     } else expect(prepared.preparationTiming).toBeUndefined()
   } finally { observation?.close(); await prepared.cancel() }
 })
-it('records the adopted child\'s asynchronous login in the late startup scope without repeating initialize', async () => {
-  const f = await fixture(true, true); await f.candidate.ready
+it.each(['0.166.0', '0.167.0'])('records the adopted %s child\'s asynchronous login in the late startup scope without repeating initialize', async version => {
+  const f = await fixture(true, true, version); await f.candidate.ready
   const prepared = f.runner.prepare(f.assignment, { ...f.options, cwd: join(f.root, 'not-yet-checked-out') }, new AbortController().signal)
   const timings: DaemonStartupTiming[] = []
   try {
