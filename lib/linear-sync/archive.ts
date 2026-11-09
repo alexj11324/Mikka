@@ -6,6 +6,7 @@ import { archiveLinearIssue, linearIssueArchiveState } from './client'
 import { LinearApiError } from './graphql'
 import { linearAccessToken } from './tokens'
 import { withPublicationWriter } from './publication'
+import { requireTaskWorkspace } from '@/lib/task-workspace'
 
 const targetSchema = z.object({
   ownerId: z.string().min(1), linearIssueId: z.string().min(1),
@@ -26,10 +27,11 @@ async function withArchiveFence<T>(job: LinearArchiveJob, work: (client: PoolCli
   const client = await pool.connect()
   try {
     await client.query('begin')
-    const issue = (await client.query('select "userId","scopeVersion" from issues where id=$1 for share', [job.issueId])).rows[0]
+    const issue = (await client.query('select "userId","workspaceId","ownershipState","linearSyncPolicy","scopeVersion" from issues where id=$1 for share', [job.issueId])).rows[0]
     const claimed = (await client.query('select operation,status,"claimToken","scopeVersion","archiveTarget" from linear_sync_outbox where id=$1 and "issueId"=$2 for share', [job.id, job.issueId])).rows[0]
-    if (!issue || issue.userId !== target.ownerId || issue.scopeVersion <= job.scopeVersion || !claimed || claimed.operation !== 'archive' || claimed.status !== 'processing' || claimed.claimToken !== job.claimToken || claimed.scopeVersion !== job.scopeVersion || JSON.stringify(targetSchema.parse(claimed.archiveTarget)) !== JSON.stringify(target)) throw unavailable()
-    const proof = (await client.query(`select d."archivedAt",t."ownerId",t."linearTeamId",c."organizationId",c."revokedAt",
+    if (!issue || !issue.workspaceId || issue.ownershipState !== 'bound' || issue.linearSyncPolicy !== 'disabled' || issue.userId !== target.ownerId || issue.scopeVersion <= job.scopeVersion || !claimed || claimed.operation !== 'archive' || claimed.status !== 'processing' || claimed.claimToken !== job.claimToken || claimed.scopeVersion !== job.scopeVersion || JSON.stringify(targetSchema.parse(claimed.archiveTarget)) !== JSON.stringify(target)) throw unavailable()
+    await requireTaskWorkspace(target.ownerId, issue.workspaceId)
+    const proof = (await client.query(`select d."archivedAt",t."ownerId",t."workspaceId",t."linearTeamId",c."organizationId",c."revokedAt",
       p."scopeVersion" as "publicationScopeVersion",p."retiredAt"
       from linear_issue_detachments d join linear_team_syncs t on t.id=d."teamSyncId"
       join linear_connections c on c."userId"=d."ownerId"
@@ -38,7 +40,7 @@ async function withArchiveFence<T>(job: LinearArchiveJob, work: (client: PoolCli
         and d."sourceLinkId"=$5 and d."publicationId" is not distinct from $6::uuid and d."externalTargetVerified"
         and not exists(select 1 from linear_issue_links l where l."linearIssueId"=d."linearIssueId")`,
     [target.linearIssueId, job.issueId, target.ownerId, target.teamSyncId, target.sourceLinkId, target.publicationId])).rows[0]
-    if (!proof || proof.ownerId !== target.ownerId || proof.linearTeamId !== target.linearTeamId || proof.revokedAt || target.organizationId && proof.organizationId !== target.organizationId || target.publicationId && (proof.publicationScopeVersion !== job.scopeVersion || !proof.retiredAt)) throw unavailable()
+    if (!proof || proof.ownerId !== target.ownerId || proof.workspaceId !== issue.workspaceId || proof.linearTeamId !== target.linearTeamId || proof.revokedAt || target.organizationId && proof.organizationId !== target.organizationId || target.publicationId && (proof.publicationScopeVersion !== job.scopeVersion || !proof.retiredAt)) throw unavailable()
     const result = await work(client, target)
     await client.query('commit')
     return result

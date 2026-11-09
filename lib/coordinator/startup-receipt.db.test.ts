@@ -592,8 +592,8 @@ dbTest('handoff privacy and human-question metadata survive a fresh receipt repl
       if (kind === 'run_question') {
         issueId = randomUUID(); runId = randomUUID()
         const agentId = randomUUID()
-        await f.pool.query('INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,$3,$4,$5,$6)',
-          [issueId, f.owner, 'Synthetic question issue', { type: 'doc' }, 'todo', 'normal'])
+        await f.pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+          [issueId, f.owner, 'Synthetic question issue', { type: 'doc' }, 'todo', 'normal', f.workspaceId, 'bound'])
         await f.pool.query('INSERT INTO agents (id,"userId",harness,name) VALUES ($1,$2,$3,$4)', [agentId, f.owner, 'codex', 'Synthetic question agent'])
         await f.pool.query('INSERT INTO agent_runs (id,"userId","agentId","botId","issueId",status) VALUES ($1,$2,$3,$4,$5,$6)',
           [runId, f.owner, agentId, f.botId, issueId, 'running'])

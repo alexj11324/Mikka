@@ -18,6 +18,8 @@ const githubPullRequest = (value: unknown): string | null => typeof value === 's
   && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*$/.test(value) ? value : null
 
 interface AttemptRow extends FactoryAttemptViewSource {
+  /** Original binding stays private; a failed run join is not an unbound control stage. */
+  boundRunId: string | null
   candidateId: string | null; status: string; createdAt: Instant; finishedAt: Instant
   runStatus: string | null; runCreatedAt: Instant; startedAt: Instant; runFinishedAt: Instant
   agentId: string | null; agentName: string | null; harness: string | null; model: string | null
@@ -126,7 +128,7 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
     : endedAtSource === 'merged' ? times.mergedAt : null)
   const observedAt = iso(times.observedAt)!
   const { rows: allAttempts } = await tx.query<AttemptRow>(`SELECT a.id,a.stage,a.position,a.status,a."candidateId",a."createdAt",a."finishedAt",a.reason,
-      r.id AS "runId",left(r.report->>'summary',4000) AS summary,left(a.output->'completion'->>'summary',4000) AS "completionSummary",
+      a."runId" AS "boundRunId",r.id AS "runId",left(r.report->>'summary',4000) AS summary,left(a.output->'completion'->>'summary',4000) AS "completionSummary",
       COALESCE(a.output->>'requestEpoch',$4::text) AS "requestEpoch",a.output->>'reasonCode' AS "reasonCode",
       r.status AS "runStatus",r."createdAt" AS "runCreatedAt",r."startedAt",r."finishedAt" AS "runFinishedAt",r."agentId",
       left(COALESCE(r."agentDefinition"->'agentProfile'->>'name',r."agentDefinition"->>'name',agent.name),200) AS "agentName",
@@ -140,9 +142,12 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
   const actor = actingContext.getStore()
   const scopedWorkspace = actor?.userId === task.userId ? actor.tokenWorkspaceId : undefined
   const hiddenRuns = scopedWorkspace ? await runsOutsideToken({ id: task.userId, [tokenWorkspace]: scopedWorkspace },
-    allAttempts.flatMap(attempt => attempt.runId ? [attempt.runId] : [])) : new Set<string>()
-  const hiddenAttempts = new Set(allAttempts.filter(attempt => attempt.runId && hiddenRuns.has(attempt.runId)).map(attempt => attempt.id))
-  const attempts = allAttempts.filter(attempt => !attempt.runId || !hiddenRuns.has(attempt.runId))
+    allAttempts.flatMap(attempt => attempt.boundRunId ? [attempt.boundRunId] : [])) : new Set<string>()
+  // A historical attempt may name another owner's/task's run. Its original
+  // binding must stay hidden even though the authorized LEFT JOIN returned NULL.
+  for (const attempt of allAttempts) if (attempt.boundRunId && !attempt.runId) hiddenRuns.add(attempt.boundRunId)
+  const hiddenAttempts = new Set(allAttempts.filter(attempt => attempt.boundRunId && hiddenRuns.has(attempt.boundRunId)).map(attempt => attempt.id))
+  const attempts = allAttempts.filter(attempt => !hiddenAttempts.has(attempt.id))
   const { rows: events } = await tx.query<TransitionRow>(`SELECT e."eventId" AS id,e."createdAt",e.request->'change'->>'action' AS action,
       e.request->>'kind' AS kind,e.result->'task'->>'attemptId' AS "attemptId",e.request->'binding'->>'attemptId' AS "previousAttemptId",
       e.result->'task'->>'stage' AS stage,e.result->'task'->>'status' AS status,
@@ -214,10 +219,10 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
   // Embedded flow references obey the same producer and original-Artifact
   // boundaries as the sidebar collections. State/attention remain canonical.
   const visibleCaptures = new Set(media.map(capture => capture.captureId))
-  const lastReview = allAttempts.findLast(attempt => attempt.stage === 'review' && attempt.runId
+  const lastReview = allAttempts.findLast(attempt => attempt.stage === 'review' && attempt.boundRunId
     && ['passed','failed','blocked','waiting'].includes(attempt.status))
   const taskFlow = { ...flow,
-    review: scopedWorkspace && lastReview?.runId && hiddenRuns.has(lastReview.runId) ? null : flow.review,
+    review: lastReview && hiddenAttempts.has(lastReview.id) ? null : flow.review,
     acceptance: scopedWorkspace && flow.acceptance ? documents.some(document => document.kind === 'acceptance'
       && document.artifactId === flow.acceptance!.artifactId && document.version === flow.acceptance!.version
       && document.runId === flow.acceptance!.runId && document.candidateId === flow.acceptance!.candidateId)

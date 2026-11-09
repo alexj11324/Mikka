@@ -26,12 +26,15 @@ stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: () => { throw
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('No database in pure test') } })
 stub('../agent-runs.ts', { addRunMessage: async (...args: unknown[]) => { forwarded.push(args) }, queueRun: () => {}, queueFactoryRun: () => { throw Error('No Factory dispatch in prompt fixture') }, readRun: () => {}, requestRunStop: () => {}, visibleRuns: () => {} })
 stub('../search/index.ts', { webSearch: () => {} })
-stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synthetic-unused' })
+// The real prompt/tool graph imports session helpers, but prompt assembly must never authenticate.
+const unexpectedAuth = () => { throw new Error('Unexpected authentication or OAuth effect in pure prompt fixture') }
+stub('../auth.ts', { auth: new Proxy({}, { get: unexpectedAuth }), authBaseURL: 'https://auth-fixture.example.invalid' })
+stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synthetic-unused', issueDeviceToken: unexpectedAuth })
 stub('../composio.ts', { runComposioAction: () => {} })
 // Factory issue-link registration is imported by the tool graph; prompt tests never authorize GitHub reads.
 stub('../github/user-access.ts', { readAuthorizedIssue: () => { throw Error('No GitHub authorization or provider I/O in prompt fixture') } })
 stub('../pending-action-store.ts', { proposeAction: () => {}, writeAccountAction: () => {}, proposeRepositoryPush: () => {} })
-stub('../issue-access.ts', { issueForUser: () => {} })
+stub('../issue-access.ts', { issueForUser: () => {}, requireUser: () => { throw new Error('User access unavailable in prompt fixture') } })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })

@@ -133,9 +133,9 @@ export async function applyLinearCommentToApp(input: {
   if (body.length > 2000) throw new Error('Linear comment is larger than Mikka supports')
   await db.transaction(async tx => {
     await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
-    const [latestIssue] = await tx.select({ updatedAt: issues.updatedAt, scope: issues.scope, userId: issues.userId, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(eq(issues.id, input.issue.id)).for('update').limit(1)
+    const [latestIssue] = await tx.select({ updatedAt: issues.updatedAt, ownershipState: issues.ownershipState, linearSyncPolicy: issues.linearSyncPolicy, userId: issues.userId, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(eq(issues.id, input.issue.id)).for('update').limit(1)
     const [currentLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, input.issueLink.id)).for('update').limit(1)
-    if (!latestIssue || latestIssue.scope !== 'workspace' || latestIssue.linearSyncBlocked || latestIssue.userId !== input.issue.userId || !currentLink || !currentLink.externalTargetVerified || currentLink.issueId !== input.issue.id || currentLink.ownerId !== input.issue.userId || currentLink.teamSyncId !== input.issueLink.teamSyncId || currentLink.linearIssueId !== input.issueLink.linearIssueId) return
+    if (!latestIssue || latestIssue.ownershipState !== 'bound' || latestIssue.linearSyncPolicy !== 'explicit' || latestIssue.linearSyncBlocked || latestIssue.userId !== input.issue.userId || !currentLink || !currentLink.externalTargetVerified || currentLink.issueId !== input.issue.id || currentLink.ownerId !== input.issue.userId || currentLink.teamSyncId !== input.issueLink.teamSyncId || currentLink.linearIssueId !== input.issueLink.linearIssueId) return
     if (input.action === 'remove') {
       if (existing && existing.issueLinkId === currentLink.id) await tx.update(linearCommentLinks).set({ syncStatus: 'remote_removed', lastError: null, updatedAt: new Date() }).where(eq(linearCommentLinks.id, existing.id))
       return

@@ -14,6 +14,10 @@ import { issueForUser } from '@/lib/issue-access'
 import { agentScope } from '@/lib/agent-kit/service'
 import { AgentKitError } from '@/lib/agent-kit/store'
 import { LEASED_RUN_STATUSES } from '@/lib/run-retry'
+import { activeTaskWorkspaces, withTaskWorkspace } from '@/lib/task-workspace'
+import { ActionFailureError } from '@/lib/action-error'
+import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
+import { tokenWorkspace } from '@/lib/tokens/principal'
 
 // The worker side of the MCP server: the agent inside a run reports progress,
 // asks the person something or says it is blocked. Each call becomes an event
@@ -34,9 +38,15 @@ function hashToken(token: string): string {
 
 /** Creates a token for one run. Only its hash is stored; the token itself goes to the daemon once. */
 export async function issueRunToken(run: { id: string; userId: string }): Promise<{ token: string; expiresAt: Date }> {
+  const [row] = await db.select({ workspaceId: agentRuns.workspaceId, machineAuthority: agentRuns.machineAuthority }).from(agentRuns)
+    .where(and(eq(agentRuns.id, run.id), eq(agentRuns.userId, run.userId))).limit(1)
+  if (!row?.workspaceId) throw new ActionFailureError('taskWorkspaceUnresolved')
   const token = `${RUN_TOKEN_PREFIX}${randomBytes(32).toString('base64url')}`
   const expiresAt = new Date(Date.now() + RUN_TOKEN_TTL_MS)
-  await db.insert(runTokens).values({ id: crypto.randomUUID(), runId: run.id, userId: run.userId, tokenHash: hashToken(token), expiresAt })
+  const admission: EnterprisePrincipal | undefined = row.machineAuthority ? { kind: 'admission', runId: run.id, workspaceId: row.workspaceId } : undefined
+  await withTaskWorkspace({ id: run.userId, [enterprisePrincipal]: admission }, row.workspaceId, async () => {
+    await db.insert(runTokens).values({ id: crypto.randomUUID(), runId: run.id, userId: run.userId, tokenHash: hashToken(token), expiresAt })
+  })
   return { token, expiresAt }
 }
 
@@ -47,7 +57,7 @@ export async function revokeRunTokens(runId: string): Promise<void> {
 
 async function currentRunToken(bearerToken: string) {
   const [row] = await db
-    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId, deviceId: agentRuns.deviceId, agentDefinition: agentRuns.agentDefinition })
+    .select({ credentialId: runTokens.id, runId: runTokens.runId, userId: runTokens.userId, workspaceId: agentRuns.workspaceId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId, deviceId: agentRuns.deviceId, agentDefinition: agentRuns.agentDefinition })
     .from(runTokens)
     .innerJoin(agentRuns, eq(agentRuns.id, runTokens.runId))
     .where(and(
@@ -66,7 +76,10 @@ async function currentRunToken(bearerToken: string) {
 export async function verifyRunToken(_request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
   if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
   const row = await currentRunToken(bearerToken)
-  if (!row || (row.issueId && !await issueForUser(row.userId, row.issueId))) return undefined
+  if (!row?.workspaceId) return undefined
+  const principal: EnterprisePrincipal = { kind: 'delegation', credentialKind: 'run', credentialId: row.credentialId, workspaceId: row.workspaceId }
+  const reader = { id: row.userId, [tokenWorkspace]: row.workspaceId, [enterprisePrincipal]: principal }
+  if (!(await activeTaskWorkspaces(reader, row.workspaceId)).length || (row.issueId && !await issueForUser(reader, row.issueId))) return undefined
   let identity
   try { identity = await revalidateExecutionIdentity(pool, row) }
   catch (error) { if (error instanceof ExecutionIdentityError) return undefined; throw error }
@@ -80,15 +93,18 @@ export async function verifyRunToken(_request: Request, bearerToken?: string): P
   return {
     token: bearerToken, clientId: `run:${row.runId}`, scopes: [],
     expiresAt: Math.floor(row.expiresAt.getTime() / 1000),
-    extra: { userId: row.userId, runId: row.runId, issueId: row.issueId, agentId: row.agentId, botId: row.botId, executionIdentity: identity },
+    extra: { userId: row.userId, credentialKind: 'run', credentialId: row.credentialId, workspaceId: row.workspaceId, runId: row.runId, issueId: row.issueId, agentId: row.agentId, botId: row.botId, executionIdentity: identity },
   }
 }
 
 /** The run a worker request comes from. */
-export function workerRun(authInfo: AuthInfo | undefined): { id: string; userId: string; botId: string | null; issueId: string | null } {
+export function workerRun(authInfo: AuthInfo | undefined): { id: string; userId: string; botId: string | null; issueId: string | null; workspaceId?: string; [enterprisePrincipal]?: EnterprisePrincipal } {
   const extra = authInfo?.extra
   if (typeof extra?.runId !== 'string' || typeof extra.userId !== 'string') throw new Error('MCP request is not a run')
-  return { id: extra.runId, userId: extra.userId, botId: typeof extra.botId === 'string' ? extra.botId : null, issueId: typeof extra.issueId === 'string' ? extra.issueId : null }
+  return { id: extra.runId, userId: extra.userId, botId: typeof extra.botId === 'string' ? extra.botId : null, issueId: typeof extra.issueId === 'string' ? extra.issueId : null,
+    workspaceId: typeof extra.workspaceId === 'string' ? extra.workspaceId : undefined,
+    [enterprisePrincipal]: typeof extra.credentialId === 'string' && extra.credentialKind === 'run'
+      ? { kind: 'delegation', credentialKind: 'run', credentialId: extra.credentialId, workspaceId: typeof extra.workspaceId === 'string' ? extra.workspaceId : undefined } : undefined }
 }
 
 async function deliver(event: CoordinatorEventInput): Promise<void> {

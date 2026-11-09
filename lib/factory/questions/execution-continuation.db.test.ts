@@ -1,3 +1,5 @@
+import { seedFixtureWorkspace } from '../../../tests/helpers/task-workspace';
+import { bindFixtureWorkspaceDatabase } from '../../../tests/helpers/workspace-database';
 // Isolated PostgreSQL fixtures model immutable host receipts, not live model acceptance.
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -32,10 +34,11 @@ test('real PG: question receipts preserve one execution without opening a repair
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
   observePoolCommits(pool)
-  const profileWorkspaces: string[] = []
+  let closeWorkspaceDatabase: (() => Promise<void>) | undefined
   const previousByos = process.env.MIKKA_BYOS_ENABLED, previousRoutes = process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
   process.env.MIKKA_BYOS_ENABLED = '1'; process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
   try {
+    closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(pool)
     const dir = new URL('../../../drizzle/', import.meta.url)
     for (const file of orderMigrations((await readdir(dir)).filter(file => file.endsWith('.sql')))) await pool.query(await readFile(new URL(file, dir), 'utf8'))
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Owner','question-cap@example.invalid',true,now(),now()),('other','Other','question-cap-other@example.invalid',true,now(),now())`)
@@ -53,9 +56,9 @@ test('real PG: question receipts preserve one execution without opening a repair
       const botId = options.withoutBot ? null : options.separateChat ? randomUUID() : runtimeBotId
       const runBotId = options.withoutBot ? null : runtimeBotId
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = randomUUID(), bindingId = randomUUID(), connectionId = randomUUID()
-      await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,'owner','Fixture workspace')`, [workspaceId])
+      await seedFixtureWorkspace(pool, 'owner', 'team', workspaceId)
       for (const id of new Set([runtimeBotId, ...(botId ? [botId] : [])])) await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,$3)`, [id, workspaceId, `Fixture ${id}`])
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,'owner','Question cap','{}','todo','normal')`, [issueId])
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES($1,'owner','Question cap','{}','todo','normal',$2,'bound','workspace')`, [issueId, workspaceId])
       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,$3,'user_message',$1::text,'{"text":"Original owner request"}')`, [sourceEventId, botId, issueId])
       await pool.query(`INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,'owner',$2,$3)`, [deviceId, `Device ${deviceId}`, options.local ? 'local' : 'cloud'])
       await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,'owner',$2,$3,$4)`, [agentId, deviceId, harness, `Agent ${agentId}`])
@@ -141,12 +144,9 @@ test('real PG: question receipts preserve one execution without opening a repair
         import('../../workspace-db'), import('../../computer/claim'), import('../profile-admission'),
       ])
       const f = await fixture({ native: true, separateChat: true }), scope = { ownerId: 'owner', workspaceId: f.workspaceId }
-      // Production membership uses its separate workspace pool. Both sides
-      // contain actual isolated PG rows; no authority or admission is mocked.
-      profileWorkspaces.push(f.workspaceId)
-      await workspacePool.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,'owner','Question Profile fixture')`, [f.workspaceId])
-      await workspacePool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,'owner','Owner','question-profile@example.invalid','admin','active')`, [f.workspaceId])
-      await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,'owner','Owner','question-profile@example.invalid','admin','active')`, [f.workspaceId])
+      // The independent production Workspace pool reads this same isolated
+      // database. fixture() already persisted its real membership once.
+      assert.equal(workspacePool.options.connectionString, target.toString())
       await pool.query(`INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES('owner','synthetic-unopened','synthetic-unopened',1,'test') ON CONFLICT("userId") DO NOTHING`)
       await pool.query(`UPDATE byos_connections SET "modelCatalog"=$2,quota=$3 WHERE id=$1`, [f.connectionId,
         JSON.stringify({ revision: '1', models: ['gpt-6-luna'] }),
@@ -859,12 +859,8 @@ test('real PG: question receipts preserve one execution without opening a repair
   } finally {
     if (previousByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = previousByos
     if (previousRoutes === undefined) delete process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES; else process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = previousRoutes
-    if (profileWorkspaces.length) {
-      const [{ workspacePool }, { pool: appPool }] = await Promise.all([import('../../workspace-db'),import('../../db')])
-      await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])',[profileWorkspaces])
-      await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])',[profileWorkspaces])
-      await Promise.all([workspacePool.end(),appPool.end()])
-    }
+    await closeWorkspaceDatabase?.()
+    await (await import('../../db')).pool.end()
     await pool.end()
     await dropTestDatabase(admin, database)
     await admin.end()

@@ -66,7 +66,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
       [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
-    const issueId = await seedIssue(pool, id)
+    const issueId = await seedIssue(pool, id, ws.id)
     // A numbered task, so its thread gets a publication branch.
     await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
     seeded.set(id, ws.id)
@@ -95,7 +95,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
   // Another numbered task of theirs, so its thread gets a publication branch.
   let taskNumber = 100
   const anotherTask = async (userId: string) => {
-    const issueId = await seedIssue(pool, userId)
+    const issueId = await seedIssue(pool, userId, await ownWorkspace(userId))
     await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: ++taskNumber } } })])
     return issueId
   }
@@ -410,7 +410,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const off = await onlineMac(d.id, false)
     const used = new Set<string>()
     for (const number of [11, 12, 13, 14]) {
-      const issueId = await seedIssue(pool, d.id)
+      const issueId = await seedIssue(pool, d.id, d.workspaceId)
       await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } } })])
       const result = await dispatch(d.id, issueId) as unknown as { runId: string }
       used.add((await runOf(result.runId)).deviceId)

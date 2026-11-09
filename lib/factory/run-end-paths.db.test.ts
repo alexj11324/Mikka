@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 // QA #449: the real cancel and thread-end paths finalize the Factory task.
 // Real migrations, app pool, run-control, completion transaction and Factory
 // runtime over a disposable *_e2e PG. No module mocks.
@@ -44,10 +45,9 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
     const { startThreadMachine, failUnclaimedCloudStart } = await import("../run-leases");
 
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','runend@example.invalid',true,now(),now())`);
-    const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), workspaceId = randomUUID();
+    const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), workspaceId = await seedFixtureWorkspace(pool, 'owner', 'team');
     // Keep fixture sources out of the Coordinator's legacy null-Bot backfill.
     const cloudBotId = randomUUID();
-    await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,'owner','Startup fixture')`, [workspaceId]);
     await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Startup fixture')`, [cloudBotId, workspaceId]);
     await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Disposable',now(),'[{"harness":"codex","installed":true}]')`, [deviceId]);
     await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Fixture','codex',$2)`, [agentId, deviceId]);
@@ -62,7 +62,7 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
     }, { configure: { execute: async () => {} }, freeze: async (tx, _task, id) => { await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [id, JSON.stringify({ schemaVersion: 1, definitionDigest: "fixture", harness: "codex" })]); } });
     const runningTask = async () => {
       const issueId = randomUUID(), src = randomUUID();
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId]);
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`, [issueId, workspaceId]);
       await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1,'owner',$3,$4,'user_message',$2,'{"text":"synthetic"}')`, [src, src, cloudBotId, issueId]);
       const r = await store.route("owner", { issueId, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
       assert.equal(r.task.botId, cloudBotId, "the task keeps its source Bot");

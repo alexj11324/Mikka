@@ -38,7 +38,7 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
       (await tx.query(`SELECT id FROM issues WHERE id=$1 AND "userId"=$2 AND content #>> '{attrs,mikka,deletedAt}' IS NULL`, [issueId, userId])).rowCount === 1
     const store = createFactoryStore(pool, authorize, bot)
     const fixture = async () => {
-      const issueId = await seedIssue(pool, owner), source = randomUUID()
+      const issueId = await seedIssue(pool, owner, workspace.id), source = randomUUID()
       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload)
         VALUES($1::uuid,$2,$3,'user_message',$1::text,'{"text":"Synthetic sidebar task"}')`, [source, owner, bot])
       const task = (await store.route(owner, { issueId, sourceEventId: source, eventId: randomUUID(),
@@ -123,6 +123,34 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
       await pool.query('UPDATE coordinator_events SET "userId"=$2 WHERE id=$1',[f.source,other])
       assert.equal((await handleFactoryActivity(pool,store,{ userId:owner,taskId:f.task.id })).status,404)
       await pool.query('UPDATE coordinator_events SET "userId"=$2 WHERE id=$1',[f.source,owner])
+    })
+    await t.test('a foreign run binding never becomes an unbound control attempt or an attention interval', async () => {
+      const historical = await fixture(), foreignRun = randomUUID(), eventId = randomUUID()
+      // Both issues and the run have valid persisted tenancy. Only the old
+      // attempt receipt is misbound; no database constraint is disabled.
+      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","botId",status,kind)
+        VALUES($1,$2,$3,$4,$5,'succeeded','review')`,[foreignRun,owner,another.issueId,agent,bot])
+      await pool.query(`UPDATE factory_attempts SET "runId"=$2,stage='review',status='blocked',output=$3 WHERE id=$1`,
+        [historical.task.attemptId,foreignRun,JSON.stringify({completion:{reviewVerdict:'changes_requested',summary:'FOREIGN_REVIEW_TITLE'}})])
+      await pool.query(`UPDATE factory_tasks SET stage='review',status='blocked',revision=2 WHERE id=$1`,[historical.task.id])
+      await pool.query(`INSERT INTO factory_events("taskId","eventId",request,result,"createdAt")
+        VALUES($1,$2,$3,$4,'2026-11-01T04:00:00Z')`,[historical.task.id,eventId,
+        JSON.stringify({change:{action:'finish'}}),JSON.stringify({task:{id:historical.task.id,attemptId:historical.task.attemptId,stage:'review',status:'blocked',revision:2}})])
+      const view = await readFactoryActivity(pool,store,owner,historical.task.id)
+      assert.deepEqual(view.agents,[])
+      assert.deepEqual(view.timeline.attempts,[])
+      assert.deepEqual(view.timeline.waits,[],'both persisted attention and its current fallback stay hidden')
+      assert.equal(view.task.review,null)
+      assert.equal(view.task.needsYou?.kind,'blocked','task attention remains the canonical flow state')
+      for(const hidden of [foreignRun,historical.task.attemptId,'FOREIGN_REVIEW_TITLE','boundRunId'])
+        assert.ok(!JSON.stringify(view).includes(hidden),hidden)
+      const control = await fixture()
+      await pool.query(`UPDATE factory_attempts SET status='blocked' WHERE id=$1`,[control.task.attemptId])
+      await pool.query(`UPDATE factory_tasks SET status='blocked' WHERE id=$1`,[control.task.id])
+      const unbound = await readFactoryActivity(pool,store,owner,control.task.id)
+      assert.equal(unbound.timeline.attempts[0].id,control.task.attemptId)
+      assert.equal(unbound.timeline.attempts[0].runId,null)
+      assert.equal(unbound.timeline.waits[0].attemptId,control.task.attemptId,'a genuinely unbound control stage retains its attention interval')
     })
     await t.test('historical execution questions use escalation and answer times without exposing the question', async () => {
       const q = randomUUID(), event = randomUUID()

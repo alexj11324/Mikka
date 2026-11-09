@@ -6,6 +6,8 @@ import { Pool, type PoolClient } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { assertE2eTarget, disposableDatabase } from '../../tests/helpers/e2e-target.mjs';
 import { dropTestDatabase } from '../../tests/support/drop-test-database';
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { freezeWorkerDefinition } from '../agent-kit/worker';
 import { observePoolCommits } from '../db/commit-effects';
 import { freezeExecutionIdentity } from '../execution-identity';
@@ -28,6 +30,7 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
   const target = new URL(adminUrl); target.pathname = `/${name}`; assertE2eTarget(target.toString());
   const pool = new Pool({ connectionString: target.toString(), max: 5 });
   observePoolCommits(pool);
+  const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
   try {
     assert.equal((await pool.query('SHOW server_version_num')).rows[0].server_version_num.slice(0, 2), '17');
     const dir = new URL('../../drizzle/', import.meta.url);
@@ -36,15 +39,16 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES
       ('spec-owner','Fixture','spec-owner@example.invalid',true,now(),now()),
       ('spec-other','Other','spec-other@example.invalid',true,now(),now())`);
+    const workspaceId = await seedFixtureWorkspace(pool, 'spec-owner');
     const deviceId = randomUUID(), agentId = randomUUID();
     await pool.query(`INSERT INTO devices (id,"ownerId",name,harnesses) VALUES ($1,'spec-owner','Fixture device','[]')`, [deviceId]);
     await pool.query(`INSERT INTO agents (id,"userId",name,harness) VALUES ($1,'spec-owner','Planner','codex')`, [agentId]);
     const authorize = async (owner: string, issueId: string, tx: Pick<PoolClient, 'query'>) =>
       (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issueId, owner])).rowCount === 1;
     const store = createFactoryStore(pool, authorize, null, { onTransition: syncFactoryPresentation });
-    const fixture = async () => {
+    const fixture = async (tenantId = workspaceId) => {
       const issueId = randomUUID(), sourceEventId = randomUUID(), runId = randomUUID();
-      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'spec-owner','Parser task','{}','todo','normal')`, [issueId]);
+      await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,'spec-owner',$2,'Parser task','{}','todo','normal')`, [issueId, tenantId]);
       await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1::uuid,'spec-owner','user_message',$1::uuid::text,'{"text":"Plan the parser change"}')`, [sourceEventId]);
       const routed = await store.route('spec-owner', { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Plan first',
         missingInformation: [], missingPermissions: [], needsSpec: true });
@@ -81,6 +85,7 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
     const { rows: [saved] } = await pool.query(`SELECT a.*,v."inlineContent",v.sha256,v.size FROM artifacts a
       JOIN artifact_versions v ON v."artifactId"=a.id AND v.version=$2 WHERE a.id=$1`, [ref.artifactId, ref.version]);
     assert.equal(saved.userId, task.userId); assert.equal(saved.issueId, task.issueId); assert.equal(saved.runId, first.runId);
+    assert.equal(saved.workspaceId, workspaceId);
     assert.equal(saved.sha256, createHash('sha256').update(saved.inlineContent).digest('hex'));
     assert.equal(saved.size, Buffer.byteLength(saved.inlineContent));
     assert.match(saved.inlineContent, /Retain workspace isolation/);
@@ -99,6 +104,8 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
       assert.equal(await synchronize({ ...task, userId: 'spec-other' }), null);
       assert.equal(await synchronize({ ...task, issueId: randomUUID() }), null);
       assert.equal(await synchronize({ ...task, attemptId: randomUUID() }), null);
+      assert.equal(await synchronize({ ...task, workspaceId: randomUUID() }), null);
+      assert.equal(await synchronize({ ...task, workspaceId: null }), null);
       await pool.query('UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1', [task.attemptId, 'wrong-session']);
       try { assert.equal(await synchronize(task), null); }
       finally { await pool.query('UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1', [task.attemptId, 'synthetic-session']); }
@@ -207,6 +214,43 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
       await assert.rejects(backfillFactorySpecArtifacts(pool, store, 'spec-owner', { cursor: { through: '2999-01-01T00:00:00.000Z', afterId: null } }), { code: 'factoryInvalid' });
     });
 
+    await t.test('historical repair pins current membership before APP locks and skips a revoked tenant', async () => {
+      const historicalWorkspace = await seedFixtureWorkspace(pool, 'spec-owner', 'team');
+      const pending = await fixture(historicalWorkspace);
+      // PostgreSQL retains microseconds, but the cursor is serialized to JS
+      // milliseconds. A historical fixture must sit strictly before its cutoff.
+      await pool.query(`UPDATE factory_attempts SET status='passed',"finishedAt"=clock_timestamp()-interval '1 second' WHERE id=$1`, [pending.task.attemptId]);
+      const inspect = await backfillFactorySpecArtifacts(pool, store, 'spec-owner');
+      assert.equal(inspect.scanned, 7, JSON.stringify(inspect));
+      assert.equal(inspect.wouldCreate, 1, JSON.stringify(inspect));
+      await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='spec-owner'`, [historicalWorkspace]);
+      try {
+        const denied = await backfillFactorySpecArtifacts(pool, store, 'spec-owner', { dryRun: false, cursor: inspect.cursor });
+        assert.ok(denied.skipped.unauthorized > 0);
+        assert.equal((await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [pending.task.attemptId])).rows[0].output.specArtifact, undefined);
+      } finally {
+        await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='spec-owner'`, [historicalWorkspace]);
+      }
+      let sawLease = false;
+      const observingStore = { lockTask: async (tx: PoolClient, userId: string, taskId: string) => {
+        if (taskId === pending.task.id) {
+          const probe = await pool.connect();
+          try {
+            await probe.query('BEGIN');
+            await assert.rejects(probe.query(`SELECT "userId" FROM mikka_workspace_members
+              WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT`, [historicalWorkspace, userId]), { code: '55P03' });
+            sawLease = true;
+          } finally { await probe.query('ROLLBACK'); probe.release(); }
+        }
+        return store.lockTask(tx, userId, taskId);
+      } };
+      const eventsBefore = (await pool.query('SELECT count(*)::int AS n FROM coordinator_events')).rows[0].n;
+      const applied = await backfillFactorySpecArtifacts(pool, observingStore, 'spec-owner', { dryRun: false, cursor: inspect.cursor });
+      assert.equal(applied.created, 1); assert.equal(sawLease, true);
+      assert.ok(parseFactorySpecArtifactRef((await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [pending.task.attemptId])).rows[0].output.specArtifact));
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM coordinator_events')).rows[0].n, eventsBefore, 'restoring access still performs a quiet historical copy');
+    });
+
     await t.test('the same transaction fences account deletion before any Artifact write', async () => {
       const writer = await pool.connect(), deletion = await pool.connect();
       try {
@@ -251,6 +295,7 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
       } finally { await pool.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1', ['spec-owner']); }
     });
   } finally {
+    await closeWorkspace();
     await dropTestDatabase(admin, name, pool);
     await admin.end();
   }

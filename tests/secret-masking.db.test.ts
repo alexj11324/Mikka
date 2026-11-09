@@ -43,14 +43,14 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     assert.deepEqual(await runtime.taskSecretInjection(ws.id, null, {}), { env: {}, secretNames: [], protectedSecrets: [], unavailable: [] })
   })
 
-  // A legacy cloud run keeps its original claim token's workspace authority.
+  // A cloud run keeps its persisted workspace and its original claim token's authority.
   const device = (await pool.query(`insert into devices (id,name,"ownerId",kind) values (gen_random_uuid(),'cloud',$1,'cloud') returning id`, [admin])).rows[0].id as string
   await pool.query(`insert into cloud_machines ("workspaceId","ownerId","operationId","deviceId") values ($1,$2,gen_random_uuid(),$3)`, [ws.id, admin, device])
   const token = 'dt_' + randomBytes(24).toString('hex')
   const claimTokenId = (await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values (gen_random_uuid(),$1,$2,$3,$4,now()+interval '1 hour') returning id`, [admin, hashDeviceToken(token), device, ws.id])).rows[0].id as string
   const agent = (await pool.query(`insert into agents (id,"userId",harness,name) values (gen_random_uuid(),$1,'codex','a') returning id`, [admin])).rows[0].id as string
   // Output writes belong to a claimed live run, including its active lease.
-  const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","deviceTokenId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,$4,'running',now()+interval '10 minutes') returning id`, [agent, admin, device, claimTokenId])).rows[0].id as string
+  const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId","deviceTokenId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,$4,$5,'running',now()+interval '10 minutes') returning id`, [agent, admin, device, ws.id, claimTokenId])).rows[0].id as string
   const call = (method: string, path: string, body: unknown) => new Request(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) })
   /** The row is committed before Next's `after()` (the wake-up) runs; outside a request it throws. */
   const afterOnly = (error: unknown) => { if (!String((error as Error)?.message).includes('outside a request scope')) throw error }
@@ -259,10 +259,12 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
       const input = await maskWorkerMailboxInput(runId, { to: '', key: randomUUID(), text: `use ${SECRET} for the deploy` }) as { to: string; key: string; text: string }
       // Same ids in the throwaway DB, so the run is live there too.
       await mailboxPool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [admin, `${admin}@example.invalid`])
+      await mailboxPool.query(`insert into mikka_workspaces (id,"userId",name,slug,kind) values ($1,$2,'Masking fixture',$3,'team')`, [ws.id, admin, `mask-${ws.id}`])
+      await mailboxPool.query(`insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,'admin','active')`, [ws.id, admin, `${admin}@example.invalid`])
       await mailboxPool.query(`insert into devices (id,name,"ownerId",kind,enabled) values ($1,'cloud',$2,'cloud',true)`, [device, admin])
       await mailboxPool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values ($1,$2,$3,$4,$5,now()+interval '1 hour')`, [claimTokenId, admin, hashDeviceToken(token), device, ws.id])
       await mailboxPool.query(`insert into agents (id,"userId",harness,name) values ($1,$2,'codex','a')`, [agent, admin])
-      await mailboxPool.query(`insert into agent_runs (id,"agentId","userId","deviceId","deviceTokenId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,'running',now()+interval '10 minutes')`, [runId, agent, admin, device, claimTokenId])
+      await mailboxPool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId","deviceTokenId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,'running',now()+interval '10 minutes')`, [runId, agent, admin, device, ws.id, claimTokenId])
       const mailbox = new SessionMailbox(mailboxPool, ws.id)
       const sender = await mailbox.run(admin, runId)
       const coordinator = await mailbox.conversation(admin, 'coordinator')

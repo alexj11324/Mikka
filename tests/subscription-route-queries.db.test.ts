@@ -73,7 +73,7 @@ test('a cloud run\'s subscription context read stays within its statement budget
 
   // The person's own subscription, a workspace Bot and its task: the shape of the traced runs.
   const workspaceId = (await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])).id
-  const botId = await seedBot(pool, workspaceId, userId), issueId = await seedIssue(pool, userId)
+  const botId = await seedBot(pool, workspaceId, userId), issueId = await seedIssue(pool, userId, workspaceId)
   const connectionId = randomUUID(), model = 'fixture-opus'
   const quota = { vendor: 'claude_code', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] }
   await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject",quota,"modelCatalog") VALUES ($1,$2,$3,'claude','connected',1,$4,$5,'synthetic-subject',$6,$7)`,

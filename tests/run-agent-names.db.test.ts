@@ -26,7 +26,7 @@ test('run work is credited to its Agent', { skip: !dbUrl }, async t => {
   await t.test('older versions stored under the dispatching Bot still read as the Agent; a bot author stays a bot', async () => {
     const { listArtifacts, readArtifact } = await import('../lib/artifacts/store')
     const fromRun = randomUUID(), fromBot = randomUUID()
-    await pool.query('insert into artifacts (id,"userId",kind,title,"runId","latestVersion") values ($1,$2,\'markdown\',\'From the run\',$3,1),($4,$2,\'markdown\',\'From the bot\',null,1)', [fromRun, owner, run, fromBot])
+    await pool.query('insert into artifacts (id,"userId",kind,title,"runId","latestVersion","workspaceId") values ($1,$2,\'markdown\',\'From the run\',$3,1,$5),($4,$2,\'markdown\',\'From the bot\',null,1,$5)', [fromRun, owner, run, fromBot, ws.id])
     for (const [artifactId, author] of [[fromRun, '后端值班'], [fromBot, '后端值班']]) {
       await pool.query('insert into artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") values ($1,$2,1,$3,\'x\',\'0\',1,$4)', [randomUUID(), artifactId, `test/${artifactId}`, author])
     }

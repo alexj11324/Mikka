@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
+import { bindFixtureWorkspaceDatabase, createFixtureWorkspaceTables } from '../../tests/helpers/workspace-database'
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import { observePoolCommits } from '@/lib/db/commit-effects'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { SubagentStore } from './subagents'
@@ -33,14 +35,19 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
   const admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
+  const closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
   // Like the app's pool (lib/db/request-scope.ts): wakes and live notices run after COMMIT.
   observePoolCommits(pool)
   const alice = { userId: 'alice', workspaceId: randomUUID() }
   const bob = { ...alice, userId: 'bob' }
   const stranger = { ...alice, workspaceId: randomUUID() }
   try {
+    await createFixtureWorkspaceTables(pool)
+    await seedFixtureWorkspace(pool, alice.userId, 'team', alice.workspaceId)
+    await seedFixtureWorkspace(pool, stranger.userId, 'team', stranger.workspaceId)
+    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,'bob','Bob','bob@example.invalid','member','active')`, [alice.workspaceId])
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY);INSERT INTO "user" VALUES('alice'),('bob');
-      CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,"botId" uuid,"agentDefinition" jsonb,status text,report jsonb,"stopRequestedAt" timestamptz,"finishedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
+      CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,"botId" uuid,"agentDefinition" jsonb,"workspaceId" uuid,status text,report jsonb,"stopRequestedAt" timestamptz,"finishedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
       CREATE TABLE agents(id uuid PRIMARY KEY,"userId" text NOT NULL,harness text NOT NULL);
       CREATE TABLE devices(id uuid PRIMARY KEY,"ownerId" text,kind text,enabled boolean DEFAULT true,"removedAt" timestamptz);
       CREATE TABLE device_tokens("boundDeviceId" uuid,"revokedAt" timestamptz);
@@ -122,7 +129,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     for (const device of [deviceA, deviceB, botDevice]) await pool.query('INSERT INTO devices(id,"ownerId",kind) VALUES ($1,\'alice\',\'cloud\')', [device])
     const cancelledRun = randomUUID(), cancelledDevice = randomUUID(), lease = randomUUID(), operation = randomUUID()
     await pool.query('INSERT INTO devices(id,"ownerId",kind) VALUES ($1,\'alice\',\'cloud\')', [cancelledDevice])
-    await pool.query('INSERT INTO agent_runs(id,"userId",status) VALUES ($1,\'alice\',\'queued\')', [cancelledRun])
+    await pool.query('INSERT INTO agent_runs(id,"userId",status,"workspaceId") VALUES ($1,\'alice\',\'queued\',$2)', [cancelledRun, alice.workspaceId])
     await pool.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","snapshotId","operationId",state,"deviceId","workerLeaseId") VALUES ($1,$2,\'alice\',$3,\'snapshot\',$4,\'starting\',$5,$6)', [cancelledRun, alice.workspaceId, botA, operation, cancelledDevice, lease])
     await pool.query('INSERT INTO device_tokens("boundDeviceId") VALUES ($1)', [cancelledDevice])
     await assert.rejects(threadMachineAction(pool, alice, cancelledRun, 'end'), { status: 409 }, 'do not report cleanup complete while create is in flight')
@@ -137,7 +144,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     assert.equal(await recordCancelledSandbox(pool, cancelledRun, 'late-sandbox', operation), true, 'late resource remains discoverable for cleanup retry')
     await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","deviceId") VALUES ($1,\'alice\',$2,$3)', [alice.workspaceId, randomUUID(), botDevice])
     for (const [runId, deviceId] of [[runA, deviceA], [runB, deviceB]]) {
-      await pool.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId",status) VALUES ($1,\'alice\',$2,$3,\'queued\')', [runId, agentId, deviceId])
+      await pool.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"workspaceId") VALUES ($1,\'alice\',$2,$3,\'queued\',$4)', [runId, agentId, deviceId, alice.workspaceId])
       await pool.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,\'alice\')', [runId, botA, alice.workspaceId])
       await pool.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,\'alice\',$3,$4,\'snapshot-owner-alice\',$5,\'running\',$6)', [runId, alice.workspaceId, botA, `sandbox-${runId}`, randomUUID(), deviceId])
     }
@@ -163,6 +170,12 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     assert.equal(await claimCloudRun(pool, bob, runA, deviceA, expires, bindingId), null, 'another owner cannot claim it')
     assert.equal(await claimCloudRun(pool, stranger, runA, deviceA, expires, bindingId), null, 'another workspace cannot claim it')
     assert.equal(await claimCloudRun(pool, alice, runA, deviceA, expires, randomUUID()), null, 'unbound subscription denied')
+    await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alice.workspaceId, alice.userId])
+    try {
+      assert.equal(await claimCloudRun(pool, alice, runA, deviceA, expires, bindingId), null, 'membership revocation denies a correctly bound cloud run')
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runA])).rows[0].status, 'queued')
+      assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1', [runA])).rowCount, 0)
+    } finally { await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [alice.workspaceId, alice.userId]) }
     await pool.query('INSERT INTO workspace_computer_policies VALUES ($1,\'deny\',1)', [alice.workspaceId])
     assert.equal(await claimCloudRun(pool, alice, runA, deviceA, expires, bindingId), null)
     await pool.query('DELETE FROM workspace_computer_policies')
@@ -170,6 +183,6 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     assert.equal((await claimCloudRun(pool, alice, runB, deviceB, expires, bindingId))?.botId, botA)
     assert.equal(await claimCloudRun(pool, alice, runA, deviceA, expires, bindingId), null, 'one claim only')
   } finally {
-    await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
+    await closeWorkspace(); await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
   }
 })

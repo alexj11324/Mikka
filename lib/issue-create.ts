@@ -10,6 +10,7 @@ import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issu
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { issueListChanged } from './live/lists'
 import { scheduleShortTitle } from './short-title-schedule'
+import { requireTaskWorkspace } from './task-workspace'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -22,9 +23,10 @@ const createIssueSchema = z.object({
 })
 
 /** `actor` is who issue history records as creating it, decided by the caller on the server. */
-export async function createIssueForUserInTransaction(tx: Transaction, userId: string, input: unknown, actor: ActivityActor, options?: { id: string; linearSyncBlocked: boolean }) {
+export async function createIssueForUserInTransaction(tx: Transaction, userId: string, input: unknown, actor: ActivityActor, options: { workspaceId: string; id?: string; linearSyncBlocked?: boolean }) {
   const parsed = createIssueSchema.safeParse(input)
   if (!parsed.success) return null
+  const workspace = await requireTaskWorkspace(userId, options.workspaceId)
   const id = options?.id ?? crypto.randomUUID()
   const number = await allocateIssueNumbers(tx, userId)
   const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
@@ -33,8 +35,13 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
     content: withIssueMetadata(parsed.data.content, metadata),
     id,
     userId,
+    workspaceId: workspace.id,
+    ownershipState: 'bound',
+    scope: workspace.kind === 'personal' ? 'personal' : 'workspace',
+    scopeSetBy: 'user',
+    linearSyncPolicy: 'disabled',
     revision: 1,
-    linearSyncBlocked: options?.linearSyncBlocked ?? false,
+    linearSyncBlocked: options.linearSyncBlocked ?? true,
   }).returning()
   await tx.insert(issueVersions).values({
     id: crypto.randomUUID(),

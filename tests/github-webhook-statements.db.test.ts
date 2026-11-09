@@ -9,6 +9,7 @@ import { createHmac, randomUUID } from 'node:crypto'
 import { after, before, mock, test } from 'node:test'
 import pg from 'pg'
 import { isE2eTarget } from './helpers/e2e-target.mjs'
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 
 const target = process.env.E2E_DATABASE_URL
 const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL && target === process.env.DATABASE_URL
@@ -57,6 +58,9 @@ before(async () => {
   process.env.GITHUB_WEBHOOK_SECRET = secret
   ;({ POST } = await import('../app/api/webhooks/github/route'))
   ;({ pool } = await import('../lib/db'))
+  // Factory's GitHub access module initializes auth during a merged-PR delivery.
+  // Finish that same instance's startup before counting per-delivery statements.
+  await (await import('../lib/auth')).auth.$context
 })
 
 /** Runs one signed delivery and its background work; returns the statements it sent. */
@@ -87,10 +91,11 @@ test('one GitHub delivery stays within its statement budget', { skip: !valid, ti
   const issueId = randomUUID(), agentId = randomUUID(), runId = randomUUID(), number = 1000 + Math.floor(Math.random() * 100_000)
   const delivered = `https://github.com/o/r/pull/${number}`, unrelated = `https://github.com/o/r/pull/${number + 1}`
   await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'O',$2,true,now(),now())`, [owner, `${owner}@example.invalid`])
+  const workspaceId = await seedFixtureWorkspace(pool, owner)
   await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubId, owner])
   await pool.query(`INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,'Coder','codex')`, [agentId, owner])
-  await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Delivered',$3,'review','normal')`,
-    [issueId, owner, JSON.stringify({ type: 'doc', attrs: { mikka: { pullRequests: [{ url: delivered, state: 'open' }] } }, content: [] })])
+  await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId") VALUES ($1,$2,'Delivered',$3,'review','normal',$4)`,
+    [issueId, owner, JSON.stringify({ type: 'doc', attrs: { mikka: { pullRequests: [{ url: delivered, state: 'open' }] } }, content: [] }), workspaceId])
   await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt) VALUES ($1,$2,$3,$4,'succeeded','Fix it')`, [runId, owner, issueId, agentId])
   await pool.query(`INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest") VALUES ($1,$2,$3,'https://github.com/o/r','o/r','published',$4)`,
     [runId, owner, issueId, JSON.stringify({ url: delivered, state: 'open' })])

@@ -1,4 +1,3 @@
-import { actAs } from '../acting-user'
 import { auth } from '../api-auth'
 import { pool } from '../db'
 import { readCapturePoster } from '../captures/poster-store'
@@ -7,15 +6,16 @@ import { captureFileResponse } from '../captures/serve'
 import { factoryHumanStore } from './server'
 import { authorizeFactoryTaskCapture } from './task-media'
 import { FactoryError } from './contract'
+import { factoryHumanWorkspaceResponse } from './workspace-http'
 import { causeFields } from '@mikka/protocol/coded-error'
 
 /** Task-detail session adapter, shared by originals and their derived covers.
- * actAs preserves the same workspace principal as the task-detail route. */
+ * Pin the complete principal and WS/member lease before any APP transaction. */
 export async function serveFactoryTaskMedia(request: Request, taskId: string, captureId: string, poster = false) {
   const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
   const privateHeaders = { 'cache-control': 'private, no-store' }
   if (!session) return new Response(null,{ status: 401, headers: privateHeaders })
-  return actAs(session.user,async () => {
+  return factoryHumanWorkspaceResponse(session.user,async () => {
     try {
       await authorizeFactoryTaskCapture(pool,factoryHumanStore,session.user.id,taskId,captureId)
       const cover = poster ? await readCapturePoster(session.user.id,captureId,request.signal) : null

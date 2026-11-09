@@ -4,6 +4,7 @@ import { ExecutionIdentityError } from '../execution-identity';
 import { factoryChanged } from '../live/factory';
 import { FactoryError } from './contract';
 import { factoryEventId } from './event-id';
+import { withFactoryBackgroundWorkspace } from './background-workspace';
 import { syncFactorySpecArtifact } from './spec-artifact';
 import type { createFactoryStore } from './store';
 
@@ -44,26 +45,32 @@ export async function backfillFactorySpecArtifacts(
     created: 0, wouldCreate: 0, existing: 0, skipped: { unauthorized: 0, sourceUnavailable: 0 },
     nextCursor: rows.length > limit ? { through: cursor.through, afterId: candidates.at(-1)!.attemptId } : null };
   for (const candidate of candidates) {
-    const tx = await pool.connect();
     try {
-      await tx.query('BEGIN');
-      const current = await store.lockTask(tx, userId, candidate.taskId);
-      const task = { ...current, attemptId: candidate.attemptId, stage: 'spec' as const, status: 'passed' as const };
-      const artifactId = factoryEventId('spec-artifact', `${task.id}:${task.attemptId}`);
-      const { rows: [{ exists }] } = await tx.query<{ exists: boolean }>('SELECT EXISTS(SELECT 1 FROM artifacts WHERE id=$1) AS exists', [artifactId]);
-      const ref = await syncFactorySpecArtifact(tx, task, { historical: true, dryRun });
-      if (!ref) result.skipped.sourceUnavailable++;
-      else if (exists) result.existing++;
-      else if (dryRun) result.wouldCreate++;
-      else result.created++;
-      if (ref && !dryRun) await factoryChanged(tx, current);
-      await tx.query(dryRun ? 'ROLLBACK' : 'COMMIT');
+      // The persisted task selects the WS/member lease before APP checkout.
+      // The original store rechecks every source/binding under its own locks.
+      await withFactoryBackgroundWorkspace(pool, userId, { kind: 'task', id: candidate.taskId }, async () => {
+        const tx = await pool.connect();
+        try {
+          await tx.query('BEGIN');
+          const current = await store.lockTask(tx, userId, candidate.taskId);
+          const task = { ...current, attemptId: candidate.attemptId, stage: 'spec' as const, status: 'passed' as const };
+          const artifactId = factoryEventId('spec-artifact', `${task.id}:${task.attemptId}`);
+          const { rows: [{ exists }] } = await tx.query<{ exists: boolean }>('SELECT EXISTS(SELECT 1 FROM artifacts WHERE id=$1) AS exists', [artifactId]);
+          const ref = await syncFactorySpecArtifact(tx, task, { historical: true, dryRun });
+          if (!ref) result.skipped.sourceUnavailable++;
+          else if (exists) result.existing++;
+          else if (dryRun) result.wouldCreate++;
+          else result.created++;
+          if (ref && !dryRun) await factoryChanged(tx, current);
+          await tx.query(dryRun ? 'ROLLBACK' : 'COMMIT');
+        } catch (error) { await tx.query('ROLLBACK'); throw error; }
+        finally { tx.release(); }
+      });
     } catch (error) {
-      await tx.query('ROLLBACK');
       if (error instanceof ExecutionIdentityError || error instanceof FactoryError && error.code === 'factoryNotFound')
         result.skipped.unauthorized++;
       else throw error;
-    } finally { tx.release(); }
+    }
   }
   return result;
 }

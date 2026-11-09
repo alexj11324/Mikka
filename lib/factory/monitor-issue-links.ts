@@ -15,18 +15,18 @@ export const monitorIssueLinkSchema=z.object({url:urlSchema}).strict()
  * approval is dispatched; the immutable candidate supplies the repository. */
 export function createFactoryMonitorIssueLinks(pool:Pool,authorize:FactoryAuthorize,readIssue:IssueReader){
   async function current(tx:PoolClient,userId:string,incidentId:string){
-    const {rows:[hint]}=await tx.query(`SELECT i.*,t."scopeVersion" AS "taskScopeVersion",t.status AS "taskStatus",c.repository
+    const {rows:[hint]}=await tx.query(`SELECT i.*,t."workspaceId" AS "taskWorkspaceId",t.status AS "taskStatus",c.repository
       FROM factory_monitor_incidents i JOIN factory_tasks t ON t.id=i."taskId" AND t."userId"=i."userId"
       JOIN factory_candidates c ON c.id=i."candidateId" AND c."taskId"=t.id
       WHERE i.id=$1 AND i."userId"=$2`,[incidentId,userId])
     if(!hint)throw new FactoryError('factoryNotFound')
-    const {rows:[source]}=await tx.query('SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1 FOR SHARE',[hint.issueId])
-    if(!factoryScopeAllows({userId,scopeVersion:hint.taskScopeVersion},source)||!await authorize(userId,hint.issueId,tx))throw new FactoryError('factoryNotFound')
+    const {rows:[source]}=await tx.query('SELECT "userId",scope,"scopeVersion","workspaceId","ownershipState" FROM issues WHERE id=$1 FOR SHARE',[hint.issueId])
+    if(!factoryScopeAllows({userId,workspaceId:hint.taskWorkspaceId},source)||!await authorize(userId,hint.issueId,tx))throw new FactoryError('factoryNotFound')
     const {rows:[incident]}=await tx.query('SELECT * FROM factory_monitor_incidents WHERE id=$1 AND "userId"=$2 FOR UPDATE',[incidentId,userId])
     if(!incident||['cancelled','revoked'].includes(hint.taskStatus))throw new FactoryError('factoryStopped')
     const issueId=incident.followupIssueId??incident.issueId
-    const {rows:[issue]}=await tx.query('SELECT "userId" FROM issues WHERE id=$1 FOR SHARE',[issueId])
-    if(issue?.userId!==userId||!await authorize(userId,issueId,tx))throw new FactoryError('factoryNotFound')
+    const {rows:[issue]}=await tx.query('SELECT "userId","workspaceId","ownershipState" FROM issues WHERE id=$1 FOR SHARE',[issueId])
+    if(issue?.userId!==userId||issue.ownershipState!=='bound'||issue.workspaceId!==hint.taskWorkspaceId||!await authorize(userId,issueId,tx))throw new FactoryError('factoryNotFound')
     return {incidentId,issueId,sourceIssueId:incident.issueId,repository:String(hint.repository)}
   }
   async function transaction<T>(userId:string,id:string,work:(tx:PoolClient,state:Awaited<ReturnType<typeof current>>)=>Promise<T>){
@@ -38,7 +38,8 @@ export function createFactoryMonitorIssueLinks(pool:Pool,authorize:FactoryAuthor
   async function view(tx:PoolClient,state:Awaited<ReturnType<typeof current>>,userId:string){
     const {rows:[github]}=await tx.query('SELECT "remoteKey","githubIssueId",number,url,state,"githubUpdatedAt","verifiedAt" FROM github_issue_links WHERE "issueId"=$1 AND "ownerId"=$2',[state.issueId,userId])
     const {rows:[linear]}=await tx.query(`SELECT l."linearIssueId",l."linearIdentifier",l."teamSyncId" FROM linear_issue_links l
-      JOIN linear_team_syncs t ON t.id=l."teamSyncId" AND t."ownerId"=l."ownerId" AND t.active
+      JOIN issues i ON i.id=l."issueId" AND i."ownershipState"='bound' AND i."linearSyncPolicy"='explicit' AND NOT i."linearSyncBlocked"
+      JOIN linear_team_syncs t ON t.id=l."teamSyncId" AND t."ownerId"=l."ownerId" AND t.active AND t."workspaceId"=i."workspaceId"
       JOIN linear_connections c ON c."userId"=l."ownerId" AND c."revokedAt" IS NULL
       WHERE l."issueId"=$1 AND l."ownerId"=$2 AND l."externalTargetVerified" AND l."remoteRemovedAt" IS NULL`,[state.issueId,userId])
     return {...state,github:github?{status:'mapped' as const,...github}:{status:'unmapped' as const},linear:linear?{status:'mapped' as const,...linear}:{status:'unmapped' as const}}

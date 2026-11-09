@@ -1,3 +1,4 @@
+import { withFactoryBackgroundWorkspace, type FactoryWorkspaceBoundary } from './background-workspace'
 import { randomUUID } from 'node:crypto'
 import { factoryChanged } from '../live/factory'
 import { runControlChanged } from '../device-gateway-notify'
@@ -38,6 +39,8 @@ export function factoryWatchdogDecision(value: Progress, now: Date) {
 type Runtime = { store: ReturnType<typeof createFactoryStore>; reconcile: { run(userId: string, runId: string): Promise<unknown> } }
 type Dispatch = (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, unknown>) => Promise<(() => Promise<void>) | undefined>
 export type WatchdogDependencies = { runtime(botId: string | null): Runtime; dispatch: Dispatch; wake(userId: string, botId: string | null): Promise<unknown>
+  /** Host/test transaction boundary; never accepted from a watchdog request. */
+  withWorkspace?: FactoryWorkspaceBoundary
   /** Recover outside task locks, then launch only after reconciliation adopts it. */
   recoverProvider?(userId: string, runId: string): Promise<(() => Promise<void>) | undefined>
   recoverQuestion?(userId: string, runId: string, now: Date): Promise<{ handled: boolean; launched: boolean }>
@@ -55,6 +58,7 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
     const { wakeCoordinator } = await import('../coordinator/wake')
     dependencies = { runtime: runtime.factoryRuntimeForBot, dispatch: automaticFactoryDispatch(pool), wake: (userId) => wakeCoordinator(userId) }
   }
+  const host = dependencies
   const counts = { scanned: 0, recovered: 0, blocked: 0, deferred: 0, failed: 0 }
   const { rows: candidates } = await pool.query(`SELECT t.id,t."userId",t."botId",a."runId",
     (t.status='running' AND t.stage='execute' AND live.status='queued' AND live."stopRequestedAt" IS NULL
@@ -74,6 +78,7 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
         AND source.report->'modelFallback'->>'retryRunId'=live.id::text LIMIT 1) provider_check ON live."retryOf" IS NULL
     LEFT JOIN agent_runs previous ON previous.id=COALESCE(live."retryOf",provider_check.id) AND previous."userId"=t."userId" AND previous."issueId"=t."issueId"
     WHERE (t.status IN ('pending','running') OR (t.status='blocked' AND a.output->'watchdog'->>'reasonCode'='task_stalled'))
+      AND EXISTS (SELECT 1 FROM "user" u WHERE u.id=t."userId")
       AND t.stage IN ('spec','execute','review','verify','monitor')
       AND (live.status IS NULL OR live.status NOT IN ('paused','waiting_input'))
       AND (($2::text IS NULL AND t."updatedAt" < $1::timestamptz - interval '1 minute'
@@ -84,13 +89,13 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
   for (const candidate of candidates) {
     if (Date.now() >= deadline) { counts.deferred++; continue }
     counts.scanned++
-    const runtime = dependencies.runtime(candidate.botId)
+    const runtime = host.runtime(candidate.botId)
     if (candidate.questionPending) {
       // The answer has already committed. Retry only its exact queued child;
       // generic stall recovery must not stop it or create another attempt.
       try {
-        const result = dependencies.recoverQuestion
-          ? await dependencies.recoverQuestion(candidate.userId, candidate.runId, now)
+        const result = host.recoverQuestion
+          ? await host.recoverQuestion(candidate.userId, candidate.runId, now)
           : await (await import('./questions/wake')).wakeQueuedQuestionContinuation(pool, candidate.userId, candidate.runId, now)
         if (result.handled) {
           if (result.launched) counts.recovered++
@@ -107,7 +112,7 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
       // current task itself; this pass holds no DB connection or task lock.
       try {
         let launch: (() => Promise<void>) | undefined
-        if (dependencies.recoverProvider) launch = await dependencies.recoverProvider(candidate.userId, candidate.providerRunId)
+        if (host.recoverProvider) launch = await host.recoverProvider(candidate.userId, candidate.providerRunId)
         else {
           const { recoverProviderFailure, launchProviderContinuation } = await import('../run-provider-fallback')
           const continuation = await recoverProviderFailure(pool, candidate.userId, candidate.providerRunId)
@@ -120,14 +125,20 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
       continue
     }
     const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction, factoryAuthorizationCheckpoint } = await import('./transaction')
-    const tx = await pool.connect()
     let wake = false, recovered = false
     let start: (() => Promise<void>) | undefined
     let reconcileRun: string | undefined
+    const afterCommit = async () => {
+      await start?.()
+      if (reconcileRun) { await runtime.reconcile.run(candidate.userId, reconcileRun); counts.recovered++ }
+      if (wake) await host.wake(candidate.userId, candidate.botId)
+    }
+    const transact = async () => {
+    const tx = await pool.connect()
     try {
       await beginFactoryTransaction(tx)
       const task = await runtime.store.lockTask(tx, candidate.userId, candidate.id)
-      if (!['pending', 'running', 'blocked'].includes(task.status)) { await commitFactoryTransaction(tx); continue }
+      if (!['pending', 'running', 'blocked'].includes(task.status)) { await commitFactoryTransaction(tx); return }
       const { rows: [state] } = await tx.query(`SELECT a."runId",r.status AS "runStatus",a.output->'watchdog' AS watchdog,
         (r."stopRequestedAt" IS NULL AND (
           (r.status='failed' AND r."stopReason"='provider_failure' AND r.report->'modelFallback'->>'state'='pending')
@@ -153,7 +164,7 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
         LEFT JOIN agent_runs previous ON previous.id=COALESCE(r."retryOf",provider_check.id) AND previous."userId"=t."userId" AND previous."issueId"=t."issueId"
         LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id
         LEFT JOIN run_checkpoints cp ON cp."runId"=r.id AND cp."userId"=t."userId" WHERE t.id=$1`, [task.id])
-      if (!state) { await commitFactoryTransaction(tx); continue }
+      if (!state) { await commitFactoryTransaction(tx); return }
       const action = factoryWatchdogDecision({ task, ...state }, now)
       const eventId = factoryEventId('task-watchdog', `${task.attemptId}:${task.sourceEventId}`)
       const { rows: [previous] } = await tx.query('SELECT result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId])
@@ -165,10 +176,10 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
           JSON.stringify({ kind: 'task_watchdog', requestEpoch: task.sourceEventId, attemptId: task.attemptId }),
           JSON.stringify({ ...previous?.result, action: previous?.result?.action ?? 'wait', observedAt: now.toISOString(), progressAt: state.progressAt,
             nextAt: new Date(now.getTime() + (task.status === 'blocked' ? 60_000 : 5 * 60_000)).toISOString() })])
-        await commitFactoryTransaction(tx); continue
+        await commitFactoryTransaction(tx); return
       }
       if (previous?.result?.nextAt && Date.parse(previous.result.nextAt) > now.getTime()
-        && !(completed && action === 'recover_stall' && previous.result.action === 'stalled')) { counts.deferred++; await commitFactoryTransaction(tx); continue }
+        && !(completed && action === 'recover_stall' && previous.result.action === 'stalled')) { counts.deferred++; await commitFactoryTransaction(tx); return }
       const tries = action === 'stalled' ? 0 : (previous?.result?.tries ?? 0) + 1
       const { rows: [budget] } = await tx.query(`SELECT COALESCE(sum(COALESCE((result->>'recoveryTries')::int,0)),0)::int AS count
         FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_watchdog' AND request->>'requestEpoch'=$2`, [task.id, task.sourceEventId])
@@ -220,7 +231,7 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
             await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [current.attemptId,
               JSON.stringify({ watchdogRecovery: { previousRunId: state.runId, requestEpoch: task.sourceEventId, handoffDigest: handoff.digest } })])
           }
-          start = await dependencies.dispatch(tx, runtime.store, current, { id: state.runId })
+          start = await host.dispatch(tx, runtime.store, current, { id: state.runId })
           recovered = true
         }
         catch (error) {
@@ -244,11 +255,16 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
       await rollbackFactoryTransaction(tx)
       if (!(error instanceof FactoryError) || !['factoryNotFound', 'factoryStopped', 'factoryStale'].includes(error.code)) counts.failed++
     } finally { forgetFactoryTransaction(tx); tx.release() }
+    }
     try {
-      await start?.()
-      if (reconcileRun) { await runtime.reconcile.run(candidate.userId, reconcileRun); counts.recovered++ }
-      if (wake) await dependencies.wake(candidate.userId, candidate.botId)
-    } catch { counts.failed++ }
+      const workspace: FactoryWorkspaceBoundary = host.withWorkspace ?? ((userId, taskId, work) =>
+        withFactoryBackgroundWorkspace(pool, userId, { kind: 'task', id: taskId, botId: candidate.botId }, work))
+      await workspace(candidate.userId, candidate.id, transact)
+    } catch (error) {
+      start = undefined; wake = false; reconcileRun = undefined
+      if (!(error instanceof FactoryError) || !['factoryNotFound', 'factoryStopped', 'factoryStale'].includes(error.code)) counts.failed++
+    }
+    try { await afterCommit() } catch { counts.failed++ }
   }
   return counts
 }

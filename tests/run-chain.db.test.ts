@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -30,7 +31,8 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
     }
     await pool.end()
     const { pool: appPool } = await import('../lib/db')
-    await appPool.end()
+    const { workspacePool } = await import('../lib/workspace-db')
+    await Promise.all([appPool.end(), workspacePool.end()])
   })
 
   async function owner() {
@@ -44,22 +46,23 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
   const issueNumbers = new Map<string, number>()
   async function issue(userId: string, scope = 'personal') {
     const id = randomUUID()
+    const workspaceId = await seedFixtureWorkspace(pool, userId, scope === 'workspace' ? 'team' : 'personal')
     const number = (issueNumbers.get(userId) ?? 0) + 1
     issueNumbers.set(userId, number)
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope,"scopeSetBy") VALUES ($1,$2,\'Chain task\',$4,\'todo\',\'normal\',$3,\'user\')', [id, userId, scope, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [] })])
+    await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope,"scopeSetBy") VALUES ($1,$2,$5,\'Chain task\',$4,\'todo\',\'normal\',$3,\'user\')', [id, userId, scope, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [] }), workspaceId])
     return id
   }
   let clock = Date.parse('2026-10-01T00:00:00Z')
   const ENDED = ['succeeded', 'failed', 'cancelled', 'stopped']
-  async function run(o: { userId: string; agentId: string }, issueId: string, status: string, link?: { origin?: string; retryOf?: string; at?: number; id?: string }) {
+  async function run(o: { userId: string; agentId: string }, issueId: string | null, status: string, link?: { origin?: string; retryOf?: string; continues?: string; workspaceId?: string; at?: number; id?: string }) {
     const id = link?.id ?? randomUUID()
     if (link?.at === undefined) clock += 1000
     const at = link?.at ?? clock
-    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt,"createdAt","finishedAt","questionContinuation","retryOf")
-      VALUES ($1,$2,$3,$4,$5,'Synthetic chain run',$6,$7,$8,$9)`, [id, o.userId, issueId, o.agentId, status, new Date(at),
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt,"createdAt","finishedAt","questionContinuation","retryOf","continuesRunId","workspaceId")
+      VALUES ($1,$2,$3,$4,$5,'Synthetic chain run',$6,$7,$8,$9,$10,$11)`, [id, o.userId, issueId, o.agentId, status, new Date(at),
       ENDED.includes(status) ? new Date(at + 500) : null,
       link?.origin ? JSON.stringify({ questionId: randomUUID(), originRunId: link.origin, originSessionId: 'session', followUp: 'answer', requireSessionResume: true }) : null,
-      link?.retryOf ?? null])
+      link?.retryOf ?? null, link?.continues ?? null, link?.workspaceId ?? null])
     return id
   }
   const cont = (origin: string) => ({ origin })
@@ -162,7 +165,8 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
     const a = await run(me, issueId, 'succeeded')
     const otherChainLive = await run(me, issueId, 'running')
     const crossIssue = await run(me, otherIssue, 'running', cont(a))
-    const crossOwner = await run(other, theirIssue, 'running', cont(a))
+    await assert.rejects(run(other, theirIssue, 'running', cont(a)), /taskWorkspaceMismatch/)
+    const crossOwner = await run(other, theirIssue, 'running')
     assert.deepEqual(ids(await readRunChain(pool, me.userId, a)), [a])
     assert.equal(await readRunChain(pool, me.userId, crossOwner), null)
     await assert.rejects(requestRunStop(me.userId, a), (e: { code?: string }) => e.code === 'runChainEnded')
@@ -172,8 +176,13 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
 
   await t.test('same issue, different owner: a teammate run pointing at my run is a separate thread', async () => {
     const me = await owner(), mate = await owner(), issueId = await issue(me.userId, 'workspace')
+    const workspaceId = (await pool.query('SELECT "workspaceId" FROM issues WHERE id=$1', [issueId])).rows[0].workspaceId
+    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status)
+      VALUES ($1,$2,$2,$3,'member','active')`, [workspaceId, mate.userId, `${mate.userId}@example.invalid`])
     const mine = await run(me, issueId, 'succeeded')
-    const theirs = await run(mate, issueId, 'running', cont(mine)), theirRerun = await run(mate, issueId, 'running', { retryOf: mine })
+    await assert.rejects(run(mate, issueId, 'running', cont(mine)), /taskWorkspaceMismatch/)
+    await assert.rejects(run(mate, issueId, 'running', { retryOf: mine }), /taskWorkspaceMismatch/)
+    const theirs = await run(mate, issueId, 'running'), theirRerun = await run(mate, issueId, 'running')
     const chains = await listIssueRunChains(pool, issueId, [me.userId, mate.userId], 20)
     assert.equal(chains.length, 3)
     assert.deepEqual(chains.map(c => c.attempts.length), [1, 1, 1])
@@ -184,8 +193,9 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
   await t.test('cycles are rejected by the depth limit without a fallback root', async () => {
     const me = await owner(), issueId = await me.issue()
     const a = randomUUID(), b = randomUUID()
-    await run(me, issueId, 'succeeded', { id: a, origin: b })
+    await run(me, issueId, 'succeeded', { id: a })
     await run(me, issueId, 'succeeded', { id: b, retryOf: a })
+    await pool.query('UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1', [a, { originRunId: b }])
     await assert.rejects(listIssueRunChains(pool, issueId, [me.userId], 20), /runChainDepthExceeded/)
     await assert.rejects(readRunChain(pool, me.userId, a), /runChainDepthExceeded/)
   })
@@ -222,6 +232,85 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
     assert.equal((await listIssueRunChains(pool, issueId, [me.userId], 20)).length, 2)
     assert.equal(await readRunChain(pool, me.userId, 'not-a-uuid'), null)
     void a
+  })
+
+  await t.test('the database rejects new task-free retry, continuation and question edges across tenants or owners', async () => {
+    const me = await owner(), foreign = await owner()
+    const alpha = await seedFixtureWorkspace(pool, me.userId, 'team')
+    const beta = await seedFixtureWorkspace(pool, me.userId, 'team')
+    const source = await run(me, null, 'succeeded', { workspaceId: alpha })
+    const candidate = await run(me, null, 'running', { workspaceId: beta })
+    const refs = [
+      { column: 'retryOf', link: { retryOf: source }, value: source },
+      { column: 'continuesRunId', link: { continues: source }, value: source },
+      { column: 'questionContinuation', link: { origin: source }, value: { originRunId: source } },
+    ]
+    for (const ref of refs) {
+      await assert.rejects(run(me, null, 'running', { ...ref.link, workspaceId: beta }), /taskWorkspaceMismatch/)
+      await assert.rejects(pool.query(`UPDATE agent_runs SET "${ref.column}"=$2 WHERE id=$1`, [candidate, ref.value]), /taskWorkspaceMismatch/)
+      await assert.rejects(pool.query(`UPDATE agent_runs SET status='succeeded',"${ref.column}"=$2 WHERE id=$1`, [candidate, ref.value]), /taskWorkspaceMismatch/)
+      const accepted = await run(me, null, 'running', { ...ref.link, workspaceId: alpha })
+      assert.ok(ids(await readRunChain(pool, me.userId, source))?.includes(accepted))
+      await assert.rejects(run(foreign, null, 'running', { ...ref.link, workspaceId: alpha }), /taskWorkspaceMismatch/)
+    }
+    await assert.rejects(run(me, null, 'running', { workspaceId: alpha, retryOf: randomUUID() }), /taskWorkspaceMismatch/)
+    await assert.rejects(pool.query('UPDATE agent_runs SET "userId"=$2 WHERE id=$1', [source, foreign.userId]), /taskWorkspaceMismatch/)
+    assert.deepEqual(await row(candidate), { status: 'running', stopRequestedAt: null }, 'failed lineage writes have no effect')
+    assert.deepEqual(ids(await readRunChain(pool, me.userId, candidate)), [candidate])
+  })
+
+  await t.test('historical task-free edges cannot widen chain reads or stop targets across workspaces', async () => {
+    const history = await pool.connect()
+    const alpha = randomUUID(), beta = randomUUID(), ownerId = `history-${randomUUID()}`
+    const root = randomUUID(), tail = randomUUID(), retry = randomUUID(), continued = randomUUID(), question = randomUUID(), unresolved = randomUUID()
+    try {
+      await history.query('BEGIN')
+      // This connection-local table represents pre-migration history. The
+      // production guard remains enabled on the real table throughout.
+      await history.query(`CREATE TEMP TABLE agent_runs (
+        id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"workspaceId" uuid,"botId" uuid,status text,outcome text,"failureDetails" jsonb,
+        "createdAt" timestamptz DEFAULT now(),"finishedAt" timestamptz,"stopRequestedAt" timestamptz,
+        "questionContinuation" jsonb,"retryOf" uuid,"continuesRunId" uuid) ON COMMIT DROP`)
+      await history.query(`INSERT INTO agent_runs (id,"userId","workspaceId",status,"retryOf","continuesRunId","questionContinuation","createdAt") VALUES
+        ($1,$7,$8,'succeeded',NULL,NULL,NULL,now()-interval '10 seconds'),
+        ($2,$7,$8,'running',$1,NULL,NULL,now()-interval '5 seconds'),
+        ($3,$7,$9,'running',$1,NULL,NULL,now()),
+        ($4,$7,$9,'running',NULL,$1,NULL,now()),
+        ($5,$7,$9,'running',NULL,NULL,jsonb_build_object('originRunId',$1::text),now()),
+        ($6,$7,NULL,'running',$1,NULL,NULL,now())`, [root, tail, retry, continued, question, unresolved, ownerId, alpha, beta])
+      for (const runId of [root, tail]) assert.deepEqual(ids(await readRunChain(history, ownerId, runId)), [root, tail])
+      assert.deepEqual(await resolveStopTargets(history, ownerId, root), { kind: 'stop', runIds: [tail], latestRunId: tail })
+      for (const runId of [retry, continued, question]) assert.deepEqual(ids(await readRunChain(history, ownerId, runId)), [runId])
+      assert.equal(await readRunChain(history, ownerId, unresolved), null)
+      assert.deepEqual(await resolveStopTargets(history, ownerId, unresolved), { kind: 'notFound' })
+    } finally { await history.query('ROLLBACK'); history.release() }
+  })
+
+  await t.test('task-free runs use their persisted tenant policy and current membership, without a home fallback', async () => {
+    const me = await owner()
+    const personal = await seedFixtureWorkspace(pool, me.userId)
+    const shared = await seedFixtureWorkspace(pool, me.userId, 'team')
+    const teamRun = await run(me, null, 'running', { workspaceId: shared })
+    const personalRun = await run(me, null, 'running', { workspaceId: personal })
+    const unresolvedRun = await run(me, null, 'running')
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy)
+      VALUES ($1,'allow',$2)`, [shared, { permissions: { network: 'deny', git_push: 'deny' } }])
+    const { readCliRunPolicy } = await import('../lib/agent-tool-approval/policy-store')
+    const current = await readCliRunPolicy(pool, teamRun, me.userId)
+    assert.equal(current.workspaceId, shared)
+    assert.deepEqual(current.workspaceIds, [shared])
+    assert.equal(current.policy.permissions.network, 'deny')
+    assert.equal(current.policy.permissions.git_push, 'deny')
+    const personalPolicy = await readCliRunPolicy(pool, personalRun, me.userId)
+    assert.equal(personalPolicy.workspaceId, personal)
+    assert.notEqual(personalPolicy.policy.permissions.network, 'deny')
+    await assert.rejects(readCliRunPolicy(pool, unresolvedRun, me.userId), /agentPolicyUnavailable/)
+    await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared, me.userId])
+    try { await assert.rejects(readCliRunPolicy(pool, teamRun, me.userId), /agentPolicyUnavailable/) }
+    finally { await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared, me.userId]) }
+    await pool.query('UPDATE agent_runs SET cli_policy_hierarchy=$2 WHERE id=$1',
+      [teamRun, { workspaceId: shared, teamId: randomUUID(), projectId: null }])
+    await assert.rejects(readCliRunPolicy(pool, teamRun, me.userId), /agentPolicyUnavailable/, 'losing a task anchor cannot discard its frozen Team policy')
   })
 
   await t.test('race: the requested run ends between the chain read and its stop -> runChainEnded, not 404', async () => {
