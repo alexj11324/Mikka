@@ -222,7 +222,8 @@
     "test:cloud-services-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.db.test.ts lib/mobile-push-delivery.db.test.ts",
     "test:factory-activity": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/attempt-view.test.ts lib/factory/spec-artifact.test.ts lib/captures/poster.test.ts",
     "test:factory-activity-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/factory/activity.db.test.ts lib/factory/activity-artifacts.db.test.ts lib/factory/spec-artifact.db.test.ts lib/factory/task-media.db.test.ts lib/cloud-computer/thread-machine-sessions.db.test.ts",
-    "test:factory-activity-http-db": "node --import ./scripts/server-test.mjs --import tsx --test tests/factory-activity-http.db.test.ts"
+    "test:factory-activity-http-db": "node --import ./scripts/server-test.mjs --import tsx --test tests/factory-activity-http.db.test.ts",
+    "test:inbox-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/inbox/store.db.test.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.121",

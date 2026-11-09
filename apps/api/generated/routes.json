@@ -1065,6 +1065,16 @@
       "sourceHash": "9a58bb4807888258c039a34baa23a8218aff063c694a50503541ed5e64b70164"
     },
     {
+      "path": "/mikka/api/inbox",
+      "template": "/api/inbox",
+      "source": "app/api/inbox/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "b64348c6412251d45961b7f503d5bfadf857ee47140e7084f0ab8f9ccbe8d297"
+    },
+    {
       "path": "/mikka/api/integrations/composio",
       "template": "/api/integrations/composio",
       "source": "app/api/integrations/composio/route.ts",

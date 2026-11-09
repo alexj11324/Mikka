@@ -40,6 +40,10 @@ export async function executeScheduleCommand(owner:string,botId:string|null,sour
 /** A scheduled read that failed is retried 30 s later, earlier than the lease the timer sleeps to. */
 export async function failScheduledRead(claim:{id:string;lease_token:string},error:unknown){await schedules().fail(claim,error);armDueTimerSoon('schedules')}
 /** The earliest persisted due time of any schedule work (epoch ms), or null. */
-export function scheduleNextDue(){return nextScheduleDue(pool)}
-export async function sweepSchedules(){const {wakeOwners,...counts}=await schedules().tick();await Promise.allSettled(wakeOwners.map(owner=>wakeCoordinator(owner)));return counts}
+export async function scheduleNextDue(){
+  const due = await Promise.all([nextScheduleDue(pool), (await import('@/lib/inbox/runtime')).inboxNextDue()])
+  const times = due.filter((at): at is number => at !== null)
+  return times.length ? Math.min(...times) : null
+}
+export async function sweepSchedules(){await (await import('@/lib/inbox/runtime')).expireInboxSnoozes();const {wakeOwners,...counts}=await schedules().tick();await Promise.allSettled(wakeOwners.map(owner=>wakeCoordinator(owner)));return counts}
 export async function assertScheduledRead(owner:string,botId:string|null,scope:ScheduledRead){return schedules().assertRead(owner,botId,scope)}

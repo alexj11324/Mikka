@@ -217,7 +217,7 @@ export async function releaseAttention(userId: string, now = new Date(), call: A
       .where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'snoozed'), lte(attentionMatters.runAt, now)))
     const [inHand] = await tx.select({ id: attentionMatters.id }).from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'handed'))).limit(1)
     if (inHand) return []
-    return tx.select(briefColumns).from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'waiting'))).orderBy(attentionMatters.updatedAt).limit(20)
+    return tx.select(briefColumns).from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'waiting'), sql`not exists (select 1 from suggestions s where s.id=${attentionMatters.suggestionId} and (s."rejectedAt" is not null or exists(select 1 from inbox_snoozes z where z."userId"=${userId} and z."itemType"='suggestion' and z."itemId"=s.id)))`)).orderBy(attentionMatters.updatedAt).limit(20)
   })
   if (!waiting.length) return false
   const handed = await spends(db, userId, 'handoff', now)
@@ -234,7 +234,7 @@ export async function releaseAttention(userId: string, now = new Date(), call: A
     if (!await attentionEnabled(userId, tx)) return false
     const [inHand] = await tx.select({ id: attentionMatters.id }).from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'handed'))).limit(1)
     if (inHand) return false
-    const [matter] = await tx.select().from(attentionMatters).where(and(eq(attentionMatters.id, pick), eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'waiting'))).limit(1)
+    const [matter] = await tx.select().from(attentionMatters).where(and(eq(attentionMatters.id, pick), eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'waiting'), sql`not exists (select 1 from suggestions s where s.id=${attentionMatters.suggestionId} and (s."rejectedAt" is not null or exists(select 1 from inbox_snoozes z where z."userId"=${userId} and z."itemType"='suggestion' and z."itemId"=s.id)))`)).limit(1)
     if (!matter || !budgetState('handoff', await spends(tx, userId, 'handoff', now), now).open) return false
     const evidence = matter.evidence as unknown as ItemEvidence
     const payload: HandoffPayload = {
