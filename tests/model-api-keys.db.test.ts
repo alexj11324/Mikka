@@ -40,7 +40,7 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
       CREATE TABLE bot_model_choices ("ownerId" text NOT NULL, "workspaceId" uuid NOT NULL, "botKey" text NOT NULL, "bindingId" uuid, PRIMARY KEY ("ownerId","workspaceId","botKey"));
       CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "botId" uuid, "deviceId" uuid, "agentDefinition" jsonb, status text NOT NULL, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz)`)
     await pool.query(await readFile(new URL('../drizzle/20261101020201_workspace_personal_policies.sql', import.meta.url), 'utf8'))
-    await pool.query(await readFile(new URL('../drizzle/20261108120220_organization_governance.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../drizzle/20261109035020_organization_governance.sql', import.meta.url), 'utf8'))
     const migration = await readFile(new URL('../drizzle/20261101021000_model_api_keys.sql', import.meta.url), 'utf8')
     await pool.query(migration)
     await pool.query(migration)

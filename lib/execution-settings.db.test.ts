@@ -82,7 +82,7 @@ test(
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const personalPolicyMigration = await readFile(new URL("../drizzle/20261101020201_workspace_personal_policies.sql",import.meta.url),"utf8");
       await pool.query(personalPolicyMigration); await pool.query(personalPolicyMigration);
-      await pool.query(await readFile(new URL("../drizzle/20261108120220_organization_governance.sql", import.meta.url), "utf8"));
+      await pool.query(await readFile(new URL("../drizzle/20261109035020_organization_governance.sql", import.meta.url), "utf8"));
       const settings = new ExecutionSettings(pool),
         alice = { ownerId: "alice", workspaceId: randomUUID() },
         bob = { ...alice, ownerId: "bob" },

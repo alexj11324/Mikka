@@ -49,7 +49,7 @@ OIDC RP-initiated logout 的 8 个新增子用例已计入 37 项：真实 OP �
 
 审计 outbox 的投递也已准备解除旧 APP→WS checkout 反序：APP claim 提交释放、WS 稳定事件 ID 入库提交释放、APP 条件 ack。独立新增 4 个实库子例（含父共 5 项）针对两生产 pool max1、并发 claim、WS 失败和 WS 成功/APP ack 失败；尚未执行，不计入 37/37。
 
-本轮准备使用 `20261108120220` Organization、`120221` identity、`120222` SAML lineage 与 `120223` live capability 迁移；后面三条显式进入 Auth 所在 APP 数据库。前两条 SQL 仅顺延文件名，内容不变。手机 session 字段来自先行 P0 的 `120202`，P2 不另造一套手机身份表。新主线及这些 session 撤销补丁的最终验收都以同一个公开 SHA 为准。
+本轮准备使用 `20261109035020` Organization、`035021` identity、`035022` SAML lineage 与 `035023` live capability 迁移；后面三条显式进入 Auth 所在 APP 数据库。前两条 SQL 仅顺延文件名，内容不变。手机 session 字段来自先行 P0 的 `035002`，P2 不另造一套手机身份表。新主线及这些 session 撤销补丁的最终验收都以同一个公开 SHA 为准。
 
 ## Issue 要求 → 后端证据
 

@@ -39,7 +39,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql", "20261102190000_model_api_key_responses_api.sql"])
       await pool.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), "utf8"));
     // Resource policy still runs against real non-Org rows in this isolated schema.
-    await pool.query(await readFile(new URL("../drizzle/20261108120220_organization_governance.sql", import.meta.url), "utf8"));
+    await pool.query(await readFile(new URL("../drizzle/20261109035020_organization_governance.sql", import.meta.url), "utf8"));
 
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
     mock.module(new URL("./workspace-db.ts", import.meta.url).href, { namedExports: { workspaceDb: drizzle(pool), workspacePool: pool } });
