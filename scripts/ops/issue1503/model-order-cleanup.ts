@@ -152,3 +152,39 @@ export function f42636835234ModelOrderCleanupPlan(initial: any, failures: any[],
     || !sameModelOrder(failures[0].restoredOrder, failures[1].originalOrder)) return refuse()
   return { ...plans[1], latest: failures[1] }
 }
+
+/** Exact current FAIL receipts; preserve the original model-order CAS plan. */
+export function f42683494583ModelOrderCleanupPlan(initial: any, failures: any[], now = Date.now()) {
+  const refuse = (): never => { throw new Error('issue1503_cleanup_f42683494583_model_order_receipt_mismatch') }
+  if (!Array.isArray(failures) || failures.length !== 2) return refuse()
+  const pins = [
+    { harness: 'claude_code', startedAt: '2026-11-09T19:28:08.256Z', completedAt: '2026-11-09T19:32:55.247Z',
+      originalCustomized: false, flagPreserved: false,
+      originalHash: '9b8296bd6449841656e279bb6287feea84899c47aaea468ffe1a44f3d76400fb' },
+    { harness: 'codex', startedAt: '2026-11-09T19:32:58.042Z', completedAt: '2026-11-09T19:34:57.294Z',
+      originalCustomized: true, flagPreserved: true,
+      originalHash: '483e54d0f2281589293466e1be05347baf93e30b008f05454fe61bd1a19233a2' },
+  ]
+  const restoredHash = '483e54d0f2281589293466e1be05347baf93e30b008f05454fe61bd1a19233a2'
+  const plans = failures.map((latest, index) => {
+    const pin = pins[index]
+    const started = briefOrder(latest?.originalOrder), restored = briefOrder(latest?.restoredOrder)
+    if (latest?.status !== 'failed' || latest.marker !== '42683494583-1'
+      || latest.expectedSha !== 'd8e09ac218f5656763a5bc42a75e45fc385caede'
+      || serialized(latest.selectedHarnesses) !== serialized([pin.harness])
+      || latest.startedAt !== pin.startedAt || latest.completedAt !== pin.completedAt
+      || !started || !restored || started.entries.length !== 8 || restored.entries.length !== 8
+      || started.location !== 'cloud' || started.preferredHarness !== 'claude_code' || started.autoModelRouting !== true
+      || started.customized !== pin.originalCustomized || restored.customized !== true
+      || createHash('sha256').update(serialized(latest.originalOrder)).digest('hex') !== pin.originalHash
+      || createHash('sha256').update(serialized(latest.restoredOrder)).digest('hex') !== restoredHash
+      || !Array.isArray(latest.cleanup) || !latest.cleanup.some((entry: any) =>
+        entry?.kind === 'effective_model_order_restored' && entry.customizedFlagPreserved === pin.flagPreserved)) return refuse()
+    const plan = receiptModelOrderCleanupPlan(initial, latest, now, 'failed')
+    if (effectiveOrder(plan.materialized) !== effectiveOrder(plan.currentDefault)) return refuse()
+    return plan
+  })
+  if (Date.parse(failures[0].completedAt) >= Date.parse(failures[1].startedAt)
+    || !sameModelOrder(failures[0].restoredOrder, failures[1].originalOrder)) return refuse()
+  return { ...plans[1], latest: failures[1] }
+}
