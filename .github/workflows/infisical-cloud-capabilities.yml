@@ -792,7 +792,7 @@ jobs:
       github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
-      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final services diagnostic recovery corrected')
+      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final services diagnostic recovery ledger')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     concurrency:
