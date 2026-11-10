@@ -159,7 +159,7 @@ test('Files/Diff/Task review HTTP API → commands → full daemon → receipt �
     }
     await pool.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,\'HTTP Files fixture\',\'HTTPFILES\')', [teamId, workspaceId, owner])
     await pool.query('INSERT INTO mikka_team_members("teamId","userId",role) VALUES($1,$2,\'owner\')', [teamId, owner])
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'HTTP Files fixture','{"type":"doc","content":[]}','done','normal','workspace')`, [issueId, owner])
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,'HTTP Files fixture','{"type":"doc","content":[]}','done','normal','workspace')`, [issueId, owner, workspaceId])
     await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner])
     const runId = randomUUID(), repoId = randomUUID(), deviceId = randomUUID(), tokenId = randomUUID(), agentId = randomUUID()
     const dataDir = join(root, 'daemon'), worktree = join(dataDir, 'worktrees', runId)

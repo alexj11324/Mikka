@@ -167,7 +167,7 @@ test('Task review send composes real transactional deliveries on PostgreSQL 17',
       for (const file of files) await writeFile(join(worktree, file.path), file.after)
       if (options.pr) { await git(worktree, 'add', '--all'); await git(worktree, 'commit', '-qm', 'task send PR head') }
       const headSha = await git(worktree, 'rev-parse', 'HEAD')
-      await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Task send\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',\'workspace\')', [taskId, owner.id])
+      await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Task send\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',\'workspace\')', [taskId, owner.id, workspaceId])
       await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [taskId, teamId, workspaceId, owner.id])
       await pool.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'Task send fixture\')', [botId, workspaceId, owner.id])
       await pool.query('INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,$2,\'Task send fixture\',\'local\')', [deviceId, owner.id])

@@ -148,7 +148,7 @@ Workspace 视图保留该 Workspace 自己的历史余额与订阅。若 Organiz
 
 ## 迁移与回滚
 
-本合同使用六份只增迁移：`20261110020030_billing_consistency.sql`、`20261110020031_billing_entitlements.sql`、`20261110020032_plan_credit_usage.sql`、`20261110020033_resource_budgets.sql`、`20261110020034_billing_financial_receipts.sql`、`20261110020035_billing_checkout_requests.sql`。第二份用于 Workspace 数据库，其余用于 APP 数据库。
+本合同使用六份只增迁移：`20261110150008_billing_consistency.sql`、`20261110150009_billing_entitlements.sql`、`20261110150010_plan_credit_usage.sql`、`20261110150011_resource_budgets.sql`、`20261110150012_billing_financial_receipts.sql`、`20261110150013_billing_checkout_requests.sql`。第二份用于 Workspace 数据库，其余用于 APP 数据库。
 
 发布前保存部署 SHA 和数据库备份，并核对 `workspace_credit_grants` 的原记录数、各账户各桶金额总和、Stripe 客户/订阅 ID 及历史 `hosted_usage` 金额。发布后核对这些历史值保持不变，再检查增量授额和使用收据。
 

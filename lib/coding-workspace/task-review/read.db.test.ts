@@ -124,8 +124,8 @@ test('Task review reads preserve exact source, tenancy and accepted comments on 
       await git(repository, 'add', '--all'); await git(repository, 'commit', '-qm', 'review base')
       await git(repository, 'worktree', 'add', '-q', '--detach', worktree, 'HEAD')
       const baseSha = await git(worktree, 'rev-parse', 'HEAD')
-      await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Task review fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',\'workspace\')',
-        [taskId, owner.id])
+      await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Task review fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',\'workspace\')',
+        [taskId, owner.id, where.id])
       await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)',
         [taskId, where.teamId, where.id, owner.id])
       await pool.query('INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,$2,\'Task review fixture\',\'local\')', [deviceId, owner.id])
@@ -279,7 +279,7 @@ test('Task review reads preserve exact source, tenancy and accepted comments on 
       await assert.rejects(() => selectedTaskReview(deps, actor(owner, elsewhere.id), f.taskId, reference(snapshot)), code('workspace_not_found'))
       await assert.rejects(() => selectedTaskReview(deps, actor(outsider, f.where.id), f.taskId, reference(snapshot)), code('workspace_not_found'))
       const otherTask = randomUUID()
-      await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Other task\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',\'workspace\')', [otherTask, owner.id])
+      await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Other task\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',\'workspace\')', [otherTask, owner.id, f.where.id])
       await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)',
         [otherTask, f.where.teamId, f.where.id, owner.id])
       await assert.rejects(() => selectedTaskReview(deps, f.who, otherTask, reference(snapshot)), code('workspace_not_found'))

@@ -100,8 +100,8 @@ test('Task review summaries preserve current source and tenant boundaries on Pos
       credential: { kind: 'session', id: who.sessionId } })
     async function task(where: Workspace) {
       const id = randomUUID()
-      await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Task summary fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',\'workspace\')',
-        [id, owner.id])
+      await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Task summary fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',\'workspace\')',
+        [id, owner.id, where.id])
       await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)',
         [id, where.teamId, where.id, owner.id])
       return id
@@ -248,7 +248,7 @@ test('Task review summaries preserve current source and tenant boundaries on Pos
       assert.equal(decorations.find(row => row.issueId === plainTaskId)?.codingReview, false)
 
       const { mobileTask } = await import('../../mobile-tasks')
-      const detail = await mobileTask({ id: member.id }, { id: f.where.id, kind: 'team' }, f.taskId)
+      const detail = await mobileTask({ id: member.id }, f.taskId, f.where.id)
       assert.ok(detail)
       assert.deepEqual(detail.task.review?.reviewRef, reference(snapshot))
       assert.doesNotMatch(JSON.stringify(detail), /"codingReview"|"repositoryKey"|"worktreePath"/)

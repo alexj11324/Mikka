@@ -47,8 +47,8 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     readFileSync('drizzle/20261030230001_legacy_hosted_workspaces.sql', 'utf8'),
   )
   await pool.query(readFileSync('drizzle/20261101130000_hosted_usage_concurrent.sql', 'utf8'))
-  await pool.query(readFileSync('drizzle/20261110020032_plan_credit_usage.sql', 'utf8'))
-  await pool.query(readFileSync('drizzle/20261110020033_resource_budgets.sql', 'utf8'))
+  await pool.query(readFileSync('drizzle/20261110150010_plan_credit_usage.sql', 'utf8'))
+  await pool.query(readFileSync('drizzle/20261110150011_resource_budgets.sql', 'utf8'))
   const store = new HostedUsageStore(pool)
   /** `n` messages sent in this workspace's chats (created by `creator`), plus a 重试 and a welcome request that never count. */
   const sent = async (workspaceId: string, n: number, creator = `creator-${workspaceId}`) => {

@@ -8,7 +8,6 @@ import { teamIssues } from '@/lib/db/team-schema'
 import { issueAttrsContent, issueLatestRun, type IssueLatestRun } from '@/lib/issue-summary-columns'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { readIssueMetadata } from '@/lib/issue-metadata'
-import { taskReviewSourceHint } from '@/lib/coding-workspace/task-review/summary-selection'
 import type { TeamScope } from '@/lib/team-access'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -16,8 +15,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 // Its own module, beside lib/issue-access.ts: unit tests stub that module with only the names they use.
 const { content: _content, ...issueColumnsWithoutBody } = getTableColumns(issues)
 const citationColumns = { id: issues.id, userId: issues.userId, scope: issues.scope, title: issues.title,
-  shortTitle: issues.shortTitle, shortTitleFrom: issues.shortTitleFrom, status: issues.status, content: issueAttrsContent, latestRun: issueLatestRun,
-  codingReview: taskReviewSourceHint }
+  shortTitle: issues.shortTitle, shortTitleFrom: issues.shortTitleFrom, status: issues.status, content: issueAttrsContent, latestRun: issueLatestRun }
 type Issue = typeof issues.$inferSelect
 type CitationIssue = Pick<Issue, Exclude<keyof typeof citationColumns, 'latestRun'>> & { latestRun: IssueLatestRun }
 type ReadOptions = { withoutBody?: boolean; teams?: readonly TeamScope[]; identifierTeams?: Map<string, { key: string; number: number }>; withTeamLinks?: false; projection?: 'citation' }

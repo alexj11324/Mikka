@@ -30,7 +30,7 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
   process.env.MIKKA_DATABASE_URL = appUrl.toString(); process.env.DATABASE_URL = wsUrl.toString()
   let moduleApp: Pool | undefined, moduleWs: Pool | undefined
   try {
-    const directory = new URL('../drizzle/', import.meta.url), boundary = '20261110020010_resource_acl.sql'
+    const directory = new URL('../drizzle/', import.meta.url), boundary = '20261110150005_resource_acl.sql'
     const files = orderMigrations((await readdir(directory)).filter(file => file.endsWith('.sql')))
     for (const pool of [app, ws]) await pool.query('create table schema_migrations(name text primary key,"appliedAt" timestamptz not null default now())')
     const migrate = async (names: string[]) => {

@@ -111,7 +111,7 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
       const who = actor(owner, workspaceId), viewer = actor(member, workspaceId), issueId = randomUUID(), taskId = randomUUID(),
         deviceId = randomUUID(), repoId = randomUUID(), agentId = randomUUID(), sourceEventId = randomUUID(),
         candidateId = randomUUID(), approvalId = randomUUID()
-      await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Task merge\',\'{"type":"doc","content":[]}\',\'review\',\'normal\',\'workspace\')', [issueId, owner.id])
+      await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Task merge\',\'{"type":"doc","content":[]}\',\'review\',\'normal\',\'workspace\')', [issueId, owner.id, workspaceId])
       await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner.id])
       await pool.query('INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,$2,\'Task merge fixture\',\'local\')', [deviceId, owner.id])
       await pool.query('INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,$3,\'codex\',$4)',

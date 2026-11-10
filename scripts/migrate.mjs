@@ -98,7 +98,7 @@ try {
     const ownership = await backfillTaskWorkspaces(application, workspace)
     console.log(`migrate: task workspace ownership bound=${ownership.bound} pending=${ownership.pending}`)
   }
-  if (application && workspace && files.includes('20261110020010_resource_acl.sql')) {
+  if (application && workspace && files.includes('20261110150005_resource_acl.sql')) {
     const { backfillProjectResourceAccess } = await import('./resource-acl-backfill.mjs')
     const access = await backfillProjectResourceAccess(application, workspace)
     console.log(`migrate: project ACL registered=${access.registered} quarantined=${access.quarantined} tasksBound=${access.tasksBound}`)

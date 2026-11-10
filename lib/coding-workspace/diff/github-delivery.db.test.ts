@@ -121,8 +121,8 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
       const where = await workspace(owner, member), elsewhere = await workspace(owner, member)
       const who = actor(owner, where.id), runId = randomUUID(), repoId = randomUUID(), taskId = randomUUID(),
         deviceId = randomUUID(), agentId = randomUUID()
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope)
-        VALUES($1,$2,'Delivery task','{"type":"doc","content":[]}','doing','normal','workspace')`, [taskId, owner.id])
+      await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope)
+        VALUES($1,$2,$3,'Delivery task','{"type":"doc","content":[]}','doing','normal','workspace')`, [taskId, owner.id, where.id])
       await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)',
         [taskId, where.teamId, where.id, owner.id])
       await pool.query('INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,$2,\'Delivery fixture\',\'local\')', [deviceId, owner.id])

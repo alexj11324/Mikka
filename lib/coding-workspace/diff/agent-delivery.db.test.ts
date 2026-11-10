@@ -135,8 +135,8 @@ test('agent review delivery with PostgreSQL 17 and real Git source proofs', { sk
       const targetBranch = 'mikka/agent-review-1'
       await git(repository, 'worktree', 'add', '-q', '-b', targetBranch, worktree, 'HEAD')
       const baseSha = await git(worktree, 'rev-parse', 'HEAD')
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope)
-        VALUES($1,$2,'Agent feedback task','{"type":"doc","content":[]}','doing','normal','workspace')`, [taskId, owner.id])
+      await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope)
+        VALUES($1,$2,$3,'Agent feedback task','{"type":"doc","content":[]}','doing','normal','workspace')`, [taskId, owner.id, where.id])
       await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)',
         [taskId, where.teamId, where.id, owner.id])
       await pool.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'Agent feedback fixture\')', [botId, where.id, owner.id])

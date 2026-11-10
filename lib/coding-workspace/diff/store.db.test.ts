@@ -116,8 +116,8 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       const baseSha = await git(worktree, 'rev-parse', 'HEAD')
       const taskId = options.task === false ? null : randomUUID(), botId = options.bot ? randomUUID() : null
       if (taskId) {
-        await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope)
-          VALUES($1,$2,'Diff fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [taskId, person.id])
+        await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope)
+          VALUES($1,$2,$3,'Diff fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [taskId, person.id, where.id])
         await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [taskId, where.teamId, where.id, person.id])
       }
       if (botId) await pool.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,$4)', [botId, where.id, person.id, `Diff bot ${botId}`])

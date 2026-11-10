@@ -40,7 +40,7 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
     assert.deepEqual(await db.transaction(tx => planWorkspaces(tx, 'legacy-owner')), { soleAdminOf: ['Legacy'] }, 'an active Personal peer must still block deletion')
     await pool.query(await readFile(new URL('../drizzle/20261109035010_team_entitlements.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../drizzle/20261109035020_organization_governance.sql', import.meta.url), 'utf8'))
-    await pool.query(await readFile(new URL('../drizzle/20261110020031_billing_entitlements.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../drizzle/20261110150009_billing_entitlements.sql', import.meta.url), 'utf8'))
     await pool.query('create table workspace_audit_outbox (id uuid primary key,"workspaceId" uuid not null,payload jsonb not null,"createdAt" timestamptz not null,"deliveredAt" timestamptz)')
     assert.equal((await pool.query('select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=\'legacy-peer\'', [legacyPersonal])).rows[0].status, 'suspended')
     await assert.rejects(pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=\'legacy-peer\'', [legacyPersonal]), /only its owner/)
@@ -175,8 +175,8 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
           "reservedUnpaid" bigint default 0,"unpaidMicroUsd" bigint default 0,"reservedFree" bigint default 0,"reservedPurchased" bigint default 0,
           "costMicroUsd" bigint,"freeMicroUsd" bigint default 0,"purchasedMicroUsd" bigint default 0,"inputTokens" bigint default 0,"outputTokens" bigint default 0,
           "generationId" text,"createdAt" timestamptz default now(),"settledAt" timestamptz);`)
-      await pool.query(await readFile(new URL('../drizzle/20261110020032_plan_credit_usage.sql', import.meta.url), 'utf8'))
-      await pool.query(await readFile(new URL('../drizzle/20261110020033_resource_budgets.sql', import.meta.url), 'utf8'))
+      await pool.query(await readFile(new URL('../drizzle/20261110150010_plan_credit_usage.sql', import.meta.url), 'utf8'))
+      await pool.query(await readFile(new URL('../drizzle/20261110150011_resource_budgets.sql', import.meta.url), 'utf8'))
       const id = await workspace(1)
       await db.insert(workspaceEntitlements).values({ workspaceId: id, plan: 'pro', source: 'cloud', seatLimit: 20 })
       await pool.query('insert into hosted_verifications values($1)', [id])

@@ -187,8 +187,8 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
         await client.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,\'Factory context fixture\',$4)',
           [teamId, workspaceId, owner, `F${randomUUID().replaceAll('-', '').slice(0, 6).toUpperCase()}`])
         await client.query('INSERT INTO mikka_team_members("teamId","userId",role) VALUES($1,$2,\'owner\')', [teamId, owner])
-        await client.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope)
-          VALUES($1,$2,'Factory context fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [issueId, owner])
+        await client.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope)
+          VALUES($1,$2,$3,'Factory context fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [issueId, owner, workspaceId])
         await client.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner])
         await client.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [base.f.runId, issueId])
         await client.query(`INSERT INTO coordinator_events(id,"userId","issueId",kind,"dedupeKey",payload)
@@ -280,7 +280,7 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
         await pool.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,\'Workspace task fixture\',$4)', [id, workspace, owner, `W${randomUUID().replaceAll('-', '').slice(0, 6).toUpperCase()}`])
         await pool.query('INSERT INTO mikka_team_members("teamId","userId",role) VALUES($1,$2,\'owner\')', [id, owner])
       }
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'Workspace task fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [issueId, owner])
+      await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,'Workspace task fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [issueId, owner, workspaceId])
       await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner])
       await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, issueId])
       assert.equal((await resolve(f)).identity.workspaceId, workspaceId)
@@ -315,15 +315,15 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
     await t.test('a no-team task belongs only to its owner\'s personal workspace; null-task legacy Runs retain their frozen authority', async () => {
       const f = await fixture(), issueId = randomUUID()
       assert.equal((await resolve(f)).identity.workspaceId, workspaceId, 'a genuinely task-less historical Run remains supported')
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'No-team task fixture','{"type":"doc"}','doing','normal','personal')`, [issueId, owner])
-      await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, issueId])
-      await assert.rejects(() => resolve(f), errorCode('workspace_not_found'))
       let personalId = (await pool.query('SELECT id FROM mikka_workspaces WHERE "userId"=$1 AND kind=\'personal\'', [owner])).rows[0]?.id as string | undefined
       if (!personalId) {
         personalId = randomUUID()
         await pool.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'Personal task fixture\',\'personal\')', [personalId, owner])
         await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [personalId, owner, `${owner}@example.invalid`])
       }
+      await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,'No-team task fixture','{"type":"doc"}','doing','normal','personal')`, [issueId, owner, personalId])
+      await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, issueId])
+      await assert.rejects(() => resolve(f), errorCode('workspace_not_found'))
       await pool.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set(jsonb_set("agentDefinition",'{executionIdentity,workspaceId}',to_jsonb($2::text)),'{repositoryAdmission,workspaceId}',to_jsonb($2::text)) WHERE id=$1`, [f.runId, personalId])
       await pool.query('UPDATE device_tokens SET "boundWorkspaceId"=$2 WHERE id=$1', [f.tokenId, personalId])
       const personalActor = { userId: owner, workspaceId: personalId }
@@ -334,8 +334,8 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
       await assert.rejects(() => pool.query('UPDATE issues SET scope=\'workspace\' WHERE id=$1', [issueId]),
         (error: unknown) => (error as { code?: string }).code === '23514')
       const legacyIssueId = randomUUID()
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope)
-        VALUES($1,$2,'Unlinked legacy task fixture','{"type":"doc"}','doing','normal','workspace')`, [legacyIssueId, owner])
+      await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope)
+        VALUES($1,$2,$3,'Unlinked legacy task fixture','{"type":"doc"}','doing','normal','workspace')`, [legacyIssueId, owner, personalId])
       await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, legacyIssueId])
       assert.equal((await resolve(f, personalActor)).identity.workspaceId, personalId)
       await pool.query('UPDATE issues SET "userId"=$2,scope=\'personal\' WHERE id=$1', [legacyIssueId, member])

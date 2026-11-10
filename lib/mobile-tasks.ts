@@ -63,7 +63,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     visibleBlockers ? db.select({ id: issues.id, status: issues.status }).from(issues)
       .where(and(inArray(issues.id, blockerIds), visibleBlockers.predicate)) : [],
   ])
-  const reviews = await taskReviewSummaries(user, decoration?.codingReview ? [id] : [], workspace.id)
+  const reviews = await taskReviewSummaries(user, decoration?.codingReview ? [id] : [], workspaceId)
   const [creation] = await enrichActivityActors(versions, issue.userId)
   const task = { ...issue, metadata }
   const newest = runs[0]
