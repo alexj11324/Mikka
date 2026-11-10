@@ -70,7 +70,7 @@ test('the bot list reads each bot\'s preview and its citations\' names only, wit
     const runs: string[] = []
     for (const [index, prompt] of prompts.entries()) {
       const id = randomUUID(); runs.push(id)
-      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,error,"workspaceId") values($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,error,"workspaceId","promptTaskStart","promptTaskLength") values($1,$2,$3,$4,$5,$6,$7,$8,$9,0,char_length($6))',
         [id, owner, index % 2 ? own : null, agent, 'succeeded', prompt, JSON.stringify({ summary: filler('summary'), files: filler('files') }), filler('error'), botWorkspace])
     }
     const teammateRun = randomUUID(), strangerRun = randomUUID()

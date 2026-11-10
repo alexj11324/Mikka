@@ -50,7 +50,7 @@ test('the polled routes read with a fixed number of queries, whatever the number
       bots.push(bot); tasks.push(issue)
       await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)', [bot, owner, workspaceId, `Bot ${index}`])
       await pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,$8,\'bound\')', [issue, owner, `Task ${index}`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: index + 1 } }, content: [] }), 'doing', 'normal', 'personal', workspaceId])
-      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt) values($1,$2,$3,$4,$5,$6)', [run, owner, issue, agent, 'succeeded', `Fix thing ${index}`])
+      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,"promptTaskStart","promptTaskLength") values($1,$2,$3,$4,$5,$6,0,char_length($6))', [run, owner, issue, agent, 'succeeded', `Fix thing ${index}`])
       await pool.query('insert into coordinator_messages(id,"userId","botId",position,message) values($1,$2,$3,1,$4)', [randomUUID(), owner, bot, JSON.stringify({ role: 'assistant', content: [{ type: 'text', text: `Started [[run:${run}]] for [[issue:${issue}]]` }] })])
     }
     for (let index = 0; index < 2; index++) await addBot()
