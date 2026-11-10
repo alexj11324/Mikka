@@ -191,6 +191,15 @@
       "sourceHash": "942486a5b184a947fedd5fccaf9f01231244c226d087f2cc277848a9fcf69c19"
     },
     {
+      "path": "/mikka/api/bots/[botId]/app-tools",
+      "template": "/api/bots/[botId]/app-tools",
+      "source": "app/api/bots/[botId]/app-tools/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "f423e367d98169aa3d6c776f92ecba4f82e0746cccdd5e2a7a622fc42c780a6b"
+    },
+    {
       "path": "/mikka/api/bots/[botId]/computer",
       "template": "/api/bots/[botId]/computer",
       "source": "app/api/bots/[botId]/computer/route.ts",
@@ -1704,7 +1713,7 @@
         "POST"
       ],
       "maxDuration": 60,
-      "sourceHash": "a89ce5cce11e96b7588f0e84abd485dc5f09d9a58016a5631f21617f987b3aeb"
+      "sourceHash": "e8b294f8e9cf1fd1542af3657ca6d34424e0bab12323098f3074f9f521abc300"
     },
     {
       "path": "/mikka/api/runs/[runId]/evidence",
@@ -1714,6 +1723,24 @@
         "GET"
       ],
       "sourceHash": "e0818cf6420a3c1ed1fa34e346716a3abb4c1e8ca55d77eff89ae1caaf8a3536"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/tool-approvals",
+      "template": "/api/runs/[runId]/tool-approvals",
+      "source": "app/api/runs/[runId]/tool-approvals/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "d19997b77c1ec950471e27064b6ce29bc95d6324a06688a7b917bacb2302ec77"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/tool-approvals/[approvalId]",
+      "template": "/api/runs/[runId]/tool-approvals/[approvalId]",
+      "source": "app/api/runs/[runId]/tool-approvals/[approvalId]/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "dda9abce68ddf3a8ba6084680de3ee3daf0f1ec9716e9f96a1252157ffe7733c"
     },
     {
       "path": "/mikka/api/runs/[runId]/workspace/diff",
@@ -2122,6 +2149,16 @@
       "sourceHash": "22f11d9eb506b07d33f1947016ba0df8011f1fb94ce8d8975eee6f9ffedbf1c5"
     },
     {
+      "path": "/mikka/api/threads/[runId]/mode",
+      "template": "/api/threads/[runId]/mode",
+      "source": "app/api/threads/[runId]/mode/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "d644a7fb95572f2761d3f279b38283121766f4d891cdf621f035dab417e1662d"
+    },
+    {
       "path": "/mikka/api/version",
       "template": "/api/version",
       "source": "app/api/version/route.ts",
@@ -2452,7 +2489,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "a4161f568a71d5a7ce69f244b25f86917a4054f535d0a2c96c431d94f37cad07"
+      "sourceHash": "449cab14dd07d41d0f1c5e6a5457867c44b780d733896dbdf92bfede7026b33e"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
@@ -2620,7 +2657,8 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "20557762165127bd0f548041265b7d1d3ffbdee769b3bf79e2f3736ad9d7e346"
+      "maxDuration": 60,
+      "sourceHash": "f383e6975bd6c3f0c26e2d24276e30c0513962d40937c419619275108e19aa02"
     },
     {
       "path": "/mikka/v1/task-secrets/[runId]",
