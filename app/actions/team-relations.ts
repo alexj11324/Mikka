@@ -13,7 +13,6 @@ import { withTaskWorkspace } from '@/lib/task-workspace'
 import { withResourceAccess } from '@/lib/resource-access/store'
 import { ActionFailureError } from '@/lib/action-error'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
-import { db } from '@/lib/db'
 import { notifyStoppedPolicyRuns, runPolicyStopSQL, type StoppedPolicyRun } from '@/lib/run-policy-stop'
 
 async function result<T>(operation: () => Promise<T>) {

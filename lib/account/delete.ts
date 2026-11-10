@@ -205,7 +205,7 @@ export async function deleteAccount(userId: string, email: string, options: impo
   return { ok: false, pending: true, id: job.id, stage: job.stage }
 }
 
-export async function planWorkspaces(wtx: WorkspaceTx, userId: string, appTarget?: Pick<PoolClient, 'query'>): Promise<Plan | { soleAdminOf: string[] }> {
+export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<Plan | { soleAdminOf: string[] }> {
   const memberships = await wtx.select({ workspaceId: workspaceMembers.workspaceId, role: workspaceMembers.role, status: workspaceMembers.status })
     .from(workspaceMembers).where(eq(workspaceMembers.userId, userId))
   const owned = await wtx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.userId, userId))
