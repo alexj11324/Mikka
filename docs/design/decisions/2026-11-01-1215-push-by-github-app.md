@@ -31,7 +31,8 @@ What follows:
 - A workspace policy or read-only mode that denies `git_push` still denies.
   `ask` no longer asks.
 - Plugins › GitHub shows 推送分支 as 「由 GitHub App 授权决定」, with no
-  switch. 创建 Pull Request keeps its own setting: it is a separate step. Its
+  switch. ~~创建 Pull Request keeps its own setting: it is a separate step.~~ 创建
+  Pull Request had its own setting; 1310 and 1600 removed it. Its
   询问 option was later removed by
   [2026-11-01-1310](2026-11-01-1310-no-ask-for-app-granted-abilities.md).
 - Only github.com repositories can be pushed.

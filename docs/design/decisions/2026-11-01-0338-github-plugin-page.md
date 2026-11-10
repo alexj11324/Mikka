@@ -37,15 +37,17 @@ Plugins › GitHub follows a store app's page, top to bottom:
    读取 Issue, 读取 CI 检查, with no control (reads run directly, R-77). The
    list is what the code does; a new ability is added with its code.
 
-The two writes are the person's own Coordinator settings, with no second
+> Historical: this section described per-Coordinator GitHub settings, superseded by [2026-11-02-1600](2026-11-02-1600-agents-use-own-github-credential.md) (neither write is a setting) and [2026-11-10-1730](2026-11-10-1730-workspace-app-permissions.md) (workspace-only app access).
+
+The two writes were the person's own Coordinator settings, with no second
 store:
 
 - ~~推送分支 is the Coordinator's `git_push` with 允许 / 拒绝, showing a stored
   询问 as 允许.~~ Replaced by 1215: a push is what the GitHub App's
   installation grants (contents: write) plus the person's own write access;
   the page shows that, read-only, and stores nothing for it.
-- 创建 Pull Request is `github_pull_request` in the Coordinator's
-  `external_write_permissions`. 拒绝 blocks the pull request (the pushed
+- 创建 Pull Request was `github_pull_request` in the Coordinator's
+  `external_write_permissions`. 拒绝 blocked the pull request (the pushed
   branch stays); ~~询问 shows a 创建 Pull Request card in chat and opens it once
-  approved~~ (1310: no 询问); unset or 允许 opens it once the push was approved, as before. It
-  only narrows the per-repository push approval, never replaces it.
+  approved~~ (1310: no 询问); unset or 允许 opened it once the push was approved, as before. It
+  only narrowed the per-repository push approval, never replaced it.

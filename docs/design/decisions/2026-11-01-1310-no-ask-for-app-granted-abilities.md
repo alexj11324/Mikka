@@ -10,11 +10,13 @@
 - Replaces: the 创建 Pull Request line of
   [2026-11-01-1215-push-by-github-app](2026-11-01-1215-push-by-github-app.md)
 
-- 创建 Pull Request offers only 允许 and 拒绝, default 允许. A stored 询问 is
-  migrated to 允许. There is no pull request card.
-- `git_push` offers only allow and deny; the GitHub App grant decides it
+> Historical: both abilities have no setting since [2026-11-02-1600](2026-11-02-1600-agents-use-own-github-credential.md). The rules below record the earlier state.
+
+- ~~创建 Pull Request offers only 允许 and 拒绝, default 允许. A stored 询问 is
+  migrated to 允许. There is no pull request card.~~
+- ~~`git_push` offers only allow and deny; the GitHub App grant decides it
   (decision 2026-11-01-1215). A stored setting can only deny: unset, or an ask
   migrated to allow, leaves the decision to the App. A run is never sent ask:
   an admitted run gets allow, every other run deny, and a run policy that does
-  not say allow never pushes.
+  not say allow never pushes.~~
 - Plugins › GitHub shows 推送分支 as 「由 GitHub App 授权决定」.

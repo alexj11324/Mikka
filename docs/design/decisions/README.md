@@ -8,7 +8,7 @@ pull requests never edit the same lines.
 stays authoritative and is frozen: add nothing new there. To supersede one of
 its rows, strike that row (~~like this~~) and link the new file.
 
-Settings names in older ADRs are historical: Bot 与 Agents became 模型与订阅 (2026-11-02-1400); 权限与审批 became 团队权限 / 应用与运行权限.
+Settings names in older ADRs are historical: Bot 与 Agents became 模型与订阅 (2026-11-02-1400); 权限与审批 became 团队权限 / 应用与运行权限. Older ADRs that describe per-Bot or per-person allow/ask/deny are historical; see [2026-11-10-1730](2026-11-10-1730-workspace-app-permissions.md).
 
 ## Adding a decision
 

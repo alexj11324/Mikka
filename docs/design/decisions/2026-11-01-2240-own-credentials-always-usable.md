@@ -3,6 +3,7 @@
 - Date: 2026-11-01
 - Source: Alex, relayed by the coordinator session: 「自己的订阅当然默认永远允许自己用……分享给工作区其他人，其他人可以用，那个是需要打开的。但个人是必须默认打开的，不允许出现调用不允许这种情况。」
 - Rule: R-76 (exception)
+- Amended by: 2026-11-10-1730 (workspace-only app access; the app-policy surface moved to 应用与运行权限).
 - Replaces:
   - [2026-10-31-2225-bindings-belong-to-the-person](2026-10-31-2225-bindings-belong-to-the-person.md) rule 3: sharing a subscription into a team as the member's own choice (模型与额度 › 在这里使用我的订阅), and the admin switch 「允许成员使用个人订阅」.
   - [2026-10-31-2130-personal-vs-workspace](2026-10-31-2130-personal-vs-workspace.md): a team admin switching off personal subscriptions.
@@ -19,10 +20,13 @@ Only 「分享给团队成员」 needs turning on: it lets other members' bots u
 credential in that workspace. It stays off by default, and it is the only
 thing a workspace admin can switch off.
 
-**App and computer policies.** A workspace admin's app policy
-(`workspace_app_policies`) or computer policy governs only sharing with other
-members and the workspace's own resources. It never stops a person using
-their own app connections or their own bots. This corrects
+**App and computer policies.** Historical: a workspace admin's app policy
+(`workspace_app_policies`) or computer policy governed only sharing with other
+members and the workspace's own resources. Target contract: app access moves
+to 应用与运行权限 (2026-11-10-1730); until then `workspace_app_policies` is
+still read. The computer policy still governs only the workspace's own
+resources. It never stops a person using their own app connections or their
+own bots. This corrects
 [2225](2026-10-31-2225-bindings-belong-to-the-person.md) rule 3, which says
 app connections and devices "get no further switch": the app policy switch
 exists.

@@ -27,7 +27,7 @@
 
 | Question | Products | Choice |
 | --- | --- | --- |
-| Per-tool approval for plugin write actions | Claude connectors, ChatGPT apps | Write tools get allow / ask / deny; read tools run |
+| Per-tool approval for plugin write actions | Claude connectors, ChatGPT apps | ~~Write tools get allow / ask / deny; read tools run~~ Historical; superseded by workspace-only app access (2026-11-10-1730) |
 | Concurrent hosted model calls in one workspace | every hosted model product | Allowed, with per-call budget holds and a concurrency cap |
 | Data freshness when a window regains focus | Linear, Slack, GitHub, Vercel | Push first; stale-while-revalidate; never hide content; no third-party checks on focus |
 | Internal terms such as "daemon" in UI copy | Cursor, Linear | Not shown; use the user-facing name |
