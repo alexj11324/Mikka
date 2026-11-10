@@ -314,7 +314,7 @@ test('evaluation Coordinator actions preserve host-owned identity and fixed trai
 })
 
 const stoppedRun: RunDetail['run'] = {
-  id:'run',issueId:'issue',agentId:'agent',agentName:'Agent',harness:'codex',status:'stopped',kind:'implement',
+  id:'run',issueId:'issue',agentId:'agent',agentName:'Agent',harness:'codex',mode:'execute',status:'stopped',kind:'implement',
   stopReason:'turn_ended',error:null,report:null,createdAt:new Date('2026-10-26T12:00:00Z'),startedAt:null,finishedAt:null,
 }
 const hostReport = {
