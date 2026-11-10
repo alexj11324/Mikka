@@ -1,5 +1,5 @@
 // Real dispatch metadata, queues, device claim HTTP and native-use authorization. Provider inference
-// and E2B are not called: a shared subscription remains owned by its lender throughout the run.
+// and E2B are not called: personal subscriptions remain owner-bound throughout every native run.
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { mock, test, type TestContext } from 'node:test'
@@ -12,7 +12,7 @@ import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/wo
 import { fakeThreadMachines } from './support/thread-machine-fake'
 import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
 
-test('shared subscriptions reach local and cloud claims with current membership and sharing', { skip: !dbUrl }, async t => {
+test('personal subscriptions reach local and cloud claims while borrowed subscriptions are refused', { skip: !dbUrl }, async t => {
   const savedKey = process.env.WORKSPACE_SECRETS_KEY
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'
@@ -74,16 +74,16 @@ test('shared subscriptions reach local and cloud claims with current membership 
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
   const seed = async (provider: 'claude' | 'codex', cloud: boolean, withProfile = false) => {
-    const ownerId = await seedUser(pool, 'shared-lender'), userId = await seedUser(pool, 'shared-runner')
-    users.push(ownerId, userId)
-    const workspace = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }, { userId: ownerId, role: 'member' }])
+    const userId = await seedUser(pool, 'personal-runner'), ownerId = userId, peerId = await seedUser(pool, 'subscription-peer')
+    users.push(userId, peerId)
+    const workspace = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }, { userId: peerId, role: 'member' }])
     const workspaceId = workspace.id, botId = await seedBot(pool, workspaceId, userId), issueId = await seedIssue(pool, userId, workspaceId)
     const harness = provider === 'claude' ? 'claude_code' : 'codex', model = provider === 'claude' ? 'shared-opus' : 'shared-gpt'
     const connectionId = randomUUID()
     const quota = { vendor: provider === 'claude' ? 'claude_code' : 'codex', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] }
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject",quota,"modelCatalog") VALUES ($1,$2,$3,$4,'connected',1,$5,$6,'synthetic-subject',$7,$8)`, [connectionId, ownerId, workspaceId, provider, `synthetic-${connectionId}`, 'a'.repeat(64), JSON.stringify(quota), JSON.stringify({ revision: '1', models: [model] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,$5,$6)`, [randomUUID(), ownerId, workspaceId, connectionId, provider === 'claude' ? 'claude_cpa' : 'codex_cpa', model])
-    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [ownerId, workspaceId])
+    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,false)', [ownerId, workspaceId])
     const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), remote = `https://github.com/mikka-ci/shared-${randomUUID()}.git`
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses) VALUES ($1,$2,'Runner',$3,true,$4,now(),$5)`, [deviceId, userId, cloud ? 'cloud' : 'local', DAEMON_PROTOCOL_VERSION, JSON.stringify(harnesses)])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)', [agentId, userId, deviceId, harness, `synthetic-${agentId}`])
@@ -125,7 +125,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     assert.equal(frozen?.ownerId, ownerId, 'the lender remains the credential owner')
     const worker = cloud ? await threadMachines.start({ userId, workspaceId }, queued.runId) : { deviceId, token }
     const claim = (runId = queued.runId) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${worker.deviceId}/runs/${runId}/claim`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${worker.token}`, [REPO_ORIGIN_HEADER]: '1' } }), { params: Promise.resolve({ deviceId: worker.deviceId, runId }) })
-    return { ownerId, userId, workspaceId, botId, agentId, harness, connectionId, model, scope, worker, runId: queued.runId, repoId, issueId, remote, claim }
+    return { ownerId, userId, peerId, workspaceId, botId, agentId, harness, connectionId, model, scope, worker, runId: queued.runId, repoId, issueId, remote, claim }
   }
   const staleProfileQuota = async (p: Awaited<ReturnType<typeof seed>>) => {
     await pool.query('UPDATE byos_connections SET quota=jsonb_set(quota,\'{observedAt}\',to_jsonb($2::text)) WHERE id=$1',
@@ -134,7 +134,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     assert.equal((await import('../lib/subscription-quota')).subscriptionAvailability(quota, p.model, 'codex').status, 'checking')
   }
   const quotaReader = async (context: TestContext, p: Awaited<ReturnType<typeof seed>>, runId = p.runId,
-    fault?: 'share' | 'revision' | 'stop' | 'unavailable') => {
+    fault?: 'member' | 'revision' | 'stop' | 'unavailable') => {
     const { SubscriptionWorkerClient } = await import('../packages/daemon/src/subscription-worker-client')
     const syntheticRuntime = {
       MIKKA_BYOS_INFISICAL_ORIGIN: 'http://127.0.0.1:1', MIKKA_BYOS_INFISICAL_PROJECT: 'synthetic-claim-quota',
@@ -160,7 +160,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
         await probe.query('SELECT 1 FROM byos_connections WHERE id=$1 FOR UPDATE NOWAIT', [p.connectionId])
         await probe.query('SELECT 1 FROM agent_runs WHERE id=$1 FOR UPDATE NOWAIT', [runId])
       } finally { await probe.query('ROLLBACK'); probe.release() }
-      if (fault === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [p.ownerId, p.workspaceId])
+      if (fault === 'member') await pool.query("UPDATE mikka_workspace_members SET status='suspended' WHERE \"userId\"=$1 AND \"workspaceId\"=$2", [p.ownerId, p.workspaceId])
       if (fault === 'revision') await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [p.connectionId])
       if (fault === 'stop') await pool.query('UPDATE agent_runs SET "stopRequestedAt"=clock_timestamp() WHERE id=$1', [runId])
       return (fault === 'unavailable' ? { status: 503, body: {} } : {
@@ -170,7 +170,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     })
     return () => reads
   }
-  for (const cloud of [false, true]) await t.test('default Profile real ' + (cloud ? 'cloud' : 'local') + ' claim refreshes only its frozen shared quota after a delayed queue', async context => {
+  for (const cloud of [false, true]) await t.test('default Profile real ' + (cloud ? 'cloud' : 'local') + ' claim refreshes only its frozen personal quota after a delayed queue', async context => {
     const p = await seed('codex', cloud, true)
     const before = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [p.runId])).rows[0].agentDefinition
     await staleProfileQuota(p)
@@ -189,7 +189,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     assert.equal(body.subscriptionBinding.ownerId, p.ownerId)
     assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1 AND "bindingId"=$2', [p.runId, before.subscription.bindingId])).rowCount, 1)
   })
-  for (const fault of ['share', 'revision', 'stop'] as const) await t.test('a ' + fault + ' change during the Profile quota read still prevents the real cloud claim', async context => {
+  for (const fault of ['member', 'revision', 'stop'] as const) await t.test('a ' + fault + ' change during the Profile quota read still prevents the real cloud claim', async context => {
     const p = await seed('codex', true, true)
     const before = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [p.runId])).rows[0].agentDefinition
     await staleProfileQuota(p)
@@ -237,7 +237,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     assert.deepEqual(claimed.agentDefinition.agentProfile, original.agentDefinition.agentProfile)
     assert.deepEqual(claimed.agentDefinition.subscription, original.agentDefinition.subscription)
   })
-  await t.test('unknown shared quota refresh uses the lender owner, not the task owner', async () => {
+  await t.test('unknown quota refresh uses the personal subscription owner', async () => {
     const p = await seed('codex', false)
     await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [p.connectionId])
     const calls: string[] = []
@@ -254,17 +254,17 @@ test('shared subscriptions reach local and cloud claims with current membership 
   })
   for (const provider of ['claude', 'codex'] as const) for (const cloud of [false, true]) {
     const label = `${provider} ${cloud ? 'cloud' : 'local'}`
-    await t.test(`${label}: a teammate subscription is frozen and the real device claim succeeds`, async () => {
+    await t.test(`${label}: the owner subscription is frozen and the real device claim succeeds`, async () => {
       const p = await seed(provider, cloud)
       const response = await p.claim()
       assert.equal(response.status, 200, JSON.stringify(await response.clone().json()))
       const body = await response.json()
       assert.equal(body.subscriptionBinding.ownerId, p.ownerId)
       assert.equal((await service.nativeRun(p.userId, p.worker.deviceId, p.runId)).ownerId, p.ownerId)
-      await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [p.ownerId, p.workspaceId])
-      await assert.rejects(service.nativeRun(p.userId, p.worker.deviceId, p.runId), { code: 'account_unavailable' }, 'an existing run cannot renew after unsharing')
+      await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [p.connectionId])
+      await assert.rejects(service.nativeRun(p.userId, p.worker.deviceId, p.runId), { code: 'account_unavailable' }, 'an existing run cannot renew after pausing')
     })
-    await t.test(`${label}: default native admission uses the run principal while custody remains with the lender`, async () => {
+    await t.test(`${label}: native admission and credential custody retain the personal owner`, async () => {
       const p = await seed(provider, cloud)
       const route = provider === 'claude' ? 'claude_code_cli' : 'codex_cli'
       const setPolicy = async (principal: string, revoked = false) => {
@@ -299,34 +299,58 @@ test('shared subscriptions reach local and cloud claims with current membership 
         }
         assert.equal(nativeCalls.length, before, 'refusal reaches no provider worker')
       }
-      await setPolicy(p.ownerId)
+      await setPolicy('foreign-run-principal')
       await assertBlocked('modelRouteDenied')
       await setPolicy(p.userId, true)
       await assertBlocked('modelPolicyRevoked')
       await setPolicy(p.userId)
-      for (const revoke of ['share', 'admin', 'lender-left', 'runner-left'] as const) {
-        if (revoke === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [p.ownerId, p.workspaceId])
-        else if (revoke === 'admin') await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false) ON CONFLICT ("workspaceId") DO UPDATE SET subscriptions=false', [p.workspaceId])
-        else await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [p.workspaceId, revoke === 'lender-left' ? p.ownerId : p.userId])
+      for (const revoke of ['pause', 'disconnect', 'membership'] as const) {
+        if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [p.connectionId])
+        else if (revoke === 'disconnect') await pool.query("UPDATE byos_connections SET state='disconnected' WHERE id=$1", [p.connectionId])
+        else await pool.query("UPDATE mikka_workspace_members SET status='suspended' WHERE \"workspaceId\"=$1 AND \"userId\"=$2", [p.workspaceId, p.userId])
         await assertBlocked()
-        if (revoke === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [p.ownerId, p.workspaceId])
-        else if (revoke === 'admin') await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1', [p.workspaceId])
-        else await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [p.workspaceId, revoke === 'lender-left' ? p.ownerId : p.userId])
+        if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [p.connectionId])
+        else if (revoke === 'disconnect') await pool.query("UPDATE byos_connections SET state='connected' WHERE id=$1", [p.connectionId])
+        else await pool.query("UPDATE mikka_workspace_members SET status='active' WHERE \"workspaceId\"=$1 AND \"userId\"=$2", [p.workspaceId, p.userId])
         await allowed()
       }
       const audit = await pool.query(`SELECT "actorId" AS principal FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='model.admitted'`, [p.workspaceId])
       assert.ok(audit.rows.length > 0)
       assert.ok(audit.rows.every(row => row.principal === p.userId), 'admission audits the executor rather than the credential lender')
     })
-    for (const revoke of ['share', 'admin', 'lender-left', 'runner-left'] as const) await t.test(`${label}: ${revoke} before claim refuses the frozen credential`, async () => {
+    for (const revoke of ['pause', 'disconnect', 'membership'] as const) await t.test(`${label}: ${revoke} before claim refuses the frozen personal credential`, async () => {
       const p = await seed(provider, cloud)
-      if (revoke === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [p.ownerId, p.workspaceId])
-      else if (revoke === 'admin') await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)', [p.workspaceId])
-      else await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [p.workspaceId, revoke === 'lender-left' ? p.ownerId : p.userId])
-      assert.equal(await repository.nativeBinding(p.userId, p.agentId, p.harness, undefined, p.workspaceId), null)
+      if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [p.connectionId])
+      else if (revoke === 'disconnect') await pool.query("UPDATE byos_connections SET state='disconnected' WHERE id=$1", [p.connectionId])
+      else await pool.query("UPDATE mikka_workspace_members SET status='suspended' WHERE \"workspaceId\"=$1 AND \"userId\"=$2", [p.workspaceId, p.userId])
+      if (revoke !== 'membership') assert.equal(await repository.nativeBinding(p.userId, p.agentId, p.harness, undefined, p.workspaceId), null)
       assert.equal((await p.claim()).status, 409)
-      const offered = await order.orderCandidates(pool, p.scope)
-      if (revoke !== 'runner-left') assert.equal(offered.some(item => item.source.kind === 'subscription' && item.source.connectionId === p.connectionId), false)
+      if (revoke !== 'membership') assert.equal((await order.orderCandidates(pool, p.scope)).some(item => item.source.kind === 'subscription' && item.source.connectionId === p.connectionId), false)
+    })
+    await t.test(`${label}: a forged teammate binding fails choice, admission, device claim and broker`, async () => {
+      const p = await seed(provider, cloud)
+      const peerScope = { ownerId: p.peerId, workspaceId: p.workspaceId }
+      assert.equal((await order.orderCandidates(pool, peerScope)).some(item => item.source.kind === 'subscription'), false)
+      await assert.rejects(pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [p.ownerId, p.workspaceId]), { code: '23514' })
+      const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), bindingId = randomUUID(), runId = randomUUID()
+      const botId = await seedBot(pool, p.workspaceId, p.peerId), issueId = await seedIssue(pool, p.peerId, p.workspaceId)
+      const remote = `https://github.com/mikka-ci/denied-${randomUUID()}.git`, token = `synthetic-${randomUUID()}`
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses) VALUES($1,$2,'Peer','local',true,$3,now(),$4)`, [deviceId, p.peerId, DAEMON_PROTOCOL_VERSION, JSON.stringify(harnesses)])
+      await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,$4,'Peer')`, [agentId, p.peerId, deviceId, p.harness])
+      await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,$4,$5)`, [repoId, deviceId, p.peerId, normalizeRepository(remote).key, remote])
+      await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash") VALUES($1,$2,$3)', [randomUUID(), p.peerId, hashDeviceToken(token)])
+      await pool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,$2,$3,$4,$5,1,$6,$7)`, [bindingId, p.ownerId, p.workspaceId, agentId, p.connectionId, p.harness === 'codex' ? 'codex_cli' : 'claude_code_cli', p.model])
+      await assert.rejects(bindAgentToConnection(pool, peerScope, agentId, provider === 'codex' ? 'codex' : 'claude_code', p.connectionId, p.model), { code: 'executionAccountUnavailable' })
+      await assert.rejects(queueRun(p.peerId, { issueId, agentId, repo: remote, model: p.model, subscriptionBindingId: bindingId, readOnly: true }, botId))
+      const definition = { schemaVersion: 1, kind: 'worker', harness: p.harness, model: p.model, cliModelSelection: 'explicit', modelSource: 'subscription', subscription: { bindingId, modelId: p.model, route: p.harness === 'codex' ? 'codex_cli' : 'claude_code_cli' } }
+      await pool.query(`INSERT INTO agent_runs(id,"userId","workspaceId","agentId","deviceId","deviceRepoId","botId","issueId",status,"agentDefinition") VALUES($1,$2,$3,$4,$5,$6,$7,$8,'queued',$9)`, [runId,p.peerId,p.workspaceId,agentId,deviceId,repoId,botId,issueId,definition])
+      const response = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${deviceId}/runs/${runId}/claim`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1' } }), { params: Promise.resolve({ deviceId, runId }) })
+      assert.equal(response.status, 409)
+      await pool.query('INSERT INTO byos_native_runs("runId","bindingId") VALUES($1,$2)', [runId, bindingId])
+      await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [runId])
+      const before = nativeCalls.length
+      await assert.rejects(service.nativeRun(p.peerId, deviceId, runId), { code: 'account_unavailable' })
+      assert.equal(nativeCalls.length, before, 'no borrowed token reaches a worker')
     })
   }
   await t.test('a cloud thread\'s next run keeps the thread\'s own model and subscription; one queued without a model fails', async () => {

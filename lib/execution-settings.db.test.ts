@@ -312,12 +312,9 @@ test(
       await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, false);
       assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies)).modelSelection,'un-shared: her own bot still uses her subscription');
       // Alex 「B」: with 分享给团队成员, other members' bots may use her subscription too.
-      await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, true, true);
+      await assert.rejects(setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, true, true),{code:'subscriptionPersonalOnly'});
       const pooled = await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies);
-      assert.equal(pooled.modelSelection?.ownerId,alice.ownerId,'the subscription is hers');
-      assert.equal((pooled.modelSelection as { runOwnerId?: string } | undefined)?.runOwnerId,'bob','the run is bob\'s');
-      assert.equal(pooled.modelSelection?.consumerId,bobBot,'for bob\'s bot only');
-      assert.equal(pooled.modelSelection?.workspaceId,teamB.workspaceId);
+      assert.equal(pooled.modelSelection,undefined,'a peer never inherits the personal subscription');
       assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'bob\'s Coordinator never uses another member\'s subscription');
       assert.equal((await settings.botModels({ownerId:'bob',workspaceId:teamB.workspaceId})).length,0,'bob is never offered her credential as his own choice');
       await assert.rejects(settings.bindingForOthersBot({ownerId:'bob',workspaceId:teamB.workspaceId},teamBot,alice.ownerId,catalogue.bindingId),{code:'executionModelUnknown'},'only for a bot of the run\'s own owner');

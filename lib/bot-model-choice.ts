@@ -7,7 +7,6 @@ import { HOSTED_CHOICE, type BotModelQuota } from './bot-model-menu-view'
 import { apiKeyChatBaseUrl } from './model-api-key-providers'
 import { botApiKeyChoice, usableApiKeys, type UsableApiKey } from './model-api-keys'
 import { subscriptionAvailability } from './subscription-quota'
-import { isCloudEdition } from './edition'
 
 type Settings = Pick<ExecutionSettings, 'chatModels' | 'chatBinding'> & Partial<Pick<ExecutionSettings, 'pooledBindings' | 'sharedChatBinding'>>
 export interface BotSubscriptionChoice {
@@ -79,31 +78,19 @@ export async function resolveBotModelChoice(
       }
       throw new ActionFailureError('executionModelUnknown')
     }
-    // Community defaults either spend their explicitly bound cloud workspace
-    // or their own provider. Local hosted balances never redirect that choice.
-    if (!isCloudEdition()) return { kind: 'hosted', ...state }
-    const { hostedPointsRefusal, pointsFallback } = await import('./points-fallback')
-    const next = await hostedPointsRefusal(scope.workspaceId) ? await pointsFallback(pool as Pool, scope) : null
-    if (next?.kind === 'api_key') {
-      const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
-      if (key) return { kind: 'apiKey', key, model: next.model, chosen: false, fallback: 'points' }
-    }
-    if (next?.kind === 'subscription') {
-      const binding = await settings.chatBinding(scope, next.bindingId)
-      if (binding) return { kind: 'subscription', binding, chosen: false, fallback: 'points' }
-    }
+    // Exhausted platform credits do not authorize a different model or payer.
+    // Keep the selected source; admission explains the refusal and the menu
+    // offers the person's other connections for an explicit new choice.
     return { kind: 'hosted', ...state }
   }
   if (preference.selected === HOSTED_CHOICE && !preference.key && await hostedAllowed()) return hosted({ chosen: true })
 
   const rows = cached.rows ?? await settings.chatModels(scope)
   const selected = preference.selected && !preference.key ? await settings.chatBinding(scope, preference.selected) : undefined
-  const shared = !selected && botId && preference.selected && !preference.key && settings.sharedChatBinding
-    ? await settings.sharedChatBinding(scope, botId, preference.selected) : undefined
   const binding = selected ?? rows.find(row => row.provider === 'claude') ?? rows[0]
   const state: ChoiceState = {
-    chosen: Boolean(selected || shared),
-    ...(!selected && !shared && (preference.selected || fallback) ? { fallback: 'preference' as const } : {}),
+    chosen: Boolean(selected),
+    ...(!selected && (preference.selected || fallback) ? { fallback: 'preference' as const } : {}),
   }
   const withQuota = async (binding: BotSubscriptionChoice, sharedOwnerId?: string): Promise<BotModelChoice> => {
     const availability = subscriptionAvailability(binding.quota, binding.modelId, binding.provider === 'codex' ? 'codex' : 'claude', now)
@@ -118,7 +105,7 @@ export async function resolveBotModelChoice(
     }
     return { kind: 'subscription', binding, ...state, ...(sharedOwnerId ? { sharedOwnerId } : {}), quota }
   }
-  if (!selected && !shared && (preference.key || preference.selected)) {
+  if (!selected && (preference.key || preference.selected)) {
     const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope)
     if (next?.kind === 'api_key') {
       const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
@@ -129,10 +116,6 @@ export async function resolveBotModelChoice(
       if (nextBinding) return withQuota(nextBinding)
     }
   }
-  if (shared) return withQuota(shared, shared.ownerId)
   if (binding) return withQuota(binding)
-  // The default remains own subscriptions first, then the first shared one.
-  const pooled = botId && settings.pooledBindings ? (cached.pooled ?? await settings.pooledBindings(scope))[0] : undefined
-  if (pooled) return withQuota(pooled, pooled.ownerId)
   return hosted(state)
 }

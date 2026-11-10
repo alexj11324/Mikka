@@ -127,16 +127,12 @@ export async function selectedOrderCandidates(query: Query, scope: OrderScope, e
   }
   if (!organizationModelAllowed(await workspaceModelPolicy(scope.workspaceId), entry.model, 'personal_subscription')) return []
   const { runMayUseCredentialSql } = await import('./personal-policy')
-  // Derive the payor only from the exact source and its current workspace share.
-  // The source owner's active membership is still checked before its catalogue.
+  // Only the exact personal Owner source is eligible; historical workspace
+  // grants cannot authorize a foreign catalogue read.
   const { rows: [source] } = await query.query<{ ownerId: string }>(`SELECT c."ownerId" FROM byos_connections c
     WHERE c.id=$1 AND ${runMayUseCredentialSql('c."ownerId"', '$2', '$3')}`,
   [entry.source.connectionId, scope.ownerId, scope.workspaceId])
-  if (!source) return []
-  if (source.ownerId !== scope.ownerId) {
-    const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
-    try { await authorizeSubscriptionWorkspace(source.ownerId, scope.workspaceId) } catch { return [] }
-  }
+  if (!source || source.ownerId !== scope.ownerId) return []
   const { executionModelOptions } = await import('./execution-model-options')
   return (await executionModelOptions(query, { ...scope, ownerId: source.ownerId }, true,
     { connectionId: entry.source.connectionId, model: entry.model }))
@@ -184,7 +180,7 @@ export { dispatchOrder } from './model-order-plan'
 
 export type RefreshOrderQuota = (scope: OrderScope, connectionId: string, signal: AbortSignal, credentialOwnerId?: string) => Promise<void>
 const quotaRefreshes = new WeakMap<Query, Map<string, Promise<void>>>()
-const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, connectionId, signal, credentialOwnerId = scope.ownerId) => {
+const refreshOrderQuota = (_query: Query): RefreshOrderQuota => async (scope, connectionId, signal, credentialOwnerId = scope.ownerId) => {
   if (credentialOwnerId !== scope.ownerId) throw new ActionFailureError('executionAccountUnavailable')
   const service = (await import('./subscription-runtime')).subscriptionRuntime()
   await service.member(scope.ownerId, scope.workspaceId)

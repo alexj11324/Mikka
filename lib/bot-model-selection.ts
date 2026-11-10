@@ -55,15 +55,12 @@ export async function freezeBotModel(
         } } : {}),
       }),
     };
-  const bindingId = choice.sharedOwnerId && scope.botId
-    ? await settings.bindingForOthersBot(settingsScope, scope.botId, choice.sharedOwnerId, choice.binding.bindingId)
-    : await settings.bindingForBot(settingsScope, scope.botId, choice.binding.bindingId);
+  const bindingId = await settings.bindingForBot(settingsScope, scope.botId, choice.binding.bindingId);
   const frozen = await freezeHostedModelSelection(
     { ...scope, workspaceId },
     { harness: "ai_sdk", model: null },
     { type: "subscription", bindingId },
     dependencies,
-    choice.sharedOwnerId,
   );
   return choice.fallback === "points" && frozen.modelSelection
     ? { ...frozen, modelSelection: { ...frozen.modelSelection, afterPoints: true } }
