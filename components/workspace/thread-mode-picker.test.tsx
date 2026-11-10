@@ -13,10 +13,10 @@ const copy = (namespace: string) => {
 }
 mock.module('next-intl', { namedExports: { useTranslations: copy } })
 
-let Content: typeof import('./thread-mode-picker')['ThreadModePickerContent']
-let BadgeContent: typeof import('./thread-mode-picker')['ThreadModeFrozenBadgeContent']
+let Picker: typeof import('./thread-mode-picker')['ThreadModePickerContent']
+let Notice: typeof import('./thread-mode-picker')['ThreadModeNoticeContent']
 before(async () => {
-  ({ ThreadModePickerContent: Content, ThreadModeFrozenBadgeContent: BadgeContent } = await import('./thread-mode-picker'))
+  ({ ThreadModePickerContent: Picker, ThreadModeNoticeContent: Notice } = await import('./thread-mode-picker'))
 })
 
 function pick(read: ThreadModeRead, active = false): ThreadModePickerView {
@@ -31,46 +31,43 @@ function selectedLabel(html: string) {
   return button.replace(/<[^>]+>/g, '').trim()
 }
 
-test('three options are always shown; the stored mode is the selected segment', () => {
-  const html = renderToStaticMarkup(<Content view={pick({ mode: 'ask', version: 2 })} />)
+test('the header picker shows three options, the stored mode selected, and the run frozen mode as a badge', () => {
+  const html = renderToStaticMarkup(<Picker view={pick({ mode: 'ask', version: 2, frozenMode: 'plan' })} />)
   for (const label of ['计划', '执行', '询问']) assert.ok(html.includes(label), label)
   assert.match(html, /data-slot="thread-mode"/)
   assert.equal(selectedLabel(html), '询问')
   assert.equal(html.match(/aria-pressed=/g)?.length, 3)
-  assert.doesNotMatch(html, /data-locked/)
-  assert.doesNotMatch(html, /线程运行中不可切换/)
-  assert.doesNotMatch(html, /data-thread-mode-frozen/)
+  assert.match(html, /data-thread-mode-frozen/)
+  assert.match(html, /本次运行：计划/)
+  // The picker is the only switch; no notice markup here.
+  assert.doesNotMatch(html, /data-slot="thread-mode-notice"/)
 })
 
-test('a running thread disables every option and says why in plain text', () => {
-  const html = renderToStaticMarkup(<Content view={pick({ mode: 'plan', version: 1, frozenMode: 'plan', locked: true })} />)
+test('a running thread disables every option and names the reason', () => {
+  const html = renderToStaticMarkup(<Picker view={pick({ mode: 'plan', version: 1, frozenMode: 'plan', locked: true })} />)
   assert.match(html, /data-locked/)
-  assert.match(html, /线程运行中不可切换/)
+  assert.match(html, /aria-label="线程运行中不可切换；结束后选择的模式会在下一轮生效。"/)
   assert.ok((html.match(/disabled=""/g)?.length ?? 0) >= 3)
 })
 
-test('the picker never draws the frozen mode; the header badge is the only place it appears', () => {
-  const html = renderToStaticMarkup(<Content view={pick({ mode: 'execute', version: 4, frozenMode: 'ask' }, true)} />)
-  assert.doesNotMatch(html, /data-thread-mode-frozen/)
-  assert.doesNotMatch(html, /本次运行/)
-  const badge = renderToStaticMarkup(<BadgeContent mode="ask" />)
-  assert.match(badge, /data-thread-mode-frozen/)
-  assert.match(badge, /本次运行：询问/)
-  // No read or no frozen mode: nothing is drawn.
-  assert.equal(renderToStaticMarkup(<BadgeContent mode={null} />), '')
-  // The badge adds no switchable control.
-  assert.equal(html.match(/aria-pressed=/g)?.length, 3)
+test('the composer notice says what the stored mode means', () => {
+  assert.match(renderToStaticMarkup(<Notice view={pick({ mode: 'plan', version: 0 })} />), /计划模式：本条线程只读并给出方案/)
+  assert.match(renderToStaticMarkup(<Notice view={pick({ mode: 'ask', version: 0 })} />), /询问模式：读操作照常/)
+  assert.match(renderToStaticMarkup(<Notice view={pick({ mode: 'execute', version: 0 })} />), /执行模式：Agent 可在现有权限内改文件/)
+  assert.match(renderToStaticMarkup(<Notice view={pick({ mode: 'ask', version: 0, locked: true })} />), /线程运行中不可切换/)
+  assert.equal(renderToStaticMarkup(<Notice view={null} />), '')
 })
 
-test('a refused transition is shown as an alert and the selection stays the server value', () => {
-  const html = renderToStaticMarkup(<Content view={pick({ mode: 'execute', version: 5 })} error="threadModeLocked" />)
+test('a refused transition is shown in the notice and the selection stays the server value', () => {
+  const view = pick({ mode: 'execute', version: 5 })
+  const html = renderToStaticMarkup(<Notice view={view} error="threadModeLocked" />)
   assert.match(html, /role="alert"/)
   assert.match(html, /线程正在运行，结束后再切换模式/)
-  assert.equal(selectedLabel(html), '执行')
+  assert.equal(selectedLabel(renderToStaticMarkup(<Picker view={view} />)), '执行')
 })
 
-test('saving disables the group and marks the bar busy', () => {
-  const html = renderToStaticMarkup(<Content view={pick({ mode: 'execute', version: 0 })} pending />)
+test('saving disables the picker and marks it busy', () => {
+  const html = renderToStaticMarkup(<Picker view={pick({ mode: 'execute', version: 0 })} pending />)
   assert.match(html, /aria-busy="true"/)
   assert.ok((html.match(/disabled=""/g)?.length ?? 0) >= 3)
 })

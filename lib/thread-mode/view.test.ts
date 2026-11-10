@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { frozenThreadMode, isThreadModeTransitionError, threadModePicker } from './view'
+import { isThreadModeTransitionError, threadModePicker } from './view'
 
 test('no read yet: no picker rather than a guessed execute', () => {
   assert.equal(threadModePicker(undefined, false), null)
@@ -31,12 +31,11 @@ test('the server lock alone is enough, even when the panel read an earlier attem
   assert.equal(view.locked, true)
 })
 
-test('the header badge names the mode the displayed run froze, whatever the stored choice', () => {
-  assert.equal(frozenThreadMode({ mode: 'execute', version: 3, frozenMode: 'ask' }), 'ask')
-  assert.equal(frozenThreadMode({ mode: 'execute', version: 3, frozenMode: 'execute' }), 'execute')
-  // A response without a frozen mode (or no read yet) draws no badge.
-  assert.equal(frozenThreadMode({ mode: 'plan', version: 1 }), null)
-  assert.equal(frozenThreadMode(undefined), null)
+test('the badge names the mode the displayed run froze, whatever the stored choice', () => {
+  assert.equal(threadModePicker({ mode: 'execute', version: 3, frozenMode: 'ask' }, false)?.frozenMode, 'ask')
+  assert.equal(threadModePicker({ mode: 'execute', version: 3, frozenMode: 'execute' }, false)?.frozenMode, 'execute')
+  // A response without a frozen mode draws no badge.
+  assert.equal(threadModePicker({ mode: 'plan', version: 1 }, false)?.frozenMode, null)
 })
 
 test('transition errors are a closed set', () => {

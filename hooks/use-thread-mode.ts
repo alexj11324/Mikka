@@ -22,14 +22,14 @@ export type ThreadModeTransitionResult = { ok: true } | { error: ThreadModeTrans
  * The thread's stored mode, the run's frozen mode and whether an unfinished
  * run keeps it. A live thread/run push rereads it; there is no timer.
  */
-export function useThreadMode(runId: string, liveRunId: string = runId) {
-  const key = threadModeKey(runId)
-  const serialized = unstable_serialize(key)
+export function useThreadMode(runId: string, liveRunId: string = runId, enabled = true) {
+  const key = enabled ? threadModeKey(runId) : null
+  const serialized = key ? unstable_serialize(key) : null
   const { data, error, mutate } = useSWR(key, () => readThreadModeState(runId), { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
   // A continuation or a new attempt may be the run that ends the lock, so both
   // the displayed run and the thread's live run invalidate this read.
-  useLiveKey('thread', runId, [serialized], null)
-  useLiveKey('thread', liveRunId === runId ? null : liveRunId, [serialized], null)
+  useLiveKey('thread', enabled ? runId : null, serialized ? [serialized] : [], null)
+  useLiveKey('thread', !enabled || liveRunId === runId ? null : liveRunId, serialized ? [serialized] : [], null)
 
   async function transition(mode: ThreadMode): Promise<ThreadModeTransitionResult> {
     if (!data) return { error: 'threadModeUnavailable' }

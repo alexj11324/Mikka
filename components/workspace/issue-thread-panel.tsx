@@ -39,7 +39,10 @@ import { ThreadHeader, ThreadStatusLine } from './thread-header'
 import { useRightColumnWiden } from './right-column-widen'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
-import { ThreadModeFrozenBadge, ThreadModePicker } from './thread-mode-picker'
+import { ThreadModeNoticeContent, ThreadModePickerContent } from './thread-mode-picker'
+import { useThreadMode } from '@/hooks/use-thread-mode'
+import { threadModePicker, type ThreadModeTransitionError } from '@/lib/thread-mode/view'
+import type { ThreadMode } from '@mikka/protocol/thread-mode'
 import { cn } from '@/lib/utils'
 import { ThreadArtifactButton, ThreadArtifactCards } from './artifact-review'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -189,6 +192,19 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const active = !!view && question !== 'resuming' && runIsActive(view.status)
   // Only a run that is generating or running turns send into stop; one waiting for an answer sends (N1).
   const working = active && runIsWorking(view.status)
+  // The thread mode (#1735): the picker sits in the header slot, the notice above the composer.
+  const threadMode = useThreadMode(runId, liveRunId, data?.thread.ownedByCurrentUser === true)
+  const [modePending, setModePending] = useState(false)
+  const [modeError, setModeError] = useState<ThreadModeTransitionError | null>(null)
+  const modeView = threadModePicker(threadMode.state, active)
+  async function changeThreadMode(next: ThreadMode) {
+    if (modePending || !modeView || modeView.locked) return
+    setModePending(true)
+    setModeError(null)
+    const result = await threadMode.transition(next)
+    if ('error' in result) setModeError(result.error)
+    setModePending(false)
+  }
   // Stop was asked for; the run keeps its live status until the daemon ends it.
   const requestedAt = stopAttempt ?? (data?.thread.stopRequestedAt ? new Date(data.thread.stopRequestedAt).getTime() : null)
   const stopRequested = active && (requestedAt !== null || !!view?.stopping)
@@ -394,8 +410,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       running: working || (question === 'resuming' && !data?.thread.questionWake), thread: true }}
     pending={[...changeRequest ? [{ id: 'change-request', name: changeRequest.label, onRemove: changeRequest.onCancel }] : [], ...replyQuote ? [{ id: 'reply-quote', name: replyQuote, onRemove: () => setReplyQuote(null) }] : []]}
     notices={<>
-      {/* The mode is the owner's choice for their own task; a teammate's read is unchanged. */}
-      {data?.thread.ownedByCurrentUser && <ThreadModePicker runId={runId} liveRunId={liveRunId} active={active} />}
+      {/* What the mode means, over the composer; the picker itself is in the header. */}
+      <ThreadModeNoticeContent view={modeView} error={modeError} />
       {data?.thread.quota?.paused && <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />}
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
@@ -408,7 +424,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       widen={widen ?? undefined} liveRunId={liveRunId} status={data?.thread.status ?? ''} acceptanceTaskId={acceptance?.id ?? null}
       place={detail ? <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} /> : null}
       acceptanceBadge={acceptance ? <AcceptanceStateBadge task={acceptance} /> : null}
-      mode={data?.thread.ownedByCurrentUser ? <ThreadModeFrozenBadge runId={runId} liveRunId={liveRunId} /> : null}
+      mode={modeView ? <ThreadModePickerContent view={modeView} pending={modePending} onChange={mode => { void changeThreadMode(mode) }} /> : null}
       identity={data?.thread.ownedByCurrentUser ? <ThreadExecutionIdentity runId={liveRunId} /> : null}
       artifact={!readRejected ? <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} /> : null}
       tabs={acceptance && !hasChanges ? <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
@@ -434,8 +450,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     {/* R-10: an open thread always ends in the composer, finished or not. A message to an ended thread runs it
         again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
-      {/* The thread's Plan / Execute / Ask choice sits directly above the composer (#1735). */}
-      {data?.thread.ownedByCurrentUser && <ThreadModePicker runId={runId} liveRunId={liveRunId} active={active} />}
+      {/* The thread's Plan / Execute / Ask choice is in the header; this says what it means (#1735). */}
+      <ThreadModeNoticeContent view={modeView} error={modeError} />
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
         quote={changeRequest ? <QuoteChip slot="change-request-chip" text={changeRequest.label} icon={<MessageSquareDiff aria-hidden="true" className="size-3.5 shrink-0" />} onRemove={changeRequest.onCancel} />
