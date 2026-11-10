@@ -1,0 +1,47 @@
+{
+  "schema": "issue1512.local-node22-formal-source-binding.v1",
+  "runId": 42748069074,
+  "attempt": 1,
+  "source": {
+    "commit": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "workflowBlob": "d195f389292e1a84967fd9864063ac536b91bbaf",
+    "serviceBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+    "fixtureBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+    "temporaryProductOverlay": false,
+    "temporaryFixtureOverlay": false
+  },
+  "dispatcherReceiptGitBlob": "e6c147230d017dad0577c00e47c97cfa7b666952",
+  "packageBindingGitBlob": "f52b7876fb0ded881a7e111194f1c2925dada406",
+  "macBindings": [
+    {
+      "node": "22.22.1",
+      "jobId": 129605200272,
+      "logGitBlob": "275bcda26c65f311741a4cf7027e3754e85cb401",
+      "resultGitBlob": "d8fa7ef81eab458c2d14cadb99c13d35f70aab19",
+      "actualCheckout": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "checkoutCommandLine": 120,
+      "checkoutResultLine": 121,
+      "downloadedArtifactZipSha256": "8548c14ffc7b10f23f342a21673ef4bf49a9e97620df62a6244ea0d91dd8ba0c",
+      "downloadDigestLine": 446
+    },
+    {
+      "node": "18.20.8",
+      "jobId": 129605200378,
+      "logGitBlob": "0482340002138ea050f99e2f7dd9f97e1a4bdcc0",
+      "resultGitBlob": "298aa283ff4230cc0e1b295bcfcda5a976109f24",
+      "actualCheckout": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "checkoutCommandLine": 149,
+      "checkoutResultLine": 150,
+      "downloadedArtifactZipSha256": "8548c14ffc7b10f23f342a21673ef4bf49a9e97620df62a6244ea0d91dd8ba0c",
+      "downloadDigestLine": 493
+    }
+  ],
+  "artifact": {
+    "id": 13732056950,
+    "name": "daemon-node22",
+    "zipSha256": "8548c14ffc7b10f23f342a21673ef4bf49a9e97620df62a6244ea0d91dd8ba0c",
+    "sourceRunId": 42748069074
+  },
+  "boundary": "Actual checkout command results from package and both Mac job logs bind the same formal commit. Git commit metadata binds its tree. The source files and workflow are immutable Git blobs; package upload, both downloads and artifact metadata share the ZIP digest. Artifact members and tarball were not independently downloaded."
+}

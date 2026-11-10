@@ -1,0 +1,296 @@
+{
+  "schema": "issue1512.local-node22-formal-result.v1",
+  "formal": {
+    "id": 42748069074,
+    "attempt": 1,
+    "event": "workflow_dispatch",
+    "workflowId": 409752684,
+    "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "branch": "fix/1512-daemon-fixture-executable-20261109",
+    "conclusion": "success",
+    "createdAt": "2026-11-10T03:13:58Z",
+    "completedAt": "2026-11-10T03:18:02Z",
+    "jobs": [
+      {
+        "id": 129604856233,
+        "name": "node22-unit",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-10T03:14:01Z",
+        "completedAt": "2026-11-10T03:16:53Z"
+      },
+      {
+        "id": 129604856273,
+        "name": "package",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-10T03:14:02Z",
+        "completedAt": "2026-11-10T03:14:57Z"
+      },
+      {
+        "id": 129605200272,
+        "name": "macos-arm (22.22.1)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-10T03:14:59Z",
+        "completedAt": "2026-11-10T03:17:36Z"
+      },
+      {
+        "id": 129605200378,
+        "name": "macos-arm (18.20.8)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-10T03:15:00Z",
+        "completedAt": "2026-11-10T03:18:01Z"
+      }
+    ]
+  },
+  "sourceBindingGitBlob": "e80b8d378bbbd30396e006790f57f387b7858705",
+  "source": {
+    "workflowBlob": "d195f389292e1a84967fd9864063ac536b91bbaf",
+    "serviceBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+    "fixtureBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+    "temporaryProductOverlay": false,
+    "temporaryFixtureOverlay": false,
+    "packageAndMacCheckoutsAllMatchHead": true
+  },
+  "node22": {
+    "jobId": 129605200272,
+    "resultGitBlob": "d8fa7ef81eab458c2d14cadb99c13d35f70aab19",
+    "result": {
+      "platform": "darwin",
+      "arch": "arm64",
+      "node": "22.22.1",
+      "npmStarted": true,
+      "registrations": 2,
+      "heartbeats": 2,
+      "enrollments": 1,
+      "socketPathBytes": 73,
+      "states": [
+        {
+          "step": "check",
+          "status": "running"
+        },
+        {
+          "step": "check",
+          "status": "running"
+        },
+        {
+          "step": "install",
+          "status": "running"
+        },
+        {
+          "step": "service",
+          "status": "running"
+        },
+        {
+          "step": "connect",
+          "status": "running"
+        },
+        {
+          "step": "connect",
+          "status": "online"
+        },
+        {
+          "step": "service",
+          "status": "running"
+        },
+        {
+          "step": "connect",
+          "status": "running"
+        },
+        {
+          "step": "connect",
+          "status": "online"
+        }
+      ],
+      "result": "installed/launchagent/online/reconnect"
+    },
+    "assertionBoundary": "The original formal fixture's real npm/private package/selected Node/data directory/install-online/reconnect-online/no-re-enrollment assertions passed."
+  },
+  "node18": {
+    "jobId": 129605200378,
+    "resultGitBlob": "298aa283ff4230cc0e1b295bcfcda5a976109f24",
+    "result": {
+      "platform": "darwin",
+      "arch": "arm64",
+      "node": "18.20.8",
+      "npmStarted": false,
+      "registrations": 0,
+      "heartbeats": 0,
+      "enrollments": 0,
+      "socketPathBytes": 73,
+      "states": [
+        {
+          "step": "check",
+          "status": "running"
+        },
+        {
+          "step": "check",
+          "status": "running"
+        },
+        {
+          "step": "check",
+          "status": "failed",
+          "cause": "node_required"
+        }
+      ],
+      "result": "check/node_required"
+    },
+    "assertionBoundary": "The original fixture rejected Node18 at check/node_required before npm, enrollment, registration or heartbeat. Raw log was read once to confirm this actual negative result."
+  },
+  "cleanup": {
+    "source": "Original formal fixture finally block, unchanged blob858b521f583e605340adc7be0685de17de2c60a8",
+    "fixtureProcessExitSuccess": true,
+    "finallySequenceCompleted": "Successful original fixture process includes closing its server, restoring HOME/PATH and removing its private HOME.",
+    "node22BootoutAttemptedByOriginalFinally": true,
+    "node22BootoutExitCode": null,
+    "bootoutFailureSuppressedByOriginalCode": true,
+    "independentCleanupReceipt": false,
+    "processAbsence": "not_independently_probed",
+    "boundary": "Do not substitute diagnostic cleanup receipts from other runners/HOMEs. Success of the formal job does not reveal the swallowed bootout result or independently prove process absence."
+  },
+  "dispatcher": {
+    "runId": 42748046897,
+    "attempt": 1,
+    "jobId": 129604782941,
+    "head": "2415588c436eb1de3f8e38b0fde5db201e354b58",
+    "conclusion": "success",
+    "receiptGitBlob": "e6c147230d017dad0577c00e47c97cfa7b666952",
+    "status": "dispatched_source_verified",
+    "preexistingTargetRuns": 0,
+    "postCalls": 1,
+    "postStatus": 200,
+    "refBefore": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "refAfter": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "returnedFormalRunId": 42748069074
+  },
+  "closure": {
+    "commit": "9ddc5bbffb384ca711861dc798028344f33f1ad0",
+    "parent": "2415588c436eb1de3f8e38b0fde5db201e354b58",
+    "tree": "c8d9cddedee216ed40a5c6aa52d30fdb13075f9e",
+    "normalCompareAndSwap": true,
+    "remoteRefReadback": true,
+    "guard": false,
+    "manifestEnabled": false,
+    "actionsWriteRemoved": true,
+    "runId": 42748159157,
+    "attempt": 1,
+    "conclusion": "skipped",
+    "jobs": [
+      {
+        "id": 129605195943,
+        "name": "dispatch",
+        "conclusion": "skipped",
+        "runnerId": null,
+        "runnerName": null,
+        "steps": []
+      }
+    ]
+  },
+  "artifactsMetadataOnly": [
+    {
+      "id": 13732876002,
+      "name": "macos-node-22.22.1",
+      "bytes": 361,
+      "digest": "sha256:76dee100c7d113d160897c63b8cabaddaaa3dd9998745ca9cc9161ca60c8c5c8",
+      "createdAt": "2026-11-10T03:17:31Z",
+      "expiresAt": "2027-02-08T03:13:59Z",
+      "expired": false,
+      "runId": 42748069074,
+      "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "downloaded": false
+    },
+    {
+      "id": 13732056950,
+      "name": "daemon-node22",
+      "bytes": 964665,
+      "digest": "sha256:8548c14ffc7b10f23f342a21673ef4bf49a9e97620df62a6244ea0d91dd8ba0c",
+      "createdAt": "2026-11-10T03:14:54Z",
+      "expiresAt": "2027-02-08T03:13:59Z",
+      "expired": false,
+      "runId": 42748069074,
+      "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "downloaded": false
+    },
+    {
+      "id": 13731598224,
+      "name": "macos-node-18.20.8",
+      "bytes": 342,
+      "digest": "sha256:d865e2c293f2f871be0c28609e9cd8e276cf3b1d909ad09a3b793212e848bbb9",
+      "createdAt": "2026-11-10T03:17:58Z",
+      "expiresAt": "2027-02-08T03:13:59Z",
+      "expired": false,
+      "runId": 42748069074,
+      "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "downloaded": false
+    },
+    {
+      "id": 13732122092,
+      "name": "issue1512-local-node22-dispatch",
+      "bytes": 1562,
+      "digest": "sha256:b35181ce892ed368fc420c3b0a6dbc1ccf144cba356355b373548ca8abcb13e4",
+      "createdAt": "2026-11-10T03:14:00Z",
+      "expiresAt": "2026-11-17T03:13:59Z",
+      "expired": false,
+      "runId": 42748046897,
+      "head": "2415588c436eb1de3f8e38b0fde5db201e354b58",
+      "downloaded": false
+    }
+  ],
+  "downloads": {
+    "scope": "This formal run plus its one dispatcher; earlier diagnostic reads are accounted in their separate archives.",
+    "reader": "/root/mac_inprocess_diag",
+    "controllerJobLog": 1,
+    "packageJobLog": 1,
+    "node22MacJobLog": 1,
+    "node18MacJobLog": 1,
+    "node22UnitJobLog": 0,
+    "artifactZips": 0,
+    "historicalActionsLogs": 0
+  },
+  "activity": {
+    "controllerExecutions": 1,
+    "dispatchPosts": 1,
+    "formalWorkflowRuns": 1,
+    "formalWorkflowReruns": 0,
+    "temporaryVMsCreated": 0,
+    "ownedActiveVMs": 0,
+    "formalBranchChangesByThisAgent": 0,
+    "ownedControllerAndFormalJobsAllTerminal": true
+  },
+  "history": {
+    "formal5852Failure": {
+      "runId": 42731843507,
+      "attempt": 1,
+      "logGitBlob": "989174f5612eaffa364b517728571cefb88d9763",
+      "cause": "unknown",
+      "observed": "Initial install online, reconnect bootstrap5 failure; original bootout result and command times were not recorded."
+    },
+    "wrapperDiagnostic": {
+      "runId": 42739939984,
+      "attempt": 1,
+      "conclusion": "success",
+      "productFixEstablished": false,
+      "archiveCommit": "6c71125de288846e0a86948de4af671ed3fcce72"
+    },
+    "inprocessDiagnostic": {
+      "runId": 42745131850,
+      "attempt": 1,
+      "conclusion": "success",
+      "productFixEstablished": false,
+      "archiveCommit": "2064a57803381338c159fef82a447f47615d4286",
+      "indexGitBlob": "8ca8cf57e49833c21068376ef639cd05a71d6585",
+      "timingComparisonGitBlob": "be24f370ce454801be05cb232ebad591dc11b733"
+    }
+  },
+  "findings": [
+    "This is independent formal acceptance for materially changed head5f359802, using the unmodified original service and fixture; it is not another run of failed head5852 or of either diagnostic overlay.",
+    "All four existing workflow jobs passed on attempt1. The two Mac results are actual stdout payloads, not conclusions inferred only from matrix names.",
+    "No cause or product fix for historical5852 bootstrap5 is established. That failed run and both diagnostic successes remain preserved.",
+    "Package upload, both Mac downloads and artifact metadata agree on ZIP SHA2568548c14ffc7b10f23f342a21673ef4bf49a9e97620df62a6244ea0d91dd8ba0c.",
+    "The formal result may support later source association only after verifying the relevant product, fixture and workflow bytes; it is not production tracing acceptance."
+  ],
+  "productionAcceptance": false
+}

@@ -1,0 +1,37 @@
+name: Issue 1512 dispatch fixed formal Node22
+on:
+  push:
+    branches: ['ops/1512-local-node22-dispatch-20261110']
+    paths:
+      - '.github/issue1512-local-node22-dispatch.json'
+      - '.github/workflows/issue1512-local-node22-dispatch.yml'
+permissions: {}
+concurrency:
+  group: issue1512-local-node22-dispatch-20261110
+  cancel-in-progress: false
+jobs:
+  dispatch:
+    if: >-
+      ${{ false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Dispatch one fixed existing Node22 workflow
+        env:
+          MIKKA_DISPATCH_TOKEN: ${{ github.token }}
+        run: |
+          node --check scripts/ops/issue1512-local-node22-dispatch.mjs
+          node scripts/ops/issue1512-local-node22-dispatch.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: issue1512-local-node22-dispatch
+          path: artifacts/issue1512-local-node22-dispatch/receipt.safe.json
+          if-no-files-found: error
+          retention-days: 7

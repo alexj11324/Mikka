@@ -1,0 +1,45 @@
+{
+  "schema": "issue1512.local-node22-formal-package-source.v1",
+  "runId": 42748069074,
+  "attempt": 1,
+  "jobId": 129604856273,
+  "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+  "workflowGitBlob": "d195f389292e1a84967fd9864063ac536b91bbaf",
+  "originalLogGitBlob": "6de36f9677d28f57d55c1960d34be3fc57d26f4a",
+  "checkoutWitness": {
+    "commandLine": 107,
+    "resultLine": 108,
+    "sha": "5f3598029033b83ee72c88ea6c49955205eecab2"
+  },
+  "buildStep": {
+    "name": "Build the tested daemon package",
+    "status": "completed",
+    "conclusion": "success",
+    "number": 6,
+    "started_at": "2026-11-10T03:14:51Z",
+    "completed_at": "2026-11-10T03:14:52Z"
+  },
+  "package": {
+    "name": "@aspectlylabs/mikka",
+    "version": "0.0.1",
+    "filename": "aspectlylabs-mikka-0.0.1.tgz",
+    "npmNoticeSha1": "9c603b4eb5852ed29b5b3929353c6fede2b2af00",
+    "npmNoticeSha1Line": 428,
+    "packageSizeDisplay": "964.2 kB",
+    "unpackedSizeDisplay": "3.7 MB",
+    "files": 43,
+    "tarballSha256": null
+  },
+  "uploadedArtifact": {
+    "name": "daemon-node22",
+    "zipSha256": "8548c14ffc7b10f23f342a21673ef4bf49a9e97620df62a6244ea0d91dd8ba0c",
+    "zipSha256Line": 453
+  },
+  "sourceBoundary": "The existing formal workflow checked out the exact head and ran its original daemon build/npm-pack commands, with no temporary product or fixture overlay. The Mac jobs download this same-run artifact by fixed name.",
+  "limitations": [
+    "Npm package-size display is rounded and is not asserted as an exact byte count.",
+    "The npm sha512 integrity display was truncated, so it is not used as a full integrity value.",
+    "The artifact ZIP and actual tarball were not downloaded independently; ZIP SHA256 is the upload action's logged digest, and package SHA1 is npm's logged shasum."
+  ]
+}

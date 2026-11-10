@@ -1,0 +1,22 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "content": "{\"ref\":\"refs/heads/ops/1512-local-node22-dispatch-20261110\",\"node_id\":\"REF_kwDOVRYxA9oAMnJlZnMvaGVhZHMvb3BzLzE1MTItbG9jYWwtbm9kZTIyLWRpc3BhdGNoLTIwMjYxMTEw\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1512-local-node22-dispatch-20261110\",\"object\":{\"sha\":\"9ddc5bbffb384ca711861dc798028344f33f1ad0\",\"type\":\"commit\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/9ddc5bbffb384ca711861dc798028344f33f1ad0\"}}",
+    "title": "1512-local-node22-dispatch-20261110",
+    "modified_date": null,
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/ops/1512-local-node22-dispatch-20261110",
+    "display_url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/ops/1512-local-node22-dispatch-20261110",
+    "display_title": "1512-local-node22-dispatch-20261110",
+    "structuredContent": {
+      "title": "1512-local-node22-dispatch-20261110",
+      "content": "{\"ref\":\"refs/heads/ops/1512-local-node22-dispatch-20261110\",\"node_id\":\"REF_kwDOVRYxA9oAMnJlZnMvaGVhZHMvb3BzLzE1MTItbG9jYWwtbm9kZTIyLWRpc3BhdGNoLTIwMjYxMTEw\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1512-local-node22-dispatch-20261110\",\"object\":{\"sha\":\"9ddc5bbffb384ca711861dc798028344f33f1ad0\",\"type\":\"commit\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/9ddc5bbffb384ca711861dc798028344f33f1ad0\"}}",
+      "display_url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/ops/1512-local-node22-dispatch-20261110"
+    }
+  },
+  "isError": false
+}

@@ -1,0 +1,224 @@
+{
+  "schema": "issue1512.local-node22-dispatch-preparation.v1",
+  "createdAt": "2026-11-10 03:10:31 UTC",
+  "repository": "alexj11324/Mikka",
+  "candidateCommit": "2415588c436eb1de3f8e38b0fde5db201e354b58",
+  "candidateTree": "d8592fbc497a1127a39143a7ee3b944ae437eb79",
+  "parent": "2064a57803381338c159fef82a447f47615d4286",
+  "intendedBranch": "ops/1512-local-node22-dispatch-20261110",
+  "referenced": false,
+  "target": {
+    "commit": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "workflowBlob": "d195f389292e1a84967fd9864063ac536b91bbaf",
+    "fixtureBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+    "serviceBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355"
+  },
+  "formalRefObserved": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "files": [
+    {
+      "path": "scripts/ops/issue1512-local-node22-dispatch.mjs",
+      "gitBlob": "f0771b6511579496f16afbee501d5e4fe29e3abe",
+      "bytes": 10877,
+      "sha256": "ce9abfd18d15d56591d1776590551065bd383797efcf9d01b681f59519ab15fb"
+    },
+    {
+      "path": ".github/workflows/issue1512-local-node22-dispatch.yml",
+      "gitBlob": "a559026235f1d2a3677fc1b34d62d1cdeb87b21e",
+      "bytes": 1380,
+      "sha256": "eed29df87f55074a16d8c13a5af43d2918370bfaf8874cd9675e8ef6787ead3e"
+    },
+    {
+      "path": ".github/issue1512-local-node22-dispatch.json",
+      "gitBlob": "74458f72fb4b784478e661a8899577a3153c48a5",
+      "bytes": 2261,
+      "sha256": "0be69bebed4e788f4ec18fbcc5bdbcd4606426447e351232fe8ca5376caa4c61"
+    }
+  ],
+  "scope": {
+    "filesChanged": [
+      {
+        "path": ".github/issue1512-local-node22-dispatch.json",
+        "status": "added",
+        "additions": 39,
+        "deletions": 0
+      },
+      {
+        "path": ".github/workflows/issue1512-local-node22-dispatch.yml",
+        "status": "added",
+        "additions": 38,
+        "deletions": 0
+      },
+      {
+        "path": "scripts/ops/issue1512-local-node22-dispatch.mjs",
+        "status": "added",
+        "additions": 183,
+        "deletions": 0
+      }
+    ],
+    "productSourceChanged": false,
+    "formalRefChanged": false,
+    "actionsWritePurpose": "One dispatch POST to existing workflow409752684 in the same repository. Job-scoped short-lived GITHUB_TOKEN only; no token logging or storage.",
+    "defaultPermissions": {},
+    "jobPermissions": {
+      "contents": "read",
+      "actions": "write"
+    }
+  },
+  "guards": {
+    "runAttempt": 1,
+    "pushBranch": "ops/1512-local-node22-dispatch-20261110",
+    "messagePrefix": "ci: dispatch fixed issue1512 local Node22 20261110-formal-a1",
+    "manifestEnabled": true,
+    "targetCommitAndTreeFixed": true,
+    "targetServiceOriginalBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+    "targetFixtureOriginalBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+    "existingTargetRunsMustBeZero": true,
+    "refBeforeAndAfterMustMatch": true,
+    "redirectsForbidden": true,
+    "postCountMaximum": 1,
+    "retries": 0,
+    "eachRequestTimeoutMs": 15000,
+    "eachBodyMaximumBytes": 131072,
+    "postAcceptedMetadataReadsMaximum": 1
+  },
+  "responseHandling": {
+    "http200": "Validate exact run id plus official repository run URLs; read that run once and verify workflow/head/branch/event/attempt.",
+    "http204": "Accepted, not failure. Read target workflow's dispatch run list once. A unique matching run is bound; empty indexing is dispatch_accepted_run_pending with exit0 and no additional POST.",
+    "errors": "POST HTTP rejection, timeout/unknown outcome, ref movement or mismatched run are closed receipts requiring inspection. No automatic retry.",
+    "publication": "No candidate ref has been created or moved; Root reviews before publication.",
+    "closure": "Normal closing commit disables job guard and manifest, removes actions write; verify skipped closure run. Formal target remains untouched."
+  },
+  "validation": {
+    "yaml": {
+      "parser": "js-yaml4.1.0 in V8",
+      "source": "https://github.com/nodeca/js-yaml/blob/4.1.0/dist/js-yaml.js",
+      "passed": true
+    },
+    "model": {
+      "runtime": "V8 model with explicit Node fs/crypto/Buffer/fetch/process shims; not actual Node, GitHub network or Actions execution.",
+      "checks": [
+        {
+          "name": "200 bound run",
+          "passed": true,
+          "posts": 1,
+          "status": "dispatched_source_verified",
+          "accepted": true,
+          "errorCode": null,
+          "metadataReads": 8,
+          "exitCode": 0
+        },
+        {
+          "name": "204 discovered run",
+          "passed": true,
+          "posts": 1,
+          "status": "dispatched_source_verified",
+          "accepted": true,
+          "errorCode": null,
+          "metadataReads": 8,
+          "exitCode": 0
+        },
+        {
+          "name": "204 indexing pending",
+          "passed": true,
+          "posts": 1,
+          "status": "dispatch_accepted_run_pending",
+          "accepted": true,
+          "errorCode": null,
+          "metadataReads": 8,
+          "exitCode": 0
+        },
+        {
+          "name": "entry disabled",
+          "passed": true,
+          "posts": 0,
+          "status": "not_dispatched",
+          "accepted": false,
+          "errorCode": "ENTRY_DISABLED",
+          "metadataReads": 0,
+          "exitCode": 1
+        },
+        {
+          "name": "target absent",
+          "passed": true,
+          "posts": 0,
+          "status": "not_dispatched",
+          "accepted": false,
+          "errorCode": "TARGET_NOT_FIXED",
+          "metadataReads": 0,
+          "exitCode": 1
+        },
+        {
+          "name": "preexisting run",
+          "passed": true,
+          "posts": 0,
+          "status": "not_dispatched",
+          "accepted": false,
+          "errorCode": "TARGET_ALREADY_HAS_RUN",
+          "metadataReads": 1,
+          "exitCode": 1
+        },
+        {
+          "name": "ref changed before",
+          "passed": true,
+          "posts": 0,
+          "status": "not_dispatched",
+          "accepted": false,
+          "errorCode": "REF_BEFORE_MISMATCH",
+          "metadataReads": 6,
+          "exitCode": 1
+        },
+        {
+          "name": "ref changed after",
+          "passed": true,
+          "posts": 1,
+          "status": "dispatch_requires_inspection",
+          "accepted": true,
+          "errorCode": "REF_AFTER_MISMATCH",
+          "metadataReads": 7,
+          "exitCode": 1
+        },
+        {
+          "name": "403 single POST",
+          "passed": true,
+          "posts": 1,
+          "status": "dispatch_requires_inspection",
+          "accepted": false,
+          "errorCode": "DISPATCH_HTTP_NON_SUCCESS",
+          "metadataReads": 7,
+          "exitCode": 1
+        },
+        {
+          "name": "uncertain POST timeout",
+          "passed": true,
+          "posts": 1,
+          "status": "dispatch_requires_inspection",
+          "accepted": false,
+          "errorCode": "POST_OUTCOME_UNKNOWN",
+          "metadataReads": 7,
+          "exitCode": 1
+        },
+        {
+          "name": "wrong response run",
+          "passed": true,
+          "posts": 1,
+          "status": "dispatch_requires_inspection",
+          "accepted": true,
+          "errorCode": "DISPATCHED_RUN_BINDING_MISMATCH",
+          "metadataReads": 8,
+          "exitCode": 1
+        }
+      ]
+    },
+    "remoteReadback": "All three blobs exactly matched local text, UTF8 byte counts, SHA256 and Git blob SHA1. Remote commit parent/tree and compare show exactly three added paths.",
+    "actualNodeExecution": false,
+    "actualGitHubDispatch": false,
+    "actualRunnerCreated": false
+  },
+  "officialDocs": {
+    "workflowDispatchAllowedFromGithubToken": "https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow",
+    "dispatchApiAndActionsWrite": "https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event",
+    "apiVersion": "2026-03-10"
+  },
+  "limitation": "Before/after ref checks and returned run binding detect movement; they do not make branch dispatch atomic. The operational owner keeps the formal branch stable and verifies actual target source. This is a dispatch controller, not test acceptance."
+}
