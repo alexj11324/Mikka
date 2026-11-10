@@ -74,19 +74,21 @@ source wins in a conflict is in [`README.md`](README.md).
   the user taps is their message but keeps its card shape, no blue bubble; the
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
-- **R-15** A task mentioned in chat is an inline chip. Internal object chips
+- **R-15** A task mentioned in chat is an inline chip: its state icon (R-52)
+  and its code, such as 「◐ ALEX-45」, with the title, state and priority in
+  the hover card; a task with no code shows its title. Internal object chips
   use the faint accent fill (`--object-chip`), rounded corners and accent
-  text at the surrounding text's size and line height. A long title wraps,
-  keeping its fill on each line. A task uses its state icon (R-52), and its
-  number is in the hover card. Every mention uses the same chip, with cards
-  deduplicated under R-66. A dispatch's card represents its task and opens
-  that task. A run reference associated with a task leads through that task
-  to its one conversation (R-82). Web sources keep the unboxed source chip.
+  text at the surrounding text's size and line height. A thread mentioned in
+  chat is its title in the link colour, with no icon, fill, accent or state
+  badge; the title never repeats the task's code. Every mention uses the same
+  chip, with cards deduplicated under R-66. A dispatch's card represents its
+  task and opens that task. Web sources keep the unboxed source chip.
   An Artifact waiting for acceptance is a bordered card under the reply
   (icon, name, state such as 待你确认), opening the Artifact window (R-56).
   Task-only cards and state icons supersede the former thread-bubble/dot
   presentation ([2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md),
-  [2230](decisions/2026-11-07-2230-one-icon-per-task-state.md)).
+  [2230](decisions/2026-11-07-2230-one-icon-per-task-state.md),
+  [0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)).
 - **R-16** The computer card in chat shows a title, a status, one sentence
   about the task and a big screen. It has no approval step: the bot operates
   until the person takes control (decisions 2026-10-30). It never shows an
@@ -368,8 +370,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     teams. A task opened from 看板 or a link is a centre page. Its origin
     crumb and close action return to the source, defaulting to 看板; ↑↓
     appear when it was opened from a list.
-  - A chat task card or right-panel task row opens task detail in the right
-    column (`?task=`), preserving the chat. A row in 活动 (one per Agent
+  - A chat task card, task chip or right-panel task row opens the task view
+    as a tab in the chat's right work area, preserving the chat; its expand
+    button opens the same task as a page. A thread, Agent stretch or subagent
+    opened from a chat opens its own work-area tab, reused when already open
+    ([0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)). A row in 活动 (one per Agent
     stretch, R-62) opens that task's one conversation, with ← back to the
     task. The conversation joins runs oldest first, opens a selected stretch
     at its first run and otherwise starts at the newest message. Its header
@@ -462,14 +467,19 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   asked about. Creating, sending, appending and adding never ask. An
   unavailable or refused judgment shows a card, never a silent write.
   Source: Alex, 2026-10-31.
-- **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…),
-  so wherever a thread or run is drawn with an icon, the icon is that
-  Agent's mark (`HarnessMark`, R-74); a thread whose Agent is unknown takes
-  the neutral thread mark. A bot never does coding work: it appears only
-  where it dispatched or owns the work (「<Bot> 派出线程」, the 概览 header),
-  never as a thread's or run's icon, and neither does the Coordinator's
-  avatar. Status icons stay where a list shows status (R-62, R-66).
-  Source: Alex, 2026-11-01 (decision `2026-11-01-0110-agent-mark-on-threads`).
+- **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…)
+  in an Agent 配置. Where an Agent stretch is drawn with a mark (the line where
+  the Agent changes, a plan step, the execution identity), the main mark is
+  its Agent 配置's mark and the Agent's own mark (`HarnessMark`, R-74) sits
+  beside it, smaller, or in the details; a stretch with no Agent 配置 takes
+  the Agent's mark, and one whose Agent is unknown the neutral thread mark.
+  A thread mentioned in text has no mark (R-15). A bot never does coding
+  work: it appears only where it dispatched or owns the work (「<Bot> 派出线程」,
+  the 概览 header), never as a thread's or run's icon, and neither does the
+  Coordinator's avatar. Status icons stay where a list shows status (R-62,
+  R-66). Source: Alex, 2026-11-01 (decision
+  `2026-11-01-0110-agent-mark-on-threads`), revised 2026-11-10
+  ([0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)).
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
