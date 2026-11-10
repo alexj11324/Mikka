@@ -482,14 +482,17 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   they change only with Alex's decision. Source: Alex, 2026-10-31.
 - **R-77** An app write has the permission its connection grants, and only
   a destructive call asks. If the Gmail, Calendar, Notion or Slack
-  connection allows the write, the agent writes without a card. The workspace's
-  allow/ask/deny wins first; there is no per-Bot or per-person layer. Otherwise
-  the Decisions API answers one predicate, `destructive`: does this exact call
+  connection allows the write and the call is not destructive, the agent
+  writes without a card. The workspace's allow/ask/deny wins first for
+  `call_app_tool`; there is no per-Bot or per-person layer. Otherwise the
+  Decisions API answers one predicate, `destructive`: does this exact call
   delete, overwrite or remove existing data? The tool's MCP annotations
-  (`destructiveHint`, `readOnlyHint`) are input; a `readOnlyHint` tool is not
-  asked about. Creating, sending, appending and adding never ask. An
-  unavailable or refused judgment shows a card, never a silent write.
-  Source: Alex, 2026-10-31.
+  (`destructiveHint`, `readOnlyHint`) are evidence; none of them skips the
+  call. Creating, sending, appending and adding never ask. An unavailable,
+  refused or malformed judgment shows no card: the call goes ahead and the log
+  records `Write judgment fallback`. The hand-written Gmail, Calendar, Notion,
+  Slack and Drive tools are unchanged; the Coordinator's Gmail/Calendar writes
+  use the same judge in `writeAccountAction`. Source: Alex, 2026-10-31.
 - **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…)
   in an Agent 配置. Where an Agent stretch is drawn with a mark (the line where
   the Agent changes, a plan step, the execution identity), the main mark is

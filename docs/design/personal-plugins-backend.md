@@ -135,7 +135,7 @@ Bots and the Coordinator reach a connected store app through two generic tools
 (`lib/app-tools.ts`), not hand-written actions: `list_app_tools` lists the
 toolkit's Composio tools (with `readOnly` from `readOnlyHint`), and
 `call_app_tool` runs one, pinned to its version, in the person's own account.
-Reads run at once. A write follows R-77: the workspace's `external_write_permissions` setting for the tool, its app key or the legacy write action wins; an explicit allow runs without a model call, and ask or deny narrows. Otherwise the shared write judge (`lib/operations/write-judgment.ts`: the Decisions API, given the tool's MCP hints and the concrete arguments) decides whether the call destroys existing data; a destructive call becomes an approval card, and so does an unavailable or refused judgment. There is no per-person or per-Bot setting. The hand-written Gmail, Calendar, Notion, Slack and Drive tools are unchanged.
+Reads run at once. A write follows R-77: the workspace's `external_write_permissions` setting for the tool, its app key or the legacy write action wins; an explicit allow runs without a model call, and ask or deny narrows. Otherwise the shared write judge (`lib/operations/write-judgment.ts`: the Decisions API, given the tool's MCP hints and the concrete arguments) decides whether the call destroys existing data; a destructive call becomes an approval card. There is no per-person or per-Bot setting. The hand-written Gmail, Calendar, Notion, Slack and Drive tools are unchanged.
 
 ## Validation
 
