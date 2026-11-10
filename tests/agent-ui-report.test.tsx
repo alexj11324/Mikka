@@ -187,7 +187,7 @@ test('In a chat, BeCitations leaves its links to the reply\'s one sources toggle
   assert.doesNotMatch(html, /OpenUI docs/)
 })
 
-test('A task or run chip is boxed with no underline and only its title; a source chip keeps its unboxed underline (R-15)', () => {
+test('A task chip is boxed with its state icon and code; a thread is its title in the link colour; a source chip keeps its unboxed underline (R-15)', () => {
   const task = '00000000-0000-4000-8000-000000000043'
   const run = '00000000-0000-4000-8000-0000000000a1'
   const sources = {
@@ -202,24 +202,24 @@ test('A task or run chip is boxed with no underline and only its title; a source
   const chips = starts.map((start, index) => html.slice(start, starts[index + 1] ?? html.length))
   assert.equal(chips.length, 3)
   const [taskChip, runChip, sourceChip] = chips
-  for (const chip of [taskChip, runChip]) {
-    assert.match(chip, /^<span[^>]*role="button"[^>]*tabindex="0"/, 'an object chip is an inline span that acts as a button')
-    const className = chip.match(/class="([^"]*)"/)?.[1] ?? ''
-    assert.match(chip, /data-variant="object"/)
-    assert.ok(className.split(' ').includes('bg-object-chip'), 'object chip has a fill')
-    assert.ok(className.split(' ').includes('rounded-md'), 'object chip is rounded')
-    assert.ok(className.split(' ').includes('no-underline'), 'object chip title is not underlined')
-    assert.ok(!className.split(' ').includes('underline'), 'object chip has no underline')
-    assert.ok(className.split(' ').includes('inline') && className.split(' ').includes('box-decoration-clone'), 'object chip wraps like a word, each line keeping its fill (R-15)')
-    assert.ok(!className.split(' ').some(name => /^h-\d/.test(name)), 'object chip takes the text\'s own height')
-    assert.ok(className.split(' ').includes('text-object-chip-foreground'), 'object chip title is in the accent')
-  }
+  for (const chip of [taskChip, runChip]) assert.match(chip, /^<span[^>]*role="button"[^>]*tabindex="0"/, 'a task or thread reference is an inline span that acts as a button')
+  const classes = (chip: string) => (chip.match(/class="([^"]*)"/)?.[1] ?? '').split(' ')
+  const taskClass = classes(taskChip)
+  assert.match(taskChip, /data-variant="object"/)
+  assert.ok(taskClass.includes('bg-object-chip'), 'task chip has a fill')
+  assert.ok(taskClass.includes('rounded-md'), 'task chip is rounded')
+  assert.ok(taskClass.includes('no-underline') && !taskClass.includes('underline'), 'task chip is not underlined')
+  assert.ok(taskClass.includes('text-object-chip-foreground'), 'task chip is in the accent')
+  assert.ok(!taskClass.some(name => /^h-\d/.test(name)), 'task chip takes the text\'s own height')
+  const runClass = classes(runChip)
+  assert.ok(runClass.includes('text-primary') && runClass.includes('bg-transparent'), 'a thread is in the link colour with no fill')
+  assert.doesNotMatch(runChip, /<svg/, 'a thread has no icon')
   const text = (chip: string) => chip.replace(/<[^>]+>/g, '')
-  assert.match(text(taskChip), /^Move the chat to OpenUI/)
-  assert.doesNotMatch(taskChip, /MIK-43/)
-  // A thread chip carries the thread's own name, the same as its row and header: task identifier and title (D9).
-  assert.match(text(runChip), /^MIK-43 Move the chat to OpenUI/)
-  assert.match(taskChip, /data-slot="chip-head"[^>]*><span data-slot="chip-icon"[^>]*><svg[^>]*>.*?<\/svg><\/span>M<\/span>/, 'the icon and the first character never part across lines')
+  assert.match(text(taskChip), /^MIK-43/)
+  assert.match(taskChip, /<svg/, 'a task chip has its state icon')
+  // A thread is the task's title without its code, so the code never repeats beside the task chip.
+  assert.match(text(runChip), /^Move the chat to OpenUI/)
+  assert.doesNotMatch(text(runChip), /MIK-43/)
   const sourceClass = sourceChip.match(/class="([^"]*)"/)?.[1] ?? ''
   assert.match(sourceChip, /data-variant="source"/)
   assert.ok(sourceClass.split(' ').includes('underline'), 'source chip keeps its underline')

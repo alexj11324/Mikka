@@ -53,7 +53,7 @@ export function FailureReason({ failure, botId, onResend, sending = false, retry
       : recovery === 'model' || (failure.kind === 'hosted' && failure.code === 'platform_paused') || (failure.kind === 'failed' && failure.reason === 'balance')
       ? <Button variant="link" size="xs" className={ACTION} onClick={() => openModelPicker(botId)}>{picker('changeModel')}</Button>
       : resend
-  return <div className={cn('flex flex-col gap-0.5', retry ? 'items-start' : 'items-end')}>
+  return <div data-failure-reason="" className={cn('flex flex-col gap-0.5', retry ? 'items-start' : 'items-end')}>
     <p data-message-failure="past" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
       <CircleAlert aria-hidden="true" className="size-3.5 shrink-0" />{reason}<span aria-hidden="true">·</span>{action}
     </p>
