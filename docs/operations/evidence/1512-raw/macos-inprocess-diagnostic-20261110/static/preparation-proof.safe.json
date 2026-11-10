@@ -1,0 +1,158 @@
+{
+  "schema": "issue1512.macos-inprocess-diagnostic-preparation.v1",
+  "createdAt": "2026-11-10 02:37:17 UTC",
+  "repository": "alexj11324/Mikka",
+  "candidateCommit": "299fbddd8c8f252959088a8cafabde962636b945",
+  "candidateTree": "ddf13157a753a7b91e85f0278ee03e11b84e012f",
+  "parent": "6c71125de288846e0a86948de4af671ed3fcce72",
+  "intendedBranch": "ops/1512-macos-restart-20261110",
+  "source": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "beforeService": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+  "beforeFixture": "858b521f583e605340adc7be0685de17de2c60a8",
+  "files": [
+    {
+      "key": "service",
+      "path": "packages/daemon/src/service.ts",
+      "sha": "a650a67ab4fc24d4014d0513b11b2e5f8bc6c639",
+      "bytes": 9415,
+      "sha256": "dcf6d9b0ea4e4fc06086b76a45f318606d4447ec2010a980d048a58dc91c4ccb",
+      "exactReadback": true
+    },
+    {
+      "key": "fixture",
+      "path": "scripts/acceptance/local-installer-macos.ts",
+      "sha": "af24a8b53480a9a394658d87e6da6a47480dc5ec",
+      "bytes": 11604,
+      "sha256": "0798cce4a2f464b53d03e5b3cc90dc5816db38d28b042951035fc475e5b4d297",
+      "exactReadback": true
+    },
+    {
+      "key": "helper",
+      "path": "scripts/acceptance/local-installer-inprocess-diagnostic.mjs",
+      "sha": "df7774974e60776ec196b3c76aa558f1a5aff493",
+      "bytes": 5293,
+      "sha256": "f5af6ff0684d4f0b8a4a23ed59947d0694c463494a5d73dde4277347a9d85c0e",
+      "exactReadback": true
+    },
+    {
+      "key": "controller",
+      "path": "scripts/ops/issue1512-macos-restart-controller.mjs",
+      "sha": "adb484a5e5606149570afccca5c3bba55eaea600",
+      "bytes": 13032,
+      "sha256": "039e7d33af1424b5675abee35ba584b4f7b93fffb03884f48ae03e9bf0ab84d6",
+      "exactReadback": true
+    },
+    {
+      "key": "workflow",
+      "path": ".github/workflows/issue1512-mac-restart.yml",
+      "sha": "1d42e9f078262cb2eb8297dce30e2671a78e9edd",
+      "bytes": 5285,
+      "sha256": "f15c7964e422be90386316a094f62881b6613651d6097f4a7104c471039a6cc2",
+      "exactReadback": true
+    },
+    {
+      "key": "manifest",
+      "path": ".github/issue1512-mac-restart.json",
+      "sha": "f1dc34377e0aa051bb2b3644abbc84a5ce7412d8",
+      "bytes": 3658,
+      "sha256": "254d3014080bb6895e3ffc8a808497027357362ee1f2d3801b8465199b84a5b0",
+      "exactReadback": true
+    }
+  ],
+  "scope": {
+    "candidateOnly": true,
+    "refWrites": 0,
+    "workflowsStarted": 0,
+    "macFixtureRuns": 0,
+    "actionsOriginalReads": 0,
+    "artifactDownloads": 0,
+    "resourcesCreated": 0,
+    "priorWorkflowData": "Only frozen Git blobs read; prior failed and instrumented runs not rerun.",
+    "originalServiceCommands": "The bootout and bootstrap commands, each argument vector and each call count (one each) remain exact. The original bootout rejection is still swallowed; the original bootstrap error object is rethrown.",
+    "betweenCommands": "Only Date.now(), performance.now(), boolean/error-reference assignments, await-resume bookkeeping and a try boundary. No new child process, file I/O, output, sleep, retry or launchctl query between the commands.",
+    "diagnosticEmission": "One writeSync(stdout) after the sequence completes/fails, only under the isolated fixture HOME pattern; exceptions from emission are swallowed so they do not replace the original command result.",
+    "fixedSchema": "Only enum stage status, fixed schema, bounded numeric exit code, allowlisted syscall/signal names, timing and booleans. No error.message, args, paths, server URL, credential, stdout/stderr body or PID emitted.",
+    "fixture": "Original assertions, PATH assignments, Node/npm symlinks, beginLocal/restartLocal calls and HTTP fixture response body remain unchanged. Parsing runs after the original runProcess completion/rejection.",
+    "daemonLifecycle": "One bounded 65536-byte read after the original fixture result, at most 16 fixed started/registered/stopped timestamp events with ordinal generation; no PID or raw content.",
+    "cleanup": "Private 0600 exact owned-home handoff and original finally receipt remain. Always controller uses only that exact HOME and fixed service label. Nonzero probe is not absence; process absence remains unverified."
+  },
+  "buildBinding": {
+    "sourceCheckout": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "productOverlay": {
+      "path": "packages/daemon/src/service.ts",
+      "gitBlob": "a650a67ab4fc24d4014d0513b11b2e5f8bc6c639",
+      "bytes": 9415,
+      "sha256": "dcf6d9b0ea4e4fc06086b76a45f318606d4447ec2010a980d048a58dc91c4ccb",
+      "beforeGitBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+      "beforeSha256": "5834bcddac2a5437157279930ecaf1aa5d30641c2f49535944fdbaa6c9ea563d"
+    },
+    "verifyOnlyOneTrackedSourceDifference": true,
+    "build": "Original frozen install, daemon build.mjs and npm pack exactly once on Ubuntu Node24.22.1.",
+    "package": "Same run/attempt, actual source/control commit, complete product overlay identity, tarball size/SHA256 and actual package/mikka.js marker count plus bytes/SHA256.",
+    "mac": "Fixed formal source plus the two manifest fixture overlays; verifies package source/tree/run/attempt/control/overlay/hash before original fixture execution on macos-26 Node22.22.1."
+  },
+  "validation": {
+    "yaml": {
+      "runtime": "V8 with actual js-yaml 4.1.0",
+      "source": "https://github.com/nodeca/js-yaml/blob/4.1.0/dist/js-yaml.js",
+      "parsed": true,
+      "jobs": [
+        "package",
+        "macos-diagnostic"
+      ],
+      "guardBlockScalars": true
+    },
+    "syntax": {
+      "helper": "V8 parsed with import/export stripped for parsing",
+      "controller": "V8 parsed with imports/top-level await/import.meta adapted for parsing",
+      "serviceTypeScript": "Not executed or compiler-validated yet; actual build remains required"
+    },
+    "parser": {
+      "runtime": "V8 only; Buffer.byteLength replaced with UTF8 byte-count shim, no Node/fs/launchctl",
+      "checks": [
+        {
+          "name": "first bootout3 and reconnect bootstrap5 preserved without raw fields",
+          "passed": true
+        },
+        {
+          "name": "unknown content-bearing key rejected",
+          "passed": true
+        },
+        {
+          "name": "unknown signal and error codes rejected",
+          "passed": true
+        },
+        {
+          "name": "missing output remains partial",
+          "passed": true
+        },
+        {
+          "name": "oversized output bounded",
+          "passed": true
+        },
+        {
+          "name": "duplicate records in one command rejected",
+          "passed": true
+        },
+        {
+          "name": "more than two service sequences are partial",
+          "passed": true
+        },
+        {
+          "name": "snapshot cannot mutate stored event objects",
+          "passed": true
+        }
+      ],
+      "initialHarnessFailure": "First model check ran without Buffer and was invalid; after explicit UTF8 shim all eight checks passed. No source change was made to turn that harness issue into a pass."
+    },
+    "sourceReadback": "All six remote blobs read back exactly; bytes, SHA256 and Git blob SHA independently recomputed.",
+    "compare": "GitHub compare shows ahead_by1, behind_by0 and exactly six named paths; no production ref changed.",
+    "actualNodeRuntimeTests": 0,
+    "actualMacExecution": 0
+  },
+  "limits": [
+    "Synchronous timestamps and exception bookkeeping still affect timing. Non-reproduction cannot establish a product fix or replace formal Node22 acceptance.",
+    "Original formal EIO5 remains unresolved. This candidate adds diagnostic evidence only.",
+    "No current process-absence proof exists for this not-yet-run candidate."
+  ]
+}

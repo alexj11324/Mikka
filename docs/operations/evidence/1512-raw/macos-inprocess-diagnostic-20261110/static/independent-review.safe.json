@@ -1,0 +1,141 @@
+{
+  "schema": "issue1512.macos-inprocess-independent-static-review.v1",
+  "observedAt": "2026-11-10 02:41:30 UTC",
+  "status": "PASS_STATIC_REVIEW_DIAGNOSTIC_EXECUTION_PENDING",
+  "candidateCommitReportedByAuthor": "299fbddd8c8f252959088a8cafabde962636b945",
+  "sourceCommit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "sourceTree": "42d33eb7faf77d7049607523599de9374e065660",
+  "sources": [
+    {
+      "role": "manifest",
+      "gitBlob": "f1dc34377e0aa051bb2b3644abbc84a5ce7412d8",
+      "bytes": 3658,
+      "sha256": "254d3014080bb6895e3ffc8a808497027357362ee1f2d3801b8465199b84a5b0"
+    },
+    {
+      "role": "service",
+      "gitBlob": "a650a67ab4fc24d4014d0513b11b2e5f8bc6c639",
+      "bytes": 9415,
+      "sha256": "dcf6d9b0ea4e4fc06086b76a45f318606d4447ec2010a980d048a58dc91c4ccb"
+    },
+    {
+      "role": "helper",
+      "gitBlob": "df7774974e60776ec196b3c76aa558f1a5aff493",
+      "bytes": 5293,
+      "sha256": "f5af6ff0684d4f0b8a4a23ed59947d0694c463494a5d73dde4277347a9d85c0e"
+    },
+    {
+      "role": "fixture",
+      "gitBlob": "af24a8b53480a9a394658d87e6da6a47480dc5ec",
+      "bytes": 11604,
+      "sha256": "0798cce4a2f464b53d03e5b3cc90dc5816db38d28b042951035fc475e5b4d297"
+    },
+    {
+      "role": "controller",
+      "gitBlob": "adb484a5e5606149570afccca5c3bba55eaea600",
+      "bytes": 13032,
+      "sha256": "039e7d33af1424b5675abee35ba584b4f7b93fffb03884f48ae03e9bf0ab84d6"
+    },
+    {
+      "role": "workflow",
+      "gitBlob": "1d42e9f078262cb2eb8297dce30e2671a78e9edd",
+      "bytes": 5285,
+      "sha256": "f15c7964e422be90386316a094f62881b6613651d6097f4a7104c471039a6cc2"
+    },
+    {
+      "role": "originalService",
+      "gitBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+      "bytes": 6054,
+      "sha256": "5834bcddac2a5437157279930ecaf1aa5d30641c2f49535944fdbaa6c9ea563d"
+    },
+    {
+      "role": "originalFixture",
+      "gitBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+      "bytes": 9689,
+      "sha256": "eb6b97e018e194d5fadbbe2ef14810952f7421bbf77fa87982ef1d3e6ec4a680"
+    },
+    {
+      "role": "sshInstaller",
+      "path": "apps/desktop/src/main/ssh-install.ts",
+      "ref": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+      "gitBlob": "678df02e8bbf82ad49e894de20edc750b36cafcc",
+      "bytes": 18756,
+      "sha256": "2180a5f03d0ddc692e206f126d07f14715d1b4e48025347d48a9d755c96222f5"
+    },
+    {
+      "role": "localInstallErrors",
+      "path": "apps/desktop/src/main/local-install.ts",
+      "ref": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+      "gitBlob": "ce08ed88e72d13501142ea306175d5a003fa1e80",
+      "bytes": 3737,
+      "sha256": "8a1078d267d7dc548f232f128748cb53b174e0b99705fb9e21d0e72a769346c6"
+    },
+    {
+      "role": "daemonBuild",
+      "path": "packages/daemon/scripts/build.mjs",
+      "ref": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+      "gitBlob": "13f7a24627b0d3e360488707d32b42dfcdbd5d4f",
+      "bytes": 4100,
+      "sha256": "def4856fd0f1825cb155d2f0e14ed4e734f62427678817f58071eeed61c7e05d"
+    }
+  ],
+  "blockingFindings": [],
+  "reviewedFindings": {
+    "originalCommandSemantics": {
+      "bootout": "Exactly one original exec('launchctl', ['bootout', same domain/label]); rejection remains swallowed.",
+      "bootstrap": "Exactly one original exec('launchctl', ['bootstrap', same domain, same file]); rejection rethrows the identical error object.",
+      "betweenCommands": "Synchronous Date.now/performance.now values and error flag/reference bookkeeping only; no wrapper, file I/O, subprocess, timer, retry or additional await.",
+      "afterSequence": "One closed-schema stdout line in finally, only for the synthetic fixture HOME. JSON construction/writeSync errors are swallowed. This intentionally remains a diagnostic overlay."
+    },
+    "capturePath": {
+      "sourceVerified": true,
+      "success": "runProcess returns captured stdout only after child close; fixture capture uses that returned string.",
+      "failure": "runProcess rejects with InstallProcessError containing captured stdout; fixture capture reads error.stdout then rethrows the original error.",
+      "privacy": "New service record emits only fixed schema, times, durations, completion/error booleans, bounded integer exit code, and enumerated error/signal names. No raw error objects, paths, argv, stdout/stderr or credentials are emitted by that record.",
+      "bounds": "Capture accepts at most 16384 bytes per command and two exact-schema records; missing/oversized/invalid data stays partial without changing the original command result."
+    },
+    "fixtureSemantics": {
+      "originalAssertionsAndFlowRetained": true,
+      "details": "Original Node/PATH/npm setup, beginLocal/restartLocal, owner/enrollment checks, service argument checks and state assertions are preserved. The in-process observer is captured only after the original command settles.",
+      "lifecycle": "One bounded 65537-byte read after fixture assertions/failure; oversized rejects data, retains at most 16 closed lifecycle events/time/ordinal generation. A missing event is not evidence it did not occur.",
+      "existingFailureLogs": "Existing sanitized failure log capture is unchanged; the new lifecycle output does not expose raw PID/log lines."
+    },
+    "packageAndSourceBinding": {
+      "linux": "Fixed formal source/tree and controller commit checked, tracked tree starts clean, exactly service.ts diagnostic overlay verified before build and alone in diff; hashes rebound after build.",
+      "tarball": "Exactly one .tgz, package bytes/SHA256 plus actual package/mikka.js bytes/SHA256 and diagnostic marker count recorded.",
+      "mac": "Same control commit/run ID/attempt/source/tree/product overlay; downloaded tarball filename/bytes/hash checked; only the two fixed fixture overlays are installed into fixed source.",
+      "interpretation": "Temporary diagnostic package is explicitly distinguished from the unmodified formal package."
+    },
+    "executionBounds": {
+      "oneActualInstallReconnectFixture": true,
+      "attemptOneOnly": true,
+      "controlBranchAndCommitMessageGuard": true,
+      "permissions": "contents: read; checkout credentials not persisted.",
+      "newPrimaryCommandRetries": 0,
+      "newBetweenCommandSubprocesses": 0,
+      "newBetweenCommandFileIO": false,
+      "cleanupLaunchctlCommands": 2
+    },
+    "cleanup": {
+      "ownership": "Private mode-0600 wx handoff from this fixture's mkdtemp HOME; controller checks file type/owner/mode/size and exact allowed prefix, without directory enumeration.",
+      "removal": "Only exact handed-off HOME, after directory/no-symlink/uid validation if present; then private control directory. No inferred path or broad process killing.",
+      "commands": "After fixture sequence only: fixed-label bootout and print, each 10-second bounded spawnSync with ignored stdout/stderr.",
+      "truthfulness": "Receipt reports bootout success/home removal and explicitly does not infer process absence or service absence from a nonzero print/bootout code. Partial cleanup fails the controller.",
+      "preservation": "Fixture finally still issues its original single bootout before local server close, env restoration and HOME removal; added receipt follows those operations."
+    }
+  },
+  "limits": [
+    "All conclusions are source-level; no shell/Node/TypeScript/macOS execution, Actions raw-log read, artifact download, resource creation, branch publication or runtime success occurred in this review.",
+    "Adding synchronous instrumentation still changes timing. Non-reproduction of the formal EIO5 failure is not proof of a product fix and does not replace Node22 formal acceptance.",
+    "Completion means the observed command promise settled, including failures; an exit code, absent lifecycle line, or nonzero service probe does not prove process absence.",
+    "Author reported candidate commit/tree binding separately; this review independently fetched and recomputed all listed file blobs and manifest hashes, but did not reread the candidate commit tree.",
+    "After the sole actual run, root/diagnostic owner must preserve result and cleanup receipts and close the operational guards normally."
+  ],
+  "reviewerOperations": {
+    "sourceOrBranchMutations": 0,
+    "actionsOriginalReads": 0,
+    "artifactDownloads": 0,
+    "ciRuns": 0,
+    "resourceCreates": 0
+  }
+}

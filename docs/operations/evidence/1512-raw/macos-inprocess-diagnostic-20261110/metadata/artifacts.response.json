@@ -1,0 +1,51 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "artifacts": [
+      {
+        "id": 13731147178,
+        "name": "issue1512-mac-inprocess-daemon",
+        "size_in_bytes": 967646,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13731147178",
+        "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13731147178/zip",
+        "expired": false,
+        "created_at": "2026-11-10T02:48:18Z",
+        "expires_at": "2026-11-17T02:48:17Z",
+        "updated_at": "2026-11-10T02:48:18Z",
+        "digest": "sha256:fe9bb5a1f60e22d72fc4be8b1b6ade8fa34fdf81d4276e8ffb6fe056d33247d9",
+        "workflow_run": {
+          "id": 42745131850,
+          "repository_id": 1427517699,
+          "head_repository_id": 1427517699,
+          "head_branch": "ops/1512-macos-restart-20261110",
+          "head_sha": "299fbddd8c8f252959088a8cafabde962636b945"
+        }
+      },
+      {
+        "id": 13730563940,
+        "name": "issue1512-mac-inprocess-diagnostic",
+        "size_in_bytes": 3197,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13730563940",
+        "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13730563940/zip",
+        "expired": false,
+        "created_at": "2026-11-10T02:52:47Z",
+        "expires_at": "2026-11-17T02:52:46Z",
+        "updated_at": "2026-11-10T02:52:47Z",
+        "digest": "sha256:4159709986ecda3031bcabd9105f5564220afd4e6a6224e2603f72ed6bde56c1",
+        "workflow_run": {
+          "id": 42745131850,
+          "repository_id": 1427517699,
+          "head_repository_id": 1427517699,
+          "head_branch": "ops/1512-macos-restart-20261110",
+          "head_sha": "299fbddd8c8f252959088a8cafabde962636b945"
+        }
+      }
+    ]
+  },
+  "isError": false
+}

@@ -1,0 +1,340 @@
+{
+  "schema": "issue1512.macos-inprocess-diagnostic-result.v1",
+  "run": {
+    "id": 42745131850,
+    "attempt": 1,
+    "head": "299fbddd8c8f252959088a8cafabde962636b945",
+    "conclusion": "success",
+    "createdAt": "2026-11-10T02:47:20Z",
+    "completedAt": "2026-11-10T02:52:56Z",
+    "jobs": [
+      {
+        "id": 129595289173,
+        "name": "package",
+        "conclusion": "success",
+        "startedAt": "2026-11-10T02:47:24Z",
+        "completedAt": "2026-11-10T02:48:21Z"
+      },
+      {
+        "id": 129595642434,
+        "name": "macos-diagnostic",
+        "conclusion": "success",
+        "startedAt": "2026-11-10T02:48:24Z",
+        "completedAt": "2026-11-10T02:52:56Z"
+      }
+    ]
+  },
+  "source": {
+    "productCommit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "productTree": "42d33eb7faf77d7049607523599de9374e065660",
+    "controlCommit": "299fbddd8c8f252959088a8cafabde962636b945",
+    "controlTree": "ddf13157a753a7b91e85f0278ee03e11b84e012f",
+    "buildSourceBindingGitBlob": "6c5a974e9e3c7daa569a51ab18a55121b566b5dc",
+    "packageBindingGitBlob": "d4668b5d9d41342e51251b13a8e4806ada4df851",
+    "package": {
+      "schema": "issue1512.macos-inprocess-diagnostic-package.v1",
+      "requestId": "20261110-5852-inprocess-a1",
+      "sourceCommit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+      "sourceTree": "42d33eb7faf77d7049607523599de9374e065660",
+      "actualControl": "299fbddd8c8f252959088a8cafabde962636b945",
+      "runId": "42745131850",
+      "attempt": 1,
+      "productOverlay": {
+        "path": "packages/daemon/src/service.ts",
+        "gitBlob": "a650a67ab4fc24d4014d0513b11b2e5f8bc6c639",
+        "bytes": 9415,
+        "sha256": "dcf6d9b0ea4e4fc06086b76a45f318606d4447ec2010a980d048a58dc91c4ccb",
+        "beforeGitBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+        "beforeSha256": "5834bcddac2a5437157279930ecaf1aa5d30641c2f49535944fdbaa6c9ea563d"
+      },
+      "platform": "linux",
+      "arch": "x64",
+      "node": "24.22.1",
+      "filename": "aspectlylabs-mikka-0.0.1.tgz",
+      "bytes": 965727,
+      "sha256": "0ec3fe7d96a744bb5e020fd8f4607cf4fed9be2e38b6ef8afe80a46a9cf5dc0a",
+      "entry": {
+        "path": "package/mikka.js",
+        "bytes": 899089,
+        "sha256": "5c678633cbcd7f43fa155de4745792172213321a92905157a0d68837398595e3",
+        "diagnosticMarkerOccurrences": 1
+      }
+    },
+    "macBindingStepExecutedSuccessfully": true,
+    "macSourceBoundary": "Fixed formal source plus the two fixture overlays; installed daemon tarball is fixed formal source plus exactly the service.ts diagnostic overlay.",
+    "artifactMemberLimitation": "The Mac source-binding.json and fixture-cleanup.json artifact members were not separately downloaded. Successful controller binding execution is preserved in the complete Mac job log; the controller cleanup record contains the selected fixture-finally receipt fields. Extracted JSON here is log payload, not a downloaded artifact member."
+  },
+  "fixture": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "22.22.1",
+    "npmStarted": true,
+    "registrations": 2,
+    "heartbeats": 2,
+    "enrollments": 1,
+    "socketPathBytes": 73,
+    "states": [
+      {
+        "step": "check",
+        "status": "running"
+      },
+      {
+        "step": "check",
+        "status": "running"
+      },
+      {
+        "step": "install",
+        "status": "running"
+      },
+      {
+        "step": "service",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "online"
+      },
+      {
+        "step": "service",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "online"
+      }
+    ],
+    "result": "installed/launchagent/online/reconnect",
+    "launchctl": {
+      "status": "captured",
+      "attempts": 2,
+      "records": [
+        {
+          "phase": "install",
+          "schema": "issue1512.launchctl-inprocess.v1",
+          "bootout": {
+            "startedAt": "2026-11-10T02:52:38.654Z",
+            "finishedAt": "2026-11-10T02:52:38.684Z",
+            "elapsedMs": 29.765,
+            "complete": true,
+            "failed": true,
+            "exitCode": 3,
+            "errorCode": null,
+            "signal": null
+          },
+          "bootstrap": {
+            "startedAt": "2026-11-10T02:52:38.684Z",
+            "finishedAt": "2026-11-10T02:52:38.703Z",
+            "elapsedMs": 19.078,
+            "complete": true,
+            "failed": false,
+            "exitCode": 0,
+            "errorCode": null,
+            "signal": null
+          },
+          "betweenCommandsMs": 0.003
+        },
+        {
+          "phase": "reconnect",
+          "schema": "issue1512.launchctl-inprocess.v1",
+          "bootout": {
+            "startedAt": "2026-11-10T02:52:41.434Z",
+            "finishedAt": "2026-11-10T02:52:41.455Z",
+            "elapsedMs": 20.907,
+            "complete": true,
+            "failed": false,
+            "exitCode": 0,
+            "errorCode": null,
+            "signal": null
+          },
+          "bootstrap": {
+            "startedAt": "2026-11-10T02:52:41.455Z",
+            "finishedAt": "2026-11-10T02:52:41.475Z",
+            "elapsedMs": 19.531,
+            "complete": true,
+            "failed": false,
+            "exitCode": 0,
+            "errorCode": null,
+            "signal": null
+          },
+          "betweenCommandsMs": 0.002
+        }
+      ],
+      "missing": 0,
+      "invalid": 0,
+      "oversized": 0,
+      "maxRecords": 2,
+      "maxCommandOutputBytes": 16384,
+      "boundary": "Only completed command output. Synchronous timestamp recording still changes timing; non-reproduction is not a product fix."
+    },
+    "daemonLifecycle": {
+      "status": "captured",
+      "events": [
+        {
+          "event": "started",
+          "at": "2026-11-10T02:52:39.755Z",
+          "generation": 1
+        },
+        {
+          "event": "registered",
+          "at": "2026-11-10T02:52:39.798Z",
+          "generation": 1
+        },
+        {
+          "event": "stopped",
+          "at": "2026-11-10T02:52:41.454Z",
+          "generation": 1
+        },
+        {
+          "event": "started",
+          "at": "2026-11-10T02:52:42.399Z",
+          "generation": 2
+        }
+      ],
+      "malformedLines": 0,
+      "boundary": "Point-in-time log read only; a missing line is not proof that an event did not happen."
+    }
+  },
+  "cleanup": {
+    "schema": "issue1512.macos-restart-diagnostic-cleanup.v1",
+    "startedAt": "2026-11-10T02:52:46.019Z",
+    "ownerRecord": "validated",
+    "fixtureStepOutcome": "success",
+    "fixtureFinally": {
+      "bootout": {
+        "attempted": true,
+        "exitCode": 0,
+        "error": false
+      },
+      "fixtureServerClosed": true,
+      "environmentRestored": true,
+      "fixtureHomeRemoved": true
+    },
+    "bootout": {
+      "attempted": true,
+      "startedAt": "2026-11-10T02:52:46.023Z",
+      "finishedAt": "2026-11-10T02:52:46.032Z",
+      "exitCode": 3,
+      "signal": null,
+      "errorCode": null,
+      "timedOut": false
+    },
+    "serviceProbe": {
+      "attempted": true,
+      "startedAt": "2026-11-10T02:52:46.032Z",
+      "finishedAt": "2026-11-10T02:52:46.040Z",
+      "exitCode": 113,
+      "signal": null,
+      "errorCode": null,
+      "timedOut": false
+    },
+    "fixtureHomeRemoved": true,
+    "privateControlRemoved": true,
+    "status": "bootout_succeeded_home_removed",
+    "processAbsence": "not_independently_probed",
+    "limitation": "Nonzero launchctl print or bootout does not prove absence; no output text is parsed. Runner teardown is separate.",
+    "finishedAt": "2026-11-10T02:52:46.043Z"
+  },
+  "closure": {
+    "commit": "63b020064269cf66c6ee551b451ffd911f9489d2",
+    "parent": "299fbddd8c8f252959088a8cafabde962636b945",
+    "tree": "bb4194c66da2e32a5510216b5a23ed1490d2f50e",
+    "manifestGitBlob": "b0593d4ca107bcbb5cf93b3ebf5793dc726a1f35",
+    "workflowGitBlob": "e4abc46fca8dd55142d8716f600689b9e31e19fc",
+    "normalCompareAndSwap": true,
+    "enabled": false,
+    "bothJobGuards": false,
+    "remoteRefReadBack": true,
+    "runId": 42745834949,
+    "attempt": 1,
+    "conclusion": "skipped",
+    "jobs": [
+      {
+        "id": 129597580941,
+        "name": "package",
+        "conclusion": "skipped",
+        "runnerId": null,
+        "runnerName": null,
+        "steps": []
+      },
+      {
+        "id": 129597581379,
+        "name": "macos-diagnostic",
+        "conclusion": "skipped",
+        "runnerId": null,
+        "runnerName": null,
+        "steps": []
+      }
+    ]
+  },
+  "comparisonGitBlob": "be24f370ce454801be05cb232ebad591dc11b733",
+  "findings": [
+    "The first bootout returned3, first bootstrap0; the reconnect bootout and bootstrap both returned0.",
+    "Measured between-command gaps were0.003ms on install and0.002ms on reconnect, with no extra inter-command child process, file I/O, output, retry, sleep or launchctl probe.",
+    "The daemon lifecycle record includes first-generation started, registered, stopped and second-generation started; missing lifecycle lines at this point-in-time read do not prove event absence.",
+    "The original formal5852 bootstrap5 failure was not reproduced. This temporary instrumented package is not a product fix or formal Node22 acceptance.",
+    "The original command argv, count, swallowed bootout error and rethrown bootstrap original error semantics were retained.",
+    "The original failure lacks bootout status and command timestamps, so no supported product root cause follows from comparison.",
+    "Fixture finally bootout succeeded and exact private HOME/control removal was reported; controller bootout3/print113 are not independent process-absence proof."
+  ],
+  "downloads": {
+    "reader": "/root/mac_inprocess_diag",
+    "packageJobLog": 1,
+    "macosJobLog": 1,
+    "packageZip": 0,
+    "diagnosticZip": 0,
+    "originalFormal5852ActionsLogs": 0,
+    "priorDiagnosticActionsLogs": 0,
+    "reason": "Complete source/package binding payloads, launchctl/daemon result and cleanup payload are emitted in the two original job logs. Original responses were frozen before parsing. ZIPs were not needed for these observations."
+  },
+  "originals": {
+    "packageWrapper": "8a7806255df7b0db06726263476d4acb3510c141",
+    "packagePlain": "b4a314f93260e6623c9128ee7a2711d4b3b42652",
+    "macWrapper": "81e0ef69286af175ed059d1d5a019adeaa7325ff",
+    "macPlain": "a542fbbc0ca7cf2afa4cb8641a112fc55fded90e"
+  },
+  "artifactsMetadataOnly": [
+    {
+      "id": 13731147178,
+      "name": "issue1512-mac-inprocess-daemon",
+      "bytes": 967646,
+      "digest": "sha256:fe9bb5a1f60e22d72fc4be8b1b6ade8fa34fdf81d4276e8ffb6fe056d33247d9",
+      "expired": false,
+      "createdAt": "2026-11-10T02:48:18Z",
+      "expiresAt": "2026-11-17T02:48:17Z",
+      "head": "299fbddd8c8f252959088a8cafabde962636b945",
+      "runId": 42745131850,
+      "downloaded": false
+    },
+    {
+      "id": 13730563940,
+      "name": "issue1512-mac-inprocess-diagnostic",
+      "bytes": 3197,
+      "digest": "sha256:4159709986ecda3031bcabd9105f5564220afd4e6a6224e2603f72ed6bde56c1",
+      "expired": false,
+      "createdAt": "2026-11-10T02:52:47Z",
+      "expiresAt": "2026-11-17T02:52:46Z",
+      "head": "299fbddd8c8f252959088a8cafabde962636b945",
+      "runId": 42745131850,
+      "downloaded": false
+    }
+  ],
+  "activity": {
+    "actualMacFixtureExecutions": 1,
+    "workflowReruns": 0,
+    "temporaryExtractionMachinesCreated": 0,
+    "ownedActiveExtractionMachines": 0,
+    "formalBranchChanges": 0,
+    "productFixImplemented": false,
+    "productionAcceptance": false,
+    "formalNode22AcceptanceReplacement": false
+  },
+  "nextStep": "Preserve the formal5852 failure and both diagnostic successes as bounded evidence. Do not add speculative retry, polling, delay or kickstart. CI for a materially changed future formal head is independent new-source evidence and must retain the historical failure record."
+}
