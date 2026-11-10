@@ -12,6 +12,7 @@ import { secretMaskerFor } from '../secrets/runtime'
 import { maskDeep } from '../secrets/mask'
 import { resolveRunWorktree, type WorkspaceActor, type WorkspaceQuery } from './identity'
 import { validateWorkspaceReceipt } from './receipt'
+import { retainGitUndo } from './git/undo'
 
 const receiptPolicy = Symbol('workspace-receipt-mask-policy')
 const receiptIdentity = Symbol('workspace-receipt-identity')
@@ -40,12 +41,14 @@ export async function assertWorkspaceResultMaskPolicy(result: object, actor: Wor
 }
 
 export async function requestWorkspaceRead(database: Pool, membership: WorkspaceQuery, actor: WorkspaceActor,
-  runId: string, repoId: string, request: WorkspaceReadRequest, signal?: AbortSignal): Promise<WorkspaceReadResult> {
+  runId: string, repoId: string, request: WorkspaceReadRequest, signal?: AbortSignal,
+  options: { ttlMs?: number } = {}): Promise<WorkspaceReadResult> {
   const binding = await resolveRunWorktree(database, membership, actor, runId, repoId)
   if (!workspaceRequestPathsAllowed(request)) throw new CodingWorkspaceError('workspace_path_unavailable')
   const requestMask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
   if (!isDeepStrictEqual(maskDeep(request, requestMask), request)) throw new CodingWorkspaceError('workspace_path_unavailable')
-  const id = randomUUID(), expiresAt = new Date(Date.now() + WORKSPACE_REQUEST_TTL_MS)
+  const ttl = Math.min(Math.max(options.ttlMs ?? WORKSPACE_REQUEST_TTL_MS, 1_000), 60_000)
+  const id = randomUUID(), expiresAt = new Date(Date.now() + ttl)
   const subscription = await subscribeShared(database, DEVICE_WORK_CHANNEL, [`workspace:${id}`], signal)
   // No timer-based SQL retry when LISTEN is unavailable.
   if (!subscription) throw new CodingWorkspaceError('workspace_machine_unavailable')
@@ -91,12 +94,15 @@ export async function requestWorkspaceRead(database: Pool, membership: Workspace
 
 /** Called only inside withDeviceRoute, so its queries retain the credential fence. */
 export async function pendingWorkspaceReads(database: WorkspaceQuery, membership: WorkspaceQuery,
-  caller: { userId: string; tokenId: string }, deviceId: string, skip: readonly string[] = [], capabilities: { diff?: boolean } = {}): Promise<WorkspaceReadCommand[]> {
+  caller: { userId: string; tokenId: string }, deviceId: string, skip: readonly string[] = [],
+  capabilities: { diff?: boolean; git?: boolean } = {}): Promise<WorkspaceReadCommand[]> {
   const { rows } = await database.query<{ id: string; identity: WorkspaceReadCommand['identity']; request: WorkspaceReadRequest; expiresAt: Date }>(
     `SELECT id,identity,request,"expiresAt" FROM coding_workspace_requests WHERE "deviceId"=$1 AND "ownerId"=$2 AND "tokenId"=$3
       AND result IS NULL AND "expiresAt">clock_timestamp() AND NOT(id=ANY($4::uuid[]))
       AND ($5::boolean OR request->>'kind' NOT IN ('diff_snapshot','diff_file'))
-      ORDER BY "createdAt" LIMIT 4`, [deviceId, caller.userId, caller.tokenId, skip, capabilities.diff === true])
+      AND ($6::boolean OR request->>'kind' NOT IN ('git_status','git_history','git_revert_preview','git_revert_apply',
+        'git_undo','git_checkpoint_preview','git_checkpoint_restore'))
+      ORDER BY "createdAt" LIMIT 4`, [deviceId, caller.userId, caller.tokenId, skip, capabilities.diff === true, capabilities.git === true])
   const result: WorkspaceReadCommand[] = []
   for (const row of rows) {
     try {
@@ -119,6 +125,10 @@ export async function finishWorkspaceRead(database: WorkspaceQuery, membership: 
   const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
   const response = validateWorkspaceReceipt(row.request, row.identity, receipt, mask)
   if (!response) return false
+  // Write receipts carry a masked Undo capture outside the public result: the
+  // operation row keeps it for the retention window, never the request row.
+  if (row.request.kind === 'git_revert_apply' || row.request.kind === 'git_checkpoint_restore')
+    await retainGitUndo(database, row.request, receipt, mask, actor.userId)
   const saved = await database.query(`UPDATE coding_workspace_requests SET result=$5,"maskPolicy"=$6 WHERE id=$1 AND "ownerId"=$2 AND "deviceId"=$3 AND "tokenId"=$4
     AND result IS NULL AND "expiresAt">clock_timestamp() RETURNING id`, [id, caller.userId, deviceId, caller.tokenId, response, mask.sourcePolicy ?? null])
   if (saved.rowCount) {

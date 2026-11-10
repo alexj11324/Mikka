@@ -103,6 +103,7 @@ import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
 import { readWorkspaceReceipt } from './coding-workspace/files'
 import { readWorkspaceDiffReceipt } from './coding-workspace/diff'
+import { handleWorkspaceGitRequest } from './coding-workspace/git'
 import type { WorkspaceReadCommand } from '@mikka/protocol/coding-workspace'
 import { RepositoryCache } from "./repositories"
 import { prepareRunRepository } from './run-repository'
@@ -1004,6 +1005,10 @@ export class Daemon {
           if (request.request.kind === 'diff_snapshot' || request.request.kind === 'diff_file') {
             if (!entry) return { result: { ok: false as const, code: 'workspace_checkout_unavailable' as const }, files: [] }
             return readWorkspaceDiffReceipt(request, entry, this.repository(entry.assignment).path)
+          }
+          if (request.request.kind.startsWith('git_')) {
+            if (!entry) return { result: { ok: false as const, code: 'workspace_checkout_unavailable' as const }, files: [] }
+            return handleWorkspaceGitRequest(request, entry, this.repository(entry.assignment).path)
           }
           return readWorkspaceReceipt(request, entry)
         })

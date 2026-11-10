@@ -12,6 +12,7 @@ import {
   WORKSPACE_DIFF_MAX_BLOB_BYTES, WORKSPACE_DIFF_MAX_FILES, diffFileVersionMaterial,
   type DiffFileMetadata, type DiffRevision, type WorkspaceDiffReadRequest,
 } from '@mikka/protocol/coding-workspace-review'
+import type { WorkspaceGitRevertPreviewResult } from '@mikka/protocol/coding-workspace-git'
 import { remoteKey } from '@mikka/protocol/repository'
 import { worktreeGitDir } from '../agents/publish'
 import { buildChildEnv } from '../env'
@@ -30,12 +31,13 @@ type WorkingConversion = { index: Map<string, ObjectFile>; unmerged: Set<string>
   fence: string; paths: string[]; rawIndex: string; attributeFences: Map<string, string>; indexCRLF: Map<string, boolean | null> }
 type Snapshot = { revision: DiffRevision; files: DiffFileMetadata[]; conversion?: WorkingConversion }
 const statFence = (stat: BigIntStats) => digest(`${stat.dev}:${stat.ino}:${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}:${stat.mode}`)
+export { statFence }
 function pathsText(bytes: Buffer): string {
   try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes) }
   catch (cause) { throw new CodingWorkspaceError('workspace_unsupported', { cause }) }
 }
 
-function missing(error: unknown): boolean {
+export function missing(error: unknown): boolean {
   for (let depth = 0; error && typeof error === 'object' && depth < 8; depth++) {
     if ('code' in error && error.code === 'ENOENT') return true
     error = 'cause' in error ? error.cause : null
@@ -46,7 +48,7 @@ function missing(error: unknown): boolean {
 /** Git reads use the daemon's registered clone, never a .git file in source.
  * No status/add/diff against the filesystem: those can invoke clean filters.
  * Only object reads, index path names and ignore-aware untracked names run. */
-async function gitFor(repoPath: string, root: WorkspaceRoot, signal: AbortSignal): Promise<Git> {
+export async function gitFor(repoPath: string, root: WorkspaceRoot, signal: AbortSignal): Promise<Git> {
   const gitDir = await worktreeGitDir(repoPath, root.path, signal)
   const env = { ...buildChildEnv({}), GIT_DIR: gitDir, GIT_COMMON_DIR: resolve(gitDir, '..', '..'),
     // cwd is resolved while the parent's FD is still open. The child does not
@@ -367,8 +369,7 @@ async function snapshot(git: Git, root: WorkspaceRoot, entry: JournalEntry, requ
 
 /** A snapshot observes bounded, descriptor-checked source bytes. It never
  * stages files, writes Git objects/indexes, invokes filters or changes refs. */
-export async function readWorkspaceDiffReceipt(command: WorkspaceReadCommand, entry: JournalEntry | undefined, repoPath: string): Promise<WorkspaceReadReceipt> {
-  let directory: FileHandle | undefined
+export async function readWorkspaceDiffReceipt(command: WorkspaceReadCommand, entry: JournalEntry | undefined, repoPath: string): Promise<WorkspaceReadReceipt> {  let directory: FileHandle | undefined
   try {
     const parsed = workspaceReadCommand.safeParse(command)
     if (!parsed.success) throw new CodingWorkspaceError('workspace_invalid_request', { cause: parsed.error })
@@ -419,6 +420,76 @@ export async function readWorkspaceDiffReceipt(command: WorkspaceReadCommand, en
       || await realpath(root.gitPath) !== root.path) throw new CodingWorkspaceError('workspace_version_conflict')
     return { result: { ...result, format: 'text' }, files: [], blobs: [...blobs].map(([sha, proof]) => ({ sha, base64: proof.bytes.toString('base64'),
       ...(proof.rawSha ? { clean: 'crlf_to_lf' as const, rawSha: proof.rawSha } : {}) })) }
+  } catch (cause) {
+    return { result: { ok: false, code: Date.parse(command.expiresAt) <= Date.now() ? 'workspace_request_expired'
+      : cause instanceof CodingWorkspaceError ? cause.code : 'workspace_checkout_unavailable' }, files: [] }
+  } finally { await directory?.close() }
+}
+
+/** Revert preview is a read: it proves the current and base bytes of exactly
+ * one file in the same snapshot the client reviewed. It never writes. */
+export async function readWorkspaceRevertPreview(command: WorkspaceReadCommand, entry: JournalEntry | undefined, repoPath: string): Promise<WorkspaceReadReceipt> {
+  let directory: FileHandle | undefined
+  try {
+    const parsed = workspaceReadCommand.safeParse(command)
+    if (!parsed.success) throw new CodingWorkspaceError('workspace_invalid_request', { cause: parsed.error })
+    const { identity, request, expiresAt } = parsed.data
+    if (request.kind !== 'git_revert_preview') throw new CodingWorkspaceError('workspace_invalid_request')
+    const remaining = Date.parse(expiresAt) - Date.now()
+    if (remaining <= 0) throw new CodingWorkspaceError('workspace_request_expired')
+    if (!entry?.worktree || entry.assignment.runId !== identity.runId || entry.assignment.repoId !== identity.repoId || entry.assignment.deviceId !== identity.deviceId
+      || remoteKey(entry.assignment.remoteUrl ?? entry.assignment.expectedRepoRemote ?? '') !== identity.repositoryKey)
+      throw new CodingWorkspaceError('workspace_checkout_unavailable')
+    if (process.platform !== 'linux') throw new CodingWorkspaceError('workspace_unsupported')
+    const path = resolve(entry.worktree)
+    if (await realpath(path) !== path) throw new CodingWorkspaceError('workspace_checkout_unavailable')
+    directory = await open(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
+    const root: WorkspaceRoot = { path, handle: directory, device: (await directory.stat({ bigint: true })).dev,
+      mountId: await mountId(directory), gitPath: `/proc/self/fd/${directory.fd}` }
+    const signal = AbortSignal.timeout(remaining), git = await gitFor(repoPath, root, signal)
+    if (remoteKey((await git(['config', '--get', 'remote.origin.url'])).toString().trim()) !== identity.repositoryKey)
+      throw new CodingWorkspaceError('workspace_checkout_unavailable')
+    const value = await snapshot(git, root, entry, { kind: 'diff_snapshot', source: 'working' }, signal)
+    if (value.revision.version !== request.revision.version) throw new CodingWorkspaceError('workspace_version_conflict')
+    const file = value.files.find(candidate => candidate.path === request.file.path)
+    if (!file || file.fileVersion !== request.file.fileVersion || file.path !== request.file.path
+      || file.previousPath !== request.file.previousPath || file.status !== request.file.status
+      || file.oldBlob !== request.file.oldBlob || file.newBlob !== request.file.newBlob
+      || file.oldMode !== request.file.oldMode || file.newMode !== request.file.newMode) throw new CodingWorkspaceError('workspace_version_conflict')
+    if (file.previousPath !== null || !['added', 'deleted', 'modified'].includes(file.status)
+      || [file.oldMode, file.newMode].some(mode => mode !== null && !['100644', '100755'].includes(mode))
+      || [file.oldSize, file.newSize, file.rawSize].some(size => size !== null && size !== undefined && size > WORKSPACE_DIFF_MAX_BLOB_BYTES))
+      throw new CodingWorkspaceError('workspace_unsupported')
+    if (request.target.kind === 'hunks' && (file.binary || file.rawBlob !== undefined))
+      throw new CodingWorkspaceError('workspace_unsupported')
+    const oldBytes = file.oldBlob ? await git(['cat-file', 'blob', file.oldBlob], WORKSPACE_DIFF_MAX_BLOB_BYTES + 1) : null
+    if (file.oldBlob && (!oldBytes || (file.oldSize !== null && file.oldSize !== undefined && oldBytes.length !== file.oldSize)))
+      throw new CodingWorkspaceError('workspace_version_conflict')
+    const current = file.newBlob ? await currentFile(root, file.path, value.revision.headSha!, { bytes: 0 }, signal, value.conversion, git) : null
+    if (file.newBlob && (!current?.bytes || current.file.blob !== file.newBlob || current.file.rawBlob !== file.rawBlob))
+      throw new CodingWorkspaceError('workspace_version_conflict')
+    if (file.newBlob === null && current !== null) throw new CodingWorkspaceError('workspace_version_conflict')
+    // The observation fences exactly what the person is about to change;
+    // the apply request must present these values or be refused.
+    const observedMode = current && (current.file.mode === '100644' || current.file.mode === '100755') ? current.file.mode : null
+    const before = {
+      headSha: value.revision.headSha!, path: file.path, exists: current !== null,
+      mode: observedMode,
+      size: current?.bytes?.length ?? null,
+      contentSha256: current?.bytes ? digest(current.bytes) : null,
+      workingVersion: current?.fence ?? digest('missing'),
+    }
+    if (value.conversion) await verifyConversion(git, root, value.conversion)
+    if (Date.parse(expiresAt) <= Date.now()) throw new CodingWorkspaceError('workspace_request_expired')
+    if ((await git(['rev-parse', '--verify', 'HEAD'])).toString().trim() !== value.revision.headSha
+      || await realpath(root.gitPath) !== root.path) throw new CodingWorkspaceError('workspace_version_conflict')
+    const blobs: NonNullable<WorkspaceReadReceipt['blobs']> = []
+    if (file.oldBlob && oldBytes) blobs.push({ sha: file.oldBlob, base64: oldBytes.toString('base64') })
+    if (file.newBlob && current?.bytes) blobs.push({ sha: file.newBlob, base64: current.bytes.toString('base64'),
+      ...(file.rawBlob ? { clean: 'crlf_to_lf' as const, rawSha: file.rawBlob } : {}) })
+    const result: WorkspaceGitRevertPreviewResult = { ok: true, identity, kind: 'git_revert_preview', operationId: request.operationId,
+      observedAt: new Date().toISOString(), availability: 'online', revision: value.revision, file, target: request.target, before }
+    return { result, files: [], ...(blobs.length ? { blobs } : {}) }
   } catch (cause) {
     return { result: { ok: false, code: Date.parse(command.expiresAt) <= Date.now() ? 'workspace_request_expired'
       : cause instanceof CodingWorkspaceError ? cause.code : 'workspace_checkout_unavailable' }, files: [] }
