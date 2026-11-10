@@ -24,7 +24,7 @@ import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert, CircleHelp } from 'lucide-react'
 import { toast } from 'sonner'
 import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'
@@ -297,6 +297,28 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const firstThreadCard = useMemo(() => firstThreadCards(items), [items])
   // A thread's event line said again later (「… 在等你回答」 twice) shows only the latest one (R-66).
   const staleEvents = useMemo(() => staleEventPositions(items), [items])
+
+  // A run's question is a live state, not a message: the thread card already names the run and its state badge says
+  // 等待你 (decision 2026-11-10), so the chat shows one sentence above the composer instead of a stored event line.
+  // The thread stays an inline link in that sentence, never a line of its own.
+  const waitingQuestions = useMemo(() => {
+    const seen = new Set<string>()
+    const rows: { runId: string | null; title: string }[] = []
+    for (const item of [...items].reverse()) {
+      const line = item.line
+      if (!line || line.kind !== 'runQuestion' || staleEvents.has(item.position)) continue
+      const run = line.runId ? sources?.[line.runId] : undefined
+      const key = line.runId ?? `position-${item.position}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      if (run && run.kind === 'run') {
+        // A run that already moved on is history, not something waiting on the person.
+        if (run.status !== 'waiting_input') continue
+        rows.push({ runId: run.id, title: runThreadName(run) })
+      } else if (line.title) rows.push({ runId: line.runId ?? null, title: line.title })
+    }
+    return rows
+  }, [items, sources, staleEvents])
   /** The thread cards under `item`: those whose first reply it is; a live reply only threads no stored reply has carded. */
   const cardsOf = (item: Chat['items'][number], live: boolean) => item.threads.filter(id => (live ? !firstThreadCard.has(id) : firstThreadCard.get(id) === item.position) && sources?.[id]?.kind === 'run')
   // A send whose result was unknown may have been stored after all: once it shows up in the chat, the failed bubble goes.
@@ -504,7 +526,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     const liveFailurePart: ThreadEntryPart = plainFailure
       ? { kind: 'error', text: wakeError ? t(`wakeErrors.${wakeError}`) : t('failedTitle'), actions: <>{retry}{liveRaw && <RunErrorDetails code={liveRaw} />}</> }
       : { kind: 'error', text: t('failedTitle'), actions: failureNotice }
-    const rows = [...items.filter(item => !staleEvents.has(item.position)).map(item => ({ item, live: undefined as CoordinatorLiveReply | undefined, key: String(item.pending ? `pending-${item.position}` : item.streamId ?? item.position) })),
+    const rows = [...items.filter(item => !staleEvents.has(item.position) && item.line?.kind !== 'runQuestion').map(item => ({ item, live: undefined as CoordinatorLiveReply | undefined, key: String(item.pending ? `pending-${item.position}` : item.streamId ?? item.position) })),
       ...stream.replies.map(reply => ({ item: streamedItem(reply, stopping), live: stopping && reply.committedThrough === undefined ? { ...reply, committedThrough: -1 } : reply, key: reply.id }))]
     const entries: ThreadEntry[] = []
     for (const { item, live, key } of rows) {
@@ -562,6 +584,12 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
         retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
       {unanswered && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48">{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
+      {/* One live sentence, not a stored event line; the thread is an inline link inside it (decision 2026-11-10). */}
+      {waitingQuestions.length > 0 && <p data-slot="waiting-questions" role="status" className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground">
+        <CircleHelp aria-hidden="true" className="size-3.5 shrink-0 text-warning" />
+        <span>{t('waitingQuestions', { count: waitingQuestions.length })}</span>
+        {waitingQuestions[0].runId && <button type="button" className="min-w-0 max-w-full truncate text-primary underline-offset-4 hover:underline focus-visible:outline-ring-inset" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}>{waitingQuestions[0].title}</button>}
+      </p>}
       <PendingActions />
     </>
     return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
@@ -626,7 +654,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               </div>)}
             {/* Stored and streamed replies are one list: a stored reply takes the key of the stream it was shown from, so
                 storing it keeps its row, text and chips in place instead of mounting them again (the chat flashed). */}
-            {[...items.filter(item => !staleEvents.has(item.position)).map(item => ({ item, live: undefined, key: item.pending ? `pending-${item.position}` : item.streamId ?? item.position })),
+            {[...items.filter(item => !staleEvents.has(item.position) && item.line?.kind !== 'runQuestion').map(item => ({ item, live: undefined, key: item.pending ? `pending-${item.position}` : item.streamId ?? item.position })),
               // After 停止 the reply in flight no longer draws as streaming (no cursor, no running activity) while it is stored.
               ...stream.replies.map(reply => ({ item: streamedItem(reply, stopping), live: stopping && reply.committedThrough === undefined ? { ...reply, committedThrough: -1 } : reply, key: reply.id }))].map(({ item, live, key }) => <Fragment key={key}>
               {!live && dividerAt === item.position && <UnreadDivider />}
@@ -707,6 +735,12 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
         retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
       {unanswered && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48">{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
+      {/* One live sentence, not a stored event line; the thread is an inline link inside it (decision 2026-11-10). */}
+      {waitingQuestions.length > 0 && <p data-slot="waiting-questions" role="status" className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground">
+        <CircleHelp aria-hidden="true" className="size-3.5 shrink-0 text-warning" />
+        <span>{t('waitingQuestions', { count: waitingQuestions.length })}</span>
+        {waitingQuestions[0].runId && <button type="button" className="min-w-0 max-w-full truncate text-primary underline-offset-4 hover:underline focus-visible:outline-ring-inset" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}>{waitingQuestions[0].title}</button>}
+      </p>}
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
         running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
