@@ -32,8 +32,6 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
-  // One Bot's permissions: app writes, run permissions and approval mode (affectUI Agent / Permissions).
-  { id: 'bot-permissions', group: 'personal', title: 'App & run permissions' },
   // 模型与订阅 (decision 2026-11-02-1400): subscriptions, API keys, 运行位置 and 优先使用的模型 (was API 与订阅 and Bot 与 Agents).
   { id: 'models', group: 'personal', title: 'Models and subscriptions' },
   { id: 'logins', group: 'personal', title: 'Secrets and logins' },
@@ -42,6 +40,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   // Hidden until an API accepts the tokens (Alex); the UI and token store are built. Delete `unbuilt` to ship it.
   { id: 'developer', group: 'personal', title: 'Personal access tokens', unbuilt: true },
   { id: 'general', group: 'workspace', title: 'General' },
+  // The workspace's app access and run policy, inherited by every Bot (decisions 2026-10-31, 2026-11-10).
+  { id: 'bot-permissions', group: 'workspace', title: 'App & run permissions' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },
