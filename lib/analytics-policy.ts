@@ -43,6 +43,20 @@ export function sanitizeAnalyticsEvent<T extends { event: string; properties: Re
       properties.$pathname = analyticsPath(url.pathname)
     } catch { /* 丢弃无法解析的 URL，避免将原始字符串发送给分析服务。 */ }
   }
+  // Keep only acquisition metadata useful for PostHog session channels.
+  // Raw referring URLs (which can include auth tokens) and arbitrary UTM
+  // values are never sent; the existing app URL cleaning remains in place.
+  const safeTag = (value: unknown) => typeof value === 'string' && value.length <= 80
+    && /^[a-z0-9][a-z0-9._-]*$/i.test(value) ? value.toLowerCase() : null
+  for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']) {
+    const tag = safeTag(event.properties[key])
+    if (tag) properties[key] = tag
+  }
+  const referringDomain = event.properties.$referring_domain
+  if (typeof referringDomain === 'string' && referringDomain.length <= 253
+    && /^(?:[a-z0-9-]+\\.)+[a-z]{2,}$/i.test(referringDomain)) {
+    properties.$referring_domain = referringDomain.toLowerCase()
+  }
   const sanitized = { ...event, properties }
   for (const key of ['$set', '$set_once', '$unset']) Reflect.deleteProperty(sanitized, key)
   return sanitized
