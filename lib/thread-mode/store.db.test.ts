@@ -6,6 +6,7 @@ import { readCliRunPolicy } from '../agent-tool-approval/policy-store'
 import { ApprovalUnavailable } from '../agent-tool-approval/store'
 import { RunToolApprovalStore } from '../agent-tool-approval/approvals'
 import { freezeThreadMode, readThreadMode, threadModeLocked, setThreadMode, ThreadModeConflict } from './store'
+import { readThreadModeSupport } from './support'
 import { workspacePool } from '../workspace-db'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
@@ -164,6 +165,24 @@ test('the lock the picker reads follows the thread, not the run it was asked by'
   await askRun()
   assert.equal(await threadModeLocked(pool, owner, id), true)
   assert.equal(await threadModeLocked(pool, other, await issueId(other)), false)
+})
+
+test('mode support follows the harness matrix and the daemon report, never a guess', async () => {
+  const run = await askRun()
+  // A local daemon that names the modes it enforces: all three are offered.
+  await pool.query(`UPDATE devices SET harnesses=$2::jsonb WHERE id=$1`, [deviceId, JSON.stringify([{ harness: 'codex', installed: true, threadModes: ['plan', 'execute', 'ask'] }])])
+  assert.deepEqual((await readThreadModeSupport(pool, owner, run)).support, {
+    plan: { state: 'enforced' }, execute: { state: 'enforced' }, ask: { state: 'enforced' },
+  })
+  // The same device without a report predates the gate.
+  await pool.query(`UPDATE devices SET harnesses='[]'::jsonb WHERE id=$1`, [deviceId])
+  assert.deepEqual((await readThreadModeSupport(pool, owner, run)).support.ask, { state: 'unsupported', reason: 'daemon' })
+  // A harness with no native ask surface is refused by the matrix first.
+  await pool.query(`UPDATE agents SET harness='cursor' WHERE id=$1`, [agentId])
+  assert.deepEqual((await readThreadModeSupport(pool, owner, run)).support, {
+    plan: { state: 'unsupported', reason: 'harness' }, execute: { state: 'enforced' }, ask: { state: 'unsupported', reason: 'harness' },
+  })
+  await pool.query(`UPDATE agents SET harness='codex' WHERE id=$1`, [agentId])
 })
 
 test('a policy revision change fences a pending approval', async () => {

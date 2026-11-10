@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { before, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { threadModePicker, type ThreadModePickerView, type ThreadModeRead } from '@/lib/thread-mode/view'
+import { threadModePicker, type ThreadModePickerView, type ThreadModeRead, type ThreadModeSupport } from '@/lib/thread-mode/view'
 
 // The real Chinese copy, so the test reads what the person sees.
 const zh = JSON.parse(readFileSync(new URL('../../messages/zh-CN.json', import.meta.url), 'utf8')) as Record<string, Record<string, Record<string, string>>>
@@ -19,8 +19,12 @@ before(async () => {
   ({ ThreadModePickerContent: Picker, ThreadModeNoticeContent: Notice } = await import('./thread-mode-picker'))
 })
 
-function pick(read: ThreadModeRead, active = false): ThreadModePickerView {
-  const view = threadModePicker(read, active)
+const enforced: ThreadModeSupport = {
+  plan: { state: 'enforced' }, execute: { state: 'enforced' }, ask: { state: 'enforced' },
+}
+
+function pick(read: Omit<ThreadModeRead, 'support'> & { support?: ThreadModeSupport | null }, active = false): ThreadModePickerView {
+  const view = threadModePicker({ support: enforced, ...read }, active)
   assert.ok(view)
   return view
 }
@@ -48,6 +52,16 @@ test('a running thread disables every option and names the reason', () => {
   assert.match(html, /data-locked/)
   assert.match(html, /aria-label="线程运行中不可切换；结束后选择的模式会在下一轮生效。"/)
   assert.ok((html.match(/disabled=""/g)?.length ?? 0) >= 3)
+})
+
+test('an unsupported mode is disabled with its reason, and the stored one offers Execute', () => {
+  const support: ThreadModeSupport = { plan: { state: 'unsupported', reason: 'harness' }, execute: { state: 'enforced' }, ask: { state: 'enforced' } }
+  const view = pick({ mode: 'plan', version: 2, support })
+  const picker = renderToStaticMarkup(<Picker view={view} />)
+  assert.match(picker, /aria-label="计划: 此 Agent 无法强制执行当前模式，请改为执行模式。"/)
+  const notice = renderToStaticMarkup(<Notice view={view} onSwitchToExecute={() => {}} />)
+  assert.match(notice, /此 Agent 无法强制执行当前模式/)
+  assert.match(notice, /改为执行/)
 })
 
 test('the composer notice says what the stored mode means', () => {

@@ -7,6 +7,7 @@
 // is read-only, so the UI never shows a mode a run cannot have.
 import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -29,7 +30,10 @@ export function ThreadModePickerContent({ view, pending = false, onChange }: Thr
       const next = values[0]
       if (next && next !== view.mode) onChange?.(next as ThreadMode)
     }}>
-    {view.options.map(option => <ToggleGroupItem key={option.mode} value={option.mode} disabled={option.disabled}>{t(option.mode)}</ToggleGroupItem>)}
+    {view.options.map(option => {
+      const reason = option.reasonKey ? t(option.reasonKey) : undefined
+      return <ToggleGroupItem key={option.mode} value={option.mode} disabled={option.disabled} title={reason} aria-label={reason ? `${t(option.mode)}: ${reason}` : t(option.mode)}>{t(option.mode)}</ToggleGroupItem>
+    })}
   </ToggleGroup>
   return <div data-slot="thread-mode" data-locked={view.locked ? '' : undefined} aria-busy={pending || undefined} className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
     {/* A disabled group still needs its reason; the wrapper is what receives the tooltip. */}
@@ -45,15 +49,21 @@ export interface ThreadModeNoticeContentProps {
   view: ThreadModePickerView | null
   /** The last refused transition, if any; a 409 means the read needs a refresh, not a retry. */
   error?: ThreadModeTransitionError | null
+  /** Only offered when the stored choice is unsupported and no run holds it. */
+  onSwitchToExecute?: () => void
 }
 
 /** What the mode means, above the composer; the picker itself is in the header. */
-export function ThreadModeNoticeContent({ view, error = null }: ThreadModeNoticeContentProps) {
+export function ThreadModeNoticeContent({ view, error = null, onSwitchToExecute }: ThreadModeNoticeContentProps) {
   const t = useTranslations('IssueThreads.mode')
   if (!view) return null
   const text = view.mode === 'plan' ? t('planNotice') : view.mode === 'ask' ? t('askNotice') : t('executeNotice')
   return <div data-slot="thread-mode-notice" className="flex min-w-0 flex-col gap-0.5 px-1 text-xs text-muted-foreground">
-    <p>{text}{view.locked ? ` ${t('locked')}` : ''}</p>
+    <p>{text}{view.locked && !view.selectedUnsupported ? ` ${t('locked')}` : ''}</p>
+    {view.selectedUnsupported && <div className="flex flex-wrap items-center gap-2">
+      <span>{t('unsupportedSelected')}</span>
+      {onSwitchToExecute && <Button variant="ghost" size="sm" className="h-6 px-2" onClick={onSwitchToExecute}>{t('switchToExecute')}</Button>}
+    </div>}
     {error && <p role="alert" className="text-destructive-foreground">{t(error)}</p>}
   </div>
 }
