@@ -405,3 +405,114 @@ test('thread identity reads keep owner-only, live membership and checkpoint beha
     await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer, outsider]])
   }
 })
+
+test('task-run visibility skips unused team metadata without weakening fresh workspace authority', { skip: !enabled }, async t => {
+  const { pool, db } = await import('../lib/db')
+  const { pollTaskRuns } = await import('../app/actions/task-runs')
+  const { issueVisibility } = await import('../lib/issue-visibility')
+  const { issues } = await import('../lib/db/schema')
+  const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
+  const { activityFixtureSession } = await import('./fixtures/activity-runtime.mjs')
+  const { tokenWorkspace } = await import('../lib/tokens/principal')
+  const { enterprisePrincipal } = await import('../lib/enterprise/principal')
+  const { bumpLiveRevisions } = await import('../lib/live/revisions')
+  const { createRequire } = await import('node:module')
+  const { statementStructure } = createRequire(import.meta.url)('../apps/desktop/test/db-query-diagnostics.cjs') as {
+    statementStructure(text: string): { value?: { status: string; normalizedStructureId: string; command: string; parameterCount: number } }
+  }
+  const owner = 'task-run-scope-' + randomUUID(), peer = 'task-run-other-' + randomUUID()
+  const personal = randomUUID(), selected = randomUUID(), foreign = randomUUID(), team = randomUUID(), agent = randomUUID()
+  const personalIssue = randomUUID(), selectedIssue = randomUUID(), personalRun = randomUUID(), selectedRun = randomUUID()
+  const links = [selectedIssue, ...Array.from({ length: 128 }, () => randomUUID())]
+  type PrincipalOptions = { pin?: string; enterprise?: boolean }
+  const asSelected = <T>(workspaceId: string, work: () => Promise<T>, principal: PrincipalOptions = {}) => withActivitySession(owner, () => {
+    const session = activityFixtureSession()
+    assert.ok(session?.user)
+    if (principal.pin) Object.assign(session.user, { [tokenWorkspace]: principal.pin })
+    if (principal.enterprise) Object.assign(session.user, { [enterprisePrincipal]: { kind: 'session', sessionId: session.session.id } })
+    return runRequestScope(createRequestScope(new Request('http://localhost/api/desktop/rpc', {
+      headers: { 'x-mikka-workspace-id': workspaceId },
+    })), work)
+  }, workspaceId)
+  const poll = (workspaceId: string, principal: PrincipalOptions = {}) => asSelected(workspaceId, () => pollTaskRuns(), principal)
+  const teamReads = (values: Read[]) => values.filter(read => /from "mikka_(teams|team_issues)"/.test(read.text))
+  try {
+    for (const user of [owner, peer]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, user + '@example.invalid'])
+    await seedFixtureWorkspace(pool, owner, 'personal', personal)
+    await seedFixtureWorkspace(pool, owner, 'team', selected)
+    await seedFixtureWorkspace(pool, peer, 'personal', foreign)
+    await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,\'Task visibility fixture\',\'codex\')', [agent, owner])
+    for (const [issue, run, workspace] of [[personalIssue, personalRun, personal], [selectedIssue, selectedRun, selected]]) {
+      await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES($1,$2,\'Task visibility\',\'{}\',\'todo\',\'normal\',$3,\'bound\')', [issue, owner, workspace])
+      await pool.query('INSERT INTO agent_runs(id,"userId","issueId","agentId","workspaceId",status,prompt) VALUES($1,$2,$3,$4,$5,\'running\',\'Task visibility\')', [run, owner, issue, agent, workspace])
+    }
+    await pool.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,\'Task visibility\',\'VISIBILITY\')', [team, selected, owner])
+    await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") SELECT id,$2,$3,$4 FROM unnest($1::uuid[]) id', [links, team, selected, owner])
+    const revisions = await bumpLiveRevisions(pool, [{ kind: 'task_run_list', id: selected }])
+
+    await t.test('the existing no-links option keeps the exact real predicate and avoids two pages of unused links', async () => {
+      const before = await measured(() => asSelected(selected, () => issueVisibility({ id: owner }, false, selected)))
+      const after = await measured(() => asSelected(selected, () => issueVisibility({ id: owner }, false, selected, db, { withTeamLinks: false })))
+      assert.equal(before.value.links.length, 129)
+      assert.deepEqual(after.value.links, [])
+      assert.deepEqual(before.value.workspaceIds, after.value.workspaceIds)
+      const oldRows = db.select({ id: issues.id }).from(issues).where(before.value.predicate)
+      const newRows = db.select({ id: issues.id }).from(issues).where(after.value.predicate)
+      assert.deepEqual(newRows.toSQL(), oldRows.toSQL(), 'tenant, bound ownership and deleted-row predicate are byte-identical')
+      assert.deepEqual(await oldRows, [{ id: selectedIssue }])
+      assert.deepEqual(await newRows, [{ id: selectedIssue }])
+      const scopeReads = before.reads.filter(read => read.text.includes('from "mikka_teams"'))
+      assert.equal(scopeReads.length, 1)
+      assert.deepEqual(statementStructure(scopeReads[0].text).value, {
+        status: 'known', normalizedStructureId: '3a287aa80050', command: 'SELECT', parameterCount: 2,
+      }, 'the real Drizzle query has the R2 task-run metadata fingerprint')
+      assert.equal(before.reads.filter(read => read.text.includes('from "mikka_team_issues"')).length, 2)
+      assert.equal(teamReads(after.reads).length, 0)
+    })
+
+    await t.test('the real task-run action reads no team metadata and still reads current tenant membership', async sub => {
+      const result = await measured(() => poll(selected))
+      assert.deepEqual(result.value.items.map(row => row.runId), [selectedRun])
+      assert.equal(result.value.live.ownerId, owner)
+      assert.equal(result.value.live.workspaceId, selected)
+      assert.deepEqual(result.value.live.revisions, revisions, 'the same pre-data Live revision still reaches the caller')
+      assert.equal(result.reads.filter(read => read.fields.join(',') === 'id,kind'
+        && read.text.includes('from "mikka_workspaces"')).length, 1, 'the operation still performs its fresh workspace-membership read')
+      assert.ok(result.reads.every(read => read.route === '/actions/task-runs/read'))
+      sub.diagnostic(JSON.stringify({ read: 'task-run-visibility', selectedRows: result.value.items.length,
+        teamMetadataQueries: teamReads(result.reads).length, freshWorkspaceMembershipReads: result.reads.filter(read =>
+          read.fields.join(',') === 'id,kind' && read.text.includes('from "mikka_workspaces"')).length }))
+      assert.equal(teamReads(result.reads).length, 0, 'task runs consume only the predicate, never team settings or link pages')
+      assert.deepEqual((await poll(personal)).items.map(row => row.runId), [personalRun])
+    })
+
+    await t.test('token pinning and foreign-workspace denial remain on the original action path', async () => {
+      assert.deepEqual((await poll(selected, { pin: selected })).items.map(row => row.runId), [selectedRun])
+      await assert.rejects(poll(selected, { pin: personal }), { code: 'workspaceAccessDenied' })
+      await assert.rejects(poll(foreign), { code: 'workspaceAccessDenied' })
+      await assert.rejects(poll(foreign, { pin: foreign, enterprise: true }), { code: 'workspaceAccessDenied' })
+    })
+
+    await t.test('suspension and removal are fresh on every call even with trusted principal provenance', async () => {
+      for (const status of ['suspended', 'removed']) {
+        await pool.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [selected, owner, status])
+        for (const principal of [{}, { pin: selected }, { enterprise: true }]) {
+          await assert.rejects(poll(selected, principal), { code: 'workspaceAccessDenied' })
+        }
+        assert.deepEqual((await poll(personal)).items.map(row => row.runId), [personalRun], 'denial never borrows the selected tenant or hides the owner personal run')
+      }
+      await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [selected, owner])
+      assert.deepEqual((await poll(selected, { enterprise: true })).items.map(row => row.runId), [selectedRun])
+    })
+  } finally {
+    await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [[personalRun, selectedRun]])
+    await pool.query('DELETE FROM agents WHERE id=$1', [agent])
+    await pool.query('DELETE FROM live_revisions WHERE kind=\'task_run_list\' AND id=$1', [selected])
+    await pool.query('DELETE FROM mikka_team_issues WHERE "teamId"=$1', [team])
+    await pool.query('DELETE FROM mikka_teams WHERE id=$1', [team])
+    await pool.query('DELETE FROM issues WHERE id=ANY($1::uuid[])', [[personalIssue, selectedIssue]])
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [[personal, selected, foreign]])
+    await pool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [[personal, selected, foreign]])
+    await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
+  }
+})
