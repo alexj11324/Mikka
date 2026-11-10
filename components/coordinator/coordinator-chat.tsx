@@ -570,7 +570,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {/* One live sentence, not a stored event line; the thread is an inline link inside it (decision 2026-11-10). */}
       {waitingQuestions.length > 0 && <p data-slot="waiting-questions" className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground">
         <span role="status" aria-live="polite" aria-atomic="false" className="inline-flex min-w-0 items-center gap-1.5"><CircleHelp aria-hidden="true" className="size-3.5 shrink-0 text-warning" />{t('waitingQuestions', { count: waitingQuestions.length })}</span>
-        {waitingQuestions[0].runId && <button type="button" className="inline-flex min-h-11 min-w-0 max-w-full items-center rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring md:min-h-7" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="min-w-0 truncate">{waitingQuestions[0].title}</span></button>}
+        {waitingQuestions[0].runId && <Button variant="link" size="xs" className="h-auto min-w-0 max-w-full px-0 font-normal" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="min-w-0 truncate">{waitingQuestions[0].title}</span></Button>}
       </p>}
       <PendingActions />
     </>
@@ -720,7 +720,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {/* One live sentence, not a stored event line; the thread is an inline link inside it (decision 2026-11-10). */}
       {waitingQuestions.length > 0 && <p data-slot="waiting-questions" className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground">
         <span role="status" aria-live="polite" aria-atomic="false" className="inline-flex min-w-0 items-center gap-1.5"><CircleHelp aria-hidden="true" className="size-3.5 shrink-0 text-warning" />{t('waitingQuestions', { count: waitingQuestions.length })}</span>
-        {waitingQuestions[0].runId && <button type="button" className="inline-flex min-h-11 min-w-0 max-w-full items-center rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring md:min-h-7" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="min-w-0 truncate">{waitingQuestions[0].title}</span></button>}
+        {waitingQuestions[0].runId && <Button variant="link" size="xs" className="h-auto min-w-0 max-w-full px-0 font-normal" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="min-w-0 truncate">{waitingQuestions[0].title}</span></Button>}
       </p>}
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
