@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "enabled": true,
+  "enabled": false,
   "repository": "alexj11324/Mikka",
   "branch": "ops/1512-native-live-diagnostic-20261110",
   "requestId": "6e1a5e12-269f-44be-9ef5-a05d6f5088c1",
@@ -268,5 +268,7 @@
     "supersededUnpublishedCandidate": "0df2e2740defd140200a161249203319ae45c280",
     "collectorFinalReview": "14642bffcb3c0428025865fe21eeb446d0bc5c65"
   },
-  "scope": "One diagnostic run only. Does not satisfy formal Native SQL or production acceptance. No main or PR head mutation."
+  "scope": "One diagnostic run only. Does not satisfy formal Native SQL or production acceptance. No main or PR head mutation.",
+  "closed": true,
+  "admittedCandidate": "2e2f75de15a01858ac0990bbcf4b50156832dbc7"
 }

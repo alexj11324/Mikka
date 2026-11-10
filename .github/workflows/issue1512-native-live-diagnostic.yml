@@ -19,8 +19,7 @@ env:
 
 jobs:
   native-arm64:
-    if: >-
-      github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/ops/1512-native-live-diagnostic-20261110' && github.run_attempt == 1 && github.event.head_commit.message == 'ci: admit issue1512 native read diagnostic 6e1a5e12-269f-44be-9ef5-a05d6f5088c1'
+    if: false
     name: Issue1512 diagnostic only — original Native lifecycle
     runs-on: macos-26  # Standard ARM64 runner; macOS 26 is required for the shared glass icon.
     timeout-minutes: 150
