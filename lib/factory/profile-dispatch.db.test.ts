@@ -2022,13 +2022,14 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       { issueId, profileId: f.implement!.id, location: 'cloud', cloudPurpose: 'task' })
     const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents[harness], harness, f.connections[harness], model[harness])
     const queue = (tx: import('pg').PoolClient, sourceEventId: string, idempotencyKey: string,
-      agentId = f.agents[harness], deviceRepoId = f.repoId) => queueCloudRun(pool, f.actor, {
+      agentId = f.agents[harness], deviceRepoId = f.repoId,
+      factoryContext?: { attemptId: string; sourceEventId: string }) => queueCloudRun(pool, f.actor, {
       botId: f.botId, issueId, agentId, deviceRepoId, title: 'Review feedback fixture',
       body: 'ORIGINAL_OWNER_REQUEST must survive feedback.', model: model[harness], subscriptionBindingId,
       ...(selected?.agentProfile ? { agentProfile: selected.agentProfile } : {}), sourceEventId, idempotencyKey,
-    }, tx)
+    }, tx, factoryContext)
     const dispatch = createFactoryDispatch(pool, f.store, (tx, _owner, input, _bot, context) =>
-      queue(tx, context.sourceEventId, 'factory:' + context.attemptId, input.agentId, input.deviceRepoId))
+      queue(tx, context.sourceEventId, 'factory:' + context.attemptId, input.agentId, input.deviceRepoId, context))
     let runId: string
     if (mode === 'ordinary') {
       const tx = await pool.connect()
