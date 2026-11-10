@@ -30,6 +30,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/governance/templates.ts', file: 'tests/team-governance-api.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/governance/entitlements.ts', file: 'tests/governance-seats.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/task-workspace.ts', file: 'tests/task-workspace-governance.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'lib/resource-access/store.ts', file: 'tests/resource-access.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/cloud-services/store.ts', file: 'lib/cloud-services/client.db.test.ts', script: 'test:cloud-services-db' },
   { marker: 'app/api/web/exchange/route.ts', file: 'tests/web-auth-handoff.db.test.ts', script: 'test:web-auth-db' },
   { marker: 'lib/workspace-selection.ts', file: 'tests/web-workspace-selection.db.test.ts', script: 'test:web-auth-db' },
