@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { db } from '@/lib/db'
 import { scheduleChatMessage } from '@/lib/schedules/chat-result'
+import { credentialMasker, maskDeep } from '@/lib/secrets/mask'
 
 type MessageRow = { id?: string; message: Record<string, unknown> }
 type Receipt = { operationId: string; title: string; status: string; result: unknown }
@@ -21,6 +22,6 @@ export async function projectScheduleResults<T extends MessageRow>(executor: Pic
   const receipts = new Map(result.rows.map(row => [row.operationId, row]))
   return rows.map(row => {
     const receipt = row.id ? receipts.get(row.id) : undefined
-    return receipt ? { ...row, message: { ...row.message, ...scheduleChatMessage(receipt.title, receipt.status, receipt.result) } } : row
+    return receipt ? { ...row, message: { ...row.message, ...maskDeep(scheduleChatMessage(receipt.title, receipt.status, receipt.result),credentialMasker) } } : row
   })
 }

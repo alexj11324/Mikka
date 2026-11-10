@@ -468,6 +468,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       // 重新发送 retried this failed message in place (store.sendRetryOf): the new attempt stands for it.
       if ((message as { mikkaRetried?: unknown }).mikkaRetried === true) continue
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+      // Compatibility only for rows without an audience. New host formats must
+      // declare display metadata; a marked person's same words are never guessed at.
       // The request for its welcome is for the Coordinator only. When the turn answering it failed (store.failTurn),
       // the Bot's side says why, with 重试, until a reply follows (the welcome request had no other trace in the chat).
       if (display?.kind === 'welcome' || (!display && raw.startsWith(COORDINATOR_WELCOME_MARK))) {

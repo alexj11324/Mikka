@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import type { db } from '@/lib/db'
 import { sourcedEventMessage } from './message-safety'
 import { projectScheduleResults } from './schedule-result-projection'
+import { credentialMasker, maskDeep } from '@/lib/secrets/mask'
 
 type MessageRow = { id?: string; message: Record<string, unknown> }
 const UUID = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
@@ -18,7 +19,7 @@ export async function projectMessageDisplays<T extends MessageRow>(executor: Pic
     && typeof (row.message.mikkaUserEvent as {id?:unknown}).id === 'string' ? [row.id] : [])
   if (!ids.length) return projected
   const result = await executor.execute<{messageId:string;payload:Record<string,unknown>}>(sql`
-    select m.id as "messageId",e.payload from coordinator_messages m join coordinator_events e
+    select m.id as "messageId",jsonb_build_object('text',e.payload->'text','source',e.payload->'source') as payload from coordinator_messages m join coordinator_events e
       on e.id=(case when m.message#>>'{mikkaUserEvent,id}' ~* ${UUID} then m.message#>>'{mikkaUserEvent,id}' end)::uuid
         and e."userId"=m."userId" and e."botId" is not distinct from m."botId" and e.kind='user_message'
     where m."userId"=${ownerId} and m.id in (${sql.join(ids.map(id=>sql`${id}::uuid`),sql`,`)})
@@ -28,7 +29,7 @@ export async function projectMessageDisplays<T extends MessageRow>(executor: Pic
   return projected.map(row=>{
     const payload=row.id?receipts.get(row.id):undefined
     if (!payload || typeof payload.text!=='string') return row
-    const message=sourcedEventMessage({kind:'user_message',issueId:null,runId:null,payload},payload.text)
+    const message=maskDeep(sourcedEventMessage({kind:'user_message',issueId:null,runId:null,payload},payload.text),credentialMasker)
     return {...row,message:{...row.message,mikkaDisplay:message.mikkaDisplay}}
   })
 }

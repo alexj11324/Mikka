@@ -815,7 +815,7 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
   // A retry (重试, or an interrupted turn) re-answers a message already in the chat (postedToChat): no second bubble.
   const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && event.payload.source !== 'coordinator_welcome'
     && (event.payload.source === 'person' || !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK))).map((event, index) => ({
-    position: last + index + 1, createdAt: event.createdAt, message: sourcedEventMessage(event, eventPrompt(event)), pending: true as const,
+    position: last + index + 1, createdAt: event.createdAt, message: maskDeep(sourcedEventMessage(event, eventPrompt(event)),credentialMasker), pending: true as const,
   }))
   const read = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   // An older page (history): a welcome failure there was answered by what came after it, so it is not shown.

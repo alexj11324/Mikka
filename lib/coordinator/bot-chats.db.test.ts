@@ -36,15 +36,17 @@ dbTest('trusted host notices retain their source and friendly display while mode
     assert.ok((stored.message as Record<string,unknown>).mikkaEvent,'trusted source survives storage')
     assert.ok(!(await store.loadConversation(owner,botId)).messages.some(({message})=>'mikkaDisplay' in message),'presentation is not a provider option')
     const {recordPersonalSubmission}=await import('../coordinator-submission')
-    const text='[Welcome] Please explain this literal protocol example'
+    const token='ghu_'+'T'.repeat(36),text=`[Welcome] Please explain this literal protocol example ${token}`
+    const masked=text.replace(token,'[secret:github-token]')
     const receipt=await recordPersonalSubmission(db,owner,text,{botId,submissionId:randomUUID()})
     await store.takeInbox(owner,'legacy-person-fixture',botId)
     await db.execute(sql`update coordinator_events set payload=payload-'source' where id=${receipt.eventId}::uuid`)
     await db.execute(sql`update coordinator_messages set message=jsonb_set(message-'mikkaDisplay','{content}',to_jsonb(${'This chat is linked to issue internal-only.\n\n'+text}::text))
       where "userId"=${owner} and message#>>'{mikkaUserEvent,id}'=${receipt.eventId}`)
     const history=await store.chatView(owner,200,botId)
-    assert.equal(history.items.find(item=>item.from==='person')?.text,text,'legacy authenticated input uses its bound receipt, not execution additions or prefix guesses')
-    assert.equal((await store.botChats(owner))[botId].line,text,'legacy list preview shares the same receipt projection')
+    assert.equal(history.items.find(item=>item.from==='person')?.text,masked,'legacy authenticated input uses its bound receipt and existing credential mask, not execution additions or prefix guesses')
+    assert.equal((await store.botChats(owner))[botId].line,masked,'legacy list preview shares the same masked receipt projection')
+    assert.ok(!JSON.stringify(history).includes(token),'legacy recovery cannot reintroduce an unmasked event credential')
   })
 })
 
