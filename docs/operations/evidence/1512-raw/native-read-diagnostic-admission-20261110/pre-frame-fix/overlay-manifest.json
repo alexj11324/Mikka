@@ -1,0 +1,385 @@
+{
+  "version": 1,
+  "status": "COMPLETE_TEMPORARY_OVERLAY_CANDIDATE_NOT_PUBLISHED_NOT_EXECUTED",
+  "issue": 1512,
+  "source": {
+    "repository": "alexj11324/Mikka",
+    "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a"
+  },
+  "purpose": "Explain the real full-login Native441/Web331 failure using unchanged business reads and exact original fixture windows. This instrumented run is causal diagnosis only and cannot constitute a formal budget pass.",
+  "files": [
+    {
+      "path": "lib/diagnostics/issue1512-native-reads.mjs",
+      "base": null,
+      "sha": "6a9eed46a4062eeebc1b0f9984f0d6fe25d8dca7",
+      "bytes": 7916,
+      "sha256": "e748c66a85eb09bd2630b9a661ce9d0234b68fe9b6574e107dec114612faedf0"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-native-reads.d.mts",
+      "base": null,
+      "sha": "c7e36b323dd04a52d9df4948a9ad503af4ae028f",
+      "bytes": 1823,
+      "sha256": "127df8c7aa7f99de75fe88ad420b67412d8d8420647a3d493dabe85d2ee1b16c"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "base": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "sha": "39d63bd92fbc9ed4c0b568694b67df28a49c6e65",
+      "bytes": 10363,
+      "sha256": "a89b07dcb399681dd434d8bd4307a99feb6786a597213e0be489b903da6f2949"
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "base": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+      "sha": "1bdf18021a9c614549bd165f41555ccd0b527479",
+      "bytes": 4727,
+      "sha256": "4561c0908805628eadda2eb6f23247a6789ec243d3dc4dd63b4bd3d2d8724f29"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "base": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+      "sha": "8fd8ad5fc8324caa0e1734887ea77eea60765b93",
+      "bytes": 10062,
+      "sha256": "d4668f3832459160aa25b045080f622919afd4cf6041faf5b18c7a5d0542231d"
+    },
+    {
+      "path": "lib/coordinator/chat-read-client.ts",
+      "base": "c5588e067ff295cc81b5c3e35ea5307fbd94bf57",
+      "sha": "668f6c2be742d2cccd25e416a73998d2baf2ed08",
+      "bytes": 4534,
+      "sha256": "7acee170698db55bd8a9b8658d1bc1b2a8a0ed1c4ac2fe439cb0e2c996f3235a"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "base": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "sha": "5f43ea9f39d9354955fe60e390aa76665ce83f99",
+      "bytes": 25440,
+      "sha256": "613d75da047a4059b822cf070f8a330c323e836a4d108fff5dc43f9ef0c77e97"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "base": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "sha": "ecd547d17c1a32cd360090621d22bc3e4e41d732",
+      "bytes": 5493,
+      "sha256": "94966e43cc8b0cb20c2a28e9a2dedd2cf41cc9abdb114e57a43dd2bd9711270e"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "base": "e7f6972a23519ae45e059038cd0c404789d44a98",
+      "sha": "64038a0aaae11888d1b32ff0f21498612013dfeb",
+      "bytes": 6628,
+      "sha256": "ac75d6ececb7a7ccd0acf6a15b69ea7db196390f8213bc29f7cfea4b5a861f9a"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-read-collector.mjs",
+      "base": null,
+      "sha": "ad525f3c4c5d5db1916dae5fea714d4bd47dc9a7",
+      "bytes": 5174,
+      "sha256": "24a9deebb761198d1a43da74e9e5c0f45628ea11f3d1526ab81699dfb201b90b"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-read-collector.d.mts",
+      "base": null,
+      "sha": "1a19642f991012cf2b9c9b23354e32bc5833a800",
+      "bytes": 949,
+      "sha256": "d362863a1eb03b3bc6a027e67131524764c9c55b570cfb1d1ce9d63ed713c15c"
+    },
+    {
+      "path": "apps/desktop/src/main/index.ts",
+      "base": "61da70923e2109761919f8b4968c0cb701917ff3",
+      "sha": "59b8685db01b9dfaf870e2cf21cba0ab2ff7bb13",
+      "bytes": 29940,
+      "sha256": "543ffe0a81ce6632107b2a6338297f8285aee9aebc5a66662b61706849781773"
+    },
+    {
+      "path": "apps/desktop/src/preload/index.ts",
+      "base": "1e62cd5e98e17554733e75915d2d9f03e99f7826",
+      "sha": "70fce399664dd440aa4a96cfa36b502f1e0957e4",
+      "bytes": 7585,
+      "sha256": "3af88f827a8d7e3a1e64066a971a6f17224e1cc0704ae560e87eec0547690bad"
+    },
+    {
+      "path": "apps/desktop/test/native-read-diagnostic.mjs",
+      "base": null,
+      "sha": "a164a94125835b901f8ce47e9d8746f71c653cfe",
+      "bytes": 1910,
+      "sha256": "827daeebd8e92ad6d99ea16776950dc8bee2efca0e54a7ad9aad8ae276e8ca37"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "base": "8251fc9aa56103614d1ddff944668930d1da937c",
+      "sha": "bb4b1a3e28514d6cfaf811568fb6b041a3191715",
+      "bytes": 33042,
+      "sha256": "1169b6e4e5cfa0ad3818c8b4857d38df3e128e9bdebc6a9806e69668b388ffe9"
+    },
+    {
+      "path": "apps/desktop/test/native-read-diagnostic.test.mjs",
+      "base": null,
+      "sha": "6126f6ff7694e47b1e308b1436b0d5557152c474",
+      "bytes": 12700,
+      "sha256": "3963670300a5f15f32c08e26c8435b8a6dd09827265d63622784ff77720a9159"
+    }
+  ],
+  "activation": {
+    "entryEnv": {
+      "MIKKA_1512_LIFECYCLE_READ_DIAGNOSTIC": "1"
+    },
+    "internalChildEnv": "MIKKA_1512_READ_DIAGNOSTIC",
+    "internalArgument": "--mikka-1512-read-diagnostic",
+    "guard": "Only lifecycle translates its own opt-in into the child env; main passes a boolean through the existing top-frame/own-origin preload guard. Web lifecycle installs the boolean before goto. Recorder default is off; no build flag/dependency added.",
+    "scope": "No formal/main ref edits; no source besides H plus these explicit diagnostic files. No application account/model/business action changed."
+  },
+  "output": {
+    "file": "existing lifecycle.json",
+    "addedField": "readDiagnostics",
+    "prefix": "MIKKA_1512_READ_DIAGNOSTIC_V1 ",
+    "currentCapture": "Native current-page view is copied in the existing recordNativeState page.evaluate after usable timing/query checkpoint; a closed main snapshot follows outside the budget. Web current view is copied only after its original complete checkpoint. Existing native-startup.mjs is unchanged.",
+    "navigationCapture": "Only pagehide serializes one new closed prefix; main listener attaches before first loadURL; Web listener is installed before first goto. Phase views are nondestructive and do not advance dump sequence/cursor.",
+    "completion": "status complete describes closed-prefix capture, not settled reads or passed query budgets. Open in-flight records are retained without waiting. Expected dom-ready/DCL document counts, dump/row sequence, counter conservation, monotonic times, realm identity, exact event arity/enums and overflow are checked. Missing exports are incomplete and never reconstructed from a later document.",
+    "bounds": {
+      "rowsPerRealm": 4096,
+      "localKeysPerRealm": 1024,
+      "dumpsPerMainCollector": 128,
+      "rowsPerMainCollector": 32768,
+      "reviewRealms": 64
+    }
+  },
+  "numericSchema": {
+    "row": [
+      "seq",
+      "performanceNowMs",
+      "event",
+      "...closedNumericFields"
+    ],
+    "realm": "two random uint32 values, local to this document; no user/workspace IDs",
+    "clock": "performance.timeOrigin plus relative performanceNowMs; same-realm sequence/readBoundary comparisons are primary, not proximity of timestamps",
+    "events": {
+      "1": [
+        "realm"
+      ],
+      "2": [
+        "readBegin",
+        "readId",
+        "cacheId",
+        "keyId",
+        "began"
+      ],
+      "3": [
+        "pendingCapture",
+        "readId"
+      ],
+      "4": [
+        "pendingNotify",
+        "readId",
+        "pendingDispatchAt"
+      ],
+      "5": [
+        "pendingRevoke",
+        "readId",
+        "reason1RepeatedCapture2RepeatedNotify3Superseded"
+      ],
+      "6": [
+        "proof",
+        "proofFunctionId",
+        "actualDispatchBarrier"
+      ],
+      "7": [
+        "readReceive",
+        "readId",
+        "receivedProofBarrierOr0",
+        "effectiveBegan"
+      ],
+      "8": [
+        "readSettle",
+        "readId",
+        "outcome1Committed2Discarded3Failed",
+        "effectiveBegan",
+        "accepted",
+        "superseded"
+      ],
+      "9": [
+        "readAccept",
+        "readId"
+      ],
+      "10": [
+        "action",
+        "localActionId",
+        "localReadIdOr0",
+        "fixedActionCode"
+      ],
+      "11": [
+        "enqueue",
+        "localActionId"
+      ],
+      "12": [
+        "dispatch",
+        "localRequestId",
+        "fixedActionCode",
+        "proofFunctionIdOr0",
+        "endpoint1Native2Web"
+      ],
+      "13": [
+        "dispatchAction",
+        "localRequestId",
+        "localActionId"
+      ],
+      "14": [
+        "response",
+        "localRequestId",
+        "httpStatusOr0NetworkFailure"
+      ],
+      "15": [
+        "fresh",
+        "cacheId",
+        "keyId",
+        "after",
+        "readIdOr0",
+        "branch",
+        "branchSpecificNumericFields"
+      ],
+      "16": [
+        "channel",
+        "channelId",
+        "state",
+        "generation",
+        "stateSpecificNumericField"
+      ],
+      "17": [
+        "subscription",
+        "channelId",
+        "generation",
+        "subscriptionId",
+        "keyId",
+        "fixedKindCode",
+        "1Add2Remove"
+      ],
+      "18": [
+        "invalidate",
+        "channelId",
+        "generation",
+        "keyId",
+        "incomingAfter",
+        "pendingAfter",
+        "immediate",
+        "unsupportedOnly",
+        "revisionOr0",
+        "cause0Other1Open2LateSubscription"
+      ],
+      "19": [
+        "flush",
+        "channelId",
+        "generation",
+        "keyId",
+        "after",
+        "unconditional",
+        "waitCount"
+      ],
+      "20": [
+        "scopeReset",
+        "generation",
+        "retiredPendingCount"
+      ],
+      "21": [
+        "incoming",
+        "channelId",
+        "generation",
+        "fixedKindCode",
+        "existingAfter",
+        "revisionOr0"
+      ]
+    },
+    "freshBranches": {
+      "1": "no_read_revalidate",
+      "2": "captured_not_notified_revalidate",
+      "3": "existing_read_before_boundary_revalidate",
+      "4": "wait_read_began_after",
+      "5": "wait_pending_dispatch_after",
+      "6": "current_lifetime_retired",
+      "7": "revoked_new_read_continue",
+      "8": "revoked_revalidate",
+      "9": "failed_propagate_same_error",
+      "10": "committed_applied_accepted_reuse",
+      "11": "accepts_rejected",
+      "12": "no_covering_next_read_revalidate",
+      "13": "new_read_continue"
+    },
+    "channelStates": {
+      "1": "construct",
+      "2": "connect_begin",
+      "3": "socket_open",
+      "4": "live_ready_existing_coverageAfter",
+      "5": "close_existing_connected_flag",
+      "6": "presence_ack_existing_coverageAfter"
+    }
+  },
+  "invariants": {
+    "fixture": [
+      {
+        "name": "query_windows",
+        "byteIdentical": true,
+        "bytes": 731,
+        "sha256": "39aea78dca6156a3a8e43a141e6da96c98d40badc1d9b752c960b8ca41f258fb"
+      },
+      {
+        "name": "usable_and_fixture",
+        "byteIdentical": true,
+        "bytes": 1520,
+        "sha256": "9de901d4dc9328274e5d80fbf1942feb114fd2260cf92aa1162b3df9b5ee2cb2"
+      },
+      {
+        "name": "native_login",
+        "byteIdentical": true,
+        "bytes": 586,
+        "sha256": "1bcf8d070d9ddc51d3aacf0a35a65727ca2c034fa07284066f917621d8c5f1bd"
+      },
+      {
+        "name": "cold_pairs",
+        "byteIdentical": true,
+        "bytes": 2052,
+        "sha256": "1732569370256e4e50244469acbe962445941ec90b3ad87723346e754e456eb3"
+      },
+      {
+        "name": "all_remaining_assertions_and_cleanup",
+        "byteIdentical": true,
+        "bytes": 9128,
+        "sha256": "7bc0565bf3a90430ac388d264ebbe4c807de14b17da724c35806ab2a0cc13014"
+      }
+    ],
+    "originalReadObserverPredicateAndBarrierCallsSameOrder": true,
+    "originalReadBatchCurrentAndFallbackCallsSameOrder": true,
+    "originalSnapshotAllowlistUnchanged": true,
+    "originalWireArgumentsAndEnvelopeUnchanged": true,
+    "noNewBusinessAwaitPollingTimersReadsOrHeaders": true,
+    "diagnosticToken": "Explicit integer token is captured before existing hydration awaits and synchronously restored only at the original action call with try/finally; it never supplies actual snapshot proof or authorization.",
+    "nonSWR": "Read ID 0 is valid for bootstrap/session/switch and other non-SWR calls. It is not guessed into a read; any target read lacking its association remains unknown.",
+    "supersededHypothesis": "The pre-dispatch queue-only window has not been observed. First Native batch entered/completed before live ticket requests in existing frozen SQL-selected receipts; this diagnostic focuses channel subscription/open/ready/actual read boundaries without assuming a root cause."
+  },
+  "tests": {
+    "command": "node --test apps/desktop/test/native-read-diagnostic.test.mjs",
+    "runtimeDependencies": "Node standard library only; no readFileSync or repo source reads by tests",
+    "inputPaths": [
+      "lib/diagnostics/issue1512-native-reads.mjs",
+      "lib/diagnostics/issue1512-read-collector.mjs",
+      "apps/desktop/test/native-read-diagnostic.test.mjs"
+    ],
+    "cases": 29,
+    "v8": {
+      "passed": 29,
+      "proof": "afd6a5701c0f8a2d219b0465a014efac81e1481a",
+      "claim": "Not Node execution; earlier event21 upper-bound miss preserved in proof then corrected"
+    },
+    "actualNode": "PENDING_ROOT_VM"
+  },
+  "review": {
+    "priorCore": "94932f449f249bc56ba3ad972e7101baef377a1d (older helper/channel; unchanged seven core product files)",
+    "priorSchema": "aced49769dcbf0c8e23cb218585b344527dcadad (prior core; collector pending)",
+    "final": "PENDING"
+  },
+  "resources": {
+    "startedByThisAgent": 0,
+    "originalActionsRereads": 0,
+    "branchesModified": 0
+  }
+}

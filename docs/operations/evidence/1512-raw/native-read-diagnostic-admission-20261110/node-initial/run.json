@@ -1,0 +1,35 @@
+{
+  "at": "2026-11-10T04:27:14.541Z",
+  "sessionId": "sbx_VxjtCFvMk4BafLea7XvD2OmVl8hW",
+  "cwd": "/vercel/sandbox/issue1512-native-diagnostic",
+  "mkdir": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"items\": [\n      {\n        \"command\": {\n          \"id\": \"cmd_24ea8cb30cbc4799b9317bd679b4\",\n          \"name\": \"mkdir\",\n          \"args\": [\n            \"-m\",\n            \"700\",\n            \"-p\",\n            \"/vercel/sandbox/issue1512-native-diagnostic\"\n          ],\n          \"cwd\": \"/vercel/sandbox\",\n          \"sessionId\": \"sbx_VxjtCFvMk4BafLea7XvD2OmVl8hW\",\n          \"startedAt\": 1794284832921,\n          \"exitCode\": null\n        }\n      },\n      {\n        \"command\": {\n          \"id\": \"cmd_24ea8cb30cbc4799b9317bd679b4\",\n          \"name\": \"mkdir\",\n          \"args\": [\n            \"-m\",\n            \"700\",\n            \"-p\",\n            \"/vercel/sandbox/issue1512-native-diagnostic\"\n          ],\n          \"cwd\": \"/vercel/sandbox\",\n          \"sessionId\": \"sbx_VxjtCFvMk4BafLea7XvD2OmVl8hW\",\n          \"startedAt\": 1794284832921,\n          \"exitCode\": 0,\n          \"durationMs\": 1\n        }\n      }\n    ],\n    \"context\": {\n      \"totalItems\": 2,\n      \"returnedItems\": 2,\n      \"truncated\": false\n    }\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  },
+  "upload": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {}\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  },
+  "run": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"items\": [\n      {\n        \"command\": {\n          \"id\": \"cmd_fbf93b43cbb546cc92592a64d416\",\n          \"name\": \"node\",\n          \"args\": [\n            \"runner.mjs\"\n          ],\n          \"cwd\": \"/vercel/sandbox/issue1512-native-diagnostic\",\n          \"sessionId\": \"sbx_VxjtCFvMk4BafLea7XvD2OmVl8hW\",\n          \"startedAt\": 1794284834006,\n          \"exitCode\": null\n        }\n      },\n      {\n        \"command\": {\n          \"id\": \"cmd_fbf93b43cbb546cc92592a64d416\",\n          \"name\": \"node\",\n          \"args\": [\n            \"runner.mjs\"\n          ],\n          \"cwd\": \"/vercel/sandbox/issue1512-native-diagnostic\",\n          \"sessionId\": \"sbx_VxjtCFvMk4BafLea7XvD2OmVl8hW\",\n          \"startedAt\": 1794284834006,\n          \"exitCode\": 0,\n          \"durationMs\": 486\n        }\n      }\n    ],\n    \"context\": {\n      \"totalItems\": 2,\n      \"returnedItems\": 2,\n      \"truncated\": false\n    }\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  }
+}

@@ -1,0 +1,269 @@
+{
+  "schema": "issue1512.production-dependency-metadata-delta.v1",
+  "observedAt": "2026-11-10 04:50:21 UTC",
+  "scope": "one read-only metadata refresh; no logs, artifacts, accounts, comments, resources or workflow actions",
+  "previousSnapshot": "19be3a51b8aa3af5af61c66cf50b268c4260a782",
+  "main": {
+    "sha": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+    "changed": false
+  },
+  "window": {
+    "commentsSince": "2026-11-10T04:16:30Z",
+    "returned": 9,
+    "completeFirstPage": true,
+    "actualOwner": "#1503 continuation owner; not available",
+    "actualWindow": {
+      "start": "2026-11-10T04:28:40Z",
+      "hardLimit": "2026-11-10T06:28:40Z",
+      "sourceComment": 6758996663
+    },
+    "uiRelease": {
+      "comment": 6759217537,
+      "createdAt": "2026-11-10T04:44:34Z",
+      "bodySays": "UI segment released 04:45; this is not #1503's release."
+    },
+    "latestMaterialStatement": {
+      "comment": 6759256859,
+      "createdAt": "2026-11-10T04:47:11Z",
+      "meaning": "R7 is terminal failure; owner is proceeding with its reviewed RO connection repair inside the current actual window, prepare entry cutoff05:03:40. Next source owner must wait for actual prepare receipt. P0#1851 follows; Factory has not begun. No #1503 release appears in this metadata response.",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6759256859"
+    },
+    "subsequentComment": {
+      "comment": 6759294409,
+      "createdAt": "2026-11-10T04:49:59Z",
+      "meaning": "#1506 PR1861 enters CI; explicitly holds no production window and respects #1503 then #1851 order."
+    },
+    "noClaim": "Preparation execution or child creation was not independently inspected; active ownership is supported by the owner's actual-window and continuation statements. UI release is not global availability."
+  },
+  "r7": {
+    "id": 42748352134,
+    "workflow_id": 405833668,
+    "head_sha": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "failure",
+    "updated_at": "2026-11-10T04:43:59Z",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42748352134",
+    "delta": "in_progress→completed/failure",
+    "jobsComplete": true,
+    "jobs": [
+      {
+        "id": 129605761509,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-10T03:16:32Z",
+        "completed_at": "2026-11-10T03:16:47Z"
+      },
+      {
+        "id": 129605861456,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-10T03:16:51Z",
+        "completed_at": "2026-11-10T03:17:09Z"
+      },
+      {
+        "id": 129605998135,
+        "name": "release / recheck",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-10T03:17:12Z",
+        "completed_at": "2026-11-10T03:17:25Z"
+      },
+      {
+        "id": 129606100850,
+        "name": "release / validate / build",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-10T03:17:31Z",
+        "completed_at": "2026-11-10T03:26:12Z"
+      },
+      {
+        "id": 129609268863,
+        "name": "release / await-web",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-10T03:26:15Z",
+        "completed_at": "2026-11-10T04:39:26Z"
+      },
+      {
+        "id": 129634323961,
+        "name": "release / subscriptions",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-11-10T04:41:28Z",
+        "completed_at": "2026-11-10T04:43:18Z"
+      },
+      {
+        "id": 129635610206,
+        "name": "release / cleanup",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-10T04:43:21Z",
+        "completed_at": "2026-11-10T04:43:44Z"
+      },
+      {
+        "id": 129635612068,
+        "name": "release / publish",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-11-10T04:43:19Z",
+        "completed_at": "2026-11-10T04:43:18Z"
+      },
+      {
+        "id": 129635756032,
+        "name": "release / remember-failure",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-10T04:43:47Z",
+        "completed_at": "2026-11-10T04:43:58Z"
+      }
+    ],
+    "counts": {
+      "success": 7,
+      "failure": 1,
+      "skipped": 1
+    },
+    "subscriptions": {
+      "job": 129634323961,
+      "status": "completed",
+      "conclusion": "failure",
+      "completedAt": "2026-11-10T04:43:18Z"
+    },
+    "published": false,
+    "publiclyReportedFailure": {
+      "comment": 6759256859,
+      "phase": "coordinator_stream / startup_dispatch_refused",
+      "code": "githubNotConnected",
+      "bothHarnessesFailedBeforeProviderExecution": true,
+      "cleanupErrorsEmpty": true,
+      "attribution": "Owner's published safe projection only; reviewer did not read original logs or ZIPs. This is not a subscriptions pass and cannot establish whether the earlier stream-observer defect recurred."
+    }
+  },
+  "web": {
+    "id": 42748999263,
+    "workflow_id": 406825791,
+    "head_sha": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "updated_at": "2026-11-10T04:39:17Z",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42748999263",
+    "delta": "in_progress→completed/success"
+  },
+  "pr1860": {
+    "head": "06ca88f2b15559c818b9a62523416eaf57fe06f5",
+    "base": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+    "mergeCommit": "cf7a2874329412d112c446e4cd2ffdd94e4eec1a",
+    "state": "open",
+    "draft": false,
+    "merged": false,
+    "mergeable": true,
+    "mergeableState": "clean",
+    "headChanged": false,
+    "workflowRuns": {
+      "count": 6,
+      "complete": true,
+      "runs": [
+        {
+          "id": 42753284585,
+          "name": "Cloud computer backend",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "success",
+          "head": "06ca88f2b15559c818b9a62523416eaf57fe06f5",
+          "updatedAt": "2026-11-10T04:05:50Z"
+        },
+        {
+          "id": 42753284668,
+          "name": "Browser gate",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "success",
+          "head": "06ca88f2b15559c818b9a62523416eaf57fe06f5",
+          "updatedAt": "2026-11-10T04:02:45Z"
+        },
+        {
+          "id": 42753284899,
+          "name": "E2B additive runtime release",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "success",
+          "head": "06ca88f2b15559c818b9a62523416eaf57fe06f5",
+          "updatedAt": "2026-11-10T04:03:01Z"
+        },
+        {
+          "id": 42753284844,
+          "name": "Workspace governance acceptance",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "success",
+          "head": "06ca88f2b15559c818b9a62523416eaf57fe06f5",
+          "updatedAt": "2026-11-10T04:04:36Z"
+        },
+        {
+          "id": 42753284789,
+          "name": "Unattended sandbox acceptance",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "success",
+          "head": "06ca88f2b15559c818b9a62523416eaf57fe06f5",
+          "updatedAt": "2026-11-10T04:04:51Z"
+        },
+        {
+          "id": 42753284670,
+          "name": "CI",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "success",
+          "head": "06ca88f2b15559c818b9a62523416eaf57fe06f5",
+          "updatedAt": "2026-11-10T04:28:31Z"
+        }
+      ]
+    },
+    "checkRuns": {
+      "count": 32,
+      "complete": true,
+      "success": 29,
+      "skipped": 3,
+      "pending": 0,
+      "failed": 0,
+      "skips": [
+        {
+          "id": 129621961037,
+          "name": "Cloud credential access (OIDC)"
+        },
+        {
+          "id": 129621803164,
+          "name": "release"
+        },
+        {
+          "id": 129621802415,
+          "name": "check"
+        }
+      ],
+      "includesGitGuardian": true
+    },
+    "delta": "All6PRworkflows nowSUCCESS;32checks=29SUCCESS+3SKIP; clean and mergeable, still unmerged. PR E2B checks do not substitute production R7.",
+    "url": "https://github.com/alexj11324/Mikka/pull/1860"
+  },
+  "sourceEndpoints": [
+    "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main",
+    "https://api.github.com/repos/alexj11324/Mikka/issues/1752/comments?since=2026-11-10T04%3A16%3A30Z&per_page=100",
+    "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42748352134",
+    "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42748352134/jobs?per_page=100",
+    "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42748999263",
+    "https://api.github.com/repos/alexj11324/Mikka/pulls/1860",
+    "https://api.github.com/repos/alexj11324/Mikka/actions/runs?head_sha=06ca88f2b15559c818b9a62523416eaf57fe06f5&per_page=100",
+    "https://api.github.com/repos/alexj11324/Mikka/commits/06ca88f2b15559c818b9a62523416eaf57fe06f5/check-runs?per_page=100"
+  ],
+  "actions": {
+    "originalLogOrArtifactReads": 0,
+    "accountActions": 0,
+    "resources": 0,
+    "comments": 0,
+    "refUpdates": 0,
+    "dispatches": 0
+  }
+}

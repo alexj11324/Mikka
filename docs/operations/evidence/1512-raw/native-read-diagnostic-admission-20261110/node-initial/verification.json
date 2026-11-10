@@ -1,0 +1,94 @@
+{
+  "schema": "mikka.issue1512.native-diagnostic-offline-verification.v1",
+  "at": "2026-11-10T04:28:28.413Z",
+  "input": "c194cfee747971c8d3d5ba7bdb572abc25ad487e",
+  "inputSha256": "82b341685d4880447acf4041b6fb3170129d039ddb1f864f435b6e0e82f0ea4a",
+  "runner": "bc1a94e80c264582d948e2aa6361f1fd54fd013e",
+  "node": "v24.22.1",
+  "platform": "linux",
+  "arch": "x64",
+  "scope": "5 immutable files; synthetic protocol/admission only; no Electron, browser, account, DB, or model",
+  "envKeys": [
+    "PATH",
+    "HOME"
+  ],
+  "createReceipt": "7ad4f1f62a1ee7b6c5b9a2cce4aaf9a7eea5e745",
+  "runReceipt": "b5a0a3bcb9c50f5cfd26cd44095823fc0fa5dea6",
+  "originalLogReceipt": "5b5b575c40bbdfe7f4bf481a0ca165335ba1ddc1",
+  "originalPartReceipts": [
+    "599e40add4ed63a15fccadae131984295f9f4a7e",
+    "e99155f468257899ef7247b652df9f3738b6783e",
+    "13d914484c4f0040768c2ca886c1a1f0b6f9040e",
+    "583bffa55f3c426b644f20a49b82ee79d0660cc4",
+    "24a24be0439fe0bfdca5101f1175b3cec549e432"
+  ],
+  "compressed": {
+    "sha": "3856bd1b484055c2539a879843de99dfc723a680",
+    "bytes": 5661,
+    "sha256": "611240ebb837111340745781db5678a50ea110ad0a455d46ac83c57c40484d3c"
+  },
+  "bundle": {
+    "sha": "e20bbb4d111a627734c3f7632227d18233ff9c90",
+    "bytes": 16570,
+    "sha256": "97a0e5e395014786e352e1cdbede04ac75d14ef5550c45038330523305439718"
+  },
+  "outputs": [
+    {
+      "name": "native_diagnostic_protocol",
+      "kind": "stdout",
+      "sha": "f8067256e4077c5d64003e0fa1ad7dd0bece3cb0",
+      "sha256": "2801da25eb44acbd18f4536a60c245ebabfcbeb8cd41bab0e10f19bdd599fb26",
+      "bytes": 5885
+    },
+    {
+      "name": "native_diagnostic_protocol",
+      "kind": "stderr",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "name": "native_diagnostic_admission",
+      "kind": "stdout",
+      "sha": "7fda050380a189115d5fc75e9813d6980b5182f1",
+      "sha256": "2f01d3f6ebbc188c7f25f78d7ed7bd59454d7944a357324af2486ada9f532b98",
+      "bytes": 4564
+    },
+    {
+      "name": "native_diagnostic_admission",
+      "kind": "stderr",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  ],
+  "cases": [
+    {
+      "name": "native_diagnostic_protocol",
+      "tests": 29,
+      "suites": 0,
+      "pass": 29,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "exitCode": 0,
+      "stderrBytes": 0
+    },
+    {
+      "name": "native_diagnostic_admission",
+      "tests": 33,
+      "suites": 0,
+      "pass": 33,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "exitCode": 0,
+      "stderrBytes": 0
+    }
+  ],
+  "cleanup": "79a6e0f01c0ec44c158116f584d29ce10b289051",
+  "resourcesLive": 0,
+  "overallAcceptance": null
+}

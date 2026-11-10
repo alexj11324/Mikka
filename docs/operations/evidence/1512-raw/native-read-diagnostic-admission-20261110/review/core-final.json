@@ -1,0 +1,158 @@
+{
+  "schema": "issue1512.independent-native-read-diagnostic-final-core-review.v2",
+  "reviewer": "/root/independent_final",
+  "observedAt": "2026-11-10 04:30:37 UTC",
+  "status": "FINAL_CORE_STATIC_NO_BLOCKER",
+  "manifest": "d12ad84713a8883071a3ddcbe49973668e054eed",
+  "base": {
+    "repository": "alexj11324/Mikka",
+    "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a"
+  },
+  "priorReview": "94932f449f249bc56ba3ad972e7101baef377a1d",
+  "priorFreshnessDesign": "c33f989cad7f330e78387ab68fa01e1096d599be",
+  "sourceVerification": [
+    {
+      "path": "lib/diagnostics/issue1512-native-reads.mjs",
+      "base": null,
+      "sha": "6a9eed46a4062eeebc1b0f9984f0d6fe25d8dca7",
+      "bytes": 7916,
+      "sha256": "e748c66a85eb09bd2630b9a661ce9d0234b68fe9b6574e107dec114612faedf0",
+      "verified": true
+    },
+    {
+      "path": "lib/diagnostics/issue1512-native-reads.d.mts",
+      "base": null,
+      "sha": "c7e36b323dd04a52d9df4948a9ad503af4ae028f",
+      "bytes": 1823,
+      "sha256": "127df8c7aa7f99de75fe88ad420b67412d8d8420647a3d493dabe85d2ee1b16c",
+      "verified": true
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "base": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "sha": "39d63bd92fbc9ed4c0b568694b67df28a49c6e65",
+      "bytes": 10363,
+      "sha256": "a89b07dcb399681dd434d8bd4307a99feb6786a597213e0be489b903da6f2949",
+      "verified": true
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "base": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+      "sha": "1bdf18021a9c614549bd165f41555ccd0b527479",
+      "bytes": 4727,
+      "sha256": "4561c0908805628eadda2eb6f23247a6789ec243d3dc4dd63b4bd3d2d8724f29",
+      "verified": true
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "base": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+      "sha": "8fd8ad5fc8324caa0e1734887ea77eea60765b93",
+      "bytes": 10062,
+      "sha256": "d4668f3832459160aa25b045080f622919afd4cf6041faf5b18c7a5d0542231d",
+      "verified": true
+    },
+    {
+      "path": "lib/coordinator/chat-read-client.ts",
+      "base": "c5588e067ff295cc81b5c3e35ea5307fbd94bf57",
+      "sha": "668f6c2be742d2cccd25e416a73998d2baf2ed08",
+      "bytes": 4534,
+      "sha256": "7acee170698db55bd8a9b8658d1bc1b2a8a0ed1c4ac2fe439cb0e2c996f3235a",
+      "verified": true
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "base": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "sha": "5f43ea9f39d9354955fe60e390aa76665ce83f99",
+      "bytes": 25440,
+      "sha256": "613d75da047a4059b822cf070f8a330c323e836a4d108fff5dc43f9ef0c77e97",
+      "verified": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "base": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "sha": "ecd547d17c1a32cd360090621d22bc3e4e41d732",
+      "bytes": 5493,
+      "sha256": "94966e43cc8b0cb20c2a28e9a2dedd2cf41cc9abdb114e57a43dd2bd9711270e",
+      "verified": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "base": "e7f6972a23519ae45e059038cd0c404789d44a98",
+      "sha": "64038a0aaae11888d1b32ff0f21498612013dfeb",
+      "bytes": 6628,
+      "sha256": "ac75d6ececb7a7ccd0acf6a15b69ea7db196390f8213bc29f7cfea4b5a861f9a",
+      "verified": true
+    },
+    {
+      "path": "apps/desktop/src/main/index.ts",
+      "base": "61da70923e2109761919f8b4968c0cb701917ff3",
+      "sha": "59b8685db01b9dfaf870e2cf21cba0ab2ff7bb13",
+      "bytes": 29940,
+      "sha256": "543ffe0a81ce6632107b2a6338297f8285aee9aebc5a66662b61706849781773",
+      "verified": true
+    },
+    {
+      "path": "apps/desktop/src/preload/index.ts",
+      "base": "1e62cd5e98e17554733e75915d2d9f03e99f7826",
+      "sha": "70fce399664dd440aa4a96cfa36b502f1e0957e4",
+      "bytes": 7585,
+      "sha256": "3af88f827a8d7e3a1e64066a971a6f17224e1cc0704ae560e87eec0547690bad",
+      "verified": true
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "base": "8251fc9aa56103614d1ddff944668930d1da937c",
+      "sha": "bb4b1a3e28514d6cfaf811568fb6b041a3191715",
+      "bytes": 33042,
+      "sha256": "1169b6e4e5cfa0ad3818c8b4857d38df3e128e9bdebc6a9806e69668b388ffe9",
+      "verified": true
+    }
+  ],
+  "scope": "Twelve core/activation/lifecycle files reviewed. Collector implementation/declaration, fixture helper and new protocol test source are separately owned by Native/Root reviewers; this receipt does not substitute their full-package conclusion.",
+  "findings": [
+    "Unchanged six product core files retain the v1 review: numeric diagnostic-only TLS uses synchronous try/finally, captures integers before existing awaits and restores around original calls; no additional promise/await, authorization reuse, snapshot tag, transport header or result proof.",
+    "Final helper defaults off unless the explicit Boolean flag is true in the top renderer frame. Phase views reason2/3 do not advance dump sequence/cursor; pagehide reason1 does. Key-limit failure now uses a dropped sequence entry, preserving recorded+dropped=through.",
+    "Final row validator checks per-event arity and enum fields, including incoming21, freshness branch-specific arity and invalidate cause0..2. Recorder has unchanged4096-row prefix and1024 local-key limits; raw payload/identity strings remain absent from dumps.",
+    "Final LiveChannel adds incoming21 immediately after the existing invalidationAfter.set, using the already created boundary and closed kind/revision fields. It records pushes even when no subscription matches; no extra readBoundary or business predicate is added.",
+    "diagnosticCause is the optional seventh invalidate parameter and appears only in its diagnostic tuple. onopen supplies the original effective undefined/false arguments and leaves after undefined, invoking its existing default readBoundary once. Late-connected subscribe adds cause2 without altering the preexisting supported/presence/coverage ternary. Scheduling, pending obligations, fallback, deadlines and catch-up are unchanged.",
+    "Main only passes --mikka-1512-read-diagnostic and installs the collector when MIKKA_1512_READ_DIAGNOSTIC is exactly1. Installation precedes original first load; privileged BrowserWindow options and existing listeners/loads are unchanged.",
+    "Preload exposes only a Boolean within the byte-identical original top-frame and own-origin/path guard. It does not expose a Node object, add IPC methods or alter bridge authorization.",
+    "Lifecycle alone maps MIKKA_1512_LIFECYCLE_READ_DIAGNOSTIC into internal child flag1/0; explicit0 prevents inherited internal activation when opt-in is absent. No model/account/business arguments are changed.",
+    "All original login query checkpoints remain in place. Native login closes its SQL window before prepareNativeDevice and recordNativeState; first cold-start SQL checkpoint and readiness duration finish before diagnostics; Web diagnostic collection occurs after its existing complete checkpoint. Five pairs, source windows and ordinary assertions/cleanup remain unmodified.",
+    "Native authenticated-profile dumps may include device-preparation events after the SQL window closed. Such records remain document-causal observations and must not be silently counted as login-window RPC. No extra settling await is added to complete records at a boundary.",
+    "Instrumentation adds bounded synchronous work and some post-window diagnostic copying. This is causal diagnosis only, not zero-perturbation timing evidence or a formal Native budget pass."
+  ],
+  "barrierCrossCheck": {
+    "path": "lib/live/channel.ts",
+    "baseCalls": 4,
+    "candidateCalls": 4,
+    "same": true
+  },
+  "actualNodeEvidence": {
+    "owner": "/root",
+    "proof": "c6496ee92dbd757e083e0724d1ef362a4bcaf026",
+    "bundle": "e20bbb4d111a627734c3f7632227d18233ff9c90",
+    "protocolTap": "f8067256e4077c5d64003e0fa1ad7dd0bece3cb0",
+    "reportedRuntime": "Node24.22.1/Linuxx64",
+    "reportedResults": {
+      "protocol": "29/29",
+      "rootAdmission": "33/33"
+    },
+    "reportedResourceState": "stopped/deleted/GET404",
+    "boundary": "Results reported and frozen by Root; reviewer did not rerun tests or re-read original Actions/VM streams."
+  },
+  "remainingPackageConditions": [
+    "Apply Native/Root collector and bounded one-shot entry review to their exact final blobs; do not interpret this core receipt as full entry approval.",
+    "Keep every source/temporary overlay bound to exact H5f and manifest; do not publish these diagnostic source edits to formal/main.",
+    "Overflow, missing documents, invalid schema/sequence or unmapped target SWR source remain explicit limits, not reconstructed proof.",
+    "Non-SWR action readId0 is legitimate and is not itself collector loss; for a target SWR action it means incomplete attribution.",
+    "Current uninstrumented full-login acceptance remains failed atNative441 versusWeb331; queued-only reuse was not implemented."
+  ],
+  "actionsByReviewer": {
+    "resources": 0,
+    "sourceRefUpdates": 0,
+    "originalActionsRereads": 0,
+    "productionActions": 0
+  }
+}

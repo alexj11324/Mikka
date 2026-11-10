@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "status": "V8_PROTOCOL_PASS_NODE_NOT_RUN",
+  "sourceFiles": [
+    {
+      "path": "lib/diagnostics/issue1512-native-reads.mjs",
+      "base": null,
+      "sha": "6a9eed46a4062eeebc1b0f9984f0d6fe25d8dca7",
+      "bytes": 7916,
+      "sha256": "e748c66a85eb09bd2630b9a661ce9d0234b68fe9b6574e107dec114612faedf0"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-read-collector.mjs",
+      "base": null,
+      "sha": "ad525f3c4c5d5db1916dae5fea714d4bd47dc9a7",
+      "bytes": 5174,
+      "sha256": "24a9deebb761198d1a43da74e9e5c0f45628ea11f3d1526ab81699dfb201b90b"
+    },
+    {
+      "path": "apps/desktop/test/native-read-diagnostic.test.mjs",
+      "base": null,
+      "sha": "6126f6ff7694e47b1e308b1436b0d5557152c474",
+      "bytes": 12700,
+      "sha256": "3963670300a5f15f32c08e26c8435b8a6dd09827265d63622784ff77720a9159"
+    }
+  ],
+  "earlierAttempt": {
+    "cases": 29,
+    "passed": 28,
+    "failed": "new event21 upper bound missed in semantic validator, corrected before this version"
+  },
+  "latest": {
+    "runtime": "functions V8 evaluator; minimal assert adapter; not actual Node",
+    "cases": 29,
+    "passed": 29,
+    "failed": [],
+    "results": [
+      {
+        "name": "default module import exposes no browser or main collector in Node",
+        "status": "passed"
+      },
+      {
+        "name": "fresh recorder exports a valid numeric-only realm prefix",
+        "status": "passed"
+      },
+      {
+        "name": "phase views are nondestructive and do not advance the next pagehide dump",
+        "status": "passed"
+      },
+      {
+        "name": "pagehide dump sequence keeps only newly recorded prefix rows",
+        "status": "passed"
+      },
+      {
+        "name": "record cap retains the initial prefix and explicitly counts dropped events",
+        "status": "passed"
+      },
+      {
+        "name": "unknown values are never serialized and are counted as lost diagnostics",
+        "status": "passed"
+      },
+      {
+        "name": "key and object IDs are local stable integers without copying key text",
+        "status": "passed"
+      },
+      {
+        "name": "key-map saturation marks diagnostics incomplete without retaining more keys",
+        "status": "passed"
+      },
+      {
+        "name": "unknown action names collapse to the closed other code",
+        "status": "passed"
+      },
+      {
+        "name": "nested synchronous diagnostic scopes restore their parent even on throw",
+        "status": "passed"
+      },
+      {
+        "name": "a scope returns the exact promise and never remains ambient across await",
+        "status": "passed"
+      },
+      {
+        "name": "two interleaved delayed reads restore only their captured local integer",
+        "status": "passed"
+      },
+      {
+        "name": "all event arities and branch-specific variants are accepted",
+        "status": "passed"
+      },
+      {
+        "name": "missing fields, extra fields and unknown event enums are rejected",
+        "status": "passed"
+      },
+      {
+        "name": "dump schema rejects unlisted fields, inconsistent counters and unsafe integers",
+        "status": "passed"
+      },
+      {
+        "name": "one current document is complete without any pagehide",
+        "status": "passed"
+      },
+      {
+        "name": "two documents link one retired pagehide plus the current nondestructive view",
+        "status": "passed"
+      },
+      {
+        "name": "lost navigation-page dump is incomplete instead of inferred from the new document",
+        "status": "passed"
+      },
+      {
+        "name": "a missing current realm is incomplete",
+        "status": "passed"
+      },
+      {
+        "name": "duplicate pagehide dump is incomplete",
+        "status": "passed"
+      },
+      {
+        "name": "a skipped dump number is incomplete",
+        "status": "passed"
+      },
+      {
+        "name": "row sequence gaps and backward time are incomplete",
+        "status": "passed"
+      },
+      {
+        "name": "overflow remains incomplete even when every exported row validates",
+        "status": "passed"
+      },
+      {
+        "name": "ordinary console text and payload are not retained",
+        "status": "passed"
+      },
+      {
+        "name": "malformed prefixed messages are counted without retaining their bytes",
+        "status": "passed"
+      },
+      {
+        "name": "main collector is attached synchronously and rejects other frame dumps",
+        "status": "passed"
+      },
+      {
+        "name": "main collector captures prior document before any runner firstWindow hook",
+        "status": "passed"
+      },
+      {
+        "name": "raw collector schema never accepts unlisted top-level data",
+        "status": "passed"
+      },
+      {
+        "name": "pending reads remain visible without waiting for a settle or adding a timer",
+        "status": "passed"
+      }
+    ]
+  }
+}

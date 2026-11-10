@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "kind": "native-live-diagnostic-control-static-review",
+  "reviewer": "native_pending_final",
+  "status": "CONTROL_STATIC_NO_BLOCKER_FINAL_OVERLAY_AND_ACTUAL_NODE_TESTS_PENDING",
+  "source": {
+    "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a"
+  },
+  "reviewed": {
+    "workflow": {
+      "path": ".github/workflows/issue1512-native-live-diagnostic.yml",
+      "sha": "5b7ea8c83aabc154f51a7f205fae0deb4eacd326",
+      "bytes": 8302,
+      "sha256": "88cea4d9b4f96fc9c3bffdf950746283d6de25d62c94391c96a5d764523f2ce9"
+    },
+    "guard": {
+      "path": "scripts/ops/issue1512-native-live-diagnostic-guard.mjs",
+      "sha": "dbb678d6d95ad2f1f025840b2ded2bd78bde803b",
+      "bytes": 7792,
+      "sha256": "78e041eb9c619f2a8b48b7267922962091d825bc799d2373f37d1365bd12baae",
+      "supersedes": "b1ac0e73894376eb41ea691ea5575a9b48e3be61",
+      "delta": "Only --no-renames added to git diff --name-only"
+    },
+    "tests": {
+      "path": "scripts/ops/issue1512-native-live-diagnostic-guard.test.mjs",
+      "sha": "ce2dbd3787e976e382e28fde6f19709dca54f06e",
+      "bytes": 5750,
+      "sha256": "0545243b44f817f581f528707bb820330b4cc1490670b60d5640f80eaa3997f3",
+      "actualExecution": "PENDING"
+    }
+  },
+  "originalExecutionBlock": {
+    "baselinePath": ".github/workflows/desktop.yml",
+    "baselineBlob": "1cfd9d8be85015b639809faedc8a68fb83609399",
+    "job": "native-arm64",
+    "firstStep": "test \"$(uname -m)\" = arm64",
+    "lastStep": "desktop-native-evidence artifact upload with retention-days7",
+    "bytes": 5068,
+    "sha256": "8c53a1ea53fdf4c856fc65b469782ba178870883a453cd320098e222cd1fe412",
+    "exactSubstringInCandidate": true,
+    "originalJobEnvironmentLinesRemoved": 0,
+    "preserved": [
+      "ARM64 assertion; pnpm frozen install; pinned Electron cache; Playwright Chromium.",
+      "Runner-local PG17; ephemeral auth secret; original migration and leased fixtures.",
+      "Production ARM64 API build; Xcode26; ad-hoc acceptance package; three-process crypto.",
+      "Exact original bundled-smoke parity lifecycle command, with original executable path.",
+      "Original package/crypto audit, native evidence audit, artifact names/conditions/retention."
+    ]
+  },
+  "changesOutsideOriginalBlock": [
+    "Dedicated ops push branch and two trigger paths; one macos-26 job, contents:read only.",
+    "Exact repository/branch/push/A1/UUID commit-message gate; no formal/main/ref mutation command.",
+    "Removed reusable desktop needs:[changes,smoke,icon] for diagnostic execution; this is not formal acceptance.",
+    "Checkout depth2 and persist-credentials:false; guard before dependencies.",
+    "Node24 diagnostic/guard tests before pnpm install.",
+    "Only MIKKA_1512_LIFECYCLE_READ_DIAGNOSTIC=1 added to original job environment.",
+    "Admission receipt upload and always-attempted disposable PostgreSQL service stop."
+  ],
+  "guardChecks": [
+    "Exact repository/ref/push/attempt1/runID/sourceSHA format.",
+    "HEAD equals event SHA; single parent H, base tree b2559, fixed admission message/UUID.",
+    "Diagnostic manifest flags fix productionCases0/formalBudgetAcceptance:false/modelCallsAllowed:false/additionalBusinessQueriesAllowed:false.",
+    "File paths unique, relative, nontraversing and not self-manifest; mode100644; actual blob/base SHA, SHA256, byte count, raw worktree Git SHA all agree.",
+    "Changed paths with rename detection disabled equal manifest.files plus manifest; clean worktree.",
+    "Required workflow/guard paths and unchanged base invariants checked.",
+    "Fixed macos-26 and exact original acceptance command; no command from manifest is executed."
+  ],
+  "triggerAudit": {
+    "originalWorkflowCount": 43,
+    "allMatchPriorAudit": true,
+    "mismatches": [],
+    "priorAuditBlob": "45d53be337bab4972ef118766560b494576b9e38",
+    "sourceTree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "newBranch": "ops/1512-native-live-diagnostic-20261110",
+    "newWorkflowName": "Issue1512 one-shot Native read diagnostic",
+    "sameOriginalBlobs": [
+      {
+        "path": ".github/workflows/analytics-ssr.yml",
+        "sha": "2a263858b477569d92f1694ed6bfddcd03469c56"
+      },
+      {
+        "path": ".github/workflows/app-icon.yml",
+        "sha": "2ad5b5fa99d72c4440c435bdd8f5bad44411bd36"
+      },
+      {
+        "path": ".github/workflows/browser-gate.yml",
+        "sha": "0717180c70f54f9af06ebe39d0f5b5ec207235c4"
+      },
+      {
+        "path": ".github/workflows/ci-selection.yml",
+        "sha": "334b063f287defd1d93ef11f1235954768c9ed1e"
+      },
+      {
+        "path": ".github/workflows/cloud-computer.yml",
+        "sha": "1d91a07140966e8220e24153be6fdaff2b0aaf6c"
+      },
+      {
+        "path": ".github/workflows/credential-vault.yml",
+        "sha": "440712e2ca9e474e64970e8e03392b91e12acdca"
+      },
+      {
+        "path": ".github/workflows/desktop-release.yml",
+        "sha": "d254ed3ac47c943d57fc3dc79448b1752753078f"
+      },
+      {
+        "path": ".github/workflows/desktop.yml",
+        "sha": "1cfd9d8be85015b639809faedc8a68fb83609399"
+      },
+      {
+        "path": ".github/workflows/device-gateway.yml",
+        "sha": "a0c0db030a9343caeffd371889bf40c13d06d2cc"
+      },
+      {
+        "path": ".github/workflows/e2b-byos.yml",
+        "sha": "333e0674355baa72ce7bd00e7e57964fff8c7d6a"
+      },
+      {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "sha": "2aa85fdd0cb12727621b774ab5886804be486605"
+      },
+      {
+        "path": ".github/workflows/e2b-runtime-release.yml",
+        "sha": "7a592d975ac7594e723822f597b512defa4526b2"
+      },
+      {
+        "path": ".github/workflows/e2b-template.yml",
+        "sha": "bb948480beac3370335dd4b8ce59a01e6becf1f0"
+      },
+      {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "sha": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be"
+      },
+      {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "sha": "9ece51fc2a39c2d362446e68df1f9bbf2076f641"
+      },
+      {
+        "path": ".github/workflows/issues-1515-1517-cleanup.yml",
+        "sha": "402b01de60f16f041ab9d0bd3b2036ad820e760e"
+      },
+      {
+        "path": ".github/workflows/issues-1515-1517-diagnostics.yml",
+        "sha": "bb67205200d6777a626cecc3494762e49d491a5c"
+      },
+      {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "sha": "4757d62065017957f6e1e4300ab4695507ce40d8"
+      },
+      {
+        "path": ".github/workflows/local-device-node22.yml",
+        "sha": "d195f389292e1a84967fd9864063ac536b91bbaf"
+      },
+      {
+        "path": ".github/workflows/mobile-native.yml",
+        "sha": "a14280622e2e0cd44d79b809ef36bb6b1895cd38"
+      },
+      {
+        "path": ".github/workflows/mobile-screenshots.yml",
+        "sha": "17cedf93280ec9955608c34c7b605f9df6704f4d"
+      },
+      {
+        "path": ".github/workflows/mobile-update.yml",
+        "sha": "0708d8d90ac94c96bd35f2cec0407d8b25d362f3"
+      },
+      {
+        "path": ".github/workflows/model-provider-fallback-acceptance.yml",
+        "sha": "316476e5015a5bc04c27a62d198f847784233201"
+      },
+      {
+        "path": ".github/workflows/production-readiness.yml",
+        "sha": "0cd039a6c28eeccf2a417ff4f3e09255b371be29"
+      },
+      {
+        "path": ".github/workflows/production-smoke.yml",
+        "sha": "67751d4d3a38989a635e5ee07ac0c8f0775a333e"
+      },
+      {
+        "path": ".github/workflows/project-decisions-acceptance.yml",
+        "sha": "7be1af6692ab21d971bd091994c56a7a3ac159fe"
+      },
+      {
+        "path": ".github/workflows/publish-daemon.yml",
+        "sha": "c6f861a5ec36468ee9a65bc226613fbbabc797c2"
+      },
+      {
+        "path": ".github/workflows/read-cache-production.yml",
+        "sha": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22"
+      },
+      {
+        "path": ".github/workflows/read-cache.yml",
+        "sha": "86ee0112413eae241189bb2d748a6d6901201c4f"
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4"
+      },
+      {
+        "path": ".github/workflows/self-hosted-image.yml",
+        "sha": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077"
+      },
+      {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "sha": "2f42f98f72a1f58022c10ea70514dbd9b2c43f84"
+      },
+      {
+        "path": ".github/workflows/self-hosting-ui.yml",
+        "sha": "5aa39770c0a4d6166e0088d5e1d84af746b57d58"
+      },
+      {
+        "path": ".github/workflows/site-search.yml",
+        "sha": "299e09591558bced0eafcc05c7d5a6d295078438"
+      },
+      {
+        "path": ".github/workflows/ssh-device-backend.yml",
+        "sha": "e980cb3cdf2bc1206972ca66c87f9bc990e2ac48"
+      },
+      {
+        "path": ".github/workflows/subagents.yml",
+        "sha": "116080d9d31bf85774dedac96f79a92235575706"
+      },
+      {
+        "path": ".github/workflows/suggestions-cron.yml",
+        "sha": "587693cbff72150a1212d0997aabee0aff1269ce"
+      },
+      {
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "sha": "938ffc405cee597005d4503ab022ab1c3b0f934e"
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "sha": "42ae23945f798020ec068635e7621869fb427af2"
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "sha": "1e3e2b5edc6dbd6796fd5f2fd464b7c2a6b12b35"
+      },
+      {
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "sha": "91ebe7a22509c3e900eedf2d6f160c454da91b4e"
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "sha": "710f70c3528e1b8eb5c37f1be52c6442445bf9be"
+      },
+      {
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "sha": "c107a7699cc0bb91ac8d9eaf258361d2f04e51a4"
+      }
+    ],
+    "conclusions": [
+      "All43 original YAML workflow blobs match the complete frozen trigger audit45d53be337bab4972ef118766560b494576b9e38.",
+      "Existing push filters accept main, unrelated explicit branches, integration/** or integrate/**, or v*tags; none match this ops branch.",
+      "Existing workflow_run consumers name Web deploy or E2B additive runtime release, not this diagnostic workflow.",
+      "This ops push does not itself generate PR, merge-group, schedule, manual or deployment events."
+    ]
+  },
+  "resourceScope": {
+    "permissions": "contents:read",
+    "productionCredentialsReferenced": false,
+    "credentials": "Ephemeral local auth secret and GitHub token for package downloads, as in original job.",
+    "maximumJobs": 1,
+    "runner": "macos-26",
+    "timeoutMinutes": 150,
+    "database": "One runner-local PostgreSQL17",
+    "resourcesStartedByReview": 0,
+    "actualCleanup": "PENDING. Workflow retains original harness cleanup and always attempts to stop a started PG service; no execution/stop/release claim."
+  },
+  "remaining": [
+    "Read final Mac collector/harness/main changes and complete manifest exact blobs.",
+    "Verify final candidate tree delta and all manifest/invariant bindings before normal publication.",
+    "Record actual Node protocol tests; static review is not a test pass.",
+    "Verify final harness keeps all full login/PKCE boundaries, first pair and5cold pairs; do not wait for diagnostic settlement at a measurement cut.",
+    "Prebuild disabled closure, close after the one terminal run, and verify skipped closure.",
+    "Native functional success/diagnostic completeness cannot replace Native SQL budget or production acceptance."
+  ]
+}

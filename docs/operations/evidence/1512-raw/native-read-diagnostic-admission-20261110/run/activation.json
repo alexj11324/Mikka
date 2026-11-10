@@ -1,0 +1,45 @@
+{
+  "schema": "mikka.issue1512.native-diagnostic-activation.v1",
+  "at": "2026-11-10T04:43:46.463Z",
+  "branch": "ops/1512-native-live-diagnostic-20261110",
+  "baseSha": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "candidate": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+  "tree": "23179d928269195860beaf27ad27786c7f5e7637",
+  "rootApproval": "681ccd563eb4dac6dafe19fbe8a03a58cc9cdf04",
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "success": true
+    },
+    "isError": false
+  },
+  "readback": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "content": "{\"ref\":\"refs/heads/ops/1512-native-live-diagnostic-20261110\",\"node_id\":\"REF_kwDOVRYxA9oAM3JlZnMvaGVhZHMvb3BzLzE1MTItbmF0aXZlLWxpdmUtZGlhZ25vc3RpYy0yMDI2MTExMA\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1512-native-live-diagnostic-20261110\",\"object\":{\"sha\":\"2e2f75de15a01858ac0990bbcf4b50156832dbc7\",\"type\":\"commit\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/2e2f75de15a01858ac0990bbcf4b50156832dbc7\"}}",
+      "title": "1512-native-live-diagnostic-20261110",
+      "modified_date": null,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/ops/1512-native-live-diagnostic-20261110",
+      "display_url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/ops/1512-native-live-diagnostic-20261110",
+      "display_title": "1512-native-live-diagnostic-20261110",
+      "structuredContent": {
+        "title": "1512-native-live-diagnostic-20261110",
+        "content": "{\"ref\":\"refs/heads/ops/1512-native-live-diagnostic-20261110\",\"node_id\":\"REF_kwDOVRYxA9oAM3JlZnMvaGVhZHMvb3BzLzE1MTItbmF0aXZlLWxpdmUtZGlhZ25vc3RpYy0yMDI2MTExMA\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1512-native-live-diagnostic-20261110\",\"object\":{\"sha\":\"2e2f75de15a01858ac0990bbcf4b50156832dbc7\",\"type\":\"commit\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/2e2f75de15a01858ac0990bbcf4b50156832dbc7\"}}",
+        "display_url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/ops/1512-native-live-diagnostic-20261110"
+      }
+    },
+    "isError": false
+  },
+  "formalHeadChanged": false,
+  "productionCalls": 0
+}

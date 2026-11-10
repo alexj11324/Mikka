@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "kind": "pinned-electron-pagehide-frame-identity-review",
+  "reviewer": "native_pending_final",
+  "targetPackage": {
+    "path": "apps/desktop/package.json",
+    "blob": "733aba8cb0bfd26f2c7c7302ad02bb9a92bb0e0f",
+    "electron": "45.1.0"
+  },
+  "collectorBlob": "ad525f3c4c5d5db1916dae5fea714d4bd47dc9a7",
+  "sources": [
+    {
+      "path": "shell/browser/api/electron_api_web_contents.cc",
+      "upstream": "https://github.com/electron/electron/blob/v45.1.0/shell/browser/api/electron_api_web_contents.cc",
+      "evidenceBlob": "bd5664c52fa3cccbe6d3728297dc37110d9946d6",
+      "bytes": 234310,
+      "sha256": "bfabc595a528382daf038160f7f84a445d398f1ec839510176c670dcaab28524"
+    },
+    {
+      "path": "shell/browser/api/electron_api_web_frame_main.cc",
+      "upstream": "https://github.com/electron/electron/blob/v45.1.0/shell/browser/api/electron_api_web_frame_main.cc",
+      "evidenceBlob": "8695f422b0a4eece9a508025ae1652f9372dca7c",
+      "bytes": 35467,
+      "sha256": "ca1e86c5e9462ce0ef37b137f5d8d137f61d40b703d8af5217557fba0b448576"
+    }
+  ],
+  "observation": [
+    "WebContents::OnDidAddMessageToConsole sets the event frame getter from source_frame, the RFH that emitted the message.",
+    "WebContents::RenderFrameHostChanged looks up the existing WebFrameMain by the new host's FrameTreeNodeId and updates its RenderFrameHost.",
+    "WebFrameMain::From treats kRunningUnloadHandlers separately and resolves the exact old RFH so its security origin remains accurate; when absent it constructs a separate WebFrameMain wrapper.",
+    "IsDetachedFrameHost checks running-unload state or RFH inequality with frame_tree_node()->current_frame_host(); its predicate has no same-origin exception.",
+    "WebFrameMain caches frame_tree_node_id_ at construction. FrameTreeNodeID() returns this cached field without CheckRenderFrame(), while the RenderFrameHost token changes during UpdateRenderFrameHost()."
+  ],
+  "conclusion": "Object identity against contents.mainFrame is not a sufficient persistent identity for a console dump emitted by a retiring top-level document during an RFH swap. Current collector safely reports the rejected dump as invalid/incomplete, but can lose the prior document needed for diagnosis. This source proves the possibility during a swap; it does not assert that every same-origin navigation swaps or that H already lost a dump.",
+  "minimalChange": [
+    "Inside the existing contents console-message callback, synchronously obtain details.frame and the current mainFrame FrameTreeNodeId.",
+    "Require both frameTreeNodeId values to be safe nonnegative integers and equal; otherwise increment invalidDumps and return.",
+    "Catch getter/lifecycle failure as invalid instead of throwing into business navigation.",
+    "Keep checks local to the already bound WebContents; do not export frame IDs, read URLs, add IPC, accept child FrameTreeNodes, wait on navigation, or modify any diagnostic source/budget window."
+  ],
+  "testsNeeded": [
+    "Different old/new WebFrameMain objects with the same FrameTreeNodeId accept a valid retiring top-frame pagehide dump.",
+    "A different iframe FrameTreeNodeId remains rejected.",
+    "Missing/invalid IDs and a throwing getter remain invalid, with no retained untrusted message.",
+    "Existing numeric protocol/continuity/capture-loss tests still pass on actual Node."
+  ],
+  "scope": "Read-only pinned upstream source inspection plus immutable evidence. No Electron runtime experiment or native job was started. All other final overlay/source/fixture bindings remain reviewed; final publication recommendation awaits this one collector correction and exact new hash/test result."
+}

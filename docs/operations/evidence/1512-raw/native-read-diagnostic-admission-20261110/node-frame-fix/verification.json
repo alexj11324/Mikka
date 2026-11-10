@@ -1,0 +1,89 @@
+{
+  "schema": "mikka.issue1512.native-frame-protocol-verification.v1",
+  "at": "2026-11-10T04:38:48.868Z",
+  "input": "7fb737d6b86d632ac2be49cbec1b67fcec866f0e",
+  "inputSha256": "30b766bfe4d5354a84b07cabc0e822ca98aa6ee936757e55d0e30e58b5e473c5",
+  "runner": "682c70bb33eecd7e7e9cc3f0c7d35eb7910eeece",
+  "node": "v24.22.1",
+  "platform": "linux",
+  "arch": "x64",
+  "scope": "Affected protocol only; old/new RFH same FrameTreeNodeId capture, invalid/foreign/deleted frame refusals; no Electron/browser/account/DB/model started.",
+  "envKeys": [
+    "PATH",
+    "HOME"
+  ],
+  "sourceFiles": [
+    {
+      "path": "lib/diagnostics/issue1512-native-reads.mjs",
+      "sha": "6a9eed46a4062eeebc1b0f9984f0d6fe25d8dca7",
+      "bytes": 7916,
+      "sha256": "e748c66a85eb09bd2630b9a661ce9d0234b68fe9b6574e107dec114612faedf0"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-read-collector.mjs",
+      "sha": "5d50d75c0ebef2eef6051a5a39a835877c6f8fa7",
+      "bytes": 5499,
+      "sha256": "fc6cb1f596bbb8f0bd511fd6c8ac501e4e6c83b08316deb2f92da01942c03ad0"
+    },
+    {
+      "path": "apps/desktop/test/native-read-diagnostic.test.mjs",
+      "sha": "fa8636f058c1f61412d39a0f8d0d493fddd2a33a",
+      "bytes": 15640,
+      "sha256": "0d2e5ba4596adada313f96ba078cd6cef888233aaaaf2ace79e1945de787bb1e"
+    }
+  ],
+  "summary": {
+    "tests": 32,
+    "suites": 0,
+    "pass": 32,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "exitCode": 0,
+  "outputs": [
+    {
+      "kind": "stdout",
+      "sha": "39d78cac06a95ac8861a8c3132881afd4ad3758f",
+      "bytes": 6575,
+      "sha256": "806c9a676255f269a80f9f337b98deb674a67612d97081c8677baf29e0fc6624"
+    },
+    {
+      "kind": "stderr",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "createReceipt": "0f3a830d4a77e2d0844252b43321ef6048c41568",
+  "runReceipt": "2353517a9aa097c086cefc7d8472838fcdf8caf1",
+  "originalLogReceipt": "5ed955fb3148323bbb9f34b848b9d6b0f34ae9dc",
+  "originalPartReceipts": [
+    "962742d14be063b8b4657ae302b0518936daab2f",
+    "c3e0da2d099ebc047987a79bfbc9fe8eaf93a717",
+    "a0fcfaa47fb256c8713b2a6c3c0f7522fce7d82d",
+    "17dfc884f5238148888eb85b2b38271df271a893"
+  ],
+  "compressed": {
+    "sha": "b2860003a75671eac243311f64e1dcda9aca3857",
+    "bytes": 4223,
+    "sha256": "37e6ee6e6a8acb5d8c36231e7d14d9df98f1b1439b6778032d4077468b864134"
+  },
+  "bundle": {
+    "sha": "f5709cb73f30e38c72ee8293c87873396c710612",
+    "bytes": 10360,
+    "sha256": "a43eb88e63b635e6d3dca5b39b161656e931e51c1e2d17f7bed881b4ddd85f12"
+  },
+  "cleanup": "f66529b503b46c74284b98e411b6cd954a290d05",
+  "resourcesLive": 0,
+  "unchangedAdmission": {
+    "verification": "c6496ee92dbd757e083e0724d1ef362a4bcaf026",
+    "guard": "dbb678d6d95ad2f1f025840b2ded2bd78bde803b",
+    "tests": "ce2dbd3787e976e382e28fde6f19709dca54f06e",
+    "pass": 33,
+    "reexecuted": false
+  },
+  "pinnedElectronProof": "6217d45b712dd529aeabbef6f461fafe815b0324",
+  "overallAcceptance": null
+}

@@ -1,0 +1,10 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"result\": {\n    \"logs\": [\n      {\n        \"data\": \"{\\\"inputBlob\\\":\\\"7fb737d6b86d632ac2be49cbec1b67fcec866f0e\\\",\\\"node\\\":\\\"v24.22.1\\\",\\\"results\\\":[{\\\"name\\\":\\\"native_diagnostic_protocol\\\",\\\"exitCode\\\":0,\\\"stdoutBytes\\\":6575,\\\"stderrBytes\\\":0}],\\\"bundle\\\":{\\\"bytes\\\":10360,\\\"sha256\\\":\\\"a43eb88e63b635e6d3dca5b39b161656e931e51c1e2d17f7bed881b4ddd85f12\\\",\\\"gitBlob\\\":\\\"f5709cb73f30e38c72ee8293c87873396c710612\\\",\\\"gzipBytes\\\":4223,\\\"gzipSha256\\\":\\\"37e6ee6e6a8acb5d8c36231e7d14d9df98f1b1439b6778032d4077468b864134\\\",\\\"parts\\\":4}}\\n\",\n        \"stream\": \"stdout\"\n      }\n    ],\n    \"context\": {\n      \"totalItems\": 1,\n      \"returnedItems\": 1,\n      \"truncated\": false\n    }\n  }\n}"
+    }
+  ],
+  "structuredContent": null,
+  "isError": false
+}

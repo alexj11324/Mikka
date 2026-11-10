@@ -1,0 +1,35 @@
+{
+  "at": "2026-11-10T04:38:03.339Z",
+  "sessionId": "sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W",
+  "cwd": "/vercel/sandbox/issue1512-native-frame-protocol",
+  "mkdir": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"items\": [\n      {\n        \"command\": {\n          \"id\": \"cmd_70e7839f01d844a695899854acf3\",\n          \"name\": \"mkdir\",\n          \"args\": [\n            \"-m\",\n            \"700\",\n            \"-p\",\n            \"/vercel/sandbox/issue1512-native-frame-protocol\"\n          ],\n          \"cwd\": \"/vercel/sandbox\",\n          \"sessionId\": \"sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W\",\n          \"startedAt\": 1794285481588,\n          \"exitCode\": null\n        }\n      },\n      {\n        \"command\": {\n          \"id\": \"cmd_70e7839f01d844a695899854acf3\",\n          \"name\": \"mkdir\",\n          \"args\": [\n            \"-m\",\n            \"700\",\n            \"-p\",\n            \"/vercel/sandbox/issue1512-native-frame-protocol\"\n          ],\n          \"cwd\": \"/vercel/sandbox\",\n          \"sessionId\": \"sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W\",\n          \"startedAt\": 1794285481588,\n          \"exitCode\": 0,\n          \"durationMs\": 1\n        }\n      }\n    ],\n    \"context\": {\n      \"totalItems\": 2,\n      \"returnedItems\": 2,\n      \"truncated\": false\n    }\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  },
+  "upload": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {}\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  },
+  "run": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"items\": [\n      {\n        \"command\": {\n          \"id\": \"cmd_4890082858f14e6ab62b6455cb4f\",\n          \"name\": \"node\",\n          \"args\": [\n            \"runner.mjs\"\n          ],\n          \"cwd\": \"/vercel/sandbox/issue1512-native-frame-protocol\",\n          \"sessionId\": \"sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W\",\n          \"startedAt\": 1794285482642,\n          \"exitCode\": null\n        }\n      },\n      {\n        \"command\": {\n          \"id\": \"cmd_4890082858f14e6ab62b6455cb4f\",\n          \"name\": \"node\",\n          \"args\": [\n            \"runner.mjs\"\n          ],\n          \"cwd\": \"/vercel/sandbox/issue1512-native-frame-protocol\",\n          \"sessionId\": \"sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W\",\n          \"startedAt\": 1794285482642,\n          \"exitCode\": 0,\n          \"durationMs\": 466\n        }\n      }\n    ],\n    \"context\": {\n      \"totalItems\": 2,\n      \"returnedItems\": 2,\n      \"truncated\": false\n    }\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  }
+}

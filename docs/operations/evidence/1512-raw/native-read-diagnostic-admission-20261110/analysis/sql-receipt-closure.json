@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "kind": "selected-timestamped-receipt-closure",
+  "lifecycleBlob": "45ea8ea2279daecbf4d5024f39548a28be3e4511",
+  "sourceHead": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "sourceCollectorBlob": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+  "status": "PASSED_FOR_SELECTED_CLOSURE",
+  "receiptCount": 164,
+  "physical": 117,
+  "children": 47,
+  "batchParents": 10,
+  "usedKnownSqlContexts": 154,
+  "errors": [],
+  "windows": {
+    "nativeLogin": {
+      "selectedReceipts": 66,
+      "selectedPhysicalRpc": 14,
+      "selectedLogicalRpc": 39,
+      "aggregatePhysical": 15,
+      "aggregateLogical": 40,
+      "missingSelectedActions": [
+        {
+          "route": "/api/rpc",
+          "action": "desktop.session",
+          "aggregate": 1,
+          "selected": 0
+        }
+      ]
+    },
+    "webLogin": {
+      "selectedReceipts": 41,
+      "selectedPhysicalRpc": 25,
+      "selectedLogicalRpc": 25,
+      "aggregatePhysical": 25,
+      "aggregateLogical": 25,
+      "missingSelectedActions": []
+    },
+    "startup-bundled": {
+      "selectedReceipts": 29,
+      "selectedPhysicalRpc": 7,
+      "selectedLogicalRpc": 19,
+      "aggregatePhysical": 7,
+      "aggregateLogical": 19,
+      "missingSelectedActions": []
+    },
+    "startup-hosted": {
+      "selectedReceipts": 28,
+      "selectedPhysicalRpc": 19,
+      "selectedLogicalRpc": 19,
+      "aggregatePhysical": 19,
+      "aggregateLogical": 19,
+      "missingSelectedActions": []
+    }
+  },
+  "scope": "Replayed only the exported closed timestamped receipts selected for known SQL contexts in the four measured windows and their batch parents/siblings. Original mixed backend stdout and invocations absent from that SQL-selected export are not reconstructed.",
+  "limits": [
+    "Selected receipt availability is not full HTTP/RPC log coverage.",
+    "nativeLogin desktop.session has one aggregate physical/logical invocation but no selected receipt. The exported selection does not assign any known window SQL context to it; unknown-context SQL cannot be attributed or excluded.",
+    "Query diagnostic rows contain ordinal/context/statement/scope, not per-query wall-clock instants; this replay checks identity/parent/time closure, not timestamp attribution of each SQL start.",
+    "Existing unknown context and unknown statement rows remain included in every SQL budget total."
+  ]
+}

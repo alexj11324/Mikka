@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "status": "READ_ONLY_FINDINGS_NO_PRODUCT_FIX",
+  "source": {
+    "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "lifecycleBlob": "45ea8ea2279daecbf4d5024f39548a28be3e4511",
+    "lifecycleSha256": "9a86cd24e01ab32de2823cb004fae94f3e05630a08a63702d4896794b1f79234",
+    "linkedReceipts": "d9f81f77c8cd696c4f624b84b7351e00d6d7fe15",
+    "batchContainmentReview": "bcf833be23a7cd37e9b8e941704ab74386b8f03b"
+  },
+  "actualResults": {
+    "ordinaryFullLogin": {
+      "nativeSQL": 441,
+      "webSQL": 331,
+      "difference": 110,
+      "status": "FAIL",
+      "nativeLogical": 40,
+      "webLogical": 25,
+      "nativePhysical": 15,
+      "webPhysical": 25,
+      "nativeWindow": [
+        "2026-11-10T03:29:22.499Z",
+        "2026-11-10T03:29:30.769Z"
+      ],
+      "webWindow": [
+        "2026-11-10T03:29:18.043Z",
+        "2026-11-10T03:29:21.122Z"
+      ]
+    },
+    "firstStartup": {
+      "nativeSQL": 208,
+      "hostedSQL": 228,
+      "status": "PASS"
+    },
+    "counting": "All full windows retained; no subtraction of email, PKCE, unknown SQL, legitimate notification/badge reads or unpaired events."
+  },
+  "observedTimingConstraints": [
+    {
+      "document": "first authenticated Native document (inferred from bootstrap and actual workspace navigation, not a captured renderer realm ID)",
+      "initialBatch": [
+        "03:29:24.350",
+        "03:29:24.528"
+      ],
+      "observedTicket": [
+        "03:29:25.119",
+        "03:29:25.148"
+      ],
+      "secondBatches": [
+        [
+          "03:29:25.586",
+          "03:29:25.624"
+        ],
+        [
+          "03:29:25.728",
+          "03:29:25.763"
+        ]
+      ],
+      "constraint": "This observed batch was already complete 591ms before the observed ticket request began; it cannot be that connection's queued-undispatched snapshot at opening."
+    },
+    {
+      "document": "second authenticated Native document (same identity limitation)",
+      "initialBatch": [
+        "03:29:29.328",
+        "03:29:30.018"
+      ],
+      "observedTickets": [
+        [
+          "03:29:29.697",
+          "03:29:29.891"
+        ],
+        [
+          "03:29:29.700",
+          "03:29:29.881"
+        ]
+      ],
+      "secondBatches": [
+        [
+          "03:29:30.411",
+          "03:29:30.426"
+        ],
+        [
+          "03:29:30.518",
+          "03:29:30.624"
+        ]
+      ],
+      "constraint": "This initial batch reached the server before either observed ticket began. Its later completion alone cannot establish a snapshot began after live coverage."
+    }
+  ],
+  "sourceFindings": [
+    {
+      "paths": [
+        "apps/desktop/src/renderer/app.tsx",
+        "apps/desktop/src/renderer/installed-workspace.tsx"
+      ],
+      "finding": "SessionApplication joins same-scope bootstrap reads and generation-fences scope changes; InstalledWorkspace retains the first component type rather than swapping lazy/loaded types. Two observed bootstraps match two authenticated documents. This does not independently prove React mount counts."
+    },
+    {
+      "paths": [
+        "lib/live/channel.ts",
+        "lib/swr/read-observer.ts"
+      ],
+      "finding": "Socket onopen causes the unconditional gap catch-up. live_ready updates capability coverageAfter. A later subscription on an existing connection can invalidate with that existing coverage boundary or a later received push boundary. Actual dispatch proof, committed exact cache identity and revision acceptance remain required; completion time is not enough."
+    },
+    {
+      "paths": [
+        "apps/desktop/src/renderer/read-batch.ts",
+        "apps/desktop/src/renderer/rpc.ts"
+      ],
+      "finding": "Only the audited five snapshot actions opt into pending/actual-dispatch proof. enqueue does not claim actual dispatch. Same-turn MessageChannel batching has no response cache, timer polling or blind network retry. Only explicit unknown-capability404 has the original fallback."
+    },
+    {
+      "paths": [
+        "lib/coordinator/chat-read-client.ts",
+        "hooks/use-live-lists.ts"
+      ],
+      "finding": "Chat, issue and thread readers merge/delta state and can cross hydration awaits. They cannot be turned into snapshot proofs solely to reduce counts. They account for much of the additional four-vs-two observed logical read waves."
+    },
+    {
+      "paths": [
+        "components/desktop/desktop-integration.tsx"
+      ],
+      "finding": "Native task-run reads supply existing badge/notification behavior and are intentionally disabled in ordinary Web. They cannot be removed just to match Web counts."
+    },
+    {
+      "paths": [
+        "lib/desktop-rpc/bootstrap.ts",
+        "hooks/use-live-key.tsx"
+      ],
+      "finding": "Selected cacheWorkspace is not a proof of the owner's personal home. Establishing an earlier shared live channel would require a server-verified routing scope and actual timing evidence; current scope discovery does not justify guessing or weakening fresh ticket authorization."
+    }
+  ],
+  "limits": [
+    "Existing frozen queryDiagnostics receipts are the SQL-selected subset, not a complete set of zero-SQL RPCs or live transport events.",
+    "No actual onopen/live_ready/channel IDs or renderer readFresh branch records exist in the old evidence; neither socket causality nor mount causality is established by timestamp proximity.",
+    "Native main presence transport restrictions were read but are not shown to cause this 8.27s full-login difference; no change is proposed on that basis.",
+    "No speculative retry, kickstart, cached authority, suppressed catch-up, changed fixture window or extra polling proposed."
+  ],
+  "next": {
+    "type": "one reviewed temporary diagnostic source overlay only",
+    "manifest": "d12ad84713a8883071a3ddcbe49973668e054eed",
+    "goal": "Join actual read/action/batch/proof epochs to channel creation/subscription/open/ready/push and the original readFresh decisions, preserving original budgets and every original business call."
+  },
+  "resources": {
+    "originalArtifactsRead": 0,
+    "newVMs": 0,
+    "newWorkflowRuns": 0,
+    "formalSourceMutations": 0
+  }
+}

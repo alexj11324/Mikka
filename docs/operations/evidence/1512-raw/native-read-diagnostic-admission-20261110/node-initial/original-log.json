@@ -1,0 +1,10 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"result\": {\n    \"logs\": [\n      {\n        \"data\": \"{\\\"inputBlob\\\":\\\"c194cfee747971c8d3d5ba7bdb572abc25ad487e\\\",\\\"node\\\":\\\"v24.22.1\\\",\\\"results\\\":[{\\\"name\\\":\\\"native_diagnostic_protocol\\\",\\\"exitCode\\\":0,\\\"stdoutBytes\\\":5885,\\\"stderrBytes\\\":0},{\\\"name\\\":\\\"native_diagnostic_admission\\\",\\\"exitCode\\\":0,\\\"stdoutBytes\\\":4564,\\\"stderrBytes\\\":0}],\\\"bundle\\\":{\\\"bytes\\\":16570,\\\"sha256\\\":\\\"97a0e5e395014786e352e1cdbede04ac75d14ef5550c45038330523305439718\\\",\\\"gitBlob\\\":\\\"e20bbb4d111a627734c3f7632227d18233ff9c90\\\",\\\"gzipBytes\\\":5661,\\\"gzipSha256\\\":\\\"611240ebb837111340745781db5678a50ea110ad0a455d46ac83c57c40484d3c\\\",\\\"parts\\\":5}}\\n\",\n        \"stream\": \"stdout\"\n      }\n    ],\n    \"context\": {\n      \"totalItems\": 1,\n      \"returnedItems\": 1,\n      \"truncated\": false\n    }\n  }\n}"
+    }
+  ],
+  "structuredContent": null,
+  "isError": false
+}

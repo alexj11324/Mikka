@@ -1,0 +1,102 @@
+{
+  "schema": "mikka.issue1512.native-frame-protocol-cleanup.v1",
+  "at": "2026-11-10T04:38:29.648Z",
+  "scope": {
+    "link_id": "link_6ad94217c91881918e99729c76fa9d61",
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "name": "issue1512-native-frame-protocol-node24-20261110-0438"
+  },
+  "sessionId": "sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W",
+  "compressed": {
+    "sha": "b2860003a75671eac243311f64e1dcda9aca3857",
+    "bytes": 4223,
+    "sha256": "37e6ee6e6a8acb5d8c36231e7d14d9df98f1b1439b6778032d4077468b864134"
+  },
+  "stop": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"sandbox\": {\n      \"name\": \"issue1512-native-frame-protocol-node24-20261110-0438\",\n      \"currentSessionId\": \"sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W\",\n      \"status\": \"stopped\",\n      \"statusUpdatedAt\": 1794285507960,\n      \"persistent\": false,\n      \"workloadType\": \"sandbox\",\n      \"region\": \"iad1\",\n      \"failoverRegions\": [],\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"runtime\": \"node24\",\n      \"architecture\": \"amd64\",\n      \"timeout\": 300000,\n      \"totalEgressBytes\": 12164,\n      \"totalIngressBytes\": 48763,\n      \"totalActiveCpuDurationMs\": 2107,\n      \"totalDurationMs\": 36106,\n      \"cwd\": \"/vercel/sandbox\",\n      \"createdAt\": 1794285471633,\n      \"updatedAt\": 1794285471633\n    },\n    \"session\": {\n      \"id\": \"sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W\",\n      \"runtime\": \"node24\",\n      \"architecture\": \"amd64\",\n      \"requestedAt\": 1794285471578,\n      \"startedAt\": 1794285471606,\n      \"requestedStopAt\": 1794285507485,\n      \"stoppedAt\": 1794285507712,\n      \"status\": \"stopped\",\n      \"duration\": 36106,\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"timeout\": 300000,\n      \"region\": \"iad1\",\n      \"cwd\": \"/vercel/sandbox\",\n      \"workloadType\": \"sandbox\",\n      \"createdAt\": 1794285471578,\n      \"updatedAt\": 1794285471613,\n      \"interactivePort\": 26661,\n      \"activeCpuDurationMs\": 2107,\n      \"networkTransfer\": {\n        \"ingress\": 48763,\n        \"egress\": 12164\n      },\n      \"sourceSandboxName\": \"issue1512-native-frame-protocol-node24-20261110-0438\",\n      \"projectId\": \"prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH\"\n    }\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  },
+  "deleted": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"sandbox\": {\n      \"name\": \"issue1512-native-frame-protocol-node24-20261110-0438\",\n      \"currentSessionId\": \"sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W\",\n      \"status\": \"stopped\",\n      \"statusUpdatedAt\": 1794285507960,\n      \"persistent\": false,\n      \"workloadType\": \"sandbox\",\n      \"region\": \"iad1\",\n      \"failoverRegions\": [],\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"runtime\": \"node24\",\n      \"architecture\": \"amd64\",\n      \"timeout\": 300000,\n      \"totalEgressBytes\": 12164,\n      \"totalIngressBytes\": 48763,\n      \"totalActiveCpuDurationMs\": 2107,\n      \"totalDurationMs\": 36106,\n      \"cwd\": \"/vercel/sandbox\",\n      \"createdAt\": 1794285471633,\n      \"updatedAt\": 1794285471633\n    }\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  },
+  "absence": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"error\":{\"message\":\"Vercel API request failed (404: not_found). Vercel Sandbox not found.\",\"recovery\":\"Check the API message, arguments, target team and resource state. Correct the request before retrying.\",\"remediation\":{\"actor\":\"agent\",\"action\":\"correct_request\"},\"status\":404,\"code\":\"not_found\",\"operation\":\"GET /v2/sandboxes/sessions/{sessionId}\",\"requestId\":\"iad1:iad1::zhb7b-1794285509558-d0f73688ffaf\"},\"cliFallback\":{\"commandTemplate\":\"vercel api /v2/sandboxes/sessions/{sessionId} --method GET\",\"guidance\":\"Check the API message, arguments, target team and resource state. Correct the request before retrying.\",\"kind\":\"api\",\"argv\":[\"vercel\",\"api\",\"/v2/sandboxes/sessions/{sessionId}\",\"--method\",\"GET\"],\"help\":\"vercel api --help\",\"limitations\":\"Same endpoint and method only after translating inputs. --input preserves JSON object bodies, not top-level arrays or primitives; use MCP for those forms. CLI authentication and default team can differ. JSONL stays text instead of MCP aggregation; response field selection, bounds and error handling differ.\",\"contextBindings\":{\"teamId\":\"teamId\"},\"instructions\":\"Replace path placeholders with URL-encoded values. Add query inputs to the URL (repeat the key for arrays; omit null/undefined), headers with --header, and a JSON object body file with --input. Preserve schema defaults and coercions; an omitted optional JSON body on POST/PUT/PATCH is {} in MCP. Set teamId explicitly when supported; a slug alone does not override the CLI default team. Preserve required inputs and scoped context. Do not use -F for query parameters or --paginate unless all pages are intended. Native alternatives have limited input/output parity.\",\"inputs\":[{\"key\":\"sessionId\",\"name\":\"sessionId\",\"location\":\"path\",\"required\":true},{\"key\":\"teamId\",\"name\":\"teamId\",\"location\":\"query\",\"required\":false},{\"key\":\"slug\",\"name\":\"slug\",\"location\":\"query\",\"required\":false}],\"targetInstructions\":\"Fill team/project placeholders from tool inputs or route context and apply explicit scope selectors. Reuse known IDs without identity/team probes; discover only missing scope or diagnose a CLI access/not-found error. Never use a different CLI default.\",\"context\":{\"teamId\":\"team_C7lwxVVvnUicFli6112mvxpv\"}}}"
+      }
+    ],
+    "structuredContent": {
+      "error": {
+        "message": "Vercel API request failed (404: not_found). Vercel Sandbox not found.",
+        "recovery": "Check the API message, arguments, target team and resource state. Correct the request before retrying.",
+        "remediation": {
+          "actor": "agent",
+          "action": "correct_request"
+        },
+        "status": 404,
+        "code": "not_found",
+        "operation": "GET /v2/sandboxes/sessions/{sessionId}",
+        "requestId": "iad1:iad1::zhb7b-1794285509558-d0f73688ffaf"
+      },
+      "cliFallback": {
+        "commandTemplate": "vercel api /v2/sandboxes/sessions/{sessionId} --method GET",
+        "guidance": "Check the API message, arguments, target team and resource state. Correct the request before retrying.",
+        "kind": "api",
+        "argv": [
+          "vercel",
+          "api",
+          "/v2/sandboxes/sessions/{sessionId}",
+          "--method",
+          "GET"
+        ],
+        "help": "vercel api --help",
+        "limitations": "Same endpoint and method only after translating inputs. --input preserves JSON object bodies, not top-level arrays or primitives; use MCP for those forms. CLI authentication and default team can differ. JSONL stays text instead of MCP aggregation; response field selection, bounds and error handling differ.",
+        "contextBindings": {
+          "teamId": "teamId"
+        },
+        "instructions": "Replace path placeholders with URL-encoded values. Add query inputs to the URL (repeat the key for arrays; omit null/undefined), headers with --header, and a JSON object body file with --input. Preserve schema defaults and coercions; an omitted optional JSON body on POST/PUT/PATCH is {} in MCP. Set teamId explicitly when supported; a slug alone does not override the CLI default team. Preserve required inputs and scoped context. Do not use -F for query parameters or --paginate unless all pages are intended. Native alternatives have limited input/output parity.",
+        "inputs": [
+          {
+            "key": "sessionId",
+            "name": "sessionId",
+            "location": "path",
+            "required": true
+          },
+          {
+            "key": "teamId",
+            "name": "teamId",
+            "location": "query",
+            "required": false
+          },
+          {
+            "key": "slug",
+            "name": "slug",
+            "location": "query",
+            "required": false
+          }
+        ],
+        "targetInstructions": "Fill team/project placeholders from tool inputs or route context and apply explicit scope selectors. Reuse known IDs without identity/team probes; discover only missing scope or diagnose a CLI access/not-found error. Never use a different CLI default.",
+        "context": {
+          "teamId": "team_C7lwxVVvnUicFli6112mvxpv"
+        }
+      },
+      "error_code": "INVALID_ARGUMENT"
+    },
+    "isError": true
+  }
+}

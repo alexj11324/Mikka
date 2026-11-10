@@ -1,0 +1,546 @@
+{
+  "schema": "issue1512.native-early-live-source-path-map.v1",
+  "author": "/root/independent_final",
+  "observedAt": "2026-11-10 04:41:08 UTC",
+  "status": "READ_ONLY_IMPLEMENTATION_PREPARATION; NO_BEHAVIORAL_CANDIDATE_IMPLEMENTED",
+  "repository": "alexj11324/Mikka",
+  "base": {
+    "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "parent": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+    "parentTree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0",
+    "binding": "Head commit API independently read: one addition in lib/desktop-rpc/read-batch-context.test.ts only. All 38 inspected source blobs match the parent tree and their Git blob hash; therefore exact H source."
+  },
+  "purpose": "If actual diagnostic events establish that delayed live entry causes excess RPC, identify the earliest existing lifecycle boundaries and the minimum source seams for an earlier connection to the same needed scope. This is not a claim that earlier connection fixes the 110-SQL difference.",
+  "sourceVerification": [
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "sha": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5",
+      "bytes": 3596,
+      "sha256": "1aac5eb7968426e8ec6158f4c2d511b13993d392e4f204111e631ccc6d58a333",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/renderer/bootstrap.ts"
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "sha": "3be4faece94b30d4a7f66ef2d3c8b2ef60134372",
+      "bytes": 2699,
+      "sha256": "832522a7f17c81487e6078220e0e14f50f019348530acc0678f21590908cf29b",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/desktop-rpc/bootstrap.ts"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "sha": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/desktop-rpc/wire.ts"
+    },
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "sha": "f43f62b4798c971ebae3b52ab2a1db413925bf51",
+      "bytes": 2409,
+      "sha256": "ba40f186a10700cf6b398a94ed90a34ec4704e53335e57540af41b40dd70f2d9",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/swr/cache-scope.ts"
+    },
+    {
+      "path": "lib/live/owner-scope.ts",
+      "sha": "962829a3e69f508f93621e897209e408f6ad1d2a",
+      "bytes": 1284,
+      "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/live/owner-scope.ts"
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "sha": "266aa82ba4a683e88d207bc197fd97cee1f2b1ae",
+      "bytes": 2332,
+      "sha256": "59eba7ae91f0b1f71eab51800c632f049f9fffe8c61f86c794f4c875781af907",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/live/revision-read.ts"
+    },
+    {
+      "path": "lib/live/list-read-server.ts",
+      "sha": "d1fa48d21bb1b429a9afacf03fa350b8f02f5763",
+      "bytes": 1249,
+      "sha256": "b6fa906a7eee521f91160f39d77098b33c640c0ec8ee15fc86a3df7e4518aff7",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/live/list-read-server.ts"
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "sha": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+      "bytes": 3337,
+      "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/live/list-read.ts"
+    },
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "sha": "c780d381fce0daa9c1646d63c7c099d48d197223",
+      "bytes": 14784,
+      "sha256": "f1135aa822bc092b6f2c490e0f1b5fdbbafe93b990c484055a5939478a07603d",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/renderer/app.tsx"
+    },
+    {
+      "path": "apps/desktop/src/renderer/platform.tsx",
+      "sha": "9b322aa0abe0869b32f709a98b3d87fbfcf4a66f",
+      "bytes": 2269,
+      "sha256": "8626f234b46457610b085503f2443061cd3addc1f7712193cbc9751504591dbc",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/renderer/platform.tsx"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace.tsx",
+      "sha": "e45052573bb4424f61da35eeaedb5f0a8d80844f",
+      "bytes": 2569,
+      "sha256": "2307562ffbbb8c4e95a693f8b234987649bdbb746ded23137d8a8ca37772016c",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/renderer/workspace.tsx"
+    },
+    {
+      "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+      "sha": "2463df1257aec4817e0fe625931d1897bb3ccbb7",
+      "bytes": 976,
+      "sha256": "2ddcc1753054ea0caf78a7c43b98e9187583d06f246c83c16d6d4e96c1c5f61b",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/renderer/installed-workspace.tsx"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-loader.ts",
+      "sha": "a966f949fce953ae8aa4eed051c17b4e5d3cb8f6",
+      "bytes": 1733,
+      "sha256": "f5ae7ca39fa04e3e9014210eae35ab1ee5379a0e92fdc3c79d60673b1f4cb8a2",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/renderer/workspace-loader.ts"
+    },
+    {
+      "path": "components/authenticated-read-cache.tsx",
+      "sha": "54b50bb03a114cdb99dd02d2909553e29b3002fc",
+      "bytes": 4539,
+      "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/components/authenticated-read-cache.tsx"
+    },
+    {
+      "path": "lib/swr/persistent-cache.ts",
+      "sha": "6776b93c8d98738a3e7c84a383da435af64baa95",
+      "bytes": 10956,
+      "sha256": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/swr/persistent-cache.ts"
+    },
+    {
+      "path": "lib/swr/cache-policy.ts",
+      "sha": "977431cfdeb11adbe2863794ca7bde010c7842ad",
+      "bytes": 7608,
+      "sha256": "b87b7847e2ea02cf4d25b8d106dc33ba30b2e8b3862d1843a7d6ada4b93e51a0",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/swr/cache-policy.ts"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "sha": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "bytes": 8237,
+      "sha256": "c520e2c86ca83fe382e6131eb48b36b813b6b9f8750dc9d3c09e6e0044412cc9",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/swr/read-observer.ts"
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "sha": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+      "bytes": 4551,
+      "sha256": "847311eb9b775d43bb9f569d6ec395aeb41475a5ed7468e17cd1826b2c73217d",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/components/swr-defaults.tsx"
+    },
+    {
+      "path": "hooks/use-workspace.ts",
+      "sha": "3bc951bb32838b9784f64ec60659a74edd1c626b",
+      "bytes": 1305,
+      "sha256": "f2a0bb97ae72c86b7a3f97a7a92f262e25bb60189a8c637af6cee666d7bc6f73",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/hooks/use-workspace.ts"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "sha": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "bytes": 8050,
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/hooks/use-live-key.tsx"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "sha": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+      "bytes": 9807,
+      "sha256": "da27e73ae937fed876ae463e988d4418292f9976aeb7bc95a89e786ae80e5fab",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/hooks/use-live-lists.ts"
+    },
+    {
+      "path": "lib/live/channels.ts",
+      "sha": "d459548cbd8785bf2764d23543109b99ae146d18",
+      "bytes": 1580,
+      "sha256": "b54a1ea2cb517ce4135d91423c1999420591f3bfc9487d1a9c11396460a321c8",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/live/channels.ts"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "sha": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "bytes": 24031,
+      "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/live/channel.ts"
+    },
+    {
+      "path": "apps/desktop/src/renderer/live-runtime.ts",
+      "sha": "e632451a6e9f4300159f7ff44ae74761349ab8fd",
+      "bytes": 3537,
+      "sha256": "d2561036b5b90c671a5061bc12cc3d0f7e8dcc1d509efbb578dee3ed56f35a61",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/renderer/live-runtime.ts"
+    },
+    {
+      "path": "apps/desktop/src/main/bundled-live.ts",
+      "sha": "7d6056ed3b623cc3366895a3ce4484bec5e65b5d",
+      "bytes": 4594,
+      "sha256": "5d70a1d96e528dd80b3287418166ebddbc526247fc18f5ef2809175538fb8647",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/main/bundled-live.ts"
+    },
+    {
+      "path": "apps/desktop/src/main/bundled-bridge.ts",
+      "sha": "72a8e7ff2bf3f6dc38937962241a46b5c2abda69",
+      "bytes": 3587,
+      "sha256": "1e55859b69d0bb9b8d69e6b568ad20e0bce492eed755414c5d5e2d30fba81c59",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/main/bundled-bridge.ts"
+    },
+    {
+      "path": "apps/desktop/src/main/bundled-auth.ts",
+      "sha": "d860b674f24e3159d7f196270c71c3a6f6e76839",
+      "bytes": 27113,
+      "sha256": "a23a2ebf683ea49b0f07380f204e3ef5692b9c973933f35f07d8041af30c7b18",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/main/bundled-auth.ts"
+    },
+    {
+      "path": "apps/desktop/src/main/index.ts",
+      "sha": "61da70923e2109761919f8b4968c0cb701917ff3",
+      "bytes": 29563,
+      "sha256": "4c85b97a6c5c030edc2c499c805326124b334d814412c9151f1a3097577dc7c1",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/main/index.ts"
+    },
+    {
+      "path": "app/api/live/ticket/route.ts",
+      "sha": "312f16abd669c2f7587a4121e81192ef2ea9a4d1",
+      "bytes": 2566,
+      "sha256": "c02163e7edee8d6dd0f8c05304ea3e0421bc354e4828613e34edf6f619ae4212",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/app/api/live/ticket/route.ts"
+    },
+    {
+      "path": "lib/task-workspace.ts",
+      "sha": "d7bb0250c4174540eb0c4661a4998a5cfbd6cfd2",
+      "bytes": 10071,
+      "sha256": "7b3714e94b498393c130cd275a7b2c80e029407363be846d0bd25734fb22063c",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/task-workspace.ts"
+    },
+    {
+      "path": "lib/enterprise/access.ts",
+      "sha": "834c8d940e6a66f0c0a724f6abf80146d60ea6d4",
+      "bytes": 10278,
+      "sha256": "ee0645ea6b950e12301c4351d0cc1f244d158fccab6298baff8e1f985b9e258d",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/enterprise/access.ts"
+    },
+    {
+      "path": "lib/enterprise/live-authority.ts",
+      "sha": "c10f1d294945ceb2122b2094cd53ef738943a40e",
+      "bytes": 14851,
+      "sha256": "be6a0fb2205db81b6e809368b5badc38291a38d9cc564acde846df7e0f724d94",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/enterprise/live-authority.ts"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "sha": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "bytes": 4726,
+      "sha256": "6119f76aa46cf1fcd93dc9b389859221c206fecba7cedf265af061fd6862270e",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/renderer/rpc.ts"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "sha": "e7f6972a23519ae45e059038cd0c404789d44a98",
+      "bytes": 6301,
+      "sha256": "f98ecf6e986da17aa66d8c54039f5d683dc7cfb7d2e563eec5efffeff9527bac",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/apps/desktop/src/renderer/read-batch.ts"
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "sha": "064b7cb66429d3219622637eaa4228596f98d54b",
+      "bytes": 58662,
+      "sha256": "40d9e39b440c3893080ea524a8d48048924d1b33ed949bf467dd7cff3565c0d0",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/components/workspace/issue-workspace.tsx"
+    },
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "sha": "a755882162c52559579cbd96b26373f121d74761",
+      "bytes": 4428,
+      "sha256": "71447f74b45076755aefb322e721c3263c61cf8188d31b4c2159246645d76168",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/components/desktop/desktop-integration.tsx"
+    },
+    {
+      "path": "components/coordinator/coordinator-chat.tsx",
+      "sha": "8eb580a57b83c952a87f4be7251ebaea4b417724",
+      "bytes": 58786,
+      "sha256": "0a08f40ee2430fdae1eec6165a8bb3af36b85d886ce69327d4eb1ebd45d0f5b0",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/components/coordinator/coordinator-chat.tsx"
+    },
+    {
+      "path": "lib/coordinator/chat-read-client.ts",
+      "sha": "c5588e067ff295cc81b5c3e35ea5307fbd94bf57",
+      "bytes": 4326,
+      "sha256": "428bd4e2529d89c0ba740efbb5e0121f1ae50d9efcedffecaca72dd0dbdd2dd4",
+      "verified": true,
+      "url": "https://github.com/alexj11324/Mikka/blob/5f3598029033b83ee72c88ea6c49955205eecab2/lib/coordinator/chat-read-client.ts"
+    }
+  ],
+  "pathMap": [
+    {
+      "stage": "A. Main restoration and local module loading",
+      "sources": [
+        "apps/desktop/src/main/bundled-auth.ts",
+        "apps/desktop/src/main/bundled-bridge.ts",
+        "apps/desktop/src/renderer/workspace-loader.ts"
+      ],
+      "fact": "Vault restore supplies an identity hint and protocol requests/IPC join whenRestored. preloadWorkspace uses local session only to load code on the permitted workspace routes. No workspace authority/home scope is learned here. Existing backend.preconnect opens an unauthenticated transport socket only.",
+      "boundary": "Do not infer live authorization or personal workspace from stored session, selected workspace, account id, deterministic UUID or code-preload eligibility."
+    },
+    {
+      "stage": "B. Server bootstrap and existing membership projection",
+      "sources": [
+        "lib/desktop-rpc/bootstrap.ts",
+        "lib/swr/cache-scope.ts",
+        "lib/desktop-rpc/wire.ts",
+        "apps/desktop/src/renderer/bootstrap.ts"
+      ],
+      "fact": "desktopBootstrap gets session identity, then config/onboarding/authorizedCacheWorkspace in Promise.all. authorizedCacheWorkspace executes one active-member JOIN across all eligible team or own workspaces, ordered by creation; its current projection is only workspaceId and role. It checks request/header selection agreement, chooses the requested/selected/cookie/default entry, and applies enterpriseWorkspaceAllowed to that selected workspace. Wire and renderer expose cacheWorkspace only, not owner home.",
+      "boundary": "The selected cache namespace is not a personal-home assertion. The membership array is local to this call and not returned. Bootstrap identity is not a substitute for the live route's fresh session check."
+    },
+    {
+      "stage": "C. Authenticated renderer continuation",
+      "sources": [
+        "apps/desktop/src/renderer/app.tsx",
+        "apps/desktop/src/renderer/platform.tsx"
+      ],
+      "fact": "SessionApplication reload joins equal in-flight requests, increments a generation, clears old cache/scope when necessary, awaits readBootstrap, rejects stale generations, then sets configuration/session/bootstrap. Ordinary local chunk preload runs in parallel. Native bootstrapScope always returns workspace, including non-Workspace routes.",
+      "boundary": "The earliest successful-bootstrap continuation is before setBootstrap, but a blanket warm here would also issue tickets for sign-in/addAccount, invitation, shared artifact, device and workspace-creation routes. Only a route that will mount InstalledWorkspace is a candidate."
+    },
+    {
+      "stage": "D. Actual workspace and cache ownership boundary",
+      "sources": [
+        "apps/desktop/src/renderer/installed-workspace.tsx",
+        "apps/desktop/src/renderer/workspace.tsx",
+        "components/authenticated-read-cache.tsx"
+      ],
+      "fact": "InstalledWorkspace chooses one stable loaded/lazy Component for its mount. Workspace wraps WorkspaceScope in AuthenticatedReadCache. This boundary is owner/selected workspace/role/build/server bound; invalidation can retire/remount it. WorkspaceScope reads useWorkspace and gives LiveProvider selected workspace only after data.currentUserId matches user.id.",
+      "boundary": "Lifting a registry outside this boundary must preserve its retirement semantics. Passing bootstrap.cacheWorkspace as a connection-routing hint must not seed workspace content, bypass currentUserId checks, alter business selectors or change persistence authorization."
+    },
+    {
+      "stage": "E. Initial UI readers and home discovery",
+      "sources": [
+        "components/workspace/issue-workspace.tsx",
+        "components/desktop/desktop-integration.tsx",
+        "hooks/use-live-lists.ts",
+        "components/coordinator/coordinator-chat.tsx",
+        "lib/live/list-read.ts"
+      ],
+      "fact": "WorkspaceScope/IssueWorkspace use the same useWorkspace SWR key. Initial readers include switcher, teams/projectTeams, native task-run badge, thread list, summaries and chat; issue/bot reads require selected workspace. Owner-wide listeners derive home from a matching live.ownerId/workspaceId response: switcher workspace_settings; thread_list; task_run_list; bot_chat_list; bot_chat. issue_list listens to selected and separately to home when different. Initial scopes may also appear from a hydrated, namespace-authorized prior read; they do not always await a new network response.",
+      "boundary": "These are source dependency relationships, not a claimed exact HTTP launch order. Hydration, React scheduling and batch dispatch determine real timing. The current owner comparison, invalid-data behavior, selected-workspace checks and null fallback must remain."
+    },
+    {
+      "stage": "F. Registry and actual connection",
+      "sources": [
+        "hooks/use-live-key.tsx",
+        "lib/live/channels.ts",
+        "lib/live/channel.ts",
+        "apps/desktop/src/renderer/live-runtime.ts"
+      ],
+      "fact": "LiveProvider creates one LiveChannels per owner within its component lifetime; creation alone sends no ticket. useLiveKeys subscribes in an effect. LiveChannels maps workspaceId (including null) to one LiveChannel and refcounts subscriptions. First visible valid subscription starts connect; last stop disposes channel and removes registry entry. runtime.ticket(null) returns null, so the unresolved placeholder never requests a guessed remote scope.",
+      "boundary": "There is no existing public warm/retain API. Any preconnection would require an explicit lifecycle seam that joins this same registry/channel and does not add a fake entity/SWR key or create a second raw socket. A parent effect has no source-level guarantee of preceding descendant SWR reads."
+    },
+    {
+      "stage": "G. Ticket and scope transport",
+      "sources": [
+        "apps/desktop/src/main/bundled-live.ts",
+        "apps/desktop/src/main/bundled-bridge.ts",
+        "app/api/live/ticket/route.ts",
+        "lib/task-workspace.ts",
+        "lib/enterprise/live-authority.ts"
+      ],
+      "fact": "Renderer receives only a local handle. Main prepares one remote ticket, validates its URL/expiry, binds it to the WebContents owner, and connects later. Live route rejects nonhuman delegated bearers, removes cookie rescue, sets disableCookieCache:true, checks activeTaskWorkspaces and invokes workspaceLiveTicket with actual session id. Locked membership/Org and principal gates remain in withTaskWorkspace/enterprise authority.",
+      "boundary": "A routing hint never replaces any ticket/member/Org/session check. Earlier prepare alone is not continuous coverage; the same live-ready channel and push history must survive to real subscriptions."
+    }
+  ],
+  "existingPersonalScope": {
+    "canonicalFunction": "lib/live/owner-scope.ts:ownerLiveScope",
+    "predicate": "w.userId = ownerId; w.kind = personal; JOIN member.workspaceId = w.id AND member.userId = w.userId AND member.status = active; return only when rows.length === 1",
+    "propagation": "beginOwnerListRead resolves home before reading revisions and list data. ownerListRead reuses that begun scope and returns live.ownerId/workspaceId. ownerListWorkspace requires matching owner and a valid LIVE_ID.",
+    "minimalDataSeam": "If a bootstrap routing hint is justified by actual diagnostics, the existing authorizedCacheWorkspace membership SELECT is the candidate: add a kind projection (and keep explicit owner semantics) and derive a unique own-personal id from those same rows within the same invocation. Preserve zero/multiple=>null and all selected cache authorization behavior. This describes a possible projection-only seam, not approved or written code.",
+    "authorityLimit": "That prospective id is only a route for an ordinarily required live ticket. enterpriseWorkspaceAllowed currently applies to selected cacheWorkspace, not every membership row. The id must not be labeled fully authorized, used for cache hydration or content reads, or persisted as a grant. Live ticket reauthorizes actual membership/Org/session at use.",
+    "noNewQuery": "Do not invoke ensurePersonalWorkspace, ownerLiveScope or an extra list query from bootstrap just to learn home; do not share the membership result beyond this invocation."
+  },
+  "candidateLocations": [
+    {
+      "id": "P0-existing-provider",
+      "where": [
+        "apps/desktop/src/renderer/workspace.tsx:WorkspaceScope",
+        "hooks/use-live-key.tsx:LiveProvider",
+        "lib/live/channels.ts",
+        "lib/live/channel.ts"
+      ],
+      "advantage": "Smallest existing ownership seam: the real future registry is already inside authenticated read-cache lifetime; a verified selected/home hint could begin the ordinarily needed connection without waiting for list response discovery.",
+      "requiredChangesIfDataJustifies": "A connection lifetime that can be retained before real subscriptions and handed to those same subscriptions; narrow optional hints, no fake keys or content adoption. Keep normal reads and UI immediate.",
+      "limitation": "Provider effect may run after initial SWR requests. It can only help if actual coverage precedes the relevant read boundary; source layout does not prove this. No implementation yet."
+    },
+    {
+      "id": "P1-installed-boundary",
+      "where": [
+        "apps/desktop/src/renderer/installed-workspace.tsx",
+        "apps/desktop/src/renderer/workspace.tsx",
+        "hooks/use-live-key.tsx:LiveProvider"
+      ],
+      "advantage": "Earlier route-correct point after bootstrap, while existing lazy workspace code/hydration proceeds. Unlike a blanket SessionApplication warm, this branch is known to mount the workspace UI.",
+      "requiredChangesIfDataJustifies": "One retained registry must be passed/adopted by the later provider, not replaced. Owner/session/server/bootstrap generation and eventual cache retirement must dispose the same connection. Use no await that holds UI for readiness.",
+      "limitation": "Larger lifetime transfer than P0, and early ticket can be unnecessary if navigation/authorization changes before mount. Net ticket/SQL count must not grow. Candidate location only."
+    },
+    {
+      "id": "P2-bootstrap-continuation-only-if-necessary",
+      "where": [
+        "apps/desktop/src/renderer/app.tsx:reload after stale-generation checks, before setBootstrap"
+      ],
+      "advantage": "Earliest available server-bootstrap result in the current renderer.",
+      "requiredChangesIfDataJustifies": "Explicit existing workspace-route eligibility and same-instance registry handoff, all request-generation and invalidation semantics preserved.",
+      "limitation": "Most likely to over-warm non-workspace routes or survive a cache/session change; not the first implementation seam. No raw socket/IPC warm at vault restore or local module preload."
+    }
+  ],
+  "retainedFreshness": [
+    "open does not mean kind support or continuous coverage. LiveChannel establishes coverageAfter only at capability readiness (and relevant presence acknowledgement).",
+    "onopen's unconditional catch-up is still required for reads that can predate the connection. It must not be removed merely because a request completed after open.",
+    "Late real subscription can use max(coverageAfter, invalidationAfter[kind]) only under its existing supported/presence condition. Pushes received while a key is unsubscribed still advance the kind boundary and must survive the handoff.",
+    "For ordinary or delta readers, read.began must actually follow the obligation to reuse a result. The audited snapshot path can additionally use actual dispatch proof; queued/enqueued is not dispatched. No widening of snapshot whitelist, no changed readFresh acceptance.",
+    "Existing 60s unsupported/presence fallback, deadlines, hidden/offline catch-up, ticket renewal and retry policy remain; no new poll or wait-until-ready UI gate.",
+    "A new session/server/document or retired cache cannot inherit coverage timestamps, pending read results or local handles from the prior scope."
+  ],
+  "falsifiableCounterexamples": [
+    {
+      "case": "Selected team differs from personal home",
+      "failure": "Warming selected as home misses owner-wide invalidations or borrows an unrelated scope.",
+      "required": "Derive unique own personal explicitly; keep separate selected/home channel entries, dedup only when actual ids equal."
+    },
+    {
+      "case": "Personal workspace missing, ambiguous or converted to team",
+      "failure": "memberships[0], admin role or deterministic user UUID guesses a home.",
+      "required": "Zero/multiple matching personal rows remain null; no creation, fallback borrowing or role-based inference."
+    },
+    {
+      "case": "Membership/session revoked after bootstrap",
+      "failure": "A cached hint is reused as authority.",
+      "required": "Live ticket's fresh session and membership checks deny; existing read and transport refusal behavior stays."
+    },
+    {
+      "case": "Org attached, archived, SSO/directory/provider/session state changes",
+      "failure": "Bootstrap-selected decision is treated as reusable Org approval.",
+      "required": "Fresh activeTaskWorkspaces plus locked workspaceLiveTicket/withTaskWorkspace/enterprise checks remain; pending revocation still yields no capability."
+    },
+    {
+      "case": "Bootstrap resolves after workspace/account navigation",
+      "failure": "Old continuation warms or retains old owner scope.",
+      "required": "Generation/current checks plus explicit release on actual scope/session/server/document changes."
+    },
+    {
+      "case": "Same user, different session or backend",
+      "failure": "A registry keyed only by user id is hoisted past the old disposal boundary.",
+      "required": "Preserve the existing remount and main closeAll/closeOwner boundaries; no cross-server/session handle or coverage adoption."
+    },
+    {
+      "case": "Authenticated sign-in/addAccount/device/invite/artifact route",
+      "failure": "Native bootstrapScope=workspace causes tickets with no actual consumer.",
+      "required": "Limit any early work to actual workspace UI route lifetime; otherwise no connection or new SQL."
+    },
+    {
+      "case": "Old hint and later authorized response disagree",
+      "failure": "Both scopes stay warm or stale home is made permanent.",
+      "required": "Later ordinary reads retain authority; retire unused hint, preserve null/error fallback. Do not introduce a permanent authorization/routing cache."
+    },
+    {
+      "case": "Temporary warm channel is replaced by LiveProvider's new instance",
+      "failure": "Duplicate tickets/sockets, lost push history, four-channel native cap pressure.",
+      "required": "Same registry entry and LiveChannel are adopted; ownership/refcounts release precisely."
+    },
+    {
+      "case": "Only prepare completes, or open occurs without ready/support",
+      "failure": "Ticket existence/onopen is counted as valid coverage.",
+      "required": "Require actual readiness and existing per-kind/presence support; retain catch-up."
+    },
+    {
+      "case": "Read dispatch before open, completion after it",
+      "failure": "Old database snapshot is accepted as post-connection coverage.",
+      "required": "Still catch up. For audited snapshots use actual D, not Q or completion; delta readers keep their existing conservative boundary."
+    },
+    {
+      "case": "Push arrives during warm period before subscription",
+      "failure": "A transport-only handoff loses invalidationAfter and incorrectly reuses initial read.",
+      "required": "Same channel retains every relevant kind boundary; subscription uses existing max boundary logic."
+    },
+    {
+      "case": "Hidden page, canceled bootstrap, navigation, sign-out or close",
+      "failure": "A no-consumer connection survives or later restores an old scope.",
+      "required": "Existing visibility/abort/dispose, bridge navigation/destroyed closeOwner and auth closeAll barriers cover warm lifetime too."
+    },
+    {
+      "case": "Cold versus hydrated read cache",
+      "failure": "Source analysis assumes every home is discovered by a new HTTP response or that restored data is fresh coverage.",
+      "required": "Distinguish actual events. Hydrated owner-bound live metadata can route, but its old read object is not this document's fresh read proof."
+    },
+    {
+      "case": "Ticket latency still exceeds initial read dispatch",
+      "failure": "Earlier connection is presented as a performance fix even though the true read remains before coverage.",
+      "required": "Keep the legitimate extra read; do not wait for live, widen freshness rules or shift acceptance windows to force a pass."
+    }
+  ],
+  "decisionAfterDiagnostic": {
+    "first": "Associate extra action/read ids with channel cause1(onopen) or cause2(late subscription) and actual fresh-branch decision; avoid timestamp-neighbor inference.",
+    "mapChannel": "Owner-wide workspace_settings/thread_list/task_run_list/bot_chat_list/bot_chat subscriptions identify home-channel use in the closed numeric event graph. bot_list identifies selected-channel use; equal channel id can demonstrate they coincide without exporting identifiers.",
+    "timing": "Use the actual same-document read R, queue Q, dispatch D, socket open O, capability ready C, incoming invalidation and fresh decision F. Only improve a proven source-dependent gap.",
+    "reject": "If extra calls originate from legitimate newer invalidation, deadline, unsupported capability, a second document/scope, or reads still preceding ready, this source map provides no shortcut.",
+    "count": "Projection-only discovery must not add a membership SQL statement. Earlier connection should replace the already-needed ticket/connection, not add one. Any changed counts or readiness benefit require the authorized future verification; none is claimed here."
+  },
+  "execution": {
+    "sourceChanges": 0,
+    "refUpdates": 0,
+    "resources": 0,
+    "tests": 0,
+    "ActionsOriginalsRead": 0,
+    "productionActions": 0
+  },
+  "references": {
+    "priorFreshnessDesign": "c33f989cad7f330e78387ab68fa01e1096d599be",
+    "finalDiagnosticCoreReview": "cd9df0e4a42b7525381df4aa9befba378937a8c9",
+    "diagnosticManifestV2Reported": "2bb50b7cc74c03c5e3898d956ddf43bd5155e141",
+    "unchangedCore": "Mac reports only collector/protocol test changed in V2; this map is exact H product source, not diagnostic source."
+  }
+}

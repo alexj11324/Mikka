@@ -1,0 +1,22 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "content": "{\"total_count\":1,\"jobs\":[{\"id\":129636119558,\"run_id\":42757792528,\"workflow_name\":\"Issue1512 one-shot Native read diagnostic\",\"head_branch\":\"ops/1512-native-live-diagnostic-20261110\",\"run_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42757792528\",\"run_attempt\":1,\"node_id\":\"CR_kwDOVRYxA88AAAAeLuo0Bg\",\"head_sha\":\"d484f536eb1c832c1ca3ffacf05dbb20faba3f1d\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129636119558\",\"html_url\":\"https://github.com/alexj11324/Mikka/actions/runs/42757792528/job/129636119558\",\"status\":\"completed\",\"conclusion\":\"skipped\",\"created_at\":\"2026-11-10T04:44:50Z\",\"started_at\":\"2026-11-10T04:44:50Z\",\"completed_at\":\"2026-11-10T04:44:49Z\",\"name\":\"Issue1512 diagnostic only — original Native lifecycle\",\"steps\":[],\"check_run_url\":\"https://api.github.com/repos/alexj11324/Mikka/check-runs/129636119558\",\"labels\":[\"macos-26\"],\"runner_id\":null,\"runner_name\":null,\"runner_group_id\":null,\"runner_group_name\":null}]}",
+    "title": "jobs",
+    "modified_date": null,
+    "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42757792528/jobs?per_page=100",
+    "display_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42757792528/jobs?per_page=100",
+    "display_title": "jobs",
+    "structuredContent": {
+      "title": "jobs",
+      "content": "{\"total_count\":1,\"jobs\":[{\"id\":129636119558,\"run_id\":42757792528,\"workflow_name\":\"Issue1512 one-shot Native read diagnostic\",\"head_branch\":\"ops/1512-native-live-diagnostic-20261110\",\"run_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42757792528\",\"run_attempt\":1,\"node_id\":\"CR_kwDOVRYxA88AAAAeLuo0Bg\",\"head_sha\":\"d484f536eb1c832c1ca3ffacf05dbb20faba3f1d\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129636119558\",\"html_url\":\"https://github.com/alexj11324/Mikka/actions/runs/42757792528/job/129636119558\",\"status\":\"completed\",\"conclusion\":\"skipped\",\"created_at\":\"2026-11-10T04:44:50Z\",\"started_at\":\"2026-11-10T04:44:50Z\",\"completed_at\":\"2026-11-10T04:44:49Z\",\"name\":\"Issue1512 diagnostic only — original Native lifecycle\",\"steps\":[],\"check_run_url\":\"https://api.github.com/repos/alexj11324/Mikka/check-runs/129636119558\",\"labels\":[\"macos-26\"],\"runner_id\":null,\"runner_name\":null,\"runner_group_id\":null,\"runner_group_name\":null}]}",
+      "display_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42757792528/jobs?per_page=100"
+    }
+  },
+  "isError": false
+}

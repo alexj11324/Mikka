@@ -1,0 +1,184 @@
+TAP version 13
+# Subtest: default module import exposes no browser or main collector in Node
+ok 1 - default module import exposes no browser or main collector in Node
+  ---
+  duration_ms: 1.168249
+  type: 'test'
+  ...
+# Subtest: fresh recorder exports a valid numeric-only realm prefix
+ok 2 - fresh recorder exports a valid numeric-only realm prefix
+  ---
+  duration_ms: 1.466227
+  type: 'test'
+  ...
+# Subtest: phase views are nondestructive and do not advance the next pagehide dump
+ok 3 - phase views are nondestructive and do not advance the next pagehide dump
+  ---
+  duration_ms: 0.528154
+  type: 'test'
+  ...
+# Subtest: pagehide dump sequence keeps only newly recorded prefix rows
+ok 4 - pagehide dump sequence keeps only newly recorded prefix rows
+  ---
+  duration_ms: 0.248441
+  type: 'test'
+  ...
+# Subtest: record cap retains the initial prefix and explicitly counts dropped events
+ok 5 - record cap retains the initial prefix and explicitly counts dropped events
+  ---
+  duration_ms: 0.37837
+  type: 'test'
+  ...
+# Subtest: unknown values are never serialized and are counted as lost diagnostics
+ok 6 - unknown values are never serialized and are counted as lost diagnostics
+  ---
+  duration_ms: 0.46077
+  type: 'test'
+  ...
+# Subtest: key and object IDs are local stable integers without copying key text
+ok 7 - key and object IDs are local stable integers without copying key text
+  ---
+  duration_ms: 0.252186
+  type: 'test'
+  ...
+# Subtest: key-map saturation marks diagnostics incomplete without retaining more keys
+ok 8 - key-map saturation marks diagnostics incomplete without retaining more keys
+  ---
+  duration_ms: 2.908643
+  type: 'test'
+  ...
+# Subtest: unknown action names collapse to the closed other code
+ok 9 - unknown action names collapse to the closed other code
+  ---
+  duration_ms: 0.260191
+  type: 'test'
+  ...
+# Subtest: nested synchronous diagnostic scopes restore their parent even on throw
+ok 10 - nested synchronous diagnostic scopes restore their parent even on throw
+  ---
+  duration_ms: 0.807104
+  type: 'test'
+  ...
+# Subtest: a scope returns the exact promise and never remains ambient across await
+ok 11 - a scope returns the exact promise and never remains ambient across await
+  ---
+  duration_ms: 0.234558
+  type: 'test'
+  ...
+# Subtest: two interleaved delayed reads restore only their captured local integer
+ok 12 - two interleaved delayed reads restore only their captured local integer
+  ---
+  duration_ms: 1.371164
+  type: 'test'
+  ...
+# Subtest: all event arities and branch-specific variants are accepted
+ok 13 - all event arities and branch-specific variants are accepted
+  ---
+  duration_ms: 1.242961
+  type: 'test'
+  ...
+# Subtest: missing fields, extra fields and unknown event enums are rejected
+ok 14 - missing fields, extra fields and unknown event enums are rejected
+  ---
+  duration_ms: 0.182401
+  type: 'test'
+  ...
+# Subtest: dump schema rejects unlisted fields, inconsistent counters and unsafe integers
+ok 15 - dump schema rejects unlisted fields, inconsistent counters and unsafe integers
+  ---
+  duration_ms: 0.195628
+  type: 'test'
+  ...
+# Subtest: one current document is complete without any pagehide
+ok 16 - one current document is complete without any pagehide
+  ---
+  duration_ms: 1.005177
+  type: 'test'
+  ...
+# Subtest: two documents link one retired pagehide plus the current nondestructive view
+ok 17 - two documents link one retired pagehide plus the current nondestructive view
+  ---
+  duration_ms: 0.462515
+  type: 'test'
+  ...
+# Subtest: lost navigation-page dump is incomplete instead of inferred from the new document
+ok 18 - lost navigation-page dump is incomplete instead of inferred from the new document
+  ---
+  duration_ms: 0.202732
+  type: 'test'
+  ...
+# Subtest: a missing current realm is incomplete
+ok 19 - a missing current realm is incomplete
+  ---
+  duration_ms: 0.155166
+  type: 'test'
+  ...
+# Subtest: duplicate pagehide dump is incomplete
+ok 20 - duplicate pagehide dump is incomplete
+  ---
+  duration_ms: 0.572416
+  type: 'test'
+  ...
+# Subtest: a skipped dump number is incomplete
+ok 21 - a skipped dump number is incomplete
+  ---
+  duration_ms: 0.191942
+  type: 'test'
+  ...
+# Subtest: row sequence gaps and backward time are incomplete
+ok 22 - row sequence gaps and backward time are incomplete
+  ---
+  duration_ms: 0.325795
+  type: 'test'
+  ...
+# Subtest: overflow remains incomplete even when every exported row validates
+ok 23 - overflow remains incomplete even when every exported row validates
+  ---
+  duration_ms: 0.184804
+  type: 'test'
+  ...
+# Subtest: ordinary console text and payload are not retained
+ok 24 - ordinary console text and payload are not retained
+  ---
+  duration_ms: 0.129951
+  type: 'test'
+  ...
+# Subtest: malformed prefixed messages are counted without retaining their bytes
+ok 25 - malformed prefixed messages are counted without retaining their bytes
+  ---
+  duration_ms: 0.169487
+  type: 'test'
+  ...
+# Subtest: main collector is attached synchronously and rejects other frame dumps
+ok 26 - main collector is attached synchronously and rejects other frame dumps
+  ---
+  duration_ms: 0.317964
+  type: 'test'
+  ...
+# Subtest: main collector captures prior document before any runner firstWindow hook
+ok 27 - main collector captures prior document before any runner firstWindow hook
+  ---
+  duration_ms: 0.230103
+  type: 'test'
+  ...
+# Subtest: raw collector schema never accepts unlisted top-level data
+ok 28 - raw collector schema never accepts unlisted top-level data
+  ---
+  duration_ms: 0.119419
+  type: 'test'
+  ...
+# Subtest: pending reads remain visible without waiting for a settle or adding a timer
+ok 29 - pending reads remain visible without waiting for a settle or adding a timer
+  ---
+  duration_ms: 0.188498
+  type: 'test'
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 147.519646

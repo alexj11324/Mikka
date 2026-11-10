@@ -1,0 +1,165 @@
+name: Issue1512 one-shot Native read diagnostic
+
+# Diagnostic-only immutable overlay over 5f359. No production credentials,
+# no main/PR mutation, and no replacement of formal Native SQL acceptance.
+on:
+  push:
+    branches: ['ops/1512-native-live-diagnostic-20261110']
+    paths:
+      - '.github/issue1512-native-live-diagnostic.json'
+      - '.github/workflows/issue1512-native-live-diagnostic.yml'
+permissions:
+  contents: read
+concurrency:
+  group: issue1512-native-diagnostic-${{ github.ref }}-${{ github.run_id }}
+  cancel-in-progress: false
+env:
+  MIKKA_EDITION: cloud
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+
+jobs:
+  native-arm64:
+    if: false
+    name: Issue1512 diagnostic only — original Native lifecycle
+    runs-on: macos-26  # Standard ARM64 runner; macOS 26 is required for the shared glass icon.
+    timeout-minutes: 150
+    env:
+      CI: 'true'
+      MIKKA_LOCAL_TEST_ACCOUNTS: '1'
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3000
+      AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      NEXT_TELEMETRY_DISABLED: '1'
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      MIKKA_DESKTOP_FLAVOR: dev
+      MIKKA_1512_LIFECYCLE_READ_DIAGNOSTIC: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify exact source and temporary diagnostic overlay
+        run: node scripts/ops/issue1512-native-live-diagnostic-guard.mjs
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Verify closed diagnostic protocol before installing dependencies
+        run: node --test scripts/ops/issue1512-native-live-diagnostic-guard.test.mjs apps/desktop/test/native-read-diagnostic.test.mjs
+      - run: test "$(uname -m)" = arm64
+      - run: pnpm install --frozen-lockfile
+        env:
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+      - name: Keep setup-node 24 in the native installer login shell
+        run: node apps/desktop/test/native-node.mjs
+      - name: Prepare the pinned native Electron and builder checksum cache
+        run: node apps/desktop/scripts/install-electron.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: pnpm exec playwright install chromium
+      - name: Start an independent local PostgreSQL
+        run: |
+          brew install postgresql@17
+          brew services start postgresql@17
+          for _ in $(seq 1 30); do
+            "$(brew --prefix postgresql@17)/bin/pg_isready" -h 127.0.0.1 -p 5432 && break
+            sleep 1
+          done
+          echo "$(brew --prefix postgresql@17)/bin" >> "$GITHUB_PATH"
+          "$(brew --prefix postgresql@17)/bin/psql" postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE e2e WITH LOGIN PASSWORD 'e2e-local-only' CREATEDB"
+          "$(brew --prefix postgresql@17)/bin/createdb" --owner=e2e mikka_e2e
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
+      - run: pnpm migrate && pnpm test:e2e:setup
+        env:
+          MIGRATE: '1'
+      - name: Build the production API for the native ARM64 runtime
+        # Traced runtime dependencies may contain platform-specific binaries.
+        # Compile on the Mac; the Linux artifact is a separate auditable build.
+        run: pnpm generate:agent-ui && pnpm build:app
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+      - name: Select Xcode 26
+        run: |
+          xcode=$(ls -d /Applications/Xcode_26*.app | grep -vi beta | sort -V | tail -1)
+          sudo xcode-select -s "$xcode"
+      - name: Package an inspector-enabled harness input
+        # The Dev-only packaging script removes inherited signing credentials,
+        # explicitly permits PR ad-hoc signing, and verifies the final bundle.
+        run: node apps/desktop/scripts/package-dev.mjs --acceptance
+        env:
+          MIKKA_DESKTOP_APP_URL: http://localhost:3000/mikka
+      - name: Real Keychain encryption across three independent packaged processes
+        # No accounts or authentication fixtures: the same immutable signed App
+        # must decrypt random canaries across profiles and hosted/bundled modes.
+        run: node apps/desktop/test/native-crypto.mjs
+        env:
+          MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/mac-arm64/Mikka Dev.app/Contents/MacOS/Mikka Dev
+      - name: Real packaged Apple Silicon native acceptance
+        id: acceptance
+        # Functional acceptance only. The one-hour idle measurement is not run
+        # (Alex, 2026-11-06); run-acceptance.mjs still accepts `idle` by hand.
+        run: node apps/desktop/test/environment.mjs -- node apps/desktop/test/run-acceptance.mjs bundled-smoke parity lifecycle
+        env:
+          MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/mac-arm64/Mikka Dev.app/Contents/MacOS/Mikka Dev
+      - name: Keep final package integrity evidence
+        if: always()
+        run: |
+          mkdir -p .cache/desktop-native-evidence
+          if test -f apps/desktop/release-acceptance/mac-package-verification.json; then
+            cp apps/desktop/release-acceptance/mac-package-verification.json .cache/desktop-native-evidence/mac-acceptance-package.json
+          fi
+      - name: Audit closed package and crypto reports
+        if: always()
+        id: package-evidence
+        run: node apps/desktop/scripts/native-evidence.mjs .cache/desktop-native-evidence
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && steps.package-evidence.outcome == 'success'
+        with:
+          name: desktop-package-evidence-${{ github.sha }}
+          path: .cache/desktop-native-evidence
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Audit native evidence
+        if: always() && steps.acceptance.outcome != 'skipped'
+        id: evidence
+        run: |
+          test -f .cache/e2e/environment.json || { echo '::error::NATIVE_ACCOUNT_ENVIRONMENT_MISSING'; exit 1; }
+          node scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/desktop-evidence
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && steps.evidence.outcome == 'success'
+        with:
+          name: desktop-native-evidence-${{ github.sha }}
+          path: .cache/desktop-evidence
+          include-hidden-files: true
+          retention-days: 7
+
+      - name: Preserve closed diagnostic admission evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: issue1512-native-diagnostic-admission-${{ github.sha }}
+          path: .cache/issue1512-native-diagnostic
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop the disposable PostgreSQL service
+        if: always()
+        run: |
+          if brew services list | awk '$1 == "postgresql@17" && $2 == "started" { found = 1 } END { exit !found }'; then
+            brew services stop postgresql@17
+          fi
+

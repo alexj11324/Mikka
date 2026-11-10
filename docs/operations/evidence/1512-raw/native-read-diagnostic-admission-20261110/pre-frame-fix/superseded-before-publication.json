@@ -1,0 +1,19 @@
+{
+  "at": "2026-11-10T04:36:22.617Z",
+  "status": "SUPERSEDED_BEFORE_PUBLICATION",
+  "reason": "Pinned Electron45.1.0 RFH swap can invalidate old/current WebFrameMain object equality. Collector must use stable valid frameTreeNodeId; original first-document export may otherwise be rejected as incomplete.",
+  "candidate": "80c20073bc2338befa829f3f3b9a75256f01d755",
+  "tree": "7833645835974620c24884625c5d0a89c584f0c5",
+  "manifest": "2e6a1fe668c3ea990324abfcf770ccec869592f6",
+  "overlay": "d12ad84713a8883071a3ddcbe49973668e054eed",
+  "closedCandidate": "0e16b4d8de2f139635cf1e14c160977d289c5d87",
+  "published": false,
+  "resourcesLive": 0,
+  "proof": "6217d45b712dd529aeabbef6f461fafe815b0324",
+  "retainedTests": "c6496ee92dbd757e083e0724d1ef362a4bcaf026",
+  "unchangedAdmissionTestScope": {
+    "guard": "dbb678d6d95ad2f1f025840b2ded2bd78bde803b",
+    "tests": "ce2dbd3787e976e382e28fde6f19709dca54f06e",
+    "pass": 33
+  }
+}

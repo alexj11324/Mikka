@@ -1,0 +1,30 @@
+{
+  "at": "2026-11-10T04:37:51.678Z",
+  "request": {
+    "link_id": "link_6ad94217c91881918e99729c76fa9d61",
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "requestBody": {
+      "name": "issue1512-native-frame-protocol-node24-20261110-0438",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+      "region": "iad1",
+      "runtime": "node24",
+      "resources": {
+        "vcpus": 1,
+        "memory": 2048
+      },
+      "ports": [],
+      "persistent": false,
+      "timeout": 300000
+    }
+  },
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"sandbox\": {\n      \"name\": \"issue1512-native-frame-protocol-node24-20261110-0438\",\n      \"currentSessionId\": \"sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W\",\n      \"status\": \"running\",\n      \"statusUpdatedAt\": 1794285471633,\n      \"persistent\": false,\n      \"workloadType\": \"sandbox\",\n      \"region\": \"iad1\",\n      \"failoverRegions\": [],\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"runtime\": \"node24\",\n      \"architecture\": \"amd64\",\n      \"timeout\": 300000,\n      \"cwd\": \"/vercel/sandbox\",\n      \"createdAt\": 1794285471633,\n      \"updatedAt\": 1794285471633\n    },\n    \"session\": {\n      \"id\": \"sbx_v4dg3E0c8Ly9gWewbTORiE5csk6W\",\n      \"runtime\": \"node24\",\n      \"architecture\": \"amd64\",\n      \"requestedAt\": 1794285471578,\n      \"startedAt\": 1794285471606,\n      \"status\": \"running\",\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"timeout\": 300000,\n      \"region\": \"iad1\",\n      \"cwd\": \"/vercel/sandbox\",\n      \"workloadType\": \"sandbox\",\n      \"createdAt\": 1794285471578,\n      \"updatedAt\": 1794285471613,\n      \"interactivePort\": 26661,\n      \"sourceSandboxName\": \"issue1512-native-frame-protocol-node24-20261110-0438\",\n      \"projectId\": \"prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH\"\n    },\n    \"routes\": []\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  }
+}

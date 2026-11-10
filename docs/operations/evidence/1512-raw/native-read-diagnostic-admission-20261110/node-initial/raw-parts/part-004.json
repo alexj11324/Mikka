@@ -1,0 +1,14 @@
+{
+  "index": 4,
+  "path": "out/part-004.bin",
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"data\": \"YJkDbAsLcCMs5chaWS/i/w1PDHFsi0LAAk0whOUNJJpFkuskRM33bv3B/AWLorYPS1gFLy/q3ti98MUfX3udJIkO7sdr9Sy2C+nfcjEt9CVpx2Fg/T4fHS5rnGy4mnOGATjETpVAYxcOfzMP3W+96Wv19PBR246WcRkXLbE/pbY/pcTCxyGId+G3sV2UMMxo6jE0394KFoOu+m7tYG/KP54rg7iM2wWQ49LJ+ZDv6rW/MZh4Gj8fPigfLNHO5YCh+d7WN/mlbxa8FHKIIe19feBcPz24tw3Kzuu2AuQcB1IdFkcQL/1jnrysLwos/8RVk0udwaiKg9frBEkd7W9cRDuzhbeIAm0uFwTPaq60keLlMXk3iLrpvity75/Gr3tv+vhhLMXsolmcOltqYKchx/17eX9x/dWcNJ6p3nT20Zx5Gty9ff+5nI+XvvnT66/LGSnuNPpw/uHzkeYMxI6XmzMfdarvMdAQJS9dhSnDlQA/vzoIeiRufX9ws4/2LhbkkmXT61oVVWRcXBD8P6o/sHgje/KTTo491MAm1/OQAwtH9b8iT8ZlAUMWWLZfnA9jfuv663IqXs2rf4WcTBkuY1LI2illaEnfX9ceq6IBkNmAS37XTzm5kdD9cd6B8z8ufd+3sl5yCSTPWSkAr08SGFy3g53rdr1X3amDP2jXIoGhxIk7wm8/jJle1iJfjQPvxPmAr/9GPCHvgaOPYvZ359f3nOexg73sHcF/5drr8j2NeX3bIuPZd54vGtg4Z2VRwr1Qr4WdHwdX2mUMiVD+8CAX0o79LQ1ieDZgD0Sv/wDg4NaP2P0wPwGyZRnUFRiAcNJfN3K6l73QPgpHC6jtkRwqezm7jj/w08Ns/1F7nsUABv6qjZ/NGYe5PS0ntj/aueyTbnvGbyykTfne/TDH2Ayt2h8GwdB+0yzHtdwrwUvgeWB5m5fFHAbe8scGQXFc6qi/5xz/yjOvDjhVWIL/aP8PC14Mngk/kDoOErNWjwu+8cfXXj0PxXu4v7akf/g2UWt3D8Mi+aOt2nlwazkAUvwlxInzcA/xsY9C7/RZXPaXrB0MRQT4Tx8GtrP22pqSovlRUPM/YmS0a1+/j1Hoh+ts643vVVhm7GV/+/8xPPr7n//1f1RVgNC6QAAA\",\n    \"encoding\": \"base64\",\n    \"contentType\": \"application/octet-stream\",\n    \"size\": 861\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "schema": "mikka.issue1512.diagnostic-extractor-root-delta-review.v1",
+  "at": "2026-11-10T04:47:06.879Z",
+  "verdict": "GUARD_ONLY_ADAPTATION_NO_BLOCKER",
+  "priorFullControllerReview": "fa20727915507997517c3c8b5021ba25e2a318e8",
+  "priorController": "9322b3f874f46cd036b67046a44b6b9297ea8d60",
+  "controller": "e7762a5757960a013c4b12dc4ed2f5eb7a3681c2",
+  "bytes": 15080,
+  "sha256": "3d3c8f9cade54c83e5c9bdb8e8c8bef287272244bff213d034f7d35ec16efe2f",
+  "exactReplacement": {
+    "before": "    head = api(\"/git/commits/\" + source[\"head\"])\n    checkout = api(\"/git/commits/\" + source[\"checkout\"])\n    require(head[\"tree\"][\"sha\"] == source[\"tree\"] == checkout[\"tree\"][\"sha\"], \"SOURCE_TREES\")\n    require([p[\"sha\"] for p in checkout[\"parents\"]] == [source[\"base\"], source[\"head\"]], \"SOURCE_CHECKOUT_PARENTS\")",
+    "after": "    require(source[\"checkout\"] == source[\"head\"], \"SOURCE_DIRECT_CHECKOUT\")\n    head = api(\"/git/commits/\" + source[\"head\"])\n    require(head[\"tree\"][\"sha\"] == source[\"tree\"], \"SOURCE_TREES\")\n    require([p[\"sha\"] for p in head[\"parents\"]] == [source[\"base\"]], \"SOURCE_CHECKOUT_PARENTS\")"
+  },
+  "allOtherBytesIdentical": true,
+  "source": {
+    "run": 42757687653,
+    "attempt": 1,
+    "job": 129635774633,
+    "head": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "checkout": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "tree": "23179d928269195860beaf27ad27786c7f5e7637",
+    "base": "5f3598029033b83ee72c88ea6c49955205eecab2"
+  },
+  "scope": "Single exact direct-source topology only, no fallback accepting unrelated parent shapes. Existing original-download, secret/audit, checksum, ZIP freeze-before-parse, CRC, fixed five JSON, contents-write and cleanup boundaries unchanged.",
+  "pending": [
+    "Source Native terminal result and audit success",
+    "Sole reader freezes original job log",
+    "Actual artifact IDs/sizes/digests and final fixed manifest"
+  ]
+}
