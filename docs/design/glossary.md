@@ -104,9 +104,6 @@ Decided by Alex, 2026-10-28.
 | **Thread** | 线程 | As above. Since 2026-11-07 it is shown only inside its task (an Agent stretch in the task's 活动); no list or tab is named 线程. |
 | **Browser** | 浏览器 | The person's own local browser, one for the whole app, opened from the globe in the top bar (R-57). |
 | **Computer** | 电脑 | A bot's cloud computer: its own desktop (X display) on its owner's bot machine, which is one per person per workspace (`cloud_machines` keyed by `workspaceId`, `ownerId`; `bot_desktops` keyed by `botId`). Used by that bot only; a thread that needs a desktop gets its own machine ([0251](decisions/2026-11-02-0251-desktop-runs-get-their-own-machine.md)). Shown in the 电脑 tab of 概览 (R-50). Never called 浏览器. |
-| **Bot machine** | Bot 机器 | The E2B sandbox that hosts one person's bot desktops in a workspace. One per person per workspace, not one per bot. |
-| **Thread machine** | thread 机器 | The E2B sandbox one cloud thread runs on, from the verified official-derived template. Separate from the bot machine. |
-| **Workspace policy** | 工作区策略 | Target contract (Capy parity): the only authorization surface — MCP servers (allow / read-only / disabled), devices (allow), computer use (allow / deny). Never per Bot. Current builds still carry per-Bot rows until the workspace rule lands. |
 
 ## Words to avoid
 
@@ -191,7 +188,7 @@ _Avoid_: Agent, assistant, 机器人.
 **Agent**:
 As defined above: the coding worker (Claude Code, Codex) that runs a thread.
 Which Agent a person's bots use is the person's choice per workspace
-(模型与订阅).
+(Bot 与 Agents).
 _Owner_: the account (Agent aggregate).
 _Avoid_: harness, 执行器, bot.
 

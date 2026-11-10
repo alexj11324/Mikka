@@ -36,10 +36,6 @@ Plugins › GitHub follows a store app's page, top to bottom:
    读取 Issue, 读取 CI 检查, with no control (reads run directly, R-77). The
    list is what the code does; a new ability is added with its code.
 
-Superseded by [2026-11-02-1600-agents-use-own-github-credential](2026-11-02-1600-agents-use-own-github-credential.md):
-both GitHub abilities are listed with no control; neither is a setting. The
-Coordinator-scoped text below is history, not current behavior.
-
 The two writes are the person's own Coordinator settings, with no second
 store:
 
