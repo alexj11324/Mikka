@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
 import { test } from 'node:test'
-import { manifestCanonicalText, type DriveManifestEntry, type DriveWrite } from './contract.ts'
+import { MANIFEST_FIELD_SEPARATOR, manifestCanonicalText, type DriveManifestEntry, type DriveWrite } from './contract.ts'
 import { DriveError, applyDriveWrite, driveRequestDigest, manifestDigestOf, readDriveHistory, restoreDriveVersion } from './store.ts'
 
 /**
@@ -15,7 +14,6 @@ import { DriveError, applyDriveWrite, driveRequestDigest, manifestDigestOf, read
  * which CI runs against an ephemeral PG17 (see `scripts/run-db-tests.mjs`).
  */
 
-const sha = (text: string) => createHash('sha256').update(text).digest('hex')
 const hex = (character: string) => character.repeat(64)
 
 interface FakeVolume {
@@ -361,5 +359,6 @@ test('the history carries the thread and author each version came from', async (
 
 test('the canonical manifest text is what the digest covers', () => {
   const entries = [entry('b.txt', { sha256: hex('c'), sizeBytes: 7 }), entry('a.txt')]
-  assert.equal(manifestCanonicalText(entries).split('\n')[0], `a.txt\u0000420\u00003\u0000${hex('a')}`)
+  const sep = MANIFEST_FIELD_SEPARATOR
+  assert.equal(manifestCanonicalText(entries).split('\n')[0], `a.txt${sep}420${sep}3${sep}${hex('a')}`)
 })

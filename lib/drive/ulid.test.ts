@@ -56,7 +56,9 @@ test('an exhausted random part moves to the next millisecond instead of repeatin
   assert.ok(first.endsWith('Z'.repeat(16)), 'all-ones random part')
   const second = next()
   assert.ok(second > first)
-  assert.equal(ulidTime(second), ulidTime(first) + 1)
+  const firstTime = ulidTime(first), secondTime = ulidTime(second)
+  assert.ok(firstTime !== null && secondTime !== null, 'both ids carry a readable time')
+  assert.equal(secondTime, firstTime + 1)
 })
 
 test('volume and version ids carry their own prefix', () => {

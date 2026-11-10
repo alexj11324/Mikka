@@ -25,7 +25,7 @@ import { DRIVE_MAX_FILE_BYTES } from './contract'
 export const DRIVE_STORAGE_PREFIX = 'drive/'
 
 /** sha256 of the bytes, as the manifest and the blob table both spell it. */
-export function driveSha256(bytes: Uint8Array): string {
+export function driveSha256(bytes: Uint8Array<ArrayBuffer>): string {
   return createHash('sha256').update(bytes).digest('hex')
 }
 
@@ -47,6 +47,13 @@ export async function readDriveBlobObject(ownerId: string, sha256: string, signa
   return getArtifactObjectStream(driveStorageKey(ownerId, sha256), signal)
 }
 
+/** The bytes are read into a buffer this module owns, never a shared one. */
+export function driveBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  return bytes instanceof Uint8Array && bytes.buffer instanceof ArrayBuffer && bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
+    ? bytes as Uint8Array<ArrayBuffer>
+    : Uint8Array.from(bytes)
+}
+
 /**
  * Writes bytes into object storage and returns their digest and size for this
  * owner. The caller records the row in its own transaction, so the object and
@@ -54,7 +61,7 @@ export async function readDriveBlobObject(ownerId: string, sha256: string, signa
  * of the same bytes re-puts it, and `if-none-match` makes that a 412 rather than
  * an overwrite), while a row without an object would be a dangling entry.
  */
-export async function storeDriveBlob(ownerId: string, bytes: Uint8Array): Promise<StoredDriveBlob> {
+export async function storeDriveBlob(ownerId: string, bytes: Uint8Array<ArrayBuffer>): Promise<StoredDriveBlob> {
   const sha256 = driveSha256(bytes), sizeBytes = bytes.byteLength
   if (sizeBytes > DRIVE_MAX_FILE_BYTES) throw new Error('driveBlobTooLarge')
   // The storage mode is process-wide configuration, so this is one decision, not one per byte.
@@ -63,7 +70,7 @@ export async function storeDriveBlob(ownerId: string, bytes: Uint8Array): Promis
 }
 
 /** Record the digest's row for this owner, keeping the first row if it exists. */
-export async function recordDriveBlob(client: Pick<PoolClient, 'query'>, blob: StoredDriveBlob, bytes: Uint8Array): Promise<void> {
+export async function recordDriveBlob(client: Pick<PoolClient, 'query'>, blob: StoredDriveBlob, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
   // Community installs and previews have no bucket: the bytes live in the row,
   // which is exactly the split the artifacts already use for their versions.
   const storageKey = artifactStorage() === 'inline' ? null : driveStorageKey(blob.ownerId, blob.sha256)

@@ -61,10 +61,22 @@ export function isDriveFileMode(value: unknown): value is DriveFileMode {
  */
 export const DRIVE_PATH_MAX_BYTES = 1024
 
+/**
+ * A backslash, a C0 control character or DEL. Scanned by code point rather than
+ * matched with a character-class regex: a path is data, and a control character
+ * in it can hide the path's real shape from anything that logs or splits it.
+ */
+export function hasForbiddenPathCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index)
+    if (code < 0x20 || code === 0x7f || code === 0x5c) return true
+  }
+  return false
+}
+
 export function isDrivePath(value: unknown): value is string {
   if (typeof value !== 'string' || !value || value.length > DRIVE_PATH_MAX_BYTES) return false
-  // Reject before splitting: a control character can hide a path's real shape.
-  if (/[\\\u0000-\u001f\u007f]/u.test(value)) return false
+  if (hasForbiddenPathCharacter(value)) return false
   if (value.startsWith('/') || /^[A-Za-z]:/.test(value)) return false
   return value.split('/').every(part => part !== '' && part !== '.' && part !== '..')
 }
@@ -78,7 +90,7 @@ export function drivePathProblem(value: unknown): DrivePathProblem | null {
   if (typeof value !== 'string') return 'empty'
   if (!value) return 'empty'
   if (value.length > DRIVE_PATH_MAX_BYTES) return 'too_long'
-  if (/[\\\u0000-\u001f\u007f]/u.test(value)) return 'forbidden_character'
+  if (hasForbiddenPathCharacter(value)) return 'forbidden_character'
   if (value.startsWith('/') || /^[A-Za-z]:/.test(value)) return 'not_relative'
   if (!value.split('/').every(part => part !== '' && part !== '.' && part !== '..')) return 'bad_segment'
   return null
@@ -91,6 +103,12 @@ export interface DriveManifestEntry {
   sizeBytes: number
   sha256: string
 }
+
+/**
+ * The field separator in the canonical manifest text: NUL, which no path may
+ * contain, so `a/b` + `c` can never merge into the same bytes as `a` + `b/c`.
+ */
+export const MANIFEST_FIELD_SEPARATOR = String.fromCharCode(0)
 
 const SHA256 = /^[a-f0-9]{64}$/
 export function isSha256(value: unknown): value is string {
@@ -108,7 +126,7 @@ export function isSha256(value: unknown): value is string {
 export function manifestCanonicalText(entries: readonly DriveManifestEntry[]): string {
   return [...entries]
     .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
-    .map(entry => `${entry.path}\u0000${entry.mode}\u0000${entry.sizeBytes}\u0000${entry.sha256}\n`)
+    .map(entry => [entry.path, entry.mode, entry.sizeBytes, entry.sha256].join(MANIFEST_FIELD_SEPARATOR) + '\n')
     .join('')
 }
 

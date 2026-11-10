@@ -5,7 +5,7 @@ import {
   DRIVE_MAX_ENTRIES, DRIVE_MAX_FILE_BYTES, DRIVE_MAX_CHANGES, DRIVE_SCOPES,
   applyDriveChanges, conflictedDrivePaths, driveChangePaths, driveManifestProblem, drivePathProblem,
   driveScopeProblem, driveWriteProblem, isDrivePath, isDriveScope, isVolumeId, isVolumeVersionId,
-  manifestCanonicalText, manifestDigest,
+  MANIFEST_FIELD_SEPARATOR, manifestCanonicalText, manifestDigest,
   type DriveChange, type DriveManifestEntry,
 } from './contract.ts'
 
@@ -34,7 +34,8 @@ test('ids are prefixed ULIDs, so a volume id cannot be mistaken for a uuid', () 
 test('a Drive path is relative, POSIX, and has no segment a host would reinterpret', () => {
   for (const good of ['README.md', 'notes/2026/a.md', 'a.b/c', '.gitignore', 'spaces are fine/a b.txt'])
     assert.equal(isDrivePath(good), true, good)
-  for (const bad of ['', '/etc/passwd', '../escape', 'a/../b', 'a/./b', 'a//b', 'a\\b', 'C:/x', 'c:x', 'a\u0000b', 'a\nb', 'a\u007fb'])
+  const nul = String.fromCharCode(0), del = String.fromCharCode(0x7f)
+  for (const bad of ['', '/etc/passwd', '../escape', 'a/../b', 'a/./b', 'a//b', 'a\\b', 'C:/x', 'c:x', `a${nul}b`, 'a\nb', `a${del}b`])
     assert.equal(isDrivePath(bad), false, JSON.stringify(bad))
   assert.equal(isDrivePath('a'.repeat(1025)), false, 'over the byte budget')
   assert.equal(drivePathProblem('/abs'), 'not_relative')
@@ -57,7 +58,8 @@ test('the manifest digest is a property of the tree, not of listing order', () =
   // NUL separators keep a boundary from merging two different trees.
   assert.notEqual(manifestDigest([entry('a/b'), entry('c')], sha), manifestDigest([entry('a'), entry('b/c')], sha))
   // Sorted by path, one line per entry: path NUL mode NUL size NUL sha256 LF.
-  assert.equal(manifestCanonicalText([b, a]), `a.txt\u0000420\u00003\u0000${hex('1')}\nb/c.txt\u0000493\u00003\u0000${hex('2')}\n`)
+  const sep = MANIFEST_FIELD_SEPARATOR
+  assert.equal(manifestCanonicalText([b, a]), `a.txt${sep}420${sep}3${sep}${hex('1')}\nb/c.txt${sep}493${sep}3${sep}${hex('2')}\n`)
   assert.deepEqual(manifestCanonicalText([]), '')
 })
 
