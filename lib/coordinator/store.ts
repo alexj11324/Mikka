@@ -43,7 +43,6 @@ import type { DecisionExecution } from './decide'
 import type { ScheduledRead } from '@/lib/schedules/contract'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
 import { botChatChanged } from '../live/chats'
-import { tokenWorkspace } from '@/lib/tokens/principal'
 import { activeTaskWorkspaces } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
 import type { CoordinatorStartupReceipt, CoordinatorStartupSettingsCandidate, CoordinatorStartupSettings, CoordinatorStartupTake } from './startup-receipt'
@@ -669,7 +668,6 @@ export async function storedReasoning(userId: string, botId: string, positions: 
 
 /** Looks up the issues and runs cited in `texts`, and the `threads` dispatched, keeping only what `userId` may see. */
 export async function citationSources(reader: IssueReader, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
-  const userId = typeof reader === 'string' ? reader : reader.id
   const cited = citedIds(texts)
   const issueIds = cited.issueIds
   const runIds = [...new Set([...cited.runIds, ...threads])]

@@ -3,8 +3,8 @@
 import { isIP } from 'node:net'
 import { z } from 'zod'
 
-export const AUDIT_CATEGORIES = ['security', 'secret', 'permission', 'member', 'billing'] as const
-export type AuditCategory = (typeof AUDIT_CATEGORIES)[number]
+import { AUDIT_CATEGORIES, type AuditCategory } from './categories'
+export { AUDIT_CATEGORIES, type AuditCategory }
 
 export const AUDIT_ACTOR_TYPES = ['user', 'bot', 'token', 'system'] as const
 export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number]

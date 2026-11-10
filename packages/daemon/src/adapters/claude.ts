@@ -21,7 +21,6 @@ import { DAEMON_VERSION } from "../paths"
 // credentials (decision 2026-11-06-1800); no extra inner environment is made.
 import { claudeQuotaSignal, mergeQuota, type QuotaSignal } from "../runs/quota-exhausted"
 import { spawn } from "node:child_process"
-import { setTimeout as delay } from 'node:timers/promises'
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
@@ -484,24 +483,39 @@ export function claudeIsolatedTools(): Pick<Options, 'tools' | 'allowedTools' | 
     }] }] } }
 }
 
-/** MCP starts after initialize resolves. Bound this local startup wait; never
- * release the first model prompt while the guarded transport is still pending. */
-export async function requireClaudeIsolatedTransport(session: Pick<Query, 'initializationResult' | 'mcpServerStatus'>, signal: AbortSignal) {
-  const initialized = await session.initializationResult()
-  if (initialized.hooks_applied !== true) throw Error('native_tool_hook_unverified')
-  const deadline = Date.now() + 10_000
-  while (true) {
-    signal.throwIfAborted()
-    const servers = await session.mcpServerStatus()
-    if (servers.length !== 1 || servers[0]?.name !== MCP_SERVER_NAME ||
-      !['sdk', 'dynamic'].includes(servers[0]?.source ?? servers[0]?.scope ?? '')) throw Error('native_tool_transport_unverified')
-    if (servers[0].status === 'connected') {
-      if (!servers[0].tools?.some(tool => tool.name === 'run_command')) throw Error('native_tool_transport_unverified')
+/** MCP starts after initialize resolves. The official reconnect request waits
+ * for its connection handshake; a bounded control request is the startup
+ * barrier, not a timer that samples status or releases an unverified prompt. */
+export async function requireClaudeIsolatedTransport(session: Pick<Query, 'initializationResult' | 'mcpServerStatus' | 'reconnectMcpServer'>, signal: AbortSignal) {
+  signal.throwIfAborted()
+  let timer: NodeJS.Timeout | undefined
+  let abort: () => void = () => undefined
+  const stopped = new Promise<never>((_, reject) => {
+    abort = () => reject(signal.reason ?? Error('native_tool_transport_revoked'))
+    signal.addEventListener('abort', abort, { once: true })
+    timer = setTimeout(() => reject(Error('native_tool_transport_unverified')), 10_000)
+  })
+  const handshake = async () => {
+    const initialized = await session.initializationResult()
+    if (initialized.hooks_applied !== true) throw Error('native_tool_hook_unverified')
+    const read = async () => {
+      signal.throwIfAborted()
+      const servers = await session.mcpServerStatus()
+      if (servers.length !== 1 || servers[0]?.name !== MCP_SERVER_NAME ||
+        !['sdk', 'dynamic'].includes(servers[0]?.source ?? servers[0]?.scope ?? '')) throw Error('native_tool_transport_unverified')
       return servers
     }
-    if (servers[0].status !== 'pending' || Date.now() >= deadline) throw Error('native_tool_transport_unverified')
-    await delay(50, undefined, { signal })
+    let servers = await read()
+    if (servers[0].status === 'pending') {
+      await session.reconnectMcpServer(MCP_SERVER_NAME)
+      servers = await read()
+    }
+    if (servers[0].status !== 'connected' || !servers[0].tools?.some(tool => tool.name === 'run_command'))
+      throw Error('native_tool_transport_unverified')
+    return servers
   }
+  try { return await Promise.race([handshake(), stopped]) }
+  finally { clearTimeout(timer); signal.removeEventListener('abort', abort) }
 }
 
 export class ClaudeAdapter implements AgentAdapter {

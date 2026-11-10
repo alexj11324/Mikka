@@ -17,7 +17,7 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-02** The right panel's 概览 header shows the bot selected on the left:
   the same bloub avatar and the same name as its left row, then the tabs
   详情 / 任务 / PR / 电脑 (R-50). Task titles belong in their rows and
-  details; this header names the bot.
+  details; this header names the bot. In the hosted edition 概览 is a tab of the chat's work area instead (decision `2026-11-09-2330-overview-as-work-area-tab.md`).
 - **R-03** Choosing another bot on the left switches the centre chat, the
   right task list and the computer together.
 - **R-04** Every bot comes with its own computer. There is no 新建云端电脑 entry
@@ -358,7 +358,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   tab of 2026-10-30).
 - **R-57** The local 浏览器 is an icon-only globe toggle at the right of the
   top bar, with no 「浏览器」 label. Turned on, it opens a right column with
-  the browser (URL bar and page). Selecting an element and annotating it puts
+  the browser (URL bar and page). In the hosted edition 浏览器 is a work-area tab opened from the New tab's Tools or ⌘⇧B, with no globe in a window bar (decision `2026-11-09-2330-overview-as-work-area-tab.md`). Selecting an element and annotating it puts
   a chip 「1 · <element> · <action> · <note>」 into the current chat's
   composer. The 浏览器 is the person's own and app-wide; it is not a bot's
   电脑 (R-50).

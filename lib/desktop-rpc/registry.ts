@@ -214,6 +214,8 @@ const functions = {
   'teams.saveTeam': actions28.saveTeam,
   'teams.listTeamMembers': actions28.listTeamMembers,
   'teams.changeTeamMember': actions28.changeTeamMember,
+  'teams.getTeamDeletionImpact': actions28.getTeamDeletionImpact,
+  'teams.deleteTeam': actions28.deleteTeam,
   'telegram.getTelegramIntegrationStatus': actions29.getTelegramIntegrationStatus,
   'telegram.createTelegramConnectLink': actions29.createTelegramConnectLink,
   'telegram.disconnectTelegram': actions29.disconnectTelegram,

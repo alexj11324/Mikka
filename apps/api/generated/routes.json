@@ -1823,7 +1823,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "17806db00cdde5941c101a2d7b50fbf056fd14703166786fd04245818dc33d8e"
+      "sourceHash": "c117f9998933e20bbd9ac0c602f5fa1b5381c717994e438663da5f771f7e39f5"
     },
     {
       "path": "/mikka/api/skills",
@@ -2137,7 +2137,7 @@
         "GET"
       ],
       "maxDuration": 60,
-      "sourceHash": "fba01c0d44c97d74ce0be6cb88391acbb46dae9b87689a10d0796487a94cf7ac"
+      "sourceHash": "a9f6dbf39b7663b85a3a32763b146bc04230450eec03a62d97afa670492fb2d1"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/audit-log/retention",

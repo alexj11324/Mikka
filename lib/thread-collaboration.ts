@@ -1,7 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
 import { sql } from 'drizzle-orm'
-import { db,pool } from '@/lib/db'
+import { pool } from '@/lib/db'
 import { ActionFailureError } from '@/lib/action-error'
 import { ACTION_ERROR_CODES,type ActionErrorCode } from '@/lib/action-result'
 import type { IssueReader } from '@/lib/issue-visibility'
@@ -48,7 +48,7 @@ export async function sendCollaborativeThreadMessage(reader:IssueReader,input:z.
   if(access.ownerId===access.viewerId)throw new ActionFailureError('validationGeneric')
   if(splitChatFiles(value.text).files.length){
     const {validateChatFiles}=await import('@/lib/chat-attachments/store')
-    try{await validateChatFiles(access.viewerId,{kind:'thread',id:value.runId},value.text)}catch{throw new ActionFailureError('messageRequired')}
+    try{await validateChatFiles(access.viewerId,{kind:'thread',id:value.runId},value.text)}catch(error){throw Object.assign(new ActionFailureError('messageRequired'), {cause:error})}
   }
   if(!value.executionGrantId)return postComment(reader,value.runId,value.text,value.requestId)
   if(!value.sessionId)throw new ActionFailureError('authRequired')

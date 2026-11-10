@@ -30,4 +30,6 @@ export type RailProps = {
   chats?: { entries: ChatNavEntry[]; onOpen: (target: ChatTarget) => void; onNewBot: () => void; onNewGroup: () => void }
   /** Opens the ⌘K search, for a frame with its own search field. */
   onSearch?: () => void
+  /** Items waiting on the person (✋ in the open-source window bar), for a frame that shows the count on 收件箱. */
+  inboxCount?: number
 }

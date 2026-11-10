@@ -29,10 +29,12 @@ async function readStatus([, viewerId]: readonly [string, string]): Promise<AppS
   return result
 }
 
-/** Only a current server administrator sees this server-wide configuration. */
-export function GitHubAppSettings({ userId }: { userId: string }) {
+/**
+ * The server's GitHub App, for a current server administrator only (`shown`): its state, and creating it through
+ * GitHub's manifest flow (the form `ManifestForm` submits). Shared by the section below and UI layers.
+ */
+export function useGitHubAppSetup(userId: string) {
   const t = useTranslations('Settings.integrations')
-  const common = useTranslations('Common')
   const failure = useTranslations('RunErrors.github_app_setup_failed')
   const { data, error, mutate } = useSWR([PATH, userId] as const, readStatus, { revalidateOnMount: false, revalidateOnFocus: false, shouldRetryOnError: false, dedupingInterval: 0 })
   useEffect(() => { void mutate() }, [mutate])
@@ -80,9 +82,9 @@ export function GitHubAppSettings({ userId }: { userId: string }) {
     } catch { setProblem('default'); setWorking(false) }
   }
 
-  if (error || data?.viewerId !== userId || !data.admin) return null
-  const readFailed = Boolean(data.error)
-  const message = problem ? failure(problem) : readFailed ? failure(detailOf(data.detail)) : null
+  const shown = !error && data?.viewerId === userId && data.admin
+  const readFailed = Boolean(data?.error)
+  const message = problem ? failure(problem) : readFailed ? failure(detailOf(data?.detail)) : null
   const owners = [{ value: 'personal', label: t('githubAppPersonal') }, { value: 'organization', label: t('githubAppOrganization') }]
   const begin = async () => {
     setProblem(null)
@@ -92,11 +94,27 @@ export function GitHubAppSettings({ userId }: { userId: string }) {
       if (handoff === 'browser') setOpen(true)
     } catch { setProblem('default') }
   }
+  return {
+    shown, data: shown ? data : undefined, retry: () => { void mutate() }, readFailed, message, owners, owner, organization, working, open, setOpen, begin, create,
+    setOwner: (value: string) => { if (value === 'personal' || value === 'organization') { setOwner(value); setProblem(null) } },
+    setOrganization: (value: string) => { setOrganization(value); setProblem(null) },
+    /** The hidden form that hands the manifest to GitHub; render it wherever the setup is shown. */
+    manifest: submission && <form ref={manifestForm} method="POST" action={submission.action} hidden><FieldGroup><Field><Input type="hidden" name="manifest" value={submission.manifest} readOnly /></Field></FieldGroup></form>,
+  }
+}
+
+/** Only a current server administrator sees this server-wide configuration. */
+export function GitHubAppSettings({ userId }: { userId: string }) {
+  const t = useTranslations('Settings.integrations')
+  const common = useTranslations('Common')
+  const setup = useGitHubAppSetup(userId)
+  const { data, readFailed, message, owners, owner, organization, working, open, setOpen, begin, create } = setup
+  if (!data) return null
   return <>
-    {submission && <form ref={manifestForm} method="POST" action={submission.action} hidden><FieldGroup><Field><Input type="hidden" name="manifest" value={submission.manifest} readOnly /></Field></FieldGroup></form>}
+    {setup.manifest}
     <SettingsSection id="github-app-heading" title={t('githubApp')}>
       <SettingRow title={data.configured ? data.slug ?? t('githubAppConfigured') : t('githubNotConfigured')} icon={<AppTile app="github" />}>
-        {readFailed ? <Button type="button" variant="secondary" size="sm" onClick={() => { void mutate() }}>{common('retry')}</Button>
+        {readFailed ? <Button type="button" variant="secondary" size="sm" onClick={setup.retry}>{common('retry')}</Button>
           : data.configured ? data.installUrl && <Button variant="secondary" size="sm" nativeButton={false} render={<a href={data.installUrl} target="_blank" rel="noopener noreferrer" />}>{t('githubAuthorize')}</Button>
           : <Button type="button" variant="secondary" size="sm" onClick={() => { void begin() }}>{t('githubAppCreate')}</Button>}
       </SettingRow>
@@ -108,13 +126,13 @@ export function GitHubAppSettings({ userId }: { userId: string }) {
         <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); void create() }}>
           <FieldGroup>
             <Field><FieldLabel htmlFor="github-app-owner">{t('githubAppOwner')}</FieldLabel>
-              <Select value={owner} items={owners} disabled={working} onValueChange={value => { if (value === 'personal' || value === 'organization') { setOwner(value); setProblem(null) } }}>
+              <Select value={owner} items={owners} disabled={working} onValueChange={value => { if (value) setup.setOwner(value) }}>
                 <SelectTrigger id="github-app-owner" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectGroup>{owners.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
             </Field>
             {owner === 'organization' && <Field><FieldLabel htmlFor="github-app-organization">{t('githubAppOrganizationName')}</FieldLabel>
-              <Input id="github-app-organization" value={organization} required pattern="[A-Za-z0-9](?:[A-Za-z0-9\-]{0,37}[A-Za-z0-9])?" maxLength={39} disabled={working} autoComplete="off" spellCheck={false} onChange={event => { setOrganization(event.target.value); setProblem(null) }} />
+              <Input id="github-app-organization" value={organization} required pattern="[A-Za-z0-9](?:[A-Za-z0-9\-]{0,37}[A-Za-z0-9])?" maxLength={39} disabled={working} autoComplete="off" spellCheck={false} onChange={event => setup.setOrganization(event.target.value)} />
             </Field>}
           </FieldGroup>
           {message && <FieldError role="alert">{message}</FieldError>}

@@ -1,9 +1,10 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nativeRunToolConfig, nativeToolConfigArgs, nativeToolEnvironment, nativeToolFilesystem } from '../src/agents/native-tool-isolation.mjs'
-import { claudeIsolatedTools } from '../src/adapters/claude'
+import { claudeIsolatedTools, requireClaudeIsolatedTransport } from '../src/adapters/claude'
+import type { Query } from '@anthropic-ai/claude-agent-sdk'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -58,4 +59,31 @@ it('Claude removes every builtin and independently rejects a forged native tool 
     expect(result).toMatchObject({ hookSpecificOutput: { permissionDecision: 'deny' } })
   }
   expect(await callback({ hook_event_name: 'PreToolUse', tool_name: 'mcp__mikka__run_command' } as never, undefined, { signal: new AbortController().signal })).toEqual({})
+})
+
+it('does not release the first prompt before the actual MCP handshake completes', async () => {
+  let complete!: () => void, requested!: () => void
+  const connected = new Promise<void>(resolve => { complete = resolve })
+  const connecting = new Promise<void>(resolve => { requested = resolve })
+  const status = vi.fn().mockResolvedValueOnce([{ name: 'mikka', source: 'dynamic', status: 'pending' }])
+    .mockResolvedValue([{ name: 'mikka', source: 'dynamic', status: 'connected', tools: [{ name: 'run_command' }] }])
+  const session = { initializationResult: async () => ({ hooks_applied: true }), mcpServerStatus: status,
+    reconnectMcpServer: async (name: string) => { expect(name).toBe('mikka'); requested(); await connected } }
+  let released = false
+  const ready = requireClaudeIsolatedTransport(session as unknown as Query, new AbortController().signal).then(() => { released = true })
+  await connecting
+  expect(released).toBe(false)
+  expect(status).toHaveBeenCalledTimes(1)
+  complete(); await ready
+  expect(released).toBe(true)
+  expect(status).toHaveBeenCalledTimes(2)
+})
+
+it('revocation interrupts a hung MCP control request without authorizing a prompt', async () => {
+  const abort = new AbortController()
+  const session = { initializationResult: () => new Promise(() => {}), mcpServerStatus: vi.fn(), reconnectMcpServer: vi.fn() }
+  const ready = requireClaudeIsolatedTransport(session as unknown as Query, abort.signal)
+  abort.abort(Error('lease_revoked'))
+  await expect(ready).rejects.toThrow('lease_revoked')
+  expect(session.mcpServerStatus).not.toHaveBeenCalled()
 })
