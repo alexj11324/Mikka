@@ -7,7 +7,10 @@ import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
-import { workspaceDb, workspacePool } from '@/lib/workspace-db'
+import * as workspaceDatabase from '@/lib/workspace-db'
+import { actingContext } from '@/lib/activity-actor'
+import { readPendingWorkspaceChoices } from '@/lib/desktop-rpc/workspace-choices'
+import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
 import { workspaces, workspaceMembers, workspaceInvitations } from '@/lib/db/workspace-schema'
 import { organizationWorkspaces } from '@/lib/db/governance-schema'
 import { renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-name'
@@ -15,11 +18,15 @@ import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-wor
 import type { ListLiveRead } from '@/lib/live/list-read'
 import { ownerLiveScope } from '@/lib/live/owner-scope'
 import { filterEnterpriseWorkspaceLinks, requireEnterpriseWorkspace } from '@/lib/enterprise/access'
-import type { EnterprisePrincipal } from '@/lib/enterprise/principal'
+import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
 import { getEdition, type MikkaEdition } from '@/lib/edition'
 import { isServerAdmin } from '@/lib/server-admin'
 import { currentRequestScope } from '@/apps/api/src/context'
 import { workspaceSelection } from '@/lib/workspace-selection'
+
+const { workspaceDb, workspacePool } = workspaceDatabase
+// Private to this exact scalar projection, membership predicate and ordering.
+const workspaceChoicesFamily = {}
 
 function workspaceLocale(value: string): WorkspaceLocale {
   return value === 'en' ? 'en' : 'zh-CN'
@@ -51,23 +58,30 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
   if (patWorkspace && (requestedId && requestedId !== patWorkspace || selection.workspaceId && selection.workspaceId !== patWorkspace)) throw new WorkspaceError('workspaceAccessDenied')
   // An explicit business target keeps its existing access check. A supplied
   // transport selection is exact: inaccessible choices never fall back home.
-  const { organizationId, ...context } = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? selection.workspaceId ?? '', locale)
+  const { organizationId, ...context } = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? selection.workspaceId ?? '', locale, user)
   if (selection.present && !context.choices.some(choice => choice.id === selection.workspaceId)) throw new WorkspaceError('workspaceAccessDenied')
   if (!(await filterEnterpriseWorkspaceLinks(user, [{ id: context.workspace.id, organizationId }])).length) throw new WorkspaceError('workspaceAccessDenied')
   return patWorkspace ? { ...context, choices: context.choices.filter(choice => choice.id === patWorkspace) } : context
 }
 
-// Membership and organization linkage share one fresh read. Neither may be
-// memoized across calls, even inside one server render: attaching an organization
-// or revoking membership must affect the next authorization in that render.
-async function readWorkspaceContext(userId: string, email: string, name: string, image: string | null, requestedId: string, locale: WorkspaceLocale) {
+// Membership and organization linkage share one fresh read. Only equivalent
+// Native callers queued before that SELECT starts may share its observation;
+// every later call reads again, even while the earlier result is still pending.
+// Enterprise policy and principal checks remain independent for every caller.
+async function readWorkspaceContext(userId: string, email: string, name: string, image: string | null, requestedId: string, locale: WorkspaceLocale, reader: AuthenticatedUser) {
   const user = { id: userId, email, name, image }
   const cookieStore = await cookies()
-  const readChoices = () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, role: workspaceMembers.role, organizationId: organizationWorkspaces.organizationId }).from(workspaces)
+  const readChoices = () => readPendingWorkspaceChoices({
+    family: workspaceChoicesFamily, database: workspacePool, request: currentRequestScope(),
+    // Missing executor/transaction introspection is not evidence of a safe pool read.
+    transaction: typeof workspaceDatabase.workspaceTransactionKey !== 'function' || workspaceDatabase.workspaceTransactionKey() !== null,
+    identity: { userId, nativeSessionId: desktopHumanSessionId(), requestedId,
+      tokenWorkspaceId: reader[tokenWorkspace], principal: reader[enterprisePrincipal], acting: actingContext.getStore() },
+  }, () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, role: workspaceMembers.role, organizationId: organizationWorkspaces.organizationId }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .leftJoin(organizationWorkspaces, eq(organizationWorkspaces.workspaceId, workspaces.id))
     .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'),
-      or(eq(workspaces.kind, 'team'), eq(workspaces.userId, user.id)))).orderBy(asc(workspaces.createdAt))
+      or(eq(workspaces.kind, 'team'), eq(workspaces.userId, user.id)))).orderBy(asc(workspaces.createdAt)))
 
   let choices = await readChoices()
   // Every person has one personal workspace, including people whose first workspace came from an invite.
