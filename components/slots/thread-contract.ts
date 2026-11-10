@@ -114,6 +114,11 @@ export type ThreadScreenProps = {
    * (`revealId`) to be shown; the work area stays folded until then.
    */
   panels?: { tabs: ThreadPanelTab[]; reveal: number; revealId: string | null }
+  /**
+   * A column inside another page (the Artifact window, a task's conversation beside its review): the page draws its
+   * own header, so the screen shows the conversation and the composer only, with no head and no work area.
+   */
+  bare?: boolean
 }
 
 export type ThreadPanelTab = { id: 'overview' | 'browser'; title: string; content: ReactNode }
