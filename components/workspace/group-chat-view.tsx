@@ -8,6 +8,11 @@ import { listAgents } from '@/app/actions/agents'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { CHAT_SURFACE, ChatMessage } from '@ui-slot/chat-message'
+import * as groupChatSlot from '@ui-slot/group-chat'
+import type { GroupChatEntry, GroupChatMember, GroupChatProps, GroupChatTask } from '@/components/slots/group-chat-contract'
+import type { listIssues } from '@/app/actions/issues'
+import type { Thread } from '@/app/actions/task-runs'
+import { localTaskState } from '@/hooks/use-bot-tasks'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
@@ -22,7 +27,7 @@ import { AgentMarkdown } from '@/components/workspace/agent-markdown'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { cn } from '@/lib/utils'
 import { mentionsIn } from '@/lib/group-mentions'
-import { authorRuns, chronological, fetchGroupMessages, mergeGroupPoll, newestGroupPosition, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMessagePage } from '@/lib/group-messages'
+import { authorRuns, chronological, fetchGroupMessages, mergeGroupPoll, newestGroupPosition, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMember, type GroupMessage, type GroupMessagePage } from '@/lib/group-messages'
 import { toast } from 'sonner'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useActionError } from '@/lib/use-action-error'
@@ -39,25 +44,31 @@ const pageKey = (groupId: string) => (index: number, previous: GroupMessagePage 
 
 export type GroupChatRequest = { id: string; title: string; workspaceId: string }
 
+type Issue = Awaited<ReturnType<typeof listIssues>>[number]
+
+/** A layer that draws the whole group chat (the group-chat slot); null keeps the layout below and the 详情 column. */
+const GroupChatScreen = groupChatSlot.GroupChat ?? null
+/** The slot draws the members in the chat itself, so the workspace leaves out the 详情 column. */
+export const GROUP_CHAT_OWNS_PANEL = GroupChatScreen !== null
+
+/** The tasks a message links to (`?issue=<id>`, as a group task report writes them), each once, in order. */
+export function linkedTaskIds(body: string) {
+  return [...new Set(Array.from(body.matchAll(/[?&]issue=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi), match => match[1].toLowerCase()))]
+}
+
 /**
- * A group chat. It reads and sends through the group API (the phone's path),
- * which checks workspace and group membership on every request. A message goes
- * to the bots it @mentions, else to the ones the server judges should answer;
- * it shows at once and, if it fails, stays with 重试. A stored message, a
- * member change or the reply starting or ending pushes the group's key; no
- * timer reads it (#1212). Names and bot avatars come from the
- * group's member list, then the workspace's members and the person's agents.
+ * Everything a group chat does, for the community layout and the group-chat slot: it reads and sends
+ * through the group API (the phone's path), which checks workspace and group membership on every request.
+ * A message goes to the bots it @mentions, else to the ones the server judges should answer; it shows at
+ * once and, if it fails, stays with 重试. A stored message, a member change or the reply starting or ending
+ * pushes the group's key; no timer reads it (#1212).
  */
-export function GroupChatView({ group, userId, people }: {
-  group: GroupChatRequest
-  userId: string
-  /** Display names of the group's workspace members, when that workspace is the loaded one. */
-  people: Map<string, string>
-}) {
+function useGroupChat({ group, userId, people }: { group: GroupChatRequest; userId: string; people: Map<string, string> }) {
   const t = useTranslations('GroupChat')
   const { data: agents = [] } = useSWR('agents', listAgents)
   // The pill's avatar is the members' bloubs (R-36); the right column's 详情 reads the same request.
-  const { data: members = [] } = useGroupMembers(group.id)
+  const membersRead = useGroupMembers(group.id)
+  const { data: members = [] } = membersRead
   const member = (type: 'user' | 'agent' | 'bot', id: string) => members.find(item => item.memberType === type && item.id === id)
   const [draft, setDraft] = useViewState(`group:${group.id}:draft`, '')
   // Navigation keeps unsent text and the same in-flight promise's result; it never resends.
@@ -146,12 +157,46 @@ export function GroupChatView({ group, userId, people }: {
   const scroller = useViewScroll<HTMLDivElement>(`group:${group.id}:messages`, !!pages)
   const end = `${messages.at(-1)?.id}:${unsent.length}:${!!first?.agentStatus}`
   useEffect(() => { if (following) scroller.current?.scrollTo({ top: scroller.current.scrollHeight }) }, [end, following, scroller])
+  // The group-chat slot's list reports its scrolling through the element itself (the layout below passes onScroll).
+  const followingRef = useRef(following)
+  followingRef.current = following
+  const loaded = !!pages
+  useEffect(() => {
+    const node = scroller.current
+    if (!GroupChatScreen || !node || !loaded) return
+    const onScroll = () => { const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== followingRef.current) setFollowing(next) }
+    node.addEventListener('scroll', onScroll, { passive: true })
+    return () => node.removeEventListener('scroll', onScroll)
+  }, [scroller, setFollowing, loaded])
   const authorName = (type: 'user' | 'agent' | 'bot', id: string) => type === 'user'
     ? id === userId ? t('you') : member(type, id)?.name || people.get(id) || t('member')
     : member(type, id)?.name ?? (type === 'agent' ? agents.find(agent => agent.id === id)?.name : undefined) ?? t('bot')
 
   // Whom the person's messages go to, for the chat-message slot: the group.
   const speaker = { id: group.id, name: group.title || t('untitled') }
+  return { t, members, membersRead, member, draft, setDraft, pages, messages, unsent, reactions, older, loadingOlder, size, setSize, mutate, blockingCode, first, replying, stopping, stop, deliver, send, following, setFollowing, scroller, authorName, speaker }
+}
+
+/**
+ * A group chat: the group-chat slot's page when a layer draws one, else the community layout (its own
+ * pill, messages and composer, with the 详情 column beside it). Names and bot avatars come from the
+ * group's member list, then the workspace's members and the person's agents.
+ */
+export function GroupChatView({ group, userId, people, issues = [], threads = [], onOpenTask, onOpenBot, onNewGroup }: {
+  group: GroupChatRequest
+  userId: string
+  /** Display names of the group's workspace members, when that workspace is the loaded one. */
+  people: Map<string, string>
+  /** The workspace's tasks and threads, to name a task a message links to (the group-chat slot only). */
+  issues?: Issue[]
+  threads?: Thread[]
+  onOpenTask?: (id: string) => void
+  onOpenBot?: (id: string) => void
+  onNewGroup?: () => void
+}) {
+  const chat = useGroupChat({ group, userId, people })
+  if (GroupChatScreen) return <GroupChatScreen {...groupChatProps(chat, { group, userId, issues, threads, onOpenTask, onOpenBot, onNewGroup })} />
+  const { t, members, member, draft, setDraft, pages, messages, unsent, reactions, older, loadingOlder, size, setSize, mutate, blockingCode, first, replying, stopping, stop, deliver, send, following, setFollowing, scroller, authorName, speaker } = chat
 
   return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className={cn('relative flex min-h-0 w-full flex-1 flex-col', CHAT_SURFACE)}>
     <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />
@@ -201,4 +246,53 @@ export function GroupChatView({ group, userId, people }: {
         sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />
     </div>
   </section>
+}
+
+/** The group-chat slot's props from useGroupChat: members as the slot names them, messages one by one with their bodies rendered. */
+function groupChatProps(chat: ReturnType<typeof useGroupChat>, { group, userId, issues, threads, onOpenTask, onOpenBot, onNewGroup }: {
+  group: GroupChatRequest; userId: string; issues: Issue[]; threads: Thread[]
+  onOpenTask?: (id: string) => void; onOpenBot?: (id: string) => void; onNewGroup?: () => void
+}): GroupChatProps {
+  const { t, membersRead, member, draft, setDraft, pages, messages, unsent, reactions, older, loadingOlder, size, setSize, mutate, blockingCode, first, replying, stopping, stop, deliver, send, scroller, authorName } = chat
+  const asMember = (item: Pick<GroupMember, 'id' | 'memberType'> & Partial<GroupMember>): GroupChatMember => {
+    const name = authorName(item.memberType, item.id)
+    return { key: `${item.memberType}:${item.id}`, id: item.id, kind: item.memberType, name, color: item.color, shape: item.shape, coordinator: item.coordinator,
+      you: item.memberType === 'user' && item.id === userId, onOpen: item.memberType === 'bot' && onOpenBot ? () => onOpenBot(item.id) : undefined }
+  }
+  // A task a message links to, as its task rows name it: its board status and its newest thread (localTaskState).
+  const taskOf = (id: string): GroupChatTask[] => {
+    const issue = issues.find(item => item.id === id)
+    if (!issue) return []
+    const { state, reason } = localTaskState(issue, threads.find(thread => thread.issueId === id))
+    return [{ id, identifier: issue.identifier ?? null, title: issue.title, state, reason, onOpen: () => onOpenTask?.(id) }]
+  }
+  const body = (message: GroupMessage) => message.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />
+  const entries: GroupChatEntry[] = [
+    ...messages.map((message): GroupChatEntry => message.authorType === 'user' && message.authorId === userId
+      ? { key: message.id, mine: true, text: message.body, body: body(message), at: message.createdAt, reactions: reactions[message.id] ?? [], status: 'sent' }
+      : { key: message.id, mine: false, text: message.body, body: body(message), at: message.createdAt, reactions: reactions[message.id] ?? [],
+        author: asMember(member(message.authorType, message.authorId) ?? { id: message.authorId, memberType: message.authorType }),
+        tasks: message.authorType === 'user' ? [] : linkedTaskIds(message.body).flatMap(taskOf) }),
+    ...unsent.map((item): GroupChatEntry => ({ key: item.key, mine: true, text: item.body, body: <CollapsibleMessage><UserMessageText text={item.body} /></CollapsibleMessage>, at: null, reactions: [],
+      status: item.failed ? 'failed' : 'sending', onRetry: item.failed ? () => { void deliver(item) } : undefined })),
+  ]
+  const status = first?.agentStatus
+  const answeringMember = status?.botId ? member('bot', status.botId) : status?.agentId ? member('agent', status.agentId) : undefined
+  return {
+    group: { id: group.id, title: group.title || t('untitled') },
+    members: membersRead.data?.map(asMember),
+    membersError: !!membersRead.error && !membersRead.data,
+    onRetryMembers: () => { void membersRead.mutate() },
+    blocked: blockingCode as GroupChatProps['blocked'],
+    onRetry: () => { void mutate() },
+    loading: !pages && !blockingCode,
+    entries,
+    answering: status ? { member: answeringMember ? asMember(answeringMember) : null } : null,
+    notice: first && !first.agentStatus ? first.routingError ? 'noTaker' : first.stopped ? 'stopped' : null : null,
+    older: older ? { loading: loadingOlder, onLoad: () => { void setSize(size + 1) } } : null,
+    scrollRef: scroller,
+    composer: { value: draft, onChange: setDraft, onSubmit: send, label: t('composer', { name: group.title || t('untitled') }), disabled: !!blockingCode, attachmentScope: { kind: 'group', id: group.id },
+      sending: stopping, editableWhileSending: stopping, running: replying && !stopping, onStop: replying && !stopping ? () => { void stop() } : undefined },
+    onNewGroup,
+  }
 }

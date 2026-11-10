@@ -4876,7 +4876,13 @@
     "notSent": "Not sent",
     "answering": "Replying",
     "noTaker": "No bot took this. @ one by name",
-    "stopped": "Stopped"
+    "stopped": "Stopped",
+    "copyConversation": "Copy group chat",
+    "conversationCopied": "Group chat copied",
+    "options": "Group chat options",
+    "openBot": "Open chat with {name}",
+    "thinkingName": "{name} is thinking",
+    "today": "Today"
   },
   "DeviceSetup": {
     "title": "Set up {device}",

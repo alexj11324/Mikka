@@ -4876,7 +4876,13 @@
     "notSent": "未发送",
     "answering": "正在回复",
     "noTaker": "没有 Bot 接这条，@ 它的名字",
-    "stopped": "已停止"
+    "stopped": "已停止",
+    "copyConversation": "复制群聊",
+    "conversationCopied": "已复制群聊",
+    "options": "群聊选项",
+    "openBot": "打开 {name} 的对话",
+    "thinkingName": "{name} 正在思考",
+    "today": "今天"
   },
   "DeviceSetup": {
     "title": "设置 {device}",
