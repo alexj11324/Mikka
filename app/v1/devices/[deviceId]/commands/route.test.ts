@@ -3,11 +3,20 @@ import { after, before, beforeEach, mock, test } from 'node:test'
 import type { RequestLogEntry } from '../../../../../lib/request-log'
 import type { SharedSubscription } from '../../../../../lib/db/listen'
 import { MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
+import { WORKSPACE_REQUEST_HEADER, type WorkspaceReadCommand } from '@mikka/protocol/coding-workspace'
 
 // Keep the real wait helper while replacing database-backed route operations.
 mock.module(new URL('../../../../../lib/db/index.ts', import.meta.url).href, {
   namedExports: { db: {}, pool: {} },
 })
+mock.module(new URL('../../../../../lib/workspace-db.ts', import.meta.url).href, {
+  namedExports: { workspaceDb: {}, workspacePool: {} },
+})
+const pendingWorkspaceReads = mock.fn(async (_database: unknown, _membership: unknown,
+  _caller: { userId: string; tokenId: string }, _deviceId: string, _skip: readonly string[] = []): Promise<WorkspaceReadCommand[]> => {
+  assert.fail('A daemon without the Files capability must never query source requests')
+})
+mock.module(new URL('../../../../../lib/coding-workspace/requests.ts', import.meta.url).href, { namedExports: { pendingWorkspaceReads } })
 const pendingDeviceCommands = mock.fn(async (_id: string, _completed: string[]) => [{ id: 'update-command', kind: 'update' }])
 mock.module(new URL('../../../../../lib/device-management.ts', import.meta.url).href, { namedExports: { pendingDeviceCommands } })
 const deviceUpdateNotice = mock.fn(async () => ({ id: 'update-command', kind: 'update' as const }))
@@ -89,6 +98,10 @@ beforeEach(() => {
   sleep.mock.mockImplementation(actual.sleep)
   deviceWorkSubscription.mock.resetCalls()
   deviceWorkSubscription.mock.mockImplementation(async () => null)
+  pendingWorkspaceReads.mock.resetCalls()
+  pendingWorkspaceReads.mock.mockImplementation(async () => {
+    assert.fail('A daemon without the Files capability must never query source requests')
+  })
   logs.length = 0
 })
 
@@ -182,6 +195,37 @@ test('mailbox notice commands require a capable daemon so older clients keep rec
   assert.equal(deviceWork.mock.calls[0].arguments[2]?.mailboxNotices, false)
   await GET(request(undefined, 0, '', true), params)
   assert.equal(deviceWork.mock.calls[1].arguments[2]?.mailboxNotices, true)
+})
+
+test('Files requests wake a capable daemon even when its ordinary inbox is empty', async () => {
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: false, deviceCommand: null }))
+  const id = '00000000-0000-4000-8000-000000000001'
+  const command: WorkspaceReadCommand = {
+    id, identity: { version: 1, runId: id, repoId: id, deviceId: id, workspaceId: id, ownerId: 'owner',
+      repositoryKey: 'github.com/owner/repository', bindingId: 'a'.repeat(64) },
+    request: { kind: 'tree', path: '', limit: 100 }, expiresAt: new Date(Date.now() + 15_000).toISOString(),
+  }
+  pendingWorkspaceReads.mock.mockImplementation(async () => [command])
+  const ordinary = request(undefined, 25)
+  const capable = new Request(ordinary, { headers: { ...Object.fromEntries(ordinary.headers), [WORKSPACE_REQUEST_HEADER]: '1' } })
+  assert.deepEqual(await (await GET(capable, params)).json(), { commands: [], workspaceRequests: [command] })
+  assert.equal(pendingWorkspaceReads.mock.callCount(), 1)
+  assert.deepEqual(pendingWorkspaceReads.mock.calls[0].arguments.slice(2), [{ userId: 'owner', tokenId: 'token' }, 'device-1', []])
+  assert.equal(deviceWork.mock.callCount(), 0)
+  assert.equal(sleep.mock.callCount(), 0)
+  assert.equal(logs[0].outcome, 'work')
+})
+
+test('Files request skip IDs are UUID-filtered and never disable normal stop delivery', async () => {
+  const id = '00000000-0000-4000-8000-000000000001'
+  pendingWorkspaceReads.mock.mockImplementation(async () => [])
+  const commands = [{ kind: 'stop', runId: 'run-1' }]
+  deviceWork.mock.mockImplementation(async () => ({ commands, queuedRuns: [] }))
+  const ordinary = request(undefined, 0, '', false, `&skipWorkspaceRequests=invalid,${id}`)
+  const capable = new Request(ordinary, { headers: { ...Object.fromEntries(ordinary.headers), [WORKSPACE_REQUEST_HEADER]: '1' } })
+  assert.deepEqual(await (await GET(capable, params)).json(), { commands })
+  assert.deepEqual(pendingWorkspaceReads.mock.calls[0].arguments[4], [id])
+  assert.equal(logs[0].outcome, 'work')
 })
 
 test('an idle check that finds nothing never runs the full read, and the poll still ends empty at its deadline', async () => {

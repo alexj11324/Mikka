@@ -2,6 +2,7 @@ import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import type { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { measured, readMetrics } from './helpers/read-metrics'
 import { mergeList } from '../lib/list-poll'
@@ -16,8 +17,37 @@ function successful<T>(result: ActionResult<T>): T {
   return result as T
 }
 
+async function warmIdentifierPools(pools: { app: Pool; workspace: Pool }) {
+  const capacity = Object.entries(pools).map(([name, database]) => {
+    const { max, connectionTimeoutMillis } = database.options
+    assert.ok(Number.isInteger(max) && max > 0, `${name} pool has a bounded configured capacity`)
+    assert.ok(typeof connectionTimeoutMillis === 'number' && Number.isFinite(connectionTimeoutMillis) && connectionTimeoutMillis > 0,
+      `${name} pool bounds every checkout`)
+    return { name, database, max }
+  })
+  // Hold every slot until all checkouts and probes settle. Releasing one early
+  // lets a later checkout reuse it without initializing the remaining slots.
+  const acquired = await Promise.allSettled(capacity.flatMap(({ database, max }) =>
+    Array.from({ length: max }, async () => database.connect())))
+  const clients = acquired.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
+  let ready = false
+  try {
+    const failures = acquired.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
+    if (failures.length) throw new AggregateError(failures, 'Identifier pool checkout failed')
+    const probe = { text: 'SELECT 1', query_timeout: 10_000 }
+    const queried = await Promise.allSettled(clients.map(async client => client.query(probe)))
+    const queryFailures = queried.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
+    if (queryFailures.length) throw new AggregateError(queryFailures, 'Identifier pool startup probe failed')
+    ready = true
+    return Object.fromEntries(capacity.map(({ name, max }) => [name, max]))
+  } finally {
+    for (const client of clients) client.release(!ready)
+  }
+}
+
 test('detail and activity revalidate current access while returning only changed content and history summaries', { skip: !enabled }, async t => {
   const { db, pool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
   const { actAs } = await import('../lib/acting-user')
   const { getIssue, saveIssue, listIssueVersions, pollIssue, pollIssueVersionSummaries, promoteIssueToTeam } = await import('../app/actions/issues')
   const { syncCoordinatorChat } = await import('../app/actions/coordinator')
@@ -179,14 +209,15 @@ test('detail and activity revalidate current access while returning only changed
         [citationRun, owner, id, citationAgent, 'succeeded', 'Citation control', JSON.stringify({ harness: 'codex', executionIdentity: { requester: owner, executionPrincipal: owner, outputOwner: owner, workspaceId } }), workspaceId])
       const issueCite = `[[issue:${id}]]`, runCite = `[[run:${citationRun}]]`
       await readWorkspace(() => listIssueConnections(id))
-      await warmCitationPool('linked')
-      // Initialize both exact read shapes before recording their steady-state
-      // budgets. Keep the warm-up socket costs visible, including any new
-      // connections opened by concurrent run and team reads.
+      // Initialize both exact read shapes and both real pools before recording
+      // their steady-state budgets. Keep the warm-up socket costs visible,
+      // including any new connections opened by concurrent run and team reads.
+      const linkedPoolsWarm = await measured(() => warmIdentifierPools({ app: pool, workspace: workspacePool }))
       const linkedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
       const linkedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
       t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'linked',
-        scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(linkedDirectWarm),
+        scope: 'data-read-path_including_connection_startup', poolCapacity: linkedPoolsWarm.value,
+        poolStartup: readMetrics(linkedPoolsWarm), directCitation: readMetrics(linkedDirectWarm),
         runOnlyCitation: readMetrics(linkedRunWarm) }))
       const linkedConnections = await measured(() => readWorkspace(() => listIssueConnections(id)))
       const linkedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
@@ -223,11 +254,12 @@ test('detail and activity revalidate current access while returning only changed
         assert.ok(unlinkedSave.statements <= personalSave.statements + 1,
           `default issueView statements ${unlinkedSave.statements} vs personal ${personalSave.statements} plus one team read`)
       })
-      await warmCitationPool('unlinked')
+      const unlinkedPoolsWarm = await measured(() => warmIdentifierPools({ app: pool, workspace: workspacePool }))
       const unlinkedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
       const unlinkedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
       t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'unlinked',
-        scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(unlinkedDirectWarm),
+        scope: 'data-read-path_including_connection_startup', poolCapacity: unlinkedPoolsWarm.value,
+        poolStartup: readMetrics(unlinkedPoolsWarm), directCitation: readMetrics(unlinkedDirectWarm),
         runOnlyCitation: readMetrics(unlinkedRunWarm) }))
       const unlinkedConnections = await measured(() => readWorkspace(() => listIssueConnections(id)))
       const unlinkedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))

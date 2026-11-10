@@ -5515,6 +5515,15 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
+    "workspace_not_found": { "default": "This code workspace is unavailable to your account." },
+    "workspace_machine_unavailable": { "default": "The run machine is unavailable. Resume it or view its saved history." },
+    "workspace_checkout_unavailable": { "default": "The run's repository checkout is unavailable." },
+    "workspace_path_unavailable": { "default": "This file is unavailable or protected." },
+    "workspace_version_conflict": { "default": "The source changed. Reload it and select the context again." },
+    "workspace_limit_exceeded": { "default": "The workspace request exceeds its limit. Select fewer files or a smaller range." },
+    "workspace_request_expired": { "default": "The file reference expired. Select the source again." },
+    "workspace_unsupported": { "default": "This operation is unsupported for the selected file or platform." },
+    "workspace_invalid_request": { "default": "The workspace request is invalid." },
     "task_secret_unavailable": {
       "default": "A task Secret is unavailable. Check its delivery policy and retry the task.",
       "invalid_capability": "The task Secret capability is invalid. Retry the task to obtain a new grant.",

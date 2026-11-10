@@ -5515,6 +5515,15 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "workspace_not_found": { "default": "当前账号无法访问此代码工作区。" },
+    "workspace_machine_unavailable": { "default": "运行机器不可用，请恢复机器或查看已保存的历史记录。" },
+    "workspace_checkout_unavailable": { "default": "此运行的仓库工作树不可用。" },
+    "workspace_path_unavailable": { "default": "文件不可用或受保护。" },
+    "workspace_version_conflict": { "default": "源码已变化，请重新加载并选择引用。" },
+    "workspace_limit_exceeded": { "default": "请求超出限制，请减少文件数量或缩小行范围。" },
+    "workspace_request_expired": { "default": "文件引用已过期，请重新选择源码。" },
+    "workspace_unsupported": { "default": "当前文件或平台不支持此操作。" },
+    "workspace_invalid_request": { "default": "代码工作区请求无效。" },
     "task_secret_unavailable": {
       "default": "任务密钥不可用。请检查使用方式后重试任务。",
       "invalid_capability": "任务密钥的授权无效，请重试任务以重新授权。",
