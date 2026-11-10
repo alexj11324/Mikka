@@ -41,6 +41,12 @@ const conflict = (cause?: unknown) => cause === undefined
 const unavailable = () => new CodingWorkspaceError('workspace_checkout_unavailable')
 
 function failure(command: WorkspaceReadCommand, cause: unknown): WorkspaceReadReceipt {
+  // The wire code is a closed set, so anything outside the typed contract has
+  // to travel as "checkout unavailable" — which also describes a genuinely
+  // missing checkout. Keep the real reason in the log or the two are
+  // indistinguishable from the server.
+  if (!(cause instanceof CodingWorkspaceError))
+    console.error(`coding-workspace-git: ${command.request.kind} failed`, cause)
   return { result: { ok: false, code: Date.parse(command.expiresAt) <= Date.now() ? 'workspace_request_expired'
     : cause instanceof CodingWorkspaceError ? cause.code : 'workspace_checkout_unavailable' }, files: [] }
 }
