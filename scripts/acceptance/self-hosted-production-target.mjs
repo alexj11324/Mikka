@@ -4,9 +4,9 @@ import { successfulRelease } from './project-decisions.mjs'
 export const CORE_MODE = 'self-hosted-core'
 export const CORE_WORKFLOW = '.github/workflows/self-hosted-production.yml'
 export const CORE_BUSINESS_ISSUES = Object.freeze([1560, 1561, 1562, 1556, 1826])
-// Memory can use the exact read-only source proof without selecting Core's
+// Inbox and Memory can use the exact read-only source proof without selecting Core's
 // credential/device business checks or permitting an Infisical account read.
-export const CORE_ISSUES = Object.freeze([...CORE_BUSINESS_ISSUES, 1821])
+export const CORE_ISSUES = Object.freeze([...CORE_BUSINESS_ISSUES, 1820, 1821])
 export const CORE_ORIGIN = 'https://app.aspectlylabs.com'
 const REPOSITORY = 'alexj11324/Mikka'
 const API = 'https://api.github.com/repos/' + REPOSITORY

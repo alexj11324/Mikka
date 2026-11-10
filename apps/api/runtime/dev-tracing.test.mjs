@@ -70,7 +70,7 @@ export default defineHandler(async () => {
     let previousWorker
     for (const version of [1, 2]) {
       if (version === 2) {
-        worker = developmentWorkerReady(api)
+        worker = developmentWorkerReady(api, { phase: 'hot-replacement' })
         await writeFile(route, routeSource(version), { mode: 0o600 })
         await worker.wait(AbortSignal.timeout(30_000))
       }

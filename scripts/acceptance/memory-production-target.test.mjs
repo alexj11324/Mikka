@@ -38,7 +38,7 @@ function metadata(options = {}) {
   const pr = { number: 1830, merged: true, merge_commit_sha: SOURCE,
     base: { ref: 'main', repo: repository }, head: { ref: MEMORY_BRANCH, sha: HEAD, repo: repository }, ...options.pr }
   const attestation = { ...coreProductionGuard(env, event), version: 1, purpose: 'self-hosted-core-production',
-    status: 'ready', readable: true, openIssues: [1821], checkedAt: new Date(NOW).toISOString(), webAttempt: 1, webDeployJobId: 61 }
+    status: 'ready', readable: true, openIssues: options.openIssues ?? [1821], checkedAt: new Date(NOW).toISOString(), webAttempt: 1, webDeployJobId: 61 }
   let clock = NOW
   const fetchImpl = async (input, init) => {
     const url = new URL(input), headers = new Headers(init.headers)
@@ -66,7 +66,8 @@ function metadata(options = {}) {
     }
     if (path.startsWith('/issues/')) {
       const number = Number(path.slice(8)); assert.ok(CORE_ISSUES.includes(number))
-      return Response.json({ number, url: url.href, repository_url: API, state: number === 1821 && !options.closed ? 'open' : 'closed' })
+      return Response.json({ number, url: url.href, repository_url: API,
+        state: (options.openIssues ?? [1821]).includes(number) && !options.closed ? 'open' : 'closed' })
     }
     if (path === '/actions/runs/17') return Response.json({ id: 17, run_attempt: options.attempt ?? 1, repository, head_repository: repository,
       url: url.href, path: CORE_WORKFLOW, event: 'workflow_run', head_branch: 'main', head_sha: SOURCE,
@@ -195,30 +196,41 @@ test('an already selected run cannot silently turn a changed PR into a successfu
   await assert.rejects(f.select(proof), /memory_selection_changed/)
 })
 
-test('only Memory open does not select legacy Core business or credentials for an unrelated main release', async () => {
+test('Inbox and Memory source proofs do not select legacy Core business or credentials for unrelated releases', async () => {
   const f = metadata({ pr: { merge_commit_sha: PREVIOUS } })
   const memory = await f.select()
   assert.equal(memory.selected, false)
-  assert.equal(coreBusinessSelected(f.args.attestation), false)
-  const core = await runCoreProduction(f.args)
-  assert.deepEqual(core, { status: 'skipped', code: 'core_business_issues_closed', applicationSha: SOURCE, driverRunId: 17 })
+  for (const openIssues of [[], [1820], [1821], [1820, 1821], [9999]]) {
+    const gate = metadata({ openIssues })
+    assert.equal(coreBusinessSelected(gate.args.attestation), false)
+    if (openIssues.some(issue => CORE_ISSUES.includes(issue))) {
+      const core = await runCoreProduction(gate.args)
+      assert.deepEqual(core, { status: 'skipped', code: 'core_business_issues_closed', applicationSha: SOURCE, driverRunId: 17 })
+    } else await assert.rejects(runCoreProduction(gate.args), /core_issue/)
+    assert.ok(gate.calls.every(path => !path.includes('/api/auth/')))
+  }
   assert.ok(f.calls.every(path => !path.includes('/api/auth/')))
   assert.deepEqual(CORE_BUSINESS_ISSUES, [1560, 1561, 1562, 1556, 1826])
   for (const issue of CORE_BUSINESS_ISSUES) assert.equal(coreBusinessSelected({ ...f.args.attestation, openIssues: [issue] }), true)
 
   const workflow = yaml.load(await readFile(new URL('../../.github/workflows/self-hosted-production.yml', import.meta.url), 'utf8'))
   const steps = workflow.jobs.acceptance.steps
-  const selector = steps.findIndex(step => step.id === 'memory_select')
+  const selectors = ['memory_select', 'inbox_selection'].map(id => steps.findIndex(step => step.id === id))
+  assert.ok(selectors.every(index => index >= 0), 'both feature selectors are retained')
   const secrets = steps.filter(step => step.uses?.startsWith('Infisical/secrets-action@'))
   assert.equal(secrets.length, 2)
   for (const step of secrets) {
-    assert.ok(selector < steps.indexOf(step), 'read-only selection precedes both existing Infisical account reads')
-    assert.equal(step.if, "steps.attest.outputs.core_selected == 'true' || steps.memory_select.outputs.selected == 'true'")
+    assert.ok(selectors.every(index => index < steps.indexOf(step)), 'both read-only selections precede both existing Infisical account reads')
+    assert.equal(step.if, "steps.attest.outputs.core_selected == 'true' || steps.inbox_selection.outputs.selected == 'true' || steps.memory_select.outputs.selected == 'true'")
   }
   assert.equal(steps.find(step => step.run === 'node --import tsx scripts/acceptance/self-hosted-production.mjs').if,
     "steps.attest.outputs.core_selected == 'true'")
   assert.equal(steps.find(step => step.run === 'node --import tsx scripts/acceptance/memory-production.mjs').if,
     "always() && steps.memory_select.outputs.selected == 'true'")
+  assert.equal(steps.find(step => step.run === 'node --import tsx scripts/acceptance/inbox-production.mjs').if,
+    "steps.inbox_selection.outputs.selected == 'true'")
+  const inboxDriver = await readFile(new URL('./inbox-production.mjs', import.meta.url), 'utf8')
+  assert.match(inboxDriver, /coreRequired = coreBusinessSelected\(attestation\)/)
   const selected = await metadata().select()
   assert.equal(coreBusinessSelected(selected.attestation), false)
   assert.equal(selected.selected, true, 'the exact Memory window can select its own account operation while legacy Core stays off')
