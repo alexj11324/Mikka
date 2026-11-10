@@ -72,7 +72,11 @@ const compiled = await build({
   tsconfig: resolve(repository, 'apps/desktop/tsconfig.renderer.json'),
   define: { 'process.env.NODE_ENV': '"test"', 'process.env.MIKKA_BASE_PATH': '"/mikka"', 'process.env': '{}' },
   plugins: [{ name: 'workspace-live-public-boundaries', setup(builder) {
-    builder.onResolve({ filter: /^(?:react(?:\/.*)?|swr)$/ }, args => ({ path: require.resolve(args.path), external: true }))
+    builder.onResolve({ filter: /^(?:react(?:\/.*)?|swr)$/ }, args => ({
+      // Node ESM must resolve SWR's import condition: its CommonJS default is
+      // the exports object, not the useSWR hook used by this real component.
+      path: args.path === 'swr' ? fileURLToPath(import.meta.resolve('swr')) : require.resolve(args.path), external: true,
+    }))
     builder.onResolve({ filter: /^mikka:platform$/ }, () => ({ path: resolve(renderer, 'platform.tsx') }))
     builder.onResolve({ filter: /.*/ }, args => fixtureModules.has(args.path) ? { path: args.path, namespace: 'live-fixture' } : undefined)
     builder.onResolve({ filter: /^\.\// }, args => {

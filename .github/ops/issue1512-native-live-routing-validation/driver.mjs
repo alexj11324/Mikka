@@ -51,13 +51,34 @@ function inspectIfPresent(kind, name) {
 }
 
 const unitGroups = [
-  { label: 'live-routing-ts', args: ['--test-reporter=tap', '--import', 'tsx', '--test',
-    'lib/live/channel.test.ts', 'lib/live/channels.test.ts', 'apps/desktop/src/renderer/workspace-live.test.ts', 'lib/desktop-rpc/wire.test.ts'] },
-  { label: 'renderer-bootstraps', args: ['--test-reporter=tap', '--test',
-    'apps/desktop/scripts/workspace-live.test.mjs', 'apps/desktop/scripts/installed-workspace.test.mjs',
-    'apps/desktop/scripts/renderer-startup.test.mjs', 'apps/frontend/scripts/auth-only-bootstrap.test.mjs'] },
-  { label: 'startup-and-template-validators', args: ['--test-reporter=tap', '--test',
-    'scripts/acceptance/cloud-startup.test.mjs', 'scripts/e2b/validate-template-subscriptions.test.mjs'] },
+  {
+    "label": "live-routing-regressions",
+    "args": [
+      "--test-reporter=tap",
+      "--import",
+      "tsx",
+      "--test",
+      "lib/live/channels.test.ts"
+    ]
+  },
+  {
+    "label": "workspace-app",
+    "args": [
+      "--test-reporter=tap",
+      "--test",
+      "apps/desktop/scripts/workspace-live.test.mjs"
+    ]
+  },
+  {
+    "label": "cloud-startup",
+    "args": [
+      "--test-reporter=tap",
+      "--import",
+      "tsx",
+      "--test",
+      "scripts/acceptance/cloud-startup.test.mjs"
+    ]
+  }
 ]
 const typeChecks = [
   { label: 'root-types', args: ['exec', 'tsrs', '--noEmit'] },
@@ -65,10 +86,7 @@ const typeChecks = [
   { label: 'desktop-renderer-types', args: ['--filter', '@mikka/desktop', 'exec', 'tsc', '--noEmit', '-p', 'tsconfig.renderer.json'] },
 ]
 const testPath = 'tests/read-cache-scope.db.test.ts'
-const additionalLintPaths = [
-  'scripts/acceptance/run-observability-browser.mjs', 'scripts/acceptance/run-observability-browser.test.mjs',
-  'scripts/e2b/validate-template-subscriptions.mjs', 'scripts/e2b/validate-template-subscriptions.test.mjs',
-]
+const additionalLintPaths = []
 const controlPaths = [
   '.github/ops/issue1512-native-live-routing-validation/driver.mjs',
   '.github/ops/issue1512-native-live-routing-validation/manifest.json',
@@ -103,13 +121,17 @@ function admission() {
     'E2B_API_KEY', 'LINEAR_API_KEY', 'GITHUB_APP_PRIVATE_KEY', 'SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD', 'BETTER_AUTH_SECRET']) {
     assert.ok(!process.env[name], 'Unexpected external credential: ' + name)
   }
-  for (const source of [manifest.merge, manifest.source]) {
+  for (const source of [manifest.merge, manifest.previousSource, manifest.source]) {
     for (const key of ['sha', 'tree']) assert.match(source[key], /^[0-9a-f]{40}$/)
     assert.ok(Array.isArray(source.parents))
     for (const parent of source.parents) assert.match(parent, /^[0-9a-f]{40}$/)
   }
   assert.match(manifest.previousOps.sha, /^[0-9a-f]{40}$/)
-  assert.deepEqual(manifest.source.parents, [manifest.merge.sha])
+  assert.deepEqual(manifest.previousSource.parents, [manifest.merge.sha])
+  assert.deepEqual(manifest.source.parents, [manifest.previousSource.sha])
+  assert.equal(manifest.previousSource.sha, 'ff385bfd91edcd40c3b3ee398b4b93098e5becbb')
+  assert.equal(manifest.previousRun.id, 42766089161)
+  assert.equal(manifest.previousRun.conclusion, 'failure')
   assert.equal(manifest.testPath, testPath)
   assert.equal(manifest.expectedPgTests, 15)
   assert.deepEqual(manifest.unitGroups, unitGroups)
@@ -119,11 +141,11 @@ function admission() {
   assert.deepEqual(manifest.typeChecks, typeChecks)
   assert.deepEqual(manifest.controlPaths, controlPaths)
   assert.deepEqual(manifest.additionalLintPaths, additionalLintPaths)
-  assert.deepEqual(manifest.lintPaths, [...new Set([...manifest.productPaths.filter(path => /\.(?:tsx?|mjs)$/.test(path)), ...additionalLintPaths])].sort())
+  assert.deepEqual(manifest.lintPaths, [...new Set([...manifest.changedSinceFailedPaths.filter(path => /\.(?:tsx?|mjs)$/.test(path)), ...additionalLintPaths])].sort())
   assert.ok(manifest.lintPaths.length > 0)
   assert.deepEqual(manifest.packageScriptBindings.map(binding => binding.packagePath === 'package.json' ? binding.testToken : binding.packagePath.slice(0, binding.packagePath.lastIndexOf('/') + 1) + binding.testToken).sort(),
     ['apps/desktop/src/renderer/workspace-live.test.ts', 'lib/live/channels.test.ts'])
-  for (const path of [...manifest.productPaths, ...manifest.lintPaths]) {
+  for (const path of [...manifest.productPaths, ...manifest.changedSinceFailedPaths, ...manifest.lintPaths]) {
     assert.ok(!path.startsWith('-') && !path.startsWith('/') && !path.split('/').includes('..'))
     assert.match(manifest.source.files[path], /^[0-9a-f]{40}$/)
   }
@@ -199,13 +221,18 @@ if (operation === 'cleanup') {
     assert.deepEqual(parents, [manifest.previousOps.sha, manifest.source.sha], 'The ops entry preserves the closed evidence archive and exact candidate ancestry')
     assert.deepEqual(git(['diff', '--name-only', '--no-renames', manifest.source.sha, 'HEAD']).split('\n'), controlPaths)
     assert.equal(git(['rev-parse', 'HEAD:' + controlPaths[2]]), manifest.workflowBlob)
-    for (const source of [manifest.merge, manifest.source]) {
+    for (const source of [manifest.merge, manifest.previousSource, manifest.source]) {
       assert.equal(git(['cat-file', '-t', source.sha]), 'commit')
       assert.equal(git(['rev-parse', source.sha + '^{tree}']), source.tree)
       const sourceParents = git(['cat-file', '-p', source.sha]).split('\n').filter(line => line.startsWith('parent ')).map(line => line.slice(7))
       assert.deepEqual(sourceParents, source.parents)
     }
     assert.deepEqual(git(['diff', '--name-only', '--no-renames', manifest.merge.sha, manifest.source.sha]).split('\n'), manifest.productPaths)
+    assert.deepEqual(git(['diff', '--name-only', '--no-renames', manifest.previousSource.sha, manifest.source.sha]).split('\n'), manifest.changedSinceFailedPaths)
+    assert.deepEqual(manifest.changedSinceFailedPaths, [
+      'apps/desktop/scripts/workspace-live.test.mjs', 'hooks/use-subagent-updates.ts',
+      'lib/live/channels.test.ts', 'tests/read-cache-scope.db.test.ts',
+    ])
     const packageScripts = JSON.parse(readFileSync('package.json')).scripts
     assert.ok(packageScripts['test:desktop-auth'].split(' && ')[0].startsWith('node --import tsx --test '))
     assert.ok(packageScripts['test:desktop-auth'].split(' && ')[0].split(' ').includes('lib/desktop-rpc/wire.test.ts'))
@@ -222,11 +249,13 @@ if (operation === 'cleanup') {
     const control = {
       opsSha: process.env.GITHUB_SHA, opsTree: git(['rev-parse', 'HEAD^{tree}']), workflowBlob: manifest.workflowBlob,
       manifestSha256: sha256(manifestBytes), driverSha256: manifest.driverSha256,
-      merge: manifest.merge, candidate: { sha: manifest.source.sha, tree: manifest.source.tree, parents: manifest.source.parents },
+      merge: manifest.merge, previousSource: manifest.previousSource, previousRun: manifest.previousRun,
+      reusedResults: manifest.reusedResults,
+      candidate: { sha: manifest.source.sha, tree: manifest.source.tree, parents: manifest.source.parents },
       node: process.version, pnpm: '10.34.3', nodeOptions: process.env.NODE_OPTIONS, capturedAt: new Date().toISOString(),
       cachePolicy: { actionsCache: false, persistentPnpmCache: false, nodeCompileCache: false, tsxDiskCache: false,
         dependencyInstalls: 1, independentTestProcesses: true },
-      validationKind: 'one fixed candidate GREEN; recorded diagnostic is the before evidence',
+      validationKind: 'one corrected forward candidate; rerun failed or changed scopes, retain source-bound unaffected results from the failed predecessor',
     }
     git(['checkout', '--detach', '--force', manifest.source.sha])
     control.initialSourceProof = sourceProof('before-install')
@@ -408,7 +437,6 @@ if (operation === 'cleanup') {
       assert.ok(desktopLintPaths.every(path => /^(?:src|scripts)\//.test(path)), 'Existing desktop lint must cover every changed desktop source')
       await runCheck('changed-root-oxlint', ['exec', 'oxlint', '--deny-warnings', ...rootLintPaths])
       await runCheck('desktop-source-oxlint', ['--filter', '@mikka/desktop', 'lint'])
-      await runCheck('ui-and-runtime-policy', ['scripts/lint-ui.mjs'], process.execPath)
       const pg = receipt.pg = { startedAt: new Date().toISOString(), verdict: 'IN_PROGRESS' }
       persist()
       try {
@@ -450,7 +478,7 @@ if (operation === 'cleanup') {
       for (const check of typeChecks) await runCheck(check.label, check.args)
       receipt.verdict = receipt.units.length === unitGroups.length
         && receipt.units.every(row => row.verdict === 'COMPLETE_UNIT_GROUP_PASS')
-        && receipt.checks.length === typeChecks.length + 3
+        && receipt.checks.length === typeChecks.length + 2
         && receipt.checks.every(row => row.verdict === 'CHECK_PASS')
         && receipt.pg?.verdict === 'COMPLETE_CACHE_SCOPE_PG_PASS'
         ? 'ALL_FIXED_SOURCE_GREEN_CHECKS_PASSED' : 'FAILED_OR_BLOCKED'

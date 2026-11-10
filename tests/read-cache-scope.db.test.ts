@@ -113,17 +113,19 @@ test('bootstrap derives only a unique owner Live route from the current cache me
   [selected, ownedTeam, home, foreignHome, peer, owner])
   await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES
     ($1,$5,$5,$7,'member','active'),($2,$5,$5,$7,'admin','active'),
-    ($3,$5,$5,$7,'admin','suspended'),($4,$5,$5,$7,'admin','active'),($4,$6,$6,$8,'admin','active')`,
+    ($3,$5,$5,$7,'admin','suspended'),($4,$6,$6,$8,'admin','active')`,
   [selected, ownedTeam, home, foreignHome, owner, peer, `${owner}@example.invalid`, `${peer}@example.invalid`])
 
   await t.test('real PG: owned teams, foreign personal rows and suspended home membership produce no owner route', async () => {
+    await assert.rejects(pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'admin\',\'active\')',
+      [foreignHome, owner, `${owner}@example.invalid`]), { code: '23514', message: 'personal workspace admits only its owner' })
     const cache = await measured(() => authorizedCacheWorkspace(reader, selected))
     const bootstrap = await measured(() => authorizedBootstrapScopes(reader, selected))
     assert.deepEqual(cache.value, { workspaceId: selected, role: 'member' })
     assert.deepEqual(bootstrap.value, expected(selected, 'member', null))
     assert.equal(cache.statements, 2, 'the existing membership and selected Organization-link reads')
     assert.equal(bootstrap.statements, cache.statements, 'the home hint adds no database statement')
-    assert.equal(await authorizedCacheWorkspace(reader, foreignHome), null, 'an active foreign-personal membership cannot authorize a cache')
+    assert.equal(await authorizedCacheWorkspace(reader, foreignHome), null, 'a foreign personal workspace cannot authorize a cache for this reader')
     t.diagnostic(JSON.stringify({ scenario: 'bootstrap_live_hint_no_extra_query', cache: readMetrics(cache), bootstrap: readMetrics(bootstrap) }))
   })
 
@@ -193,15 +195,14 @@ test('bootstrap derives only a unique owner Live route from the current cache me
     assert.deepEqual(await authorizedBootstrapScopes(reader, selected), expected(selected, 'member'))
   })
 
-  await t.test('real PG: a later call observes kind changes without creating a replacement home', async () => {
-    await pool.query('UPDATE mikka_workspaces SET kind=\'team\' WHERE id=$1', [home])
-    try {
-      assert.deepEqual(await authorizedBootstrapScopes(reader, selected), expected(selected, 'member', null))
-      const count = await pool.query<{ count: number }>('SELECT count(*)::int AS count FROM mikka_workspaces WHERE "userId"=$1', [owner])
-      assert.equal(count.rows[0].count, 2, 'routing lookup does not create a workspace')
-    } finally {
-      await pool.query('UPDATE mikka_workspaces SET kind=\'personal\' WHERE id=$1', [home])
-    }
+  await t.test('real PG: the immutable personal kind remains enforced without creating a replacement home', async () => {
+    await assert.rejects(pool.query('UPDATE mikka_workspaces SET kind=\'team\' WHERE id=$1', [home]),
+      { code: '23514', message: 'workspace kind and personal ownership are immutable' })
+    const bootstrap = await measured(() => authorizedBootstrapScopes(reader, selected))
+    assert.deepEqual(bootstrap.value, expected(selected, 'member'))
+    assert.equal(bootstrap.statements, 2, 'the rejected kind mutation does not change the fresh membership and selected Organization reads')
+    const count = await pool.query<{ count: number }>('SELECT count(*)::int AS count FROM mikka_workspaces WHERE "userId"=$1', [owner])
+    assert.equal(count.rows[0].count, 2, 'routing lookup does not create a workspace')
   })
 
   await t.test('real PG: deleted home membership cannot supply a route while the selected team stays authorized', async () => {
