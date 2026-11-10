@@ -131,6 +131,10 @@ Its lifetime is ten minutes and its machine binding must still match.
 `resolve` returns a context observation containing the files in selection order.
 Rename, deletion, changed bytes, changed HEAD, or a new machine generation
 requires a new selection; none is silently rebound to a newer Run.
+A folder selection is rejected with `workspace_limit_exceeded` (429) when it
+contains more than 20 text files or more than 64 KiB of selected content;
+`omitted` counts non-text (binary or too-large) files, never the 21st file. A
+`resolve` or `submit` with several mentions is limited to 20 files in total.
 
 Submission requires a real human session and same-origin `Origin`. PATs can
 create and resolve references but cannot impersonate a human submission.
@@ -145,7 +149,11 @@ request epoch. Under the existing Task → Issue → Run lock order, the current
 Factory attempt, Run chain, machine binding, human session and Workspace
 membership are rechecked. The existing `run_messages` table provides the
 idempotent owner message. Reusing `requestId` with different message content is
-a conflict. Device wake happens after the owning transaction commits.
+a conflict. A submit must target the current Run chain's latest Run, the current
+Factory attempt and the current machine binding; an earlier or superseded Run
+is a `workspace_version_conflict`, while a different Run/repository authority
+is `workspace_not_found`. Device wake happens after the owning transaction
+commits.
 
 ## Resource and file boundaries
 
@@ -235,6 +243,11 @@ All public responses use `Cache-Control: private, no-store` and
 Human-inbox submission also preserves the existing action conflict codes.
 Do not infer retry authority from a generic 409; use the code and require a
 new selection for stale context.
+
+The mentions endpoint returns HTTP 403 with `workspace_not_found` when a
+session request is not same-origin or when a PAT attempts `submit`; every
+other `workspace_not_found` is 404. Treat the 403 as "send from the app or its
+mobile BFF", not as missing authority.
 
 ## Acceptance records
 
