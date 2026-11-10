@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
 import type { Pool as PgPool } from 'pg'
 import { normalizeRepository } from '@mikka/protocol/repository'
-import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedUser } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
@@ -118,9 +118,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     await connectGitHub(github, id, String(++githubAccount), ['octo/repo'])
     // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
     await recordPushGrant(pool, id, normalizeRepository('octo/repo').key)
-    const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
-    // Their own workspace: the personal one, where work with no workspace of its own goes.
-    await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [ws.id])
+    const ws = { id: await seedPersonalWorkspace(pool, id) }
     const issueId = await numberedTask(id, ws.id, taskNumber)
     const botId = await seedBot(pool, ws.id, id)
     const connection = randomUUID()

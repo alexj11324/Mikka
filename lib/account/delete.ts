@@ -6,6 +6,10 @@ import { workspaceDb } from '@/lib/workspace-db'
 import * as workspaceSchema from '@/lib/db/workspace-schema'
 import * as teamSchema from '@/lib/db/team-schema'
 import * as projectSchema from '@/lib/db/project-schema'
+import { organizationMembers } from '@/lib/db/governance-schema'
+import { GovernanceError } from '@/lib/governance/errors'
+import { lockAccountOrganizationOwnership } from '@/lib/governance/organization-ownership'
+import { enqueueOrganizationAudit } from '@/lib/governance/audit'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { workspaceListScopesBeforeChange, workspaceListScopeChanged, workspaceListChanged } from '@/lib/live/lists'
 
@@ -56,6 +60,13 @@ const SKIPPED = new Map<string, string>([
   ['user', 'user row'],
   ['account_deletion_jobs', 'durable deletion receipt'],
   ['account_deletion_guards', 'restore suppression tombstone'],
+  // Org configuration belongs to the Org; userId records only its creator.
+  // The original Auth FK clears that attribution when the user row is deleted.
+  ['enterprise_sso_provider', 'organization configuration'],
+  // The SCIM directory is Org-owned. Its original FK clears the account link;
+  // pending delivery then records pending_link without recreating membership.
+  ['enterprise_scim_user', 'organization directory'],
+  ['mikka_organization_members', 'workspace database'],
 ])
 /**
  * Append-only skill-evaluation ledgers: triggers reject every DELETE
@@ -152,7 +163,7 @@ export interface Plan {
 /** Durable deletion receipts written before Project v2 do not carry this field. */
 type CompatiblePlan = Omit<Plan, 'keptProjectIds'> & { keptProjectIds?: string[] }
 
-type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'delete' | 'execute' | 'update'>
+type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'insert' | 'delete' | 'execute' | 'update'>
 
 async function retainedWorkspaceProjects(wtx: WorkspaceTx, userId: string, solo: string[], shared: string[]) {
   return (await wtx.select({ id: projects.id }).from(projects)
@@ -187,6 +198,7 @@ export async function deleteAccount(userId: string, email: string, options: impo
   const requested = await requestAccountDeletion(userId, email, undefined, options)
   if (!requested.ok) return requested
   const job = await resumeAccountDeletion(requested.id, options)
+  if (job.stage === 'cancelled' && job.blockedReasons.includes('last_owner')) throw new GovernanceError('last_owner')
   if (job.stage === 'completed') return job.warnings.length ? { ok: true, receipt: { id: job.id, warnings: job.warnings } } : { ok: true }
   return { ok: false, pending: true, id: job.id, stage: job.stage }
 }
@@ -198,12 +210,19 @@ export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<
   const ids = [...new Set([...memberships.map(row => row.workspaceId), ...owned.map(row => row.id)])].sort()
   if (!ids.length) return { solo: [], shared: [], keptIssueIds: [], keptProjectIds: await retainedWorkspaceProjects(wtx, userId, [], []) }
   // Same lock order as role changes (lib/workspace-access.ts requireWorkspace): the workspace row first.
-  const locked = await wtx.select({ id: workspaces.id, name: workspaces.name }).from(workspaces).where(inArray(workspaces.id, ids)).orderBy(workspaces.id).for('update')
+  const locked = await wtx.select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, ownerId: workspaces.userId }).from(workspaces).where(inArray(workspaces.id, ids)).orderBy(workspaces.id).for('update')
   const others = await wtx.select({ workspaceId: workspaceMembers.workspaceId, role: workspaceMembers.role, status: workspaceMembers.status })
     .from(workspaceMembers).where(and(inArray(workspaceMembers.workspaceId, ids), ne(workspaceMembers.userId, userId)))
   const solo: string[] = [], shared: string[] = [], soleAdminOf: string[] = []
   for (const workspace of locked) {
     const rest = others.filter(row => row.workspaceId === workspace.id)
+    // Migrated Personal peers are retained as suspended history. They cannot
+    // administer the owner's tenant, or turn it into a shared workspace.
+    if (workspace.kind === 'personal' && workspace.ownerId === userId) {
+      if (rest.some(row => row.status === 'active')) soleAdminOf.push(workspace.name)
+      else solo.push(workspace.id)
+      continue
+    }
     if (!rest.length) { solo.push(workspace.id); continue }
     shared.push(workspace.id)
     const mine = memberships.find(row => row.workspaceId === workspace.id)
@@ -280,6 +299,13 @@ export async function deleteWorkspaceData(wtx: WorkspaceTx, userId: string, emai
   await wtx.delete(projectEvents).where(inArray(projectEvents.projectId, deletedProjects))
   await wtx.delete(projects).where(kept.length ? and(eq(projects.userId, userId), sql`not (${projects.id} = any(${sql.param(kept)}::uuid[]))`) : eq(projects.userId, userId))
   for (const previous of previousLists) await workspaceListScopeChanged(wtx, previous.id, previous.scopes)
+  // Canonical Workspace membership is cleaned here, including split-store
+  // retries after the APP user has gone. Historical Org audit rows stay.
+  await lockAccountOrganizationOwnership(wtx, userId)
+  const removed = await wtx.delete(organizationMembers).where(eq(organizationMembers.userId, userId)).returning({ organizationId: organizationMembers.organizationId })
+  for (const { organizationId } of removed) await enqueueOrganizationAudit(wtx, {
+    organizationId, actorId: userId, action: 'organization.member_removed', targetId: userId, metadata: { reason: 'account_deletion' },
+  })
 }
 
 const ident = (name: string) => `"${name.replaceAll('"', '""')}"`

@@ -1,6 +1,7 @@
 import { freshSessionRoute } from '@/lib/fresh-session'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
+import { GovernanceError } from '@/lib/governance/errors'
 import { AccountAuthenticationError, requireFreshAccountSession } from '@/lib/account/fresh-session'
 import { cancelAccountDeletion, readAccountDeletionReceipt, requestAccountDeletion } from '@/lib/account/deletion-jobs'
 
@@ -25,7 +26,10 @@ async function POSTBody(request: Request) {
     const job = await requestAccountDeletion(session.user.id, session.user.email, input.data.requestId)
     if (!job.ok) return Response.json({ error: 'accountSoleAdmin', workspaces: job.soleAdminOf }, { status: 409, headers })
     return Response.json(await readAccountDeletionReceipt(job.id), { status: 202, headers })
-  } catch { return Response.json({ error: 'accountDeletionUnavailable' }, { status: 503, headers }) }
+  } catch (error) {
+    if (error instanceof GovernanceError && error.detail === 'last_owner') return Response.json({ error: 'accountLastOrganizationOwner' }, { status: 409, headers })
+    return Response.json({ error: 'accountDeletionUnavailable' }, { status: 503, headers })
+  }
 }
 /** Receipt capability remains usable when the account and its sessions have already been deleted. */
 export async function GET(request: Request) {

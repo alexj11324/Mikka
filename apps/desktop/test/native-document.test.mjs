@@ -218,6 +218,123 @@ test('a failed workspace click propagates without retrying or requiring a new do
   assert.deepEqual(state.calls, ['old-document-ready', 'new-document-armed', 'click'])
 })
 
+const lifecycleSource = await readFile(new URL('./lifecycle.mjs', import.meta.url), 'utf8')
+const selectFixtureSource = lifecycleSource.match(/^async function selectFixture\(page\) \{[\s\S]*?^\}/m)?.[0]
+assert.ok(selectFixtureSource, 'exercise the actual lifecycle workspace-selection function')
+
+// Deliver the real page contract's events in a controlled order. The old
+// document is already loaded and has the seeded chat; only a *new* DCL makes
+// its successor safe to read. No application response or authority is mocked.
+function workspaceSelectionPage({ current = false, immediateLoad = false, clickFailure, usableFailure } = {}) {
+  const events = new EventEmitter(), calls = []
+  let loaded = current, rejectNavigation, usableCalls = 0, waits = 0
+  const ready = () => { loaded = true; events.emit('domcontentloaded') }
+  const item = {
+    async getAttribute(name) { assert.equal(name, 'aria-current'); return current ? 'true' : null },
+    async click() {
+      calls.push('workspace-click')
+      if (clickFailure) throw clickFailure
+      if (immediateLoad) ready()
+    },
+  }
+  const page = {
+    async waitForFunction(predicate) {
+      assert.equal(vm.runInNewContext('(' + predicate + ')()', { document: { documentElement: { lang: 'en' } } }), true)
+    },
+    async evaluate(read) {
+      return vm.runInNewContext('(' + read + ')()', { document: { documentElement: { lang: 'en' } } })
+    },
+    getByRole(role, options) {
+      assert.equal(options.exact, true)
+      if (role === 'button') {
+        assert.equal(options.name, 'Workspace menu')
+        return { first: () => ({ async click() { calls.push('open-menu') } }) }
+      }
+      assert.equal(role, 'menuitem'); assert.equal(options.name, 'Fixture workspace')
+      return item
+    },
+    waitForEvent(event, options) {
+      assert.equal(event, 'domcontentloaded'); assert.equal(options.timeout, 60_000)
+      calls.push('arm-new-document'); waits++
+      const result = Promise.withResolvers()
+      const resolve = () => { events.off(event, resolve); rejectNavigation = undefined; result.resolve() }
+      events.once(event, resolve)
+      rejectNavigation = error => { events.off(event, resolve); result.reject(error) }
+      return result.promise
+    },
+  }
+  const select = vm.runInNewContext('(' + selectFixtureSource + ')', {
+    menuNames: { en: 'Workspace menu' }, fixtures: { fixture: { workspaceName: 'Fixture workspace' } },
+    async usable() {
+      usableCalls++; calls.push('usable')
+      if (!loaded) throw new Error('page.evaluate: Execution context was destroyed, most likely because of a navigation')
+      if (usableFailure) throw usableFailure
+    },
+  })
+  return {
+    run: () => select(page), ready, calls,
+    rejectNavigation: error => rejectNavigation?.(error),
+    get usableCalls() { return usableCalls }, get waits() { return waits },
+    get listeners() { return events.listenerCount('domcontentloaded') },
+  }
+}
+
+test('workspace selection waits for its new document before reading the old ready chat', async () => {
+  const state = workspaceSelectionPage()
+  const pending = state.run().then(value => ({ value }), error => ({ error }))
+  await new Promise(setImmediate)
+  assert.equal(state.usableCalls, 0, 'old chat readiness cannot race the requested full-document navigation')
+  assert.equal(state.waits, 1)
+  assert.ok(state.calls.indexOf('arm-new-document') < state.calls.indexOf('workspace-click'))
+  state.ready()
+  assert.deepEqual(await pending, { value: 'en' })
+  assert.equal(state.usableCalls, 1)
+  assert.equal(state.listeners, 0)
+})
+
+test('selecting the current workspace does not wait for a nonexistent new document', async () => {
+  const state = workspaceSelectionPage({ current: true })
+  assert.equal(await state.run(), 'en')
+  assert.equal(state.waits, 0)
+  assert.equal(state.usableCalls, 1)
+  assert.equal(state.listeners, 0)
+})
+
+test('a failed workspace click preserves its failure and observes later page-close rejection', async () => {
+  const failure = new Error('WORKSPACE_CLICK_FAILED')
+  const state = workspaceSelectionPage({ clickFailure: failure })
+  await assert.rejects(state.run(), error => error === failure)
+  assert.equal(state.usableCalls, 0)
+  // Promise.all must already observe the waiter's later rejection while the
+  // owning lifecycle finally block closes the application.
+  state.rejectNavigation(new Error('Target page, context or browser has been closed'))
+  await new Promise(setImmediate)
+  assert.equal(state.listeners, 0)
+})
+
+test('workspace selection keeps the original event timeout and page-close failures', async t => {
+  for (const kind of ['TimeoutError', 'PageClosedError']) await t.test(kind, async () => {
+    const failure = Object.assign(new Error(kind), { name: kind })
+    const state = workspaceSelectionPage()
+    const pending = state.run().then(value => ({ value }), error => ({ error }))
+    await new Promise(setImmediate)
+    state.rejectNavigation(failure)
+    assert.equal((await pending).error, failure)
+    assert.equal(state.usableCalls, 0)
+    assert.equal(state.waits, 1)
+    assert.equal(state.listeners, 0)
+  })
+})
+
+test('a document arriving during the click still runs the unchanged viewport and usable checks', async () => {
+  const failure = new assert.AssertionError({ message: 'Native renderer layout mismatch' })
+  const state = workspaceSelectionPage({ immediateLoad: true, usableFailure: failure })
+  await assert.rejects(state.run(), error => error === failure)
+  assert.equal(state.usableCalls, 1)
+  assert.equal(state.waits, 1)
+  assert.equal(state.listeners, 0)
+})
+
 // Use the installed SDK's actual main-frame-only DOMContentLoaded forwarding.
 const loadStateHandlers = [...sdk.matchAll(/^        this\._channel\.on\("loadstate", \(event\) => \{\n([\s\S]*?)^        \}\);/gm)]
 assert.equal(loadStateHandlers.length, 1, 'identify the installed Frame loadstate forwarding contract')

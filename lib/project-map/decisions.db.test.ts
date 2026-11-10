@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedProjectTasks, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { ProjectMapError, recordDecisionSchema, type RecordDecisionInput } from './contracts'
 import { ownLiveRuntime } from '../../tests/support/live-runtime'
@@ -37,8 +37,7 @@ test('project decisions: real PostgreSQL authority, atomic appends, retries and 
   const owner = await seedUser(connection, 'decision-owner')
   const stranger = await seedUser(connection, 'decision-stranger')
   const member = await seedUser(connection, 'decision-member')
-  const personal = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }])
-  await connection.query('update mikka_workspaces set kind=\'personal\' where id=$1', [personal.id])
+  const personal = { id: await seedPersonalWorkspace(connection, owner) }
   const other = await seedWorkspace(connection, stranger, [{ userId: stranger, role: 'admin' }])
   const teamWorkspace = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
   const team = await seedTeam(connection, teamWorkspace.id, owner)

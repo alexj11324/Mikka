@@ -36,14 +36,18 @@ export async function listIssueConnections(id: string) {
   return issueConnections(id, 'linked')
 }
 
+async function connectionAccess(id: string) {
+  return requireIssueAccessWithoutBody(id, { projection: 'lock' })
+}
+
 /**
  * `linked`: only the task, the tasks its metadata names (parent, blocked by,
  * related, duplicate of) and the tasks whose metadata names it, found in SQL;
  * every other task of the owner stays in Postgres. `all`: every task of the
  * owner, for copying a whole subtask tree.
  */
-async function issueConnections(id: string, reach: 'linked' | 'all', authorized?: Awaited<ReturnType<typeof requireIssueAccessWithoutBody>>) {
-  const { issue, user } = authorized ?? await requireIssueAccessWithoutBody(id)
+async function issueConnections(id: string, reach: 'linked' | 'all', authorized?: Awaited<ReturnType<typeof connectionAccess>>) {
+  const { issue, user } = authorized ?? await connectionAccess(id)
   return db.transaction(async tx => {
   const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
@@ -158,7 +162,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
     const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), kind: z.enum(['child', 'duplicate']), title: z.string().trim().min(1).max(200).optional(), includeSubissues: z.boolean().optional() }).safeParse(input)
     if (!parsed.success) return { error: 'issueTitleInvalid' }
     const t = await getTranslations('IssueDetail')
-    const authorized = await requireIssueAccessWithoutBody(input.id)
+    const authorized = await connectionAccess(input.id)
     const { issue, user } = authorized
     if (!issue.workspaceId || issue.ownershipState !== 'bound') throw new ActionFailureError('workspaceAccessDenied')
     // This entry read belongs to the same operation. The relation snapshot

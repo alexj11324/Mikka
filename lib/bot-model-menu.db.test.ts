@@ -32,15 +32,17 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
-      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY);
+      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,kind text NOT NULL DEFAULT 'team' CHECK (kind IN ('personal','team')));
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false,"modelSettings" jsonb);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
     for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql", "20261102190000_model_api_key_responses_api.sql"])
       await pool.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), "utf8"));
+    // Resource policy still runs against real non-Org rows in this isolated schema.
+    await pool.query(await readFile(new URL("../drizzle/20261109035020_organization_governance.sql", import.meta.url), "utf8"));
 
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
-    mock.module(new URL("./workspace-db.ts", import.meta.url).href, { namedExports: { workspaceDb: drizzle(pool) } });
+    mock.module(new URL("./workspace-db.ts", import.meta.url).href, { namedExports: { workspaceDb: drizzle(pool), workspacePool: pool } });
     // Points and their fallback have their own tests: here Mikka 默认 has points.
     let hostedPoints = 98;
     let hostedTrial = 0;
@@ -55,7 +57,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
 
     const settings = new ExecutionSettings(pool);
     const workspace = randomUUID(), elsewhere = randomUUID();
-    await pool.query('INSERT INTO mikka_workspaces VALUES ($1),($2)', [workspace, elsewhere]);
+    await pool.query('INSERT INTO mikka_workspaces(id) VALUES ($1),($2)', [workspace, elsewhere]);
     const alice = { ownerId: "alice", workspaceId: workspace };
     const [botA, botB, bobBot] = [randomUUID(), randomUUID(), randomUUID()];
     await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'alice','Alice','active'),($1,'bob','Bob','active')`, [workspace]);

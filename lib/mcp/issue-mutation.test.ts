@@ -5,6 +5,7 @@ import type { SQL } from 'drizzle-orm'
 import { collectIssueEffects, scheduleIssueEffect } from '@/lib/issue-effects'
 import { actingContext } from '@/lib/activity-actor'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
+import { organizationWorkspaces } from '@/lib/db/governance-schema'
 
 type Receipt = { userId: string; toolCallId: string; operation: string; inputHash: string; issueId: string; result: Record<string, unknown>; effects: unknown[] }
 const receipts = new Map<string, Receipt>()
@@ -37,17 +38,32 @@ const executor = {
     }
   },
 }
-mock.module('@/lib/db', { namedExports: { db: executor, withDatabaseTransaction: (_tx: unknown, fn: () => unknown) => fn() } })
-const workspaceTransaction = { select: () => ({ from: (table: unknown) => ({ where: (condition: SQL) => ({ for: async (mode: string) => {
+mock.module('@/lib/db', { namedExports: { db: executor,
+  pool: { query: async () => { throw new Error('Unexpected APP authority query for the no-Organization mutation fixture') } },
+  withDatabaseTransaction: (_tx: unknown, fn: () => unknown) => fn() } })
+const workspaceTransaction = { select: (columns: Record<string, unknown>) => ({ from: (table: unknown) => {
+  let organizationJoined = false
+  const selection = { leftJoin(joined: unknown, predicate: SQL) {
+    assert.equal(table, workspaceMembers); assert.equal(joined, organizationWorkspaces)
+    assert.deepEqual(columns, { id: workspaceMembers.userId, organizationId: organizationWorkspaces.organizationId })
+    const join = dialect.sqlToQuery(predicate)
+    assert.equal(join.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+    assert.deepEqual(join.params, [])
+    organizationJoined = true
+    return selection
+  }, where: (condition: SQL) => ({ for: async (mode: string, options?: { of?: unknown }) => {
   assert.equal(mode, 'share')
   const query = dialect.sqlToQuery(condition)
   assert.ok(query.params.includes(workspaceId))
   if (table === workspaces) return [{ id: workspaceId, kind: 'team', ownerId: 'owner' }]
   assert.equal(table, workspaceMembers); assert.ok(query.params.includes('active'))
+  assert.equal(organizationJoined, true); assert.equal(options?.of, workspaceMembers)
   const userId = query.params[1]
   assert.ok(userId === 'owner' || userId === 'other-owner')
-  return [{ id: userId }]
-} }) }) }) }
+  return [{ id: userId, organizationId: null }]
+} }) }
+  return selection
+} }) }
 mock.module('@/lib/workspace-db', { namedExports: {
   workspaceDb: { transaction: (work: (tx: typeof workspaceTransaction) => unknown) => work(workspaceTransaction) },
   workspacePool: { query: async () => { throw new Error('Issue mutation must use its held Workspace transaction') } },

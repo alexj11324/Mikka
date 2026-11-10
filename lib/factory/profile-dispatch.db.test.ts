@@ -6,7 +6,7 @@ import test from 'node:test'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
-import { dbUrl, seedUser, seedWorkspace, seedBot, seedIssue } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedUser, seedPersonalWorkspace, seedBot, seedIssue } from '../../tests/support/workspace-admin-db'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { templateModelsFixture } from '../../tests/support/template-models'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
@@ -103,8 +103,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const template = templateModelsFixture(Object.values(model)); t.after(() => template.restore())
   const fixture = async (withProfiles = true, missingCodex = false, inherit = false, profileId?: 'default', needsSpec = false) => {
     const ownerId = await seedUser(pool, 'profile-stage')
-    const { id: workspaceId } = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }])
-    await pool.query("UPDATE mikka_workspaces SET kind='personal' WHERE id=$1", [workspaceId])
+    const workspaceId = await seedPersonalWorkspace(pool, ownerId)
     const botId = await seedBot(pool, workspaceId, ownerId), issueId = await seedIssue(pool, ownerId, workspaceId)
     const scope = { ownerId, workspaceId, botId }, actor = { userId: ownerId, workspaceId }
     const submissionId = randomUUID()

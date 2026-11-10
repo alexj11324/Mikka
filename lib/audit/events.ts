@@ -54,6 +54,7 @@ export const AUDIT_ACTIONS = {
   'workspace.slug_changed': 'security',
   'workspace.deleted': 'security',
   'workspace.ownership_transferred': 'security',
+  'workspace.entitlements_changed': 'security',
   // 计费
   'billing.card_verified': 'billing',
   'billing.checkout_started': 'billing',
@@ -120,6 +121,7 @@ export const AUDIT_METADATA = {
   'workspace.slug_changed': z.object({ from: label, to: label }).strict(),
   'workspace.deleted': none,
   'workspace.ownership_transferred': none,
+  'workspace.entitlements_changed': z.object({ fromPlan: z.enum(['free', 'pro', 'enterprise']), toPlan: z.enum(['free', 'pro', 'enterprise']), source: z.enum(['cloud', 'license']), seatLimit: z.number().int().min(1).max(100_000).nullable(), expiresAt: z.iso.datetime({ offset: true }).nullable(), reason: z.enum(['evaluation', 'licensed', 'downgrade', 'correction']) }).strict(),
   'billing.card_verified': z.object({ allowanceGranted:z.boolean() }).strict(),
   'billing.checkout_started': z.object({ amountCents: cents, currency }).partial().strict(),
   'billing.credits_purchased': z.object({ amountCents: cents, currency, credits: z.number().int().min(0) }).partial().strict(),

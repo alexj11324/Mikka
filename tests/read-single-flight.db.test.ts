@@ -179,19 +179,26 @@ test('overlapping reads with identical authorization and proofs join exactly one
 test('concurrent reads of two people, or of a removed member, are never shared', { skip: !enabled, timeout: 180_000 }, async () => {
   const { workspacePool } = await import('../lib/workspace-db')
   const { actAs } = await import('../lib/acting-user')
-  const { pollIssues } = await import('../app/actions/issues')
+  const { pollIssues, saveIssue } = await import('../app/actions/issues')
   const owner = await fixture('single-flight-owner'), peer = await fixture('single-flight-peer')
   const read = (who: { owner: string; personal: string }, workspace?: string) => withActivitySession(who.owner, () => actAs(who.owner, () => pollIssues()), workspace ?? who.personal)
   const [mine, theirs] = await Promise.all([read(owner), read(peer)])
   assert.ok(mine.items?.every((item: { ownerId: string }) => item.ownerId === owner.owner))
   assert.ok(theirs.items?.every((item: { ownerId: string }) => item.ownerId === peer.owner))
-  // The peer joins the owner's personal workspace as a member, then is suspended. Its next
-  // concurrent read resolves its own authorization first and never takes the owner's list.
-  await workspacePool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,'member')`, [owner.personal, peer.owner, `${peer.owner}@example.invalid`])
-  await workspacePool.query(`update mikka_workspace_members set status='suspended' where "workspaceId"=$1 and "userId"=$2`, [owner.personal, peer.owner])
-  const [ownerRead, revoked] = await Promise.all([read(owner), read(peer, owner.personal)])
+  // A peer joins a real Shared workspace. Its next concurrent read after
+  // suspension must resolve fresh authority before it can share a list flight.
+  const shared = randomUUID()
+  await workspacePool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Shared read fixture','team')`, [shared, owner.owner])
+  await workspacePool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,'admin'),($1,$4,$4,$5,'member')`, [shared, owner.owner, `${owner.owner}@example.invalid`, peer.owner, `${peer.owner}@example.invalid`])
+  for (let index = 0; index < 20; index++) {
+    const saved = await withActivitySession(owner.owner, () => actAs(owner.owner, () => saveIssue({ title: `Shared task ${index}`, content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })), shared)
+    assert.ok('issue' in saved && saved.issue)
+  }
+  assert.equal((await read(peer, shared)).items?.length, 20, 'the peer can read before membership is suspended')
+  await workspacePool.query(`update mikka_workspace_members set status='suspended' where "workspaceId"=$1 and "userId"=$2`, [shared, peer.owner])
+  const [ownerRead, revoked] = await Promise.all([read(owner, shared), read(peer, shared)])
   assert.equal(ownerRead.items?.length, 20)
-  assert.notEqual(revoked.live.selectedWorkspaceId, owner.personal)
+  assert.notEqual(revoked.live.selectedWorkspaceId, shared)
   assert.ok(revoked.items?.every((item: { ownerId: string }) => item.ownerId === peer.owner), 'a removed member sees none of the workspace list')
 })
 
