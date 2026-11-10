@@ -9,8 +9,8 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '6b0ee8cd5b9211b8d744a4d9d51914918d03466a',
-  tree: '3bb02ae48e62a2c430009537c975eb0b8e95939f',
+  source: 'd2ab0ccc6e9c90f0113cfba5134b24c760758c56',
+  tree: 'cc0b11ebd2d285c93bb9655302cfd3e3d1872d36',
   workerSha: '638876d7e373115b084b8e56fe69cb437f342f47',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
@@ -25,8 +25,8 @@ export const P0 = Object.freeze({
     'scripts/e2b/official-files.test.py': '9f5c3b13a0b219fa55570964139214fe89db36c76c3b58ba00313a587dade7d0',
     'scripts/e2b/cleanup-template-candidates.py': '893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d',
     'scripts/e2b/cleanup-template-candidates.test.py': '826a489c570a788ea018b6a6ce786fd3e71b41dc8d514cfd8a09e516f8bf84f1',
-    'scripts/e2b/workspace-ingress-acceptance.mjs': '4e9646a707cdac149141e26ac3c0f715cabb0f2a7f2fc549509c1d905e686c28',
-    'scripts/e2b/workspace-ingress-acceptance.test.mjs': '4ccf47c093c59cf7e32a5197dab36c045568f4474ff02ad961e2213a51067c08',
+    'scripts/e2b/workspace-ingress-acceptance.mjs': '72a8d8ca769c46e2a8519efb7fa5060b0b04442fc2711caee27386599020f4a4',
+    'scripts/e2b/workspace-ingress-acceptance.test.mjs': 'eadc427e523e87383ae9e976b29c3891a7b2fc1e288917a9f4f157965d7c318d',
     'scripts/e2b/workspace-ingress-servers.py': '5c0c12ff3f5573f7a6032a359a372b2a4697b17e44501c7d175bd10c809c74b8',
     'scripts/e2b/workspace-terminal-acceptance.mjs': 'd6d9d535c393e179eca800a44e5dfed508b06135d8891a793af05d539fa8252c',
     'scripts/e2b/workspace-terminal-acceptance.test.mjs': '971003d90739338112ae83838abc218811818600dcebe7fdbdd46b5e2214dce3',
