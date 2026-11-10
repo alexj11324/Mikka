@@ -2,8 +2,12 @@
 
 import { createContext, use, type ReactNode } from 'react'
 
-/** On in chat replies: the reply's own text sits in a bubble, like the user's messages. */
-export const ReplyBubbles = createContext(false)
+/**
+ * On in chat replies: the reply's own text sits in a bubble, like the user's messages. Unset (undefined) until a chat
+ * says: a host that draws its own message frame (the hosted thread and chat-message slots) sets it off, and a reply
+ * inside such a frame keeps it off instead of turning bubbles back on (CoordinatorReply).
+ */
+export const ReplyBubbles = createContext<boolean | undefined>(undefined)
 /** On inside a card, table or other block, whose text stays as it is. */
 export const InsideBlock = createContext(false)
 

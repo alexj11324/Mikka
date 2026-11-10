@@ -1,4 +1,8 @@
+import { measured, readMetrics } from '../../../tests/helpers/read-metrics';
+import type { ModelMessage } from 'ai';
+import { completeAttentionQuestions } from '../../coordinator/question-attention';
 import { factoryTestLifecycle } from "../../../tests/helpers/factory-test-authority";
+import { seedFixtureWorkspace } from '../../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
@@ -149,6 +153,7 @@ test(
         selectSkill: (runId: string, issueId: string) => Promise<unknown> = (
           runId,
         ) => assignments.selectBaseline(userId, runId),
+        workspaceId?: string,
       ) => {
         // This fixture represents an online daemon. Refresh its heartbeat for
         // each case so earlier database cases cannot age it past the real
@@ -158,8 +163,8 @@ test(
           eventId = randomUUID(),
           questionId = randomUUID();
         await pool.query(
-          `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Use existing HTTP API','{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Keep the existing public API"}]}]}','todo','normal')`,
-          [issueId],
+          `INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Use existing HTTP API','{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Keep the existing public API"}]}]}','todo','normal',$2,'bound')`,
+          [issueId, workspaceId ?? await seedFixtureWorkspace(pool, userId)],
         );
         await pool.query(
           `INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey","issueId",payload) VALUES ($1,'owner','user_message',$2,$3,'{"text":"Keep the existing public API"}')`,
@@ -243,11 +248,82 @@ test(
           )
         ).rows[0].n;
 
+      await t.test("Coordinator attention completes a permission handoff once without another read or a fabricated answer", async (t) => {
+        const normal = await fixture('permission');
+        const missing = await fixture('permission');
+        const normalView = (await questions.list(userId, normal.task.id)).find(q => q.id === normal.questionId)!;
+        const missingView = (await questions.list(userId, missing.task.id)).find(q => q.id === missing.questionId)!;
+        const event = (q: typeof normalView) => ({
+          eventId:q.sourceEventId,taskId:q.taskId,issueId:q.issueId,questionId:q.id,runId:q.originRunId,
+        });
+        const messages = (q: typeof normalView, written?: unknown): ModelMessage[] => [
+          {role:'assistant',content:[{type:'tool-call',toolCallId:'read-question',toolName:'list_factory_questions',input:{taskId:q.taskId}}]},
+          {role:'tool',content:[{type:'tool-result',toolCallId:'read-question',toolName:'list_factory_questions',output:{type:'json',value:[q] as never}}]},
+          ...(written ? [
+            {role:'assistant',content:[{type:'tool-call',toolCallId:'escalate-question',toolName:'escalate_factory_question',input:{reference:q.reference,eventId:q.sourceEventId,reason:'A human decision is needed.'}}]},
+            {role:'tool',content:[{type:'tool-result',toolCallId:'escalate-question',toolName:'escalate_factory_question',output:{type:'json',value:written}}]},
+          ] as ModelMessage[] : []),
+          {role:'assistant',content:[{type:'text',text:'Please confirm the requested permission.'}]},
+        ];
+        let submitted: Parameters<Parameters<typeof completeAttentionQuestions>[2]['escalate']>[0] | undefined;
+        const handoff = await measured(() => completeAttentionQuestions([event(missingView)],messages(missingView),{
+          userId,enabled:true,escalate:async input => {
+            assert.equal(submitted,undefined);
+            submitted=input;
+            return questions.escalate(userId,input);
+          },
+        }));
+        assert.equal(handoff.value,1);
+        assert.ok(submitted);
+        assert.deepEqual(submitted.reference,missingView.reference);
+        assert.equal(submitted.eventId,missingView.sourceEventId);
+        const normalWrite = await measured(() => questions.escalate(userId,{
+          ...submitted!,reference:normalView.reference,eventId:normalView.sourceEventId,
+        }));
+        const afterReceipt = await measured(() => completeAttentionQuestions([event(normalView)],messages(normalView,normalWrite.value),{
+          userId,enabled:true,escalate:async () => { throw new Error('The normal escalation must not run twice'); },
+        }));
+        t.diagnostic(JSON.stringify({
+          case:'coordinator_permission_attention',
+          existingEscalation:readMetrics(normalWrite),
+          missingEscalation:readMetrics(handoff),
+          completionAfterActualReceipt:readMetrics(afterReceipt),
+        }));
+        assert.equal(afterReceipt.value,0);
+        assert.equal(afterReceipt.statements,0);
+        assert.equal(afterReceipt.bytes,0);
+        assert.equal(afterReceipt.bytesWritten,0);
+        assert.equal(handoff.statements,normalWrite.statements,'the missing handoff uses only the existing business write');
+        const waiting = await questions.read(userId,missing.questionId);
+        assert.equal(waiting.status,'waiting_user');
+        assert.equal(waiting.answerId,null);
+        assert.equal(waiting.continuationRunId,null);
+        assert.equal(waiting.originSessionId,missing.q.originSessionId);
+        assert.equal(await queued(missing.issueId),0,'escalation is not a human answer or permission to resume');
+        const persisted = (await pool.query('SELECT id,payload FROM coordinator_events WHERE id=$1',[factoryEventId('question-escalated',missing.questionId)])).rows;
+        assert.equal(persisted.length,1);
+        assert.equal(persisted[0].payload.needsUser,true);
+        assert.equal(persisted[0].payload.questionId,missing.questionId);
+        assert.equal((await questions.escalate(userId,submitted)).id,waiting.id,'the actual source-event key replays the same normal escalation');
+        const answer = await questions.answer(human,{
+          reference:waiting.reference,answerId:randomUUID(),text:'The person permits the requested continuation.',
+        });
+        assert.ok(answer.continuationRunId);
+        const child = (await pool.query('SELECT "questionContinuation" FROM agent_runs WHERE id=$1',[answer.continuationRunId])).rows[0];
+        assert.equal(child.questionContinuation.originRunId,missing.runId);
+        assert.equal(child.questionContinuation.originSessionId,missing.q.originSessionId);
+        assert.equal(child.questionContinuation.requireSessionResume,true);
+        const claim = await questions.claimContinuation(userId,deviceId,answer.continuationRunId,new Date(Date.now()+60000).toISOString());
+        assert.equal(claim.resumeSessionId,missing.q.originSessionId);
+        assert.equal(claim.requireSessionResume,true);
+      });
+
       await t.test("cloud question answer keeps the exact task VM, frozen identity and original SID; replay dispatches once", async (t) => {
         type CloudQuestionTarget = { repoPath: string; remoteUrl: string | null; readOnly?: boolean };
         const cloudFixture = async (state = 'running', afterContinuation?: (owner:string,result:{continuationRunId:string})=>Promise<void>, withSkills = false, beforeRecovery?: Parameters<typeof createFactoryQuestions>[7], target: CloudQuestionTarget = { repoPath: '/isolated', remoteUrl: 'fixture/repo' }) => {
-          const f = await fixture('context',true,async () => undefined);
-          const workspaceId=randomUUID(),botId=randomUUID(),childDevice=randomUUID(),childRepo=randomUUID(),connectionId=randomUUID(),credentialId=randomUUID();
+          const workspaceId=await seedFixtureWorkspace(pool,userId,'team');
+          const f = await fixture('context',true,async () => undefined,workspaceId);
+          const botId=randomUUID(),childDevice=randomUUID(),childRepo=randomUUID(),connectionId=randomUUID(),credentialId=randomUUID();
           await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,'Cloud fixture')`,[botId,workspaceId,userId]);
           await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,$2,'Task VM','cloud',now(),'[{"harness":"codex","installed":true}]')`,[childDevice,userId]);
           await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,'main')`,[childRepo,childDevice,userId,target.repoPath,target.remoteUrl]);

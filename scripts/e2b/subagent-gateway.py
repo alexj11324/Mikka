@@ -262,14 +262,21 @@ async def stop(request):
 async def viewer(request):
     raw,grant=authorize(request,'view');b=browser(grant)
     ws=web.WebSocketResponse(max_msg_size=1024);await ws.prepare(request);b.viewer.add(ws)
+    async def consume_control_frames():
+        # aiohttp handles CLOSE/PING while receiving. Application input remains
+        # ignored: a view capability never gains browser or CDP control.
+        async for _ in ws:pass
+    receiver=asyncio.create_task(consume_control_frames())
     try:
-        while not ws.closed and not b.stopped:
+        while not ws.closed and not b.stopped and not receiver.done():
             token(raw,'view')
             # Server-only send. Any input is ignored; viewers never get CDP.
             if not b.guard and b.frame:await ws.send_json({'type':'frame','data':b.frame})
             await asyncio.sleep(.25)
     except (ValueError,ConnectionError,RuntimeError):pass
-    finally:b.viewer.discard(ws);await ws.close()
+    finally:
+        receiver.cancel();await asyncio.gather(receiver,return_exceptions=True)
+        b.viewer.discard(ws);await ws.close()
     return ws
 
 async def begin(request):

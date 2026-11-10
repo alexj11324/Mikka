@@ -3,6 +3,7 @@
 - Date: 2026-11-02
 - Source: the coordinating session, on a report relayed from review (「已完成线程的标题栏和列表里，状态图标是空心圆，旁边标签却写『已完成』，两者不一致」), choosing option A: 「徽标的图标和文字都跟分组走，列表、卡片和徽标完全一致……『未判定的 succeeded 不能看起来像已解决』是 R-52 的核心。」
 - Rule: R-52
+- Superseded in part by: [2026-11-07-2300](2026-11-07-2300-one-conversation-per-task.md) (an attempt shows its own result icon; only the task can show the hand).
 - Replaces: —
 
 The state badge of a thread (an open thread under its title, a row of a

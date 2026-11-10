@@ -1,92 +1,52 @@
 'use client'
 
-import { settingsKeys } from '@/lib/swr/keys'
-import { useState } from 'react'
-import useSWR, { useSWRConfig } from 'swr'
-import { useLocale, useTranslations } from 'next-intl'
-import { openBillingPortal, startPlanCheckout, type getBilling } from '@/app/actions/billing'
-import { settingsRead } from '@/lib/settings-read'
-import { Button } from '@/components/ui/button'
-import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
-import { BalanceSection, creditBillingKey } from '@/components/billing/balance-section'
-import { FreeAllowanceSection } from '@/components/billing/free-allowance-section'
+import { useCallback } from 'react'
+import useSWR from 'swr'
+import { useTranslations } from 'next-intl'
+import { BillingPage } from '@ui-slot/settings-billing'
 import { useGatedFeature } from '@/hooks/use-feature-availability'
+import { useFreeAllowance } from '@/hooks/settings/use-billing'
+import { useBillingManagement } from '@/hooks/settings/use-billing-management'
+import type { BillingScope } from '@/lib/billing/management-contract'
+import { withBasePath } from '@/lib/base-path'
 import { useActionError } from '@/lib/use-action-error'
-import { FieldError } from '@/components/ui/field'
+import { SettingsLoading, SettingsSaveError } from './primitives'
+import { BillingManagementError } from '@/lib/billing/management-client'
 
 /**
- * V15 计费. No embedded card or tax forms (WS-20~22 dropped): the plan goes
- * through Stripe Checkout, payment method, plan changes and invoices through
- * the Customer Portal.
+ * V15 计费: reads and Stripe redirects here (hooks/settings/use-billing.ts); the
+ * page is the settings-billing slot.
  */
-export function BillingSettings({ workspaceId, personal = false }: { workspaceId: string; /** Card verification belongs to the person: its USD 1 lands in their personal workspace, so only that 计费 offers it (C19). */ personal?: boolean }) {
-  const t = useTranslations('Settings.billing')
+export function BillingSettings({ workspaceId, personal = false, admin = true }: { workspaceId: string; /** Card verification belongs to the person: its USD 1 lands in their personal workspace, so only that 计费 offers it (C19). */ personal?: boolean; admin?: boolean }) {
+  return admin ? <BillingContext key={workspaceId} scope={{ kind: 'workspace', id: workspaceId }} personal={personal} /> : <OrganizationBillingEntry />
+}
+
+/** An Organization admin does not need a Workspace admin role to reach finance metadata. */
+function OrganizationBillingEntry() {
+  const t = useTranslations('Common'), actionError = useActionError()
+  const read = useSWR('/api/organizations', async path => {
+    const response = await fetch(withBasePath(path), { credentials: 'same-origin', cache: 'no-store' })
+    if (!response.ok) throw new BillingManagementError([401, 403].includes(response.status) ? 'workspaceAccessDenied' : 'generic', response.status)
+    return response.json() as Promise<{ organizations: { id: string; role: 'owner' | 'admin' | 'member' }[] }>
+  })
+  if (read.error) return <SettingsSaveError message={actionError(read.error instanceof BillingManagementError ? read.error.code : 'generic')} retryLabel={t('retry')} onRetry={() => void read.mutate()} />
+  if (!read.data) return <SettingsLoading label={t('loading')} rows={1} bare />
+  const organization = read.data.organizations.find(row => row.role === 'owner' || row.role === 'admin')
+  return organization ? <OrganizationBillingSettings organizationId={organization.id} /> : null
+}
+
+/** The same Billing page inside Organization settings; no additional settings system. */
+export function OrganizationBillingSettings({ organizationId }: { organizationId: string }) {
+  return <BillingContext key={organizationId} scope={{ kind: 'organization', id: organizationId }} />
+}
+
+function BillingContext({ scope, personal = false }: { scope: BillingScope; personal?: boolean }) {
   const computerBilling = useGatedFeature('computerBilling')
-  const locale = useLocale()
-  const actionError = useActionError()
-  const billing = useSWR(settingsKeys.billing(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getBilling>>>('billing', { workspace: workspaceId }))
-  const { mutate } = useSWRConfig()
-  // 免费额度 and 余额 (#558, #559) come first, whether or not a plan is set up.
-  const credits = <>
-    {personal && <FreeAllowanceSection workspaceId={workspaceId} onVerified={() => { void mutate(creditBillingKey(workspaceId)) }} />}
-    <BalanceSection workspaceId={workspaceId} />
-  </>
-  const [pending, setPending] = useState<'portal' | 'checkout' | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const data = billing.data && !billing.data.error ? billing.data : null
-  const number = new Intl.NumberFormat(locale)
-  const date = new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric' })
-
-  async function redirect(kind: 'portal' | 'checkout') {
-    setPending(kind)
-    setError(null)
-    try {
-      const back = window.location.href
-      const result = kind === 'portal' ? await openBillingPortal(back, workspaceId) : await startPlanCheckout(back, workspaceId)
-      if (result.error) { setError(actionError(result.error)); setPending(null); return }
-      window.location.assign(result.url)
-    } catch {
-      setError(actionError('billingProviderFailed'))
-      setPending(null)
-    }
-  }
-
-  if (!billing.data && !billing.error) return <SettingsLoading label={t('loading')} rows={3} />
-  if (!data) return <FieldError>{actionError(billing.data?.error)}</FieldError>
-  // No Stripe: card verification and 充值 cannot work, so only the state shows (and a balance already granted, read-only).
-  if (!data.configured) return <>
-    <BalanceSection workspaceId={workspaceId} purchasable={false} />
-    <p role="status" className="text-sm text-muted-foreground">{actionError('billingNotConfigured')}</p>
-  </>
-
-  const planLine = data.live
-    ? [t(`status.${data.status}` as never), data.currentPeriodEnd ? t('renews', { date: date.format(new Date(data.currentPeriodEnd)) }) : null].filter(Boolean).join(' · ')
-    : t('noPlan')
-
-  return <>
-    {credits}
-    <SettingsSection id="billing-plan" title={t('plan')}>
-      <SettingRow title={data.live ? data.plan ?? t('team') : t('free')} description={planLine}>
-        {data.live || data.hasCustomer
-          ? <Button type="button" variant="secondary" size="sm" disabled={pending !== null} onClick={() => void redirect('portal')}>{t('changePlan')}</Button>
-          : <Button type="button" size="sm" disabled={pending !== null} onClick={() => void redirect('checkout')}>{t('subscribe')}</Button>}
-      </SettingRow>
-      {data.live && <SettingRow title={t('seats')}><span>{t('seatsUsed', { used: data.members, total: data.seats })}</span></SettingRow>}
-    </SettingsSection>
-
-    {computerBilling && (data.planPoints !== null || data.purchasedPoints > 0) && <SettingsSection id="billing-points" title={t('points')}>
-      {data.planPoints !== null && <SettingRow title={t('planPoints')}><span>{t('pointsValue', { points: number.format(data.planPoints) })}</span></SettingRow>}
-      {data.purchasedPoints > 0 && <SettingRow title={t('purchasedPoints')} description={t('neverExpires')}><span>{t('pointsValue', { points: number.format(data.purchasedPoints) })}</span></SettingRow>}
-    </SettingsSection>}
-
-    {data.hasCustomer && <SettingsSection id="billing-payment" title={t('payment')}>
-      <SettingRow title={t('paymentMethod')}>
-        <Button type="button" variant="secondary" size="sm" disabled={pending !== null} onClick={() => void redirect('portal')}>{t('managePayment')}</Button>
-      </SettingRow>
-      <SettingRow title={t('invoices')}>
-        <Button type="button" variant="secondary" size="sm" disabled={pending !== null} onClick={() => void redirect('portal')}>{t('viewInvoices')}</Button>
-      </SettingRow>
-    </SettingsSection>}
-    {error && <FieldError className="px-1">{error}</FieldError>}
-  </>
+  const management = useBillingManagement(scope)
+  const { plan, balance } = management
+  const { reload } = balance
+  const onVerified = useCallback(() => reload(), [reload])
+  const showAllowance = personal && management.scope.kind === 'workspace' && management.scope.id === scope.id
+  const allowance = useFreeAllowance(scope.id, showAllowance, onVerified)
+  return <BillingPage plan={plan} balance={balance} allowance={showAllowance ? allowance : null} computerBilling={computerBilling} management={management} />
 }

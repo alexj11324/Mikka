@@ -62,8 +62,9 @@ const LOCATION_SCRIPT = `(${locationScript.toString()})()`
  * the person drag a box over the frame instead: the note carries the URL and
  * that box, nothing read from the page.
  */
-/** `openAt`: a page asked for from outside (the review page's 预览), with the width it asks for; a width the person chose wins. */
-export function BrowserPane({ onClose, openAt = null }: { onClose: () => void; openAt?: { url: string; width?: number; id: number } | null }) {
+/** `openAt`: a page asked for from outside (the review page's 预览), with the width it asks for; a width the person chose wins.
+ * `inTab`: drawn as a tab of the conversation's work area (FRAME_OWNS_PANEL), filling it, with no edge of its own. */
+export function BrowserPane({ onClose, openAt = null, inTab = false }: { onClose: () => void; openAt?: { url: string; width?: number; id: number } | null; inTab?: boolean }) {
   const t = useTranslations('Browser')
   const tCommon = useTranslations('Common')
   const tRoles = useTranslations('Artifact.roles')
@@ -124,9 +125,10 @@ export function BrowserPane({ onClose, openAt = null }: { onClose: () => void; o
   const opened = useRef<number | null>(null)
   useEffect(() => {
     if (!openAt || opened.current === openAt.id) return
-    opened.current = openAt.id
     const src = normalizeAddress(openAt.url, window.location.origin)
-    if (src) load(src, true)
+    if (!src) return
+    opened.current = openAt.id
+    load(src, true)
   }, [openAt])
 
   // Reopening the browser comes back to the last page, unless it was asked for one.
@@ -267,7 +269,7 @@ export function BrowserPane({ onClose, openAt = null }: { onClose: () => void; o
   const tool = (label: string, icon: ReactNode, props: { onClick?: () => void; disabled?: boolean; pressed?: boolean }) =>
     <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', props.pressed && pressed)} aria-label={label} aria-pressed={props.pressed} disabled={props.disabled} onClick={props.onClick} />}>{icon}</TooltipTrigger><TooltipContent side="bottom">{label}</TooltipContent></Tooltip>
 
-  return <ResizablePane render="aside" aria-label={t('label')} data-slot="browser-pane" storageKey="mikka:browser-width" defaultWidth={openAt?.width ?? 560} min={360} max="half" edge="start" label={tCommon('resize.browser')} className="flex min-h-0 shrink-0 flex-col border-l bg-background">
+  const content = <>
     <div className="flex h-11 shrink-0 items-center gap-0.5 px-2">
       {tool(t('back'), <ArrowLeft data-icon="inline-start" />, { onClick: () => go(-1), disabled: history.index <= 0 })}
       {tool(t('forward'), <ArrowRight data-icon="inline-start" />, { onClick: () => go(1), disabled: history.index >= history.entries.length - 1 })}
@@ -300,5 +302,7 @@ export function BrowserPane({ onClose, openAt = null }: { onClose: () => void; o
         </InputGroup>
       </form>}
     </div>
-  </ResizablePane>
+  </>
+  if (inTab) return <section aria-label={t('label')} data-slot="browser-pane" className="flex size-full min-h-0 flex-col bg-background">{content}</section>
+  return <ResizablePane render="aside" aria-label={t('label')} data-slot="browser-pane" storageKey="mikka:browser-width" defaultWidth={openAt?.width ?? 560} min={360} max="half" edge="start" label={tCommon('resize.browser')} className="flex min-h-0 shrink-0 flex-col border-l bg-background">{content}</ResizablePane>
 }

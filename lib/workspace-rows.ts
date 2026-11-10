@@ -4,6 +4,8 @@ import { PgTable } from 'drizzle-orm/pg-core'
 import * as workspaceSchema from '@/lib/db/workspace-schema'
 import * as teamSchema from '@/lib/db/team-schema'
 import * as projectSchema from '@/lib/db/project-schema'
+import * as teamEntitlementsSchema from '@/lib/db/team-entitlements-schema'
+import * as governanceSchema from '@/lib/db/governance-schema'
 import { runToFixpoint } from '@/lib/account/delete'
 import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
@@ -16,7 +18,7 @@ import { armDueTimerAfterCommit } from '@/lib/due-timer'
  */
 export const WORKSPACE_COLUMNS = ['workspaceId', 'workspace_id'] as const
 
-const workspaceDatabaseTables = ([...Object.values(workspaceSchema), ...Object.values(teamSchema), ...Object.values(projectSchema)] as unknown[])
+const workspaceDatabaseTables = ([...Object.values(workspaceSchema), ...Object.values(teamSchema), ...Object.values(projectSchema), ...Object.values(teamEntitlementsSchema), ...Object.values(governanceSchema)] as unknown[])
   .filter((value): value is PgTable => is(value, PgTable)).map(table => getTableName(table))
 
 /** Tables keyed by a workspace whose rows stay when it is deleted, and why. */
@@ -34,6 +36,7 @@ export const KEPT_WITH_WORKSPACE = new Map<string, string>([
   // Audit evidence: deleteWorkspaceRows records the deletion in workspace_deletions; lib/audit/retention.ts expires both.
   ['workspace_audit_events', 'kept 90 days after deletion; the audit-retention job removes them'],
   ['workspace_audit_retention', 'kept 90 days after deletion; the audit-retention job removes them'],
+  ['resource_access_events', 'append-only access audit without private content or credential values'],
   // Append-only skill ledgers: triggers reject every DELETE.
   ['improvement_team_skill_metadata', 'append-only'],
   ['improvement_team_skill_reviews', 'append-only'],
@@ -52,6 +55,7 @@ export async function workspaceDeletionStatements(client: Query, workspaceId: st
   const tables = keyed.filter(row => !KEPT_WITH_WORKSPACE.has(row.table))
   // Some tables keep the id as text.
   const keyColumn = new Map(tables.map(row => [row.table, `${ident(row.column)} = $1${row.type === 'uuid' ? '::uuid' : ''}`]))
+  const nullableKey = new Map(tables.map(row => [row.table, `${ident(row.column)} IS NULL`]))
   // Rows elsewhere that point at the workspace's rows without ON DELETE CASCADE
   // (agent_runs → session_mailboxes, suggestion_executions → bot_subagents…) go first.
   const { rows: references } = await client.query<{ child: string; childColumn: string; parent: string; parentColumn: string }>(
@@ -65,9 +69,13 @@ export async function workspaceDeletionStatements(client: Query, workspaceId: st
   const statements: { table: string; text: string; values: unknown[] }[] = []
   for (const ref of references) {
     const parentKey = keyColumn.get(ref.parent)
-    if (!parentKey || keyColumn.has(ref.child) || KEPT_WITH_WORKSPACE.has(ref.child)) continue
+    if (!parentKey || KEPT_WITH_WORKSPACE.has(ref.child)) continue
+    // Newly tenant-keyed tables can still contain quarantined legacy rows.
+    // Follow their existing parent only while their own tenant is unresolved;
+    // a contradictory bound child must block deletion, never be swept away.
+    const unresolved = nullableKey.get(ref.child)
     statements.push({ table: ref.child, values: [workspaceId],
-      text: `delete from ${ident(ref.child)} where ${ident(ref.childColumn)} in (select ${ident(ref.parentColumn)} from ${ident(ref.parent)} where ${parentKey})` })
+      text: `delete from ${ident(ref.child)} where ${ident(ref.childColumn)} in (select ${ident(ref.parentColumn)} from ${ident(ref.parent)} where ${parentKey})${unresolved ? ` AND ${unresolved}` : ''}` })
   }
   for (const [table, key] of keyColumn) statements.push({ table, values: [workspaceId], text: `delete from ${ident(table)} where ${key}` })
   return statements

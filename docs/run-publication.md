@@ -75,7 +75,10 @@ and may commit and push its task branch. Without a matching, actually pushed
 result the thread stays stopped/unverified and the task is not advanced to
 review. After a successful push the server
 requests a draft PR and tells the Coordinator that human checking remains.
-A failed verify never publishes. A harness's self-reported verification is
+A failed verify never publishes. A Factory execute attempt leaves final
+readiness to its independent review/verify path and preserves an existing PR
+readiness state when execution had no preconfigured verification command
+(`publishRunResult` in `lib/run-publications.ts`). A harness's self-reported verification is
 discarded in every path.
 Alex approved this missing-verification behavior on 2026-10-28.
 
@@ -85,10 +88,14 @@ automatically reopens a closed PR or marks a draft ready for review.
 
 ## GitHub ownership and permissions
 
-The server opens or adopts the pull request with the run owner's own GitHub
-token (`githubTokenForUser`, lib/github/user-access.ts), never an installation
-token. It first checks that GitHub's `/user` is the owner's linked account.
-Tokens never enter rows, workflow arguments, logs or responses. Without a
+The server opens or adopts the pull request through `githubMachineCredential`
+(`lib/github/machine-credential.ts`). A saved self-owned App is selected first,
+then an explicitly linked Mikka Cloud capability, then the legacy OAuth
+connection. User tokens check GitHub `/user` against the linked account. Cloud
+installation tokens check the target repository in `/installation/repositories`.
+See [GitHub through Mikka Cloud](self-hosting-github-cloud.md).
+Publication receipts, workflow arguments, logs and user-facing publication
+responses contain no GitHub token. Without a
 connection the result is `github_identity_required`; a token GitHub refuses is
 `github_reconnect_required`.
 
@@ -111,12 +118,13 @@ existing thread card, while a person's own text is not hidden by an event prefix
 
 ## Configuration
 
-Existing Infisical-managed variables: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`.
-The App must be installed on each target repository with `pull_requests: write`,
-`contents: read` and standard metadata access. No live installation or permission
-was verified during implementation. A linked Better Auth GitHub account with
-write access is required; a Google-only account needs that connection first.
-There is no new login method or approval UI in this backend delivery.
+Configure the selected GitHub authority through a self-owned App, an explicit
+Mikka Cloud connection, or a linked GitHub OAuth account with repository write
+access. The legacy official App configuration uses Infisical-managed
+`GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY`. Community App creation stores its
+credentials encrypted in the database. See [App setup](github-app-manifest.md)
+and [self-hosting](self-hosting.md#create-your-github-app). Live repository
+access and PR publication require acceptance on that configured authority.
 
 ## Validation
 
@@ -129,7 +137,8 @@ There is no new login method or approval UI in this backend delivery.
   real local git, policy-only branch continuation and truthful unverified output.
 - `pnpm typecheck`, `pnpm lint`, and migration/DB runner gates.
 
-No migration was executed against a developer, Preview or production database.
-The R-66 card follows the review frame linked in `design/decisions.md`, which is
-still **待 Alex 确认**. `RunSource.pullRequests` supplies owner-filtered output data.
-Real screenshots (local production build) and acceptance remain part of item 6.
+The original backend delivery ran no migration against a developer, Preview or
+production database. Its R-66 frame and item-6 handoff are historical.
+`RunSource.pullRequests` supplies owner-filtered output data. New UI evidence
+follows [the design source order](design/README.md), and new GitHub publication
+acceptance follows [the acceptance guide](acceptance.md).

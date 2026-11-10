@@ -17,9 +17,19 @@ configuration or HTTP/CONNECT/provider relay around the CLI. Local worktrees
 preserve the person's repository and unrelated work without adding another
 remote authorization check before each call.
 
-Prepare the task's real subscription login, GitHub credential and model key
-up front, or once when first needed. Official CLIs connect directly to their
-providers. Agent tools use Claude Code `bypassPermissions` or Codex approvals
+Prepare the run's selected native CLI subscription login or model key and its
+authorized GitHub credential up front, or once when first needed. Other
+user/workspace/repository third-party Secrets follow the
+[credential-exposure decision](decisions/2026-11-08-0240-credential-exposure-boundary.md).
+The source implements that distinction. `taskSecretInjection()` returns ordinary
+env and explicitly approved direct Secrets in `env`, separates protected HTTP
+Secrets for sealed run-scoped grants, and reports unsupported protected values
+as unavailable. `effectiveSecretDelivery()` defaults missing or invalid metadata
+to protected. Claim verifies worker capability and the secret snapshot before
+returning grants. `lib/secrets/egress-http.ts` applies the approved HTTP scope;
+`task-renewal.ts` renews grants through the existing heartbeat. This source check
+does not establish deployed protected-secret acceptance.
+Official CLIs connect directly to their providers. Agent tools use Claude Code `bypassPermissions` or Codex approvals
 `never`; a read-only task is an instruction to the Agent. The machine receives
 its resolved authority at admission. Revocation persists and pushes a stop,
 or stops/reclaims the VM, rather than checking authority again before each
@@ -73,7 +83,10 @@ The mandatory cloud-backend database gate includes the unattended regressions.
 `pnpm test:unattended` checks visual input, policy and network contracts. The
 unattended-sandbox workflow additionally executes the real Chromium gateway
 (`scripts/e2b/subagent-guard.test.py`, `scripts/e2b/subagent-visual-browser.test.py`). Official CLI synthetic acceptance, the
-full database inventory and selected application browser gates remain required.
+full database inventory and affected API/CLI acceptance remain required.
+The Python Chromium gateway tests exercise the browser service's own protocol;
+application acceptance follows [acceptance.md](../acceptance.md), including
+production-build screenshots for UI changes.
 Model/provider fixtures establish protocol behavior, not live third-party account
 acceptance. Preserve exact revision and environment provenance with test evidence.
 

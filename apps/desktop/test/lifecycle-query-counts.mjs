@@ -6,6 +6,7 @@ import { request } from 'node:http'
 import { dirname, resolve } from 'node:path'
 import queryOperations from './db-query-operations.cjs'
 import unattributedSourceKeys from './db-query-unattributed-sources.cjs'
+import queryDiagnostics from './db-query-diagnostics.cjs'
 
 const fields = ['pid', 'startedAt', 'endedAt', 'instrumentedClients', 'queryCalls',
   'pgProtocolReceiveBytes', 'pgProtocolSendBytes', 'activeConnections', 'closedConnections', 'unknownReadings']
@@ -229,10 +230,14 @@ function projectRpcActions(text, windows) {
 
 // One read after the existing samples and cleanup. Never upload the mixed
 // stdout file, wait for a flush or query an API to obtain these diagnostics.
-async function readRpcActions({ revision, runtimePath, backend }, windows) {
+async function readRpcActions({ revision, runtimePath, backend, diagnostics }, windows) {
+  let logText = ''
+  const annotate = result => diagnostics === undefined ? result : { ...result,
+    queryDiagnostics: diagnostics === null ? { version: 1, status: 'unavailable', reasons: ['diagnostic_read_failed'] }
+      : queryDiagnostics.projectQueryDiagnostics(diagnostics, windows, backend, logText) }
   const ownerPid = /^\/tmp\/mikka-bundled-([0-9]+)\.sock$/.exec(backend.socket)?.[1]
   const expected = resolve(dirname(runtimePath), 'bundled-' + revision.slice(0, 12) + '-' + ownerPid + '.log')
-  if (!ownerPid || backend.log !== expected) return unavailableRpcActions('log_binding_mismatch')
+  if (!ownerPid || backend.log !== expected) return annotate(unavailableRpcActions('log_binding_mismatch'))
   let file, result
   try {
     file = await open(expected, constants.O_RDONLY | constants.O_NOFOLLOW)
@@ -244,14 +249,34 @@ async function readRpcActions({ revision, runtimePath, backend }, windows) {
       const read = await file.read(bytes, 0, bytes.length, 0)
       if (read.bytesRead !== info.size) result = unavailableRpcActions('log_read_incomplete')
       else if (bytes.length && bytes.at(-1) !== 10) result = unavailableRpcActions('log_partial_line')
-      else result = projectRpcActions(bytes.toString('utf8'), windows)
+      else { logText = bytes.toString('utf8'); result = projectRpcActions(logText, windows) }
     }
   } catch (error) {
     result = unavailableRpcActions(error.code === 'ENOENT' ? 'log_missing' : 'log_read_failed')
   } finally {
     try { await file?.close() } catch { result = unavailableRpcActions('log_close_failed') }
   }
-  return result
+  return annotate(result)
+}
+
+// One bounded export after the original samples and cleanup, alongside the
+// existing log projection. Normal /metrics snapshots retain their old fields.
+function readQueryDiagnostics(backend, httpRequest) {
+  return new Promise((resolve, reject) => {
+    const failed = () => reject(new Error('LIFECYCLE_QUERY_DIAGNOSTICS_UNAVAILABLE'))
+    const req = httpRequest({ socketPath: backend.socket, path: '/diagnostics', method: 'GET', signal: AbortSignal.timeout(5000) }, response => {
+      if (response.statusCode !== 200) { response.resume(); failed(); return }
+      const chunks = []; let bytes = 0
+      response.on('data', chunk => {
+        bytes += chunk.length
+        if (bytes > queryDiagnostics.LIMITS.bytes) req.destroy(new Error('LIFECYCLE_QUERY_DIAGNOSTICS_SIZE'))
+        else chunks.push(chunk)
+      })
+      response.once('error', failed); response.once('aborted', failed)
+      response.once('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))) } catch { failed() } })
+    })
+    req.once('error', failed); req.end()
+  })
 }
 
 export function projectQuerySnapshot(value, expected) {
@@ -345,7 +370,13 @@ export async function createLifecycleQueryCounter({ revision, origin, runtimePat
   return {
     source: { revision, platform: process.platform, arch: process.arch, runtime: backend.runtime, pid: backend.pid,
       process: 'primary API shared by lifecycle bundled, hosted and Chromium' },
-    rpcActions: windows => readRpcActions({ revision, runtimePath, backend }, windows),
+    rpcActions: async windows => {
+      // Historical aggregate-only fixtures have no ordinal boundaries. They
+      // cannot acquire or retrospectively claim the new query-level evidence.
+      const measured = Object.values(windows).some(window => Array.isArray(window?.checkpoints))
+      const diagnostics = measured ? await readQueryDiagnostics(backend, httpRequest).catch(() => null) : undefined
+      return readRpcActions({ revision, runtimePath, backend, diagnostics }, windows)
+    },
     snapshot: () => new Promise((resolve, reject) => {
       const failed = error => reject(new Error('LIFECYCLE_QUERY_COUNTER_READ_FAILED', { cause: error }))
       const req = httpRequest({ socketPath: backend.socket, path: '/metrics', method: 'GET', signal: AbortSignal.timeout(5000) }, response => {

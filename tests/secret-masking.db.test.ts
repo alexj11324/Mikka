@@ -43,14 +43,14 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     assert.deepEqual(await runtime.taskSecretInjection(ws.id, null, {}), { env: {}, secretNames: [], protectedSecrets: [], unavailable: [] })
   })
 
-  // A legacy cloud run keeps its original claim token's workspace authority.
+  // A cloud run keeps its persisted workspace and its original claim token's authority.
   const device = (await pool.query(`insert into devices (id,name,"ownerId",kind) values (gen_random_uuid(),'cloud',$1,'cloud') returning id`, [admin])).rows[0].id as string
   await pool.query(`insert into cloud_machines ("workspaceId","ownerId","operationId","deviceId") values ($1,$2,gen_random_uuid(),$3)`, [ws.id, admin, device])
   const token = 'dt_' + randomBytes(24).toString('hex')
   const claimTokenId = (await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values (gen_random_uuid(),$1,$2,$3,$4,now()+interval '1 hour') returning id`, [admin, hashDeviceToken(token), device, ws.id])).rows[0].id as string
   const agent = (await pool.query(`insert into agents (id,"userId",harness,name) values (gen_random_uuid(),$1,'codex','a') returning id`, [admin])).rows[0].id as string
   // Output writes belong to a claimed live run, including its active lease.
-  const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","deviceTokenId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,$4,'running',now()+interval '10 minutes') returning id`, [agent, admin, device, claimTokenId])).rows[0].id as string
+  const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId","deviceTokenId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,$4,$5,'running',now()+interval '10 minutes') returning id`, [agent, admin, device, ws.id, claimTokenId])).rows[0].id as string
   const call = (method: string, path: string, body: unknown) => new Request(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) })
   /** The row is committed before Next's `after()` (the wake-up) runs; outside a request it throws. */
   const afterOnly = (error: unknown) => { if (!String((error as Error)?.message).includes('outside a request scope')) throw error }
@@ -63,6 +63,31 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   await t.test('C: the workspace E2B key is masked like a secret', async () => {
     const mask = await runtime.workspaceSecretMasker(ws.id)
     assert.equal(mask(`key ${E2B_KEY}`), 'key [secret:E2B_API_KEY]')
+  })
+
+  await t.test('mobile steps read masked tool output and source timing through a retried event batch', async () => {
+    const events = await import('../app/v1/runs/[runId]/events/route')
+    const { threadItems } = await import('../lib/issue-run-conversation')
+    const runId = await newRun()
+    const chunks = [
+      { type: 'tool-input-available', toolCallId: 'command', toolName: 'bash', input: { command: 'print result' } },
+      { type: 'tool-output-available', toolCallId: 'command', toolDurationMs: 1250,
+        output: { stdout: `${SECRET} ${Buffer.from(SECRET).toString('base64')} ${E2B_KEY}` } },
+    ]
+    for (let retry = 0; retry < 2; retry++) {
+      const response = await events.POST(call('POST', `/v1/runs/${runId}/events`, { fromSeq: 1, chunks }), { params: Promise.resolve({ runId }) })
+      assert.equal(response.status, 200)
+    }
+    const { rows } = await pool.query('select chunk, "createdAt" as at from run_chunks where "runId"=$1 order by seq', [runId])
+    assert.equal(rows.length, 2)
+    const [item] = threadItems(rows, [])
+    assert.ok(item.kind === 'steps')
+    assert.equal(item.steps[0].ms, 1250)
+    assert.equal(item.steps[0].failed, false)
+    const output = item.steps[0].output!
+    noPlain('mobile tool output', output)
+    assert.ok(!output.includes(Buffer.from(SECRET).toString('base64')))
+    assert.equal(output, '{\n  "stdout": "[secret:API_TOKEN] [secret:API_TOKEN] [secret:E2B_API_KEY]"\n}')
   })
 
   await t.test('A: a secret (and its base64) split over deltas of one batch never reaches run_chunks or lastReply', async () => {
@@ -234,10 +259,12 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
       const input = await maskWorkerMailboxInput(runId, { to: '', key: randomUUID(), text: `use ${SECRET} for the deploy` }) as { to: string; key: string; text: string }
       // Same ids in the throwaway DB, so the run is live there too.
       await mailboxPool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [admin, `${admin}@example.invalid`])
+      await mailboxPool.query(`insert into mikka_workspaces (id,"userId",name,slug,kind) values ($1,$2,'Masking fixture',$3,'team')`, [ws.id, admin, `mask-${ws.id}`])
+      await mailboxPool.query(`insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,'admin','active')`, [ws.id, admin, `${admin}@example.invalid`])
       await mailboxPool.query(`insert into devices (id,name,"ownerId",kind,enabled) values ($1,'cloud',$2,'cloud',true)`, [device, admin])
       await mailboxPool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values ($1,$2,$3,$4,$5,now()+interval '1 hour')`, [claimTokenId, admin, hashDeviceToken(token), device, ws.id])
       await mailboxPool.query(`insert into agents (id,"userId",harness,name) values ($1,$2,'codex','a')`, [agent, admin])
-      await mailboxPool.query(`insert into agent_runs (id,"agentId","userId","deviceId","deviceTokenId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,'running',now()+interval '10 minutes')`, [runId, agent, admin, device, claimTokenId])
+      await mailboxPool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId","deviceTokenId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,'running',now()+interval '10 minutes')`, [runId, agent, admin, device, ws.id, claimTokenId])
       const mailbox = new SessionMailbox(mailboxPool, ws.id)
       const sender = await mailbox.run(admin, runId)
       const coordinator = await mailbox.conversation(admin, 'coordinator')

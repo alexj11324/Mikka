@@ -14,7 +14,7 @@ import { issueView } from '@/lib/task-identifier-server'
 import { assigneeSchema, blockFlagSchema, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { activityActor } from '@/lib/activity-actor'
-import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
+import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspace } from '@/lib/issue-scope-authorization'
 
 const patchSchema = z.object({
   // R-60 keeps the UI human-only; the verified legacy MCP contract remains supported.
@@ -33,7 +33,8 @@ export async function getIssuePropertyOptions(id: string) {
   const { issue, user } = await requireIssueAccess(id)
   return db.transaction(async tx => {
   const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
-  requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+  requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
+  await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
   const [owner] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, issue.userId))
   const members = await tx.select({ id: users.id, name: users.name, image: users.image }).from(issueMembers).innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId)))
   const choices = await issuePropertyChoices(user.id)
@@ -56,14 +57,10 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
     const { issue, user } = await requireIssueAccess(parsed.data.id)
     if (parsed.data.patch.assignee?.kind === 'agent' && activityActor(user.id).actorType !== 'agent') return { error: 'issueMetadataInvalid' }
     try {
-      const result = await db.transaction(async tx => {
+      const result = await withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canSteer' }, () => db.transaction(async tx => {
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
-        requireLockedIssueScope(latest, user.id, issue.scopeVersion)
+        requireLockedIssueScope(latest, user.id, issue.scopeVersion, issue.workspaceId)
         if (!latest || latest.revision !== parsed.data.revision) return { error: 'issueOutdated' }
-        if (user.id !== issue.userId) {
-          const [membership] = await tx.select({ id: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, issue.id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, user.id)))
-          if (!membership) return { error: 'issueAccessLost' }
-        }
         const metadata = readIssueMetadata(latest.content)
         const patch = parsed.data.patch
         let assignee = metadata.assignee
@@ -101,8 +98,8 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         await issueListChanged(tx, saved.id)
         await issueRelationsChanged(tx, [saved.id, ...relationIds(latest.content), ...relationIds(saved.content)])
         return { issue: await issueView(saved, tx) }
-      })
-      if ('issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
+      }))
+      if ('issue' in result && result.issue?.linearSyncPolicy === 'explicit' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error

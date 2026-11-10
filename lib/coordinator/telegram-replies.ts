@@ -10,7 +10,7 @@ const receipt = z.object({
   sourceEventIds: z.array(z.uuid()).min(1).max(100),
 }).strict()
 type SourceEvent = TelegramPendingEvent & { issueId: string | null }
-type AuthorizedSource = SourceEvent & { issueOwnerId: string | null; scope: string | null; issueContent: Parameters<typeof readIssueMetadata>[0]; knownBotId: string | null; botWorkspace: string | null }
+type AuthorizedSource = SourceEvent & { issueOwnerId: string | null; issueWorkspace: string | null; ownershipState: string | null; issueContent: Parameters<typeof readIssueMetadata>[0]; knownBotId: string | null; botWorkspace: string | null }
 const denied = () => new Error('telegramReplySourceUnavailable')
 
 /** Public reply custody only. Reuses current owner/task/workspace access and
@@ -24,7 +24,7 @@ export function createTelegramReplies(app: Pick<Pool, 'connect'>, workspace: Pic
       // One app authorization read binds the live lease, Telegram link, Bot,
       // source events and their current issue owners. No lock choreography.
       const { rows: events } = await tx.query<AuthorizedSource>(`
-        SELECT e.id,e.kind,e.payload,e."issueId",i."userId" AS "issueOwnerId",i.scope,i.content AS "issueContent",
+        SELECT e.id,e.kind,e.payload,e."issueId",i."userId" AS "issueOwnerId",i."workspaceId" AS "issueWorkspace",i."ownershipState",i.content AS "issueContent",
           b.id AS "knownBotId",b."workspaceId" AS "botWorkspace"
         FROM coordinator_events e LEFT JOIN issues i ON i.id=e."issueId"
         LEFT JOIN bots b ON b.id=$3::uuid AND b."ownerId"=$2
@@ -35,28 +35,23 @@ export function createTelegramReplies(app: Pick<Pool, 'connect'>, workspace: Pic
           AND EXISTS (SELECT 1 FROM telegram_links l WHERE l."userId"=$2 AND l."telegramUserId"=$5)
         ORDER BY e.id`, [target.sourceEventIds, userId, botId, holder, target.telegramUserId])
       if (events.length !== target.sourceEventIds.length || events[0].knownBotId !== botId) throw denied()
-      if (events.some(event => event.issueId && (!event.issueOwnerId || readIssueMetadata(event.issueContent).deletedAt))) throw denied()
+      const botWorkspace = events[0].botWorkspace
+      if (!botWorkspace || events.some(event => event.issueId && (!event.issueOwnerId || event.ownershipState !== 'bound'
+        || event.issueWorkspace !== botWorkspace || readIssueMetadata(event.issueContent).deletedAt))) throw denied()
       const current = pendingTelegramTargets(events)
       if (current.length !== 1 || current[0].threadId !== target.threadId || current[0].telegramUserId !== target.telegramUserId
         || current[0].sourceEventIds.length !== target.sourceEventIds.length) throw denied()
-      const foreign = events.filter(event => event.issueId && event.issueOwnerId !== userId)
-      if (foreign.some(event => event.scope !== 'workspace')) throw denied()
-      const foreignIds = [...new Set(foreign.map(event => event.issueId!))]
-      const botWorkspace = events[0].botWorkspace
-      if (foreignIds.length || botWorkspace) {
+      {
         // Workspace membership lives in a separate database. Read it once,
         // without a nested transaction or locks held across databases.
         const authority = await workspace.connect()
         try {
           const { rows: [access] } = await authority.query<{ allowed: boolean }>(`
-            SELECT ($3::uuid IS NULL OR EXISTS (
-              SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$3 AND "userId"=$1 AND status='active'
-            )) AND NOT EXISTS (
-              SELECT 1 FROM unnest($2::uuid[]) x(id) WHERE NOT EXISTS (
-                SELECT 1 FROM mikka_team_issues t JOIN mikka_workspace_members m ON m."workspaceId"=t."workspaceId"
-                WHERE t."issueId"=x.id AND m."userId"=$1 AND m.status='active'
-              )
-            ) AS allowed`, [userId, foreignIds, botWorkspace])
+            SELECT EXISTS (
+              SELECT 1 FROM mikka_workspace_members m JOIN mikka_workspaces w ON w.id=m."workspaceId"
+              WHERE w.id=$2::uuid AND m."userId"=$1 AND m.status='active'
+                AND (w.kind='team' OR (w.kind='personal' AND w."userId"=$1))
+            ) AS allowed`, [userId, botWorkspace])
           if (!access?.allowed) throw denied()
         } finally { authority.release() }
       }

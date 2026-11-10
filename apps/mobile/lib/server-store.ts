@@ -1,4 +1,4 @@
-import { serverAddress, serverUrl, type MobileServer } from './server-discovery'
+import { CLOUD_API_URL, serverAddress, serverUrl, type MobileServer } from './server-discovery'
 export type { MobileServer } from './server-discovery'
 
 export type SavedAccount = { id: string; server: MobileServer; user: { id: string; name: string; email: string } | null }
@@ -34,6 +34,8 @@ export class MobileServerStore {
         || account.id !== 'legacy' && (!Number.isSafeInteger(Number(account.id)) || Number(account.id) >= stored.next)
         || typeof account.server.name !== 'string' || !account.server.signIn || typeof account.server.mobileReady !== 'boolean'
         || account.user && (typeof account.user.id !== 'string' || typeof account.user.name !== 'string' || typeof account.user.email !== 'string')) throw new Error('mobile_accounts_invalid')
+      account.server.signIn.apple = account.server.signIn.apple === true
+        || account.server.signIn.apple === undefined && account.server.url === CLOUD_API_URL
       ids.add(account.id)
     }
     this.publish({ ...stored, ready: true })

@@ -1,16 +1,18 @@
+import { mobileMessages } from '@/lib/messages'
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { Keyboard } from 'react-native'
 import { StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
 import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
 import { latestOwnIndex } from '@/features/chat/model/chat-layout'
-import { GestureDetector } from 'react-native-gesture-handler'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { uuid } from 'expo'
 import { Spinner } from '@/components/icons'
+import { ListTopFade } from '@/components/NavBar'
+import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { runIcon } from '@/lib/thread-icon'
-import { Arrival, BotBubble, EventLine, MyBubble, OutgoingBubble, Reactions, ReplyActions, ThreadCard, TimedRow, useChatPhotos, useTimeReveal } from '@/components/chat'
+import { Arrival, BotBubble, EventLine, MessageActions, MessageRow, MyBubble, OutgoingBubble, Reactions, ThreadCard, TimeSeparator, useChatPhotos } from '@/components/chat'
 import { myReaction, toggled, withMine } from '@/lib/reactions'
 import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
@@ -21,9 +23,10 @@ import { Composer } from '@/features/chat/components/chat-composer'
 import { GlassButton } from '@/components/GlassButton'
 import { api } from '@/lib/api'
 import { outgoing, type Attachment } from '@/lib/attachments'
-import { clockTime, shortWhen } from '@/lib/clock'
+import { shortWhen } from '@/lib/clock'
+import { separatorLabel, startsGroup } from '@/lib/chat-time'
 import { isOpenUI } from '@/lib/openui'
-import { holdMessage, type HeldMessage } from '@/lib/message-actions'
+import type { HeldMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
 import { delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled, type Outgoing } from '@/lib/outbox'
 import { apiCache } from '@/lib/api-cache'
@@ -33,11 +36,13 @@ import { ChatHeader } from '@/features/chat/components/chat-header'
 import { menuTasks } from '@/features/chat/model/chat-header-menu'
 import { useTasks } from '@/features/tasks/components/task-list'
 import { AttemptIcon } from '@/features/tasks/components/task-icons'
+import { ReviewSummaryRow } from '@/features/review/components/review-summary-row'
+import { reviewHref } from '@/features/review/model/routes'
 import { ATTEMPT_WORD, attemptState } from '@/features/tasks/model/task-groups'
 import { ChatSelectableText } from '@/features/chat/components/chat-selectable-text'
 import { ChatSelectionBar } from '@/features/chat/components/chat-selection-bar'
 import { ChatQueueCard } from '@/features/chat/components/chat-queue-card'
-import { endsSelection, quotedMessage, selectionQuote, type Rect, type SelectionAction } from '@/features/chat/model/chat-selection'
+import { ADD_TO_CHAT, endsSelection, quotedMessage, selectionQuote, type Rect, type SelectionAction } from '@/features/chat/model/chat-selection'
 import { nextQueueCheck, queuedItems } from '@/features/chat/model/chat-queue'
 import { FailedReply } from '@/components/FailedReply'
 import { eventText, questionCard } from '@/lib/event-line'
@@ -61,14 +66,14 @@ import { colors } from '@/lib/theme'
  * person (approve or decline, as on the web); `focus` marks the one a push
  * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
-export function ChatScreen({ botId, name, draft, focus, compose, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode | ((running: boolean) => ReactNode); composerNotice?: ReactNode }) {
+export function ChatScreen({ botId, name, color, shape, draft, focus, compose, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode | ((running: boolean) => ReactNode); composerNotice?: ReactNode }) {
   const [quote, setQuote] = useState<string | null>(null)
   const self = botId ?? 'coordinator'
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const list = useRef<ChatListHandle>(null)
   const [atLatest, setAtLatest] = useState(true)
-  const { offset, gesture: timeReveal, scrollLocked } = useTimeReveal()
+  const underBar = useScrolledUnderBar()
   const photos = useChatPhotos()
   // The composer floats over the end of the list; the list leaves room for it.
   const [composerHeight, setComposerHeight] = useState(90)
@@ -215,6 +220,8 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
 
   const selectionAction = (action: SelectionAction) => {
     if (!selection) return
+    // 添加到对话: the selection becomes the composer's quote; the person writes the rest.
+    if (action.key === ADD_TO_CHAT.key) { setQuote(quotable(selectionQuote(selection.selected, selection.text))); setSelection(null); return }
     void send(quotedMessage(selectionQuote(selection.selected, selection.text), action.instruction))
   }
 
@@ -253,41 +260,44 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
     }
   }
 
-  // A long press: reactions, then 回复 · 复制 · 选择文本 in a system sheet (app/message.tsx).
+  // ⋯ under a message: reactions, then 回复 · 复制 · 选择文本 (MessageMenu).
   const message = (words: string, id?: string, key?: number): HeldMessage => ({ text: plainText(words), onQuote: () => setQuote(quotable(words)),
     ...(key !== undefined ? { onSelect: () => toggleSelection(key, words) } : {}),
     ...(id ? { react: { current: myReaction(reactions[id]), set: emoji => void react(id, emoji) } } : {}) })
-  const actions = (words: string, id?: string, key?: number) => {
-    holdMessage(message(words, id, key))
-    router.push('/message')
-  }
   const chips = (id: string | undefined, align?: 'right') => id
     ? <Reactions reactions={reactions[id]} align={align} onToggle={emoji => void react(id, toggled(reactions[id], emoji))} />
     : null
 
   const renderItem = (item: Chat['items'][number], index: number) => {
-    const time = clockTime(item.createdAt)
+    // A centred time above each group: the first message, one 15 minutes after the last, or one on a new day.
+    const separator = startsGroup(item.createdAt, items[index - 1]?.createdAt) ? separatorLabel(item.createdAt) : null
     const question = item.from === 'event' ? questionCard(item.line, sources) : null
     const selected = selection?.key === item.position ? selection : null
     return (
       <Arrival animate={arrived(item.position)}>
+        {separator ? <TimeSeparator label={separator} /> : null}
         {question ? <ThreadCard title={question.title} status="waiting" info="在等你回答" action="去回答" onPress={() => {
           // A question about a task's thread opens the task at that attempt (2026-11-07).
           const run = sources[question.runId]
           router.push(run?.kind === 'run' && run.issue ? `/task/${run.issue.id}?attempt=${question.runId}` : `/thread/${question.runId}`)
         }} />
           : item.from === 'event' ? <EventLine text={eventText(item.line, sources)} /> : null}
-        {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text && !selected ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text && !selected ? () => actions(item.text, item.id, item.position) : undefined} menu={item.text ? message(item.text, item.id, item.position) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} selecting={selected ? <ChatSelectableText text={selected.text} color={colors.onAccent} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} /> : undefined} />{chips(item.id, 'right')}</TimedRow> : null}
+        {item.from === 'person' && (item.text || item.images) ? (
+          <MessageRow align="right" onSelect={item.text && !selected ? () => toggleSelection(item.position, item.text) : undefined}>
+            <MyBubble text={item.text} photos={photos(item.id, item.images)} selecting={selected ? <ChatSelectableText text={selected.text} color={colors.onAccent} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} /> : undefined} />
+            {chips(item.id, 'right')}
+          </MessageRow>
+        ) : null}
         {item.from === 'coordinator' && item.text ? (
-          <TimedRow time={time} offset={offset} onQuote={selected ? undefined : () => setQuote(quotable(item.text))} onLongPress={selected ? undefined : () => actions(item.text, item.id, item.position)} menu={message(item.text, item.id, item.position)}>
+          <MessageRow onSelect={selected ? undefined : () => toggleSelection(item.position, item.text)}>
             {isOpenUI(item.text)
               ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} sources={sources} onOpen={open} />
               : <BotBubble>{selected
                 ? <ChatSelectableText text={selected.text} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} />
                 : <Markdown text={item.text} sources={sources} onOpen={open} />}</BotBubble>}
             {chips(item.id)}
-            {index === latestReply && !working ? <ReplyActions text={plainText(item.text)} onQuote={() => setQuote(quotable(item.text))} onMore={() => actions(item.text, item.id, item.position)} /> : null}
-          </TimedRow>
+            {selected ? null : <MessageActions message={message(item.text, item.id, item.position)} copy={index === latestReply && !working} />}
+          </MessageRow>
         ) : null}
         {item.from === 'coordinator' && item.stopped ? <Text style={styles.stopped}>已停止</Text> : null}
         {item.threads.map(id => {
@@ -296,13 +306,14 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
           // A dispatch is its task's card (2026-11-07): the attempt's state icon, number and title, then state · bot · time.
           const result = run.issue ? attemptState({ group: run.group, status: run.status }) : null
           return (
-            <TimedRow key={id} time={time} offset={offset}>
+            <View key={id}>
               {run.issue && result
                 ? <ThreadCard title={[run.issue.identifier, run.issue.title].filter(Boolean).join(' ')} status={runIcon(run)} onPress={() => open(run)}
                   icon={<AttemptIcon result={result} />}
+                  footer={run.issue.review ? <ReviewSummaryRow compact short summary={run.issue.review} onPress={() => router.push(reviewHref(run.issue!.id))} /> : undefined}
                   info={[ATTEMPT_WORD[result], run.agentName, shortWhen(item.createdAt)].filter(Boolean).join(' · ')} />
                 : <ThreadCard title={runName(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => open(run)} />}
-            </TimedRow>
+            </View>
           )
         })}
       </Arrival>
@@ -311,11 +322,10 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
 
   return (
     <View style={styles.screen}>
-      {/* Back is the system's (and its edge swipe); the bot's name opens its menu: its tasks and its page. */}
-      <ChatHeader name={name} tasks={tasks.data ? menuTasks(tasks.data.tasks, ownBotId) : null} onTask={id => router.push(`/task/${id}`)}
+      {/* Back is the system's (and its edge swipe); the title pill opens the bot's page, ⋯ its tasks and its page. */}
+      <ChatHeader scrolled={underBar.scrolled} name={name} color={color} shape={shape} botId={ownBotId} coordinator={self === 'coordinator'} tasks={tasks.data ? menuTasks(tasks.data.tasks, ownBotId) : null} onTask={id => router.push(`/task/${id}`)}
         onAllTasks={() => router.push(`/bots/${self}/tasks`)} onInfo={() => router.push(`/bots/${self}/info`)} />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
-      <GestureDetector gesture={timeReveal}>
       <View style={{ flex: 1, overflow: 'hidden' }}
         // While words are selected, a tap anywhere but on that message ends it; the touch still reaches what is there.
         onTouchStart={selection ? event => { touch.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, at: Date.now() } } : undefined}
@@ -324,7 +334,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
           if (down && endsSelection(down, { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, at: Date.now() }, selectionRect.current)) setSelection(null)
         } : undefined}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
-        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled={!scrollLocked} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
+        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
           keyOf={item => item.pending ? `pending-${item.position}` : String(item.position)} renderItem={renderItem} anchorIndex={anchorIndex}
           onStartReached={data?.historyBefore ? () => void loadOlder() : undefined}
           header={loadingOlder ? <View style={styles.older}><Spinner size={16} /></View> : null}
@@ -334,16 +344,16 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
         {data && data.enabled !== false && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
-        <ReadNotice error={error} hasData={Boolean(data)} label="对话" onRetry={reload} />
+        <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
         <ReadNotice error={pending.error} hasData={Boolean(pending.data)} label="待处理事项" onRetry={pending.reload} />
         {data?.failure && !working ? <FailedReply key={`${botId}:${JSON.stringify(data.failure)}`} failure={data.failure} botId={botId} onQueued={reload} modelChoice={typeof composerAccessory === 'function' ? composerAccessory(false) : composerAccessory} /> : null}
         {pending.data ? <PendingActions items={pending.data} focus={focus} reload={pending.reload} onFocusLayout={focus ? showFocus : undefined} /> : null}
           </>} />
+        <ListTopFade color={colors.page} />
       </View>
-      </GestureDetector>
       <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={selection ? '回复选中的文字' : name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+      <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}
           <ChatQueueCard items={queue} busy={stopper.sending} onSendNow={data?.working ? () => void stopper.stop() : undefined} />
           <ChatSelectionBar visible={Boolean(selection)} disabled={serviceUnavailable} onAction={selectionAction} /></>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />

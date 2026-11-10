@@ -1,7 +1,9 @@
 # Settings surface
 
 Each section is a small heading over one card of rows, as in
-Comma's 「模型与 API」 (decision 2026-10-30).
+Comma's 「模型与 API」 (decision 2026-10-30). This is the open-source default
+settings surface; the hosted settings are affectUI screens used as shipped
+([2026-11-09-0050](design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
 `components/settings/primitives.tsx` owns the shapes; product code only
 supplies content.
 
@@ -39,7 +41,7 @@ The section list is `SETTINGS_SECTIONS` in `lib/settings-sections.ts`; the
 sidebar, URL parsing and page body all read it.
 
 - **Personal (account):** Account, Security, Preferences, Notifications, Memory, Connections, 模型与订阅 (subscriptions, API keys, 运行位置 and 优先使用的模型; it replaced API 与订阅 and Bot 与 Agents), Secrets and logins, Data and privacy, Devices. The same in every workspace. Personal access tokens are built but hidden (`unbuilt`).
-- **Workspace:** General, Members, Teams, Team permissions (admins), Secrets and environment, Audit log (admins), Usage, Billing. A personal workspace has its own workspace settings ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
+- **Workspace:** General, Members, Teams, Team permissions (admins), Secrets and environment, Audit log (admins), Usage, Billing, Mikka Cloud (server administrators). A personal workspace has its own workspace settings ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
 
 Account and Security hold how the person signs in, including linking Google
 to the Mikka account. Connections holds connected apps (Gmail, Calendar,

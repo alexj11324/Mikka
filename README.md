@@ -7,454 +7,109 @@
 
 # Mikka
 
-### The AI lead for ambitious work.
+**AI agent coordination across your computers and the cloud.**
 
-Every agent, from laptop to cloud, working as one team.
+Mikka organizes work for Claude Code, Codex and supported Cursor runners, with bots that coordinate tasks and agents that execute them.
 
-[![CI](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml/badge.svg?branch=main)](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml)
+[Open Mikka](https://app.aspectlylabs.com/mikka) · [Documentation](https://aspectlylabs.com/mikka/docs) · [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart)
+
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
-[![LINUX DO](https://img.shields.io/badge/LINUX%20DO-Community-FFB003)](https://linux.do)
-
-[Open Mikka](https://app.aspectlylabs.com/mikka) · [Docs](https://aspectlylabs.com/mikka/docs) · [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart)
 
 **English** · [简体中文](README.zh-CN.md)
 
 </div>
 
-Mikka connects AI agents across your computers, remote servers and cloud
-infrastructure into one coordinated team. Describe the work to a bot, and it
-organizes coding tasks for Claude Code, Codex and Cursor on connected devices.
-Each bot also has a cloud desktop you can watch, take over and hand back.
+Describe a task to a bot. Mikka dispatches coding work to agents on your Mac, Linux machine, SSH server or an eligible cloud sandbox, then brings their progress, questions and results back into one place. Use it in the web, macOS or iOS app.
 
-Track progress, respond when needed and review results in one place, on the web,
-in the macOS desktop app or in the iOS app.
+## Get started
 
-## Run your own server
+**Mikka Cloud (early access).** [Open the app](https://app.aspectlylabs.com/mikka). If you need access, email [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com), then follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
 
-Deploy the [self-hosted Docker server](docs/self-hosting.md), then connect the
-official app to its address. The image provides the API, realtime updates,
-daemon gateway, scheduler, migrations and your own model credentials. Its
-default web entry exposes server information and keeps the authentication
-pages needed by the official clients.
+**Self-hosted server.** Mikka can run on your own Linux host with Docker and PostgreSQL. Follow the [self-hosting guide](docs/self-hosting.md) to configure credentials, download the matching Compose file and start the server:
 
-The full community workspace UI remains in the public source and still builds,
-but is frozen and disabled by default. Set `MIKKA_COMMUNITY_UI=1` and recreate
-the app container to enable that compatibility UI. The official UI is maintained
-separately; paid UI libraries are not distributed in this repository or image.
+```sh
+docker compose up -d --wait
+```
 
-## How Mikka works
+The Compose deployment starts the Mikka server and PostgreSQL; it does **not** install a separate copy of the official UI. Connect an official client to your server. See [Client and source availability](#client-and-source-availability) before choosing self-hosting.
 
-- **Bots coordinate. Agents execute.**
-  - A bot chats with you, plans the work and dispatches coding tasks to
-    Agents on your computers.
-  - Each piece of work runs in a **thread**: one work run with its own name,
-    usually tied to a task. One bot can run many threads at once.
-  - The full definitions are in the [glossary](docs/design/glossary.md).
-  - An **Agent** is the worker that does a thread's work: Claude Code, Codex or Cursor, running on a **computer** (yours, an SSH server, or Mikka Cloud). Bots are not Agents: every bot chats on Mikka's AI SDK / Workflow loop, the Coordinator's. The retired standalone Agent chat is available only as read-only history. Running the Coordinator itself on Claude Code or Codex ([#312](docs/architecture/native-coordinator.md)) is a deprecated design: the code is kept switched off and must not be enabled.
-
-- **The Coordinator and your own bots.**
-  - The Coordinator is the built-in bot. It is long-running: it wakes when a
-    run ends, a task changes state, or a worker asks a question, decides the
-    next step, and notifies you only when your input is required. It raises
-    matters from your connected apps at most five times a day.
-  - You can create more bots, each with its own name, shape and colour. Every
-    bot chats on the same loop as the Coordinator, with its own chat, memory
-    and threads, and hands coding work to Agents.
-
-- **Asks before it guesses.**
-  - Before it dispatches, the Coordinator routes an unclear request back to
-    you, in chat or as a choice card.
-  - A worker can ask a question or report that it is blocked. The thread waits
-    for your reply, and your answer goes back to the run.
-
-- **Runs on your own machines.**
-  - The Mikka daemon connects your Mac, Linux machine or server. The desktop
-    app can also install it on a server over SSH.
-  - It starts work through the Agents you have already installed and signed
-    in to, so your existing plans and settings apply.
-
-- **Recovers from failures.**
-  - Runs use leases and checkpoints. A run whose machine drops resumes on
-    another connected machine with the same repository.
-
-- **Fits into your existing tools.**
-  - Other agents can operate Mikka through MCP, and a Telegram message or a
-    Slack mention reaches the Coordinator. Two-way Linear sync is built but
-    switched off.
-
-### How a task moves
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/task-flow-dark.svg">
-  <img src="docs/assets/task-flow-light.svg" alt="How a task moves through Mikka: a request from chat, Telegram, Slack or MCP is triaged; an unclear one goes back to the person for details, a clear one is dispatched to an Agent. The Agent can ask for clarification and gets the answer back. A finished run goes to review and verification Agents, back to a fix run when a check fails, then to acceptance and release, and monitoring turns incidents into new issues.">
-</picture>
-
-Every step runs in production. In the Factory loop a task takes the shortest
-path it needs through triage, plan, implementation and review; a failed check
-sends it back for a fix, and monitoring turns incidents into new issues.
-Accepting the work on its acceptance page merges the pull request as you, with
-your own GitHub account.
-
-## What Mikka does today
-
-- **Turns requests into runs.** The Coordinator dispatches runs for your tasks
-  and decides whether each new task belongs to the workspace or to you. You can
-  change the assignment in one click. The Coordinator can also create and
-  update tasks itself.
-- **Names tasks briefly.** A task and its threads show in lists under a short
-  title that a small model writes once, after the task is created. A title you
-  change yourself wins.
-- **Lets you create bots.** The left column lists the Coordinator and the bots
-  you create. Each bot has its own chat, with unread markers and an animated
-  avatar.
-- **Makes progress visible.** A dispatched thread appears in the chat as a card
-  that follows the run; open it to see the thread's own conversation. Workers
-  report progress, ask questions and flag blocks through Mikka's MCP tools,
-  and the Coordinator triages each one. You can reply to or stop your thread
-  directly.
-- **Answers with charts and cards.** Bots reply with OpenUI components: bar,
-  line, area, donut and radial charts, tables, stats, task and run chips, and
-  question cards with choices, switches, sliders and date ranges.
-- **Keeps threads private.** On a workspace task, teammates see whose thread it
-  is, its status and its time, but not its instructions, transcript or result.
-- **Cites its sources.** Replies show the tasks, runs and web pages they draw
-  on as chips you can open. Bots can search the web when they need current
-  information.
-- **Hands back Artifacts.** A bot can deliver a document or an HTML page as an
-  Artifact, with versions and a share link.
-- **Delivers through Factory.** Triage and clarification, review, a fix run
-  when a check fails, run captures as evidence, an acceptance page that merges
-  the pull request as you, and monitoring that opens a follow-up issue.
-- **Acts in your apps.** Bots propose email, Google Calendar, Notion and Slack
-  actions, which run after your approval.
-- **Keeps tasks in one place.** Tasks show on a board and a list, with
-  relations, activity history and a number every task gets when it is
-  created: its team key for a workspace task (AL-12), your own prefix for a
-  personal one (ALEX-12). The task's branch and pull request carry it. ⌘K
-  searches bots, group chats, tasks, threads and projects.
-- **Decides what needs you.** Mikka rates notifications from GitHub, Linear,
-  Notion and Gmail by what it costs to ignore them. Urgent matters go to the
-  Coordinator, which interrupts you at most five times a day; the rest wait in
-  Suggestions. A daily briefing arrives in the Coordinator chat after 08:00 in
-  your time zone.
-- **Gets you started.** A first-run guide has you create your first bot and
-  connect a subscription. You can replay it from Settings › Preferences.
-- **Uses your own subscriptions and keys.** Connect a ChatGPT (Codex) or Claude
-  subscription, or add a model provider's API key, in Settings › Models and
-  subscriptions. A subscription answers bot chats and runs threads on your
-  computers. A key offers the models the provider lists for it and is called at
-  the provider directly.
-- **Plugins.** One 插件 page, also shown in Settings › Connections, lists your
-  apps (Gmail, Google Calendar, Notion, Slack, GitHub, Linear and Telegram)
-  and searches public agent skills. Each app connection belongs to the person
-  who made it.
-- **Settings inside the app.** Settings open in the app window, with sections
-  for account, security, preferences, notifications, memory, connections,
-  models, saved logins, privacy and devices, and for workspace admins general,
-  members, teams, permissions, secrets (including the workspace's own E2B API
-  key), audit log, usage and billing.
-- **Billing.** The hosted model (Mikka 默认) needs a verified card. Card
-  verification is Stripe Checkout and grants a one-off $1 free allowance (免费额度)
-  to the first workspace using that card. Prepaid points top up the balance
-  (余额) through Stripe Checkout. Your own subscriptions, devices and E2B key
-  need no card.
-- **Manages devices.** Settings › Devices lists your computers. Removing an
-  online device also uninstalls its daemon.
-- **Works from other tools.** Operate Mikka from Claude Code or Codex through its
-  [MCP server](https://aspectlylabs.com/mikka/docs/mcp), or reach the
-  Coordinator from Telegram or Slack.
-- **Supports teams.** Workspaces, members, invitations and teams, with email,
-  Google and GitHub sign-in. Email sign-in has a kill switch; Google and GitHub
-  stay on.
-- **Desktop app.** A macOS app for Apple Silicon renders the same UI in a
-  translucent window, signs in through the system browser, shows waiting runs
-  in the Dock and system notifications, and updates itself from GitHub
-  Releases. It also enrolls servers from your `~/.ssh/config` over SSH. Its
-  icon is a layered Liquid Glass icon with default, dark, tinted and clear
-  looks on macOS 26.
-- **iOS app.** In TestFlight, not yet in the App Store. Built in
-  [`apps/mobile`](apps/mobile) around a native tab bar: chats, threads (with
-  tasks), suggestions, settings and search, with push notifications.
-- **Cloud computer.** Each bot gets its own desktop on Mikka Cloud, running on
-  the workspace's own E2B key. Its 电脑 tab lets you watch it live, take
-  control and hand it back; runs pause while you hold it, and it sleeps when
-  idle and keeps its disk. Bots can start web sub-agents there, each in its own browser, and
-  desktop actions follow the applicable authorization policy. With a key,
-  threads run in the cloud first, and each task keeps one sandbox, paused
-  between its runs.
-- **Saved logins.** When a web sub-agent reaches a login page, the bot sends a
-  secure login card. The password goes to a KMS-encrypted vault that the model
-  never reads, and is reused for that site; you can delete it in Settings.
-- **Scheduled tasks.** Bots can create reminders, task snapshots and read-only
-  agent tasks that run at a set time or on a schedule.
-- **Bilingual interface.** The app is available in English and Simplified Chinese.
-
-Behind a switch that is off by default:
-
-- **Memory of you.** Mikka reads rated notifications for facts about you, merges
-  them nightly, and shows them in Memory, where you can correct or delete each
-  one.
-
-## What we're building
-
-The intended authorization flow uses a vision-capable model to judge business
-meaning and actions. An existing auto-review or MCP policy of allow permits
-execution; ask requests confirmation, and deny stops. Authentication,
-credential protection, idempotency and mechanical checks remain in force.
-Sensitive deletion and security settings still require confirmation when policy
-requires it. This flow remains subject to implementation and acceptance.
-
-Work in progress is tracked in
-[GitHub issues](https://github.com/alexj11324/Mikka/issues).
-
-| Area | Planned | Tracking |
-| --- | --- | --- |
-| **Cloud computer** | Mikka-billed compute, so a cloud computer runs without the workspace's own E2B key. It is built but hidden behind `mikka-computer-billing`. | [#172](https://github.com/alexj11324/Mikka/issues/172) |
-| **Hybrid execution** | Agents on your computer offload builds, tests and dev servers to Mikka Cloud. | [#572](https://github.com/alexj11324/Mikka/issues/572) |
-| **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. The backend is on main, and a group of your own bots can be created on the web; the rest of the interface is not done. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Plugins** | Personal MCP servers and installed skills have a backend and Coordinator tools but no page yet; workspace admins switching single apps off. | [#595](https://github.com/alexj11324/Mikka/issues/595) |
-| **Proactive suggestions** | A nightly research run that turns your deadlines and interests into a few suggestion cards a day, which start a task when tapped. | [#350](https://github.com/alexj11324/Mikka/issues/350) |
-
-## Connect your agents
-
-### Operate Mikka through MCP
-
-Mikka is an MCP server (Streamable HTTP, OAuth 2.1). Add it to Claude Code:
+**Already use Claude Code?** Connect Mikka as an MCP server:
 
 ```sh
 claude mcp add --transport http mikka https://app.aspectlylabs.com/mikka/api/mcp
 ```
 
-Claude Code completes sign-in in your browser. Agents can then read and modify
-tasks, dispatch runs and update the Coordinator's memory. Other clients and the
-full tool list are in the [MCP docs](https://aspectlylabs.com/mikka/docs/mcp).
+This registers Mikka in Claude Code and uses browser-based OAuth sign-in. You need access to the Mikka server; the command does not install the Mikka daemon or run a coding task. See the [MCP guide](docs/mcp.md) for other clients and tools.
 
-### Where Agents run: Mikka managed cloud, or your own
+## What Mikka does
 
-Like hosted and self-hosted CI runners, an Agent runs either on a machine Mikka
-manages or on one you bring.
+- **Coordinates work.** The built-in Coordinator and bots you create turn requests into tasks, clarify ambiguous instructions and dispatch work to coding agents.
+- **Runs where your work lives.** Connect your own computers and SSH servers through the Mikka daemon, or use a configured cloud execution environment. Eligible parallel coding runs use isolated Git worktrees or task sandboxes.
+- **Keeps work reviewable.** Follow task progress, answer agents' questions, inspect run results and review eligible pull requests through Factory's checks and acceptance flow.
+- **Provides cloud desktops.** On configured Mikka Cloud accounts, bots can use a desktop you can watch, take over and hand back. Direct E2B access uses the owner's own key.
+- **Works with existing tools.** Reach Mikka from Claude Code or Codex through MCP, or from Telegram and Slack. Connected-app actions respect the relevant permissions and approval policy.
+- **Bring your own subscriptions.** Use your existing Claude or ChatGPT/Codex subscription with supported coding agents. Model API keys are also supported where applicable.
+- **Supports personal and team work.** Tasks, bots and activity can be organized across personal and team workspaces, with access controls for connected resources.
 
-**Mikka managed cloud.** On Mikka Cloud, Mikka starts the machine, sleeps it when idle and
-keeps its disk. Today it runs on the workspace's own E2B API key, set in
-Settings › Secrets and environment; Mikka-billed compute is built but hidden behind the
-`mikka-computer-billing` flag.
+Availability depends on deployment configuration, connected services and feature flags. Planned work is tracked in [GitHub Issues](https://github.com/alexj11324/Mikka/issues), not represented here as shipped functionality.
 
-**Your own.** Your computer, through the desktop app or the daemon, or any
-server you reach over SSH. Mikka installs the daemon there and dispatches
-Agents to it. The daemon in [`packages/daemon`](packages/daemon) detects the
-Agents installed on the machine and runs threads through them:
+## How it works
 
-| Agent | CLI it looks for |
-| --- | --- |
-| Claude Code | `claude` |
-| Codex | `codex` |
-| Cursor | `cursor-agent` or `agent` |
-
-Each run uses its own git worktree, so parallel threads stay isolated.
-
-## Architecture
+1. **Describe the work.** A bot turns your request into a task and asks for clarification when needed.
+2. **Dispatch an agent.** Mikka selects a configured execution location and starts the coding run.
+3. **Follow along.** The agent reports progress or questions; you can respond when it needs input.
+4. **Review the result.** Factory applies the checks required for the task, sends failed work back for fixes and presents eligible code changes for acceptance. An authorized acceptance can merge the PR using your connected GitHub account.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web, desktop and iOS apps, Telegram, Slack, notification sources and MCP clients reach the Hono/Nitro API on Vercel, which keeps state in Postgres and takes payments through Stripe. A minute Worker and app events wake the Coordinator, which dispatches runs to the daemon on your Mac, Linux machine or SSH host and wakes each bot's Mikka Cloud computer. Agents report back through MCP. Factory stages fed by monitoring sit on top of the Coordinator, and approved writes go back to connected apps. Linear sync, switched off, is dashed.">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/task-flow-dark.svg">
+  <img src="docs/assets/task-flow-light.svg" alt="Mikka task flow: triage, agent execution, review, fixes, acceptance and follow-up monitoring.">
 </picture>
 
-The web app, the desktop and iOS apps, Telegram, Slack and MCP clients all reach
-the same Hono/Nitro API on Vercel. The web and desktop share the Vite-built React
-UI. Events such as a finished run, a worker
-question or a rated notification go to the Coordinator, a durable workflow
-that triages each event and decides the next step. Every bot runs on the same
-workflow, each with its own chat, memory and inbox.
+For definitions of bots, agents, tasks, threads and runs, see the [glossary](docs/design/glossary.md).
 
-Runs execute on your machines. The daemon registers the device, claims runs
-through the device API, and starts the agent CLI in a dedicated git worktree.
-Each person's preferred model list, in order, and their run location (cloud
-or local) in Settings › Models and subscriptions choose a new thread's model, Agent and machine;
-each computer has one switch to take part in dispatch
-([execution settings](docs/execution-rules.md)).
-A run whose machine drops hands over by checkpoint to another connected
-machine with the same repository.
-The agent reports progress, questions and blocks through Mikka's MCP worker
-tools.
+## Client and source availability
 
-A bot's Mikka Cloud computer is an E2B sandbox on the workspace's own E2B key, running
-the same daemon and a desktop you can view through noVNC. A Go subscription
-worker in [`packages/subscription-worker`](packages/subscription-worker) holds
-the sign-in for subscriptions you connect, with the secrets kept in Infisical.
-A separate credential broker in
-[`services/credential-broker`](services/credential-broker) is the only part
-that decrypts saved logins, using AWS KMS.
+Mikka has one official UI across its web, macOS and iOS clients. Those clients can connect to Mikka Cloud or a self-hosted server.
 
-The hosted default model (Mikka 默认) is called on ZeroCat's OpenAI-compatible
-API, with Vercel AI Gateway as its fallback, and is metered per call; card
-verification and top-ups go through Stripe Checkout and its webhooks.
+This public repository includes the server, daemon, native mobile source and much of the web UI code. **Official web and desktop builds also use private UI components** that are not distributed here. A build from the public source alone is therefore **not the complete official web or desktop UI**. A legacy built-in workspace UI remains available behind an opt-in flag, but is not a second supported product design.
 
-A Cloudflare Worker fires every minute and calls the app's cron routes: due
-Coordinator wakes, schedules, run recovery, account deletions, audit retention
-and operational monitoring every minute, briefings every 15 minutes, hourly
-notification reconciliation and the profile merge
-([suggestions schedules](docs/suggestions-cron.md)). Linear sync runs in a
-second Worker that exchanges changes with Postgres through a durable inbox and
-outbox; it is switched off by a PostHog flag.
-
-The dashed box and lines are Linear sync, which is switched off.
-
-## Built with
-
-| Layer | Stack |
-| --- | --- |
-| App | Vite, Hono/Nitro, React 19, Tailwind CSS 4, shadcn/ui, ReUI, OpenUI for bot replies |
-| Desktop | Electron with electron-updater in [`apps/desktop`](apps/desktop) (macOS, Apple Silicon) |
-| Mobile | Expo and Expo Router (React Native) with native tabs in [`apps/mobile`](apps/mobile) |
-| Bots | Vercel AI SDK; the hosted default model on ZeroCat, with Vercel AI Gateway as fallback; every bot, including the Coordinator, is a durable loop on [Vercel Workflow](workflows/coordinator) |
-| Triage | A capable model judges business meaning; policy controls allow / ask / deny and mechanical checks protect execution. Current rules-first routing remains to be updated and accepted |
-| Data | Postgres on Neon, Drizzle migrations in [`drizzle/`](drizzle) |
-| Auth | Better Auth, with email, Google and GitHub sign-in, Cloudflare Turnstile on email sign-up, and an OAuth 2.1 server for MCP |
-| Billing | Stripe Checkout and webhooks |
-| Flags | PostHog |
-| Integrations | GitHub and Linear webhooks; Composio for Gmail, Google Calendar, Notion and Slack; Cloudflare Workers for scheduled work and Linear sync; Vercel Chat SDK for Telegram and Slack; Firecrawl for web search |
-| Cloud computer | E2B sandboxes with a noVNC desktop |
-| Credentials | A credential broker with AWS KMS envelope encryption; project secrets in Infisical |
-| Subscriptions | A Go worker in [`packages/subscription-worker`](packages/subscription-worker), with secrets in Infisical |
-| Agents | The Mikka daemon runs Claude Code, Codex or Cursor through a CLI adapter for each thread |
-
-Current build, start and rollback steps: [shared runtime operations](docs/operations/web-runtime.md).
-
-## Repository layout
-
-```text
-app/                 # Shared pages, action sources and API handlers (MCP, webhooks, cron, daemon /v1)
-components/          # React UI
-lib/                 # Domain logic: coordinator, issues, billing, factory, computer, MCP, auth
-workflows/           # Durable workflows (Coordinator, Slack, sub-agents, thread machines, run publication)
-agents/              # Built-in bot definitions
-apps/frontend/       # Shared Vite renderer for web and desktop
-apps/api/            # Hono/Nitro runtime and server compatibility adapters
-apps/desktop/        # macOS desktop app (Electron)
-apps/mobile/         # iOS app (Expo)
-packages/daemon/     # Local daemon and Agent CLI adapters
-packages/protocol/   # Types shared by the server, the daemon and the desktop app
-packages/config/     # Shared configuration
-packages/subscription-worker/  # Go worker for connected subscriptions
-services/credential-broker/    # Decrypts saved logins for the vault
-cloudflare/          # Cloudflare Workers: the minute cron and Linear sync
-drizzle/             # Database migrations
-messages/, i18n/     # English and Simplified Chinese strings
-tests/               # Unit, acceptance and Playwright tests
-docs/                # Engineering and design docs
-factory.yaml         # The reviewed Factory definition
-```
+Read [UI source boundaries](docs/ui-overlay.md) and [self-hosting](docs/self-hosting.md) for what can be built, deployed and connected. Source implementation and production availability are verified separately under the [acceptance policy](docs/acceptance.md).
 
 ## Development
 
-Development and functional acceptance run in cloud Linux against a local
-application, a real isolated Postgres database and, when relevant, a real
-daemon. Builds, type checks and API/CLI acceptance run there; CI runs source,
-daemon and database checks.
-Credentials live in Infisical Cloud; never commit them or store them in a local
-`.env` file.
-
-In a fresh cloud Linux session, one command sets up PostgreSQL 17 with
-`mikka_e2e` migrated, Node 24, dependencies, the sandbox tools and Chromium for screenshots
-(see [docs/local-bootstrap.md](docs/local-bootstrap.md)):
+The repository uses Node.js 24.x and pnpm 10.34.3. To install dependencies and run the source checks in a prepared development environment:
 
 ```sh
-eval "$(scripts/dev/bootstrap-local.sh)"
-```
-
-Install dependencies and run the source checks:
-
-```sh
-pnpm install
+pnpm install --frozen-lockfile
 pnpm check
 ```
 
-Set up the isolated test database and start the app at
-`http://127.0.0.1:3000/mikka`:
+For a runnable local environment with an isolated PostgreSQL database, follow the [cloud Linux bootstrap](docs/local-bootstrap.md) and [development workflow](docs/dev-workflow.md). Do not commit credentials; the project uses Infisical for development secrets.
 
-```sh
-pnpm test:e2e:setup
-pnpm dev
-```
+**Core stack:** React, Vite, Hono/Nitro, Vercel AI SDK and Workflow, PostgreSQL/Drizzle, Electron, Expo and the Mikka daemon. See the [documentation index](docs/README.md) for architecture, integrations, CI, deployment and runtime details.
 
-The desktop shell loads that local app:
+## Documentation
 
-```sh
-pnpm desktop:dev
-```
+- [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart) — get started with the official app.
+- [Self-hosting](docs/self-hosting.md) — run your own server and connect clients.
+- [MCP integration](docs/mcp.md) — operate Mikka from other agents and tools.
+- [Documentation index](docs/README.md) — architecture, setup, security and operations.
+- [Contributing](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) — contribution and coding-agent rules.
 
-While working, run `pnpm typecheck`, `pnpm lint`, the unit tests for what you
-changed and the local API/CLI acceptance of the flow you changed
-(`pnpm test:local-loop`). No browser tests run, in CI or locally, and Vercel,
-not CI, builds `main`. See
-[`CONTRIBUTING.md`](CONTRIBUTING.md) ("How changes are tested").
+## Open source and licensing
 
-### Local-only tests
+The public source is licensed under [AGPL-3.0-only](LICENSE). Modified versions offered as network services are subject to the AGPL's source-availability obligations. Third-party components retain their own licenses; see the [third-party notices](packages/daemon/THIRD_PARTY_NOTICES.md).
 
-These tests run in no CI workflow. Run them in cloud Linux when you change
-what they cover.
-
-| Test | Needs | Why not in CI |
-| --- | --- | --- |
-| `pnpm test:factory-http` (`tests/factory-{query,question,monitor-cycle}-http.test.ts`) | A production build (`pnpm build`), `eval "$(bash scripts/dev/bootstrap-local.sh)"` (which exports `BETTER_AUTH_SECRET` from a random local file). The runner points its server's `BETTER_AUTH_URL` at its own origin. In local test-account mode the runner creates the probes' own non-superuser database roles (`factory192`, `factoryquestions192`, `factorycycle192`) on the loopback `*_e2e` database | Run explicitly against a prepared isolated build; CI runtime build and browser checks run separately |
-| `pnpm test:test-accounts-http` (`tests/test-account-pool.http.test.mjs`) | A production build and a disposable test environment registered with `scripts/test-accounts/bootstrap.mjs` | Same prepared isolated-build requirement |
-| `pnpm test:local-loop` and its `:mailbox`, `:cloud`, `:worker-mailbox` variants | `dev:local`, a real daemon, a model API key; the cloud item needs an E2B template | Needs real credentials, and it refuses to run under a CI identity |
-| `tests/byos-handoff-browser.test.mjs` | Chromium at `/usr/bin/chromium` | Standalone Linux browser and loopback handoff check, outside `pnpm test:byos`; HTTPS destinations are intercepted locally. CI runs separate Analytics and desktop browser checks. |
-| `packages/daemon/test/codex-contract.node-test.mts` | The official Codex CLI, passed as `CODEX_CONTRACT_BIN`; without it the test skips | CI does not download the Codex binary |
-
-Start with these documents:
-
-- [`AGENTS.md`](AGENTS.md): the rules every contributor and coding agent follows.
-- [`docs/design/README.md`](docs/design/README.md): read before any design,
-  spec or UI work.
-- [`docs/design/glossary.md`](docs/design/glossary.md): what bot, thread and
-  chat mean.
-- [`docs/acceptance.md`](docs/acceptance.md): how a change is accepted.
-- [`docs/dev-workflow.md`](docs/dev-workflow.md): local first, issue
-  ownership and merging, and production acceptance after a merge.
-- [`docs/review-checklist.md`](docs/review-checklist.md): complete before
-  presenting UI to others.
-- [`apps/desktop/README.md`](apps/desktop/README.md): running and packaging
-  the desktop app.
-
-## Get access
-
-Mikka is in early access. Email
-[mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com) for an invite, then
-follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
+Commercial licenses are available from Aspectly Labs at [legal@aspectlylabs.com](mailto:legal@aspectlylabs.com). Contributors retain copyright in their work and grant the additional licensing rights described in [CONTRIBUTING.md](CONTRIBUTING.md#license).
 
 ## Acknowledgements
 
 <p>
   <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
-      <img src="docs/assets/openai-mark-light.svg" alt="OpenAI logo" width="32" height="32">
-    </picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
+    <img src="docs/assets/openai-mark-light.svg" alt="OpenAI mark" width="28" height="28">
+  </picture>
   <strong>OpenAI · Codex for Open Source</strong>
 </p>
 
-Mikka is proudly developed with support from the [Codex for Open Source](https://openai.com/form/codex-for-oss/) program.
-
-A heartfelt thank-you to OpenAI and the Codex team for providing Mikka's maintainer with six months of ChatGPT Pro access. This support gives us more room to explore ambitious ideas, improve engineering and user experience, and give back to the open-source community.
-
-Mikka is an independent open-source project and is not affiliated with or endorsed by OpenAI. The OpenAI name and logo are trademarks of OpenAI.
-
-## License
-
-Mikka is copyright © 2026 Aspectly Labs and licensed under
-[AGPL-3.0-only](LICENSE). Third-party components keep their own licenses; see
-[`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md).
-
-Commercial licenses for use without the AGPL's obligations are available from
-Aspectly Labs: [legal@aspectlylabs.com](mailto:legal@aspectlylabs.com).
-
-If you run a modified version of Mikka as a network service, the AGPL requires
-you to offer its users the source code of your version.
-
-## Contributing
-
-Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
-Contributors keep the copyright in their work and license it under
-[AGPL-3.0-only](LICENSE); by submitting it they also allow Aspectly Labs to
-offer it under other terms, including commercial licenses. There is no form to
-sign. The terms are in [`CONTRIBUTING.md`](CONTRIBUTING.md#license).
+Mikka's maintainer received six months of ChatGPT Pro access through the [Codex for Open Source](https://openai.com/form/codex-for-oss/) program. Mikka is independent and is not affiliated with or endorsed by OpenAI. The OpenAI name and logo are trademarks of OpenAI.

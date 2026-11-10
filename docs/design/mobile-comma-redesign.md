@@ -1,6 +1,16 @@
-# iOS 重新设计：按 Comma 的布局，去掉抽屉
+# iOS 按 Comma 重做的设计记录（2026-11-06）
 
-- **状态：** 设计稿，等 Alex 看图（2026-11-06）。图没被接受之前不改应用代码；`main` 上仍是抽屉版。
+- **状态：** 图 01–20 已于 2026-11-06 接受
+  （[决定](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md)）。
+  本页保留当时的调研和画面说明。后续的
+  [只列任务](decisions/2026-11-07-2045-tasks-only-threads-inside.md)、
+  [一个任务一段对话](decisions/2026-11-07-2300-one-conversation-per-task.md)、
+  [居中标题](decisions/2026-11-08-0120-ios-header-like-comma.md)、
+  [状态图标颜色](decisions/2026-11-08-0130-task-state-icon-colours.md)和
+  [间距](decisions/2026-11-08-0200-mobile-spacing.md)以及
+  [聊天手势与标题](decisions/2026-11-08-1430-ios-chat-gestures-and-header.md)
+  取代对应旧画面。
+  实现与现行规范见 [mobile.md](mobile.md) 和 [components.md](components.md)。
 - **起因：** Alex 觉得抽屉版（#1408、#1446、#1453）不好看，不要抽屉，参照 Comma 的移动端重做
   （[决定 2026-11-06-1200](decisions/2026-11-06-1200-ios-drop-drawer-comma-redesign.md)）。
 - **图（源）：** Figma 文件 `zPe5LKycb2XuT1ivCLRw07` 的页面
@@ -77,25 +87,26 @@ badge；部分高度的 sheet 用系统默认外观。
 | Reduce Transparency / Increase Contrast 下玻璃要保持可读（Materials） | ✅ 系统玻璃自动处理 | ✅ 用系统玻璃（`expo-glass-effect`）；自绘的状态切换器在 `isLiquidGlassAvailable()` 为假时退回不透明底 |
 | Reduce Motion | ✅ 每个动画都有分支 | ✅ 沿用 `lib/springs.ts` 和现有分支 |
 
-## 三、新的导航结构
+## 三、接受后更新的导航结构
 
-```
+```text
 NativeTabs（系统 tab bar，Liquid Glass）
-├─ 对话   (chats)     Stack：对话 → 聊天 / 群聊 → Bot 资料 → 线程
-├─ 线程   (threads)   Stack：线程 | 任务（分段） → 线程页
-├─ 建议   (suggest)   Stack：建议 → 插件
-├─ 设置   (settings)  Stack：设置 → 个人资料 / 工作区 / 通知 / 记忆 / 已连接的 App(=插件) / 外观
-└─ 搜索   (search, role="search")  按钮外观：键盘 + 键盘上方的搜索框
-新建 Bot / 新建群聊：formSheet（large），从「对话」右上角的新建菜单打开
+├─ Bot       Stack：Bot → 聊天 / 群聊 → Bot 资料 / 任务
+├─ 任务      Stack：任务 → 任务详情 → 任务的一段对话
+├─ 建议      Stack：建议 → 插件 / Coordinator 聊天
+├─ 设置      Stack：设置 → 个人资料 / 工作区 / 通知 / 记忆 / 插件
+└─ 搜索      role="search"：Bot、群聊、任务
+新建 Bot / 新建群聊：从 Bot 右上角 + 打开 formSheet
 ```
 
-- 「设置」tab 的图标是本人头像（跟 Comma 一样），文字是「设置」。
-- 工作区切换有两个入口：「对话」左上角的工作区按钮（系统菜单，一步切换），和「设置 › 工作区」（选中即返回，Comma 的做法）。
-- **Coordinator 不另开入口。** Comma 把总调度放在搜索位的圆钮里；这违反上面的 HIG 条目，也违反 R-06（Coordinator 除置顶星标外没有特殊 UI）。Coordinator 在「对话」顶部的置顶格里，和其它置顶 Bot 一样。
-- **线程页是 push，不是底部 dock。** Comma 的任务 dock 好看，但 `mobile.md` 已定「线程卡片推开线程页，没有底部 sheet，没有最小化条」（R-15）。如果 Alex 想要 dock，这是一个单独的决定。
+- 工作区只从 设置 › 工作区 切换。Bot 和任务都用 + 作为新建入口。
+- 每个 tab 根页只有一处系统居中标题，按钮集中在右侧，左侧留空。tab 不显示角标。
+- 列表只列任务。点任务进入详情，点 活动 中的一行进入该任务的同一段对话，滚到对应位置。
+- Coordinator 和其它 Bot 使用相同入口。聊天和任务详情以 push 打开，tab bar 收起。
 
-## 四、每一屏
+## 四、2026-11-06 的画面记录
 
+以下表格保留原画面的结构和取舍；后续已替换的项目按页首决定和 §三。
 文件名在 `light/` 和 `dark/` 下相同。
 
 | # | 图 | 结构和取舍 | 对应 Comma |
@@ -146,9 +157,9 @@ Mikka 自己的部分是页面上「Mikka 本地组件」框里的组件：bloub
 和第一版（HTML 画的）相比，用了 Apple 组件以后有几处变化：聊天页标题是系统标题，不再是自画的玻璃胶囊；「+」附件用系统菜单
 （相机、照片、文件），不再是自画的玻璃卡片；搜索是系统的键盘上方搜索栏。
 
-## 五、和现在的抽屉版有什么不同
+## 五、2026-11-06 与当时抽屉版的对照
 
-| 现在（抽屉版，`main`） | 新设计 |
+| 当时的抽屉版 | 2026-11-06 设计 |
 | --- | --- |
 | 一个 Stack，装在推开式抽屉里；左上工作区按钮或右滑打开抽屉 | 系统 tab bar，四个 tab + 搜索 tab；没有抽屉，没有边缘右滑手势冲突 |
 | 线程、建议、任务、插件、设置都在抽屉里 | 线程（含任务）、建议、设置各是一个 tab；插件从设置和建议进入 |
@@ -159,7 +170,7 @@ Mikka 自己的部分是页面上「Mikka 本地组件」框里的组件：bloub
 | 附件是底部 sheet（相机/照片/文件三块） | 「+」弹出系统菜单（相机、照片、文件） |
 | 账号在抽屉底部 | 设置 tab（头像图标）顶部的账号行 |
 
-## 六、实现时用什么
+## 六、2026-11-06 的实现方案记录
 
 | 部分 | 组件 |
 | --- | --- |
@@ -175,7 +186,7 @@ Mikka 自己的部分是页面上「Mikka 本地组件」框里的组件：bloub
 | 输入框、「+」、线程状态切换器（附件用系统 `Menu`） | `expo-glass-effect` 的 `GlassView`（`isInteractive`）和 `GlassContainer` 让「+」与输入框融合；`isLiquidGlassAvailable()` 为假时退回不透明 `surface`。状态切换器放在 `NativeTabs.BottomAccessory`（iOS 26，`usePlacement()` 处理收起时的 inline 形态）。 |
 | 图标 | SF Symbols（`expo-symbols`，现有 `Symbol.ios.tsx`）。 |
 
-## 七、可以原样保留的部分
+## 七、2026-11-06 计划保留的部分
 
 - **聊天列表虚拟化：** `features/chat/components/chat-message-list.tsx`（`@legendapp/list`）。
 - **发送动效和新消息上浮：** `lib/springs.ts`（`ENTER`、`SNAP_BACK`）及其 Reduce Motion 分支。
@@ -184,7 +195,7 @@ Mikka 自己的部分是页面上「Mikka 本地组件」框里的组件：bloub
 - 消息菜单 `MessageMenu.ios.tsx`、OpenUI 卡片 `components/OpenUI.tsx`、`cards.tsx`、输入框里的模型菜单 `ModelMenu.ios.tsx`、所有 `app/api/mobile/*` 接口。
 - 要删的只有抽屉：`features/shell/components/app-drawer.tsx`、`drawer-content.tsx` 和 `drawerDim` / `drawerLift` / `drawer` / `drawerRow` token（#1470、Phase 5 已删）。
 
-## 八、Alex 的决定（2026-11-06）
+## 八、Alex 的原始决定（2026-11-06）
 
 设计图 01–20 通过（[决定](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md)）。
 
@@ -195,5 +206,5 @@ Mikka 自己的部分是页面上「Mikka 本地组件」框里的组件：bloub
 
 ## 没有复制 Comma 的内容
 
-本 PR 只有文档和设计图。图在 Figma 里用 Apple 官方 iOS 27 库的组件和 Mikka 自己的组件拼成，头像是 Mikka 的 bloub。没有复制 Comma（AGPL-3.0）的代码、文字、图标或截图；上面的数值和行为是读源码后的
+原设计 PR 只包含文档和设计图。图在 Figma 里用 Apple 官方 iOS 27 库的组件和 Mikka 自己的组件拼成，头像是 Mikka 的 bloub。没有复制 Comma（AGPL-3.0）的代码、文字、图标或截图；上面的数值和行为是读源码后的
 描述，链接指向它的仓库。

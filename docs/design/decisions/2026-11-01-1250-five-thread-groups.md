@@ -8,9 +8,11 @@
   里面。」 Then: 「应该是 5 档：Running、Blocked、Waiting for you、Idle、Resolved」.
   Relayed by the coordinator session.
 - Rule: R-52
+- Superseded in part by: [2026-11-09-0045](2026-11-09-0045-no-attempt-word.md) (no 「尝试」 in the UI: a task is one conversation; only an Agent switch gets a divider)
+- Superseded in part by: [2026-11-07-2045](2026-11-07-2045-tasks-only-threads-inside.md) (lists group tasks as 等待你, 进行中, 待办 and 已完成; outcome judgement remains).
 - Replaces: [decisions.md](../decisions.md) 2026-10-28 row "Thread lists group as
-- Superseded in part by: [2026-11-02-0300](2026-11-02-0300-waiting-for-you-first.md) (等待你 is the first group)
   等待回复 → 进行中 → 空闲 → 已解决 (… failed under 等待回复 …)", as to the groups
+- Superseded in part by: [2026-11-02-0300](2026-11-02-0300-waiting-for-you-first.md) (等待你 is the first group)
 
 Thread lists, on the web and the phone, group as 进行中 · 受阻 · 等待你 · 空闲 ·
 已解决 (Running, Blocked, Waiting for you, Idle, Resolved); 已解决 stays collapsed.

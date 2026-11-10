@@ -30,6 +30,19 @@ import { ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { readAccessFailure } from '@/lib/swr/persistent-cache'
 
 /** Where a decision draws into the reader: its actions in the header, its report above the document (P1). */
+/** Below Tailwind's `sm` (640px): the window's header holds the title and ✕ only. */
+function useNarrow() {
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 639px)')
+    const update = () => setNarrow(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  return narrow
+}
+
 export interface ArtifactDecisionSlots { actions: HTMLElement | null; lead: HTMLElement | null; /** The report banner's action area, once the report lead has drawn one. */ banner?: HTMLElement | null }
 
 /** What the reader hands the chat beside it. */
@@ -79,6 +92,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   const [quote, setQuote] = useState<ArtifactQuote | null>(null)
   const [pane, setPane] = useState<'content' | 'chat'>('content')
   const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null)
+  const narrow = useNarrow()
   const [leadSlot, setLeadSlot] = useState<HTMLElement | null>(null)
 
   const latest = detail?.latestVersion ?? 1
@@ -148,7 +162,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
       <header className="relative flex h-13 shrink-0 items-center gap-2 px-4">
         <a ref={downloadRef} href={versionPath(artifactId, version, 'download')} download className="hidden" tabIndex={-1} aria-hidden="true">{t('download')}</a>
         {visible && <ArtifactKindIcon kind={visible.kind} className="size-4 shrink-0 text-muted-foreground" />}
-        <DialogTitle className="truncate text-sm leading-5 font-medium">{accessBlocked ? '' : title ?? visible?.title ?? ''}</DialogTitle>
+        <DialogTitle className="min-w-0 truncate text-sm leading-5 font-medium">{accessBlocked ? '' : title ?? visible?.title ?? ''}</DialogTitle>
         {visible && <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="secondary" size="xs" className="gap-0.5 rounded-md px-1.5 font-normal text-muted-foreground" aria-label={t('versions')} />}>
             {t('version', { version })}<ChevronDown data-icon="inline-end" />
@@ -166,7 +180,8 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
           </DropdownMenuContent>
         </DropdownMenu>}
         <span className="flex-1" />
-        {decision && <div ref={setActionsSlot} data-slot="artifact-actions" className="flex items-center gap-2 empty:hidden" />}
+        {/* A phone has no room for the decision beside the title: it goes to the footer below, and ✕ stays here. */}
+        {decision && !narrow && <div ref={setActionsSlot} data-slot="artifact-actions" className="flex shrink-0 items-center gap-2 empty:hidden" />}
         {visible && <ArtifactShare artifactId={artifactId} shared={Boolean(visible.shared)} onChange={() => { void mutate() }} />}
         {visible?.kind === 'markdown' && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('download')} render={<a href={versionPath(artifactId, version, 'download')} onClick={event => openAsset(event, 'download')} download />} />}><Download data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('download')}</TooltipContent></Tooltip>}
         {visible?.kind === 'html' && <>
@@ -175,7 +190,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
         </>}
         <Button variant="ghost" size="icon-sm" className="aria-pressed:bg-muted aria-pressed:text-foreground md:hidden" aria-pressed={pane === 'chat'} aria-label={pane === 'chat' ? t('showContent') : t('showChat')} onClick={() => setPane(current => current === 'chat' ? 'content' : 'chat')}><MessageSquare data-icon="inline-start" /></Button>
         <Separator orientation="vertical" className="mx-1 data-vertical:h-5 data-vertical:self-center" />
-        <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
+        <Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
       </header>
       {visible && decision?.({ version, latestVersion: latest, slots: { actions: actionsSlot, lead: leadSlot } })}
       <div className="flex min-h-0 flex-1">
@@ -209,6 +224,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
           {chat({ quote, clearQuote: () => setQuote(null), activeArtifactId: artifactId, openArtifact: switchArtifact })}
         </aside>
       </div>
+      {decision && narrow && <footer ref={setActionsSlot} data-slot="artifact-actions" className="flex shrink-0 items-center justify-end gap-2 bg-sidebar px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] empty:hidden" />}
     </DialogContent>
   </Dialog>
 }

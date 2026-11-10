@@ -6,6 +6,8 @@ import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { desktopNotifyQuestions, readDesktopNotify, type DesktopCandidate } from '@/lib/platform/desktop-notifications'
+import { readPreferences } from '@/lib/preferences'
+import { pushAllowed } from '@/lib/push-allowed'
 import { listTaskRuns } from './task-runs'
 
 const candidatesSchema = z.array(z.object({ id: z.string().max(300), issueId: z.string().max(100), kind: z.enum(['awaiting', 'failed', 'finished']) })).max(20)
@@ -23,10 +25,15 @@ export async function chooseDesktopNotifications(raw: unknown): Promise<ActionRe
     const parsed = candidatesSchema.safeParse(raw)
     if (!parsed.success || !parsed.data.length) return { show: [] }
     const runs = new Map((await listTaskRuns()).map(run => [run.issueId, run]))
-    const candidates: DesktopCandidate[] = parsed.data.flatMap(item => {
+    let candidates: DesktopCandidate[] = parsed.data.flatMap(item => {
       const run = runs.get(item.issueId)
       return run && run.status === STATUS[item.kind] ? [{ id: item.id, kind: item.kind, title: run.issueTitle, agent: run.agentName }] : []
     })
+    // Preferences affect completed-run notifications only. Read them when an
+    // owned completion actually arrives, never during a quiet desktop launch.
+    if (candidates.some(candidate => candidate.kind === 'finished') && !pushAllowed(await readPreferences(session.user.id), ['finished'])) {
+      candidates = candidates.filter(candidate => candidate.kind !== 'finished')
+    }
     if (!candidates.length) return { show: [] }
     const userId = session.user.id
     const [{ decide }, { hostedBillingScope }, { executionWorkspace }] = await Promise.all([import('@/lib/coordinator/decide'), import('@/lib/abuse/context'), import('@/lib/execution-settings')])

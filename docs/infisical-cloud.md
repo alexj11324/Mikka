@@ -1,6 +1,10 @@
 # Infisical cloud migration
 
-Initial migration verified on 2026-10-22; identity discovery and private production delivery reverified on 2026-11-07 below. Organization: Aspectly Labs. Project: Mikka (`89850d6a-f020-4936-863e-df77380dfe40`). This inventory contains names and migration status only.
+Initial migration verified on 2026-10-22; identity discovery and private production delivery reverified on 2026-11-07 below. Organization: Aspectly Labs. Project: Mikka (`89850d6a-f020-4936-863e-df77380dfe40`). This inventory records names and dated migration receipts. Revalidate resource
+metadata and the exact authorized action before operational use. Historical
+Preview syncs and branch database snapshots remain records of their observed
+state. Mikka's current branch workflow builds in cloud Linux/CI and publishes
+only main to production ([deployment guide](operations/web-deploy.md)).
 
 ## Required identity reuse
 
@@ -115,8 +119,16 @@ an organization to resolve it.
 
 | Existing identity | Authentication and purpose |
 | --- | --- |
-| `token` (`264e0674-6468-4731-a57d-7bb1957f735b`) | Environment-configured Universal Auth; organization administration. Use existing `INFISICAL_*` bindings, never copy their values into the repository or terminal. |
+| `token` (`264e0674-6468-4731-a57d-7bb1957f735b`) | Environment-configured Universal Auth with organization administration in the 2026-11-07 cloud receipt. Use existing `INFISICAL_*` bindings, never copy their values into the repository or terminal. |
 | `mikka-github-cloud` (`2cf9fa19-b9db-4c08-8ca0-b31859f2cbac`) | GitHub Actions OIDC, audience `mikka-infisical`; production secret delivery inside the runner. Its project membership does not itself grant organization App Connection permissions. |
+
+On Alex's Mac, `~/.codex/rules/infisical-api.md` specifies the signed
+`/Users/alexjiang/.local/libexec/infisical-auth` helper and direct HTTPS API.
+Its local `token` identity is documented with organization No Access and Mikka
+project Admin. A shared identity name does not establish the same host's
+credential or organization rights. Check effective metadata for the current
+host and action without printing values. Cloud jobs use their configured
+workload authentication.
 
 For a new agent, check the presence of the configured variable names and the
 existing authentication helper/startup notes supplied by its environment before

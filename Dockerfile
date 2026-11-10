@@ -13,7 +13,9 @@ ENV CI=true ELECTRON_SKIP_BINARY_DOWNLOAD=1 NEXT_TELEMETRY_DISABLED=1 NITRO_PRES
 RUN npm install --global pnpm@10.34.3
 COPY . .
 COPY --from=subscription-workers /source/packages/subscription-worker/bin/ ./packages/subscription-worker/bin/
-RUN --mount=type=cache,id=mikka-pnpm,target=/pnpm/store pnpm install --frozen-lockfile --store-dir /pnpm/store
+RUN --mount=type=cache,id=mikka-pnpm,target=/pnpm/store \
+    --mount=type=secret,id=ffmpeg_github_token,env=FFMPEG_GITHUB_TOKEN,required=false \
+    pnpm install --frozen-lockfile --store-dir /pnpm/store
 ARG MIKKA_BUILD_REVISION
 ENV MIKKA_BUILD_REVISION=${MIKKA_BUILD_REVISION}
 RUN pnpm generate:agent-ui && pnpm build:app

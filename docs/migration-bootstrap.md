@@ -1,6 +1,24 @@
 # Migration bootstrap
 
-`MIGRATE=1 pnpm migrate` applies the tracked SQL files to the configured application (`MIKKA_DATABASE_URL`) and workspace (`DATABASE_URL`) databases. Do not run it against a production database as a test; the local isolated `mikka_e2e` database is the place to try it ([dev workflow](dev-workflow.md)). `pnpm build` runs `node scripts/migrate.mjs` last, after `next build` succeeds; the script only applies files in Vercel Production, with `MIGRATE=1`, or off Vercel when every target is a loopback database, so every production deploy migrates itself and Preview/CI builds skip it. A failed migration fails the deploy and the previous deployment keeps serving, so migrations must stay backward-compatible with the code that is live.
+Use this guide to initialize an isolated database and understand the migrations
+run by the production release. `MIGRATE=1 pnpm migrate` applies tracked SQL to
+the application (`MIKKA_DATABASE_URL`) and workspace (`DATABASE_URL`) databases.
+Try migrations against the isolated `mikka_e2e` database in cloud Linux.
+
+`pnpm build` runs the subscription-worker build, Agent UI generation, Vite
+frontend and Nitro API build, type checks, then `scripts/migrate.mjs`.
+`pnpm build:app` only builds the application and omits migrations. The
+[Web release](operations/web-deploy.md) runs the full build on GitHub Actions
+with production configuration before uploading prebuilt output to Vercel.
+The migration runner applies in Vercel production, with explicit `MIGRATE=1`,
+or outside Vercel when every target is loopback. `MIGRATE=0` skips before
+database access. Remote opt-in outside Vercel also requires `--allow-remote`.
+Unrequested Vercel Preview and remote CI builds skip. Production requires
+`VERCEL_GIT_COMMIT_REF=main`.
+
+A failed migration stops publication while the previous deployment serves.
+Completed files may already have committed, so every migration must remain
+compatible with the live code. The two database targets have separate commits.
 
 ## The pre-history baseline
 
@@ -12,7 +30,10 @@ Workspace/project/team migrations still target `DATABASE_URL`; optional group-ch
 
 ## CI proof
 
-The database check jobs (`Database checks (n/4)`) in `.github/workflows/ui-policy.yml` run `tests/migrate-empty-db.test.mjs` before the existing E2E schema setup. The test requires `CI=true`, an explicit `MIGRATION_BOOTSTRAP_CI=1`, loopback host, the exact `mikka_e2e` database name and PostgreSQL 17. It never falls back to another database URL.
+Selected database check jobs (`Database checks (n/N)`, up to four shards) in
+`.github/workflows/ui-policy.yml` run `tests/migrate-empty-db.test.mjs` before
+the isolated schema setup. [CI selection](ci/incremental.md) decides whether
+these jobs run. The test requires `CI=true`, an explicit `MIGRATION_BOOTSTRAP_CI=1`, loopback host, the exact `mikka_e2e` database name and PostgreSQL 17. It never falls back to another database URL.
 
 It creates empty disposable schemas inside that service database and invokes `pnpm migrate` with migration opt-in. It covers both shared and separate application/workspace schemas, checks every current Drizzle table/column and nullability, auth/chat-state prerequisites and every tracked migration record. It reruns the command and verifies that schema/index definitions and ledger timestamps stay unchanged, then directly replays the baseline twice against populated user/issue tables and verifies schema/history/data preservation. The test retains its isolated database and schemas for inspection during the CI job; it closes connections without deleting fixtures. No `setup-e2e-db`, schema push or Better Auth migrator is used to satisfy this test.
 

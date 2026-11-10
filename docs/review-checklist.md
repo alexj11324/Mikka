@@ -4,6 +4,11 @@ Run this before you show any UI to Alex, in Figma or in code, and before you
 approve someone else's UI PR. Each item names the rule it checks. If an item
 fails, fix it first; do not show work with known failures.
 
+A paid block or component (BoardUI Pro, affectUI, beUI Pro) is checked against
+the library's demo instead: attach a side-by-side and list every visual
+difference beyond data and text. The Reuse, Look and Figma items below never
+ask to restyle one ([2026-11-09-0050](design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
+
 ## Before showing UI
 
 ### Reuse (R-90)
@@ -39,16 +44,23 @@ what they came for. A reviewer who did not build the screen runs this.
 
 - [ ] Left column lists bots and group chats only; no thread names (R-01).
 - [ ] Right 概览 header = the selected bot's avatar and name, then 详情 /
-      线程 / PR / 电脑; the 概览 header has no 「<Bot 名> 的屏幕」 (R-02,
+      任务 / PR / 电脑; the 概览 header has no 「<Bot 名> 的屏幕」 (R-02,
       R-17, R-50).
-- [ ] Switching bots switches chat, threads and computer together (R-03).
+- [ ] Switching bots switches chat, tasks and computer together (R-03).
 - [ ] No 新建云端电脑, no per-bot computer list (R-04).
-- [ ] The right panel has no action button; besides navigation the only
-      control is 「展开」 (R-51).
-- [ ] Thread lists group 等待回复 → 进行中 → 空闲 → 已解决, 已解决 collapsed,
-      no 「今天」 group (R-52).
-- [ ] A thread row's second line quotes the last reply verbatim; no generated
-      summary, status word or bot name (R-53).
+- [ ] Right-panel controls follow R-51, including the existing owner controls
+      for an ordinary bot's name, avatar, public role and uploaded files.
+- [ ] Every list and tab shows tasks, including 全部任务. Groups are 等待你 →
+      进行中 → 待办 → 已完成, with 已完成 collapsed and no 「今天」 group (R-52).
+- [ ] Each task row shows its own state's icon. The hand means a task needs
+      the person, the octagon means blocked, and the triangle means failed.
+      State glyphs use the accepted semantic colours, with no dots or badges
+      ([state icons](design/decisions/2026-11-07-2230-one-icon-per-task-state.md),
+      [colours](design/decisions/2026-11-08-0130-task-state-icon-colours.md)).
+- [ ] A task opens its one conversation through task detail. Attempts and
+      活动 run oldest first. Selecting an attempt scrolls to its section, the
+      composer addresses the newest attempt, and attempts never show a hand
+      ([conversation decision](design/decisions/2026-11-07-2300-one-conversation-per-task.md)).
 - [ ] The Artifact rail item uses Mikka's stacked-cards icon, not lucide Copy
       or Library (R-56).
 - [ ] The browser toggle is an icon-only globe with no 「浏览器」 label (R-57).
@@ -58,7 +70,7 @@ what they came for. A reviewer who did not build the screen runs this.
 Grep the screens and the diff for these. They came back from old components
 more than once.
 
-- [ ] No input box in the thread list or under a computer screen; an open
+- [ ] No input box in the task list or under a computer screen; an open
       thread ends in the standard composer (R-10).
 - [ ] The only model picker is a bot composer's `BotModelPicker` chip (R-11).
 - [ ] No starter or suggestion cards in a chat (R-12).
@@ -112,14 +124,17 @@ more than once.
 
 - One Artifact page with all screenshots (light, dark, each state), the
   Figma frame beside each one, and the branch and commit SHA. Screenshots come
-  from a local production build (`next build`, `next start`).
+  from a local production build (`pnpm build`, `pnpm start`) in cloud Linux.
+  The [runtime guide](operations/web-runtime.md) describes the Vite frontend
+  and Nitro API outputs.
   No piles of attachments.
 - Say which rules or frames you could not follow and why.
 
 ## Definition of done (UI work)
 
 1. The checklist above passes.
-2. Alex accepted the review page.
+2. Alex accepted the review page. Design and accepted-frame requirements
+   follow [the source priority](design/README.md#when-sources-disagree).
 3. Then the flow passes local API/CLI acceptance (not before acceptance of
    the screens).
 4. CI is green as the final gate (`CONTRIBUTING.md` § How changes are
@@ -127,10 +142,14 @@ more than once.
 5. Docs updated in the same PR: `rules.md`, `components.md`, a new file in
    `decisions/`, `glossary.md` or the feature spec, whichever the change
    touches.
-6. The owning agent squash-merges it once CI is green on the latest head and
+6. The owning agent merges it once CI is green on the latest head and
    the PR is mergeable, after it has reviewed the screenshots and attached
-   them to the PR; then it accepts the change in production
-   ([dev workflow](dev-workflow.md) § 5).
+   them to the PR. It follows the applicable merge strategy in the
+   [dev workflow](dev-workflow.md) § 5 and watches the production deployment
+   until READY and serving the merge commit. CI and local production-build
+   screenshots accept UI, interaction, navigation, refresh, layout and copy.
+   Real external services use the production checks in
+   [the acceptance guide](acceptance.md#production-acceptance-after-a-merge).
 
 ## Common-sense check (every PR)
 

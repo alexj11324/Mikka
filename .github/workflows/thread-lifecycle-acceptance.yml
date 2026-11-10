@@ -124,6 +124,8 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Check source, official template and disposable database guards without allocating
         run: node --import ./scripts/server-test.mjs --import tsx scripts/e2b/thread-lifecycle-acceptance.ts --check
         env: &provider_environment

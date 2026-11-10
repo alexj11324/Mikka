@@ -1,12 +1,14 @@
 import 'server-only'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { projectDb, projects } from '@/lib/db/projects'
 import { teamIssues, teamProjects, teams } from '@/lib/db/team-schema'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
+import { organizationWorkspaces } from '@/lib/db/governance-schema'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { tokenWorkspace } from '@/lib/tokens/principal'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { actingContext } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
@@ -60,14 +62,17 @@ export function decodeProjectReadLinks(workspaceId: string, rawLinks: unknown, r
  * Re-run this whole function after reading content; none of its membership or
  * link facts survive a request. Decision writes retain resolveProjectScope. */
 export async function resolveProjectReadScope(reader: IssueReader, projectId: string, workspaceId: string): Promise<ProjectScope> {
+  const { filterEnterpriseWorkspaceLinks } = await import('@/lib/enterprise/access')
   if (![projectId, workspaceId].every(id => z.uuid().safeParse(id).success)) throw new ProjectMapError('INVALID_SCOPE')
   const userId = readerId(reader)
   if (tokenScope(reader) && tokenScope(reader) !== workspaceId) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
-  const scopedReader: IssueReader = { id: userId, [tokenWorkspace]: workspaceId }
+  const scopedReader: IssueReader = { ...(typeof reader === 'string' ? { id: reader } : reader), [tokenWorkspace]: workspaceId,
+    [enterprisePrincipal]: typeof reader === 'string' ? undefined : reader[enterprisePrincipal] }
   const boundedIds = sql<string[] | null>`CASE WHEN jsonb_typeof(${projects.issueIds})='array' AND octet_length(${projects.issueIds}::text)<=4096
     THEN CASE WHEN jsonb_array_length(${projects.issueIds})<=100 THEN ${projects.issueIds} ELSE NULL END ELSE NULL END`
   const [row] = await projectDb.select({
     workspace: { kind: workspaces.kind, userId: workspaces.userId },
+    organizationId: organizationWorkspaces.organizationId,
     project: { id: projects.id, userId: projects.userId, name: projects.name, revision: projects.revision, issueIds: boundedIds, createdAt: projects.createdAt },
     // Keep raw Project links: filtering orphaned/mismatched teams here could hide a scope conflict.
     links: sql<unknown>`COALESCE((SELECT jsonb_agg(CASE WHEN link."workspaceId"=${workspaces.id}
@@ -85,40 +90,46 @@ export async function resolveProjectReadScope(reader: IssueReader, projectId: st
         FROM jsonb_array_elements_text(COALESCE(${boundedIds},'[]'::jsonb)) candidate(value))) LIMIT 101) link),'[]'::jsonb)`,
   }).from(workspaces)
     .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
+    .leftJoin(organizationWorkspaces, eq(organizationWorkspaces.workspaceId, workspaces.id))
     .innerJoin(projects, eq(projects.id, projectId))
-    .where(eq(workspaces.id, workspaceId)).limit(1)
+    .where(and(eq(workspaces.id, workspaceId), or(eq(workspaces.kind, 'team'), eq(workspaces.userId, userId)))).limit(1)
   if (!row) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
+  if (!(await filterEnterpriseWorkspaceLinks(scopedReader, [{ id: workspaceId, organizationId: row.organizationId }])).length)
+    throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   const { workspace, project } = row
-  const { links, issueLinks } = decodeProjectReadLinks(workspaceId, row.links, row.issueLinks)
+  const candidateIds = Array.isArray(project.issueIds) ? [...new Set(project.issueIds)].filter(id => z.uuid().safeParse(id).success) : []
+  const visibility = issueVisibilityPredicate(userId, { allowedIds: [], workspaceIds: [workspaceId] })
+  // The second bounded read authorizes the Project and filters its Task IDs.
+  // It cannot return content or acknowledge a stale ACL, even for empty maps.
+  const { rows: [access] } = await db.execute<{ allowed: boolean; ids: string[] }>(sql`with permitted as (
+    select mikka_resource_acl_allowed('account',${userId},${workspaceId}::uuid,'project',${projectId}::uuid,'canReadContent') as allowed
+  ) select allowed,coalesce((select jsonb_agg(${issues.id}) from ${issues}
+    where permitted.allowed and ${issues.id}=any(${sql.param(candidateIds)}::uuid[]) and ${visibility}),'[]'::jsonb) as ids from permitted`)
+  if (!access?.allowed) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
+  // Structural corruption is reported only after content authorization; a
+  // malformed private Project must not become an existence oracle.
+  const { links } = decodeProjectReadLinks(workspaceId, row.links, row.issueLinks)
   const projectWorkspaces = new Set(links.map(link => link.workspaceId))
   if (links.length && !projectWorkspaces.has(workspaceId)) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   if (projectWorkspaces.size > 1) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
   const personalWorkspace = workspace.kind === 'personal' && workspace.userId === userId
-  if (!links.length && (project.userId !== userId || !personalWorkspace)) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   if (!Array.isArray(project.issueIds)) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
-  const candidateIds = [...new Set(project.issueIds)].filter(id => z.uuid().safeParse(id).success)
-  const allowedIds = issueLinks.filter(link => link.allowed).map(link => link.issueId)
-  const visibility = issueVisibilityPredicate(userId, { allowedIds })
-  // The base predicate grants only owner access or a valid workspace-team pair.
-  // Raw links are still needed to exclude an owner's task linked to another
-  // tenant, even when that team is invalid or membership there was revoked.
-  const linked = issueLinks.filter(link => link.workspaceId === workspaceId).map(link => link.issueId)
-  const elsewhere = issueLinks.filter(link => link.workspaceId !== workspaceId).map(link => link.issueId)
-  const tenant = personalWorkspace
-    ? elsewhere.length ? sql`not (${issues.scope} = 'workspace' and ${inArray(issues.id, elsewhere)})` : undefined
-    : linked.length ? inArray(issues.id, linked) : sql`false`
-  const visible = candidateIds.length ? await db.select({ id: issues.id }).from(issues)
-    .where(and(inArray(issues.id, candidateIds), visibility, tenant)) : []
+
   return { reader: scopedReader, userId, workspaceId, projectId, project: { ...project, issueIds: project.issueIds },
-    issueIds: visible.map(issue => issue.id), personalWorkspace }
+    issueIds: access.ids, personalWorkspace }
 }
 
 /** No name matching, current-workspace cookie, cross-request cache, or cross-database join. */
 export async function resolveProjectScope(reader: IssueReader, projectId: string, workspaceId: string, executor: WorkspaceExecutor = projectDb, authorizedIssueIds?: string[]): Promise<ProjectScope> {
+  const { activeTaskWorkspaces } = await import('@/lib/task-workspace')
+  const { resourceActionAllowed } = await import('@/lib/resource-access/store')
   if (![projectId, workspaceId].every(id => z.uuid().safeParse(id).success)) throw new ProjectMapError('INVALID_SCOPE')
   const userId = readerId(reader)
   if (tokenScope(reader) && tokenScope(reader) !== workspaceId) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
-  const scopedReader: IssueReader = { id: userId, [tokenWorkspace]: workspaceId }
+  const scopedReader: IssueReader = { ...(typeof reader === 'string' ? { id: reader } : reader), [tokenWorkspace]: workspaceId,
+    [enterprisePrincipal]: typeof reader === 'string' ? undefined : reader[enterprisePrincipal] }
+  if (!(await activeTaskWorkspaces(scopedReader, workspaceId)).length
+    || !await resourceActionAllowed(db, userId, { kind: 'project', id: projectId, workspaceId }, 'canReadContent')) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   const [membership] = await executor.select({ workspace: { kind: workspaces.kind, userId: workspaces.userId } }).from(workspaces)
     .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
     .where(eq(workspaces.id, workspaceId)).limit(1)
@@ -131,8 +142,6 @@ export async function resolveProjectScope(reader: IssueReader, projectId: string
   // Report malformed ownership only to a member of one of the project's workspaces.
   if (links.length && !workspacesForProject.has(workspaceId)) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   if (workspacesForProject.size > 1) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
-  if (!links.length && (project.userId !== userId || membership.workspace.kind !== 'personal' || membership.workspace.userId !== userId))
-    throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   if (!Array.isArray(project.issueIds)) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
   const checkedProject = { ...project, issueIds: project.issueIds }
   const candidateIds = [...new Set(project.issueIds)].filter(id => z.uuid().safeParse(id).success)
@@ -163,8 +172,10 @@ export async function projectForIssue(reader: IssueReader, issueId: string, work
 
 /** Keep project and membership changes from racing a decision commit. */
 export async function withProjectWriteScope<T>(reader: IssueReader, projectId: string, workspaceId: string, operation: (scope: ProjectScope) => Promise<T>): Promise<T> {
+  const { withTaskWorkspace } = await import('@/lib/task-workspace')
+  const { withResourceAccess } = await import('@/lib/resource-access/store')
   const observed = await resolveProjectScope(reader, projectId, workspaceId)
-  return projectDb.transaction(async tx => {
+  return withTaskWorkspace(reader, workspaceId, () => projectDb.transaction(async tx => {
     await lockTeamRelations(tx)
     const userId = readerId(reader)
     await tx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, workspaceId)).for('share')
@@ -173,6 +184,6 @@ export async function withProjectWriteScope<T>(reader: IssueReader, projectId: s
     await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).for('share')
     await tx.select({ projectId: teamProjects.projectId }).from(teamProjects).where(eq(teamProjects.projectId, projectId)).for('share')
     const scope = await resolveProjectScope(reader, projectId, workspaceId, tx, observed.issueIds)
-    return operation(scope)
-  })
+    return withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, 'canSteer', () => operation(scope))
+  }))
 }

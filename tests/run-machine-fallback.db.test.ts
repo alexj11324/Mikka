@@ -10,6 +10,7 @@ import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { templateModelsFixture } from './support/template-models'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
+import { threadPromptView } from '../lib/thread-prompt'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists.
 const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
@@ -66,7 +67,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
       [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
-    const issueId = await seedIssue(pool, id)
+    const issueId = await seedIssue(pool, id, ws.id)
     // A numbered task, so its thread gets a publication branch.
     await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
     seeded.set(id, ws.id)
@@ -95,7 +96,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
   // Another numbered task of theirs, so its thread gets a publication branch.
   let taskNumber = 100
   const anotherTask = async (userId: string) => {
-    const issueId = await seedIssue(pool, userId)
+    const issueId = await seedIssue(pool, userId, await ownWorkspace(userId))
     await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: ++taskNumber } } })])
     return issueId
   }
@@ -158,6 +159,9 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     }
     assert.equal(children.length, 1, 'ordinary automatic dispatch must produce one actual re-admitted B run')
     const child = children[0]
+    assert.ok(original.promptTaskLength > 0)
+    assert.deepEqual(threadPromptView(child.prompt, child.promptTaskStart, child.promptTaskLength),
+      threadPromptView(original.prompt, original.promptTaskStart, original.promptTaskLength))
     assert.equal(child.deviceId, deviceB)
     assert.equal(child.botId, botId)
     assert.equal(child.agentDefinition.pinnedDeviceId, undefined)
@@ -372,8 +376,10 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
       [lost, c.id, c.issueId, agentId, server, repoId, JSON.stringify({ harness: 'codex' }), botId])
     await reclaimLostRuns(c.id, new Date())
     assert.equal((await runOf(lost)).status, 'failed')
-    const moved = (await pool.query(`SELECT r.id,r.attempt,r.status,r."deviceId",b."botId" FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id WHERE r."retryOf"=$1`, [lost])).rows
+    const moved = (await pool.query(`SELECT r.id,r.attempt,r.status,r."deviceId",r.prompt,r."promptTaskStart",r."promptTaskLength",b."botId" FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id WHERE r."retryOf"=$1`, [lost])).rows
     assert.equal(moved.length, 1, 'the retry was queued on the cloud through the normal cloud queue')
+    assert.ok(moved[0].prompt.includes('## This run is a retry'))
+    assert.equal(threadPromptView(moved[0].prompt, moved[0].promptTaskStart, moved[0].promptTaskLength).task.includes('## This run is a retry'), false)
     assert.equal(moved[0].attempt, 2)
     assert.equal(moved[0].deviceId, cloudDevice, 'queued on the bot cloud computer, not the offline server')
     const retried = (await pool.query(`SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind='run_retried'`, [lost])).rows[0]
@@ -410,7 +416,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const off = await onlineMac(d.id, false)
     const used = new Set<string>()
     for (const number of [11, 12, 13, 14]) {
-      const issueId = await seedIssue(pool, d.id)
+      const issueId = await seedIssue(pool, d.id, d.workspaceId)
       await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } } })])
       const result = await dispatch(d.id, issueId) as unknown as { runId: string }
       used.add((await runOf(result.runId)).deviceId)

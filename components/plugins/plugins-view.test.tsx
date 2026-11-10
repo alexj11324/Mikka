@@ -7,7 +7,7 @@ import type { McpWorkspacePage } from '@/lib/plugins/contracts'
 
 type App = 'github' | 'linear' | 'telegram'
 type State = 'connected' | 'notConnected' | 'paused' | null
-type Read = { states: Partial<Record<App, State>>; failed: App[] }
+type Read = { states: Partial<Record<App, State>>; failed: App[]; codes?: Partial<Record<App, string>> }
 let read: { data?: Read; error?: Error; isLoading?: boolean; isValidating?: boolean }
 let ownFetcher: () => Promise<Read>
 let mcpRead: { data?: McpWorkspacePage; error?: Error }
@@ -149,11 +149,11 @@ test('the plugin store also shows native status failures with retry', async () =
 })
 
 test('successful native reads retain meaningful configured, connected and paused states', async () => {
-  assert.deepEqual(await fetchOwnAppStates(), { states: { github: 'connected', linear: 'connected', telegram: 'connected' }, failed: [] })
+  assert.deepEqual(await fetchOwnAppStates(), { states: { github: 'connected', linear: 'connected', telegram: 'connected' }, failed: [], codes: {} })
   githubResponse.data = { configured: false }
   linearResponse.data = { enabled: false }
   telegram.mock.mockImplementation(async () => ({ configured: false, connected: false }))
-  assert.deepEqual(await fetchOwnAppStates(), { states: { github: null, linear: 'paused', telegram: null }, failed: [] })
+  assert.deepEqual(await fetchOwnAppStates(), { states: { github: null, linear: 'paused', telegram: null }, failed: [], codes: {} })
 })
 
 for (const app of ['github', 'linear', 'telegram'] as const) {
@@ -164,6 +164,9 @@ for (const app of ['github', 'linear', 'telegram'] as const) {
     const first = await fetchOwnAppStates()
     assert.equal(first.states[app], undefined)
     assert.deepEqual(first.failed, [app])
+    // 详情 carries a code and the cause's kind, never the upstream message.
+    assert.match(first.codes?.[app] ?? '', new RegExp(`^${app}_status_failed \\(`))
+    assert.ok(!first.codes?.[app]?.includes('private upstream details'))
     const refreshed = await fetchOwnAppStates({ [app]: 'connected' })
     assert.equal(refreshed.states[app], 'connected')
     assert.deepEqual(refreshed.failed, [app])
@@ -172,10 +175,21 @@ for (const app of ['github', 'linear', 'telegram'] as const) {
 }
 
 
-test('Linear flag evaluation failure is unreadable even when its HTTP response succeeds', async () => {
+test('an unreadable Linear flag (PostHog timeout, quota) is no read failure: the row keeps its state, else paused', async () => {
   linearResponse = { ok: true, data: { enabled: false, state: 'unavailable' } }
-  assert.deepEqual(await fetchOwnAppStates({ linear: 'connected' }), { states: { github: 'connected', linear: 'connected', telegram: 'connected' }, failed: ['linear'] })
+  assert.deepEqual(await fetchOwnAppStates({ linear: 'connected' }), { states: { github: 'connected', linear: 'connected', telegram: 'connected' }, failed: [], codes: {} })
+  assert.deepEqual(await fetchOwnAppStates(), { states: { github: 'connected', linear: 'paused', telegram: 'connected' }, failed: [], codes: {} })
   assert.equal(linear.mock.callCount(), 0)
+})
+
+test('without PostHog the status route says disabled, so Linear shows paused with no banner', async () => {
+  linearResponse = { ok: true, data: { enabled: false, state: 'disabled' } }
+  assert.deepEqual(await fetchOwnAppStates(), { states: { github: 'connected', linear: 'paused', telegram: 'connected' }, failed: [], codes: {} })
+})
+
+test('a malformed answer from our own status endpoint is still a read failure', async () => {
+  linearResponse = { ok: true, data: { state: 'enabled' } }
+  assert.deepEqual(await fetchOwnAppStates({ linear: 'connected' }), { states: { github: 'connected', linear: 'connected', telegram: 'connected' }, failed: ['linear'], codes: { linear: 'linear_status_failed (malformed)' } })
 })
 
 test('revalidation reads the existing SWR cache so a failed refresh retains its connected row', async () => {

@@ -1,6 +1,14 @@
 # Proposed Skill source boundary for #232 / #237
 
-Status: **coordination proposal only**. #232 currently has an issue, not an
+This is the historical coordination proposal for #232 / #237. Its example types
+and absence-of-implementation statements describe that proposal's baseline.
+The implemented schemas are `packages/protocol/src/skill-artifact.ts`, with
+single-artifact claim receipts and separate authenticated mount evidence in
+`lib/self-improvement/skill-mounts.ts`. Registry, selection and evaluation paths
+are mapped in [self-improvement.md](self-improvement.md). Use those sources for
+integration rather than copying the proposed envelope below.
+
+Recorded status: **coordination proposal only**. #232 had an issue, not an
 implemented trusted registry/assignment receipt path. #238 does not consume
 this proposed type and must continue to record `skillUsage: "unrecorded"`.
 Shape validation, feedback, a worker report or a content hash alone cannot

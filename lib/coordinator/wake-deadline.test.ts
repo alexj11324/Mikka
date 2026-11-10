@@ -44,7 +44,7 @@ stub('./wake-recovery.ts', { deliverWake, createWakeRecovery: () => ({
   due: async () => dueScopes, exhausted: async () => 0, replay: async () => false,
 }) })
 mock.module('workflow/api', { namedExports: { start: async (workflow: unknown, args: unknown[]) => {
-  if (workflow === coordinatorTurn) { assert.deepEqual(args, [scope.userId, scope.botId]); trace.push('turn-start'); if (turnThrows) throw new Error('private provider error'); return { runId: 'synthetic-turn' } }
+  if (workflow === coordinatorTurn) { assert.deepEqual(args, [scope.userId, scope.botId, 1]); trace.push('turn-start'); if (turnThrows) throw new Error('private provider error'); return { runId: 'synthetic-turn' } }
   assert.equal(workflow, deadlineWorkflow)
   assert.ok(trace.includes('claim-committed'))
   if (turnThrows) assert.ok(trace.includes('failed-committed'))

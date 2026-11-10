@@ -1,5 +1,11 @@
 # Nonproduction adapter wiring and controlled local acceptance
 
+> Historical local-adapter implementation and Preview design.
+> [The Vercel adapter record](194-vercel-publication-v2.md) describes the later
+> implementation and its removal from code-candidate acceptance. Current
+> [server composition](../../lib/factory/server.ts) registers Skill activation
+> only. The design and pending authorization below describe this earlier batch.
+
 `lib/factory/local-publication.ts` implements an actual local artifact target. It validates the exact repository and candidate provenance, plus a separately approved `local-*` destination environment, accepts only the server's UUID reservation as a filename, creates an immutable mode-0600 candidate record, fsyncs it and verifies its contents by reading it back. Its receipt is `local-artifact:<reservation>:sha256:<content hash>`. This publishes a candidate record into an isolated local target; it does not deploy an application or manufacture a provider success response.
 
 ## Existing server wiring

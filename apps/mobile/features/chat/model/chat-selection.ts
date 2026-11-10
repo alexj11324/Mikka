@@ -12,6 +12,15 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { key: 'translate', label: '翻译', instruction: '翻译这段：中文译成英文，其他语言译成中文。' },
 ]
 
+/**
+ * 添加到对话 (Alex 2026-11-08), first in the row: the selection goes into the composer as its quote, as Codex adds a
+ * selection to the conversation; nothing is sent. It replaces swipe-to-quote.
+ */
+export const ADD_TO_CHAT: SelectionAction = { key: 'add', label: '添加到对话', instruction: '' }
+
+/** The capsules above the composer while words are selected. */
+export const SELECTION_BAR: readonly SelectionAction[] = [ADD_TO_CHAT, ...SELECTION_ACTIONS]
+
 /** A message quoting `quote` (each line marked `> `), then `words`. */
 export function quotedMessage(quote: string, words: string) {
   const lines = quote.trim().split('\n').map(line => `> ${line}`).join('\n')

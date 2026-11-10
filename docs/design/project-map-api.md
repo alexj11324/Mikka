@@ -104,7 +104,7 @@ rejected/abandoned option 必须说明理由。当前记录中路线停止的位
 
 本地检查由 source/type/lint、真实隔离 PostgreSQL、真实 HTTP PAT 与 worker MCP 调用，以及 daemon stdio 协议测试组成。源 SQL 用当前迁移后的真实 schema 校验。
 
-生产验收沿用现有租用测试账号机制；真实订阅使用已授权 Owner 与其仍有效的订阅绑定。凭证不得进入日志、截图或 GitHub。按最新 AGENTS.md，仅记录 Claude Code 订阅 claude-haiku-5-5、Codex 订阅 gpt-6-luna 两条路径；DeepSeek 不再是合并和验收门禁。订阅需先证明原 thread 仍工作，再真实插话改变方向，核对工具记录、实际执行身份和产物；只列出模型、只读工具目录或结束后续跑不算这项通过。生产写入/改设置仍需 Alex 的具体授权。
+生产验收使用 `AGENTS.md` 指定的共享验收账号，在其已授权的团队工作区使用有效订阅绑定。凭证不得进入日志、截图或 GitHub。按最新 AGENTS.md，仅记录 Claude Code 订阅 claude-haiku-5-5、Codex 订阅 gpt-6-luna 两条路径；DeepSeek 不再是合并和验收门禁。订阅需先证明原 thread 仍工作，再真实插话改变方向，核对工具记录、实际执行身份和产物；只列出模型、只读工具目录或结束后续跑不算这项通过。生产操作遵循对应 issue 已有授权和 `AGENTS.md` 的验收范围。
 
 完成记录以对应 issue 的 PR、commit、Web deploy、生产 version 和脱敏验收报告为准。
 

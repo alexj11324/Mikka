@@ -16,6 +16,7 @@
 //
 // Naming (firm): the machine is a `device`; agents are named by `harness`.
 import { z } from "zod"
+import { workspaceReadCommand } from './coding-workspace'
 
 import { modelNameSchema, runPolicySchema } from "./agent-policy"
 import { signedPolicySnapshotSchema } from "./policy-snapshot"
@@ -300,6 +301,9 @@ export const runCheckpointSchema = z.object({
   takenAt: isoTime,
   /** The latest tree could not be checkpointed; it supersedes older patches. */
   unavailableReason: z.literal('too_large').optional(),
+  /** Full-source review proof is optional and independently validated. It is
+   * consumed in memory, never retained in recovery records or claim payloads. */
+  review: z.unknown().optional(),
 })
 export type RunCheckpoint = z.infer<typeof runCheckpointSchema>
 
@@ -657,6 +661,8 @@ export type RunCommand = z.infer<typeof runCommandSchema>
  */
 export const runCommandsResponse = z.object({
   commands: z.array(runCommandSchema).max(500),
+  /** Owner-scoped reads, delivered only to a daemon advertising protocol v1. */
+  workspaceRequests: z.array(workspaceReadCommand).max(4).optional(),
   /**
    * Runs queued for this device (outside `skip`), so it claims them now
    * instead of on its next heartbeat. A queued run also ends the long-poll.

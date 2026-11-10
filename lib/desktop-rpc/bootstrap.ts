@@ -8,6 +8,7 @@ import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { readWorkspaceLink } from '@/lib/workspace-admin/links'
 import { ActionFailureError } from '@/lib/action-error'
 import { authorizedCacheWorkspace } from '@/lib/swr/cache-scope'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { safeDesktopSession } from './session'
 import { desktopFeatures } from './features'
 import { getEdition } from '@/lib/edition'
@@ -27,7 +28,7 @@ export async function desktopBootstrap(workspaceId?: string): Promise<DesktopBoo
   const session = await desktopSession()
   if (!session) throw new ActionFailureError('authRequired')
   const [config, onboarding, cacheWorkspace] = await Promise.all([desktopConfig(session.user.id), onboardingDone(session.user.id).then(done => !done).catch(() => false),
-    authorizedCacheWorkspace(session.user.id, workspaceId),
+    authorizedCacheWorkspace({ id: session.user.id, [enterprisePrincipal]: { kind: 'session', sessionId: session.session.id } }, workspaceId),
   ])
   let computer: 'none' | 'ask' = 'none'
   if (onboarding && byoE2BKeyEnabled()) {

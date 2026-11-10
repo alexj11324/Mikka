@@ -1,6 +1,6 @@
 # Custom MCP connections in workspace settings
 
-- **Status:** implementation in review; production-build screenshots pending.
+- **Status:** implemented sharing controls and API contracts. See #1163 for acceptance evidence.
 - **GitHub:** #1163.
 - **Owner thread:** `fix/mcp-share-ui-1163`, with the shared-MCP backend follow-up.
 - **Layout source:** the existing Settings › Connections screen and API-key sharing controls on main; no new navigation or design direction.
@@ -35,7 +35,8 @@ The domain stays connection, account holder, workspace membership, authorization
 
 `SettingsSection`, `SettingRow`, `AppTile`, `Switch`, `Label`, `Badge`, `AlertDialog` and `SettingsSaveError` supply the UI. `McpConnections` composes these for the new API; it creates no new primitive. R-31, R-40, R-42, R-70, R-74, R-75 and R-76 apply. Confirmation copy describes the granted account authority; it is not an introductory subtitle. All copy lives in `Settings.mcpConnections` in both locale files.
 
-The GET is scoped by `workspaceId`; the PATCH uses exactly `{serverId, workspaceId, shared}`. Owner identity, active membership and fresh-session enforcement remain server-side. The client never sends another owner, an endpoint or a credential in a share request.
+`GET /api/integrations/mcp?workspaceId=WORKSPACE_ID` lists the workspace projection.
+`PATCH /api/integrations/mcp/shares` uses exactly `{serverId, workspaceId, shared}`. Owner identity, active membership and fresh-session enforcement remain server-side. The client never sends another owner, an endpoint or a credential in a share request.
 
 ## Scope and acceptance
 

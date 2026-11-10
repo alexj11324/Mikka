@@ -108,6 +108,11 @@ Deployment requirement: the GitHub App that signs people in must grant
 `contents: write` and `pull_requests: write`, or GitHub refuses the merge
 (`githubMergeForbidden`).
 
+The public v2 task flow and report/deliverable acceptance receipts are described
+in [the flow contract](1276-flow-v2.md). The browser merge restriction here
+applies to the in-product Factory API. Repository issue owners follow the
+separate [development workflow](../dev-workflow.md).
+
 ## Credentials
 
 Four boundaries remain separate, as in Warp Factories:
@@ -119,8 +124,14 @@ Four boundaries remain separate, as in Warp Factories:
 | Harness authentication | Used inside the execution environment for direct provider calls |
 | Repository identity | `credentialStrategy` selecting creator or executor identity |
 
-An agent receives only the secrets explicitly granted to it. Anthropic-style
-output redaction is a backstop, not a substitute for least privilege.
+Native task execution follows the [machine execution decision](../design/decisions/2026-11-06-1800-machine-is-the-execution-boundary.md).
+Deliver the selected CLI authentication and authorized GitHub credential through
+the native mechanisms. Other third-party Secrets follow the separate
+[credential exposure decision](../design/decisions/2026-11-08-0240-credential-exposure-boundary.md).
+The current [task-secret projection](../../lib/secrets/runtime.ts) separates
+protected Secrets from ordinary env and explicit direct-exposure compatibility.
+Record runtime acceptance against the tested revision. Secret names in a
+definition and output masking alone do not establish protected delivery.
 
 ## Execution and budget
 

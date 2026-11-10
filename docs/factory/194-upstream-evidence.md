@@ -1,5 +1,11 @@
 # Exact #193 → #194 evidence handoff
 
+> Frozen PR199 handoff. The composition example and acceptance prerequisites
+> below belong to that revision. The integrated composition is
+> [server.ts](../../lib/factory/server.ts), with [flow v2](1276-flow-v2.md),
+> [merge acceptance](warp-aligned-factory.md#acceptance-is-the-merge-528) and
+> [skill approval](494-approve-and-publish.md).
+
 Verified by reading frozen PR199 `05f9dbb3e357268df73ea863f7ebac3edfb5967b`, including `checks.ts`, `reconcile-check.ts` and `server.ts`. No #193 files/validators or #192 contract fields are modified by #194. This is source/schema compatibility plus local layer verification, not a claim of real CC/Codex acceptance.
 
 ## Same-store composition

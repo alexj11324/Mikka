@@ -1,6 +1,6 @@
 # Connect a computer and approve daemon login
 
-- **Status:** in review; new frames require Alex's acceptance.
+- **Status:** implemented connection and packaging contracts. The Figma frames listed here retain their recorded review status.
 - **GitHub:** #357, MVP item 4.
 - **Figma:** existing accepted style guide `98:2`; [device dialog and code confirmation review](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07?node-id=347-4758), frames `347:4761`, `347:4798`, `347:4835`, `347:4873`, `347:4890`, `347:4907`, `347:4916`, `349:4879`, `349:4894`, `349:4909`, `349:4916` are pending Alex's acceptance.
 - **Owner thread:** `codex/mvp-device-auth`.
@@ -26,8 +26,8 @@ dialog is no longer the Settings entry point.
 Reuse the existing dialog, buttons, code block, input and authentication page
 components with the accepted Mikka neutral tokens and R-32 typography. The
 dialog has three ordered commands, each copyable; no subtitle or SSH form.
-Use the current origin and base path in Preview commands. The production
-default can omit `--server`.
+Use the current origin and base path in nonproduction and self-hosted commands.
+The production default can omit `--server`.
 
 The approval page shows the signed-in account, terminal code and approve/deny
 actions. Cover code entry, review, loading, approved, denied, expired/invalid
@@ -59,23 +59,25 @@ workspace dependency. The source package is private; the distribution is not.
 The isolated pack test exercises the compiled CLI outside the workspace with
 only its declared external dependencies, including manual `--token` login.
 
-The public package name and manual npm trusted-publishing workflow are
-**待 Alex 确认** in `decisions.md`; no release has been executed. Configure the
-approved npm package's trusted publisher for this repository and workflow
-before dispatching it. Production variables: `MIKKA_BASE_PATH` and
-`MIKKA_DAEMON_PACKAGE_NAME` at release build time; existing auth/database
-variables remain in Infisical. `NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME` must match
-the approved published name in the web build. No new long-lived npm token is required by the
-proposed workflow.
+The configured public package is `@aspectlylabs/mikka`.
+`.github/workflows/publish-daemon.yml` publishes on relevant `main` pushes and
+supports manual dispatch, using npm trusted publishing and provenance. It
+requires checks for the exact source commit and verifies the sealed package
+again after its installed-package test. Release results belong to that run's
+evidence. `MIKKA_DAEMON_PACKAGE_NAME` selects the release package name and
+`NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME` supplies the matching web name. Existing
+auth/database configuration remains in Infisical. See the
+[daemon guide](../../packages/daemon/README.md) for installation and release details.
 
 ## Verification and remaining gates
 
 Better Auth integration fixtures cover an unknown client, Preview base path,
 pending/approved/denied/expired grants, owner binding, exactly one exchange and
 session cleanup. Existing daemon HTTP login tests verify polling and reject
-unexchanged session tokens. Command tests cover the exact Preview origin and
+unexchanged session tokens. Command tests cover the configured application origin and
 base path. Packaging tests use the packed artifact, not the TypeScript entry.
 
-Actual PostgreSQL bootstrap/replay runs only in isolated GitHub CI. Before this
-item can ship, the UI review, green PR CI, published npm package and fixed-SHA
-Preview browser-login acceptance still need their own evidence.
+Run PostgreSQL bootstrap/replay checks in isolated cloud Linux or GitHub CI.
+Record exact-revision API/CLI, packed-package and production-build screenshot
+evidence under [acceptance.md](../acceptance.md). Actual provider sign-in and
+publication need their own evidence. Branches have no Vercel Preview.

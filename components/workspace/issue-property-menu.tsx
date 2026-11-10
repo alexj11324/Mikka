@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { ROW_VALUE } from './issue-property-row'
 import { statusDots, statusIconTints, statusTones, type StatusTone } from '@/lib/status-appearance'
 
-export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, disabled, iconOnly = false, variant = 'badge', displayValue, renderIcon, onChange }: {
+export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, disabled, iconOnly = false, variant = 'badge', displayValue, renderIcon, valueIcon, onChange }: {
   label: string
   value: string
   options: readonly { value: string; label: string; icon?: LucideIcon; iconProps?: Pick<LucideProps, 'viewBox' | 'strokeWidth'>; indicatorClassName?: string; tone?: StatusTone }[]
@@ -25,6 +25,8 @@ export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, d
   displayValue?: string
   /** iconOnly: draws the value's mark instead of its lucide icon (the board card's priority bars). */
   renderIcon?: (value: string) => ReactNode
+  /** row: drawn in place of the value's icon (the status row's task state, with `displayValue` its words). */
+  valueIcon?: ReactNode
   onChange: (value: string) => void
 }) {
   const t = useTranslations('Common')
@@ -45,7 +47,7 @@ export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, d
     {iconOnly ? <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" disabled={disabled} className="size-5 rounded-sm text-muted-foreground" title={valueLabel} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
       {renderIcon ? renderIcon(value) : <ValueIcon data-icon="inline-start" className={cn('size-3.5 shrink-0', statusIconTints[tintTone])} {...option?.iconProps} />}
     </DropdownMenuTrigger> : variant === 'row' ? <DropdownMenuTrigger render={<Button variant="ghost" size="sm" disabled={disabled} className={ROW_VALUE} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
-      <ValueIcon data-icon="inline-start" className={cn('shrink-0', statusIconTints[tintTone])} {...option?.iconProps} />
+      {valueIcon ?? <ValueIcon data-icon="inline-start" className={cn('shrink-0', statusIconTints[tintTone])} {...option?.iconProps} />}
       <span className="truncate">{valueLabel}</span>
     </DropdownMenuTrigger> : <DropdownMenuTrigger render={<BadgeButton disabled={disabled} variant="outline" size="xl" className={cn('cursor-pointer px-2 py-0.5 hover:brightness-95', statusTones[tintTone])} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
       {valueLabel}

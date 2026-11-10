@@ -5,7 +5,7 @@ import { once } from 'node:events'
 import { gzipSync } from 'node:zlib'
 import { mock, test } from 'node:test'
 import type { PoolClient } from 'pg'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedPersonalWorkspace, seedWorkspace } from '../../tests/support/workspace-admin-db'
 
 test('project map uses real PostgreSQL and normal HTTP PAT authorization', { skip: !dbUrl, timeout: 180_000 }, async t => {
   // Sample every SQL result on the real app/workspace pools only during the
@@ -47,10 +47,9 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
   const overview = await import('../../app/api/projects/[projectId]/map/overview/route')
   const source = await import('../../app/api/projects/[projectId]/map/sources/[sourceRef]/route')
   const owner = await seedUser(connection, 'map-reader'), peer = await seedUser(connection, 'map-peer')
-  const home = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }])
-  const other = await seedWorkspace(connection, peer, [{ userId: peer, role: 'admin' }])
-  await connection.query('UPDATE mikka_workspaces SET kind=\'personal\' WHERE id=ANY($1::uuid[])', [[home.id, other.id]])
-  const projectId = await seedProject(connection, owner, []), issueId = await seedIssue(connection, owner)
+  const home = { id: await seedPersonalWorkspace(connection, owner) }
+  const other = { id: await seedPersonalWorkspace(connection, peer) }
+  const projectId = await seedProject(connection, owner, []), issueId = await seedIssue(connection, owner, home.id)
   await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [projectId, JSON.stringify([issueId])])
   const botId = await seedBot(connection, home.id, owner), agentId = await seedAgent(connection, owner)
   const runId = await seedRun(connection, { userId: owner, agentId, botId, issueId, status: 'running' })
@@ -70,7 +69,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
     await factoryFixture.query('COMMIT')
   } catch (cause) { await factoryFixture.query('ROLLBACK'); throw cause } finally { factoryFixture.release() }
   const artifactId = randomUUID(), versionId = randomUUID()
-  await connection.query(`INSERT INTO artifacts(id,"userId",kind,title,"runId","issueId") VALUES($1,$2,'markdown','结果 report.md',$3,$4)`, [artifactId, owner, runId, issueId])
+  await connection.query(`INSERT INTO artifacts(id,"userId",kind,title,"runId","issueId","workspaceId") VALUES($1,$2,'markdown','结果 report.md',$3,$4,$5)`, [artifactId, owner, runId, issueId, home.id])
   await connection.query(`INSERT INTO artifact_versions(id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName")
     VALUES($1,$2,1,'isolated/unused',$3,$4,$5,'fixture')`, [versionId, artifactId, hidden + 'a'.repeat(120_000), 'b'.repeat(64), 120_040])
   const messageId = randomUUID(), original = '真实来源 ' + '甲乙丙丁'.repeat(3000)
@@ -169,7 +168,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
       assert.match(response.headers.get('etag')!, /^"[a-f0-9]{64}"$/)
       assert.equal(body.live.ownerId, owner); assert.equal(body.live.workspaceId, home.id)
     }
-    const anotherIssue = await seedIssue(connection, owner)
+    const anotherIssue = await seedIssue(connection, owner, home.id)
     const anotherRun = await seedRun(connection, { userId: owner, agentId, botId, issueId: anotherIssue })
     await connection.query('UPDATE workspace_projects SET "issueIds"=$2,revision=revision+1 WHERE id=$1', [projectId, JSON.stringify([issueId, anotherIssue])])
     const current = await readPage()
@@ -186,16 +185,16 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
     const response = await get(); assert.equal(response.status, 409); assert.equal((await response.json()).code, 'map_scope_conflict')
     await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [projectId, JSON.stringify([issueId])])
   })
-  await t.test('batched scope preserves owner, tenant, deleted-task and malformed-link boundaries', async () => {
+  await t.test('batched scope uses immutable tenant ownership despite malformed sync links', async () => {
     const shared = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
     const team = await seedTeam(connection, shared.id, owner), foreignTeam = await seedTeam(connection, other.id, peer)
-    const unlinked = await seedIssue(connection, owner)
-    // Historical workspace rows use the same isolated fixture pattern as
-    // issue-visibility-narrow.db.test.ts; no promotion guard is disabled.
+    const unlinked = await seedIssue(connection, owner, home.id)
+    // Team links describe synchronization; the bound workspace remains the
+    // authorization boundary even when historical links are malformed.
     const workspaceIssue = async (workspaceId: string, teamId: string) => {
       const id = randomUUID()
-      await connection.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"linearSyncBlocked")
-        VALUES($1,$2,'Scope fixture','{"type":"doc"}','todo','normal','workspace',true)`, [id, owner])
+      await connection.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"linearSyncBlocked","workspaceId","ownershipState")
+        VALUES($1,$2,'Scope fixture','{"type":"doc"}','todo','normal','workspace',true,$3,'bound')`, [id, owner, workspaceId])
       await connection.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [id, teamId, workspaceId, owner])
       return id
     }
@@ -206,7 +205,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
     const project = await seedProject(connection, owner, [{ teamId: team.id, workspaceId: shared.id }])
     const candidates = [unlinked, valid, foreign, mismatched, orphan, deleted, valid, 'not-a-uuid', null]
     await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [project, JSON.stringify(candidates)])
-    for (const [reader, expected] of [[owner, [valid, mismatched, orphan]], [peer, [valid]]] as const) {
+    for (const [reader, expected] of [[owner, [valid, mismatched, orphan]], [peer, [valid, mismatched, orphan]]] as const) {
       const original = await resolveProjectScope(reader, project, shared.id)
       const batched = await resolveProjectReadScope(reader, project, shared.id)
       assert.deepEqual([...batched.issueIds].sort(), [...expected].sort())
@@ -370,10 +369,10 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
     const team = await seedTeam(connection, shared.id, owner)
     const project = await seedProject(connection, owner, [{ teamId: team.id, workspaceId: shared.id }])
     const bot = await seedBot(connection, shared.id, owner), ids = Array.from({ length: 100 }, () => randomUUID())
-    await connection.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"linearSyncBlocked","createdAt")
+    await connection.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"linearSyncBlocked","createdAt","workspaceId","ownershipState")
       SELECT id,$2,'Synthetic load fixture '||lpad(n::text,3,'0')||' — no provider execution','{"type":"doc"}'::jsonb,
-        'canceled','normal','workspace',true,'2026-10-28T19:56:34.123456Z'::timestamptz+n*interval '1 millisecond'
-      FROM unnest($1::uuid[]) WITH ORDINALITY AS fixture(id,n)`, [ids, owner])
+        'canceled','normal','workspace',true,'2026-10-28T19:56:34.123456Z'::timestamptz+n*interval '1 millisecond',$3,'bound'
+      FROM unnest($1::uuid[]) WITH ORDINALITY AS fixture(id,n)`, [ids, owner, shared.id])
     await connection.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId")
       SELECT unnest($1::uuid[]),$2,$3,$4`, [ids, team.id, shared.id, owner])
     await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [project, JSON.stringify(ids)])
@@ -431,7 +430,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
   })
   await t.test('500/1000 executions have fixed query count and measured per-read KB', async () => {
     for (const count of [500, 1000]) {
-      const project = await seedProject(connection, owner, []), issue = await seedIssue(connection, owner)
+      const project = await seedProject(connection, owner, []), issue = await seedIssue(connection, owner, home.id)
       await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [project, JSON.stringify([issue])])
       await connection.query(`INSERT INTO agent_runs(id,"userId","agentId","issueId",status,prompt,report,"agentDefinition","createdAt")
         SELECT gen_random_uuid(),$1,$2,$3,'succeeded',repeat('p',8192),jsonb_build_object('summary',repeat('r',8192)),

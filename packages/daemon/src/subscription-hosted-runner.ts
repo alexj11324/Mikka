@@ -205,6 +205,9 @@ export async function createHostedBotRunner(host: {
         const cwd = preparation ? resolve(options.cwd) : realpathSync(options.cwd)
         const env = Object.fromEntries(Object.entries({ ...process.env, ...options.env, ...assignment.taskEnv })
           .filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+        // Anonymous initialization uses this same trusted diagnostic switch.
+        // Keep its child environment equal without changing any other key.
+        if (runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming)) env.CLOUD_STARTUP_TIMING = '1'
         const selectedGithub = options.github ?? (assignment.github ? { ...assignment.github, issueId: assignment.issueId, runToken: assignment.mcp?.token } : undefined)
         if (selectedGithub) {
           const credential = selectedGithub.token ? selectedGithub : { ...selectedGithub,
@@ -365,6 +368,8 @@ export async function createHostedBotRunner(host: {
       const { anonymous } = anonymousFor(assignment, options)
       if (assignment.harness === 'codex') {
         const candidate = anonymous as AnonymousCodexCandidate | undefined
+        const startCodex = (final: StartOptions) => start(assignment, final)
+        let boundStart: typeof startCodex | undefined
         const prepared = prepareAgentStart(signal, async control => {
           const stop = () => { void candidate?.close().catch(() => undefined) }
           control.signal.addEventListener('abort', stop, { once: true })
@@ -372,10 +377,13 @@ export async function createHostedBotRunner(host: {
             control.parked()
             const final = await control.finalOptions
             control.signal.throwIfAborted()
-            return await start(assignment, final)
+            return await (boundStart ?? startCodex)(final)
           } finally { control.signal.removeEventListener('abort', stop) }
         })
-        return { ready: prepared.ready, start: prepared.start, cancel: async () => {
+        return { ready: prepared.ready, start: (final: StartOptions) => {
+          boundStart ??= daemonTracer.bindStartupTiming(startCodex)
+          return prepared.start(final)
+        }, cancel: async () => {
           await candidate?.close(); await prepared.cancel()
         }, get preparationTiming() { return candidate?.preparationTiming } }
       }

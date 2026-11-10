@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -38,7 +39,7 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','O','o@example.invalid',true,now(),now()),('other','X','x@example.invalid',true,now(),now())`);
     await pool.query(`INSERT INTO devices (id,"ownerId",name,harnesses,"lastSeenAt") VALUES ($1,'owner','Mac','[]',now())`, [deviceId]);
     await pool.query(`INSERT INTO agents (id,"userId",name,harness) VALUES ($1,'owner','Coder','codex')`, [agentId]);
-    await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{}','todo','normal')`, [issueId]);
+    await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{}','todo','normal',$2,'bound')`, [issueId, await seedFixtureWorkspace(pool, 'owner')]);
     const sourceEventId = randomUUID();
     await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [sourceEventId, sourceEventId]);
     const report = { criteria: [
@@ -172,7 +173,7 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
 
     await t.test('v2 clarification preserves its latest missing context without inventing an execution history', async () => {
       const clarificationIssue = randomUUID(), requestId = randomUUID(), answerId = randomUUID();
-      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Clarify fixture','{}','todo','normal')`, [clarificationIssue]);
+      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Clarify fixture','{}','todo','normal',$2,'bound')`, [clarificationIssue, await seedFixtureWorkspace(pool, 'owner')]);
       await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"clarify"}')`, [requestId, requestId]);
       const routed = await store.route('owner', { issueId: clarificationIssue, sourceEventId: requestId, eventId: randomUUID(), rationale: 'Needs context', missingInformation: ['Which file?'], missingPermissions: ['Permission token=fixture'], needsSpec: true });
       const read = () => readFactoryTaskView(pool, store, 'owner', routed.task.id);

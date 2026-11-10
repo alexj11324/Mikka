@@ -336,6 +336,30 @@ describe("unsampled startup timings", () => {
     ])
   })
 
+  it("keeps bound startup work out of foreign, closed, and unmeasured scopes", async () => {
+    const tracer = new DaemonTracer(), records: DaemonStartupTiming[] = []
+    const foreign = { "mikka.run.id_hash": runIdHash("foreign-run"), "mikka.harness": "codex" }
+    const phase = (identity: Record<string, string>) =>
+      tracer.span("daemon.adapter.auth.context", identity, async () => 42)
+    const unmeasured = tracer.bindStartupTiming(phase)
+    let bound = unmeasured
+    const options = { onStartupTiming: (timing: DaemonStartupTiming) => records.push(timing) }
+    await tracer.span("daemon.adapter.start", attributes, async () => {
+      bound = tracer.bindStartupTiming(phase)
+      expect(await bound(foreign)).toBe(42)
+      expect(await bound(attributes)).toBe(42)
+    }, options)
+    const completed = JSON.stringify(records[0])
+    await tracer.span("daemon.adapter.start", foreign, async () => {
+      expect(await bound({})).toBe(42)
+      expect(await unmeasured({})).toBe(42)
+    }, options)
+    expect(JSON.stringify(records[0])).toBe(completed)
+    expect(records[0].phases.map(phase => phase.name)).toEqual(["daemon.adapter.auth.context"])
+    expect(records[1]).toMatchObject({ runIdHash: foreign["mikka.run.id_hash"], harness: "codex", phases: [] })
+    expect(tracer.headers()).toEqual({})
+  })
+
   it("bounds records and closes the scope before detached CLI activity can append to it", async () => {
     const tracer = new DaemonTracer(), records: DaemonStartupTiming[] = []
     const options = { onStartupTiming: (timing: DaemonStartupTiming) => { records.push(timing) } }

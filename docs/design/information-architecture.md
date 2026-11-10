@@ -1,14 +1,17 @@
 # Information architecture
 
 What each object is, who owns it, where it is managed and found, and the
-navigation tree. Written 2026-11-02 against `main` at `fa4ac2b`, with PRs #890,
-#892 and #895 read as in flight.
+navigation tree. The object/lifecycle tables and audit findings in §§1–4,
+§6's inconsistency table and §8 record the 2026-11-02 audit of `fa4ac2b`,
+when #890, #892 and #895 were in flight. Their counts, line numbers, gaps
+and proposed fixes describe that revision. The accepted navigation in §5
+and the linked feature contracts incorporate later decisions.
 
 Sources, higher wins (`README.md`): Alex's decisions, `glossary.md`,
 `rules.md`, then code. Tenancy rules T1–T6 are in
 [decision 2026-11-02-0231](decisions/2026-11-02-0231-workspace-is-the-tenant.md),
-which waits for Alex's confirmation; where it disagrees with a confirmed
-decision, this page says so.
+which records the tenant rules. Later accepted decisions take priority
+over the audit snapshot.
 
 Method texts, cited by short name:
 
@@ -88,7 +91,8 @@ since `issues` has no `workspaceId`.
 
 ## 2. Ownership and lifecycle (workspace area)
 
-Each cell cites the code path; "not implemented" means no code path exists.
+Each cell cites the code path read at `fa4ac2b`; "not implemented" means no
+path was found at that revision.
 
 | Object | Created by | Belongs to | Changed by | Transfer | Delete | Owner leaves a shared workspace | Owner deletes the account (personal workspace) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -104,7 +108,7 @@ Each cell cites the code path; "not implemented" means no code path exists.
 | Model credential | Owner | Account | Owner | n/a | Owner | Shares in that workspace deleted, runs on them stopped (`members.ts:76-85`) | Deleted (owner column) |
 | Credits, billing | Stripe webhook (`lib/billing/service.ts:145`) | Workspace | Admins (计费) | n/a | With the workspace, refused while a subscription is live (`general.ts:172`) | Their card designation released with a grace period (`members.ts:74`), credit share deleted (`:78`) | Personal workspace's billing rows remain (see first row) |
 
-## 3. Model vs implementation
+## 3. Model vs implementation on 2026-11-02
 
 Severity: P0 blocks a key task or loses data; P1 frequent or a security,
 credential or data-retention risk; P2 friction or drift. Occurrence × impact
@@ -189,81 +193,96 @@ check uses server-authorized access, including a current team share. See
 
 ## 5. Navigation tree
 
-### Organization, labeling, navigation, search (IA-1…IA-7)
+The accepted structure follows [tasks-only lists](decisions/2026-11-07-2045-tasks-only-threads-inside.md),
+[one task conversation](decisions/2026-11-07-2300-one-conversation-per-task.md)
+and the [iOS header decision](decisions/2026-11-08-0120-ios-header-like-comma.md).
+The web source exposes slots for this structure. Official builds fill them
+from `mikka-hosted-ui` ([UI slots](../ui-overlay.md)); the defaults in this
+repository can still show older thread lists and only have to compile
+([one UI](decisions/2026-11-08-2133-one-ui.md)). The map describes
+accepted navigation, with implementation boundaries listed after it.
 
-| System | Mikka | Note |
-| --- | --- | --- |
-| Organization | Topical by object: bots (left), the chat (centre), threads (right); rail pages by kind (建议, 看板, 插件, Artifact) | IA-1: object-oriented matches the tasks "talk to a bot", "check work" |
-| Labeling | § 6 | IA-3 |
-| Navigation | Global: window bar and rail. Local: bot list, settings sections, 概览 tabs. Contextual: chat cards and chips | NAV "layer the systems" |
-| Search | ⌘K over bots, chats, group chats, tasks, projects (`components/nav/global-search.tsx`, `lib/site-search.ts:14-16`); not threads, Artifacts or settings | IA-5: known-item search misses two primary objects |
+### Web and desktop
 
-### Web, desktop width (≥ 1280px)
-
-```
-Window bar (44px, R-35)
-├── ← →                         history (R-82)
-├── ⌘K search pill              global
-├── [打开右栏]                   when the right column is closed
-├── 全部线程                     target, top bar global entry (in progress, another session)
-└── 浏览器 globe                 R-57
-Icon rail (68px, icons only, R-35)
-├── 主页 ─ bot list | chat | right column
-├── 建议 ─ cards | Coordinator chat (R-55)
-├── 看板 ─ tasks, projects, teams (R-82)
-├── 插件 ─ apps, skills
-├── Artifact ─ categories | table (R-56)
-├── 重启以更新                   desktop app only
-└── avatar ─ account menu: accounts, workspaces, 创建工作区, 设置, 添加账户, 退出登录 (R-75)
-Card
-├── Bot list (left): bots, group chats; 「+」 › 新建 Bot / 新建群聊 (R-01)
-├── Centre: chat, or a task page, or a rail page
-└── Right column (R-50, R-82), one of:
-    ├── 概览: bot header, tabs 详情 / 线程 / PR / 电脑
-    ├── 全部线程 (current: the second pill of this header, components/nav/context-panel.tsx:171)
-    ├── a thread: 对话 / 验收, composer at the bottom, ended or not (#892)
-    └── 浏览器
-设置 (same frame, R-35; /settings?section=…, /settings/members, /settings/teams)
-├── 账号: 账户 · 安全 · 偏好设置 · 通知 · 记忆与建议 · 连接 · 模型与订阅 · 密钥与登录 · 数据与隐私 · 设备
-├── <workspace name>: 常规 · 成员* · 团队* · Bot 与 Agents · 团队权限* · 密钥与环境 · 审计日志* · 用量 · 计费   (* team-only)
-└── 你的团队: one row per team, 创建团队 (shared workspace only)
+```text
+Window bar
+├── Back / forward
+├── Search (⌘K)
+├── Right column toggle
+├── 全部任务 (hand + count of 等你处理 tasks)
+└── Browser globe
+Icon rail
+├── Home → bot list | chat | right column
+├── 建议
+├── 看板 → tasks, projects and teams
+├── 插件
+├── Artifact
+└── Account menu → accounts, workspaces and Settings
+Right column beside the chat
+├── Bot overview → 详情 / 任务 / PR / 电脑
+├── 全部任务 → 等待你 / 进行中 / 待办 / 已完成
+├── Task detail → properties, description and chronological 活动
+└── Task conversation → one conversation, oldest first, composer on the newest
+Centre pages
+├── Task opened from 看板 or a link
+├── Project / team under 看板
+└── Settings → account and workspace sections
+Artifact → shared window over the page
 ```
 
-### Narrow desktop (768–1279px) and phone web (< 768px)
+A chat card and right-panel row open task detail beside the chat. A 活动 row
+opens the task's one conversation at that Agent's stretch. Other conversation opens
+start at the newest message. PRs and web pages open externally. A task opened
+as a centre page retains its origin for close/back and list navigation (R-82).
+Narrow phone web substitutes a full-page right column and a bot-list sheet.
 
-| Element | ≥ 1280 | 768–1279 | < 768 (phone web) |
-| --- | --- | --- | --- |
-| Window bar (back, ⌘K, panel, globe) | Shown | Shown | Hidden (`components/app-shell.tsx:55`, `md:grid`) |
-| Icon rail | Shown | Shown | Hidden (`icon-rail.tsx:52`); its items move to the bot list's footer with the account menu (`bot-list.tsx:184-187`) |
-| Bot list | Column, collapsible | Column, collapsible | Off-canvas sheet behind the header button |
-| Right column (概览, 全部线程) | Inline (`context-panel.tsx`, `xl:flex`) | Sheet over the content (`issue-workspace.tsx:180`) | No opener: `openPanel` is called only from the window bar (gap G2) |
-| Conversation pill | Shown | Shown | Hidden (`conversation-pill.tsx`, `md:flex`) |
-| Search | Pill in the window bar | Pill | Header search icon, except on 插件, 建议, Artifact |
-| Settings sections | Column | Column | Sheet with the rail items at its foot (`settings-sidebar.tsx`, SP "mobile treatment") |
+`workspace-navigation.ts` owns navigation, including `?task=` for the task
+column and the legacy `?thread=` / `?threads=` route keys. `ContextPanel`
+uses the `bot-tasks` slot and its optional `LISTS_TASKS` export. `ThreadColumn`
+uses the optional `task-conversation` slot and otherwise opens a single
+`IssueThreadPanel`. These fallbacks do not establish task-only parity in an
+unconfigured build. `lib/site-search.ts` exposes history, group and task
+search sources; a task-conversation hit is represented by its task.
 
-### Desktop app (Electron, same UI)
+### Coding review
 
-Differs only in: window bar padding for the macOS traffic lights and drag
-region; translucent frame; 重启以更新 above the avatar; system notifications
-when a run enters 等你 or fails, and a Dock badge with the count of runs
-waiting for the person; clicking a notification opens the task
-(`platforms.md`). No second settings surface.
+The accepted [coding-review layout](decisions/2026-11-08-1230-coding-workspace.md)
+opens one full review page from a task's summary line or 审阅 action. The
+conversation, final whole-PR diff, comments and checks live there. Files,
+terminal and preview belong in ⋯. `lib/code-review/client.ts` records the
+proposed backend contract; public review slots render nothing until a UI
+layer supplies them. Native review screens exist in `features/review/`.
+Source presence does not establish integrated review or GitHub acceptance.
 
-### Native iOS app (for comparison)
+### Native iOS
 
-One Stack in a push drawer: the chat list is home with header search; the drawer holds the workspaces, 线程, 任务, 建议, 插件 and 设置 (`mobile.md`).
-Threads are a top-level page there: the web is the only client where all
-threads sit only inside the panel of the bot that dispatched them.
+```text
+NativeTabs
+├── Bot → bot or group chat → bot information / tasks
+├── 任务 → task detail → the task's conversation
+├── 建议 → Coordinator chat / plugins
+├── 设置 → account, workspaces and settings pages
+└── Search → bots, groups and tasks
+```
 
-### Global entries (reachable from anywhere)
+Chats, task details and task conversations push over the tab bar. Each tab
+root has one centred native title, with actions grouped on the right and an
+empty left side. Bot's + creates a Bot or group; 任务 has filter and +.
+Workspaces switch only in 设置 › 工作区. Tabs carry no badges. Rows show
+the task's own state glyph, with its semantic colour; 活动 rows show their
+own result and never the hand. Native source is in `apps/mobile/app/(tabs)`
+and `apps/mobile/features/tasks/`; [mobile.md](mobile.md) owns the details.
 
-| Entry | Now | Target |
-| --- | --- | --- |
-| ⌘K search | Window bar pill and ⌘K; settings pill asks the app to open it (`lib/settings-navigation.ts`) | Also threads, Artifacts and settings sections (G3) |
-| 全部线程 | Pill inside the right column's header | Top-bar entry, opens in the right column beside the centre (R-82); in progress in another session |
-| 等你 inbox / notifications | Web: none. `inbox` section (收件箱, followed tasks) exists in `workspace-navigation.ts:12` and `workspace-overview.tsx:28` but nothing opens it; `components/app-sidebar.tsx` that linked it is imported nowhere | Rule: the top-bar 全部线程 entry carries the 等你 count, the same number as the desktop Dock badge (heuristic "visibility of system status"; built in the top-bar 全部线程 PR) |
-| 设置 | Account menu and ⌘, (R-75) | Unchanged |
-| Workspace switch | Account menu only (R-75, R-79) | Unchanged |
+### Global entries and notifications
+
+The window bar opens all tasks from any web page. The account menu switches
+workspaces and opens settings. The desktop integration reads live task-run
+updates, counts runs in `waiting_input` for its Dock badge and asks the
+Decisions API which transition notifications to show. Its link names the
+issue and referenced run (`lib/platform/desktop-notifications.ts`). Native
+push routing binds the current server/account and resolves a task-bound run
+to `/task/:id?attempt=:runId`, then the task conversation
+(`apps/mobile/lib/push-route.ts`).
 
 ## 6. Labeling
 
@@ -278,10 +297,10 @@ threads sit only inside the panel of the bot that dispatched them.
 | Shared workspace | 共享工作区 | Shared workspace |
 | Team (inside a workspace) | 团队 | Team |
 | Member | 成员 | Member |
-| Bot list / thread list | Bot / 线程 | Bots / Threads |
+| Bot list / task list | Bot / 任务 | Bots / Tasks |
 | Chat | 对话 | Chat |
 | Thread | 线程 | Thread |
-| All threads | 全部线程 | All threads |
+| All tasks | 全部任务 | All tasks |
 | Task / board | 任务 / 看板 | Task / Board |
 | Artifact | Artifact | Artifact |
 | Agent | Agent | Agent |
@@ -294,7 +313,7 @@ threads sit only inside the panel of the bot that dispatched them.
 | Usage / billing | 用量 / 计费 | Usage / Billing |
 | Right panel / overview | 右栏 / 概览 | Right panel / Overview |
 
-### Inconsistencies (same thing, different names)
+### Inconsistencies recorded on 2026-11-02
 
 | # | Where | Names | Fix |
 | --- | --- | --- | --- |
@@ -318,14 +337,14 @@ threads sit only inside the panel of the bot that dispatched them.
 | P2 | What is bound to the person is stored and shown once, at the account level, the same in every workspace; it enters a workspace only by an explicit share. | T6; ChatGPT and Claude (personal settings separate from workspace admin); GitHub (user PATs and SSH keys vs organization settings) |
 | P3 | A capability a run needs (secrets, environment, Agent and model defaults) exists wherever runs exist, so in every workspace. | T5; GitHub repositories have Actions secrets and environments in personal and organization accounts alike; Vercel Hobby projects have environment variables |
 | P4 | Anything a person checks daily is one click from anywhere: in the window bar or the rail, never inside one bot's panel. | NAV "keep essentials visible"; PM:`persistent-nav`; Linear Inbox and My issues, Slack Activity, GitHub notifications in the header |
-| P5 | Every list a bot's panel shows has a global equivalent, except the bot's computer (R-04). | IA-5 (multiple paths); the iOS app's 线程 tab |
-| P6 | Every primary object is findable by ⌘K: bots, chats, tasks, projects, threads, Artifacts, settings sections. | IA-5 known-item search; PM:`search-accessible`; Linear and GitHub command palettes; Notion search over pages and settings |
+| P5 | Every list a bot's panel shows has a global equivalent, except the bot's computer (R-04). | IA-5 (multiple paths); the iOS app's 任务 tab |
+| P6 | Every primary object is findable by ⌘K: bots, chats, tasks, projects, Artifacts and settings sections. A hit in a task conversation resolves to its task. | IA-5 known-item search; PM:`search-accessible`; Linear and GitHub command palettes; Notion search over pages and settings |
 | P7 | One object opens in one place, whatever the entry point. | R-82; NAV "always answer where am I" |
 | P8 | A destination that does not apply in this workspace says why in one status line instead of vanishing, when someone may look for it. | PM:`empty-nav-state`; H-1; R-40 (state only) |
 | P9 | Phone web keeps every global entry: what the window bar holds moves to the header or the list footer. | PM:`persistent-nav`, `adaptive-navigation`; NAV "never bury primary sections behind a hamburger when space allows" |
 | P10 | One word per object across UI, settings and docs; the glossary decides. | IA-3; H-4; C-06; DM |
 
-## 8. Gaps (current vs target)
+## 8. Gaps recorded on 2026-11-02
 
 | # | Gap | Where | Sev | Breaks | Change | Status |
 | --- | --- | --- | --- | --- | --- | --- |

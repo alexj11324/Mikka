@@ -241,8 +241,10 @@ test('provider health persists across dispatches without changing credential own
       [scope.workspaceId, stranger.ownerId, `${stranger.ownerId}@example.invalid`])
     const mine = await key(scope, ['fixture-mine'])
     const theirs = await key(stranger, ['fixture-theirs'])
-    await run(stranger, { kind: 'api_key', keyId: mine.id }, { kind: 'balance', retryable: false }, now - 20_000, { workspaceId: scope.workspaceId })
-    await run(scope, { kind: 'api_key', keyId: mine.id }, { kind: 'auth', retryable: false }, now - 10_000, { workspaceId: stranger.workspaceId })
+    await assert.rejects(run(stranger, { kind: 'api_key', keyId: mine.id }, { kind: 'balance', retryable: false }, now - 20_000, { workspaceId: scope.workspaceId }), /taskWorkspaceMismatch/)
+    // A foreign-workspace receipt may be botless; it cannot carry a Bot from another tenant.
+    await run(stranger, { kind: 'api_key', keyId: mine.id }, { kind: 'balance', retryable: false }, now - 20_000, { botId: null, workspaceId: scope.workspaceId })
+    await run(scope, { kind: 'api_key', keyId: mine.id }, { kind: 'auth', retryable: false }, now - 10_000, { botId: null, workspaceId: stranger.workspaceId })
     const allowed = await read(scope)
     assert.ok([...allowed.states.values()].every(state => state.credential.usable))
     const foreign: OrderEntry = { id: 'forged', harness: 'codex', model: 'fixture-theirs', source: { kind: 'api_key', keyId: theirs.id } }
@@ -339,7 +341,7 @@ test('provider health persists across dispatches without changing credential own
   await t.test('an independent check switch needs its host event, matching definition and same owned task', async () => {
     const scope = await person('provider-check-feedback')
     const stranger = await person('provider-check-stranger')
-    const issueId = await seedIssue(pool, scope.ownerId)
+    const issueId = await seedIssue(pool, scope.ownerId, scope.workspaceId)
     const saved = await key(scope, ['fixture-check'])
     const source = { kind: 'api_key' as const, keyId: saved.id }
     const sourceId = await run(scope, source, { kind: 'unavailable', retryable: true }, now - 20_000)

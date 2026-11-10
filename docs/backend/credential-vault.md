@@ -1,12 +1,16 @@
 # Account credential backend (#180)
 
 This implements Alex's 2026-10-27 updates to #180 and the rules merged in #343.
-The active design uses AWS KMS immediately. The Infisical vault/master-key
-proposal in the design's historical section is superseded.
+Cloud deployments use AWS KMS. Community deployments use the separately
+implemented `CREDENTIAL_MASTER_KEY` backend and an in-process broker.
+`credentialKms()` in `lib/credentials/kms.ts` selects by edition. See
+[self-hosted services](../self-hosting-byok.md). The original Infisical
+vault/master-key proposal remains superseded.
 
 ## Deployment and identity
 
-The Next application runs in Vercel project `mikka`; the standalone Node APIs
+The Web API runs in Vercel project `mikka` through the
+[Hono/Nitro runtime](../operations/web-runtime.md). The standalone Node APIs
 in `services/credential-broker` run in `mikka-credential-broker` with that root
 directory and access to source files outside it. Both use Team OIDC. The app
 can GenerateDataKey/Encrypt; the broker can Decrypt. There is no static AWS
@@ -82,10 +86,11 @@ CR/LF/NUL. Responses and errors are no-store and provider errors have no cause.
 
 ## Browser integration (#342)
 
-`resolveSubagentBrowserTarget` and `resolveThreadBrowserTarget` are the only
-integration seams. This PR's implementation fails closed until #342 supplies
-the actual owner-bound gateway. Its result contains targetId, exact origin,
-an HTTPS E2B endpoint with a broker-only capability and expiresAt in millis.
+`resolveSubagentBrowserTarget` and `resolveThreadBrowserTarget` in
+`lib/cloud-computer/subagent-browser.ts` resolve the owner-bound gateway. Their
+results contain targetId, exact origin, an HTTPS E2B endpoint with a broker-only
+capability and expiresAt in milliseconds. The subagent resolver also supplies
+observed input bindings used by the credential review path.
 The broker appends `/credentials/begin` to the URL path, preserving its query.
 Begin atomically blocks viewing, screenshots, model DOM reads and other input;
 it returns a guarded CDP websocket and token. The broker attaches to the exact
@@ -101,21 +106,26 @@ The model receives no secret, credential ID, cookie or broker capability.
 
 ### Current integration boundary
 
-The broker requires the trusted target resolver to provide `observedInput`:
-`{loaderId,backendNodeId,credentialRole,epoch,permissionVersion}`. The host
-must consume the existing `computer_use` decision before issuing the scoped
-gateway capability. These fields are not accepted from the credential HTTP
-submission body. The store additionally binds each lease to the encrypted
+The broker accepts `observedInputs` (and the legacy singular `observedInput`),
+with `{loaderId,backendNodeId,credentialRole,epoch,permissionVersion}` for each
+field. The subagent resolver obtains these from `/credentials/observe` and
+checks the current target, origin and workspace policy.
+`lib/cloud-computer/credential-reviews.ts` binds and consumes the credential
+operation before issuing its scoped continuation capability. These fields
+come from the trusted host and remain outside the credential HTTP submission
+body. The store additionally binds each lease to the encrypted
 secret's nonce; the broker verifies it under the account lock before gateway
 I/O, fencing password updates even after a lease has been claimed.
 
-`guarded` means insertion completed with observation still locked. It is not
-submission or successful login. The gateway retains the guard; its token is
-not returned to the model. The trusted browser host still needs to connect
-its authorized submit/clear continuation and safe guard completion. The
-published legacy #346 resolver does not supply `observedInput` and therefore
-fails closed with this broker. Unit, database and direct-CDP fixtures do not
-establish that this production integration or visual-model acceptance passed.
+`guarded` means insertion completed with observation still locked. The gateway
+retains the guard and keeps its token private. The subagent credential review
+path implements authorized submit/clear continuation through
+`/credentials/continue`, checks its `resumed` result and requests visual
+observation after a safe release. Saved-login consent and secret revision are
+rechecked before the operation. The thread resolver has no observed-input
+binding. `login()` requires a subagent and `observedInputs`, so that thread
+login path remains unavailable. Source wiring and the unit/database/CDP
+fixtures require separate runtime acceptance of the browser flow.
 
 HMAC fingerprints (using a domain-separated derivation of the existing auth
 secret) reject copies of saved passwords before coordinator inbox and chat/tool
@@ -140,10 +150,12 @@ availability does not supply missing KMS configuration or provider authority.
 3. Deploy `services/credential-broker` as the `mikka-credential-broker` project
    so `CREDENTIAL_BROKER_URL` can point at a frozen origin.
 4. Configure `CREDENTIAL_BROKER_URL` for the deployment under test (production
-   after merge; there is no branch Preview). Verify: signed out
-   gets `401`, signed in gets
-   `200 {"logins":[]}`, and the protected `/api/credentials/oidc` probe reports
-   own-role and same-context KMS success with cross-role and wrong-owner denial.
+   after merge). Confirm that a signed-out metadata read gets `401` and a
+   signed-in read gets `200` with its owner-scoped `logins` array. Exercise an
+   authorized browser credential flow with the configured broker.
+   `/api/credentials/oidc` is a POST probe restricted in source to
+   `VERCEL_ENV=preview`. Production returns 404. Its historical KMS results
+   cannot establish production acceptance.
 5. Record the matching Production verification. An explicit incident kill
    switch restores the `503` path; saved ciphertext rows remain.
 
@@ -160,5 +172,8 @@ The protected Preview-only `/api/credentials/oidc` probe calls the broker using
 the app's signed OIDC token. It reports only own-role/cross-role booleans and
 real KMS same-context/wrong-owner results. It returns no OIDC or STS credentials.
 Runtime evidence and frozen deployment SHAs are recorded in the PR/issue.
-Frontend pill/card/settings acceptance is intentionally pending the separately
-approved Figma work; neither this PR nor a passing unit test closes #180.
+The original backend handoff left frontend pill/card/settings acceptance to
+the separately approved Figma work. Settings login creation and password
+replacement are implemented in `app/actions/settings-activity.ts`; their
+contract is in [settings activity](../settings-backend/activity.md). Acceptance
+for a later revision follows the current acceptance guide.

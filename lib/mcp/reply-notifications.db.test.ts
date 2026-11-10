@@ -45,6 +45,7 @@ const tables = `
   CREATE TABLE coordinator_sessions("userId" text, "botId" uuid, "leaseHolder" text, "leaseUntil" timestamptz,
     "lastError" text, "lastErrorAt" timestamptz, summary text);
   CREATE TABLE mikka_workspace_members("workspaceId" uuid, "userId" text, status text);
+  CREATE TABLE mikka_workspaces(id uuid PRIMARY KEY, "userId" text, kind text);
 `
 
 test('PG reply triggers are transaction-bound and cover both databases and scope loss', { skip: !valid, timeout: 120_000 }, async t => {
@@ -135,6 +136,7 @@ test('PG reply triggers are transaction-bound and cover both databases and scope
       await t.test(`${change} wakes the two-database waiter and its fresh scope check rejects`, async () => {
         const owner = randomUUID(), botId = randomUUID(), home = randomUUID(), nextHome = randomUUID()
         await app.query('INSERT INTO bots VALUES($1,$2,$3)', [botId, owner, home])
+        await workspace.query('INSERT INTO mikka_workspaces VALUES($1,$2,\'team\'),($3,$2,\'team\')', [home, owner, nextHome])
         await workspace.query('INSERT INTO mikka_workspace_members VALUES($1,$2,\'active\'),($3,$2,\'active\')', [home, owner, nextHome])
         await Promise.all([fixtureCommitBarrier(app), fixtureCommitBarrier(workspace)])
         const controller = new AbortController()

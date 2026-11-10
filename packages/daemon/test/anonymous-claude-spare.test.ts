@@ -235,7 +235,8 @@ it('rejects a modified adopted temporary directory before claim', async () => {
   expect(f.events().filter(e => e.type === 'claim_session' || e.event === 'user')).toEqual([])
 })
 
-it.each([false, true])('the actual hosted runner adopts one bootstrap process with diagnostics=%s and no credential RPC', async diagnostics => {
+it.each([false, true, 'host'] as const)('the actual hosted runner adopts one bootstrap process with diagnostics=%s and no credential RPC', async diagnosticMode => {
+  const diagnostics = diagnosticMode !== false, hostOnly = diagnosticMode === 'host'
   // A fresh worker has not invoked query/prewarm before this bootstrap.
   vi.stubEnv('CLAUDE_AGENT_SDK_VERSION', undefined)
   const f = fixture('normal', diagnostics)
@@ -252,15 +253,17 @@ it.each([false, true])('the actual hosted runner adopts one bootstrap process wi
   let credentialCalls = 0
   const never = async () => { credentialCalls++; throw Error('Unexpected credential RPC') }
   const link = Object.assign(new MemoryServer(f.bootstrap.deviceId).link(), { nativeLease: never, nativeContext: never, nativeRequest: never, githubLease: never })
-  const runner = await createHostedBotRunner({ stateDir: f.stateDir, link, binaries: { claude_code: join(f.root, 'claude') }, anonymousClaudeCandidate: candidate })
+  const runner = await createHostedBotRunner({ stateDir: f.stateDir, link, binaries: { claude_code: join(f.root, 'claude') }, anonymousClaudeCandidate: candidate,
+    ...(hostOnly ? { collectCliTiming: true } : {}) })
   const assignment = {
     runId: f.hint.runId, deviceId: f.bootstrap.deviceId, issueId: randomUUID(), repoId: randomUUID(),
     baseBranch: 'main', harness: 'claude_code' as const, prompt: 'offline local task', model: f.hint.model, effort: f.hint.effort,
-    ...(diagnostics ? { taskEnv: { CLOUD_STARTUP_TIMING: '1' } } : {}),
+    ...(diagnostics && !hostOnly ? { taskEnv: { CLOUD_STARTUP_TIMING: '1' } } : {}),
     subscriptionBinding: { bindingId: randomUUID(), ownerId: randomUUID(), workspaceId: f.bootstrap.workspaceId, consumerId: randomUUID(), route: 'claude_code_cli' as const },
     subscriptionLease: { route: 'claude_code_cli' as const, accountId: 'fixture-account', revision: 1,
       modelId: f.hint.model, accessToken: 'fixture-token', expiresAt: new Date(Date.now() + 3600000).toISOString() },
   }
+  if (hostOnly) expect(assignment.taskEnv).toBeUndefined()
   const gate = new ToolApprovalGate(f.hint.runId, { isLive: () => !f.lifetime.signal.aborted }, 'push')
   const options = { runId: f.hint.runId, cwd: f.cwd, env: buildChildEnv({ runId: f.hint.runId }), model: f.hint.model, effort: f.hint.effort,
     policy: f.hint.policy, policyHash: policySnapshotHash(f.hint.policy), kind: 'implement' as const,

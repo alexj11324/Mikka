@@ -6,6 +6,27 @@
 帧 E `332:5816`、过渡 `342:6595`、F `342:6337`、G `332:6066`，组件 Mobile/LoginCard
 `340:6372`。
 
+## 文档状态
+
+这份文件保留 2026-10-27 的调研、候选方案和 #313 拆分交接。下文的
+Infisical 密码存储、总钥匙、表结构和验收命令属于当时方案。实施与部署请读
+[密码箱后端](../backend/credential-vault.md) 和
+[AWS KMS 配置](../operations/aws-kms-credential-setup.md)。
+
+`lib/credentials/store.ts` 将密文与 wrapped DEK 存在数据库，
+`lib/credentials/kms.ts` 和独立 broker 实现 AWS KMS 信封加密及解密权限。
+模型工具和 HTTP 响应不返回 credential ID。`guarded` 只表示受保护的填写完成，
+实际网站登录与完整浏览器集成仍需相应证据。下文「拿到 credential_id」、
+Infisical vault_ref 和默认已登录的描述不能作为当前 API 合同。
+
+保存的网站登录继续走这条独立 broker 路径。编码任务的原生 CLI/GitHub 认证与
+其他第三方 API Secret 交付遵循
+[2026-11-08 凭据暴露边界](decisions/2026-11-08-0240-credential-exposure-boundary.md)。
+受保护交付的源码合同与兼容模式见
+[任务 Secret 交付](../security/task-secret-delivery.md)。部署保护仍需独立验收证据。
+运行验收遵循 [acceptance.md](../acceptance.md)，使用云端 Linux 的隔离环境、
+API/CLI 和生产构建截图。历史 `pnpm dev` 验收步骤不再适用。
+
 ## 1. 要做成什么
 
 照 Hark 的 Secured Login：

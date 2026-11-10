@@ -101,6 +101,9 @@ import { deviceRepoSchema } from "@mikka/protocol"
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
+import { readWorkspaceReceipt } from './coding-workspace/files'
+import { readWorkspaceDiffReceipt } from './coding-workspace/diff'
+import type { WorkspaceReadCommand } from '@mikka/protocol/coding-workspace'
 import { RepositoryCache } from "./repositories"
 import { prepareRunRepository } from './run-repository'
 import { daemonTestMode, normalizeRepository } from "@mikka/protocol/repository"
@@ -244,6 +247,7 @@ export class Daemon {
   private outbox!: Outbox
   private registrationTraceContext?: RunTraceContext
   private journal!: RunJournal
+  private readonly workspaceReads = new Set<string>()
   private captureUploader!: CaptureUploader
   private worktrees!: WorktreeManager
   private repositories!: RepositoryCache
@@ -728,13 +732,15 @@ export class Daemon {
         let news = false
         const commands = await link.fetchCommands(deviceId, wait, {
           signal,
+          workspaceSkip: [...this.workspaceReads],
+          onWorkspaceRequests: requests => { news = true; this.answerWorkspaceRequests(deviceId, requests) },
           skipRuns,
           onQueuedRuns: (runIds) => { queued = runIds },
           updates: { daemonLatest: this.knownLatest ?? DAEMON_VERSION, skipDeviceCommands: this.polledDeviceCommands },
           onUpdates: ({ daemonVersions, deviceCommands }) => {
             const known = this.knownLatest
             this.learnRelease(daemonVersions?.latest)
-            news = this.knownLatest !== known
+            news ||= this.knownLatest !== known
             this.checkAutoUpdate()
             const fresh = deviceCommands.filter(command => !this.polledDeviceCommands.includes(command.id))
             if (fresh.length === 0) return
@@ -782,6 +788,8 @@ export class Daemon {
     let queued: string[] = []
     const commands = await this.options.link.fetchCommands(deviceId, 0, {
       signal,
+      workspaceSkip: [...this.workspaceReads],
+      onWorkspaceRequests: requests => this.answerWorkspaceRequests(deviceId, requests),
       skipRuns,
       onQueuedRuns: (runIds) => { queued = runIds },
       updates: { daemonLatest: this.knownLatest ?? DAEMON_VERSION, skipDeviceCommands: this.polledDeviceCommands },
@@ -983,6 +991,30 @@ export class Daemon {
   }
 
   /** Hands commands to the runs' sessions; true when any took effect. */
+  private answerWorkspaceRequests(deviceId: string, requests: WorkspaceReadCommand[]) {
+    const answer = this.options.link.answerWorkspaceRead
+    if (!answer || this.stopped) return
+    for (const request of requests) {
+      if (this.workspaceReads.has(request.id)) continue
+      this.workspaceReads.add(request.id)
+      const reading = this.workspaceReads.size > 4
+        ? Promise.resolve({ result: { ok: false as const, code: 'workspace_limit_exceeded' as const }, files: [] })
+        : Promise.resolve().then(() => {
+          const entry = this.journal.get(request.identity.runId)
+          if (request.request.kind === 'diff_snapshot' || request.request.kind === 'diff_file') {
+            if (!entry) return { result: { ok: false as const, code: 'workspace_checkout_unavailable' as const }, files: [] }
+            return readWorkspaceDiffReceipt(request, entry, this.repository(entry.assignment).path)
+          }
+          return readWorkspaceReceipt(request, entry)
+        })
+      // Stop commands keep their existing independent path while bounded file
+      // IO runs. Neither content nor absolute paths enter the daemon logs.
+      void reading.then(receipt => answer.call(this.options.link, deviceId, request.id, receipt, { expiresAt: request.expiresAt, signal: this.commandsAbort.signal }))
+        .catch(() => { this.log.warn({ request_id: request.id }, 'workspace read delivery failed') })
+        .finally(() => this.workspaceReads.delete(request.id))
+    }
+  }
+
   private async applyCommands(commands: RunCommand[]): Promise<boolean> {
     let acted = false
     for (const command of commands) {

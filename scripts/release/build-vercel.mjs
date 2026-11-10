@@ -17,7 +17,7 @@ export function buildFailureEvidence({ result, sourceSha, overlaySha, log }) {
   const sha = value => typeof value === 'string' && value.length === 40 && /^[a-f0-9]{40}$/.test(value) ? value : null
   const signal = ['SIGABRT', 'SIGBUS', 'SIGILL', 'SIGKILL', 'SIGSEGV', 'SIGTERM'].includes(result.signal) ? result.signal : null
   const codes = ['EACCES', 'EAGAIN', 'E2BIG', 'ENOENT', 'ENOMEM', 'ENOSPC', 'ETIMEDOUT']
-  const databaseCodes = ['22023', '22P02', '23502', '23503', '23505', '23514', '25006', '40001', '40P01', '42501', '42703', '42804', '42883', '42P01', '53300', '53400', '57014', '57P01']
+  const databaseCodes = ['22023', '22P02', '23502', '23503', '23505', '23514', '25006', '40001', '40P01', '42501', '42703', '42804', '42883', '42P01', '53300', '53400', '55000', '57014', '57P01']
   const networkCodes = ['ECONNREFUSED', 'ECONNRESET', 'EAI_AGAIN', 'ENETUNREACH', 'ENOTFOUND', 'ETIMEDOUT']
   let lastObservedPhase = 'unknown', databaseCode = null, networkCode = null, observedSystemCode = null
   let lastTypecheckCommand = null

@@ -9,13 +9,14 @@ import type { ThreadOutcome } from '@/lib/thread-groups'
 import type { MobileTaskBot, MobileTaskSchedule } from '@/lib/mobile-task-view'
 import type { Definition } from '@/lib/schedules/contract'
 import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from './run-failure-projection'
+import { taskReviewSourceHint } from './coding-workspace/task-review/summary-selection'
 
 /**
  * Each listed task's newest thread from the last 30 days, as far as 受阻 needs it
  * (lib/task-blocked.ts): the same window and owner as the web's listTaskRuns.
  * One small read beside the task list, which the 任务 list already makes.
  */
-export type TaskRunSnapshot = { issueId: string; runId: string | null; status: string | null; outcome: ThreadOutcome | null; failureDetails: CompactRunFailure | null; bot: MobileTaskBot | null; schedule: MobileTaskSchedule | null }
+export type TaskRunSnapshot = { issueId: string; runId: string | null; status: string | null; outcome: ThreadOutcome | null; failureDetails: CompactRunFailure | null; bot: MobileTaskBot | null; schedule: MobileTaskSchedule | null; codingReview: boolean }
 type ScheduleRow = { title: string; timing: Definition['timing']; nextAt: string | null }
 type ScheduleLabels = { daily: (time: string) => string; interval: (minutes: number) => string }
 
@@ -36,6 +37,7 @@ export function taskSchedule(issueId: typeof issues.id, userId: string, workspac
   return sql<ScheduleRow | null>`(select jsonb_build_object('title', s.definition->>'title', 'timing', s.definition->'timing', 'nextAt', s.next_at)
     from user_schedules s where s.owner_id=${userId} and s.definition->'task'->>'kind'='issue_snapshot'
       and s.definition->'task'->>'issueId'=${issueId}::text and s.status in ('active','paused')
+      and s.workspace_id=${issues.workspaceId}
       ${workspaceId ? sql`and s.workspace_id=${workspaceId}::uuid` : sql``}
     order by s.next_at asc nulls last, s.id limit 1)`
 }
@@ -44,14 +46,17 @@ export async function newestTaskRuns(userId: string, issueIds: readonly string[]
   if (!issueIds.length) return []
   const latest = db.selectDistinctOn([agentRuns.issueId], { issueId: agentRuns.issueId, runId: agentRuns.id, status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'), botId: runBotId.as('botId') })
     .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.userId, userId), inArray(agentRuns.issueId, [...issueIds]), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+    .innerJoin(issues, and(eq(issues.id, agentRuns.issueId), eq(issues.ownershipState, 'bound'), eq(agentRuns.workspaceId, issues.workspaceId)))
+    .where(and(eq(agentRuns.userId, userId), inArray(agentRuns.issueId, [...issueIds]), workspaceId ? eq(issues.workspaceId, workspaceId) : undefined,
+      sql`${agentRuns.createdAt} > now() - interval '30 days'`))
     .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).as('newest_task_runs')
-  // Start from the authorized tasks so a scheduled task without a thread is decorated too.
-  // Both decorations share the existing read, including closed tasks' Bot avatars.
+  // Callers supply already-authorized task IDs. Keep every source on each
+  // task's persisted tenant, including pending/legacy run exclusion, even when
+  // no explicit workspace filter was supplied. All decorations share one read.
   const rows = await db.select({ issueId: issues.id, runId: latest.runId, status: latest.status, outcome: latest.outcome, failureDetails: latest.failureDetails,
-    bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }, schedule: taskSchedule(issues.id, userId, workspaceId),
+    bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }, schedule: taskSchedule(issues.id, userId, workspaceId), codingReview: taskReviewSourceHint,
   }).from(issues).leftJoin(latest, eq(latest.issueId, issues.id))
-    .leftJoin(bots, and(eq(bots.id, latest.botId), eq(bots.ownerId, userId), workspaceId ? eq(bots.workspaceId, workspaceId) : undefined))
-    .where(inArray(issues.id, [...issueIds]))
+    .leftJoin(bots, and(eq(bots.id, latest.botId), eq(bots.ownerId, userId), eq(bots.workspaceId, issues.workspaceId)))
+    .where(and(inArray(issues.id, [...issueIds]), eq(issues.ownershipState, 'bound'), workspaceId ? eq(issues.workspaceId, workspaceId) : undefined))
   return rows.map(row => ({ ...row, schedule: taskScheduleView(row.schedule, labels), failureDetails: readCompactRunFailure(row.failureDetails) }))
 }

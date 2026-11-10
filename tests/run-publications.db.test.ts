@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 // Next captures AsyncLocalStorage when its work stores are first imported.
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
@@ -21,7 +22,7 @@ if (connection) {
 if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Run publication DB tests cannot skip in required CI')
 
 type Fixture = {
-  userId: string; deviceId: string; agentId: string; repoId: string; issueId: string; runId: string
+  workspaceId: string; userId: string; deviceId: string; agentId: string; repoId: string; issueId: string; runId: string
   remoteUrl: string; remoteKey: string; identifier: string; branch: string; githubAccountId: string
   /** The receipt admission wrote from the GitHub App grant, when the fixture is admitted to push. */
   admission?: Record<string, unknown>
@@ -79,16 +80,17 @@ test('run result publication commits one owner-scoped result through retries and
     const remoteKey = options.remoteUrl ? repositoryKey(options.remoteUrl) : options.remoteKey ?? `v2/github.com/mikka-ci/repo-${seed}`
     const row: Fixture = {
       userId: `publication-${seed}`, deviceId: randomUUID(), agentId: randomUUID(), repoId: randomUUID(), issueId: randomUUID(), runId: randomUUID(),
-      remoteUrl: options.remoteUrl ?? `https://${remoteKey.slice(3)}.git`, remoteKey, identifier: `${prefix}-${number}`, branch: `mikka/${prefix.toLowerCase()}-${number}`, githubAccountId: String(++githubId),
+      workspaceId: randomUUID(), remoteUrl: options.remoteUrl ?? `https://${remoteKey.slice(3)}.git`, remoteKey, identifier: `${prefix}-${number}`, branch: `mikka/${prefix.toLowerCase()}-${number}`, githubAccountId: String(++githubId),
     }
     fixtures.push(row)
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$1,$2,true,now(),now())', [row.userId, `${row.userId}@example.invalid`])
+    await seedFixtureWorkspace(pool, row.userId, options.scope === 'workspace' ? 'team' : 'personal', row.workspaceId)
     await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2)', [row.userId, prefix])
     await pool.query('insert into account (id,"accountId","providerId","userId","createdAt","updatedAt") values ($1,$2,\'github\',$3,now(),now())', [randomUUID(), row.githubAccountId, row.userId])
     await pool.query('insert into devices (id,"ownerId",name,kind,harnesses) values ($1,$2,\'Publication CI computer\',\'local\',$3)', [row.deviceId, row.userId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents (id,"userId","deviceId",harness,name) values ($1,$2,$3,\'codex\',$4)', [row.agentId, row.userId, row.deviceId, `codex ${row.deviceId}`])
     await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,null)', [row.repoId, row.deviceId, row.userId, row.remoteKey, row.remoteUrl])
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Fix redirect\',$3,\'todo\',\'normal\',$4)', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal'])
+    await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$5,\'Fix redirect\',$3,\'todo\',\'normal\',$4)', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal', row.workspaceId])
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt) values ($1,$2,$3,$4,$5,$6,\'running\',\'implement\',null,\'Fix redirect\')', [row.runId, row.userId, row.issueId, row.agentId, row.deviceId, row.repoId])
     await pool.query('insert into run_tokens (id,"runId","userId","tokenHash","expiresAt") values ($1,$2,$3,$4,now()+interval \'1 hour\')', [randomUUID(), row.runId, row.userId, `synthetic-${randomUUID()}`])
     if (options.approved) await admit(row)
@@ -206,9 +208,7 @@ test('run result publication commits one owner-scoped result through retries and
       const { workspacePool } = await import('../lib/workspace-db')
       const f = await fixture({ approved: true, prefix: 'MINE', number: 12, scope: 'workspace' })
       const linked = await fixture({ approved: true, prefix: 'OTHR', number: 18, scope: 'workspace' })
-      const workspaceId = randomUUID(), teamId = randomUUID()
-      await workspacePool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'Publication budget CI\')', [workspaceId, linked.userId])
-      await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [workspaceId, linked.userId, `${linked.userId}@example.invalid`])
+      const workspaceId = linked.workspaceId, teamId = randomUUID()
       await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Publication budget CI\',\'PUBREAD\')', [teamId, workspaceId, linked.userId])
       const { rows: [link] } = await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4) returning number', [linked.issueId, teamId, workspaceId, linked.userId])
       linked.identifier = `PUBREAD-${link.number}`
@@ -265,13 +265,12 @@ test('run result publication commits one owner-scoped result through retries and
       const { workspacePool } = await import('../lib/workspace-db')
       const { searchIssues, parseSearchParams } = await import('../lib/issue-search')
       const { listArtifacts } = await import('../lib/artifacts/store')
+      const { withRunWorkspace } = await import('../lib/run-completion')
       const samples: Array<{ body: string; teamState: string; search: ReturnType<typeof readMetrics>; artifacts: ReturnType<typeof readMetrics>; cloud: ReturnType<typeof readMetrics>; publication: ReturnType<typeof readMetrics>; frozen: ReturnType<typeof readMetrics> }> = []
       for (const body of ['empty', 'short'] as const) for (const teamState of ['linked', 'unlinked', 'revoked-owner'] as const) {
         const f = await fixture({ approved: true, prefix: 'MTRX', number: 12, scope: 'workspace' })
-        const workspaceId = randomUUID(), teamId = randomUUID()
+        const workspaceId = f.workspaceId, teamId = randomUUID()
         await pool.query('update issues set content=$2 where id=$1', [f.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 12 } }, content: body === 'empty' ? [] : [{ type: 'paragraph', content: [{ type: 'text', text: 'Short task body' }] }] })])
-        await workspacePool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'Identifier transport CI\')', [workspaceId, f.userId])
-        await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [workspaceId, f.userId, `${f.userId}@example.invalid`])
         if (teamState !== 'unlinked') {
           await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Identifier transport CI\',\'MTRTEAM\')', [teamId, workspaceId, f.userId])
           const { rows: [link] } = await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4) returning number', [f.issueId, teamId, workspaceId, f.userId])
@@ -279,10 +278,15 @@ test('run result publication commits one owner-scoped result through retries and
           f.branch = `mikka/mtrteam-${link.number}`
           await admit(f)
         }
-        if (teamState === 'revoked-owner') await workspacePool.query('update mikka_workspace_members set status=\'revoked\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, f.userId])
         const artifactId = randomUUID()
         await pool.query('insert into artifacts (id,"userId",kind,title,"issueId","latestVersion") values ($1,$2,\'markdown\',\'Transport fixture\',$3,1)', [artifactId, f.userId, f.issueId])
         await pool.query('insert into artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") values ($1,$2,1,$3,\'fixture\',\'fixture\',7,\'CI\')', [randomUUID(), artifactId, `ci/identifier-transport/${artifactId}.md`])
+        if (teamState === 'revoked-owner') {
+          // Freeze an authorized receipt first; it must not authorize later
+          // reads or publication after current workspace membership is lost.
+          await prepareRunPublication(assignment(f), f.remoteUrl)
+          await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, f.userId])
+        }
         const search = () => searchIssues(db, { userId: f.userId, workspaceId, params: parseSearchParams(new URLSearchParams({ q: 'Fix redirect' })) })
         await search()
         await listArtifacts(f.userId)
@@ -291,6 +295,36 @@ test('run result publication commits one owner-scoped result through retries and
         const client = await pool.connect()
         const cloud = () => admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, now: new Date() })
         try {
+          if (teamState === 'revoked-owner') {
+            const savedReceipt = await receipt(f)
+            let helperReached = false
+            // Cloud's naming helper runs only inside a workspace-authorized
+            // queue operation. Exercise that real membership gate as well as
+            // the standalone publication boundary, including a frozen receipt.
+            const gatedCloud = () => withRunWorkspace(f.userId, workspaceId, () => {
+              helperReached = true
+              return cloud()
+            })
+            const admitted = await measured(gatedCloud)
+            const prepared = await measured(async () => {
+              await assert.rejects(() => prepareRunPublication(assignment(f), f.remoteUrl),
+                (error: unknown) => error instanceof PublicationError && error.code === 'issue_unavailable')
+              return { error: 'issue_unavailable' }
+            })
+            const frozen = await measured(gatedCloud)
+            const sample = { body, teamState, search: readMetrics(searched), artifacts: readMetrics(artifacts), cloud: readMetrics(admitted), publication: readMetrics(prepared), frozen: readMetrics(frozen) }
+            samples.push(sample)
+            t.diagnostic(JSON.stringify({ event: 'identifier_transport_matrix', ...sample }))
+            assert.deepEqual(searched.value.items, [])
+            assert.deepEqual(artifacts.value, [])
+            assert.equal(admitted.value, null)
+            assert.equal(frozen.value, null)
+            assert.equal(helperReached, false, 'revoked membership cannot reach cloud admission')
+            assert.deepEqual(await receipt(f), savedReceipt, 'revocation leaves the old receipt unchanged')
+            assert.deepEqual(await counts(f), { versions: 0, events: 0 })
+            assert.doesNotMatch(JSON.stringify([searched.value, artifacts.value]), /MTRTEAM-|prefixInput|__mikkaIdentifierPrefix|@example\.invalid/)
+            continue
+          }
           await client.query('BEGIN')
           const admitted = await measured(cloud)
           await client.query('COMMIT')
@@ -634,9 +668,7 @@ test('run result publication commits one owner-scoped result through retries and
       await pool.query('update devices set "protocolVersion"=3 where id=$1', [f.deviceId])
       const input = { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl, model: 'fixture-model' }
       const eventId = randomUUID()
-      const {seedWorkspace}=await import('./support/workspace-admin-db')
-      const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])
-      const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null, workspace.id)
+      const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null, f.workspaceId)
       await pool.query('insert into coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,$6,\'user_message\',$5,$3,$4,now())', [eventId, f.userId, f.issueId, JSON.stringify({ text: 'Synthetic owner task; no provider invocation', taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + eventId, coordinator])
       const before = Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n)
       const admitted = await Promise.all([queueRun(f.userId, input, coordinator, undefined, eventId), queueRun(f.userId, input, coordinator, undefined, eventId)])
@@ -664,11 +696,13 @@ test('run result publication commits one owner-scoped result through retries and
 
     await t.test('opening the owner PR records the repository installation; a failed record never blocks the PR', async () => {
       const { createOwnerPullRequestOpener } = await import('../lib/run-publications')
-      const github = (f: Fixture, installations: 'ok' | 'down') => {
+      const observed = new Map<string, { creates: number; details: number }>()
+      const github = (f: Fixture, installations: 'ok' | 'down', details: 'ok' | 'down' = 'ok') => {
         const [, , owner, repo] = f.remoteKey.split('/')
         const marker = `<!-- mikka-issue:${f.issueId} -->`
-        const pr = { number: 9, html_url: `https://github.com/${owner}/${repo}/pull/9`, state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: f.branch, repo: { id: 4242 } }, base: { repo: { id: 4242 } } }
+        const pr = { number: 9, html_url: `https://github.com/${owner}/${repo}/pull/9`, state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: f.branch, sha: 'a'.repeat(40), repo: { id: 4242 } }, base: { repo: { id: 4242 } } }
         let created = false
+        const requests = { creates: 0, details: 0 }; observed.set(f.runId, requests)
         return (async (input: string | URL | Request, init?: RequestInit) => {
           const url = new URL(String(input))
           assert.equal(url.origin, 'https://api.github.com')
@@ -679,7 +713,14 @@ test('run result publication commits one owner-scoped result through retries and
             : Response.json({ installations: [{ id: 1, app_id: 999, account: { login: owner }, suspended_at: null }, { id: 77, app_id: 123, account: { login: owner }, suspended_at: null }] })
           if (url.pathname.endsWith(`/git/ref/heads/${f.branch}`)) return Response.json({ object: { sha: 'a'.repeat(40) } })
           if (url.pathname.endsWith('/pulls') && (init?.method ?? 'GET') === 'GET') return Response.json(created ? [pr] : [])
-          if (url.pathname.endsWith('/pulls')) { created = true; return Response.json(pr, { status: 201 }) }
+          if (url.pathname.endsWith('/pulls')) { created = true; requests.creates++; return Response.json(pr, { status: 201 }) }
+          if (url.pathname.endsWith('/pulls/9')) {
+            requests.details++
+            return details === 'down' ? Response.json({ message: 'synthetic-detail-secret' }, { status: 502 })
+              : Response.json({ ...pr, additions: 3, deletions: 1, changed_files: 1 })
+          }
+          if (url.pathname.endsWith('/check-runs')) return Response.json({ total_count: 0, check_runs: [] })
+          if (url.pathname.endsWith('/status')) return Response.json({ sha: 'a'.repeat(40), total_count: 0, statuses: [] })
           throw new Error(`Unexpected ${url.pathname}`)
         }) as typeof fetch
       }
@@ -696,6 +737,11 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await publishRunResult(f.runId, createOwnerPullRequestOpener({ credential: credential(f), fetcher: github(f, 'ok'), env: { GITHUB_APP_ID: '123' } })), { done: true })
       assert.equal((await receipt(f)).status, 'published')
       assert.deepEqual(await row(f), { githubAccountId: f.githubAccountId, installationId: '77', repositoryId: '4242', pushGrantedAt: null })
+      const full = (await receipt(f)).pullRequest
+      assert.equal(full.branch, f.branch); assert.equal(full.headSha, 'a'.repeat(40))
+      assert.equal(full.additions, 3); assert.equal(full.deletions, 1); assert.equal(full.changedFiles, 1)
+      assert.equal(full.reviewChecks.complete, true)
+      assert.deepEqual(observed.get(f.runId), { creates: 1, details: 1 })
 
       const down = await ready()
       const logged: string[] = []
@@ -708,6 +754,19 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal(await row(down), undefined)
       assert.deepEqual(logged.map(line => JSON.parse(line)), [{ event: 'github_installation_record_failed', code: 'github_502' }])
       assert.doesNotMatch(logged.join(''), /synthetic-owner-token/)
+
+      const optional = await ready()
+      const opener = createOwnerPullRequestOpener({ credential: credential(optional), fetcher: github(optional, 'ok', 'down'), env: { GITHUB_APP_ID: '123' } })
+      assert.deepEqual(await publishRunResult(optional.runId, opener), { done: true })
+      const retained = await receipt(optional)
+      assert.equal(retained.status, 'published', 'optional metadata failure cannot undo an already verified external publication')
+      assert.equal(retained.pullRequest.url.endsWith('/pull/9'), true)
+      assert.equal(retained.pullRequest.headSha, 'a'.repeat(40)); assert.equal(retained.pullRequest.branch, optional.branch)
+      assert.equal(retained.pullRequest.additions, undefined); assert.equal(retained.pullRequest.changedFiles, undefined)
+      assert.equal(retained.pullRequest.reviewChecks, null, 'refused metadata stays unknown')
+      assert.deepEqual(await row(optional), { githubAccountId: optional.githubAccountId, installationId: '77', repositoryId: '4242', pushGrantedAt: null })
+      assert.deepEqual(await publishRunResult(optional.runId, opener), { done: true }, 'database publication replay does not touch GitHub')
+      assert.deepEqual(observed.get(optional.runId), { creates: 1, details: 1 })
     })
 
     await t.test('Plugins › GitHub settings gate nothing: a stored deny or ask still opens the pull request with no card', async () => {

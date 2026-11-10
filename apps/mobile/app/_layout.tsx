@@ -15,11 +15,12 @@ import { ServerGate } from '@/components/ServerGate'
 import { Text } from '@/components/Text'
 import { CardButton } from '@/components/cards'
 import { authClient } from '@/lib/auth'
+import { watchAppleCredential } from '@/lib/apple-auth'
 import { apiCache } from '@/lib/api-cache'
 import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
-import { newSheetOptions } from '@/lib/sheet-options'
+import { newSheetOptions, reviewSheetOptions } from '@/lib/sheet-options'
 import { currentAccount, servers } from '@/lib/config'
 import { serverCopy as copy } from '@/lib/server-copy'
 
@@ -53,6 +54,9 @@ function SessionGate() {
   const [saveFailed, setSaveFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
+    if (data?.user) return watchAppleCredential(account.id)
+  }, [account.id, data?.user?.id])
+  useEffect(() => {
     let live = true
     setSaveFailed(false)
     if (data?.user) void servers.remember(account.id, { id: data.user.id, name: data.user.name, email: data.user.email }).catch(() => { if (live) setSaveFailed(true) })
@@ -78,6 +82,9 @@ function SessionGate() {
         {/* 新建 Bot and 新建群聊: full-height form sheets with the grabber (docs/design/mobile-comma, 06–07). */}
         <Stack.Screen name="new-bot" options={newSheetOptions(colors.page)} />
         <Stack.Screen name="new-group" options={newSheetOptions(colors.page)} />
+        <Stack.Screen name="task/[id]/comment" options={reviewSheetOptions(colors.page)} />
+        <Stack.Screen name="task/[id]/batch" options={reviewSheetOptions(colors.page)} />
+        <Stack.Screen name="task/[id]/note" options={reviewSheetOptions(colors.page)} />
         <Stack.Screen name="message-text" options={{ presentation: 'modal' }} />
       </Stack>
     </HomeProvider>

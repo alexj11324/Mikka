@@ -425,5 +425,15 @@
     "command": "node --test scripts/ci/*.test.mjs",
     "kind": "core",
     "env": {}
+  },
+  "core-governance": {
+    "command": "pnpm test:governance",
+    "kind": "core",
+    "env": {}
+  },
+  "integration-factory-activity": {
+    "command": "pnpm test:factory-activity",
+    "kind": "integration",
+    "env": {}
   }
 }

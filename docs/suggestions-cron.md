@@ -1,14 +1,19 @@
 # Suggestions schedules
 
-Three schedules keep the 建议 page and each person's profile current (R-21, R-73). They do not use Vercel Cron (`vercel.json` has no crons). The Cloudflare Worker `cloudflare/suggestions-cron` (`mikka-suggestions-cron`) fires them. The Worker only calls Mikka with a bearer secret; the logic stays in the Next.js app.
+Three schedules keep the 建议 page and each person's profile current (R-21, R-73). They do not use Vercel Cron (`vercel.json` has no crons). The Cloudflare Worker `cloudflare/suggestions-cron` (`mikka-suggestions-cron`) fires them. The Worker only calls Mikka with a bearer secret; the logic stays in the
+Hono/Nitro API. Community deployments can run the same schedule through the
+[built-in scheduler](self-hosting-realtime.md#scheduled-work).
 
 The Worker has one trigger, `* * * * *` (`wrangler.jsonc`). On each run it reads Cloudflare's `scheduledTime` and calls, in parallel (`src/index.mjs`):
 
 | When (UTC) | Endpoints |
 | --- | --- |
 | Minutes 0, 15, 30 and 45 | `/api/cron/reconcile` (`SWEEP_MINUTES`), `/api/cron/ops-monitor`, `/api/cron/briefings` |
-| Minute 0 | `/api/cron/account-deletions`, `/api/cron/audit-retention`, `/api/cron/subscriptions`, `/api/cron/suggestions-reconcile` |
+| Minute 0 | `/api/cron/subscriptions`, `/api/cron/suggestions-reconcile` |
 | Minute 30 | `/api/cron/user-facts` |
+
+Account deletion and audit retention also use due timers and the reconcile
+safety sweep. The Worker does not call their individual cron routes hourly.
 
 Coordinator wakes, schedules and run recovery are event-driven (#1212, #1371): each starts from the write that makes it due, and work due later runs on a durable Workflow timer (`workflows/due-timer`, the Coordinator wake deadline) at its persisted time. `/api/cron/reconcile` is the one safety net: one statement (`lib/reconcile-due.ts`) says which of the three has work already due that no wake or timer picked up, and only that work runs and its timer is re-armed. Worst case, work whose start was lost runs 15 minutes after its due time. The old `/api/cron/coordinator-wakes`, `/api/cron/schedules` and `/api/cron/run-recovery` routes still work when called by hand.
 
@@ -63,8 +68,10 @@ they accept nothing but the exact `CRON_SECRET` bearer (503 when unset, 401 othe
 before any read or write) and every write is idempotent, so a repeated or overlapping run converges.
 
 The hourly `suggestions-reconcile` run also sweeps the Factory monitor stage when
-`MIKKA_FACTORY_ROUTING_ENABLED=1` and `MIKKA_FACTORY_LIFECYCLE_ENABLED=1` (otherwise it reports
-`factoryMonitor.enabled: false` and does nothing). It finds `run_finished` events of monitor
+`factoryLifecycleEnabled()` admits both deployment switches. They default on.
+`mikka-factory-routing-off` and `mikka-factory-lifecycle-off` are the PostHog
+incident kill switches (`lib/deployment-switches.ts`). Otherwise it reports
+`factoryMonitor.enabled: false` and does nothing. It finds `run_finished` events of monitor
 attempts that no `factory_monitor_observations` row records, and hands each (user, Bot) scope to that
 Bot's `monitor.reconcile`, until 50 seconds after the request started. Observed events are skipped
 and replays create no new transition. The response carries
@@ -135,7 +142,8 @@ Worker bindings.
 
 ## Acceptance boundary
 
-`pnpm build` runs `scripts/migrate.mjs` last, after `next build` succeeds, so a
+`pnpm build` runs `scripts/migrate.mjs` last, after the subscription worker,
+Agent UI generation, shared frontend/API build and type checks succeed, so a
 Vercel production deploy applies pending migrations itself. Do not apply the
 Production SQL by hand. Off production it skips unless `MIGRATE=1` (or every
 target is a loopback database); initialize any other non-production database
@@ -150,3 +158,11 @@ Cloudflare scheduled-run history and the Worker log line of each endpoint.
 
 Run the source-only Worker checks with:
 `node --test cloudflare/suggestions-cron/src/index.test.mjs`.
+
+## Inbox handling
+
+Rejection, undo and snooze use the [Inbox API](inbox-api.md). Rejected or snoozed
+suggestions are excluded from list/briefing reads and Coordinator attention
+handoff. Inbox deadlines share the existing schedules due timer; the cron
+routes above do not poll for them. Completed handling is recorded from the
+source transaction starting at the inbox migration, without historical backfill.

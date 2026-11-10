@@ -6,8 +6,10 @@
 
 People add personal MCP servers, install skills and connect supported apps for
 their Bots. Installation and connection belong to the signed-in person across
-workspaces. Neither a teammate nor a workspace admin receives another person's
-connection or credential. This change does not redesign the plugin page.
+workspaces. Credentials remain private to their owner. The owner may explicitly
+share a custom MCP connection's use with the current team workspace through the
+[workspace sharing contract](mcp-workspace-sharing.md). Recipients receive
+scoped access and public metadata. This reference records the backend scope.
 
 ## API contracts
 
@@ -17,10 +19,11 @@ be supplied in request bodies; all row operations include the authenticated owne
 
 | Endpoint | Request | Result |
 | --- | --- | --- |
-| `GET /api/integrations/mcp` | — | `{servers, count}`; each row has id, name, URL, transport, enabled, revision, authKind and createdAt |
+| `GET /api/integrations/mcp` | Optional `workspaceId` query | Personal `{servers, count}` without a workspace. Workspace-scoped owner/shared projection with it. Shared rows omit private endpoints and credentials |
 | `POST /api/integrations/mcp` | `{name,url,transport?:"http"\|"sse",enabled?:boolean,auth?:{name,value}}` | `{server}`; enabled defaults to true |
 | `PATCH /api/integrations/mcp` | `{id,name?,enabled?,auth?:{name,value}\|null}` | `{server}`; null removes authentication |
 | `DELETE /api/integrations/mcp` | `{id}` | `{deleted:true}` |
+| `PATCH /api/integrations/mcp/shares` | `{serverId,workspaceId,shared}` | Owner-authorized workspace share state |
 | `GET /api/skills` | — | `{skills,count,scope:"personal"}`; metadata includes source kind, source revision/path and SHA-256 |
 | `POST /api/skills` | `{source:"owner/repository",slug:"skill-name"}` from a skills.sh search result | `{skill}`; repeated installation returns the existing pinned version |
 | `PATCH /api/skills` | `{id,enabled}` | `{skill}` |
@@ -152,7 +155,8 @@ unchanged.
   owner/peer separation, encrypted authentication, enable/rename/delete,
   skill install/toggle/uninstall and immutable execution replay.
 - Existing integrations, Agent Kit compatibility, source checks, migrations and
-  required PR CI/browser gates remain in force.
+  required PR CI and API/CLI acceptance remain in force. UI changes also need
+  reviewed production-build screenshots under [acceptance.md](../acceptance.md).
 
 Provider connection acceptance is distinct from controlled fixtures. This
 delivery does not claim a new real Google OAuth connection or a public MCP

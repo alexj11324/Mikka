@@ -2,10 +2,12 @@
 
 - **Status:** this is the source of truth for these topics from 2026-10-31
   ([decision](decisions/2026-10-31-2300-orchestration-spec.md)). When another
-  document, decision or code comment disagrees, this file wins and the other
-  one gets fixed. The execution and credential sections incorporate Alex's
+  document or code comment disagrees, follow the source order in
+  [the design entry point](README.md). Alex's later recorded decisions win. The execution and credential sections incorporate Alex's
   [2026-11-06 machine-authority decision](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md)
-  from #1505. `decisions.md` rows stay as frozen history.
+  from #1505 and the separate
+  [credential-exposure boundary](decisions/2026-11-08-0240-credential-exposure-boundary.md).
+  `decisions.md` rows stay as frozen history.
 - **Built on:** Alex's rules of 2026-10-31 and his answers to the open
   questions, both relayed by the coordinator. Also
   [personal vs workspace](decisions/2026-10-31-2130-personal-vs-workspace.md)
@@ -25,12 +27,12 @@
 | **Bot** | Lives in one workspace and has one owner. Runs on Mikka's own AI SDK on Vercel; when it has work to do, it sends a thread through the daemon to Claude Code or Codex (R-05). |
 | **Thread** | The work a bot dispatched (`agent_runs`). Each turn of it is a **run**. |
 | **Agent** | The coding worker that runs a thread: Claude Code or Codex. Code may say `harness`; the UI says Agent (R-43). |
-| **Model credential** | A Claude or ChatGPT/Codex subscription login, an API key, or a custom provider. Bound to the account and managed on the page 「模型与订阅」 ([1400](decisions/2026-11-02-1400-model-order-dispatch.md)). |
-| **Share** | 「分享给团队成员」: a member's opt-in, in one team workspace, to let other members' bots use one of their credentials. Off by default. The owner's own bots need no share ([2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). |
+| **Model credential** | A personal Claude Code/Codex subscription, a personal API key, or an Organization API key/gateway/custom endpoint. Subscription credentials remain account-owned. Model and credential are frozen at admission. |
+| **Share** | An explicit resource ACL for content. It grants no model, device, personal memory, Secret or payment authority. Personal API key grants remain separate; personal subscriptions cannot enter a member pool ([0017](decisions/2026-11-10-0017-collaboration-governance.md)). |
 | **Mikka 默认** | The hosted model, paid from the workspace's credits. It is a **model**, never a machine. |
 | **Machine (电脑)** | Where an Agent runs: **Mikka Cloud** (a sandbox on the run owner's own E2B key) or a **device** (a personal computer running the desktop app, or a server running the daemon). Both are **runners** with one contract (§3). |
 | **Mikka Cloud** | The cloud machine. It is a **machine**, never a model. Mikka hosts no sandbox of its own. |
-| **Environment** | What a thread executes in. One per thread, reused across that thread's runs (§5). |
+| **Environment** | Where the task executes. Its own cloud VM can be retained across authorized attempts; local runs keep their task worktree (§5). |
 | **Lease** | A machine's time-limited claim on a run, renewed by heartbeat (ADR 0012). |
 
 Never write 「Mikka Cloud」 for the hosted model, and never write
@@ -124,8 +126,10 @@ receives the task's resolved authority, the selected native CLI/GitHub
 credentials, and scoped third-party API capabilities during preparation;
 it must not automatically inherit all user/workspace/repository Secrets.
 The [credential exposure decision](decisions/2026-11-08-0240-credential-exposure-boundary.md)
-specifies the target boundary; the old runtime env-injection path still
-requires migration. The machine executes the assignment directly; lifecycle messages report progress
+specifies the boundary. `lib/secrets/runtime.ts` separates ordinary env and
+explicit direct exposure from protected HTTP capabilities, and the claim route
+seals the latter for a supported runner. Deployed protection is established
+by the decision's runtime canaries and acceptance evidence. The machine executes the assignment directly; lifecycle messages report progress
 and deliver stops, without a permission round trip before each tool or model call
 ([1800](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md)).
 
@@ -244,8 +248,8 @@ explicit provider-failure stop without a stop request is failure evidence:
 
 The open thread names the failed model and reason, then 「已改用」 and the
 replacement only after the host commits the continuation. Pending recovery
-keeps polling without displaying an unconfirmed switch; a cancelled or obsolete
-recovery stops polling without claiming that no model is available. If no entry can run,
+waits for the thread/run live updates without displaying an unconfirmed
+switch; cancellation or an obsolete recovery does not claim that no model is available. If no entry can run,
 the existing 「没有能跑这个任务的模型」 card lists the reasons and opens 模型与订阅.
 Independent review, verification and monitoring runs remain independent: their
 switch line requires the host adoption receipt, matching definition and both
@@ -268,8 +272,9 @@ A device runs only its owner's work. A team admin's computer policy governs
 only sharing with others and the workspace's own resources; it never stops a
 member running their own bots on their own device
 ([2240](decisions/2026-11-01-2240-own-credentials-always-usable.md), which
-replaces the 「个人设备」 switch that left members' devices out). Whether it
-can stop cloud work on the member's own E2B key is open.
+replaces the 「个人设备」 switch that left members' devices out). The workspace computer policy governs Agent computer operations; it does
+not block a person viewing or taking over their own Bot's desktop
+([1232](decisions/2026-11-02-1232-computer-policy-binds-agents-not-people.md)).
 
 ## 5. Scheduling and concurrency
 
@@ -280,7 +285,8 @@ renews its scheduling lease through the existing heartbeat, and reports
 completion. A persisted stop is delivered through the control channel; cloud
 reclamation is also available when the task must end.
 
-- **One environment per thread**, reused across that thread's turns. The
+- **One cloud VM per task**, retained across its authorized turns and compatible
+  attempts. The
   owner-bound cloud VM may pause with its ordinary private runtime state;
   the local worktree stays. Neither is given to another task or owner. A
   reusable template contains software only. The disposable VM is reclaimed
@@ -352,6 +358,17 @@ anonymous warm pool and its retention remain independent of task ownership.
 
 ## 6. Credentials lifecycle
 
+[Issue #1849](https://github.com/alexj11324/Mikka/issues/1849) and
+[decision 0017](decisions/2026-11-10-0017-collaboration-governance.md) amend the
+sharing rules. A shared Thread retains its Owner and records each message's
+actual Actor. A collaborator cannot borrow an Owner's personal subscription or
+local device. Any allowed owner-funded cloud turn requires a separate, bounded,
+revocable authorization; the Run freezes the Actor, Thread Owner, executor,
+credential owner, model payer and compute payer. The admission and renewal
+paths revalidate that authority without adding a proxy before native model or
+tool calls. The implementation and acceptance status is tracked per PR in
+[collaboration governance](collaboration-governance.md).
+
 This section follows Alex's [#1505 decision of 2026-11-06](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md).
 One task, one VM is the cloud execution boundary. The former placeholder,
 provider-forwarding proxy, isolated cloud HOME and repeated remote permission
@@ -364,12 +381,16 @@ checks are superseded.
    ownership. The E2B account pays for and owns the task's cloud resources.
 2. **Preparation and admission.** Resolve the requester, selected model,
    credential owner and any explicit share, destination and payer once when
-   admitting or explicitly moving the work. Deliver the task's real subscription
-   login, GitHub credential and model key during preparation, or once on the
-   first request that needs it. Use normal cloud credential files and environment,
-   as on an ordinary development machine. There is no categorical ban on a
-   credential needed by the task being present in its own machine. Never log
-   those values or bake them into a reusable image.
+   admitting or explicitly moving the work. Deliver only the selected native
+   CLI subscription login or model key and the authorized GitHub credential
+   during preparation, or once on the first request that needs them. Use the
+   CLI's normal credential mechanism. Other sensitive user/workspace/repository
+   API Secrets use scoped protected capabilities where supported, with an
+   explicit direct-exposure mode for compatible workloads. Ordinary config
+   env values remain env. `lib/secrets/runtime.ts`, `delivery.ts` and the
+   run claim route implement this split; runtime acceptance must verify the
+   protected path on its actual runner. Never log credentials or bake them
+   into a reusable image.
 3. **Execution and renewal.** The assigned machine has the authority to run
    the task. Official CLIs call their providers directly; no Mikka model proxy
    or extra server authorization request precedes each model or tool call.
@@ -453,6 +474,6 @@ external bill.
 | Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, an ordinary worktree, direct provider credentials and no sandbox; cloud machines on additive official E2B templates | — |
 | A device capability check and 参与调度 instead of Agent detection and 「设备离线时」; 优先使用的模型 in order instead of label rules and 任务默认 | — |
 | 立即警告 (the action card) when there is no machine; the offline flow of §4 | — |
-| One environment per thread; leases and heartbeats; credentials prepared once, background renewal and pushed stops | — |
+| One cloud VM per task, retained across authorized attempts; leases and heartbeats; selected credentials prepared once, background renewal and pushed stops | — |
 | Card verification per person; credit and card shares per workspace | — |
 | No Mikka-hosted sandboxes and no free cloud trial | (not planned) |

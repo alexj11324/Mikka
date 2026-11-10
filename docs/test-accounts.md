@@ -5,14 +5,21 @@ application's normal Better Auth registration and sign-in routes, ordinary user
 identities, and the PostgreSQL instance already owned by the test job. It does
 not create product roles or a separate authentication system.
 
+Use this pool for the isolated regression harnesses that provision their own
+owner/peer fixtures. Shared application and production acceptance use the
+existing SMOKE account in **Acme Inc.**, as [acceptance.md](acceptance.md)
+requires. A pool lease proves its isolated fixture scope.
+
 ## Supported environment and side effects
 
-The adapter supports one disposable loopback PostgreSQL database, in CI or in
-local test-account mode (below). Application, workspace and pool metadata must
-all address that exact database. A multi-database or deployed-origin adapter
-needs independent registration and approval; the current adapter rejects it.
-Mikka's branches have no Vercel Preview to point it at.
-A production deployment is not supported.
+The `isolated-ci` adapter supports one disposable loopback PostgreSQL database,
+in CI or local test-account mode. `isolated-docker` adds a verified public Docker
+origin with the same loopback database boundary. Its ownership receipt and
+bootstrap are described in [the Docker environment guide](operations/desktop-docker-test-environment.md).
+Application, workspace and pool metadata must all address the exact registered
+database. Other origins and multiple databases require their own implemented
+adapter. Mikka's branches have no Vercel Preview. Production has no pool
+bootstrap path.
 
 The owning harness creates the disposable resource and initializes the normal
 application schema. Before any users exist, it installs a random environment
@@ -90,13 +97,16 @@ URL a loopback `*_e2e` database. The bootstrap, auth origins
 (`lib/auth-config.ts`), signup limits (`lib/abuse/signup.ts`), the daemon's
 `MIKKA_TEST_MODE` (`daemonTestMode`) and the MVP acceptance all use it. MVP
 acceptance runs through the API and the CLI: `pnpm test:local-loop`
-([local-runtime.md](local-runtime.md)). No browser tests run, locally or in CI
-([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)); the `pnpm test:e2e:mvp` specs
-are not an acceptance entry point.
+([local-runtime.md](local-runtime.md)), following the
+[ordinary acceptance policy](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
+The general `tests/e2e/` browser suite is retired. Retained targeted Desktop,
+Analytics and self-hosted checks keep their explicitly selected scopes in the
+[workflow reference](../.github/workflows/README.md).
 
 Do not set `CI` for a local server.
 
-- Every acceptance run registers new accounts. In local test-account mode the sign-up
+- Acceptance harnesses provision missing fixture accounts and sign in existing
+  accounts on reuse. In local test-account mode the sign-up
   and verification limits default to 1000 per address and 10000 overall each
   hour, and Better Auth's sign-up rule to 100 per ten seconds
   (`lib/abuse/signup.ts`); outside it they stay at five sign-ups per address
@@ -192,9 +202,11 @@ verified lifecycle action.
 
 ## Browser and HTTP integration
 
-History: no browser tests run any more
-([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)); the browser adapter below is
-kept for reference. HTTP acceptance is current.
+Ordinary acceptance uses HTTP and CLI checks under the
+[accepted policy](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
+The general settings-surface browser adapter is retained for reference.
+Targeted browser jobs retain their own scope and fixture handling, as the
+[workflow reference](../.github/workflows/README.md) records.
 
 The settings-surface browser test acquired its two accounts through
 `tests/e2e/test-account-fixtures.ts`. Cookie storage is bound to an environment,
@@ -218,12 +230,13 @@ Authentication tests retain real registration, sign-in, sign-out, expiry,
 revocation and ownership checks. A storage-state fixture is not evidence that
 those authentication behaviors passed.
 
-The `scripts/test-accounts/run-http.mjs` runner owns an exact-build Next child,
+The `scripts/test-accounts/run-http.mjs` runner owns an exact-build Node child
+through `scripts/start-app.mjs`, using the compiled Vite/Nitro output,
 proves its deployment identity, runs the HTTP suite and stops its process group
 on success, failure, cancellation or timeout. It never reuses an existing server.
 It exposes named TAP results and counts, while discarding raw server output and
 arbitrary test diagnostics that could serialize credentials. HTTP acceptance
-uses the normal Next server and PostgreSQL and exercises unauthenticated, owner
+uses the compiled Node API and PostgreSQL and exercises unauthenticated, owner
 and peer access to existing product routes without invoking a real model or external provider.
 Attestation and authenticated HTTP responses enforce their decoded byte budgets
 while reading (4 KiB and 8 MiB respectively), cancelling an oversized stream
@@ -236,7 +249,8 @@ timestamp, run/lease IDs, non-sensitive account IDs and expected/actual results.
 Do not place credentials, cookies, tokens, raw authentication responses or
 unfiltered driver errors in logs, PRs, screenshots, traces or public artifacts.
 Secret scans must include the generated logs and exported browser evidence.
-CI runs no browser tests (decision 2026-11-01-1520). The lease session scans
+The retired general browser suite does not run in CI. Selected targeted jobs
+retain their source-bound evidence checks. The lease session scans
 the evidence it records (`scripts/test-accounts/session.mjs` with
 `evidence-content.mjs`); the scanner also decodes the ZIP payload embedded inside Playwright HTML reports,
 with bounded entry count, depth and decompressed size. It rejects malformed,

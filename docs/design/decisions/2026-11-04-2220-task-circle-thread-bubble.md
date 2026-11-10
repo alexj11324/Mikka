@@ -10,6 +10,7 @@
 - Rule: R-15, R-52, R-66
 - Replaces: [2026-11-02-0220-waiting-raises-a-hand.md](2026-11-02-0220-waiting-raises-a-hand.md)
   (every thread state is now a dot on the bubble; 等待你 is the amber one)
+- Superseded in part by: [2026-11-07-2045-tasks-only-threads-inside.md](2026-11-07-2045-tasks-only-threads-inside.md) (lists show tasks only, so the thread bubble no longer appears in a list)
 
 A task and a thread never look alike. A task is always its board status circle (○ ◌ ◉ ✓ ✕ ⊘). A thread is
 always a speech bubble, with its state as a dot on the bubble's corner: 进行中 a pulsing grey dot, 等待你 amber,

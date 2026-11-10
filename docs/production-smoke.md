@@ -1,7 +1,7 @@
 # Production smoke
 
 The acceptance account pool ([test-accounts.md](test-accounts.md)) can create,
-reset and wipe accounts, so it only runs against a disposable CI database. It
+reset fixture state, so it runs against a registered disposable database. It
 cannot tell whether production works. Production smoke fills that gap the way
 large products do (Meta test users, Google probers): a fixed account made
 through normal sign-up, tagged as test traffic, with no extra powers, that
@@ -9,7 +9,7 @@ signs in and reads.
 
 ## The account
 
-| | |
+| Account field | Source or recorded state |
 | --- | --- |
 | Email | Infisical `prod:/` → `SMOKE_OWNER_EMAIL` |
 | Made | 2026-10-30, through `/api/auth/sign-up/email`; verified from the Gmail inbox |
@@ -36,7 +36,13 @@ account.
 
 ## What it checks
 
-### Browser smoke
+### Retained browser smoke
+
+This spec is retained for explicit historical/deployed-target drivers. The
+ordinary `production-smoke.yml` job runs the API-only driver described next.
+The repository's ordinary acceptance policy uses API/CLI checks and local
+production-build screenshots.
+
 
 [`tests/smoke/production.spec.ts`](../tests/smoke/production.spec.ts) signs in,
 verifies and selects the shared team with the same cookie jar, opens its
@@ -76,9 +82,17 @@ HTTP status codes; cookies and API response bodies stay in process memory.
 
 ## When it runs
 
-[`production-smoke.yml`](../.github/workflows/production-smoke.yml): after each
-successful Production deployment, daily at 14:17 UTC, and by hand. The job
-reads `prod:/` through the existing GitHub OIDC identity.
+The `smoke` job in
+[`production-smoke.yml`](../.github/workflows/production-smoke.yml) runs after
+each successful Production deployment, daily at 14:17 UTC, and on manual
+dispatch. It uses `SMOKE_EXPECT_ON=credentialVault,cloudComputer` and reads
+`prod:/` through the existing GitHub OIDC identity. It writes a report and job
+summary on success and failure, retaining the artifact for seven days.
+
+The workflow's separate `deployment-comparison` job also runs every fifteen
+minutes. It collects deployment windows, runtime outcomes and database egress.
+Manual `audit_auth_sha` and `audit_lease` inputs select additional explicit
+production authorization/lease checks, with their own exact-source guards.
 
 Locally, with the credentials in the environment:
 
@@ -90,8 +104,13 @@ Inject `SMOKE_OWNER_EMAIL` and `SMOKE_OWNER_PASSWORD` through the existing secre
 delivery path. Do not put credential values in shell history. The JSON report
 and job summary are written to `production-smoke-report/`.
 
-## Next
+## Required active coverage
 
-- An active tier behind a flag and a spending cap: send one message, wake the
-  bot's computer, run one browser sub-agent task.
-- A peer account (`+mikka-smoke-peer`) for invitations and thread privacy.
+The [2026-11-07 production acceptance decision](design/decisions/2026-11-07-1400-production-acceptance-scope.md)
+calls for automatic sign-in, a Coordinator message and task dispatch after each
+Web deploy. The implemented automatic driver covers sign-in and reads.
+`AGENTS.md` records that implementation and requires separate live messaging
+and dispatch acceptance until the automatic-smoke gap is implemented. Computer
+boot and model execution also need their own active evidence. Use the two
+official subscription paths for model acceptance. DeepSeek/API-key work never
+gates a merge. See [runtime acceptance](acceptance.md).

@@ -27,15 +27,14 @@ async function lockAllowedTeam(tx: WorkspaceTx, userId: string, teamId: string) 
   await lockTeamRelations(tx)
   const [team] = await tx.select({ id: teams.id, workspaceId: teams.workspaceId }).from(teams)
     .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, teams.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
-    .where(eq(teams.id, teamId)).for('update').limit(1)
+    .where(eq(teams.id, teamId)).for('share').limit(1)
   if (!team) throw new TeamCreateError('teamIssueAccessDenied')
   return team
 }
 
-/** Creates a personal, provider-blocked issue first; commits its team relation;
- * then rechecks membership and that relation under workspace locks while the
- * application transaction promotes it. requestId is an idempotency key, not an
- * issue ID. No provider call is made and failures retain the private issue. */
+/** The team supplies a verified workspace before the application insert.
+ * A retry reconciles the separate relation receipt without changing ownership.
+ * requestId is an idempotency key; provider synchronization stays disabled. */
 export async function createTeamIssueForUser(userId: string, input: unknown, actor: ActivityActor = userActor(userId)) {
   const parsed = schema.safeParse(input)
   if (!parsed.success) return { error: 'teamIssueInvalid' as const }
@@ -45,20 +44,25 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
   try {
     const issueId = await workspaceDb.transaction(async workspace => {
       const team = await lockAllowedTeam(workspace, userId, teamId)
+      const [receipt] = await workspace.select().from(teamIssueCreateReceipts).where(eq(teamIssueCreateReceipts.requestId, requestId)).for('update')
+      if (receipt && (receipt.teamId !== teamId || receipt.workspaceId !== team.workspaceId || receipt.ownerId !== userId)) throw new TeamCreateError('teamIssueRequestConflict')
       const id = await db.transaction(async tx => {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`team-issue-create:${requestId}`}, 0))`)
         const [old] = await tx.select().from(teamIssueCreateRequests).where(eq(teamIssueCreateRequests.requestId, requestId)).for('update')
         if (old) {
           if (old.ownerId !== userId || old.teamId !== teamId || old.fingerprint !== fingerprint) throw new TeamCreateError('teamIssueRequestConflict')
+          const [prior] = await tx.select({ workspaceId: issues.workspaceId, ownershipState: issues.ownershipState }).from(issues).where(eq(issues.id, old.issueId)).for('share')
+          if (!prior || prior.ownershipState !== 'bound' || prior.workspaceId !== team.workspaceId) throw new TeamCreateError('teamIssueChanged')
           return old.issueId
         }
-        const id = crypto.randomUUID()
-        const issue = await createIssueForUserInTransaction(tx, userId, content, actor, { id, linearSyncBlocked: true })
+        // A caller's outer application transaction may have rolled back
+        // after the workspace receipt committed. Reuse its reserved identity.
+        const id = receipt?.issueId ?? crypto.randomUUID()
+        const issue = await createIssueForUserInTransaction(tx, userId, content, actor, { workspaceId: team.workspaceId, id, linearSyncBlocked: true })
         if (!issue) throw new TeamCreateError('teamIssueRequestConflict')
         await tx.insert(teamIssueCreateRequests).values({ requestId, issueId: id, ownerId: userId, teamId, fingerprint })
         return id
       })
-      const [receipt] = await workspace.select().from(teamIssueCreateReceipts).where(eq(teamIssueCreateReceipts.requestId, requestId)).for('update')
       if (receipt && (receipt.issueId !== id || receipt.teamId !== teamId || receipt.workspaceId !== team.workspaceId || receipt.ownerId !== userId)) throw new TeamCreateError('teamIssueRequestConflict')
       if (!receipt) await workspace.insert(teamIssues).values({ issueId: id, teamId, workspaceId: team.workspaceId, userId }).onConflictDoNothing()
       const [link] = await workspace.select().from(teamIssues).where(eq(teamIssues.issueId, id)).for('update')
@@ -74,14 +78,14 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
       return db.transaction(async tx => {
         const [request] = await tx.select().from(teamIssueCreateRequests).where(eq(teamIssueCreateRequests.requestId, requestId)).for('update')
         const [issue] = await tx.select().from(issues).where(eq(issues.id, issueId)).for('update')
-        if (!request || request.ownerId !== userId || request.issueId !== issueId || request.teamId !== teamId || request.fingerprint !== fingerprint || !issue || issue.userId !== userId || !issue.linearSyncBlocked) throw new TeamCreateError('teamIssueChanged')
+        if (!request || request.ownerId !== userId || request.issueId !== issueId || request.teamId !== teamId || request.fingerprint !== fingerprint || !issue || issue.userId !== userId || issue.ownershipState !== 'bound' || issue.workspaceId !== team.workspaceId || !issue.linearSyncBlocked) throw new TeamCreateError('teamIssueChanged')
         if (request.status === 'complete') return { issue: await issueView(issue, tx), linearSync: { enabled: false as const, reason: 'no_explicit_target' as const } }
-        if (issue.scope !== 'personal' || issue.revision !== 1) throw new TeamCreateError('teamIssueChanged')
+        if (issue.revision !== 1) throw new TeamCreateError('teamIssueChanged')
         // The workspace transaction still holds membership and relation locks.
         // Bind the transaction-local database fence to exactly this task.
         await tx.execute(sql`select set_config('mikka.team_scope_verified', ${issueId}, true), set_config('mikka.team_scope_team', ${teamId}, true), set_config('mikka.team_scope_request', ${requestId}, true)`)
         const previousLists = await issueListScopesBeforeChange(issue)
-        const [saved] = await tx.update(issues).set({ scope: 'workspace', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: 2, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
+        const [saved] = await tx.update(issues).set({ linearSyncPolicy: 'disabled', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: 2, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...actor })
         await tx.update(teamIssueCreateRequests).set({ status: 'complete' }).where(eq(teamIssueCreateRequests.requestId, requestId))
         await issueListScopeChanged(tx, issueId, previousLists)

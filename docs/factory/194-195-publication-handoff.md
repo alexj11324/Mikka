@@ -1,5 +1,11 @@
 # #194 → #195 publication receipt v1
 
+> Historical v1 handoff. [Monitor V2](195-vercel-monitor-v2.md) records the
+> later provider-binding integration. Code candidates follow
+> [PR merge acceptance](warp-aligned-factory.md#acceptance-is-the-merge-528),
+> and the current server registers only the Skill activation publication adapter.
+> The unrun provider acceptance below remains a result of this frozen handoff.
+
 Read against #195 PR200 `994ae2e5ec781a21063128394f258bcc8ee38473`. No #195 files or branch are modified here. Its existing `monitorGate` checks prior stage passes, evidence, independent run/session identities and publish timing, but does not yet read #194's actual action/target/provider receipt. A passed publish attempt alone therefore cannot establish which running target was checked. The parent must coordinate the following call and target/probe binding before actual recovery acceptance.
 
 ## Frozen additive reader

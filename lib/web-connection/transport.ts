@@ -1,14 +1,18 @@
 import { OFFICIAL_WEB_URL, officialWebOriginAllowed, webConnectionURL, type WebConnectionEnvironment } from './policy'
 import { NextRequest } from '../../apps/api/compat/server'
+import { parseRequestCookies } from '../../apps/api/src/request-cookies.mjs'
+import { selectedWorkspaceId, WORKSPACE_SELECTION_HEADER, workspaceSelection } from '../workspace-selection'
 
 const allowedHeaders = [
   'accept', 'authorization', 'content-type', 'range', 'if-none-match', 'last-event-id',
   'x-mikka-client', 'x-mikka-client-version', 'x-mikka-web-protocol', 'x-mikka-desktop-protocol',
   'x-mikka-locale', 'x-mikka-credential', 'x-mikka-stream-key', 'x-mikka-deletion-receipt',
+  WORKSPACE_SELECTION_HEADER,
 ]
 const exposedHeaders = [
   'content-disposition', 'content-length', 'content-range', 'etag', 'x-mikka-session-token',
   'x-mikka-stream-key', 'x-mikka-stream-reset', 'x-mikka-stream-run', 'x-mikka-observed-at', 'x-mikka-viewer',
+  WORKSPACE_SELECTION_HEADER,
 ]
 const methods = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']
 const publicPaths = new Set(['/api/desktop/discovery', '/api/server', '/api/version', '/api/web/begin', '/api/web/exchange'])
@@ -25,6 +29,18 @@ export type PrepareWebTransport = (request: Request, route: string) => Promise<W
 
 function corsResponse(response: Response, origin: string) {
   const headers = new Headers(response.headers)
+  // Existing workspace actions acknowledge their validated choice through a
+  // preference cookie. Expose only that preference to a bearer-only client;
+  // authentication cookies and cache proofs still never cross this boundary.
+  headers.delete(WORKSPACE_SELECTION_HEADER)
+  if (response.ok) for (const cookie of response.headers.getSetCookie()) {
+    const value = parseRequestCookies(cookie.split(';', 1)[0]).get('mikka-workspace')
+    if (value === '') headers.set(WORKSPACE_SELECTION_HEADER, '')
+    else if (value !== undefined) {
+      const workspaceId = selectedWorkspaceId(value)
+      if (workspaceId) headers.set(WORKSPACE_SELECTION_HEADER, workspaceId)
+    }
+  }
   // Cross-origin browser clients never receive or rely on a Cookie proof.
   headers.delete('set-cookie')
   headers.delete('x-mikka-session-cache')
@@ -91,6 +107,8 @@ export function createWebTransport(options: {
     try { identity = await options.authenticate(new Headers({ authorization })) }
     catch { return finish(rejected(503, 'web_connection_auth_unavailable')) }
     if (!identity) return finish(rejected(401, 'web_connection_session_expired'))
+    const selection = workspaceSelection(headers)
+    if (selection.present && !selection.workspaceId) return finish(rejected(403, 'workspaceAccessDenied'))
     // Handoff revoke verifies the original official Origin itself. Other REST
     // routes use the server's already-authenticated native transport semantics.
     if (route !== '/api/web/revoke') {

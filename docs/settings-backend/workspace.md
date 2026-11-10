@@ -1,6 +1,6 @@
 # 设置 › 工作区：后端
 
-分支 `feat/settings-backend-workspace`。本文写的是已经实现、测试通过的部分（常规、成员、团队、Bot）。用量和计费还没有交付，见文末「未完成」。
+本文记录常规、成员、团队和 Bot 的后端接口。用量和计费由文末列出的独立接口负责。最初实现分支为 `feat/settings-backend-workspace`，原分支的测试记录不代表后续版本的验收结果。
 
 ## 约定
 
@@ -27,7 +27,7 @@ updateWorkspace(input: { name?: string; slug?: string; icon?: string | null }): 
 - `name`：去掉首尾空白后 1–120 个字符。
 - `slug`：3–64 位小写字母、数字或 `-`，首尾不能是 `-`。改 slug 时，旧 slug 写进 `mikka_workspace_slug_redirects`；以后打开 `/w/<旧 slug>` 会 308 跳到 `/w/<新 slug>`（只对该工作区的启用成员生效，非成员仍然得到 404，不会泄露新地址）。改回自己以前用过的 slug 时，那条重定向记录会被删掉。所有 slug 修改共用一把 advisory lock。`createWorkspace` 也不能占用别的工作区保留的旧 slug。
 - `icon`：`null` 或 `''` 表示清除。只接受 `data:image/(png|jpeg|webp|gif);base64,...`，解码后不超过 200 KB，并且会核对文件头（magic bytes）。不接受 SVG，因为 SVG 里可以带脚本。
-- 存储方式：data URL 直接存在 `mikka_workspaces.icon`。原因是仓库里没有对象存储，账户头像也是以 URL 字符串存在 user 行上；不超过 200 KB 的位图对单行来说可以接受，也不需要再接一个服务。
+- 存储方式：data URL 直接存在 `mikka_workspaces.icon`。该工作区图标接口直接校验并保存内联位图。账户头像另走 `user_avatars` 与现有 S3/R2 存储，见 [账户接口](account.md)。
 - 错误码：`workspaceAccessDenied`、`workspaceSlugTaken`、`workspaceIconInvalid`、`validationGeneric`。
 
 ### `/w/[slug]` 回退 — `app/w/[slug]/route.ts`
@@ -121,7 +121,7 @@ getWorkspaceBotDefaults(): Promise<ActionResult<{
 
 - 权限：任何启用中的成员都能读。
 - 模型可选值：Bot 本身原来没有模型字段，模型是通过订阅绑定来选的（`byos_bindings.route`，provider 是 codex 或 claude）。所以可选值定义成：`mikka`（Mikka 托管的默认模型）、`codex`、`claude`（用 Bot 主人自己连接的对应订阅）。
-- 仓库可选值：本工作区启用成员在 `github_repository_installations` 里的 `remoteKey`（owner/repo），去重后排序。
+- 仓库可选值：本工作区启用成员在 `github_repository_installations` 里的 `remoteKey`（owner/repo），以及有效 GitHub cloud binding 可用的 `cloud_github_repositories.remote_key`，合并去重后排序。
 
 ### `updateWorkspaceBotDefaults(input)`
 

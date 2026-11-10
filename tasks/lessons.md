@@ -1,5 +1,10 @@
 # 教训记录
 
+本文件按事件日期保留当时的现象和结论。当前操作遵循
+[`AGENTS.md`](../AGENTS.md)、[开发流程](../docs/dev-workflow.md)和
+[凭据约定](../docs/infisical-cloud.md)。引用旧命令、运行时或发布配置前，
+先按这些现行指南和实际源码重新核对。
+
 ## 2026-10-20 调研需要登录的线上应用时，别在登录墙前停下
 
 **发生了什么**：要分析 app.comma.surf 的真实字体，用 chrome-devtools MCP 打开却只看到登录页。

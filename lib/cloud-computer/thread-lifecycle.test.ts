@@ -1,9 +1,20 @@
 import assert from 'node:assert/strict'
-import { beforeEach, mock, test } from 'node:test'
+import { after, beforeEach, mock, test } from 'node:test'
 import type { Pool } from 'pg'
 import { CLOSED_TASK_RETENTION_MS, THREAD_MACHINE_BUDGET_MS, THREAD_MACHINE_IDLE_MS, THREAD_MACHINE_RETENTION_MS,
   reconcileThreadMachine, threadMachineExecutionDeadline, threadMachineLifecycleDecision, type ThreadLifecycleRow } from './thread-lifecycle'
 import { threadLifecycleErrorKind, threadLifecycleLogFields } from './thread-lifecycle-log'
+
+// This suite simulates the SQL store, so it cannot inherit a configured live
+// transport. Real COMMIT/ROLLBACK invalidation is exercised by the PG suites.
+const liveEnvironment = { DEVICE_GATEWAY_URL:process.env.DEVICE_GATEWAY_URL, DEVICE_GATEWAY_PUSH_SECRET:process.env.DEVICE_GATEWAY_PUSH_SECRET }
+process.env.DEVICE_GATEWAY_URL = 'https://unused-lifecycle-fixture.invalid'
+delete process.env.DEVICE_GATEWAY_PUSH_SECRET
+after(() => {
+  for (const [key,value] of Object.entries(liveEnvironment)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value
+  }
+})
 
 const lifecycleLog = mock.method(console, 'info', () => {})
 beforeEach(() => lifecycleLog.mock.resetCalls())

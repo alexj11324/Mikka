@@ -1,7 +1,8 @@
+import { withFactoryBackgroundWorkspace } from './background-workspace'
 import 'server-only'
 import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
 import { createHash, randomUUID } from 'node:crypto'
-import { escapeLiteral, type Pool, type QueryResult } from 'pg'
+import { escapeLiteral, type Pool, type PoolClient, type QueryResult } from 'pg'
 import { FactoryError } from './contract'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { factoryBinding, createFactoryDispatch, type FactoryQueue } from './dispatch'
@@ -9,6 +10,8 @@ import { factoryEventId } from './event-id'
 import { factoryLifecycleEnabled, factoryRuntimeForBot } from './runtime'
 import { notifyQueuedLocalRun } from '../device-gateway-notify'
 import { advanceFactoryRequest, factoryContinuationSource } from './request-epoch'
+import { assertFactoryTransaction } from './transaction'
+import type { FactoryTask } from './store'
 
 function isLockResult(value: unknown): value is Pick<QueryResult, 'command' | 'rows'> {
   if (!value || typeof value !== 'object') return false
@@ -16,6 +19,18 @@ function isLockResult(value: unknown): value is Pick<QueryResult, 'command' | 'r
   return result.command === 'SELECT' && Array.isArray(result.rows) && result.rows.length === 1
     && result.rows[0] !== null && typeof result.rows[0] === 'object' && !Array.isArray(result.rows[0])
 }
+
+/** The same host-dispatch lock order is reusable by a transaction that must
+ * atomically accept another existing domain's request with the queued Run. */
+export async function lockFactoryHostDispatch(tx: PoolClient, userId: string, issueId: string) {
+  const locks: unknown = await tx.query(`SELECT pg_advisory_xact_lock(hashtextextended(${escapeLiteral(JSON.stringify(['factory-host-dispatch', userId, issueId]))},0));
+    SELECT pg_advisory_xact_lock(hashtextextended(${escapeLiteral(JSON.stringify([userId, issueId]))},0))`)
+  if (!Array.isArray(locks) || locks.length !== 2 || !locks.every(isLockResult)) throw new TypeError('Invalid Factory dispatch locks')
+}
+
+export type FactoryTaskTransaction = { client: PoolClient;
+  /** Host-only attachment, after the exact attempt exists and before queue/configure/freeze. */
+  prepareAttempt?: (tx: PoolClient, task: FactoryTask) => Promise<void> }
 
 /** The initial Profile follows the existing route. The queue rechecks it under lock. */
 export async function factoryTaskNeedsSpec(pool: Pool, userId: string, input: {
@@ -34,27 +49,28 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
   key?: string; sourceEventId?: string; previousRunId?: string; needsSpec?: boolean
   selection?: unknown
   queue: FactoryQueue
-}) {
+}, existing?: FactoryTaskTransaction) {
   if (!factoryLifecycleEnabled()) throw new FactoryError('factoryLifecycleUnavailable')
   if (input.needsSpec && input.previousRunId) throw new FactoryError('factoryTransition')
+  return withFactoryBackgroundWorkspace(pool, userId, { kind: 'issue', id: input.issueId, botId: input.botId }, async () => {
   const runtime = factoryRuntimeForBot(input.botId)
-  const tx = await pool.connect()
+  const tx = existing?.client ?? await pool.connect()
   const key = input.key ?? randomUUID()
   const receiptId = factoryEventId('host-dispatch', `${userId}:${key}`)
   const digest = createHash('sha256').update(JSON.stringify([input.agentId, input.deviceRepoId, input.note ?? null, input.previousRunId ?? null, input.sourceEventId ?? null, input.selection ?? null, ...(input.needsSpec ? [{ needsSpec: true }] : [])])).digest('hex')
   try {
-    await tx.query('BEGIN')
+    if (existing) assertFactoryTransaction(tx)
+    else await tx.query('BEGIN')
     // Native simple-query keeps two statements and the original lock order.
     // BEGIN stays separate; no policy snapshot moves ahead of a waiting lock.
-    const locks: unknown = await tx.query(`SELECT pg_advisory_xact_lock(hashtextextended(${escapeLiteral(JSON.stringify(['factory-host-dispatch', userId, input.issueId]))},0));
-      SELECT pg_advisory_xact_lock(hashtextextended(${escapeLiteral(JSON.stringify([userId, input.issueId]))},0))`)
-    if (!Array.isArray(locks) || locks.length !== 2 || !locks.every(isLockResult)) throw new TypeError('Invalid Factory dispatch locks')
+    await lockFactoryHostDispatch(tx, userId, input.issueId)
     const { rows: [receipt] } = await tx.query(`SELECT e.result,e.request->>'digest'=$5 AS same,t.status,t.id AS "taskId" FROM factory_events e JOIN factory_tasks t ON t.id=e."taskId" WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND e."eventId"=$4`, [userId, input.issueId, input.botId, receiptId, digest])
     if (receipt) {
       if (!receipt.same) throw new FactoryError('factoryReplayMismatch')
       if (['cancelled','revoked'].includes(receipt.status)) throw new FactoryError('factoryStopped')
       await runtime.store.lockTask(tx, userId, receipt.taskId)
-      await tx.query('COMMIT'); return receipt.result as { runId: string }
+      if (!existing) await tx.query('COMMIT')
+      return receipt.result as { runId: string }
     }
     const { rows } = await tx.query<import('./store').FactoryTask>(`SELECT * FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ORDER BY "createdAt" DESC,id DESC LIMIT 1 FOR UPDATE`, [userId, input.issueId, input.botId])
     let task: import('./store').FactoryTask | undefined = rows[0]
@@ -111,12 +127,16 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
       if (task && (task.stage !== 'execute' || task.status !== 'pending')) throw new FactoryError('factoryRunStillActive')
     } else if (!pendingSpec) task = undefined
     if (!task) task = (await runtime.store.route(userId, { issueId: input.issueId, eventId: factoryEventId('host-route', key), sourceEventId, needsSpec: Boolean(input.needsSpec), rationale: 'Authenticated task dispatch; placement and model selected by the host.' }, tx)).task
+    await existing?.prepareAttempt?.(tx, task)
     const dispatch = createFactoryDispatch(pool, runtime.store, input.queue)
     const result = await dispatch(userId, { binding: factoryBinding(task), agentId: input.agentId, deviceRepoId: input.deviceRepoId, ...(input.note ? { note: input.note } : {}) }, tx)
     if (input.previousRunId) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1 AND "userId"=$3', [result.runId, input.previousRunId, userId])
     await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [task.id, receiptId, JSON.stringify({ key, digest }), JSON.stringify({ runId: result.runId })])
-    await tx.query('COMMIT')
-    await notifyQueuedLocalRun(tx, userId, result.runId)
+    if (!existing) {
+      await tx.query('COMMIT')
+      await notifyQueuedLocalRun(tx, userId, result.runId)
+    }
     return { runId: result.runId }
-  } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+  } catch (error) { if (!existing) await tx.query('ROLLBACK'); throw error } finally { if (!existing) tx.release() }
+  })
 }

@@ -28,10 +28,12 @@ let link: typeof import('../lib/device-link')
 
 before(async () => {
   if (!databaseUrl) return
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false }) } })
+  // Credential mutations are audited in the selected workspace; this suite selects its team explicitly.
+  const workspaceCookie = { name: 'mikka-workspace', value: workspaceId }
+  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === workspaceCookie.name ? workspaceCookie : undefined, getAll: () => [workspaceCookie], has: (key: string) => key === workspaceCookie.name }) } })
   const intl = await import('next-intl/server')
   mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en' } })
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser, name: sessionUser, email: `${sessionUser}@example.invalid` } } : null } } } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser, name: sessionUser, email: `${sessionUser}@example.invalid` }, session: { id: 'activity-fixture-session' } } : null } } } })
   ;({ pool } = await import('../lib/db'))
   ;({ workspacePool } = await import('../lib/workspace-db'))
   actions = await import('../app/actions/settings-activity')
@@ -245,7 +247,7 @@ dbTest('devices: rename is owner-only and survives re-register; removal waits fo
   await pool.query(`INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,'codex',$3,$4)`, [agentA, A, `codex ${deviceId}`, deviceId])
   const repoId = randomUUID()
   await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'github.com/acme/app')`, [repoId, deviceId, A])
-  await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","deviceRepoId",status) VALUES ($1,$2,$3,$4,$5,'succeeded'),($6,$2,$3,$4,$5,'running')`, [runA, A, agentA, deviceId, repoId, randomUUID()])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","deviceRepoId","workspaceId",status) VALUES ($1,$2,$3,$4,$5,$7,'succeeded'),($6,$2,$3,$4,$5,$7,'running')`, [runA, A, agentA, deviceId, repoId, randomUUID(), workspaceId])
   sessionUser = A
   assert.deepEqual(await deviceActions.removeDevice(deviceId), { error: 'deviceHasActiveRuns', params: undefined })
   assert.equal((await daemonCall(`/v1/devices/${deviceId}/heartbeat`, token, {}, deviceId)).status, 400, 'still authorized while refused (invalid body only)')

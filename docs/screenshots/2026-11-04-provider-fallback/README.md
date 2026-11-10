@@ -1,5 +1,9 @@
 # #1225 模型失败接续：界面审阅页
 
+> 本文保留当次版本的三路模型证据与失败。现行验收使用共享 SMOKE 账号，
+> 官方 Claude Code 与 Codex 两条订阅路径独立记录。DeepSeek/API-key 路径
+> 已退出合并及验收门槛，后续执行按 [验收指南](../../acceptance.md)。
+
 关联 [issue #1225](https://github.com/alexj11324/Mikka/issues/1225) / [PR #1232](https://github.com/alexj11324/Mikka/pull/1232)。本页汇总全部 32 张截图，不另建导航、弹窗或模型选择入口。
 
 ## 版本与证据边界

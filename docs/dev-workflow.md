@@ -4,7 +4,8 @@ Standing rules for how work moves from a branch to `main`. Decision:
 [`2026-11-01-1440-dev-workflow-local-first`](design/decisions/2026-11-01-1440-dev-workflow-local-first.md);
 ownership as Alex set it on 2026-11-03, with batch merging updated on
 2026-11-05 (§ 5).
-Where another document disagrees, this page wins; fix the other document.
+Use `AGENTS.md` and the accepted decision hierarchy when another document
+disagrees, then update the lower-priority document.
 
 ## 1. Local first
 
@@ -19,47 +20,43 @@ locally. Push, open the PR and keep working; read CI when it reports.
 
 Ordinary acceptance follows [`acceptance.md`](acceptance.md): a local
 application, a real isolated database and, when the flow uses one, a real
-daemon. No browser tests run, in CI or locally
-([1520](design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md),
-[2026-11-01-2225](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)): acceptance goes through the API and the CLI
+daemon. Ordinary acceptance goes through the API and CLI
 (`pnpm test:local-loop`, [local-runtime.md](local-runtime.md)), and a UI change
-is checked with screenshots of a local production build.
+is checked with screenshots of a local production build of the official UI
+(this repository plus `mikka-hosted-ui`, [one UI](design/decisions/2026-11-08-2133-one-ui.md)) under
+[1520](design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md) and
+[2225](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
+The general browser suite is retired. Retained targeted Desktop, Analytics and
+self-hosted jobs keep the scopes in the
+[workflow reference](../.github/workflows/README.md).
 
 ## 2. Hot reload
 
-Debugging and pipeline runs use source, not builds:
+Debugging and pipeline runs use source with hot reload.
 
 | Part | Command |
 | --- | --- |
-| Server | `pnpm dev` (`next dev`, via `scripts/dev-preview.mjs`) |
+| Web application and API | `pnpm dev` (`apps/api/scripts/dev.mjs`, Vite + Nitro) |
 | Daemon | `pnpm daemon` (`tsx` on `packages/daemon` source) |
 
-A `pnpm dev` server peaks near 7 GB RSS while compiling the first pages
-(`/[locale]/page`, settings): the root page alone is ~14k server and ~10k
-client modules, and the OpenUI chat library brings every `lucide-react` icon.
-Dev keeps webpack's cache in memory; the default filesystem cache added ~2.4 GB
-and saved about 15 s on a restart. Cloud containers cap memory at about 14 GB,
-so run one dev server at a time and no build beside it. If `next dev` exits with no
-error and esbuild then prints `fatal error: all goroutines are asleep -
-deadlock!`, the kernel killed `next-server` for memory; `dmesg | grep -i oom`
-shows it. The esbuild message follows the kill; it is not the cause.
+Vite serves the frontend and proxies API requests to Nitro's development
+worker at the same origin. The API uses Hono, and the Workflow runtime uses
+the local world. Development state lives under `.cache/dev-runtime/<port>/`.
+The default origin is `http://localhost:3000/mikka`.
 
-Use a production build (`next build` then `next start`) only for production
-screenshots of a UI change. Run `next build`
-directly (`pnpm exec next build`): `pnpm build` also runs lint and migrations.
+For production screenshots of a UI change, run
+`NITRO_PRESET=node-server pnpm build:app`, then `pnpm start` in cloud Linux
+with the isolated database configured. The build
+emits the Vite frontend and Nitro Node server into `.output`. Startup validates
+`.output/mikka-build.json` and serves the compiled application. Node 24 is
+required. `pnpm build` also builds the subscription worker, generates the Agent
+UI, runs type checks and invokes migrations. The official Web workflow builds
+with `NITRO_PRESET=vercel` into `.vercel/output` through
+`scripts/release/build-vercel.mjs`.
 
-Vercel builds on a Standard machine: 4 cores, 8 GB. `next build` peaks at
-"Collecting page data", while Turbopack's ~5 GB is still held in the
-`next-build` process. So production builds emit no source maps and stop
-esbuild once the workflow bundles are built (`next.config.mjs`). To check a
-change against the limit, run `next build` in an 8 GB cgroup and read
-`memory.max_usage_in_bytes`.
-
-Vercel keeps every `node_modules` and `.next/cache` between builds, up to
-1.5 GB on that machine; a bigger cache is dropped and the next build starts
-cold. The Expo app's packages (`react-native-skia` alone is ~840 MB) pushed it
-over, so `vercel.json` installs every workspace except `@mikka/mobile`, which
-the web build and typecheck do not use.
+`vercel.json` installs every workspace except `@mikka/mobile`, which the Web
+build does not use. Runtime and frontend build configuration lives in
+`apps/api/nitro.config.ts` and `apps/frontend/vite.config.mjs`.
 
 ## 3. Environment
 
@@ -68,25 +65,26 @@ One command sets up a container: `eval "$(scripts/dev/bootstrap-local.sh)"`
 the cloud environment's setup script so every session starts ready. It
 provides:
 
-- **Node 24**, the same as CI. The unit tests also pass on Node 22: mock a
-  module with `namedExports`/`defaultExport` (Node 22 ignores `{ exports }`)
-  and use `--experimental-test-isolation` (Node 22 has no `--test-isolation`).
+- **Node 24**, the version family required by the runtime and CI. The separate
+  Node 22 compatibility workflow covers its selected source tests only.
 - **PostgreSQL 17** at `127.0.0.1:5432`, database `mikka_e2e`; migrations with
   `pnpm migrate` (it runs by itself when every target is a loopback database;
   a remote database off Vercel still needs `MIGRATE=1` and `--allow-remote`).
 - **Chromium** for UI screenshots: the container's
   `/opt/pw-browsers/chromium`. Never run `playwright install`.
 
-Local runs use DeepSeek DS 4.1 Flash through the workspace's own key
-(`DEEPSEEK_API_KEY` in Infisical, `dev:/vercel`), never Mikka 默认 or the AI
-Gateway: [local-runtime.md](local-runtime.md#which-model-local-runs-use).
+`dev:local` retains its DeepSeek Flash setup. Its paid API-key path does not
+gate acceptance or a merge. Live model acceptance follows the two subscription
+paths in [acceptance.md](acceptance.md#live-model-acceptance). See the
+[local model setup](local-runtime.md#which-model-local-runs-use) for the
+existing harness's limits.
 
 Signup limits never block local work. In local test-account mode
 (`localTestAccountsMode`, `scripts/test-accounts/database-target.mjs`) and
 outside Vercel, the signup and verification limits default to CI's (1000 per
 IP and 10000 overall each hour, instead of 5 per IP), and Better Auth's
 sign-up rule rises from 3 to 100 per 10 seconds (`lib/abuse/signup.ts`). This
-holds for `next dev` and `next start` alike. A limit set explicitly
+holds for `pnpm dev` and `pnpm start` alike. A limit set explicitly
 (`MIKKA_SIGNUP_*_HOURLY`, `MIKKA_VERIFICATION_*_HOURLY`) still wins;
 production is unchanged.
 
@@ -99,9 +97,13 @@ GitHub-hosted runner is left to CI.
 Database suites decide by the database, not the runner: they run wherever every
 application database URL is a loopback `*_e2e` database
 (`disposableDatabase` in `tests/helpers/e2e-target.mjs`) and skip or refuse
-otherwise. 现状（非决定）：the shared test-account pool
-(`scripts/test-accounts/bootstrap.mjs`) and a few hosted-service suites still
-require `GITHUB_ACTIONS`; those run in CI. Browser suites run nowhere.
+otherwise. The shared test-account bootstrap supports local mode and
+GitHub-hosted CI, plus a separately bound Docker bootstrap
+(`scripts/test-accounts/bootstrap.mjs`). Its CI entry requires
+`GITHUB_ACTIONS`. Local mode uses its own disposable-database and revision
+checks. These account-pool guards also apply to any retained targeted consumer.
+The general browser suite is retired, while targeted jobs retain their
+source-bound scope in the [workflow reference](../.github/workflows/README.md).
 
 Local test accounts: the local mode (`MIKKA_LOCAL_TEST_ACCOUNTS=1` with a
 loopback `*_e2e` database) is described in
@@ -160,8 +162,9 @@ old module owners (backend was Codex's).
    [`acceptance.md`](acceptance.md)). A simulated test is not production
    acceptance. The owner writes the evidence on the issue (time, run id,
    log summary; no secrets or personal data) and closes the issue. Every
-   production Web deploy also runs the automatic post-deploy smoke test
-   (Alex, 2026-11-07).
+   production Web deploy also triggers the implemented API smoke. The required
+   message/task smoke remains a documented coverage gap in
+   [production smoke](production-smoke.md).
    A PR that touches only `apps/mobile/**` and documentation is the
    exception: it merges once CI is green and it is mergeable, without
    waiting for Web deploy or E2B to be idle. Its push still queues a Web
@@ -181,12 +184,13 @@ old module owners (backend was Codex's).
 8. A documentation conflict is resolved by whoever merges: they edit the
    documents directly.
 
-Before any merge, the change is verified end to end in CI (for example
-`Production build and browser interactions`) or with a production build
-(`next build`, `next start`) in a local or Docker sandbox, against its own
-isolated PostgreSQL database (`mikka_e2e`) and leased test accounts
-([`test-accounts.md`](test-accounts.md)); production is never the test
-environment. Pull requests and branches have no Vercel Preview: every build
+Before any merge, verify the affected API/CLI flow and required CI checks.
+UI changes also need screenshots of a production build of the official UI
+(`pnpm build:app`, `pnpm start`, with `mikka-hosted-ui`) in a cloud Linux or Docker sandbox, against its
+own isolated PostgreSQL database (`mikka_e2e`). Isolated screenshot harnesses
+use their leased owner/peer fixtures ([`test-accounts.md`](test-accounts.md)).
+Shared-team and external-service acceptance follows the shared SMOKE account
+contract in [`acceptance.md`](acceptance.md). Pull requests and branches have no Vercel Preview: every build
 runs on GitHub Actions, and only `main` deploys, to production
 ([decision 2026-11-05-1632](design/decisions/2026-11-05-1632-no-vercel-preview.md)).
 
@@ -240,11 +244,13 @@ failed release so the removed candidates are rebuilt.
 
 ## 8. Reaching a local service from outside
 
-Use a Cloudflare tunnel when a local service must be reachable from outside.
-In the cloud environment, outbound traffic goes only through a proxy on
-port 443, and `cloudflared` cannot connect (it needs port 7844). Report that
-as it is. Do not work around it, and never put production credentials on a
-public machine.
+Identify the current environment's supported ingress before exposing a local
+service. The issue-owned Docker adapter uses a verified HTTPS publication
+([Docker environment](operations/desktop-docker-test-environment.md)). Earlier
+managed cloud sessions allowed outbound traffic only through a port-443 proxy,
+which blocked `cloudflared` on port 7844. Recheck that network boundary in the
+current session and record the actual failure. Keep production credentials in
+their existing delivery environment.
 
 ## 9. Parallel work and stalls
 

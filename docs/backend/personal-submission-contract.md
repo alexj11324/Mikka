@@ -4,16 +4,28 @@ This change is limited to authenticated personal chat submissions. It uses the e
 
 ## Frontend contract
 
-- Coordinator HTTP: `POST /api/coordinator/messages` accepts `{text, submissionId?}`. Text is trimmed and must contain 1–10,000 characters. The optional submissionId must be a UUID; case normalizes to lowercase. Authentication supplies the owner. Caller-supplied owner, bot, question or approval fields are rejected with HTTP 400.
-- Existing Bot-aware server action: `sendCoordinatorMessage(text, quote?, botId = null, submissionId?)`. The optional fourth argument enables the same retry contract. Existing authentication and `ownBot` checks run before event insertion, including on duplicate retries. `null` botId identifies the Coordinator. HTTP remains Coordinator-only.
+- Coordinator HTTP: `POST /api/coordinator/messages` accepts `{text?, images?, submissionId?}`. Text is trimmed and capped at 10,000 characters. Text or an image is required; image and body limits come from `lib/coordinator/user-attachments.ts`. The optional submissionId must be a UUID; case normalizes to lowercase. Authentication supplies the owner. Caller-supplied owner, bot, question or approval fields are rejected with HTTP 400.
+- Existing Bot-aware server action: `sendCoordinatorMessage(text, quote?, botId = null, submissionId?)`. The optional fourth argument enables the same retry contract. Existing authentication and `ownBot` checks run before event insertion, including on duplicate retries. `null` botId selects the Coordinator in the current workspace. The server
+  resolves its actual Bot row through `openChatBotId`; persisted deduplication
+  binds that resolved chat. HTTP remains Coordinator-only. The action also
+  accepts the task destination, browser notes, images, retry position and
+  profile reference in its later arguments; see `app/actions/coordinator.ts`.
 - Keep one UUID and one frozen message/quote/chat body for an unsettled logical submission. Retry the same body with that UUID after an uncertain network/server outcome. An intentionally new message gets a new UUID, even when its text matches a previous message.
 - HTTP returns the existing 202 `{queued:true, enabled}` shape on both a fresh write and an identical retry. A changed message under the same owner/chat/submission UUID returns 409 `{error:'submissionConflict'}`. The server action returns `{queued:true}` or its normal ActionResult with `error:'submissionConflict'`.
 - Quotes participate through their existing serialized stored body. Changing quoted content/reference metadata under a settled UUID is a payload conflict. Separate Bot chats and different authenticated owners may independently use the same UUID.
-- Calls without submissionId retain legacy independent-write behavior. The current main composer still omits the UUID; this backend change alone does not make that existing UI idempotent. Claude's frontend wiring must pass the fourth action argument or the documented HTTP body without changing layout.
+- Calls without submissionId retain independent-write behavior. The shared
+  `useCoordinatorSubmit` hook (`components/coordinator/use-coordinator-submit.ts`)
+  passes the UUID as the fourth action argument. Its submitter keeps unsettled
+  bodies in the mounted composer's memory. Reloading, unmounting or sending from
+  another composer creates a new submission; durable cross-reload storage is
+  an integration requirement in the following original contract.
 
-### Durable frontend lifecycle
+### Original durable frontend integration contract
 
-Persist one pending record before sending: `{ownerContext, conversationId, submissionId, text, quote, state}`. `conversationId` is null for the Coordinator or the actual Bot UUID returned by the authenticated Bot model, never a name/list position/agent ID. This record must survive retries and remount/reload using the frontend's existing account-scoped pending-storage mechanism; do not store credentials in it. The frozen quote includes artifact/version/kind/text/label/selector. The ownerContext is a local routing guard and is never sent as API authority.
+Persist one pending record before sending: `{ownerContext, conversationId, submissionId, text, quote, state}`. `conversationId` identifies the actual server-resolved Bot chat, including the
+workspace's Coordinator Bot; the action may accept null to request Coordinator
+resolution, but stored events bind the resolved Bot UUID. The original contract requires this record to survive retries and
+remount/reload. The current submitter stores it only in memory; do not store credentials in it. The frozen quote includes artifact/version/kind/text/label/selector. The ownerContext is a local routing guard and is never sent as API authority.
 
 1. On a new user intent, trim/validate the draft and allocate `crypto.randomUUID()` exactly once. Save its immutable body and actual chat, then invoke HTTP or the action. A second click on that pending item resends the same record.
 2. Timeout, lost response, HTTP 5xx, or an unknown rejected server-action promise leaves the record pending. Retry its same UUID/body/chat; do not infer rejection or allocate a replacement UUID.
@@ -41,4 +53,6 @@ Additional controlled contract tests hold an uncommitted winner's adapter result
 
 Separately approved retained PostgreSQL validation passed eight checks using the actual submission helper and existing unique constraint: ten concurrent same-body calls produced one event; a different-body loser waited for the winner to commit and was rejected after reading it; rollback allowed a waiting writer to insert; owner/chat scope and legacy no-ID writes remained independent. The fixture retained seven events after nineteen INSERT attempts and one uncommitted-row rollback, with at most three connections and no UPDATE, DELETE or DROP. This validates unique-index arbitration at READ COMMITTED, not actual Bot/user foreign keys, authenticated sessions or compiled Next HTTP. The original container was returned to its stopped state; all data and evidence were retained. That one-time authorization is consumed and is not automatic CI disposal permission.
 
-The earlier owner/run-message/stop fixture separately passed its bounded real PostgreSQL validation; its permission is also consumed. Frontend durable submission-ID wiring, request-scoped integration, compiled HTTP and production acceptance remain separate delivery steps. No previous fixture approval authorizes new tables, writes or cleanup.
+The earlier owner/run-message/stop fixture separately passed its bounded real PostgreSQL validation; its permission is also consumed. Cross-reload durable submission storage and current-version runtime acceptance
+remain separate delivery steps. The mounted-composer UUID/action wiring is
+implemented as described in the frontend contract. No previous fixture approval authorizes new tables, writes or cleanup.

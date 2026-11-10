@@ -1,5 +1,15 @@
 # #1225 生产验收的版本绑定
 
+本文保留 #1225 在 2026-11-04 的版本绑定和旧三路径验收合同。
+后续模型验收按 [现行规则](../acceptance.md#live-model-acceptance) 执行。
+官方 Claude Code 的 `claude-haiku-5-5` 与官方 Codex 的 `gpt-6-luna`
+分别记录结果，一路受阻时继续另一路。DeepSeek/API-key 路径不作为合并或验收门槛，
+不为补齐该路径发出付费重试。共享应用验收使用 Acme Inc. 中的现有 SMOKE 账号。
+
+现有 `model-provider-fallback-acceptance.yml` 的 active 模式仍从 #1249 的固定提交
+检出 driver，driver 会枚举旧三条路径。它尚未实现现行的双订阅验收选择，不能把
+该旧入口的三路径汇总状态当作现行验收门槛。下列历史授权和回执不扩大后续付费权限。
+
 功能 PR #1232 的合并提交是 `72d30d6179e1e844e8da74edce4523611d200ccc`。
 2026-11-04 17:51:09 和 17:52:01 UTC，生产 `/mikka/api/version` 已精确返回该提交，
 Web deploy 与对应 Vercel 生产部署也已成功。后续正常的主分支发布更新了生产域名；
@@ -8,7 +18,7 @@ Web deploy 与对应 Vercel 生产部署也已成功。后续正常的主分支�
 这类拒绝不能通过回退生产、放宽发布保护或把旧检查冒充新版本检查来处理。
 验收需要分别记录功能来源和本次实际运行的应用版本。
 
-## 授权与版本
+## 历史授权与版本
 
 - 只有 PR #1232 和补充 PR #1249 的真实合并部署可以自动触发付费验收；普通主分支发布不触发本 issue 的模型任务。
 - 功能来源仍为 PR #1232 的实际合并 SHA，必须通过 GitHub 读取确认。
@@ -20,9 +30,9 @@ Web deploy 与对应 Vercel 生产部署也已成功。后续正常的主分支�
 - 只有完成以上检查，才读取既有 smoke 账户并创建测试任务。凭证仅通过既有 Infisical identity 注入环境。
 - 一轮验收固定实际生产 SHA。期间版本变化仍须停止并清理；不得悄悄改成新的 SHA 继续原测试。
 
-## 三条独立路径
+## 历史三条路径
 
-继续使用 `deepseek-flash`、官方 Claude Code 的 `claude-haiku-5-5`、官方 Codex 的
+当时合同使用 `deepseek-flash`、官方 Claude Code 的 `claude-haiku-5-5`、官方 Codex 的
 `gpt-6-luna`。第一条专门验证真实 402 后按偏好接续；另两条保持各自官方订阅。
 原有 owner、workspace、运行位置、全工作区空闲检查、精确测试模型、产物字节核对及清理规则保持不变。
 

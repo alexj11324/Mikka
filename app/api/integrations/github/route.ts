@@ -19,7 +19,9 @@ async function handleGET(request: Request) {
     if (result.userId !== viewerId) throw new GitHubAccessError('authRequired', 401)
     const connection = await githubConnection(viewerId)
     const cloud = await useCloudGitHub(viewerId)
-    return Response.json({ viewerId, configured: true, connected: true, ...(cloud ? { source: 'cloud' } : {}), login: cloud ? null : connection?.githubLogin ?? null, installed: result.installations.length > 0, repositories: result.repositories }, { headers })
+    return Response.json({ viewerId, configured: true, connected: true, ...(cloud ? { source: 'cloud' } : {}),
+      githubAccountId: result.githubAccountId, login: cloud ? null : connection?.githubLogin ?? null,
+      installed: result.installations.length > 0, repositories: result.repositories }, { headers })
   } catch (error) {
     if (error instanceof CloudServiceError) return Response.json({ ...(viewerId ? { viewerId } : {}), error: error.code }, { status: cloudErrorStatus(error.code), headers })
     if (error instanceof GitHubAccessError) {

@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -53,9 +54,10 @@ test('the bot list reads each bot\'s preview and its citations\' names only, wit
     for (const [person, role] of [[peer, 'admin'], [owner, 'member']]) await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,$4)', [workspaceId, person, `${person}@example.invalid`, role])
     await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)', [teamId, workspaceId, peer, 'Summary team', 'SUM'])
     await pool.query('insert into agents(id,"userId",name,harness) values($1,$2,$3,$4),($5,$6,$7,$8)', [agent, owner, 'Owner agent', 'codex', peerAgent, peer, 'Peer agent', 'claude_code'])
+    await seedFixtureWorkspace(pool, owner, 'personal', botWorkspace)
     const issue = async (userId: string, scope: string, attrs: object = {}) => {
       const id = randomUUID()
-      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)', [id, userId, `Task ${id.slice(0, 4)}`, doc(attrs), 'doing', 'normal', scope])
+      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,$8,\'bound\')', [id, userId, `Task ${id.slice(0, 4)}`, doc(attrs), 'doing', 'normal', scope, scope === 'workspace' ? workspaceId : await seedFixtureWorkspace(pool, userId)])
       return id
     }
     const own = await issue(owner, 'personal'), deleted = await issue(owner, 'personal', { deletedAt: new Date().toISOString() })
@@ -68,8 +70,8 @@ test('the bot list reads each bot\'s preview and its citations\' names only, wit
     const runs: string[] = []
     for (const [index, prompt] of prompts.entries()) {
       const id = randomUUID(); runs.push(id)
-      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,error) values($1,$2,$3,$4,$5,$6,$7,$8)',
-        [id, owner, index % 2 ? own : null, agent, 'succeeded', prompt, JSON.stringify({ summary: filler('summary'), files: filler('files') }), filler('error')])
+      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,error,"workspaceId","promptTaskStart","promptTaskLength") values($1,$2,$3,$4,$5,$6,$7,$8,$9,0,char_length($6))',
+        [id, owner, index % 2 ? own : null, agent, 'succeeded', prompt, JSON.stringify({ summary: filler('summary'), files: filler('files') }), filler('error'), botWorkspace])
     }
     const teammateRun = randomUUID(), strangerRun = randomUUID()
     await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt) values($1,$2,$3,$4,$5,$6)', [teammateRun, peer, shared, peerAgent, 'running', filler('Private teammate prompt')])
@@ -130,6 +132,8 @@ test('the bot list reads each bot\'s preview and its citations\' names only, wit
     await pool.query('delete from mikka_teams where id=$1', [teamId])
     await pool.query('delete from mikka_workspace_members where "workspaceId"=$1', [workspaceId])
     await pool.query('delete from mikka_workspaces where id=$1', [workspaceId])
+    await pool.query('delete from mikka_workspace_members where "userId"=any($1::text[])', [[owner, peer, stranger]])
+    await pool.query('delete from mikka_workspaces where "userId"=any($1::text[])', [[owner, peer, stranger]])
     await pool.query('delete from "user" where id=any($1::text[])', [[owner, peer, stranger]])
   }
 })

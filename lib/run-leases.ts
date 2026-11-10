@@ -30,6 +30,8 @@ import { subscriptionPreflightSchema } from '@mikka/protocol/harness'
 import type { RunReport } from '@mikka/protocol/run'
 import messages from '@/messages/zh-CN.json'
 import { armDueTimerSoon } from '@/lib/due-timer'
+import { withTaskWorkspace } from '@/lib/task-workspace'
+import { ActionFailureError } from '@/lib/action-error'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -69,23 +71,42 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
   const validRunIds = runIds.filter(id => RUN_UUID.test(id))
   const leaseExpiresAt = new Date(now.getTime() + RUN_LEASE_MS)
   const candidates = validRunIds.length ? await db.select().from(agentRuns).where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, validRunIds), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))) : []
-  const authorized: string[] = []
+  const renewed: string[] = []
   for (const run of candidates) {
-    try { await revalidateExecutionIdentity(pool, run); authorized.push(run.id) }
+    try {
+      // Historical runs may lack a frozen resource identity. That never
+      // exempts their persisted tenant from current membership checks.
+      if (!run.workspaceId || (run.agentDefinition?.executionIdentity?.workspaceId
+        && run.agentDefinition.executionIdentity.workspaceId !== run.workspaceId)) throw new ExecutionIdentityError()
+      const held = await withTaskWorkspace(run.userId, run.workspaceId, async () => {
+        await revalidateExecutionIdentity(pool, run)
+        // Membership stays pinned until this atomic application write finishes.
+        // Recheck mutable task deletion and Bot provenance in that same write.
+        return db.update(agentRuns).set({ leaseExpiresAt, updatedAt: now }).where(and(
+          eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId),
+          eq(agentRuns.workspaceId, run.workspaceId!), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), isNull(agentRuns.stopRequestedAt),
+          sql`(${agentRuns.issueId} IS NULL OR EXISTS (SELECT 1 FROM issues task WHERE task.id=${agentRuns.issueId}
+            AND task."workspaceId"=${agentRuns.workspaceId} AND task."ownershipState"='bound'
+            AND coalesce(task.content->'attrs'->'mikka',task.content->'attrs'->'orvilo')->>'deletedAt' IS NULL))`,
+          sql`(${agentRuns.botId} IS NULL OR EXISTS (SELECT 1 FROM bots bot WHERE bot.id=${agentRuns.botId}
+            AND bot."workspaceId"=${agentRuns.workspaceId} AND bot."archivedAt" IS NULL))`,
+        )).returning({ id: agentRuns.id })
+      })
+      renewed.push(...held.map(row => row.id))
+    }
     catch (error) {
-      if (!(error instanceof ExecutionIdentityError)) throw error
-      // The daemon receives revoked on this heartbeat and removes injected credentials.
-      const stopped = await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now }).where(and(eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))).returning({ id: agentRuns.id })
-      if (stopped.length && !run.stopRequestedAt) { await runListChanged(db, run.id); await runChanged(db, run.id) }
-      // Its lease ended now: reclaimed by the run-recovery due timer if the daemon never reports it (#1212).
-      if (stopped.length) armDueTimerSoon('run-recovery')
+      if (!(error instanceof ExecutionIdentityError) && !(error instanceof ActionFailureError && error.code === 'workspaceAccessDenied')) throw error
     }
   }
-  const renewed = authorized.length ? await db.update(agentRuns)
-    .set({ leaseExpiresAt, updatedAt: now })
-    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, authorized), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), isNull(agentRuns.stopRequestedAt)))
+  const held = new Set(renewed)
+  const rejected = candidates.filter(run => !held.has(run.id)).map(run => run.id)
+  // The heartbeat tells the daemon to remove credentials and ends any live
+  // lease, including a legacy run whose membership was removed.
+  const stopped = rejected.length ? await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now })
+    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, rejected), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), isNull(agentRuns.stopRequestedAt)))
     .returning({ id: agentRuns.id }) : []
-  const held = new Set(renewed.map(run => run.id))
+  for (const run of stopped) { await runListChanged(db, run.id); await runChanged(db, run.id) }
+  if (stopped.length) armDueTimerSoon('run-recovery')
   const revoked = runIds.filter(id => !held.has(id))
   return { leases: Object.fromEntries([...held].map(id => [id, leaseExpiresAt.toISOString()])), ...(revoked.length ? { revoked } : {}) }
 }
@@ -187,7 +208,7 @@ export async function latestCheckpoint(retryOf: string): Promise<RunCheckpoint |
   // Changing providers does not spend an infrastructure retry. Bound its
   // history separately, while retaining the existing three-attempt limit.
   const maxProviderAttempts = 128, visited = new Set<string>()
-  type SnapshotSource = Pick<Run, 'id' | 'retryOf' | 'userId' | 'issueId' | 'botId' | 'deviceRepoId' | 'stopReason' | 'report'> & {
+  type SnapshotSource = Pick<Run, 'id' | 'retryOf' | 'userId' | 'workspaceId' | 'issueId' | 'botId' | 'deviceRepoId' | 'stopReason' | 'report'> & {
     repoOwner: string | null; repoPath: string | null; remoteUrl: string | null
     baseCommit: string | null; patch: Buffer | null; files: number | null; takenAt: Date | null; unavailableReason: string | null
   }
@@ -195,15 +216,15 @@ export async function latestCheckpoint(retryOf: string): Promise<RunCheckpoint |
   let providerAttempts = 0, infrastructureAttempts = 0
   while (current && !visited.has(current)) {
     visited.add(current)
-    const { rows }: { rows: SnapshotSource[] } = await pool.query<SnapshotSource>(`SELECT r.id,r."retryOf",r."userId",r."issueId",r."botId",r."deviceRepoId",r."stopReason",r.report,
+    const { rows }: { rows: SnapshotSource[] } = await pool.query<SnapshotSource>(`SELECT r.id,r."retryOf",r."userId",r."workspaceId",r."issueId",r."botId",r."deviceRepoId",r."stopReason",r.report,
       repo."userId" AS "repoOwner",repo."repoPath",repo."remoteUrl",c."baseCommit",c.patch,c.files,c."updatedAt" AS "takenAt",c."unavailableReason"
       FROM agent_runs r LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId"
       LEFT JOIN run_checkpoints c ON c."runId"=r.id AND c."userId"=r."userId" WHERE r.id=$1`, [current])
     const row: SnapshotSource | undefined = rows[0]
-    if (!row || (row.deviceRepoId && row.repoOwner !== row.userId)) break
+    if (!row?.workspaceId || (row.deviceRepoId && row.repoOwner !== row.userId)) break
     const origin: SnapshotSource = source ?? row
     source = origin
-    if (row.userId !== origin.userId || row.issueId !== origin.issueId || row.botId !== origin.botId) break
+    if (row.userId !== origin.userId || row.workspaceId !== origin.workspaceId || row.issueId !== origin.issueId || row.botId !== origin.botId) break
     if (row.deviceRepoId !== origin.deviceRepoId && !(row.repoPath && origin.repoPath && row.repoPath === origin.repoPath &&
       repositoryBindingMatches(row.repoPath, row.remoteUrl, { allowFile: daemonTestMode(process.env) }) &&
       repositoryBindingMatches(origin.repoPath, origin.remoteUrl, { allowFile: daemonTestMode(process.env) }))) break
@@ -256,7 +277,7 @@ async function reclaimLostRun(run: Run, now: Date) {
   }
   const retryId = crypto.randomUUID()
   const where = bound || cloud ? 'moved to the cloud' : 'handed to another device'
-  const recovery = await (await import('@/lib/factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run.prompt, outcome.attempt))
+  const recovery = await (await import('@/lib/factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run, outcome.attempt))
   if (recovery.blocked) {
     const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status: 'failed', error: recovery.blocked }, now, true)
     if (ended) await announceEnd({ ...run, status: 'failed' })
@@ -275,7 +296,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
       agentDefinition: retryWorkerDefinition(target ? await rebindExecutionDevice(pool, run, target.deviceId) : run.agentDefinition, recovery.prompt),
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
-      prompt: recovery.prompt, attempt: outcome.attempt, retryOf: run.id,
+      prompt: recovery.prompt, promptTaskStart: recovery.promptTaskStart, promptTaskLength: recovery.promptTaskLength, attempt: outcome.attempt, retryOf: run.id,
     })
     await runListChanged(tx, retryId)
     await runChanged(tx, retryId)
@@ -352,7 +373,7 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
     const { queueCloudRun } = await import('@/lib/computer/queue-run')
     const repo = await ensureDeviceRepository(run.userId, cloud.deviceId, cloud.remoteUrl)
     const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: cloud.agentId, deviceRepoId: repo.id, title: issue.title, body: tiptapToText(issue.content),
-      note: retryNote(attempt) + handoff, withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`, threadRunId: run.id, ...await cloudRetryModel(run, cloud) })
+      executionNote: retryNote(attempt) + handoff, withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`, threadRunId: run.id, ...await cloudRetryModel(run, cloud) })
     await db.update(agentRuns).set({ retryOf: run.id, attempt, updatedAt: now }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
     await recordCoordinatorEvent(db, runRetriedEvent(run, { runId, attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedTo: { kind: 'cloud' } }))
     await startThreadMachine(actor, runId)

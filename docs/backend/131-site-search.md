@@ -1,5 +1,11 @@
 # #131 independent title read contract
 
+This is the historical #131 integration and acceptance record for the revisions
+named here. Current application startup and API/RPC transport follow
+[the shared runtime guide](../operations/web-runtime.md). Its old browser and
+Next process instructions describe those recorded candidates. Use
+[acceptance](../acceptance.md) for a new run.
+
 Integration base: main 2cfbd5ad (#311, #314 and #315 included) (normal merge, preserving the complete latest tree). The current GlobalSearch filters supplied recent arrays;
 this candidate supplies reads for a later frontend integration. Main now includes #307 code-only builds/legacy generation retirement and #306/#309
 avatar/auth behavior. All of those changes are retained without replacing their files. No layout changes.
@@ -143,13 +149,12 @@ renderer is changed. Foreign IDs still return the same 404 as missing IDs.
 Current client-only GlobalSearch still cannot select older server hits until
 Claude wires this API; existing browser cases establish the recent archive path.
 
-History: `browser-tests.yml` was removed and no browser tests run
-([decision](../design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)); verify through the HTTP/API
-profile. The text below records the original plan. The candidate stays draft. Use the existing browser-tests workflow's explicit
-workflow_dispatch on the frozen candidate to run the same full ready/before-merge
-suite without changing readiness or invoking a merge/deployment. Dedicated dual-PG
-HTTP remains separate from that single-DB browser fixture job. (That workflow and
-its browser validation no longer exist: CI and local work run no browser tests.)
+The original plan used `browser-tests.yml`; that workflow was removed. CI and
+local acceptance run no browser tests
+([decision](../design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)).
+The dedicated dual-PG HTTP profile remains separate from the historical
+single-database browser fixture job. Read the candidate and draft references
+here as the original handoff state.
 
 
 ## Merged #311 composition regression
@@ -168,8 +173,9 @@ workspace PG services through the existing actAs internal identity boundary: tas
 owner gets only thread metadata, read/send fail specifically runNotFound, zero
 messages are written, and the thread owner reads the real saved prompt/chunks.
 These are real action/SQL calls, not HTTP server-action or real OAuth acceptance.
-The HTTP and action claims remain distinguished. Fixtures are retained without
-DELETE. The entire normal browser gate is rerun on the new exact SHA as well.
+The HTTP and action claims remain distinguished. Fixtures were retained without
+DELETE. The browser-gate statement in the original handoff predates the
+no-browser-test decision; a new run uses the current API/CLI checks.
 
 A task search hit is still metadata authority, never thread content or private-DM
 permission. Do not widen #311 or change Auth's task visibility policy to compose

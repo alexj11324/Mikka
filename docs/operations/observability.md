@@ -29,8 +29,10 @@ Response, not that a streamed conversation or external action finished.
 | Secret cleanup overdue | Unreferenced BYOS artifacts past notBefore by 5 minutes, not deleted | Zero | Inspect the existing cleanup worker; never copy secret names or values into the alert |
 | Database unavailable | Read-only aggregate probe with bounded connection/query timeout | Zero failed probes | Check connectivity and saturation; do not infer that absent queue data is healthy |
 
-The existing minute worker can call `GET /api/cron/ops-monitor` using its
-existing `CRON_SECRET` bearer. It uses the existing main pool
+The existing minute Worker calls `GET /api/cron/ops-monitor` at UTC minutes
+0, 15, 30 and 45 using its existing `CRON_SECRET` bearer
+(`cloudflare/suggestions-cron/src/index.mjs`). The response targets in the
+table do not establish five-minute alert detection with that cadence. It uses the existing main pool
 (`MIKKA_DATABASE_URL`), persists aggregate observations and firing/resolved
 transitions in `ops_monitor_observations`, and returns `notificationStatus`.
 No extra variable is needed to collect database signals. The same route also
@@ -50,8 +52,9 @@ transaction is read-only. A collector must supply actual log lines and invoke
 this command once a minute, as a single writer for its private state file.
 The sink is deliberately restricted to a literal loopback HTTP address;
 existing infrastructure may receive that event locally and forward it through
-its already approved notification channel. The existing minute worker owns the schedule; this command does not create
-a second scheduled job or an external paging integration. Do not claim production
+its already approved notification channel. The minute Worker schedules the HTTP collector. It does not execute this CLI
+or collect its runtime-log input. An operator must establish that separate
+collector before claiming the CLI's once-per-minute coverage. Do not claim production
 coverage until the collector, invocation, sink forwarding and owner are real
 and have been tested. No traffic produces no success ratio, not a synthetic
 100%; malformed/legacy lines without invocation timestamps cannot prove

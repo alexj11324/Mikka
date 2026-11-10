@@ -12,6 +12,9 @@ why. Where the two skills disagree, `interface-design` decides. A skill audit
 never changes the shell layout (R-35), and the generated gradient avatar for
 people is intentional (R-36). The example
 code and copy in a skill are illustrations, not Mikka's components or wording.
+No skill restyles a paid block or component (BoardUI Pro, affectUI, beUI Pro):
+their token, icon-set, font and polish rules apply to Mikka's own UI only
+(`docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md`).
 
 Vendored on 2026-10-29, unmodified, from these pinned commits:
 
@@ -31,10 +34,20 @@ Vendored on 2026-10-29, unmodified, from these pinned commits:
 | [expo/skills](https://github.com/expo/skills) | `a9e5bd3fa00b4e61f632e43f85da73aee1942582` | MIT, (c) 2025-present 650 Industries, Inc. (Expo); `expo-animation` also MIT, (c) 2026 Emil Kowalski (its own `LICENSE`) | `expo-overview`, `expo-native-ui`, `expo-animation`, `expo-ui`, `expo-router`, `expo-design-system`, vendored 2026-11-05 at Alex's request from `plugins/expo/skills/`, unmodified. Changed: `expo-ui/scripts/list-components.js` left out under the no-scripts rule; to list `@expo/ui` components, read the installed package's `.d.ts` files as its `references/swift-ui.md` also says. Their mentions of sibling skills not vendored here (`expo-project-structure`, `expo-data-fetching`, `eas-app-stores`, `eas-simulator`, …) are references only; `eas-simulator` was left out because iOS changes are checked on Alex's phone after each OTA, not on a cloud simulator |
 | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | `1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62` | MIT (declared in the skill's frontmatter; the repository ships no `LICENSE` file) | `react-native-skills` (`skills/react-native-skills/`), vendored 2026-11-05 at Alex's request, unmodified |
 | [warpdotdev/common-skills](https://github.com/warpdotdev/common-skills) | `8792394ff1b655e0af451b8fabb68ef0cfcbd208` | MIT, (c) 2026 Denver Technologies, Inc. | `merge-risk` (vendored 2026-11-06 from `.agents/skills/merge-risk/SKILL.md`, unmodified; five-dimensional PR merge-risk review, no scripts) |
+| [avdlee/swiftui-agent-skill](https://github.com/avdlee/swiftui-agent-skill) | `62bd760f005093d1e2e4de5db156e456a5f96400` | MIT, (c) 2026 Antoine van der Lee | `swiftui-expert-skill` (vendored 2026-11-08 at Alex's request, from `skills/swiftui-expert-skill/`). Changed: `scripts/` (the Instruments `record_trace.py` / `analyze_trace.py` helpers and `instruments_parser/`) left out under the no-scripts rule, so the trace recording and analysis steps in `SKILL.md` do not run here; every other file is unmodified |
+| [gannonh/skills](https://github.com/gannonh/skills) | `2ef000341d4e60af00e8934ba1d4cfef82b63b13` | MIT, (c) 2026 Gannon Hall | `update-docs` (`skills/update-docs/`, vendored 2026-11-08), unmodified. The optional `documentation-and-adrs` reference uses an available installed skill when relevant |
+| [wondelai/skills](https://github.com/wondelai/skills) | `6621b1f32cca2b9b17d7a18c076bf6e7da83f8a6` | MIT, (c) 2025 Wondel.ai sp. z o.o. Google guide attribution is retained in `SKILL.md` | `technical-documentation` (vendored 2026-11-08), unmodified, including all seven reference pages |
 
-Full license texts are in [`../skill-licenses/`](../skill-licenses/).
+Full license texts are in [`../skill-licenses/`](../skill-licenses/). The
+`update-docs` license is retained in [`update-docs/LICENSE.md`](update-docs/LICENSE.md).
 
 ## Which skill to use
+
+- **Documentation updates** use `update-docs` to discover affected pages and
+  `technical-documentation` to check facts, structure and writing. Use the
+  existing `writing-for-agents` for Agent instructions. Start with
+  `docs/README.md` and preserve Mikka's document ownership. `AGENTS.md` routes
+  Codex and other coding agents to the same vendored files.
 
 - **UI design and review**: `interface-design`, with
   `/interface-design:design-review` (craft review with a pass bar) and
@@ -46,6 +59,10 @@ Full license texts are in [`../skill-licenses/`](../skill-licenses/).
   signs it finds and keep Mikka's palette, Geist and layout, as its own
   tokens page says to do for a project with a working system.
 
+- **iOS app UI follows `swiftui-expert-skill`** (Alex, 2026-11-08: 「遵守这个的规范进行开发」). Load it for every iOS UI change in `apps/mobile`, together with the Expo skills below. It is the binding standard for:
+  - every SwiftUI tree the app draws through `@expo/ui/swift-ui` (`*.ios.tsx`: `Host`, menus, segmented controls, symbols, the chat header) and any native Swift module: its Operating Rules, `references/latest-apis.md` (no hard-deprecated APIs), `#available` gating with fallbacks, `Button` for every tappable element with accessibility labels;
+  - native iOS behaviour and look in React Native screens too: toolbars (`references/toolbar-patterns.md`), sheets and navigation (`references/sheet-navigation-patterns.md`), lists and scrolling (`references/list-patterns.md`, `references/scroll-patterns.md`), layout and safe areas (`references/layout-best-practices.md`), Liquid Glass (`references/liquid-glass.md`; Mikka uses it for the floating header buttons and tab bar per the 2026-11-08 Comma-style header decision), accessibility and localization.
+  Where it and an Expo skill disagree on how to build something inside Expo / React Native, the Expo skill decides the mechanism and this skill decides the native iOS result. `docs/design/` still decides Mikka's product rules.
 - **iOS app UI** (`apps/mobile`): load `expo-overview` first and the Expo skills it routes to (`expo-native-ui`, `expo-router`, `expo-animation`, `expo-ui`, `expo-design-system`), with `react-native-skills` for list, animation and UI patterns. An iOS UI PR carries Expo Web screenshots and a checklist of what Alex checks on TestFlight after the OTA. `ios-design` stays a review checklist (native controls first, gestures as springs, keyboard through `react-native-keyboard-controller`); its Uizze MCP steps are optional and not connected here. Where it and the Expo skills differ on how to build something in Expo, the Expo skills decide.
 
 - **Flow usability (glanceable, simple user flow)**: before a design or UI change is handed in, run `ux-heuristics` (score every screen out of 10; below 8 is not ready) and `cognitive-walkthrough` on each key task, counting clicks, scrolls and page switches per step. Report both results with the design. The author's own score is only a reference: the review that decides is done by an independent reviewer that did not author the design, against full-size screenshots and the live product, and it also checks R-84 to R-90 in `docs/design/rules.md` (Design review) one by one, including R-90: every part reuses an existing component.

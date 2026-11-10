@@ -4,10 +4,10 @@
 // (short-title-server.ts); lists show it while the task keeps the title it was written from (short-title-sql.ts).
 // Pure, and safe in client components.
 
-/** About 12 Chinese characters, or 6 English words; the stored column holds at most 60 characters. */
+/** Strict compact-title limits; the stored column holds at most 60 characters. */
 export const SHORT_TITLE_CJK_MAX = 12
 export const SHORT_TITLE_WORDS_MAX = 6
-const STORED_MAX = 60
+export const SHORT_TITLE_CHARS_MAX = 60
 const BODY_MAX = 800
 
 const CJK = /[぀-ヿ㐀-鿿豈-﫿가-힯]/
@@ -36,20 +36,17 @@ export function shortTitlePrompt(task: { title: string; body: string }): { instr
 const LEADING_KEY = /^\s*(?:\[\s*)?(?:[A-Za-z][A-Za-z0-9]*-\d+|#\d+)(?:\s*\])?\s*[:：\-–—·|]?\s*/
 const TRAILING_DATE = /\s*[-–—·|,，(（[]?\s*(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?|\d{1,2}:\d{2})\s*[)）\]]?\s*$/
 
+function limitShortTitle(title: string, cjk: boolean): string {
+  const limited = cjk ? [...title].slice(0, SHORT_TITLE_CJK_MAX).join('') : title.split(' ').slice(0, SHORT_TITLE_WORDS_MAX).join(' ')
+  return [...limited].slice(0, SHORT_TITLE_CHARS_MAX).join('').trim()
+}
+
 /** Cleans what the model wrote and holds it to the limit; null when nothing usable is left. */
 export function cleanShortTitle(raw: string, cjk: boolean): string | null {
   let title = raw.replace(/\s+/g, ' ').trim().replace(/^["'“”‘’「」『』]+|["'“”‘’「」『』]+$/g, '').trim()
   title = title.replace(LEADING_KEY, '').replace(/[。.]$/, '').replace(TRAILING_DATE, '').replace(/[。.]$/, '').trim()
   if (!title) return null
-  if (cjk) {
-    const chars = [...title]
-    // A little over the asked limit is kept whole; beyond it the title is cut, never mid-character.
-    if (chars.length > SHORT_TITLE_CJK_MAX + 4) title = chars.slice(0, SHORT_TITLE_CJK_MAX).join('')
-  } else {
-    const words = title.split(' ')
-    if (words.length > SHORT_TITLE_WORDS_MAX + 2) title = words.slice(0, SHORT_TITLE_WORDS_MAX).join(' ')
-  }
-  title = [...title].slice(0, STORED_MAX).join('').trim()
+  title = limitShortTitle(title, cjk || isCjk(title))
   return title || null
 }
 
@@ -67,4 +64,11 @@ export function parseShortTitle(text: string, cjk: boolean): string | null {
 /** What a list shows for a task: its short title, else its title. */
 export function displayTaskTitle(task: { title: string; shortTitle?: string | null }): string {
   return task.shortTitle || task.title
+}
+
+/** Compact navigation uses the existing generated title, with a bounded fallback while it is unavailable. */
+export function compactTaskTitle(task: { title: string; shortTitle?: string | null }): string {
+  const title = displayTaskTitle(task).replace(/\s+/g, ' ').trim()
+  const cjk = isCjk(title)
+  return cleanShortTitle(title, cjk) ?? limitShortTitle(title, cjk)
 }

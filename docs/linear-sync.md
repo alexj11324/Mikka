@@ -65,8 +65,10 @@ resume through normal dispatch/recovery cron; failed jobs retain their
 existing explicit retry flow. There is no bulk remote backfill on resume.
 
 Operational verification must record the flag state and deployed SHA for
-Vercel production, the unique Preview, each existing Linear Worker and the
-old `feat/linear-bidirectional-sync` Preview separately. Old immutable
+Vercel production and each existing Linear Worker. The original rollout also
+tracked the unique Preview and old `feat/linear-bidirectional-sync` Preview;
+those references describe historical deployments. Branch Previews are disabled
+([decision](design/decisions/2026-11-05-1632-no-vercel-preview.md)). Old immutable
 deployments do not gain this check when main changes. A disabled setting on
 new code does not establish that an old Preview or unrelated database caller
 has stopped, or that Neon will suspend. Do not suspend/delete Neon resources
@@ -74,11 +76,12 @@ as part of operating this switch.
 
 The app and both Workers expose a database-free, unauthenticated `GET
 /mikka/api/integrations/linear/status` with `Cache-Control: no-store`. It
-returns only global availability: `{ enabled, state }`. `state: disabled`
-means PostHog confirmed a false or absent flag; `unavailable` means missing
-configuration or failed evaluation and also pauses work. This distinction
-lets deployment checks verify real PostHog wiring without retrieving webhook
-signing or cron credentials. The endpoint reads no session or tenant data.
+returns only global availability, `{ enabled, state }`. `state: disabled`
+means no PostHog project is configured, or PostHog returned a false or absent
+flag. `unavailable` means an attempted evaluation failed and also pauses work.
+A disabled result alone does not verify PostHog wiring. Deployment checks
+record the configuration and flag state without retrieving webhook signing or
+cron credentials. The endpoint reads no session or tenant data.
 
 Official references: [PostHog flag evaluation](https://posthog.com/docs/api/flags)
 and [Linear webhook delivery/retries](https://linear.app/developers/webhooks).
@@ -133,4 +136,6 @@ Mikka `review` shares Linear's `started` category with `doing`; `duplicate` shar
 
 ## Neon schema
 
-Sync tables and triggers are part of `drizzle/0004_linear_sync.sql`, `drizzle/0005_linear_sync_retry_and_comment_keys.sql`, `drizzle/0006_linear_comment_authorship.sql`, and `drizzle/0007_linear_description_snapshot.sql`. They use the Mikka issue database through `MIKKA_DATABASE_URL`. `scripts/apply-sql.mjs` converts a Neon pooled URL to its direct endpoint for migration and prints the database and branch before applying a SQL file. The local migration target is the isolated `dev-local` branch; production is not changed by local development.
+Sync tables and triggers are part of `drizzle/0004_linear_sync.sql`, `drizzle/0005_linear_sync_retry_and_comment_keys.sql`, `drizzle/0006_linear_comment_authorship.sql`, and `drizzle/0007_linear_description_snapshot.sql`. They use the Mikka issue database through `MIKKA_DATABASE_URL`. `scripts/apply-sql.mjs` converts a Neon pooled URL to its direct endpoint for migration and prints the database and branch before applying a SQL file. Development and database tests use their own isolated cloud Linux database.
+The production release applies migrations through the existing build flow; see
+[migration bootstrap](migration-bootstrap.md).

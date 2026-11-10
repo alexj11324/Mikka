@@ -5,8 +5,8 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { useRevealLoaded } from '@/lib/hooks/use-reveal-loaded'
-import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { SidebarInset, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, ArrowRight, PanelLeft } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
@@ -14,24 +14,9 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbS
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 
-/** Settings' own palette, mapped onto the shared tokens for everything inside the frame. */
-const SETTINGS_COLORS = '[--background:var(--settings-background)] [--foreground:var(--settings-foreground)] [--card:var(--settings-card)] [--card-foreground:var(--settings-foreground)] [--sidebar:var(--settings-sidebar)] [--sidebar-foreground:var(--settings-sidebar-foreground)] [--sidebar-accent:var(--settings-sidebar-accent)] [--sidebar-accent-foreground:var(--settings-foreground)] [--sidebar-border:var(--settings-border)] [--border:var(--settings-border)] [--input:var(--settings-input)] [--muted-foreground:var(--settings-muted-foreground)]'
-
-/**
- * The app window, built like Comma's shell: one gray frame that never scrolls,
- * the window bar across the top, the rail on the left, and every page inside a
- * single rounded card. Columns inside the card scroll on their own.
- */
-export function AppFrame({ bar, rail, children, settings = false }: { bar: ReactNode; rail: ReactNode; children: ReactNode; settings?: boolean }) {
-  const t = useTranslations('Shell')
-  return <TooltipProvider><SidebarProvider className={cn('h-svh min-h-0 flex-col overflow-hidden bg-shell-chrome in-data-desktop-translucent:bg-transparent', settings && SETTINGS_COLORS)}>
-    {bar}
-    <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">
-      {rail}
-      <section data-slot="app-frame-content" aria-label={t('window')} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background in-data-desktop-translucent:bg-transparent md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">{children}</section>
-    </div>
-  </SidebarProvider></TooltipProvider>
-}
+/** The app window (the app-frame slot; the open-source one is app-frame-view.tsx). */
+export { AppFrame, FRAME_LISTS_CHATS, FRAME_OWNS_HEADER, FRAME_OWNS_PANEL } from '@ui-slot/app-frame'
+import { FRAME_LISTS_CHATS } from '@ui-slot/app-frame'
 
 type NavigationHistory = EventTarget & { canGoBack: boolean; canGoForward: boolean }
 
@@ -91,14 +76,15 @@ export function AppShellContent({ parent, title, heading, actions, children, var
     {/* Desktop has no title bar (MIK-40): the top bar searches and the pill names the conversation. Phones keep it, having no rail. */}
     {!hideHeader && <header className={cn('flex h-12 shrink-0 items-center justify-between gap-3 px-4 md:hidden')}>
       <div className="flex min-w-0 items-center gap-2">
-        <SidebarTrigger className="-ml-1" aria-label={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />
-        <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
+        {!FRAME_LISTS_CHATS && <><SidebarTrigger className="-ml-1 size-10" aria-label={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />
+        <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" /></>}
         {heading ?? <Breadcrumb aria-label={i18nText("Workspace.breadcrumb")}><BreadcrumbList>{parent && <><BreadcrumbItem className="hidden sm:inline-flex"><span>{parent}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /></>}<BreadcrumbItem><BreadcrumbPage>{title}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {/* The phone header is the only way to these actions: each is a 40px target (UI audit chat-10). */}
+      {actions && <div className="flex shrink-0 items-center gap-1 [&_button]:min-h-10 [&_button]:min-w-10">{actions}</div>}
     </header>}
     {/* With the list collapsed, its panel button waits at the top left (Figma 60:299). */}
-    {variant === 'workspace' && listToggle && !open && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="absolute top-3 left-3 z-20 hidden md:inline-flex" aria-label={i18nText('Shell.openList')} aria-expanded={false} onClick={toggleSidebar} />}><PanelLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="right">{i18nText('Shell.openList')}</TooltipContent></Tooltip>}
+    {variant === 'workspace' && listToggle && !open && !FRAME_LISTS_CHATS && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="absolute top-3 left-3 z-20 hidden md:inline-flex" aria-label={i18nText('Shell.openList')} aria-expanded={false} onClick={toggleSidebar} />}><PanelLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="right">{i18nText('Shell.openList')}</TooltipContent></Tooltip>}
     {children}
   </SidebarInset>
 }

@@ -1,5 +1,10 @@
 # Factory #194 approval/publish consumer v1
 
+> Historical v1 approval/publication contract. [#494](494-approve-and-publish.md)
+> supersedes its separate approval and publication steps, expiry requirement
+> and evidence-digest gate. Code candidates use [PR merge acceptance](warp-aligned-factory.md#acceptance-is-the-merge-528).
+> The results and uncompleted acceptance below retain their original scope.
+
 Base: coordinated #191+#192 `7e93b86277fbfeb1a5f19d41bcc0c03596484491`, with coordinator-supplied #194 filename compatibility `4d6f83c43639a26380e4cdc1587ce52ac0a5f4d9`. This preserves the earlier `4cd3a1b5` / frozen PR197 `605bf086` ancestry. The [#192 contract](192-contract-v1.md) and `lib/factory/contract.ts` are unchanged. `createFactoryApprovals` uses `createFactoryStore(pool, authorize, gates)` and its existing `read/apply` transaction boundary. There is no second stage source, scheduler, Harness or worker permission system.
 
 ## Dependencies and installation

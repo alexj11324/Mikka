@@ -1,7 +1,9 @@
 # Files in every chat
 
 - **Status:** accepted by Alex after the long-filename correction; implementation
-  completed with local acceptance; see the evidence report.
+  source paths are listed below. Earlier acceptance belongs to its recorded
+  revision and environment; [acceptance](../acceptance.md) defines the evidence
+  required for a later change.
 - **Figma:** [all-chat attachments, page `917:456`](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07?node-id=917-456).
   A1–A10 are accepted frames.
 - **Source:** [Alex's requested scope](decisions/2026-11-03-1242-all-chat-attachments.md).
@@ -109,8 +111,8 @@ or thread never sends the previous surface's attachments to the new one.
 - Applicable rules: R-10 (shared composer), R-31 (surfaces), R-40 (copy),
   R-42 (translations), R-74 (icons).
 - Design uses the existing horizontal attachment component and Lucide file,
-  image and audio icons. Text uses the current app's Inter font, as defined
-  in `app/[locale]/layout.tsx`; no shell-layout change.
+  image and audio icons. Text uses the shared renderer's Inter font from
+  `apps/desktop/src/renderer/styles.css`; no shell-layout change.
 - The interface-design and unslop checks were applied: inherited neutral
   surfaces, compact file rows, one send action, no decorative badges or filler.
   A visual pass corrected icon/remove contrast in both themes.
@@ -125,7 +127,8 @@ or thread never sends the previous surface's attachments to the new one.
   three entry methods, multiple files, attachment-only sends, failed reads,
   pending/failed upload handling, resend/reload, surface switches, private
   access, and live/ended Agent-thread delivery. Use local API/CLI acceptance
-  and production screenshots, not browser tests.
+  and screenshots of a local production build in cloud Linux, following
+  [acceptance](../acceptance.md).
 
 The current text-only bug repair is covered by
 `components/coordinator/chat-composer.test.tsx`, included in

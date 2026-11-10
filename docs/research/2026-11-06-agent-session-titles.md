@@ -1,5 +1,9 @@
 # Claude Code / Codex 会话标题：第三方客户端怎么拿、Mikka 能否直接用
 
+> 后续决定见 [任务短标题](../design/decisions/2026-11-06-1400-task-short-titles.md)。
+> Alex 采用 Mikka 自己的小模型在任务创建后生成短标题，原生 Claude Code / Codex
+> 标题不读取。下面保留当日调研与被后续决定取代的建议。
+
 日期：2026-11-06。只用一手资料：官方文档、CHANGELOG、源码。所有 GitHub 仓库都是当天 `--depth 1` 克隆，下面给出读到的 commit。凡写「未查到」的，就是没有找到一手依据。
 
 ## 1. Claude Code（CLI 2.1.318，Agent SDK 0.3.318）
@@ -80,7 +84,7 @@
   - 本地模式会过滤掉 CC 自己的 `summary` 消息，注释原话是「we generate our own」（`claude/claudeLocalLauncher.ts:19`）。
 - 代价是标题占用主模型的一次工具调用和上下文，质量和时机都取决于 agent 是否听话。
 
-## 6. Mikka 现状
+## 6. 2026-11-06 调研时的 Mikka 状态
 
 - **线程名今天怎么来**：
   - 有任务的线程用任务标题。
@@ -89,6 +93,11 @@
 - **Claude**：daemon 用 Agent SDK 的 `query()` 启动 CLI（`packages/daemon/src/adapters/claude.ts`），每个 run 有独立的 `HOME` 和 `CLAUDE_CONFIG_DIR`。`CLAUDE_RUN_ENV` 没有关闭标题，因此按 2.1.318 的代码读，CC 会把 `ai-title` 写进 `<run 的 CLAUDE_CONFIG_DIR>/projects/<cwd 编码>/<sessionId>.jsonl`，而 Mikka 目前不读它。
 - **Codex**：daemon 直接驱动 `codex app-server`（`adapters/codex.ts`，`thread/start` / `turn/start`），不会有自动 `name`。
 - **可借用的挂点**：adapter 已有 `onRuntimeModel(sessionId, model)` 回调（`adapters/types.ts:116`），同类的 `onSessionTitle` 可以照它的方式往上报。
+
+上面的独立 HOME / `CLAUDE_CONFIG_DIR` 描述属于调研时源码。后续执行环境按
+[机器执行边界](../design/decisions/2026-11-06-1800-machine-is-the-execution-boundary.md)
+保留原生 CLI 的普通 HOME。下面的原生标题接线方案已由上方任务短标题决定取代；实际实现见
+[`lib/short-title.ts`](../../lib/short-title.ts)。
 
 ## 给 Mikka 的建议
 

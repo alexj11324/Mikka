@@ -6,9 +6,14 @@
 import { maskTaskSecretCapabilities, taskSecretCapabilityHoldback } from '@mikka/protocol/task-secrets'
 
 export const MASK_MIN_LENGTH = 8
+// Bump when the matching rules (including task capabilities) change. Retained
+// source fragments cannot prove safety against a new rule without full blobs.
+export const MASK_RULES_VERSION = 1
 
 export interface MaskableSecret { name: string; value: string }
 export type Masker = ((text: string) => string) & {
+  /** Server-only, keyed fingerprint of the exact rules and saved values. */
+  sourcePolicy?: string
   /** Characters at the end of already-masked text that could still be the start of a secret form; a stream holds these back. */
   holdback?: (text: string) => number
   /** Characters at the end of raw text that could still grow into a credential; a stream holds these back unmasked, in memory, until they end. */

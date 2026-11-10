@@ -16,7 +16,8 @@ export function createLinearSyncGate({
   let pending: { token: string; promise: Promise<LinearSyncState> } | undefined
 
   return async (token: string | undefined): Promise<LinearSyncState> => {
-    if (!token) return 'unavailable'
+    // No PostHog project means the flag is off by default (docs/self-hosting-byok.md), not unreadable.
+    if (!token) return 'disabled'
     if (cached?.token === token && now() < cached.expires) return cached.state
     if (pending?.token === token) return pending.promise
     const started = now()

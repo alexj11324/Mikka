@@ -107,12 +107,13 @@ export function startAnonymousCodex(input: {
       '-c', 'shell_environment_policy.set.MIKKA_POLICY_HASH=' + JSON.stringify(fixedEnv.MIKKA_POLICY_HASH),
       ...(timing?.args ?? [])]
     const childEnv = { ...fixedEnv }
-    if (daemonTracer.generationsEnabled && traceContext) {
+    if (daemonTracer.generationsEnabled) {
       const bypass = codexTraceEnvironment(childEnv)
       if (!bypass) throw Error('Anonymous Codex native trace unavailable')
       nativeGenerations = await startCodexGenerationCollector(metrics => {
-        // Before adoption this is the real bootstrap trace; afterward it is the fresh run context.
-        daemonTracer.generation(metrics, traceContext)
+        // A bootstrap can lack a trace carrier. Keep its receiver local until
+        // the fresh adoption supplies the run context; never invent a parent.
+        if (traceContext) daemonTracer.generation(metrics, traceContext)
       })
       args.push(...nativeGenerations.args); Object.assign(childEnv, nativeGenerations.env, bypass)
     }
@@ -134,7 +135,8 @@ export function startAnonymousCodex(input: {
       untilReady(child!, rpc!.sendRequest<{ userAgent?: string }>('initialize', {
         clientInfo: { name: 'mikka', title: 'Mikka', version: DAEMON_VERSION }, capabilities: { experimentalApi: true },
       }), 'anonymous codex initialize', input.initializeTimeoutMs ?? 30000))
-    if (!/^[A-Za-z0-9._-]+\/0\.166\.0(?:\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')
+    // Keep the versions explicit: anonymous initialization and late thread config are verified together.
+    if (!/^[A-Za-z0-9._-]+\/0\.(?:166|167)\.0(?:\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')
     await rpc.sendNotification('initialized')
     systemSkills = await captureCodexSystemSkills(input.env)
     lifetime.signal.throwIfAborted()
@@ -185,7 +187,7 @@ export function startAnonymousCodex(input: {
         state = 'adopted'; adopted = true; clearTimeout(timer)
         measurement?.finish('ok')
         return { child, rpc, initialized, nativeGenerations,
-          threadConfig: { mcp_servers: { mikka: context.server } } }
+          threadConfig: { mcp_servers: { mikka: { ...context.server, required: true } } } }
       } catch (cause) { await close(); throw cause }
     },
   }

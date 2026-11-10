@@ -3,10 +3,12 @@
 MVP tracker: #357, item 2.
 
 The Coordinator exposes `create_issue` and `update_issue` through its normal
-Mikka AI SDK tool registry when explicitly enabled; the default definition
-retains their logical IDs. Both call a durable
+Mikka tool registry when the deployment switch and execution grant admit
+them; the default definition retains their logical IDs. Both call a durable
 Workflow step, check `assertNativeToolScope` first, and reuse
-`lib/mcp/actions.ts`. No native Coordinator runtime is enabled.
+`lib/mcp/actions.ts`. The AI SDK and native Coordinator runtimes preserve the
+same host authorization boundary. See `workflows/coordinator/tools.ts` and
+`workflows/coordinator/native-steps.ts`.
 
 ## Contract
 

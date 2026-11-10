@@ -1,15 +1,14 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Reanimated, { cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming, type SharedValue } from 'react-native-reanimated'
+import Reanimated, { useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
-import { AccessibilityInfo, Platform, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
-import { Check, CircleAlert, Copy, Ellipsis, Reply } from 'lucide-react-native'
+import { Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
+import { Check, CircleAlert, Copy } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
-import { MessageMenu, NATIVE_MESSAGE_MENU } from '@/components/MessageMenu'
+import { MessageMenu } from '@/components/MessageMenu'
 import type { HeldMessage } from '@/lib/message-actions'
-import { ENTER, rubberBand, SNAP_BACK } from '@/lib/springs'
-import { QUOTE_DISTANCE, quotes } from '@/lib/message-gesture'
+import { ENTER, SNAP_BACK } from '@/lib/springs'
 import { StatusIcon } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
@@ -112,7 +111,7 @@ export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRe
  * A thread card: status icon and name, outputs as chips; no step line (R-66). Opens the thread's page. A thread
  * waiting for the person carries its action (去回答, #1386); a long name is cut here and read in full on its page.
  */
-export function ThreadCard({ title, status, info, onPress, action, icon }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void; action?: string; icon?: ReactNode }) {
+export function ThreadCard({ title, status, info, onPress, action, icon, footer }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void; action?: string; icon?: ReactNode; footer?: ReactNode }) {
   const body = (
     <>
       {/* A task card (2026-11-07) passes its task state's icon; a thread without a task keeps its bubble. */}
@@ -128,6 +127,13 @@ export function ThreadCard({ title, status, info, onPress, action, icon }: { tit
     <View style={[styles.threadCard, { paddingRight: 8 }]}>
       <Pressable accessibilityRole="button" accessibilityLabel={[title, info].filter(Boolean).join('，')} onPress={onPress} style={({ pressed }) => [styles.threadOpen, pressed && { opacity: 0.6 }]}>{body}</Pressable>
       <CardButton label={action} primary onPress={onPress} />
+    </View>
+  )
+  // A code task's card carries its review summary as a second button under the card's own (#1738).
+  if (footer) return (
+    <View style={[styles.threadCard, styles.threadCardStack]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={[title, info].filter(Boolean).join('，')} onPress={onPress} style={({ pressed }) => [styles.threadOpen, pressed && { opacity: 0.6 }]}>{body}</Pressable>
+      <View style={styles.threadFooter}>{footer}</View>
     </View>
   )
   return (
@@ -157,152 +163,61 @@ export function EventLine({ text }: { text: string }) {
   return <Text style={styles.event} numberOfLines={2}>{text}</Text>
 }
 
-const REVEAL = 56
-
 /**
- * Message times are hidden; dragging the chat from right to left reveals each message's time on the right, as in
- * Messages (Figma 01b). One shared value for every row, on the UI thread (expo-animation: Gesture Handler and
- * Reanimated, never PanResponder). The drag locks to an axis, as Messages does: it starts only when the finger moves
- * mostly left, and fails once it moves mostly up or down, so a scroll that has begun keeps the list; while the reveal
- * is on, the list stops scrolling (`scrollLocked`), because a vertical UIScrollView's own pan also starts on a
- * sideways drag. Past the times it rubber-bands, and SNAP_BACK brings it home with the finger's velocity.
+ * A message row. A long press selects the message's words where they are, natively (`onSelect`; the system's
+ * selection handles and its own menu), as Codex does; the bubble gives way a little while the finger rests. There is
+ * no drag on a message (Alex 2026-11-08): the screen's left edge is only the system's swipe back, and reactions, 复制
+ * and 回复 live in the ⋯ under the message (MessageActions). VoiceOver reaches 选择文本 on the frame over it.
  */
-export function useTimeReveal() {
-  const offset = useSharedValue(0)
-  const start = useSharedValue({ x: 0, y: 0 })
+export function MessageRow({ children, align = 'left', onSelect }: { children: ReactNode; align?: 'left' | 'right'; onSelect?: () => void }) {
   const reduceMotion = useReducedMotionPreference()
-  const [scrollLocked, setScrollLocked] = useState(false)
-  useEffect(() => { if (reduceMotion) { cancelAnimation(offset); offset.set(0) } }, [offset, reduceMotion])
-  const gesture = useMemo(() => Gesture.Pan()
-    .manualActivation(true)
-    .onTouchesDown(event => { const touch = event.allTouches[0]; if (touch) start.set({ x: touch.absoluteX, y: touch.absoluteY }) })
-    .onTouchesMove((event, state) => {
-      const touch = event.allTouches[0]
-      if (!touch) return
-      const dx = touch.absoluteX - start.get().x, dy = touch.absoluteY - start.get().y
-      if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) state.fail()
-      else if (dx < -10 && Math.abs(dx) > 1.5 * Math.abs(dy)) state.activate()
-    })
-    .onStart(() => { cancelAnimation(offset); scheduleOnRN(setScrollLocked, true) })
-    .onUpdate(event => {
-      const x = -event.translationX
-      offset.set(x <= REVEAL ? -Math.max(0, x) : -REVEAL - rubberBand(x - REVEAL, REVEAL / 2))
-    })
-    // Also after a cancelled drag: the list never stays locked. Unlocking an unlocked list renders nothing.
-    .onFinalize(event => {
-      offset.set(reduceMotion ? 0 : withSpring(0, { ...SNAP_BACK, velocity: event.velocityX }))
-      scheduleOnRN(setScrollLocked, false)
-    }), [offset, reduceMotion, start])
-  return { offset, gesture, scrollLocked }
+  const held = useCallback(() => { press(); onSelect?.() }, [onSelect])
+  // While a finger rests on the bubble it gives way a little (after 120 ms, so a tap or a scroll never shows it), and
+  // the selection starts at 500 ms; letting go or scrolling springs it back.
+  const pressed = useSharedValue(1)
+  const long = Gesture.LongPress().enabled(Boolean(onSelect)).minDuration(HOLD_MS)
+    .onBegin(() => { if (!reduceMotion) pressed.value = withDelay(PRESS_IN_DELAY, withTiming(PRESSED_SCALE, { duration: HOLD_MS - PRESS_IN_DELAY })) })
+    .onStart(() => { scheduleOnRN(held) })
+    .onFinalize(() => { pressed.value = reduceMotion ? 1 : withSpring(1, SNAP_BACK) })
+  const scaled = useAnimatedStyle(() => ({ transform: [{ scale: pressed.value }] }))
+  return (
+    <View>
+      <GestureDetector gesture={long}>
+        <Reanimated.View style={[scaled, { alignItems: align === 'right' ? 'flex-end' : 'stretch' }]}>{children}</Reanimated.View>
+      </GestureDetector>
+      {onSelect ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="选择文本" focusable onPress={held}
+          // No button of its own on screen: touch goes to the message (long press); VoiceOver and the keyboard reach
+          // the same action on this frame over it.
+          pointerEvents="none" style={StyleSheet.absoluteFill} />
+      ) : null}
+    </View>
+  )
 }
 
-/** How far a message is dragged right before letting go quotes it (`lib/message-gesture.ts`). */
-const WEB = Platform.OS === 'web'
-const QUOTE_AT = QUOTE_DISTANCE
-/** A press opens the message's actions after this long (ms); the bubble starts to give way after `PRESS_IN_DELAY`. */
+/** A press selects the words after this long (ms); the bubble starts to give way after `PRESS_IN_DELAY`. */
 const HOLD_MS = 500
 const PRESS_IN_DELAY = 120
 const PRESSED_SCALE = 0.96
 
 /**
- * A message row. Dragging it from left to right (not from the screen's edge,
- * which stays the system's swipe back) pulls the message along with a reply
- * arrow behind it; letting go past the mark quotes it in the composer, with a
- * tick, as in iMessage and Claude. A spring takes it back on the UI thread.
+ * A centred time above a group of messages (Alex 2026-11-08), as in Messages: 「09:21」, 「昨天 21:04」,
+ * 「星期五 14:11」, 「11月3日 14:11」 (lib/chat-time.ts). Messages no longer carry their own times.
  */
-export function TimedRow({ time, offset, children, align = 'left', onQuote, onLongPress, menu }: { time?: string; offset: SharedValue<number>; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void; onLongPress?: () => void; menu?: HeldMessage }) {
-  const drag = useSharedValue(0)
-  const reduceMotion = useReducedMotionPreference()
-  const quote = useCallback(() => { tap(); onQuote?.() }, [onQuote])
-  // On the web a mouse drag also selects the bubble's text: while the bubble is dragged, its text can't be selected
-  // and the selection the press started is cleared. Selecting text works again once it is let go.
-  const [dragging, setDragging] = useState(false)
-  const dragStarted = useCallback(() => { setDragging(true); globalThis.getSelection?.()?.removeAllRanges() }, [])
-  const dragEnded = useCallback(() => { setDragging(false) }, [])
-  const pan = Gesture.Pan()
-    .enabled(Boolean(onQuote))
-    // Rightward only, and not from the edge: the first 28 points belong to swipe back. It starts after 16 points to
-    // the right and gives way at once to a leftward move (the times) or to 12 points up or down (scrolling).
-    .activeOffsetX(16)
-    .failOffsetX(-8)
-    .failOffsetY([-12, 12])
-    .hitSlop({ left: -28 })
-    .onStart(() => { cancelAnimation(drag); if (WEB) scheduleOnRN(dragStarted) })
-    // Follows the finger with rubber-band resistance (lib/springs.ts), easing towards twice the mark, never a hard stop.
-    .onUpdate(event => { drag.value = rubberBand(event.translationX, QUOTE_AT * 2) })
-    .onEnd((event, success) => {
-      if (success && quotes(drag.value, event.velocityX)) scheduleOnRN(quote)
-    })
-    // Finalize also runs for an interrupted/cancelled drag; cancellation never
-    // quotes the message and must not leave its bubble stuck off its baseline.
-    .onFinalize(event => {
-      drag.value = reduceMotion ? 0 : withSpring(0, { ...SNAP_BACK, velocity: event.velocityX })
-      if (WEB) scheduleOnRN(dragEnded)
-    })
-  const held = useCallback(() => { press(); onLongPress?.() }, [onLongPress])
-  // A long press opens the message's actions: on iOS the system context menu (MessageMenu), elsewhere the sheet
-  // (app/message.tsx). VoiceOver and the keyboard reach the sheet through the frame below on every platform.
-  const native = NATIVE_MESSAGE_MENU && Boolean(menu)
-  // While a finger rests on the bubble it gives way a little (after 120 ms, so a tap or a scroll never shows it), and
-  // the actions open at 500 ms; letting go or scrolling springs it back.
-  const pressed = useSharedValue(1)
-  const long = Gesture.LongPress().enabled(Boolean(onLongPress) && !native).minDuration(HOLD_MS)
-    .onBegin(() => { if (!reduceMotion) pressed.value = withDelay(PRESS_IN_DELAY, withTiming(PRESSED_SCALE, { duration: HOLD_MS - PRESS_IN_DELAY })) })
-    .onStart(() => { scheduleOnRN(held) })
-    .onFinalize(() => { pressed.value = reduceMotion ? 1 : withSpring(1, SNAP_BACK) })
-  const moved = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }, { scale: pressed.value }] }))
-  const revealed = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }))
-  const arrow = useAnimatedStyle(() => ({ opacity: Math.min(1, drag.value / QUOTE_AT), transform: [{ scale: reduceMotion ? 1 : 0.6 + 0.4 * Math.min(1, drag.value / QUOTE_AT) }] }))
-  return (
-    <View>
-    <GestureDetector gesture={Gesture.Race(pan, long)}>
-      <Reanimated.View style={dragging ? styles.unselectable : undefined}>
-        <Reanimated.View style={[styles.quoteArrow, arrow]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-          <Symbol name="arrowshape.turn.up.left" size={15} color={colors.secondary} web={<Reply size={15} color={colors.secondary} />} />
-        </Reanimated.View>
-        <Reanimated.View style={moved}>
-          <Reanimated.View style={[revealed, { alignItems: align === 'right' ? 'flex-end' : 'stretch' }]}>
-            {native ? <MessageMenu message={menu}><View style={{ alignItems: align === 'right' ? 'flex-end' : 'stretch' }}>{children}</View></MessageMenu> : children}
-            {time ? <Text style={styles.time}>{time}</Text> : null}
-          </Reanimated.View>
-        </Reanimated.View>
-      </Reanimated.View>
-    </GestureDetector>
-    {onLongPress || onQuote ? (
-      <Pressable accessibilityRole="button" accessibilityLabel={`${time ? `${time}，` : ''}${onLongPress ? '消息操作' : '引用消息'}`} focusable
-        accessibilityActions={[
-          { name: 'activate', label: onLongPress ? '消息操作' : '引用消息' },
-          ...(onQuote ? [{ name: 'quote', label: '引用消息' }] : []),
-          ...(time ? [{ name: 'time', label: `时间：${time}` }] : []),
-        ]}
-        onAccessibilityAction={event => {
-          if (event.nativeEvent.actionName === 'quote') quote()
-          else if (event.nativeEvent.actionName === 'time' && time) AccessibilityInfo.announceForAccessibility(time)
-          else if (event.nativeEvent.actionName === 'activate') { if (onLongPress) held(); else quote() }
-        }}
-        onPress={onLongPress ? held : quote}
-        // No button of its own on screen (#1386): touch goes to the message (long press, drag); VoiceOver and
-        // the keyboard reach the same actions on this frame over it.
-        pointerEvents="none" style={StyleSheet.absoluteFill} />
-    ) : null}
-    </View>
-  )
+export function TimeSeparator({ label }: { label: string }) {
+  return <Text accessibilityRole="header" style={styles.separator}>{label}</Text>
 }
 
 /**
- * The one row under the bot's latest reply (#1386), as in ChatGPT and Claude: 复制, 回复 (quote it) and 更多 (the
- * message's actions, as a long press opens them). Older replies and the person's own messages: long press.
+ * The row under a bot's reply, or another member's message in a group (Alex 2026-11-08): ⋯ holds its reactions,
+ * 回复, 复制 and 选择文本 (MessageMenu); under the bot's latest reply 复制 sits beside it, as in ChatGPT and Claude. The
+ * person's own messages have no row: a long press selects their words.
  */
-export function ReplyActions({ text, onQuote, onMore }: { text: string; onQuote: () => void; onMore: () => void }) {
+export function MessageActions({ message, align = 'left', copy }: { message: HeldMessage; align?: 'left' | 'right'; copy?: boolean }) {
   return (
-    <View style={styles.replyActions}>
-      <CopyButton text={text} />
-      <Pressable accessibilityRole="button" accessibilityLabel="回复" hitSlop={6} onPress={() => { tap(); onQuote() }} style={({ pressed }) => [styles.copy, pressed && { backgroundColor: colors.pressed }]}>
-        <Symbol name="arrowshape.turn.up.left" size={14} color={colors.secondary} web={<Reply size={14} color={colors.secondary} />} />
-      </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="更多" hitSlop={6} onPress={onMore} style={({ pressed }) => [styles.copy, pressed && { backgroundColor: colors.pressed }]}>
-        <Symbol name="ellipsis" size={14} color={colors.secondary} web={<Ellipsis size={14} color={colors.secondary} />} />
-      </Pressable>
+    <View style={[styles.replyActions, align === 'right' && styles.replyActionsRight]}>
+      {copy ? <CopyButton text={message.text} /> : null}
+      <MessageMenu message={message} />
     </View>
   )
 }
@@ -363,18 +278,18 @@ const styles = StyleSheet.create({
   threadCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.bubble, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 8, minHeight: 52 },
   // The list's 12-point gap between a message and the cards that follow it.
   arrival: { gap: 12 },
+  threadCardStack: { flexDirection: 'column', alignItems: 'stretch', gap: 0, paddingVertical: 4 },
+  threadFooter: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator, marginLeft: 30 },
   threadOpen: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 },
   threadTitle: { fontSize: 16, fontWeight: '500' },
   threadInfo: { fontSize: 12, lineHeight: 16, color: colors.secondary },
   event: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 17, color: colors.secondary, marginHorizontal: 24 },
-  time: { position: 'absolute', right: -REVEAL + 6, bottom: 4, fontSize: 11, color: colors.secondary },
-  // Web only: the bubble's text is not selected while it is dragged (TimedRow).
-  unselectable: { userSelect: 'none' } as never,
-  quoteArrow: { position: 'absolute', left: 4, top: 0, bottom: 0, justifyContent: 'center' },
+  separator: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 16, fontWeight: '500', color: colors.secondary, marginTop: 8, marginBottom: 2, fontVariant: ['tabular-nums'] },
   // A 32-point button whose 6-point hitSlop keeps the 44-point target (the glyph at text size, as in ChatGPT and Claude).
   copy: { alignSelf: 'flex-start', width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   // The icons' own 44-point targets sit flush with the bubble's left edge, a little under it.
   replyActions: { flexDirection: 'row', alignSelf: 'flex-start', gap: 4, marginLeft: -8, marginTop: -4, marginBottom: -4 },
+  replyActionsRight: { alignSelf: 'flex-end', marginLeft: 0, marginRight: -8 },
 })
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { ChatFiles } from './ChatFiles'

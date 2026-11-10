@@ -29,7 +29,7 @@ test('discovery falls back from a bare origin and never sends session credential
   }))
   assert.equal(result.status, 'ok')
   if (result.status === 'ok') assert.deepEqual(result.server, { url: 'https://self.example.test/mikka', name: document.name,
-    version: document.version, edition: 'community', signIn: document.signIn, mobileReady: true })
+    version: document.version, edition: 'community', signIn: { ...document.signIn, apple: false }, mobileReady: true })
   assert.equal(calls.filter(url => url.endsWith('/api/desktop/discovery')).length, 2)
 })
 
@@ -67,4 +67,13 @@ test('cancelled discovery does not make another candidate request', async () => 
 test('server-selected WebSockets require TLS except exact local loopback', () => {
   for (const url of ['wss://self.example/mikka/v1/live/channel/socket', 'wss://own-worker.example/v1/live/channel/socket', 'ws://localhost:3000/mikka/v1/live/channel/socket', 'ws://[::1]:3000/v1/live/channel/socket']) assert.equal(liveSocketUrl(url), true)
   for (const url of ['ws://self.example/v1/live/channel/socket', 'ws://192.168.1.5/socket', 'https://self.example/socket', 'wss://user:password@self.example/socket', 'wss://self.example/socket?token=secret']) assert.equal(liveSocketUrl(url), false)
+})
+
+
+test('Apple sign-in requires an explicit boolean in discovery', async () => {
+  for (const apple of [true, false, undefined, 'true']) {
+    const result = await probeMobileServer('self.example/mikka', options(async () => reply({ ...document, signIn: { ...document.signIn, apple } })))
+    assert.equal(result.status, 'ok')
+    if (result.status === 'ok') assert.equal(result.server.signIn.apple, apple === true)
+  }
 })

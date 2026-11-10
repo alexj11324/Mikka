@@ -11,6 +11,10 @@ import { CLOUD_PRELOADER_WAKE_COMMAND, CLOUD_PRELOADER_WAKE_RECEIPT } from '../c
 import { logRuntimeRefreshFailure, readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, TAIL_MAX, WORKER_LOG } from './thread-worker-logs'
 
 const mask = (text: string) => text.replaceAll('sekret', '[secret:TOKEN]')
+// Admit only the parent-locked sandbox registration statement, not arbitrary CTEs.
+const sandboxRegistrationSql = `WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 FOR KEY SHARE)
+  UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp())
+  FROM parent WHERE m."runId"=parent.id AND m."workerLeaseId"=$3 AND m.state<>'ended' RETURNING m."runId"`.replace(/\s+/g, ' ').trim()
 
 test('worker output reaches the server log line by line, masked, bounded and split across chunks', () => {
   const lines: Record<string, string>[] = []
@@ -127,7 +131,7 @@ test('runtime refresh failures name their actual phase without logging provider 
         if (sql.startsWith('SELECT * FROM thread_machines')) return { rows: [{ ...machine }], rowCount: 1 }
         if (sql.startsWith('SELECT status,"stopRequestedAt"')) return { rows: [{ status: 'failed', stopRequestedAt: null }], rowCount: 1 }
         if (/^SELECT 1 FROM (factory_questions|devices|thread_machines)/.test(sql)) return { rows: [{}], rowCount: 1 }
-        if (sql.startsWith('UPDATE thread_machines')) return { rows: [{ runId: run.id }], rowCount: 1 }
+        if (sql.startsWith('UPDATE thread_machines') || sql.replace(/\s+/g, ' ').trim() === sandboxRegistrationSql) return { rows: [{ runId: run.id }], rowCount: 1 }
         if (/^(BEGIN|COMMIT|ROLLBACK|SELECT set_config|SELECT pg_advisory_xact_lock)/.test(sql)) return { rows: [], rowCount: 0 }
         assert.fail(`Unexpected diagnostic-fixture SQL: ${sql}`)
       }
@@ -209,7 +213,7 @@ test('question wake failures identify the rejecting boundary without exposing pr
         }], rowCount: 1 }
         if (sql.startsWith('SELECT 1 FROM factory_questions')) return { rows: phase === 'question_source' ? [] : [{}], rowCount: phase === 'question_source' ? 0 : 1 }
         if (sql.startsWith('SELECT status,"stopRequestedAt"')) return { rows: [{ status: 'queued', stopRequestedAt: null }], rowCount: 1 }
-        if (sql.startsWith('UPDATE thread_machines')) return { rows: [{ runId: run.id }], rowCount: 1 }
+        if (sql.startsWith('UPDATE thread_machines') || sql.replace(/\s+/g, ' ').trim() === sandboxRegistrationSql) return { rows: [{ runId: run.id }], rowCount: 1 }
         if (/^(BEGIN|COMMIT|ROLLBACK|SELECT pg_advisory_xact_lock)/.test(sql)) return { rows: [], rowCount: 0 }
         assert.fail(`Unexpected question diagnostic-fixture SQL: ${sql}`)
       }
@@ -315,7 +319,7 @@ async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'legacy' | 
       finished = true
       return result([{ ...machine, epoch: 1, lifecycle: { phase: 'created' }, computeSeconds: 0 }])
     }
-    if (sql.startsWith('UPDATE thread_machines')) return result([{ runId: run.id }])
+    if (sql.startsWith('UPDATE thread_machines') || sql.replace(/\s+/g, ' ').trim() === sandboxRegistrationSql) return result([{ runId: run.id }])
     if (/^(BEGIN|COMMIT|ROLLBACK|SELECT pg_advisory_xact_lock|INSERT INTO (devices|device_repos)|UPDATE (device_tokens|agent_runs|factory_attempts))/.test(sql)) return result([])
     assert.fail(`Unexpected bootstrap-fixture SQL: ${sql}`)
   }

@@ -28,8 +28,13 @@ mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
   AcceptanceStateBadge: () => null,
 } })
 
-let IssueThreads: typeof import('../components/workspace/issue-threads')['IssueThreads']
-before(async () => { ({ IssueThreads } = await import('../components/workspace/issue-threads')) })
+let useAgentActivity: typeof import('../components/workspace/issue-threads')['useAgentActivity']
+before(async () => { ({ useAgentActivity } = await import('../components/workspace/issue-threads')) })
+// 活动 places these rows among the task's events; here they stand alone, one <li> each.
+function AgentRows() {
+  const { rows } = useAgentActivity('issue-1', null, () => {})
+  return <ul>{rows.map(row => <li key={row.id}>{row.node}</li>)}</ul>
+}
 const producer = (patch: Partial<IssueThread> = {}): IssueThread => ({
   id: 'producer-1', rootRunId: 'producer-1', latestRunId: 'producer-1', status: 'succeeded', outcome: 'needs_input',
   stopping: false, question: null, continuation: null, ownedByCurrentUser: true, ownerName: null,
@@ -44,10 +49,11 @@ const accepted = (patch: Partial<FactoryTask> = {}): FactoryTask => ({
 })
 beforeEach(() => { threads = [producer()]; tasks = [accepted()] })
 const render = () => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" now={new Date(2)} messages={messages}>
-  <IssueThreads issueId="issue-1" openId={null} onOpen={() => {}} />
+  <AgentRows />
 </IntlProvider>)
 function expectRowGroup(html: string, group: string) {
-  assert.match(html, new RegExp(`<span\\b(?=[^>]*role="img")(?=[^>]*data-group="${group}")[^>]*>`), 'the row icon must agree with its status badge')
+  // The row leads with its Agent's mark (R-78, decision 2026-11-09-0045 as amended); its state is the result badge.
+  assert.match(html, /data-slot="agent-mark"/, 'the row leads with its Agent\'s mark')
   assert.match(html, new RegExp(`<span\\b(?=[^>]*data-slot="badge")(?=[^>]*data-group="${group}")[^>]*>`), 'the visible status badge must use acceptance for this exact producer')
 }
 
@@ -57,20 +63,36 @@ test('a committed acceptance resolves the current producer row while its stored 
   tasks = [accepted()]
   const html = render()
   expectRowGroup(html, 'resolved')
-  assert.match(html, /Resolved<\/span>/)
+  assert.match(html, />Done<\/span>/) // the run-result word (glossary: Run result), not the R-52 group
   assert.equal(threads[0].outcome, 'needs_input')
   assert.equal(threads[0].status, 'succeeded')
 })
 
-test('accepting the producer preserves the independent review result and the historical blocked attempt', () => {
-  threads = [producer(), producer({ id: 'review-current', rootRunId: 'review-current', latestRunId: 'review-current', outcome: 'done' }),
-    producer({ id: 'review-old', rootRunId: 'review-old', latestRunId: 'review-old', status: 'failed', outcome: 'blocked' })]
+test('runs by one Agent are one 活动 row in the latest run\'s state; run data is unchanged (2026-11-09-0045)', () => {
+  threads = [producer(), producer({ id: 'review-current', rootRunId: 'review-current', latestRunId: 'review-current', outcome: 'done', createdAt: new Date(1) }),
+    producer({ id: 'review-old', rootRunId: 'review-old', latestRunId: 'review-old', status: 'failed', outcome: 'blocked', createdAt: new Date(2) })]
   const rows = [...render().matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map(match => match[1])
-  assert.equal(rows.length, 3)
-  expectRowGroup(rows[0], 'resolved')
-  expectRowGroup(rows[1], 'resolved')
-  expectRowGroup(rows[2], 'blocked')
+  assert.equal(rows.length, 1)
+  expectRowGroup(rows[0], 'blocked')
+  assert.match(rows[0], />Claude Code</)
+  assert.match(rows[0], /data-agent-stretch="1"/)
+  assert.doesNotMatch(rows[0], /Attempt|Current producer/)
+  assert.equal(threads[0].outcome, 'needs_input')
   assert.equal(threads[2].outcome, 'blocked')
+})
+
+test('an Agent change starts a new row labelled with the new Agent\'s own name, no switch verb', () => {
+  const codex = { name: 'Retry', agentName: 'Codex', harness: 'codex', summary: null }
+  threads = [producer({ id: 'cc-2', rootRunId: 'cc-2', latestRunId: 'cc-2', status: 'failed', outcome: 'blocked', createdAt: new Date(1) }), producer({ status: 'failed', outcome: 'blocked' }),
+    producer({ id: 'codex-1', rootRunId: 'codex-1', latestRunId: 'codex-1', status: 'running', outcome: null, createdAt: new Date(3), detail: codex })]
+  tasks = []
+  const rows = [...render().matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map(match => match[1])
+  assert.equal(rows.length, 2)
+  assert.match(rows[0], />Claude Code</)
+  expectRowGroup(rows[0], 'blocked')
+  assert.match(rows[1], />Codex</)
+  assert.doesNotMatch(rows[1], /Switched|Continu|换/)
+  expectRowGroup(rows[1], 'running')
 })
 
 const retainedRowStates: { name: string; task?: Partial<FactoryTask>; run?: Partial<IssueThread>; group: string; stopping?: boolean }[] = [

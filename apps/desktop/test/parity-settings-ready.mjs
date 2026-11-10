@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
 
-const SECTIONS = new Set(['members', 'preferences', 'memory', 'account', 'teams', 'notifications', 'security', 'connections', 'models', 'logins', 'privacy', 'computers', 'general', 'permissions', 'secrets', 'audit', 'usage', 'billing'])
+const SECTIONS = new Set(['members', 'preferences', 'memory', 'account', 'teams', 'notifications', 'security', 'connections', 'bot-permissions', 'models', 'logins', 'privacy', 'computers', 'general', 'permissions', 'secrets', 'audit', 'usage', 'billing'])
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/
 
 function sectionId(id) {
@@ -28,11 +28,18 @@ export function settingsReadRequirements(id, fixture) {
       { path: '/api/integrations/mcp' },
       { action: 'telegram.getTelegramIntegrationStatus' },
     ]
+    // Bot 权限 lists the same connected apps (Composio and Mikka's own), without MCP servers.
+    case 'bot-permissions': return [
+      { path: '/api/integrations/composio' },
+      { path: '/api/integrations/github' },
+      { path: '/api/integrations/linear/status' },
+      { action: 'telegram.getTelegramIntegrationStatus' },
+    ]
     default: return []
   }
 }
 
-/** Positive application DOM states for all eighteen existing Settings pages.
+/** Positive application DOM states for all nineteen existing Settings pages.
  * One shared deadline, no sleeps, click retries, private React probes or UI
  * mutation. A title and an absent skeleton are never the completion signal.
  * settingsReadRequirements must also settle for the no-DOM subreads above. */
@@ -47,11 +54,9 @@ export async function settingsReady(page, id, fixture, messages, observed = { li
   }
   const body = page.locator('main[data-slot="sidebar-inset"]').last()
   const alerts = body.locator('[role="alert"]').filter({ visible: true })
-  // The caller derives this only from this page's observed HTTP 200 response
-  // with enabled:false/state:unavailable. Missing rollout configuration is an
-  // explicit unreadable Linear state, not a paused or connected account.
-  const linearUnavailable = id === 'connections' && observed.linearUnavailable === true
-  const linearAlert = alerts.filter({ has: page.getByText(t('Plugins.connectionStatusFailed', { names: 'Linear' }), { exact: true }) })
+  // `observed.linearUnavailable` (an HTTP 200 with state:unavailable) is no read
+  // failure: PostHog not answering leaves the Linear row paused, with no alert.
+  // Missing rollout configuration reads as disabled, the documented default.
   const section = heading => body.locator(`section[aria-labelledby="${heading}"]`)
   const text = (key, root = body, values) => root.getByText(t(key, values), { exact: true })
   const role = (kind, key, root = body, values) => root.getByRole(kind, { name: t(key, values), exact: true })
@@ -98,14 +103,15 @@ export async function settingsReady(page, id, fixture, messages, observed = { li
       await either(text('Settings.integrations.googleNotConfigured'), text('Settings.integrations.googleLinked'), role('button', 'Settings.integrations.linkGoogle').filter({ visible: true }).and(body.locator(':enabled')))
       break
     case 'connections':
-      if (linearUnavailable) {
-        await visible(linearAlert)
-        await enabled(role('button', 'Plugins.retry', linearAlert))
-      } else {
-        // A disabled Linear rollout is an explicit paused row, even when the
-        // account has no connections. The required reads also cover empty MCP.
-        await either(text('Plugins.noConnections'), section('plugin-apps').getByText(t('Plugins.state.paused'), { exact: true }))
-      }
+      // A disabled or unreadable Linear rollout is an explicit paused row, even
+      // when the account has no connections. The required reads also cover empty MCP.
+      // The app list's card has no title, so it is not a labelled section: look in the page body.
+      await either(text('Plugins.noConnections'), text('Plugins.state.paused'))
+      break
+    case 'bot-permissions':
+      // The rule's line shows once the connected apps are read; an account with none says so.
+      await visible(text('Settings.botPermissions.rule'))
+      await either(text('Settings.botPermissions.empty'), body.getByRole('listitem').first())
       break
     case 'models': {
       const subscriptions = section('subscriptions-heading')
@@ -177,6 +183,5 @@ export async function settingsReady(page, id, fixture, messages, observed = { li
   // primary ready condition. Hidden field errors and unrelated toasts do not
   // count as the open Settings page's data state.
   await expect(body.locator('[data-settings-state="error"]')).toHaveCount(0, options())
-  await expect(alerts).toHaveCount(linearUnavailable ? 1 : 0, options())
-  if (linearUnavailable) await expect(linearAlert).toHaveCount(1, options())
+  await expect(alerts).toHaveCount(0, options())
 }

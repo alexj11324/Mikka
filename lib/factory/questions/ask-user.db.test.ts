@@ -1,5 +1,6 @@
 // BE-12: pending questions per task / run in AskUserQuestion shape, over a
 // disposable *_e2e PG with real migrations and the real question store.
+import { seedFixtureWorkspace } from '../../../tests/helpers/task-workspace';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
@@ -45,9 +46,9 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     const runtimeForBot = (botId: string | null = null) => {
       const store = createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent });
       const dispatch = createFactoryDispatch(pool, store, async (tx, userId, input, scopeBotId) => {
-      const runId = randomUUID();
-      await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,prompt) VALUES ($1,$2,$3,$4,$5,$6,$7,'queued','Fixture')`, [runId, userId, input.issueId, input.agentId, fixture[userId].deviceId, input.deviceRepoId, scopeBotId]);
-      return { runId };
+        const runId = randomUUID();
+        await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId","workspaceId",status,prompt) VALUES ($1,$2,$3,$4,$5,$6,$7,(SELECT "workspaceId" FROM issues WHERE id=$3),'queued','Fixture')`, [runId, userId, input.issueId, input.agentId, fixture[userId].deviceId, input.deviceRepoId, scopeBotId]);
+        return { runId };
       }, { configure: { execute: async () => {} }, freeze: async (tx, _task, id) => { await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [id, JSON.stringify({ schemaVersion: 1, definitionDigest: "fixture", harness: "codex" })]); } });
       return { store, dispatch, questions: createFactoryQuestions(pool, authorize, store, dispatch) };
     };
@@ -56,7 +57,11 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       const { agentId, repoId } = fixture[user];
       const issueId = randomUUID(), src = randomUUID(), questionId = randomUUID();
       const runtime = botId ? runtimeForBot(botId) : { store, dispatch, questions };
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,$2,'Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId, user]);
+      const workspaceId = botId
+        ? (await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, user])).rows[0]?.workspaceId
+        : await seedFixtureWorkspace(pool, user);
+      assert.ok(workspaceId, "the question fixture must use its actual Bot's tenant");
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,$2,'Fixture','{"type":"doc","content":[]}','todo','normal',$3,'bound')`, [issueId, user, workspaceId]);
       await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload,"botId") VALUES ($1,$3,'user_message',$2,'{"text":"synthetic"}',$4)`, [src, src, user, botId]);
       const r = await runtime.store.route(user, { issueId, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
       const { runId } = await runtime.dispatch(user, { binding: factoryBinding(r.task), agentId, deviceRepoId: repoId });
@@ -246,6 +251,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
         assert.equal((await within(store.read("owner", b.taskId), "task-detail read")).task.id, b.taskId);
         const issueId = (await pool.query<{ issueId: string }>('SELECT "issueId" FROM factory_tasks WHERE id=$1', [b.taskId])).rows[0].issueId;
         assert.ok((await within(store.listForIssue("owner", issueId), "listForIssue")).tasks.some((x) => x.id === b.taskId));
+        assert.ok((await within(store.listPublicForIssue("owner", issueId), "listPublicForIssue")).tasks.some((x) => x.id === b.taskId));
         // Control: a real write path (dispatch -> lockForDispatch, FOR UPDATE on the task) does wait.
         const snap = await store.read("owner", b.taskId);
         const write = dispatch("owner", { binding: factoryBinding(snap.task), agentId: fixture.owner.agentId, deviceRepoId: fixture.owner.repoId }).then(() => "done", () => "done");
@@ -276,7 +282,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.equal((await store.read("owner", b.taskId)).task.id, b.taskId, "control: own bot scope reads it");
       // Task re-bound to another bot while its source event stays bot-less: only the task.botId check stops it.
       const rebound = await asked("decision", "Rebound", ["A"]), botId = randomUUID();
-      await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,'owner','Fixture bot')`, [botId, randomUUID()]);
+      await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,'owner','Fixture bot')`, [botId, await seedFixtureWorkspace(pool, 'owner')]);
       await pool.query('UPDATE factory_tasks SET "botId"=$2 WHERE id=$1', [rebound.taskId, botId]);
       await assert.rejects(store.read("owner", rebound.taskId), notFound, "read path checks task.botId");
       await assert.rejects(questions.read("owner", rebound.questionId), notFound);
@@ -323,7 +329,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     await t.test("public question GETs read the user's named Bots without changing scoped reads or writes", async () => {
       const firstBot = randomUUID(), secondBot = randomUUID(), foreignBot = randomUUID();
       for (const [id, user] of [[firstBot, "owner"], [secondBot, "owner"], [foreignBot, "intruder"]])
-        await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,'Question fixture')`, [id, randomUUID(), user]);
+        await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)`, [id, await seedFixtureWorkspace(pool, user), user, `Question fixture ${id}`]);
       const first = await asked("permission", "Continue the original task?", ["Continue"], "owner", firstBot);
       const second = await asked("external", "Wait for the external service?", ["Continue"], "owner", secondBot);
       const foreign = await asked("permission", "Other person's task", ["Continue"], "intruder", foreignBot);

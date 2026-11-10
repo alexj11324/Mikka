@@ -12,6 +12,7 @@ import type { BotView } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/reui/badge'
 import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from '@/components/ui/command'
+import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import { Spinner } from '@/components/ui/spinner'
 import { statusTone, type StatusTone } from '@/lib/status-appearance'
 import { ShortcutKeys } from '@/components/shortcut-keys'
@@ -19,15 +20,22 @@ import type { SavedAgentSession } from '@/lib/agent-history'
 import { matchesQuery, mergeById, type SiteSearchItem } from '@/lib/site-search'
 import { useSiteSearch, type ListedSource } from '@/hooks/use-site-search'
 import type { ChatTarget } from './bot-list'
+import * as searchSlot from '@ui-slot/search'
+import type { SearchLead, SearchPaletteProps, SearchRow, SearchSection } from '@/components/slots/search-contract'
+import { cn } from '@/lib/utils'
 import { LetterAvatar } from './letter-avatar'
 import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 import { FieldError } from '@/components/ui/field'
+import { localTaskState, type TaskState } from '@/hooks/use-bot-tasks'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Project = Awaited<ReturnType<typeof listProjects>>[number]
 type TaskHit = Extract<SiteSearchItem, { type: 'task' }>
 type GroupHit = Extract<SiteSearchItem, { type: 'group' }>
 type HistoryHit = Extract<SiteSearchItem, { type: 'history' }>
+
+/** A task state's badge tone: waiting is the person's turn, blocked and failed need help, the rest are calm. */
+const TASK_STATE_TONE = { waiting: 'warning', blocked: 'destructive', failed: 'destructive', running: 'info', queued: 'neutral', todo: 'neutral', idle: 'neutral', done: 'success', canceled: 'neutral', duplicate: 'neutral' } as const satisfies Record<TaskState, StatusTone>
 
 const STATUS_BADGES = { neutral: 'outline', warning: 'warning-light', info: 'info-light', success: 'success-light', destructive: 'destructive-light', focus: 'focus-light' } as const satisfies Record<StatusTone, string>
 
@@ -37,22 +45,12 @@ export function SearchPill({ onSearch }: { onSearch: () => void }) {
   return <Button variant="outline" size="sm" aria-label={t('searchLabel')} aria-keyshortcuts="Control+k Meta+k" onClick={onSearch} className="h-7 w-full min-w-0 justify-center gap-2 rounded-full px-3 text-xs font-normal text-muted-foreground hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring">
     <Search data-icon="inline-start" />
     <span className="truncate">{t('searchPlaceholder')}</span>
-    <ShortcutKeys keys={['mod', 'K']} />
+    {/* Keycaps a step off the pill, so Ctrl and K read as keys in light mode too (chat-12, work-15). */}
+    <ShortcutKeys keys={['mod', 'K']} className="*:data-[slot=kbd]:bg-muted" />
   </Button>
 }
 
-/**
- * ⌘K over everything (MIK-36): conversations, group chats, tasks, threads and projects.
- * Built on reUI's command palette (c-command-5 / c-command-8), centered in the
- * window with a fixed-height list so the dialog doesn't jump while filtering.
- *
- * With an empty query it lists what the page already loaded. Once there is a
- * query, the loaded rows that match show at once and GET /api/search (#310) adds
- * history, group and task hits beyond them, one source and cursor each. Rows
- * stay authorized by the server; opening one goes through the destination's own
- * access check.
- */
-export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, sessions, coordinatorLine, issues, projects, threads = [], workspaceId, onChat, onNewBot, onIssue, onProject, onThread, onCreateIssue, reviewTaskId = null, onReview }: {
+type GlobalSearchProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onOpenChangeComplete?: (open: boolean) => void
@@ -75,7 +73,31 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
   reviewTaskId?: string | null
   /** Opens a task's review page; only given when the UI layer has one (review-summary's REVIEW_ENABLED). */
   onReview?: (issueId: string) => void
-}) {
+}
+
+const QUERY_MAX_LENGTH = 400
+
+/**
+ * ⌘K over everything (MIK-36): conversations, group chats, tasks, threads and projects.
+ * Built on reUI's command palette (c-command-5 / c-command-8), centered in the
+ * window with a fixed-height list so the dialog doesn't jump while filtering;
+ * a UI layer draws its own from the same sections (the `search` slot).
+ *
+ * With an empty query it lists what the page already loaded. Once there is a
+ * query, the loaded rows that match show at once and GET /api/search (#310) adds
+ * history, group and task hits beyond them, one source and cursor each. Rows
+ * stay authorized by the server; opening one goes through the destination's own
+ * access check.
+ */
+export function GlobalSearch(props: GlobalSearchProps) {
+  const palette = useSearchPalette(props)
+  const Layer = searchSlot.SearchPalette ?? null
+  if (Layer) return <Layer {...palette} />
+  return <SearchDialog {...palette} />
+}
+
+/** The palette as data: what is listed for the query, in order, and what picking each row does. */
+function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sessions, coordinatorLine, issues, projects, threads = [], workspaceId, onChat, onNewBot, onIssue, onProject, onThread, onCreateIssue, reviewTaskId = null, onReview }: GlobalSearchProps): SearchPaletteProps {
   const t = useTranslations('Shell')
   const tNav = useTranslations('Nav')
   const tIssue = useTranslations('Issue')
@@ -99,7 +121,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
     issues.filter(issue => shown(`${issue.identifier ?? ''} ${issue.title}`)),
     search.state.tasks.items.filter((item): item is TaskHit => item.type === 'task'),
   )
-  const threadRows = onThread ? threadSearchHits(threads, text, thread => threadName(thread, issues, tNav('untitledConversation'))) : []
+  const threadRows = onThread ? threadSearchHits(threads, text, thread => threadName(thread, issues, tNav('untitledConversation')), new Set(taskRows.map(row => row.id))) : []
   const projectRows = projects.filter(project => shown(`${project.name} ${project.summary}`))
   const actions = [
     // i18n-ignore: bilingual search keywords, not rendered
@@ -122,89 +144,116 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
     : search.query.kind === 'tooLong' ? t('search.tooLong')
       : resultCount === 0 ? t('searchEmpty') : t('search.count', { count: resultCount })
 
-  /** Label of a source's "load more" row; the row sits inside that source's group. */
-  function moreLabel(source: ListedSource) {
-    const loading = search.state[source].loadingMore
-    return <>{loading ? <Spinner role="presentation" aria-hidden="true" /> : <Plus />}{loading ? t('search.loadingMore') : t('search.more')}</>
+  /** A source's "load more" row; it sits inside that source's group. */
+  function moreRow(source: ListedSource): SearchRow[] {
+    const page = search.state[source]
+    if (!page.nextCursor) return []
+    return [{ key: `more ${source}`, label: page.loadingMore ? t('search.loadingMore') : t('search.more'), lead: { kind: 'glyph', icon: Plus }, busy: page.loadingMore, disabled: page.loadingMore, select: () => search.more(source) }]
   }
 
-  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-[max(1rem,calc(50svh-15rem))] translate-y-0 sm:max-w-xl">
+  const quickActions: SearchSection = { id: 'actions', heading: t('groups.actions'), rows: [
+    ...reviewRows.map(row => ({ key: row.value, label: row.label, lead: { kind: 'glyph', icon: FileDiff }, select: () => pick(() => onReview?.(row.id)) } satisfies SearchRow)),
+    ...actions.map(action => ({ key: action.value, label: action.label, lead: { kind: 'glyph', icon: action.icon }, select: () => pick(action.run) } satisfies SearchRow)),
+  ] }
+  const listed: SearchSection[] = [
+    ...(text ? [quickActions] : []),
+    { id: 'bots', heading: t('groups.bots'), rows: [
+      ...(coordinatorShown ? [{ key: coordinatorValue, label: tNav('coordinator'), detail: coordinatorLine, lead: { kind: 'coordinator' }, select: () => pick(() => onChat({ kind: 'coordinator' })) } satisfies SearchRow] : []),
+      ...botRows.map(bot => ({ key: `bot ${bot.id}`, label: bot.name, lead: { kind: 'bot', id: bot.id, color: bot.color, shape: bot.shape }, select: () => pick(() => onChat({ kind: 'bot', botId: bot.id })) } satisfies SearchRow)),
+    ] },
+    { id: 'conversations', heading: t('groups.conversations'), rows: historyRows.length ? [
+      ...historyRows.map(row => {
+        const name = sessionName(row.title)
+        const preview = 'preview' in row ? row.preview : null
+        return { key: `session ${row.id}`, label: name, detail: preview && preview !== name ? preview : undefined, lead: { kind: 'letter', name }, select: () => pick(() => onChat({ kind: 'agent', sessionId: row.id })) } satisfies SearchRow
+      }),
+      ...moreRow('history'),
+    ] : [] },
+    { id: 'groupChats', heading: t('groups.groupChats'), rows: groupRows.length ? [
+      ...groupRows.map(row => ({ key: `group ${row.id}`, label: row.title || tNav('untitledConversation'), lead: { kind: 'icon', icon: Users }, select: () => pick(() => onChat({ kind: 'group', id: row.id, title: row.title, workspaceId: row.workspaceId })) } satisfies SearchRow)),
+      ...moreRow('groups'),
+    ] : [] },
+    { id: 'tasks', heading: t('groups.tasks'), rows: taskRows.length ? [
+      ...taskRows.map(row => {
+        const assignee = 'metadata' in row ? row.metadata.assignee?.name : null
+        // The task's one state, as its card, panel row and board read it (localTaskState), not the bare board
+        // status: a done run whose PR waits says Needs review here too (UI audit work-04). A server hit without
+        // its metadata keeps the board status.
+        const task = 'metadata' in row ? localTaskState(row, threads.find(thread => thread.issueId === row.id)) : null
+        const status = task
+          ? { label: task.reason ? t(`panel.task.reason.${task.reason}`) : t(`panel.task.state.${task.state}`), tone: TASK_STATE_TONE[task.state] }
+          : { label: statusLabel(row.status), tone: statusTone(row.status) }
+        return { key: `issue ${row.id}`, label: row.title, identifier: row.identifier ?? undefined, detail: assignee ?? undefined, status, lead: { kind: 'icon', icon: ListTodo }, select: () => { if (onIssue(row.id)) onOpenChange(false) } } satisfies SearchRow
+      }),
+      ...moreRow('tasks'),
+    ] : [] },
+    { id: 'threads', heading: t('groups.threads'), rows: onThread ? threadRows.map(({ thread, name }) => ({ key: `thread ${thread.id}`, label: name, detail: thread.lastReply ?? thread.agentName, lead: { kind: 'thread' }, select: () => pick(() => onThread(thread.id)) } satisfies SearchRow)) : [] },
+    { id: 'projects', heading: t('groups.projects'), rows: projectRows.map(project => ({ key: `project ${project.id}`, label: project.name, detail: project.summary || undefined, lead: { kind: 'icon', icon: FolderClosed }, select: () => pick(() => onProject(project.id)) } satisfies SearchRow)) },
+    ...(text ? [] : [quickActions]),
+    ...(failed.length > 0 && !authLost ? [{ id: 'retry', rows: [{
+      key: 'retry search', label: t('search.failed', { sources: failed.map(source => t(`search.source.${source}`)).join(t('search.sourceSeparator')) }), trailing: t('search.retry'), lead: { kind: 'glyph', icon: RotateCw },
+      select: () => { for (const source of failed) search.retry(source) },
+    }] } satisfies SearchSection] : []),
+  ]
+  const sections = listed.filter(section => section.rows.length > 0)
+
+  return {
+    open, onOpenChange, onOpenChangeComplete, query, onQueryChange: setQuery, maxLength: QUERY_MAX_LENGTH, sections,
+    searching: search.searching, announce: text ? announce : '',
+    empty: !search.searching && resultCount === 0 ? (search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')) : null,
+    authError: authLost ? t('search.authRequired') : null,
+  }
+}
+
+function RowLead({ lead }: { lead: SearchLead }) {
+  switch (lead.kind) {
+    case 'coordinator': return <CoordinatorAvatar size="search" />
+    case 'bot': return <BotAvatar id={lead.id} color={lead.color} shape={lead.shape} size="search" />
+    case 'letter': return <LetterAvatar name={lead.name} size="search" />
+    case 'thread': return <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted"><ThreadMark size="row" /></span>
+    case 'icon': return <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><lead.icon /></span>
+    case 'glyph': return <lead.icon />
+  }
+}
+
+/** The open-source palette: reUI's command dialog over the sections. */
+function SearchDialog({ open, onOpenChange, onOpenChangeComplete, query, onQueryChange, maxLength, sections, searching, announce, empty, authError }: SearchPaletteProps) {
+  const t = useTranslations('Shell')
+  const tCopy = useTranslations('FeatureCopy')
+  const tCommon = useTranslations('Common')
+
+
+  // Rows sit in their group's JSX (lint-ui composition/group).
+  const group = (section: SearchSection) => <CommandGroup key={section.id} heading={section.heading}>{section.rows.map(item => item.lead.kind === 'glyph'
+    ? <CommandItem key={item.key} value={item.key} disabled={item.disabled} onSelect={item.select} className={cn((item.busy !== undefined || item.trailing) && 'text-muted-foreground')}>
+      {item.busy ? <Spinner role="presentation" aria-hidden="true" /> : <RowLead lead={item.lead} />}{item.label}
+      {item.trailing && <CommandShortcut className="tracking-normal">{item.trailing}</CommandShortcut>}
+    </CommandItem>
+    : <CommandItem key={item.key} value={item.key} disabled={item.disabled} onSelect={item.select} className="gap-3 py-2">
+      <RowLead lead={item.lead} />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-medium">{item.identifier && <><span className="text-muted-foreground tabular-nums">{item.identifier}</span> </>}{item.label}</span>
+        {item.detail && <span className="truncate text-xs text-muted-foreground">{item.detail}</span>}
+      </span>
+      {item.status && <CommandShortcut className="tracking-normal"><Badge variant={STATUS_BADGES[item.status.tone]} size="sm">{item.status.label}</Badge></CommandShortcut>}
+    </CommandItem>)}</CommandGroup>
+
+  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-[max(1rem,calc(50svh-15rem))] translate-y-0 max-md:top-[max(1rem,env(safe-area-inset-top))] sm:max-w-xl">
     {/* Filtering is ours: server hits must not be dropped by cmdk's client-side match. */}
-    <Command shouldFilter={false} className="**:data-[selected=true]:bg-muted">
-      <CommandInput className="text-base md:text-sm" aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={setQuery} maxLength={400} />
-      <p role="status" aria-live="polite" className="sr-only">{text ? announce : ''}</p>
+    {/* The active row is a step of the text colour, so it reads on white and on the dark popover alike (bg-muted equals the dark popover). */}
+    <Command shouldFilter={false} className="**:data-[selected=true]:bg-foreground/[0.08]">
+      <CommandInput className="text-base text-ellipsis md:text-sm" aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={onQueryChange} maxLength={maxLength} />
+      <p role="status" aria-live="polite" className="sr-only">{announce}</p>
       {/* The dialog's top edge stays put and its height follows the results (Linear, Raycast): no blank block under one empty line. */}
-      <CommandList aria-busy={search.searching} className="max-h-[min(26rem,60svh)]">
-        {(coordinatorShown || botRows.length > 0) && <CommandGroup heading={t('groups.bots')}>
-          {coordinatorShown && <CommandItem value={coordinatorValue} onSelect={() => pick(() => onChat({ kind: 'coordinator' }))} className="gap-3 py-2">
-            <CoordinatorAvatar size="search" />
-            <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{tNav('coordinator')}</span>{coordinatorLine && <span className="truncate text-xs text-muted-foreground">{coordinatorLine}</span>}</span>
-          </CommandItem>}
-          {botRows.map(bot => <CommandItem key={bot.id} value={`bot ${bot.id}`} onSelect={() => pick(() => onChat({ kind: 'bot', botId: bot.id }))} className="gap-3 py-2">
-            <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="search" />
-            <span className="truncate font-medium">{bot.name}</span>
-          </CommandItem>)}
-        </CommandGroup>}
-        {historyRows.length > 0 && <CommandGroup heading={t('groups.conversations')}>
-          {historyRows.map(row => {
-            const name = sessionName(row.title)
-            const preview = 'preview' in row ? row.preview : null
-            return <CommandItem key={`history:${row.id}`} value={`session ${row.id}`} onSelect={() => pick(() => onChat({ kind: 'agent', sessionId: row.id }))} className="gap-3 py-2">
-              <LetterAvatar name={name} size="search" />
-              <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{name}</span>{preview && preview !== name && <span className="truncate text-xs text-muted-foreground">{preview}</span>}</span>
-            </CommandItem>
-          })}
-          {search.state.history.nextCursor && <CommandItem value="more history" disabled={search.state.history.loadingMore} onSelect={() => search.more('history')} className="text-muted-foreground">{moreLabel('history')}</CommandItem>}
-        </CommandGroup>}
-        {groupRows.length > 0 && <CommandGroup heading={t('groups.groupChats')}>
-          {groupRows.map(row => <CommandItem key={`group:${row.id}`} value={`group ${row.id}`} onSelect={() => pick(() => onChat({ kind: 'group', id: row.id, title: row.title, workspaceId: row.workspaceId }))} className="gap-3 py-2">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><Users /></span>
-            <span className="min-w-0 flex-1 truncate font-medium">{row.title || tNav('untitledConversation')}</span>
-          </CommandItem>)}
-          {search.state.groups.nextCursor && <CommandItem value="more groups" disabled={search.state.groups.loadingMore} onSelect={() => search.more('groups')} className="text-muted-foreground">{moreLabel('groups')}</CommandItem>}
-        </CommandGroup>}
-        {taskRows.length > 0 && <CommandGroup heading={t('groups.tasks')}>
-          {taskRows.map(row => {
-            const assignee = 'metadata' in row ? row.metadata.assignee?.name : null
-            return <CommandItem key={`task:${row.id}`} value={`issue ${row.id}`} onSelect={() => { if (onIssue(row.id)) onOpenChange(false) }} className="gap-3 py-2">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><ListTodo /></span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium">{row.identifier && <><span className="text-muted-foreground tabular-nums">{row.identifier}</span> </>}{row.title}</span>
-                {assignee && <span className="truncate text-xs text-muted-foreground">{assignee}</span>}
-              </span>
-              <CommandShortcut className="tracking-normal"><Badge variant={STATUS_BADGES[statusTone(row.status)]} size="sm">{statusLabel(row.status)}</Badge></CommandShortcut>
-            </CommandItem>
-          })}
-          {search.state.tasks.nextCursor && <CommandItem value="more tasks" disabled={search.state.tasks.loadingMore} onSelect={() => search.more('tasks')} className="text-muted-foreground">{moreLabel('tasks')}</CommandItem>}
-        </CommandGroup>}
-        {threadRows.length > 0 && onThread && <CommandGroup heading={t('groups.threads')}>
-          {threadRows.map(({ thread, name }) => <CommandItem key={`thread:${thread.id}`} value={`thread ${thread.id}`} onSelect={() => pick(() => onThread(thread.id))} className="gap-3 py-2">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted"><ThreadMark size="row" /></span>
-            <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{name}</span><span className="truncate text-xs text-muted-foreground">{thread.lastReply ?? thread.agentName}</span></span>
-          </CommandItem>)}
-        </CommandGroup>}
-        {projectRows.length > 0 && <CommandGroup heading={t('groups.projects')}>
-          {projectRows.map(project => <CommandItem key={project.id} value={`project ${project.id}`} onSelect={() => pick(() => onProject(project.id))} className="gap-3 py-2">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><FolderClosed /></span>
-            <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{project.name}</span>{project.summary && <span className="truncate text-xs text-muted-foreground">{project.summary}</span>}</span>
-          </CommandItem>)}
-        </CommandGroup>}
-        {(actions.length > 0 || reviewRows.length > 0) && <CommandGroup heading={t('groups.actions')}>
-          {reviewRows.map(row => <CommandItem key={row.value} value={row.value} onSelect={() => pick(() => onReview?.(row.id))}><FileDiff />{row.label}</CommandItem>)}
-          {actions.map(action => <CommandItem key={action.value} value={action.value} onSelect={() => pick(action.run)}><action.icon />{action.label}</CommandItem>)}
-        </CommandGroup>}
+      <CommandList aria-busy={searching} className="max-h-[min(26rem,60svh)] scroll-fade-y">
+        {sections.filter(section => section.id !== 'retry').map(group)}
         {/* Both lines are announced by the status region above, so the listbox stays options only for screen readers. */}
-        {search.searching && <div aria-hidden="true" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><Spinner role="presentation" aria-hidden="true" className="size-3.5" />{t('search.searching')}</div>}
-        {!search.searching && resultCount === 0 && <p aria-hidden="true" className="py-6 text-center text-sm">{search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')}</p>}
-        {failed.length > 0 && (authLost
-          ? <FieldError className="px-3 py-2 text-xs">{t('search.authRequired')}</FieldError>
-          : <CommandGroup>
-            <CommandItem value="retry search" onSelect={() => { for (const source of failed) search.retry(source) }} className="text-muted-foreground">
-              <RotateCw />{t('search.failed', { sources: failed.map(source => t(`search.source.${source}`)).join(t('search.sourceSeparator')) })}
-              <CommandShortcut className="tracking-normal">{t('search.retry')}</CommandShortcut>
-            </CommandItem>
-          </CommandGroup>)}
+        {searching && <div aria-hidden="true" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><Spinner role="presentation" aria-hidden="true" className="size-3.5" />{t('search.searching')}</div>}
+        {empty && <p aria-hidden="true" className="py-6 text-center text-sm">{empty}</p>}
+        {authError ? <FieldError className="px-3 py-2 text-xs">{authError}</FieldError> : sections.filter(section => section.id === 'retry').map(group)}
       </CommandList>
+      {/* The list ends on this bar, not mid-row; the keys are the ones issue-search names. */}
+      <div aria-hidden="true" className="flex items-center gap-4 bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground max-md:hidden"><span className="flex items-center gap-1.5"><KbdGroup><Kbd>↑</Kbd><Kbd>↓</Kbd></KbdGroup>{tCopy('c_70b20820')}</span><span className="flex items-center gap-1.5"><Kbd>Enter</Kbd>{tCopy('c_65fc81e1')}</span><span className="ml-auto flex items-center gap-1.5"><Kbd>Esc</Kbd>{tCommon('close')}</span></div>
     </Command>
   </CommandDialog>
 }

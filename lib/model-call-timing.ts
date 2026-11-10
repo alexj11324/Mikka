@@ -5,7 +5,7 @@
  * it ended, how many input and output tokens it used and how many tools it was
  * offered. Logged for the platform route and for a person's subscription.
  */
-import type { SubscriptionCallTiming, SubscriptionStages } from '../packages/daemon/src/subscription-worker-timing'
+import type { SubscriptionCallTiming, SubscriptionStages, WorkerTransportTiming } from '../packages/daemon/src/subscription-worker-timing'
 
 export type ModelRoute = 'hosted' | 'subscription'
 
@@ -120,8 +120,29 @@ export function modelFinishReason(value: unknown): string | null {
   return typeof reason === 'string' && ['stop', 'length', 'content-filter', 'tool-calls', 'error', 'other', 'unknown'].includes(reason) ? reason : null
 }
 
+
+export type SubscriptionTransportLog = {
+  msg: 'subscription_transport_timing'
+  workflowRunId: string | null; stepId: string | null; attempt: number | null
+  workerOrdinal: number | null; outcome: 'pending' | 'result' | 'error' | 'cancelled' | null
+  state: 'reported' | 'missing' | 'invalid'
+} & Partial<WorkerTransportTiming>
+
+/** The same trusted step identity; malformed/unbounded input stays unknown. */
+const transportIdentity = (value: unknown, prefix: string) => typeof value === 'string' && value.length <= 128 && value.startsWith(prefix) && /^[A-Za-z0-9_-]+$/.test(value) ? value : null
+
+function logTransport(start: ModelCallStart, log: (line: SubscriptionTransportLog) => void) {
+  if (!start.subscriptionTiming) return
+  const rows = start.subscriptionTiming.transportSnapshot()
+  const identity = { workflowRunId: transportIdentity(start.workflowRunId, 'wrun_'), stepId: transportIdentity(start.stepId, 'step_'),
+    attempt: typeof start.attempt === 'number' && Number.isSafeInteger(start.attempt) && start.attempt >= 0 && start.attempt <= 1_000_000 ? start.attempt : null }
+  // A cancellation before an execution child has no HTTP evidence.
+  if (!rows.length) log({ msg: 'subscription_transport_timing', ...identity, workerOrdinal: null, outcome: null, state: 'missing' })
+  for (const row of rows) log({ msg: 'subscription_transport_timing', ...identity, workerOrdinal: row.ordinal, outcome: row.outcome, state: row.state, ...row.timing })
+}
+
 /** Passes the model's stream through unchanged and logs its timing once it ends. Never throws for logging. */
-export function timedModelStream<P extends Part, Result extends { stream: ReadableStream<P> }>(result: Result, start: ModelCallStart, now: () => number = Date.now, log: (line: ModelCallTiming) => void = line => console.info(JSON.stringify(line))): Result {
+export function timedModelStream<P extends Part, Result extends { stream: ReadableStream<P> }>(result: Result, start: ModelCallStart, now: () => number = Date.now, log: (line: ModelCallTiming) => void = line => console.info(JSON.stringify(line)), transportLog: (line: SubscriptionTransportLog) => void = line => console.info(JSON.stringify(line))): Result {
   let firstToken: number | null = null
   let firstText: number | null = null
   let usage: unknown
@@ -149,6 +170,7 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
         ...(start.subscriptionTiming ? { subscriptionStages: start.subscriptionTiming.snapshot() } : {}),
       })
     } catch { /* timing never fails the call */ }
+    try { logTransport(start, transportLog) } catch { /* a diagnostic cannot change a result or cancellation */ }
   }
   const reader = result.stream.getReader()
   const stream = new ReadableStream<P>({

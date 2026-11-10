@@ -1,6 +1,6 @@
 # Contributing to Mikka
 
-Thank you for helping improve Mikka.
+Use this guide to prepare, verify and submit changes to Mikka.
 
 ## Before you start
 
@@ -20,7 +20,7 @@ Thank you for helping improve Mikka.
 - Write commit messages in English, in the form `<type>: <description>`, where
   the type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`
   or `ci`.
-- Run the source-only checks before you push:
+- For code changes, run the source checks in cloud Linux before you push.
 
   ```sh
   pnpm install
@@ -101,16 +101,18 @@ cannot.
    Selected DB suites keep PG17 isolation, clone databases and strict no-skip
    summaries across 1–4 dynamic shards. Required gate names stay stable; every
    selected lane must succeed. Weekly and manual runs cover the full inventory.
-   CI builds no Web production artifact: Vercel builds `main`. See
+   The Web release workflow builds `main` on GitHub Actions and uploads the
+   prebuilt output to Vercel. See
    [selection, trust and fallback rules](docs/ci/incremental.md).
-3. **No browser tests**, in CI or locally. Acceptance runs locally through
+3. **Ordinary acceptance uses API and CLI.** Acceptance runs locally through
    the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
-   with screenshots of a local production build (`next build`, `next start`). `browser-gate.yml` only keeps the protected
+   with screenshots of a local production build of the official UI (`pnpm build`, `pnpm start`, with `mikka-hosted-ui`). `browser-gate.yml` only keeps the protected
    check name "Browser tests (before merge)" and passes at once. The specs
-   under `tests/e2e/` and the `test:e2e*` scripts stay in the repository but do
-   not run in CI and are not an acceptance entry point; the one exception,
-   `site-search.yml`, runs `tests/e2e/site-search.spec.ts` as an HTTP API test
-   (Playwright's request client, no browser). Decision:
+   under `tests/e2e/` stay as retained fixtures. The general browser suite is
+   retired. Targeted Desktop, Analytics and self-hosted jobs retain their
+   explicitly selected build/browser checks. `site-search.yml` runs its
+   spec with Playwright's request client. See the
+   [workflow reference](.github/workflows/README.md) for actual scopes. Decisions
    [`design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md`](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md),
    [`design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md`](docs/design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
 
@@ -129,6 +131,17 @@ Mikka's own strategy, money or brand. When they agree, follow them and record
 which products in the PR. Details:
 `docs/design/decisions/2026-11-01-0400-research-before-asking-alex.md`.
 
+### One UI
+
+Mikka has one UI ([decision](docs/design/decisions/2026-11-08-2133-one-ui.md)).
+Fix a page where its code lives today: in this repository or in the private
+`mikka-hosted-ui`. Don't add a slot or move code only to make a fix possible.
+Paid component source (BoardUI Pro, affectUI, beUI Pro) never enters this
+repository or its image; official builds bring it in. The build without it
+only has to compile, so there is no separate open-source look to design,
+screenshot or review. Official apps connect to Mikka Cloud or any self-hosted
+server.
+
 ### UI changes: Figma, then skill review, then code
 
 A change a person can see is drawn in Figma first, reviewed with the
@@ -136,16 +149,25 @@ A change a person can see is drawn in Figma first, reviewed with the
 remains, confirmed by Alex, and only then implemented. The PR shows the built
 screen next to the confirmed frames; green CI alone does not make it
 mergeable. Details: `docs/design/decisions/2026-11-01-0330-ui-figma-and-skill-review-before-code.md`.
+A paid block or component (BoardUI Pro, affectUI, beUI Pro) is not redrawn or
+skill-reviewed for look: it is used as shipped, and its PR attaches a
+side-by-side of the library demo and our use
+(`docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md`).
 
 ### Test logins: never ask for a password
 
-Sessions never ask Alex for an account, password or login step. To test
-signed in, take an account from the test-account lease pool
-(`scripts/test-accounts/session.mjs`; `docs/test-accounts.md`), which signs up
-or signs in through the normal email flow. Only a click on a third-party site
-under Alex's identity (a GitHub App install, an OAuth consent) or a session
-permission prompt may be asked of him. The named accounts set up outside the
-pool: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
+For isolated local and CI HTTP/API tests, use the
+[test-account lease pool](docs/test-accounts.md), which signs up or signs in
+through the normal email flow and checks the application and database binding.
+For production external-service acceptance, use the existing shared SMOKE
+account in Alex's team workspace as [the acceptance rules](docs/acceptance.md)
+describe. `AGENTS.md` identifies the authorized Infisical entries. Read them
+through the existing authorized path and keep their values private.
+
+Sessions never ask Alex for an account, password or verification code. Existing
+authorization covers the shared acceptance account. A third-party consent under
+Alex's own identity still follows the OAuth and account-ownership rules in
+`AGENTS.md`.
 
 Cloud machines use versioned Mikka templates derived from E2B's official
 `desktop`, `claude` and `codex` templates. Node, the worker and its dependencies
@@ -160,6 +182,21 @@ paired configuration for rollback. The historical `e2b-template.yml` is now the
 reusable candidate builder; it cannot publish production configuration.
 See [the release workflow](.github/workflows/README.md#cloud-worker-template-release)
 and [`docs/dev-workflow.md`](docs/dev-workflow.md) § 7.
+
+## Documentation
+
+Start with the [documentation index](docs/README.md). Use the repository's
+[`update-docs`](.claude/skills/update-docs/SKILL.md) checklist to identify pages
+affected by a change and
+[`technical-documentation`](.claude/skills/technical-documentation/SKILL.md)
+to check their facts, structure and writing. Follow the existing language and
+document ownership, including the design decision records.
+
+Check commands and behavior against source, update corresponding English and
+Chinese README sections together, and verify changed links and paths. Run
+`git diff --check` before committing documentation. A source review or link
+check establishes documentation consistency. Record any runtime verification
+separately with its revision and environment.
 
 ## License
 

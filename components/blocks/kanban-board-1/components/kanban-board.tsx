@@ -28,11 +28,13 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from '@/components
 import { PriorityIcon } from '@/components/workspace/priority-icon'
 import { BOARD_COLUMNS, type AgentState, type BoardColumn, type BoardColumns, type BoardTask, type CardProperty, type RunOwner } from './data'
 import type { TaskBlock } from '@/lib/task-blocked'
+import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
 import { blockLabel } from '@/components/workspace/block-label'
+import { BoardCard, BoardColumnFrame, BoardHiddenLane } from '@ui-slot/board'
 
 function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Viewport> & { viewportRef: Ref<HTMLDivElement> }) {
   return <ScrollAreaPrimitive.Root data-slot="scroll-area" className="relative min-h-0 w-full min-w-0 flex-1 pb-3">
-    <ScrollAreaPrimitive.Viewport {...props} ref={viewportRef} data-slot="scroll-area-viewport" className="h-full w-full overscroll-x-contain rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+    <ScrollAreaPrimitive.Viewport {...props} ref={viewportRef} data-slot="scroll-area-viewport" className="h-full w-full overscroll-x-contain scroll-fade-x rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
       <ScrollAreaPrimitive.Content data-slot="scroll-area-content" className="h-full w-max min-w-full">{children}</ScrollAreaPrimitive.Content>
     </ScrollAreaPrimitive.Viewport>
     <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="flex h-2.5 touch-none flex-col p-px select-none"><ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-foreground/15" /></ScrollAreaPrimitive.Scrollbar>
@@ -82,6 +84,8 @@ export type CardHandlers = {
 export type CardContext = {
   properties: ReadonlySet<CardProperty>
   agentStates: ReadonlyMap<string, AgentState>
+  /** Each task's own state (localTaskState on its newest run), for a card's status line (decision #1864 point 6). */
+  taskStates?: ReadonlyMap<string, { state: TaskState; reason: TaskReason | null }>
   subtasks: ReadonlyMap<string, { done: number; total: number }>
   /** The Bot and coding agents working each task, from its threads. */
   owners?: ReadonlyMap<string, RunOwner>
@@ -89,6 +93,8 @@ export type CardContext = {
   blocks?: ReadonlyMap<string, TaskBlock>
   /** Cards the person just moved with the status menu (enter) or deleted (leave); others' changes are absent and snap (R-37). */
   motion?: ReadonlyMap<string, 'enter' | 'leave'>
+  /** A personal workspace: every task is the person's, so no card shows the private lock. */
+  personalWorkspace?: boolean
 }
 
 function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: CardHandlers & {
@@ -137,24 +143,14 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     show('dueDate') && metadata.dueDate && <span key="due" className={cn(meta, overdue && 'text-destructive-foreground')}><CalendarDays />{formatDateOnly(format, metadata.dueDate, { month: 'short', day: 'numeric' })}</span>,
   ].filter(Boolean)
 
-  // Figma 看板/任务卡片: filled, no stroke (R-31); radius 8, padding 12, rows 8 apart.
-  const card = <div className={cn('group/card flex flex-col gap-2 rounded-md bg-card p-3 text-card-foreground shadow-xs transition-colors hover:bg-muted/50', isOverlay && 'pointer-events-none rotate-2 shadow-lg')}>
-    <div className="flex h-5 min-w-0 items-center gap-1.5">
-      {/* No placeholder while the task has no number (Linear sync off): the row starts with what is there (R-25, R-40). */}
-      {show('identifier') && task.identifier && <span className="truncate text-xs text-muted-foreground tabular-nums">{task.identifier}</span>}
-      {task.scope === 'personal' && <Tooltip><TooltipTrigger render={<span className="flex shrink-0" />}><Lock aria-label={tCard('personal')} className="size-3.5 text-muted-foreground" /></TooltipTrigger><TooltipContent>{tCard('personalHint')}</TooltipContent></Tooltip>}
-      {/* No placeholder circle when nobody owns the task; the control appears on hover and focus. */}
-      {show('assignee') && <div className={cn('ml-auto flex shrink-0 items-center', !assigneeGroup && 'opacity-0 group-hover/card:opacity-100 focus-within:opacity-100')}><CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary></div>}
-    </div>
-    <div className="flex min-w-0 items-start gap-[3px]">
-      <CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>
-      <h3 data-slot="kanban-task-title" className={cn('line-clamp-2 min-w-0 flex-1 text-[13px] leading-5 font-medium break-words', done && 'text-muted-foreground')} title={task.title}>{displayTaskTitle(task)}</h3>
-    </div>
-    {chips.length > 0 && <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-5">{chips}</div>}
-    {show('createdAt') && <div className="pl-5"><CardCreatedAt createdAt={task.createdAt} /></div>}
-    {/* Opened from the context menu: labels, project and PR editors, rendered off-card. */}
-    {!isOverlay && <div hidden><IssueMetadataControls task={task} section="all" compact disabled={controlsDisabled} request={request && request.target !== 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>}
-  </div>
+  const card = <BoardCard id={task.id} title={displayTaskTitle(task)} fullTitle={task.title} identifier={show('identifier') && task.identifier ? task.identifier : null} done={done} overlay={isOverlay}
+    personal={task.scope === 'personal' && !context.personalWorkspace ? <Tooltip><TooltipTrigger render={<span className="flex shrink-0" />}><Lock aria-label={tCard('personal')} className="size-3.5 text-muted-foreground" /></TooltipTrigger><TooltipContent>{tCard('personalHint')}</TooltipContent></Tooltip> : null}
+    hasAssignee={Boolean(assigneeGroup)}
+    assignee={show('assignee') ? <CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary> : null}
+    status={<CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>}
+    chips={chips} runState={show('agentState') && agentState ? agentState : null} block={block ? { reason: block.reason, label: blockLabel(tCard, block) } : null} createdAt={show('createdAt') ? <CardCreatedAt createdAt={task.createdAt} /> : null}
+    // Opened from the context menu: labels, project and PR editors, rendered off-card.
+    editors={isOverlay ? null : <div hidden><IssueMetadataControls task={task} section="all" compact disabled={controlsDisabled} request={request && request.target !== 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>} />
 
   if (isOverlay) return <KanbanItem value={task.id} disabled className="shrink-0">{card}</KanbanItem>
   const cardMotion = context.motion?.get(task.id)
@@ -175,31 +171,68 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
           onOpen(task.id)
         }
       }} />}>{card}</ContextMenuTrigger>
-      <ContextMenuContent className="w-56">
-        <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={disabled}><Circle />{tCard('status')}<ContextMenuShortcut>S</ContextMenuShortcut></ContextMenuSubTrigger>
-          <ContextMenuSubContent><ContextMenuRadioGroup value={task.status} onValueChange={value => onStatusChange(task, value as IssueStatus)}>
-            {statusOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon className={option.indicatorClassName} />{option.label}</ContextMenuRadioItem>)}
-          </ContextMenuRadioGroup></ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={disabled}><Flag />{tCard('priority')}<ContextMenuShortcut>P</ContextMenuShortcut></ContextMenuSubTrigger>
-          <ContextMenuSubContent><ContextMenuRadioGroup value={task.priority} onValueChange={value => onPriorityChange(task, String(value))}>
-            {priorityOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon {...option.iconProps} />{option.label}</ContextMenuRadioItem>)}
-          </ContextMenuRadioGroup></ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuItem disabled={disabled} onClick={() => ask('assignee')}><CircleUserRound />{tCard('assignee')}<ContextMenuShortcut>A</ContextMenuShortcut></ContextMenuItem>
-        <ContextMenuItem disabled={disabled} onClick={() => ask('labels')}><Tag />{tCard('labels')}</ContextMenuItem>
-        <ContextMenuItem disabled={disabled} onClick={() => ask('project')}><Box />{tCard('project')}</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem disabled={disabled} onClick={() => ask('pullRequests')}><Link2 />{tCard('linkPr')}</ContextMenuItem>
-        {onBlockChange && <ContextMenuItem disabled={disabled} onClick={() => onBlockChange(task, !block)}><CircleStop />{block ? tCard('unblock') : tCard('markBlocked')}</ContextMenuItem>}
-        <ContextMenuItem onClick={() => onDiscuss(task)}><MessageSquare />{tCard('discuss')}</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" disabled={disabled} onClick={() => onDelete(task)}><Trash2 />{tCard('delete')}</ContextMenuItem>
-      </ContextMenuContent>
+      <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={!!block} ask={ask} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
     </ContextMenu>
   </KanbanItem>
+}
+
+/** A card's context menu: status, priority, the metadata editors, 受阻, discuss and delete. */
+function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityChange, onDelete, onDiscuss, onBlockChange }: Pick<CardHandlers, 'onStatusChange' | 'onPriorityChange' | 'onDelete' | 'onDiscuss' | 'onBlockChange'> & {
+  task: BoardTask
+  disabled: boolean
+  block: boolean
+  ask: (target: MetadataRequest['target']) => void
+}) {
+  const tCard = useTranslations('Shell.board.card')
+  const tIssue = useTranslations('Issue')
+  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
+  const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
+  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
+  return <>
+    <ContextMenuSub>
+      <ContextMenuSubTrigger disabled={disabled}><Circle />{tCard('status')}<ContextMenuShortcut>S</ContextMenuShortcut></ContextMenuSubTrigger>
+      <ContextMenuSubContent><ContextMenuRadioGroup value={task.status} onValueChange={value => onStatusChange(task, value as IssueStatus)}>
+        {statusOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon className={option.indicatorClassName} />{option.label}</ContextMenuRadioItem>)}
+      </ContextMenuRadioGroup></ContextMenuSubContent>
+    </ContextMenuSub>
+    <ContextMenuSub>
+      <ContextMenuSubTrigger disabled={disabled}><Flag />{tCard('priority')}<ContextMenuShortcut>P</ContextMenuShortcut></ContextMenuSubTrigger>
+      <ContextMenuSubContent><ContextMenuRadioGroup value={task.priority} onValueChange={value => onPriorityChange(task, String(value))}>
+        {priorityOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon {...option.iconProps} />{option.label}</ContextMenuRadioItem>)}
+      </ContextMenuRadioGroup></ContextMenuSubContent>
+    </ContextMenuSub>
+    <ContextMenuItem disabled={disabled} onClick={() => ask('assignee')}><CircleUserRound />{tCard('assignee')}<ContextMenuShortcut>A</ContextMenuShortcut></ContextMenuItem>
+    <ContextMenuItem disabled={disabled} onClick={() => ask('labels')}><Tag />{tCard('labels')}</ContextMenuItem>
+    <ContextMenuItem disabled={disabled} onClick={() => ask('project')}><Box />{tCard('project')}</ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem disabled={disabled} onClick={() => ask('pullRequests')}><Link2 />{tCard('linkPr')}</ContextMenuItem>
+    {onBlockChange && <ContextMenuItem disabled={disabled} onClick={() => onBlockChange(task, !block)}><CircleStop />{block ? tCard('unblock') : tCard('markBlocked')}</ContextMenuItem>}
+    <ContextMenuItem onClick={() => onDiscuss(task)}><MessageSquare />{tCard('discuss')}</ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem variant="destructive" disabled={disabled} onClick={() => onDelete(task)}><Trash2 />{tCard('delete')}</ContextMenuItem>
+  </>
+}
+
+/**
+ * The same context menu around a UI layer's own card (the `board` slot's BoardScreen), with the editors it opens kept
+ * off the card. The card stays as the layer draws it: the trigger adds no box of its own.
+ */
+export function TaskContextMenu({ task, disabled, block, children, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: Omit<CardHandlers, 'onOpen'> & {
+  task: BoardTask
+  disabled: boolean
+  block: boolean
+  children: ReactNode
+}) {
+  const [request, setRequest] = useState<MetadataRequest | null>(null)
+  const ask = (target: MetadataRequest['target']) => setRequest(current => ({ target, sequence: (current?.sequence ?? 0) + 1 }))
+  return <>
+    <ContextMenu>
+      <ContextMenuTrigger render={<div className="contents" />}>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={block} ask={ask} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
+    </ContextMenu>
+    <div hidden><IssueMetadataControls task={task} section="all" compact disabled={disabled} request={request} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>
+  </>
 }
 
 function RememberedColumn({ stateKey, ...props }: ComponentProps<typeof KanbanColumnContent> & { stateKey: string }) {
@@ -232,40 +265,31 @@ export function KanbanBoard({ stateKey = 'board', columns, hiddenColumns: hidden
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const shown = BOARD_COLUMNS.filter(column => columns.includes(column.value))
   // R-25: every column is a fixed 300px, as Linear, sidebar open or not; when they do not fit, the board scrolls
-  // and spare width stays empty. Beside the Coordinator sidebar the hidden lane is left out; hidden columns stay reachable from 显示.
+  // and spare width stays empty; its edges fade where more columns wait (UI audit work-03). Beside the Coordinator sidebar the hidden lane is left out; hidden columns stay reachable from 显示.
   return <Kanban {...props} getItemValue={item => item.id} className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
     <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label={t('horizontalScroll')} aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
       <KanbanBoardPrimitive className="flex h-full min-h-0 w-max min-w-full items-stretch gap-3 pb-2">
         {shown.map(column => {
           const tasks = props.value[column.value] ?? []
           return <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-75 min-w-75 shrink-0">
-            <section className="group/column flex min-h-0 flex-1 flex-col gap-1 rounded-xl bg-muted/60 dark:bg-muted/30 p-1.5" aria-label={t('columnLabel', { status: statusLabel(column.value) })}>
-              <div className="flex h-8 shrink-0 items-center gap-2 pr-0.5 pl-1.5">
-                <column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />
-                <h2 className="truncate text-sm font-medium">{statusLabel(column.value)}</h2>
-                <span className="text-sm text-muted-foreground tabular-nums">{tasks.length}</span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" aria-label={tBoard('columnMenu', { status: statusLabel(column.value) })} />}><Ellipsis /></DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => onHideColumn(column.value)}><EyeOff />{tBoard('hideColumn')}</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+            <BoardColumnFrame status={column.value} label={statusLabel(column.value)} count={tasks.length}
+              icon={<column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />}
+              menu={<DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" aria-label={tBoard('columnMenu', { status: statusLabel(column.value) })} />}><Ellipsis /></DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => onHideColumn(column.value)}><EyeOff />{tBoard('hideColumn')}</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>}>
               <RememberedColumn stateKey={`${stateKey}:column:${column.value}`} value={column.value} className="min-h-0 flex-1 gap-1.5 overflow-y-auto overscroll-y-contain p-0.5" aria-label={t('columnContent', { status: statusLabel(column.value) })}>
                 {tasks.map(task => <TaskCard key={task.id} task={task} disabled={pending} context={context} {...handlers} />)}
               </RememberedColumn>
-            </section>
+            </BoardColumnFrame>
           </KanbanColumn>
         })}
-        {hidden.length > 0 && !sidebarOpen && <section aria-label={tBoard('hiddenLane')} className="flex w-52 shrink-0 flex-col gap-1 rounded-xl bg-muted/60 dark:bg-muted/30 p-1.5">
-          <h2 className="flex h-8 items-center px-1.5 text-sm font-medium text-muted-foreground">{tBoard('hiddenLane')}</h2>
-          {hidden.map(({ status, count }) => {
-            const column = BOARD_COLUMNS.find(item => item.value === status)!
-            return <Button key={status} variant="ghost" className="h-9 justify-start gap-2 rounded-lg px-1.5 font-normal" title={tBoard('showColumn', { status: statusLabel(status) })} onClick={() => onShowColumn(status)}>
-              <column.icon data-icon="inline-start" className={column.indicatorClassName} />{statusLabel(status)}<span className="ml-auto text-muted-foreground tabular-nums">{count}</span>
-            </Button>
-          })}
-        </section>}
+        {hidden.length > 0 && !sidebarOpen && <BoardHiddenLane label={tBoard('hiddenLane')} columns={hidden.map(({ status, count }) => {
+          const column = BOARD_COLUMNS.find(item => item.value === status)!
+          return { status, label: statusLabel(status), icon: column.icon, iconClassName: column.indicatorClassName, count, title: tBoard('showColumn', { status: statusLabel(status) }), onShow: () => onShowColumn(status) }
+        })} />}
       </KanbanBoardPrimitive>
     </BoardScrollArea>
     <KanbanOverlay>{({ value }) => {

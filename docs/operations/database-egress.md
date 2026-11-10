@@ -15,30 +15,32 @@ GitHub schedules can run late; this is not an instant detection guarantee.
 
 The minute Worker's `GET /api/cron/ops-monitor` is a second, provider-only
 collector (`lib/ops/egress-fallback.ts`). It reads Neon usage with
-`NEON_API_KEY` and publishes to PostHog every 15 minutes, and retries a failed
-collection after one minute. Its state lives in `ops_monitor_observations`.
+`NEON_API_KEY` and publishes to PostHog every 15 minutes, and makes a failed
+collection eligible again after one minute. The minute Worker calls this route
+only at UTC quarter-hours, so the normal next opportunity is the next
+quarter-hour tick. Its state lives in `ops_monitor_observations`.
 A failed collection makes the route answer 503.
 
 ## Automatic alerts
 
-[Dashboard](https://us.posthog.com/project/670821/dashboard/2297143) and
-[alerts](https://us.posthog.com/project/670821/alerts) are in the existing Mikka
-PostHog project. All four alerts subscribe the existing account owner by email.
-The current plan rejected fifteen-minute alert evaluation, so they check hourly.
-Only a threshold breach triggers an alert; these are not scheduled status emails.
+The [monitoring dashboard](https://us.posthog.com/project/670821/dashboard/2297143)
+shows collection health and supplier usage. Managed alert definitions live in
+`scripts/ops/posthog-observability.mjs` and their SQL in
+`scripts/ops/posthog/`. Five hourly definitions cover billing-period transfer,
+collector health, source query/JSON-byte anomalies, daily transfer pace and
+error spikes. [Tracing](tracing.md#alerts) describes their thresholds and
+coverage rules.
 
-| Signal | Initial threshold | Insight |
-| --- | --- | --- |
-| Latest reported hour | Greater than 20,000,000 bytes | `MeqUS5os` |
-| Today (UTC) | Greater than 100,000,000 bytes | `CpCslHvh` |
-| Current billing period | Greater than 50% of 5,000,000,000 bytes | `Vy1tVOwr` |
-| Collector health | Failed collection, or no snapshot in the last hour | `r8wuvlUx` |
+The collector's source policy uses `MONTHLY_BUDGET_BYTES=500_000_000_000`
+and a daily reference of that value divided by 30. The monthly alert fires
+above 50% of that reference. These constants do not verify the provider's
+current plan or bill. Neon usage arrives in delayed hourly buckets, and
+notification delivery has its own evidence requirement.
 
-These are conservative **operating budgets**, not Launch plan quotas or
-historically calibrated anomalies. Calibrate them against actual use as the
-product grows. No automatic rollback, throttling or account suspension occurs.
-Neon reports hourly buckets with delay; email delivery adds another dependency.
-Do not advertise real-time alerting or confirmed mailbox delivery.
+The four alerts created on 2026-11-03 used earlier operating thresholds,
+including a 5 GB billing-period reference. That setup receipt is historical.
+The managed five-alert inventory supersedes those definitions. Observe a real
+threshold and delivery before claiming notification acceptance.
 
 The collector uses completed daily buckets plus today's hourly buckets, within
 the active billing period. Upgrading plans can begin a new period mid-day.

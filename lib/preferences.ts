@@ -1,11 +1,11 @@
 import 'server-only'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { PUSH_WHEN, userPreferences } from '@/lib/db/schema'
+import { attentionSettings, PUSH_WHEN, userPreferences } from '@/lib/db/schema'
 import { SEND_KEYS } from '@/lib/send-key'
 import { ActionFailureError } from '@/lib/action-error'
-import { attentionEnabled, setAttentionEnabled } from '@/lib/attention/store'
+import { setAttentionEnabled } from '@/lib/attention/store'
 
 /**
  * The app's 通知, 偏好 and 记忆 settings (docs/design/mobile.md, "Settings";
@@ -58,12 +58,30 @@ export function parsePreferencesPatch(input: unknown): PreferencesPatch {
   throw new ActionFailureError(tooLong ? 'personalInstructionsTooLong' : 'validationGeneric')
 }
 
+export type CoordinatorPromptPreferences = Pick<Preferences, 'memoryEnabled' | 'personalInstructions'>
+
+/** Fresh prompt input only; notification and attention settings are not part of a model prompt. */
+export async function readCoordinatorPromptPreferences(userId: string): Promise<CoordinatorPromptPreferences> {
+  const [row] = await db.select({
+    memoryEnabled: userPreferences.memoryEnabled,
+    personalInstructions: userPreferences.personalInstructions,
+  }).from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1)
+  return row ?? {
+    memoryEnabled: DEFAULT_PREFERENCES.memoryEnabled,
+    personalInstructions: DEFAULT_PREFERENCES.personalInstructions,
+  }
+}
+
 /** The person's settings; the defaults when they never changed one. */
 export async function readPreferences(userId: string): Promise<Preferences> {
-  const [[row], proactive] = await Promise.all([
-    db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1),
-    attentionEnabled(userId),
-  ])
+  // Anchor both optional rows to the same owner without reading the user table.
+  // LEFT JOIN retains each table's defaults when only the other row exists.
+  const [settings] = await db.select({ preferences: userPreferences, proactive: attentionSettings.enabled })
+    .from(sql`(values (${userId}::text)) as preference_owner("userId")`)
+    .leftJoin(userPreferences, sql`${userPreferences.userId} = preference_owner."userId"`)
+    .leftJoin(attentionSettings, sql`${attentionSettings.userId} = preference_owner."userId"`)
+  const row = settings?.preferences
+  const proactive = settings?.proactive ?? true
   if (!row) return { ...DEFAULT_PREFERENCES, proactive }
   const { userId: _user, updatedAt: _at, suggestionSources: _sources, ...stored } = row
   return { ...stored, dailySuggestions: stored.dailySuggestions && stored.memoryEnabled, proactive }

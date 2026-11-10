@@ -10,7 +10,7 @@ import { auditFailureSummary } from './record'
 
 type AuthAuditContext = {
   path?: string
-  body?: { email?: unknown }
+  body?: { email?: unknown; idToken?: unknown }
   headers?: Headers
   request?: Request
   context: {
@@ -24,7 +24,7 @@ type AuthAuditContext = {
 /** Called by the existing Better Auth after hook, before publishing its result. */
 export async function auditAuthentication(ctx: AuthAuditContext) {
   const method = ctx.path === '/sign-in/email' ? 'password'
-    : ctx.path?.startsWith('/callback/') || ctx.path === '/oauth-proxy-callback' ? 'oauth' : null
+    : (ctx.path === '/sign-in/social' && ctx.body?.idToken) || ctx.path?.startsWith('/callback/') || ctx.path === '/oauth-proxy-callback' ? 'oauth' : null
   if (!method) return
   const session = ctx.context.newSession
   const failure = ctx.context.returned instanceof APIError && ctx.context.returned.statusCode >= 400 && ctx.context.returned.statusCode < 500

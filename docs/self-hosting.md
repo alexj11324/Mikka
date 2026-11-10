@@ -2,7 +2,7 @@
 
 Deploy the community server, then connect the official app to that server. It runs on your own database and does not need a Mikka account, Stripe, Vercel, Cloudflare, or a Mikka-owned API key. Your subscriptions and API keys belong to you. Hosted Mikka billing is disabled in the community edition.
 
-The image is a backend by default: API, realtime, the daemon gateway, scheduling, migrations and BYOK remain enabled. The full community workspace UI is frozen and opt-in. Official app layouts and connection-flow screenshots are maintained in the official UI work; they are not copied into this public image.
+The image is a backend by default: API, realtime, the daemon gateway, scheduling, migrations and BYOK remain enabled. Mikka has one UI: the official apps, which connect to this server ([decision](design/decisions/2026-11-08-2133-one-ui.md)). An older built-in workspace UI is opt-in (below). Screenshots of the official apps are not copied into this public image.
 
 ## Start the server
 
@@ -41,9 +41,9 @@ docker compose up -d --force-recreate app
 
 On an empty database, `setup.state` is `required`. Configure SMTP/Resend or your own OAuth client, then use `setup.signUpUrl` to create the initial account. Registration uses the existing authentication flow and creates that person's workspace with the `admin` membership. There is no installation-wide administrator role and no special access to other people's workspaces. Existing installations report `ready`; upgrading does not assign a new administrator or alter existing accounts. Email/password being enabled is separate from the `emailDeliveryConfigured` flag, which reports configuration presence rather than a successful delivery test.
 
-The server retains sign-in, sign-up, verification/reset, device authorization, OAuth consent, invitations and app handoff pages. GitHub linking keeps its existing account-confirmation surface. Ordinary navigation from these pages returns to the server entry, so authentication does not accidentally open the frozen workspace UI.
+The server retains sign-in, sign-up, verification/reset, device authorization, OAuth consent, invitations and app handoff pages. GitHub linking keeps its existing account-confirmation surface. Ordinary navigation from these pages returns to the server entry, so authentication does not accidentally open the older built-in workspace UI.
 
-### Optional frozen community UI
+### Optional older built-in UI
 
 For compatibility, add `MIKKA_COMMUNITY_UI=1` to your private Compose configuration and recreate the app:
 
@@ -51,7 +51,7 @@ For compatibility, add `MIKKA_COMMUNITY_UI=1` to your private Compose configurat
 MIKKA_COMMUNITY_UI=1 docker compose up -d --force-recreate app
 ```
 
-Unset the variable or set it to `0`, then recreate the app to restore server mode. Only the exact value `1` enables the old community UI; cloud deployments keep the official app regardless of this setting. This is a presentation switch, not an API authorization rule. It does not change your data, credentials, migrations, scheduler or gateway. The public UI source and its compilation stay in the repository; BoardUI/affectUI source and bundles do not enter the public image.
+Unset the variable or set it to `0`, then recreate the app to restore server mode. Only the exact value `1` enables the older built-in UI; cloud deployments keep the official app regardless of this setting. This is a presentation switch, not an API authorization rule. It does not change your data, credentials, migrations, scheduler or gateway. The public UI source and its compilation stay in the repository; BoardUI/affectUI source and bundles do not enter the public image.
 
 ## Installation secrets and backups
 
@@ -282,6 +282,13 @@ Configure these server-only variables with values from **your own** Infisical in
 | `MIKKA_BYOS_ACCESS_CLIENT_ID` / `MIKKA_BYOS_ACCESS_CLIENT_SECRET` | A different Universal Auth identity, with read-only permission on the access path and no access to the grant path. |
 
 The access path uses the same project unless `MIKKA_BYOS_ACCESS_INFISICAL_PROJECT` is set. The supported static-token alternative uses `MIKKA_BYOS_INFISICAL_TOKEN` for custody and a different `MIKKA_BYOS_ACCESS_INFISICAL_TOKEN` for access-only reads, with the same permissions. Do not mix in Mikka's project, identities, paths or provider grants. Supply these values as runtime secrets; the [environment template](../.env.example) lists the standard configuration.
+
+An existing usable custody identity can also serve the shared-custody mode.
+Set `MIKKA_BYOS_SHARED_CUSTODY_IDENTITY=1` with its custody client ID/secret and
+the two distinct storage paths. The application authorizes the exact binding,
+consumer, run and membership before reading an access-only projection. This
+mode keeps the custody identity on the application side. Use the existing
+authorized configuration described in the [subscription worker guide](../packages/subscription-worker/README.md).
 
 After configuring this backend, each user connects their existing subscription through the normal provider OAuth flow in **Settings → Models and subscriptions**. Community defaults enable BYOS and both OAuth routes; an explicit administrator override can disable them. The owner, workspace permissions, model availability and quota are checked before use. Missing backend configuration is reported as unavailable and does not fall back to Mikka's credentials. The separate operator enrollment receiver has additional configuration; it is not required for the signed-in Settings connection flow. See the [subscription worker documentation](../packages/subscription-worker/README.md) for that custody boundary and recovery behavior.
 

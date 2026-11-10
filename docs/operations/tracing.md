@@ -222,8 +222,18 @@ In the PostHog app: **Tracing** (`https://us.posthog.com/tracing`), filter
 service `mikka-web`, then by attribute, for example `mikka.client_kind = daemon`
 or `mikka.route = /v1/devices/[deviceId]/commands`.
 
-From an agent, the PostHog MCP tool `query-apm-spans`. Use `flatSpans: true` to
-get the database spans themselves rather than their traces:
+For Agent queries and operations, use `posthog-cli api`. Before the first
+PostHog command in a session, read its full `--agent-help` output, then list
+skills and install/read the matching skill as `AGENTS.md` requires.
+
+```sh
+posthog-cli api --agent-help
+posthog-cli api skill list
+```
+
+Use the installed guide's schema-discovery steps to find `query-apm-spans`.
+`flatSpans: true` returns database spans directly. The following is a query
+payload to validate against the discovered CLI schema.
 
 ```json
 { "query": { "serviceNames": ["mikka-web"], "flatSpans": true, "dateRange": { "date_from": "-6h" },
@@ -231,8 +241,8 @@ get the database spans themselves rather than their traces:
                   { "key": "db.operation", "operator": "is_set", "type": "span_attribute" }] } }
 ```
 
-`apm-attributes-list` and `apm-attribute-values-list` list the attribute keys
-and values; `apm-trace-get` returns one trace's tree. Counts now mix full
+Discover `apm-attributes-list` and `apm-attribute-values-list` for attribute
+keys/values, and `apm-trace-get` for one trace's tree through the same CLI. Counts now mix full
 retention and sampling. Estimate totals with each span's
 `1 / mikka.trace.sample_rate`, not a single global multiplier; historical
 records without that field use the previous 0.1 rate.
@@ -372,11 +382,23 @@ initialization; this is not a database `READ ONLY` transaction. Batches share
 only the current request's workspace memo and real owner/revision reads, never
 a cross-request authorization cache. Revision keys are combined before each
 reader proceeds to its data, preserving the original Live catch-up behavior.
+The validated batch declares only its existing owner-list revision kinds. Once
+an original reader resolves its real personal home, it can read those home
+counters together, including a sibling whose workspace lookup finishes later.
+Each reader receives only its original keys and keeps the conservative earlier
+revision. Selected-team and entity keys still follow their original readers.
+If a later reader fails, its planned home counter can be unused; no extra SQL
+statement or response key is introduced, but this is not zero extra bytes for
+every failed batch.
 No task/thread list is truncated or substituted for another. Queued reads are
 discarded when their owner/session/workspace generation retires, and in-flight
 responses retain Main's existing identity fence. There is no timed collection
 window. An older server's explicit unknown-action response is the only reason
 to fall back to individual reads; transport failures do not replay a batch.
+Native task-run, bot-summary and bot-roster readers return their original
+snapshot, so its actual HTTP dispatch can prove Live readiness coverage. That
+proof stays attached to the same response object, including its own batch item.
+Merged issue, thread and chat results retain their existing catch-up checks.
 
 Startup counts come from the first pair of the unchanged five-pair lifecycle:
 bundled Electron versus the preserved hosted Web renderer in the same compiled
@@ -399,8 +421,9 @@ and completions in memory, then retains only the two RPC routes, registered-acti
 shapes, HTTP status counts and window counts. `startedInWindow` counts requests
 whose start is in the half-open measurement window; completions, confirmed
 crossings and missing boundaries are separate and must not be added together.
-These are RPC invocations, not per-action SQL counts. The raw log, internal IDs
-and user hashes are never copied to the artifact. Missing, oversized, truncated,
+These aggregate counts are RPC invocations, not per-action SQL counts. This
+projection discards internal IDs; raw logs and user hashes never enter the
+artifact. Missing, oversized, truncated,
 invalid or unpaired records explicitly make this diagnosis incomplete; unavailable
 windows do not become zero counts.
 The same log snapshot also groups calls by the existing authentication, handoff
@@ -418,7 +441,7 @@ excluding the batch envelope. Every item has a paired `rpc_action_started` /
 fixed action, status and duration. The parent completion's `rpcItemCount`
 detects even a missing whole pair. The diagnostic verifies parent identity,
 route and time containment; incomplete logical evidence stays incomplete.
-Internal IDs are used only during projection and are not copied to the report.
+This aggregate projection uses internal IDs only while pairing the records.
 Each item also owns an ordinary sampled span and independent metadata scope,
 so parallel reads cannot overwrite another action's SQL attribution. Shared
 queries are attributed once to the action that starts them, without multiplying
@@ -445,6 +468,28 @@ unchanged. Missing historical refinements are unavailable, and a mixed or invali
 partition fails validation. This diagnoses concurrent work without retaining SQL,
 parameters, request data, arbitrary routes or identity values.
 
+`rpcActions.queryDiagnostics` captures bounded, test-only metadata from the
+first existing checkpoint; its per-query CPU and memory work happens inside
+the measurement windows. After all existing measurements and cleanup, one
+read of the isolated counter's
+`/diagnostics` socket endpoint exports at most 8,192 query records in 2 MiB.
+It leaves the original `/metrics` snapshots, windows and totals unchanged.
+Each row contains the original cumulative query ordinal and indices into the
+closed context, statement and scope tables. Contexts retain internal random
+HTTP/item invocation IDs, method, route and action; they contain no user
+identity, request arguments or headers. These IDs join the existing completion
+receipts, including batch siblings with no SQL of their own.
+
+Queries belong to `(before.queryCalls, after.queryCalls]`, even when their
+request starts or finishes outside that window. An action unknown when SQL
+starts stays unknown. Shared SQL belongs once to the context that issued it.
+`normalizedStructureId` hashes a supported literal-free SQL shape; it is not
+the production raw-text `mikka.db.statement_id`, and equal shapes do not prove
+equal parameters or redundant work. Unsupported syntax, ambiguous contexts,
+overflow and missing receipts remain explicit unknown or incomplete evidence.
+The production request logger only registers a metadata getter; query capture
+and export run exclusively in the isolated acceptance preload.
+
 ### Changing them
 
 `scripts/ops/posthog-observability.mjs` holds the dashboard, its insights
@@ -452,21 +497,19 @@ and the alerts; the SQL is in `scripts/ops/posthog/`. It finds each object by
 its production id, else its `key:<name>` tag, else its exact name, and
 changes only what differs, so running it twice changes nothing.
 
-```sh
-# POSTHOG_PERSONAL_API_KEY: a personal API key (phx_…) with insight, dashboard
-# and alert write access, kept in Infisical prod:/platform; never in a file.
-infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs           # plan, read-only
-infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs --check   # exit 1 on drift
-infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs --apply
-```
-
-Edit the definitions or SQL in a PR, then apply once it merges. A change made
-in the PostHog app shows as drift in the next `--check`; copy it back into the
-repository or it is overwritten on the next `--apply`.
+Edit definitions or SQL through a PR. Run operational reads and writes through
+`posthog-cli api`, following the discovered guide and matching task skill.
+Preserve the definition manager's object IDs, tag/name resolution and
+change-only comparison. `scripts/ops/posthog-observability.mjs` still contains
+a direct REST client using `POSTHOG_PERSONAL_API_KEY`; its existence does not
+establish that the CLI-only operating requirement has been implemented in that
+script. Cloud credentials arrive through existing workload delivery. On Alex's
+Mac, follow `~/.codex/rules/infisical-api.md` for the signed authentication
+helper and direct Infisical HTTPS API.
 
 Validate the error-spike classifier with `node scripts/ops/posthog-alert-acceptance.mjs`.
 It runs one synthetic read-only query through the authenticated PostHog CLI in
-project 670821. `--query-only` prints the exact packet for review or MCP use.
+project 670821. `--query-only` prints the exact packet for review through the CLI.
 The 64 cases exercise the actual HogQL CTEs, including continuous/linked delivery,
 non-root entries, the single queue hop, wake/cron/nudge handling, missing or
 conflicting proof, unrelated failures and duplicate physical span rows. The
@@ -536,6 +579,12 @@ compaction, title/profile and daemon agent calls use the same convention.
 See PostHog's [APM/AI linkage](https://posthog.com/docs/distributed-tracing/link-ai-observability)
 and [AI traces](https://posthog.com/docs/ai-observability/traces).
 
+An official Claude SDK `assistant` frame with `aborted: true` closes one error
+generation, even without a final `stop_reason`. The response ID deduplicates
+repeated terminal frames and later adapter cleanup. Known input/cache counts
+and SDK timing remain available; the interrupted frame's non-final output-token
+placeholder is omitted. Ordinary partial assistant frames do not close a generation.
+
 #### Native Codex request measurements
 
 When daemon tracing and AI capture are enabled on Linux, each Codex child gets
@@ -580,6 +629,11 @@ budget. Reordered batches and repeated exports are reconciled before emission.
 Each successfully reconstructed native request consumes at most one matching
 app-server usage receipt, matching conversation, model and all four numeric
 token/cache fields as a multiset. Missing values remain distinct from zero.
+An official completed response with all four usage attributes absent still
+produces one generation from its proven request ancestry and native timing,
+with token and cost fields absent. It does not consume a numeric app-server
+receipt. A complete tuple takes precedence over an empty replay of the same
+completion; partial or invalid tuples are not treated as absent usage.
 Unmatched app-server receipts still produce generations with
 `mikka.ai.timing_basis=app_server_usage`, without invented latency or TTFT.
 The `daemon.ai.collection` span records native/fallback/matched counts,
@@ -754,7 +808,7 @@ current billing period, and **73 MB** of traces on 2026-11-05. AI events and
 recordings were zero before the new instrumentation. Billing usage can lag
 ingestion; a single observed day is not a peak-capacity forecast.
 
-| Product | Current published allowance and first paid tier |
+| Product | Published allowance and first paid tier recorded on 2026-11-06 |
 | --- | --- |
 | Logs + Tracing, shared ingestion | 10 GB/month free; $0.25/GB from 10–300 GB, then $0.15/GB |
 | Retention | 14 days standard; custom retention $0.05/GB per month retained |
@@ -789,8 +843,9 @@ changes in workload or tail-retained error/slow traffic.
   browser sessions/day, Replay is **3,000/month**. These planning volumes
   remain below their respective allowances, but are not measured demand.
 
-Recheck the observed bytes, AI events and recordings after production acceptance
-with `billing-usage-get` and `billing-overview-get`. Do not apply the tracing
+Recheck the observed bytes, AI events, recordings and actual plan after
+production acceptance through the CLI-discovered `billing-usage-get` and
+`billing-overview-get` operations. Do not apply the tracing
 multiplier to AI-event or Replay pricing.
 
 ### Repeatable production acceptance
@@ -806,11 +861,16 @@ remain intact, and the previous accepted release remains available for rollback.
 The driver checks the public
 version during its run; that check alone does not prove the worker release.
 
-Start with `mode=preflight`. For an actual task, `mode=execute` uses the existing
-Infisical production acceptance account and its own official Claude Haiku 5.5
-or Codex GPT-6 Luna subscription. It verifies the account's unique personal
-workspace through the normal workspace API and, when necessary, switches only
-its own newly authenticated session before selecting the Coordinator. Each model
+Start with `mode=preflight`. For an actual task, `mode=execute` uses the
+`ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD` entries at Infisical `prod:/`, as
+explicitly authorized by [issue #1512](https://github.com/alexj11324/Mikka/issues/1512),
+and that account's own official Claude Haiku 5.5 or Codex GPT-6 Luna subscription. The
+`scripts/acceptance/run-observability.mjs` driver selects the account's unique
+personal workspace through the normal API and switches its own new session
+when required. This issue-specific authorization does not replace the shared
+**Acme Inc.** acceptance requirement for other work in
+[acceptance.md](../acceptance.md). A personal-workspace result cannot establish
+shared-team acceptance. Each model
 case is independent and submits once per revision. The driver verifies native execution identity, the current
 Factory flow's independent checks, exact Artifact bytes and the formal
 deliverable acceptance receipt. Factory v2 uses execute/review; historical
@@ -819,14 +879,21 @@ flows still require verify. It never accepts a repository publication.
 `prepare=true` requires all visible owner-wide runs to be terminal, using the
 existing readers' 200-row, 30-day windows, and also checks the current workspace's
 complete Factory inventory. It temporarily prepares the account through existing
-settings APIs and restores unchanged settings afterward. For actual Replay
-evidence, run a single model case with `browser-submit=true`, refresh the
-already-signed-in production browser after deployment, and follow the generated
-ready comment in #1512 to submit the exact fixture once through New task. Confirm
-that the browser has selected the official Cloud backend before selecting the
-reported workspace: `/api/version` identifies the official browser shell even
-when business requests are routed to a selected self-hosted backend.
-The API-only case does not prove browser Replay. The driver also does not prove
+settings APIs and restores unchanged settings afterward. For a browser case,
+select `mode=execute`, `prepare=true`, `browser-submit=true`, and exactly one
+`model-case` (`claude` or `codex`). The workflow starts its own fresh Chromium
+context, signs in through the normal email form, verifies the exact workspace
+and official Cloud backend, and submits the generated fixture once through
+**New task**. Its progress comment says that submission is automatic; do not
+submit a second copy manually. Run the other model case separately.
+
+Before clicking, the browser requires the active PostHog session to have
+started recording and observed a sanitized snapshot. This is client readiness,
+not proof of upload or playback. The helper closes its page, signs out, verifies
+an anonymous session, and closes the context and browser when the driver ends;
+cleanup failure fails the workflow. The separate CLI manual-browser path is
+described in the driver contract. The API-only case does not prove browser
+Replay. The driver also does not prove
 PostHog ingestion; correlate its recorded IDs with the actual APM, AI, Logs and
 Replay records afterward. See the full
 [driver contract](../../scripts/acceptance/run-observability.md).

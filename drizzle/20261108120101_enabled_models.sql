@@ -2,10 +2,21 @@
 ALTER TABLE byos_connections ADD COLUMN IF NOT EXISTS "modelSettings" jsonb;
 ALTER TABLE model_api_keys ADD COLUMN IF NOT EXISTS "modelSettings" jsonb;
 ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "hostedModelEnabled" boolean NOT NULL DEFAULT true;
-UPDATE byos_connections c SET "modelSettings"=jsonb_build_object('autoEnable',true,'models',COALESCE((
-  SELECT jsonb_object_agg(id,jsonb_build_object('enabled',true,'fresh',false,'manual',true))
-  FROM (SELECT DISTINCT b."modelId" AS id FROM byos_bindings b WHERE b."connectionId"=c.id
-    UNION SELECT jsonb_array_elements_text(c."modelCatalog"->'models')) models), '{}'::jsonb));
+-- Existing deletion fences must keep rejecting writes to retained accounts.
+-- Split app databases may not contain the workspace deletion-guard table.
+DO $$
+DECLARE fenced_workspaces text[] := ARRAY[]::text[];
+BEGIN
+  IF to_regclass('account_deletion_workspace_guards') IS NOT NULL THEN
+    SELECT COALESCE(array_agg("workspaceId"::text), ARRAY[]::text[])
+      INTO fenced_workspaces FROM account_deletion_workspace_guards;
+  END IF;
+  UPDATE byos_connections c SET "modelSettings"=jsonb_build_object('autoEnable',true,'models',COALESCE((
+    SELECT jsonb_object_agg(id,jsonb_build_object('enabled',true,'fresh',false,'manual',true))
+    FROM (SELECT DISTINCT b."modelId" AS id FROM byos_bindings b WHERE b."connectionId"=c.id
+      UNION SELECT jsonb_array_elements_text(c."modelCatalog"->'models')) models), '{}'::jsonb))
+    WHERE NOT (c."workspaceId"::text = ANY(fenced_workspaces));
+END $$;
 UPDATE model_api_keys k SET "modelSettings"=jsonb_build_object('autoEnable',false,'models',COALESCE((
   SELECT jsonb_object_agg(id,jsonb_build_object('enabled',true,'fresh',false,'manual',true))
   FROM jsonb_array_elements_text(k.models) AS items(id)), '{}'::jsonb));

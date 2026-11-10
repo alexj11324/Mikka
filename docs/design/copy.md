@@ -87,7 +87,9 @@
 | C-07 | Microsoft（present tense for a state that still exists） |
 | C-08 | Shopify Polaris（specific, exact numbers and dates）；Material 3（explain consequences neutrally） |
 
-## 本轮已改
+## 历史文案复核记录
+
+下面记录该次文案修订的计数与例子；它们不代表当前消息字典的条目总数。
 
 第一轮按旧 C-04「不写请」机械删除了 238 条「请」，复核后按新 C-04 逐条看组件重新归类：
 

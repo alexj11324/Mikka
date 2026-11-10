@@ -1,8 +1,9 @@
 # Local bootstrap
 
 `scripts/dev/bootstrap-local.sh` sets up a fresh cloud Linux session (Ubuntu or
-Debian, root or sudo) in one step. It is idempotent: the first run takes under
-a minute, a second run only checks and takes about a second.
+Debian, root or sudo) in one step. Repeated runs reuse installed dependencies and migration state
+when their recorded inputs match. Installation time depends on the image and
+network. Run it in cloud Linux, as required by `AGENTS.md`.
 
 ```sh
 eval "$(scripts/dev/bootstrap-local.sh)"

@@ -1,64 +1,35 @@
 'use client'
 
-import { settingsKeys } from '@/lib/swr/keys'
-import { useEffect, useState } from 'react'
-import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { Download } from 'lucide-react'
-import { toast } from 'sonner'
 import { SettingsSection } from '@/components/settings/primitives'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { getCreditBilling, POINTS_PER_USD, POINTS_PURCHASE_AMOUNTS, startPointsPurchase, type CreditTransaction } from '@/lib/billing/verification-client'
-import { useActionError } from '@/lib/use-action-error'
+import { POINTS_PER_USD, POINTS_PURCHASE_AMOUNTS, type CreditTransaction } from '@/lib/billing/verification-client'
+import type { CreditBalanceState } from '@/hooks/settings/use-billing'
 
-export const creditBillingKey = settingsKeys.creditBilling
+export { creditBillingKey } from '@/hooks/settings/use-billing'
 
-const STATUS: Record<CreditTransaction['type'], 'paid' | 'credited' | 'refunded'> = { topup: 'paid', verification: 'credited', refund: 'refunded' }
+const STATUS: Record<CreditTransaction['type'], 'paid' | 'credited' | 'refunded'> = { topup: 'paid', verification: 'credited', refund: 'refunded', subscription: 'paid' }
 
 /**
  * 计费 › 余额 and 账单记录 (Figma BIL-1 `708:26856`, BIL-3 `708:27372`). One balance
  * in points, the card-verification $1 included at 100 points per dollar (#559).
- * 充值 goes to Stripe Checkout in payment mode; on `?topup=` the balance and
- * history reload. With billing not set up (`purchasable={false}`) there is no 充值,
- * and an empty balance with no history is not shown at all.
+ * 充值 goes to Stripe Checkout in payment mode (`useCreditBalance`). With billing
+ * not set up (`purchasable={false}`) there is no 充值, and an empty balance with no
+ * history is not shown at all.
  */
-export function BalanceSection({ workspaceId, purchasable = true }: { workspaceId: string; purchasable?: boolean }) {
+export function BalanceSection({ balance, purchasable = true }: { balance: CreditBalanceState; purchasable?: boolean }) {
   const t = useTranslations('Billing.balance')
   const locale = useLocale()
-  const actionError = useActionError()
-  const billing = useSWR(creditBillingKey(workspaceId), () => getCreditBilling(workspaceId))
-  const { mutate } = billing
-  const [redirecting, setRedirecting] = useState(false)
+  const { redirecting, topUp } = balance
   const number = new Intl.NumberFormat(locale)
   const usd = new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' })
   const day = new Intl.DateTimeFormat('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit' })
 
-  useEffect(() => {
-    const url = new URL(window.location.href)
-    const topup = url.searchParams.get('topup')
-    if (topup === null) return
-    url.searchParams.delete('topup')
-    url.searchParams.delete('session_id')
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
-    if (topup === 'success') { toast.success(t('paid')); void mutate() }
-  }, [mutate, t])
-
-  async function topUp(amount: number) {
-    setRedirecting(true)
-    try {
-      const result = await startPointsPurchase(workspaceId, amount)
-      if (result.error) { setRedirecting(false); toast.error(result.error === 'billingNotConfigured' ? t('unavailable') : actionError(result.error)); return }
-      window.location.assign(result.url)
-    } catch {
-      setRedirecting(false)
-      toast.error(actionError('billingProviderFailed'))
-    }
-  }
-
-  const data = billing.data && !billing.data.error ? billing.data : null
+  const data = balance.credits
   if (!data || (!purchasable && data.balancePoints === 0 && data.transactions.length === 0)) return null
   return <>
     <SettingsSection id="billing-balance" title={t('section')}>
@@ -67,7 +38,7 @@ export function BalanceSection({ workspaceId, purchasable = true }: { workspaceI
         {purchasable && <DropdownMenu>
           <DropdownMenuTrigger render={<Button type="button" size="sm" disabled={redirecting} />}>{t('topUp')}</DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-max"><DropdownMenuGroup>
-            {POINTS_PURCHASE_AMOUNTS.map(amount => <DropdownMenuItem key={amount} onClick={() => { void topUp(amount) }}>
+            {POINTS_PURCHASE_AMOUNTS.map(amount => <DropdownMenuItem key={amount} onClick={() => topUp(amount)}>
               {t('amount', { amount: usd.format(amount), points: number.format(amount * POINTS_PER_USD) })}
             </DropdownMenuItem>)}
           </DropdownMenuGroup></DropdownMenuContent>

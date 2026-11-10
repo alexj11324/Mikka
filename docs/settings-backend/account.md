@@ -20,7 +20,7 @@ uploadAvatar(form: FormData): Promise<ActionResult<{ image: string }>>
 - 返回：`image` 是新的 `user.image`，形如 `/api/avatars/<userId>/<sha256>`。显示时照旧走 `avatarImageSrc()`（`lib/default-avatar.ts`，已支持这类路径，会加 base path）。iOS 端 `Avatar` 组件对 `/` 开头的路径会拼 `API_URL`，无需改动。
 - 错误码：`avatarInvalidType`（类型不对、不是文件、空文件）、`avatarTooLarge`、`authRequired`。
 - 副作用：写 `user_avatars`（每人一行，覆盖旧的），更新 Better Auth `user.image`。旧图的 URL 立即 404；配置了 R2 时旧对象尽力删除。
-- 存储方式与理由：仓库已有 R2（`lib/artifacts/storage.ts`，私有 artifacts 桶），头像存到 `avatars/<userId>/<sha256>.<ext>`；未配置 R2（预览、测试）时存 `user_avatars.inlineContent`（bytea，≤200 KB，表上有 CHECK）。**没有用 data URL 写进 `user.image`**：`user.image` 会随每次 `getSession`、成员列表和 RSC payload 下发，200 KB 的 data URL 会让每个请求都变重。
+- 存储方式与理由：仓库已有 R2（`lib/artifacts/storage.ts`，私有 artifacts 桶），头像存到 `avatars/<userId>/<sha256>.<ext>`；未配置对象存储时存 `user_avatars.inlineContent`（bytea，≤200 KB，表上有 CHECK）。**没有用 data URL 写进 `user.image`**：`user.image` 会随每次 `getSession`、成员列表和 RSC payload 下发，200 KB 的 data URL 会让每个请求都变重。
 - 读取：`GET /api/avatars/:userId/:sha256`（`app/api/avatars/[userId]/[hash]/route.ts`），不需要登录（队友、iOS 端都要能显示，和 Google 头像一样是公开图片；URL 含内容哈希）。`cache-control: public, max-age=86400`，`nosniff` + `sandbox` CSP。
 
 ## 名称
@@ -79,10 +79,10 @@ interface SignedInDevice {
 ## 导出我的数据
 
 ```ts
-requestDataExport(): Promise<ActionResult<{ email: string; expiresAt: string }>>
+requestDataExport(): Promise<ActionResult<{ email: string; expiresAt: string; downloadPath?: string }>>
 ```
 
-- 行为：生成一次性下载链接，用现有邮件通道（Resend，`RESEND_API_KEY`，发件人同登录邮件 `AUTH_EMAIL_FROM`）发到账户邮箱。**只有 Resend 接受了邮件才返回成功**；返回的 `email` 用于提示「已发送到 xxx」，`expiresAt` 是链接失效时间（24 小时）。
+- 行为：生成有期限的下载链接，用 `lib/mail-delivery.ts` 的共享邮件通道发到账户邮箱。`SMTP_URL` 优先，否则使用 `RESEND_API_KEY`，发件人取 `MIKKA_EMAIL_FROM`。邮件服务接受后返回 `email` 和 `expiresAt`（24 小时）。没有配置邮件通道或 `appOrigin`，或通道在发送时不可用，会直接返回同源 `downloadPath`，页面显示下载链接。该结果没有声称邮件已发送。
 - 邮件文案：`messages/*.json` 的 `AccountEmail.exportSubject` / `exportBody`，按当前界面语言。
 - 下载：`GET /api/account/export/:token`（`app/api/account/export/[token]/route.ts`）。
   - 必须以申请导出的账户登录（未登录 401；其他账户、过期或无效 token 都是 404）。
@@ -90,8 +90,7 @@ requestDataExport(): Promise<ActionResult<{ email: string; expiresAt: string }>>
   - 文件在下载时生成：`mikka-export-YYYY-MM-DD.json`，`no-store`、`no-referrer`。
 - 频率限制：每人每小时一次（`account_data_exports` 上加事务内咨询锁判断，两次并发点击不会都通过）。邮件发送失败会撤回这次预约，可以立刻重试。
 - 错误码：
-  - `emailUnavailable`：没有配置 `RESEND_API_KEY`（或没有配置站点地址 `appOrigin`），不会假装成功。
-  - `emailDeliveryFailed`：Resend 拒收或超时。
+  - `emailDeliveryFailed`：邮件服务拒收或超时。
   - `dataExportRateLimited`，`params: { minutes }`：还要等几分钟。
   - `authRequired`。
 - 导出内容（`lib/account/export.ts`，每个查询显式列字段）：账户资料（id、名称、邮箱、头像、创建时间）、登录方式（provider 名）、偏好（推送、记忆开关、时区）、所在工作区（名称、角色）、Bot、Agent、线程（运行 + 用户追加消息）、Bot 聊天消息、任务（本人拥有的 issues）、记忆（user_facts，不含已删除）、Artifact 列表（元数据，不含正文）、已保存的登录（站点、用户名，不含密码/TOTP）、连接（Composio 应用、Linear 组织名、Telegram 用户名、GitHub 仓库、设备、模型订阅的 provider/账户标签）。
@@ -162,7 +161,7 @@ deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true; r
 
 ## 新增错误码
 
-`avatarInvalidType`、`avatarTooLarge`、`passwordIncorrect`、`passwordTooShort`、`passwordTooLong`、`passwordNotSet`、`passwordAlreadySet`、`sessionNotFound`、`sessionIsCurrent`、`emailUnavailable`、`emailDeliveryFailed`、`dataExportRateLimited`（`{minutes}`）、`accountEmailMismatch`、`accountSoleAdmin`（`{workspaces}`、`{count}`）。
+`avatarInvalidType`、`avatarTooLarge`、`passwordIncorrect`、`passwordTooShort`、`passwordTooLong`、`passwordNotSet`、`passwordAlreadySet`、`sessionNotFound`、`sessionIsCurrent`、`emailDeliveryFailed`、`dataExportRateLimited`（`{minutes}`）、`accountEmailMismatch`、`accountSoleAdmin`（`{workspaces}`、`{count}`）。
 
 ## 测试
 

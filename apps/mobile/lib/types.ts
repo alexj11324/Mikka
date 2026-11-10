@@ -35,7 +35,9 @@ export interface RunSource {
   kind: 'run'; id: string; name: string; agentName: string; harness: string; status: string
   /** Its group in the thread list (R-52), decided on the server. Absent from a server older than it. */
   group?: ThreadGroup
-  issue: { id: string; identifier: string | null; number: number | null; title: string } | null
+  issue: { id: string; identifier: string | null; number: number | null; title: string
+    /** A code task's review summary (#1738, from #1722); absent for a non-code task or an older server. */
+    review?: import('../features/review/model/contract').ReviewSummary | null } | null
   /** 运行信息, on the person's own runs. */
   info?: import('./run-info').RunInfo
 }
@@ -60,7 +62,7 @@ export interface ChatItem {
 
 /** lib/coordinator/event-line.ts on the server. */
 export interface EventLine {
-  kind: 'runFinished' | 'runRetried' | 'runSwitched' | 'runPaused' | 'runWaitingDevice' | 'runDeviceBack' | 'issueStatus' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'other'
+  kind: 'runFinished' | 'runRetried' | 'runSwitched' | 'runPaused' | 'runWaitingDevice' | 'runDeviceBack' | 'issueStatus' | 'issueSnapshot' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'scheduleRan' | 'scheduleDue' | 'other'
   runId: string | null
   issueId: string | null
   status: string | null
@@ -134,7 +136,7 @@ export interface Thread {
   finishedAt: string | null
   /** Its place in the list, as on the web (R-52). Absent from a server older than it. */
   group?: ThreadGroup
-  /** How many threads its task has had; the list shows only the newest (第 N 次尝试). */
+  /** How many threads its task has had; the list shows only the newest. */
   attempts?: number
 }
 
@@ -157,9 +159,12 @@ export interface ComputerStatus { machine: 'sleeping' | 'waking' | 'running' | '
 
 export interface Threads { threads: Thread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[]; live?: LiveScope & { presence?: PresenceProof | null } }
 
+/** Optional result fields are absent on older servers or when timing is unknown. */
+export type ThreadStep = { id: string; name: string; detail: string | null; failed: boolean; output?: string; ms?: number }
+
 export type ThreadItem =
   | { kind: 'agent'; id: string; text: string; at: number }
-  | { kind: 'steps'; id: string; count: number; at: number }
+  | { kind: 'steps'; id: string; count: number; steps?: ThreadStep[]; at: number }
   | { kind: 'error'; id: string; text: string; at: number }
   | { kind: 'person'; id: string; text: string; mine: boolean; at: number }
 
@@ -206,7 +211,9 @@ export type TaskActivity =
     /** Its own result (2026-11-07-2230); absent from an older server. */
     state?: 'running' | 'waiting' | 'failed' | 'blocked' | 'done'
     /** The pull request it opened; absent from an older server. */
-    pullRequest?: { number: number; url?: string | null } | null }
+    pullRequest?: { number: number; url?: string | null } | null
+    /** The factory stage this run did (lib/mobile-tasks.ts, coming); absent or null when it was not a factory stage. */
+    stage?: 'implement' | 'fix' | 'review' | 'verify' | null }
   | { kind: 'replaced'; runId: string; createdAt: string }
   | { kind: 'created'; by: string | null; createdAt: string }
 
@@ -218,6 +225,10 @@ export interface TaskDetail {
     description: string | null
     agent: { harness: string; model: string | null } | null
     place: { kind: MachineKind; name: string } | null
+    /** A code task's review summary (#1738, from #1722); absent for a non-code task or an older server. */
+    review?: import('../features/review/model/contract').ReviewSummary | null
+    /** A factory task's flow: its stage, what it needs from the person, 审阅's verdict (2026-11-04-2200). Not sent yet. */
+    flow?: import('../features/tasks/model/task-flow').TaskFlow | null
   }
   activity: TaskActivity[]
   /** The channel its task and run keys arrive on. */
@@ -241,6 +252,8 @@ export interface Preferences {
 }
 
 export interface Settings {
+  /** Fresh finance entry scope; absent on older servers. */
+  billingScope?: { kind: 'workspace' | 'organization'; id: string } | null
   user: Person
   workspace: Workspace
   workspaces: Workspace[]

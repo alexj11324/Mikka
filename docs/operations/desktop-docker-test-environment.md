@@ -82,18 +82,21 @@ create accounts, migrate data, mutate Docker resources, or deploy an app.
 Docker terminates public TLS and forwards to the sandbox's port 3000. The test
 server checks the original raw Host header exactly against the descriptor;
 duplicate Host, conflicting forwarded host/protocol/port, ambiguous forwarding
-claims and non-origin-form request targets are rejected before Next executes.
+claims and non-origin-form request targets are rejected before the API executes.
 No request header selects the trusted origin.
 
-The Node HTTP listener binds port 3000. The standard Next custom-server options
-pin the verified public hostname and port 443, and the validated request uses a
-fixed HTTPS protocol. This preserves the same public `Request.url` origin in
-Next's middleware, route handlers and application attestation. In the installed
-Next 16.4.1 implementation, putting an absolute URL directly in `req.url` would
-be concatenated with the server's own authority; the adapter instead retains
-the normalized origin-form path. This is specific to the disposable test
-entry point and does not change application proxy trust or production config.
-The entry point uses Next's documented [custom server API](https://nextjs.org/docs/app/guides/custom-server).
+The outer Node HTTP listener binds port 3000 and retains the normalized
+origin-form path after ingress validation. It passes the real Node request and
+response to the compiled Nitro adapter in `.output/server/mikka-docker.mjs`.
+`createDockerRuntime` receives the descriptor's fixed HTTPS origin. The build
+receipt requires `trustProxy: false`, the same source revision and the matching
+test revision. The adapter owns no listener or process signal handlers.
+
+Shutdown closes owned connections, drains the application response/`waitUntil`
+lifecycle and closes Nitro, then closes the local Worker. The entry point and
+its validation are in `apps/desktop/test/docker-environment.mjs` and
+`scripts/start-app.mjs`. Its origin handling is specific to this disposable
+environment.
 
 The service starts the real device-gateway Worker in local Miniflare. Only its
 existing exact `/v1/live/<channel>/{socket,push}` and

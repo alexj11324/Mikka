@@ -15,9 +15,12 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
   const { issues } = await import('../lib/db/schema')
   const { allocateIssueNumbers } = await import('../lib/issue-numbering')
   const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
+  const { seedPersonalWorkspace, seedWorkspace } = await import('./support/workspace-admin-db')
+  const workspaces = new Map<string, string>()
   const user = async () => {
     const id = `numbering-${randomUUID()}`
     await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [id, `${id}@example.invalid`])
+    workspaces.set(id, await seedPersonalWorkspace(pool, id))
     return id
   }
   const base = { type: 'doc', content: [] }
@@ -27,16 +30,15 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
       const { listIssues, listWorkspaceIssues } = await import('../app/actions/issues')
       const { actAs } = await import('../lib/acting-user')
       const { withDatabaseTransaction } = await import('../lib/db')
-      const { seedWorkspace } = await import('./support/workspace-admin-db')
       const { sql } = await import('drizzle-orm')
       const owner = await user()
-      const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }], 'Read-only list fixture')
+      const workspace = { id: workspaces.get(owner)! }
       const ids = [randomUUID(), randomUUID()]
       // A writer that did not use the allocator: the database numbers the row
       // itself (assign_issue_number). Reading must still leave every row alone.
       await db.insert(issues).values([
-        { id: ids[0], userId: owner, title: 'already numbered', content: content(7), status: 'todo', priority: 'normal' },
-        { id: ids[1], userId: owner, title: 'missing number', content: content(), status: 'todo', priority: 'normal' },
+        { id: ids[0], userId: owner, workspaceId: workspace.id, ownershipState: 'bound', title: 'already numbered', content: content(7), status: 'todo', priority: 'normal' },
+        { id: ids[1], userId: owner, workspaceId: workspace.id, ownershipState: 'bound', title: 'missing number', content: content(), status: 'todo', priority: 'normal' },
       ])
       const snapshot = async () => ({
         rows: (await pool.query('SELECT id,content FROM issues WHERE "userId"=$1 ORDER BY id', [owner])).rows,
@@ -86,7 +88,7 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
     })
 
     await t.test('#1492: the list reads while several people have saved a prefix, each task with its own owner prefix', async () => {
-      const { listIssues } = await import('../app/actions/issues')
+      const { listIssues, listWorkspaceIssues } = await import('../app/actions/issues')
       const { actAs } = await import('../lib/acting-user')
       const { issuePrefixes } = await import('../lib/db/schema')
       const [owner, other, third] = [await user(), await user(), await user()]
@@ -96,11 +98,21 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
         { userId: third, prefix: 'THRD', updatedAt: new Date() },
       ])
       const id = randomUUID()
-      await db.insert(issues).values({ id, userId: owner, title: 'prefixed', content: content(), status: 'todo', priority: 'normal' })
+      await db.insert(issues).values({ id, userId: owner, workspaceId: workspaces.get(owner)!, ownershipState: 'bound', title: 'prefixed', content: content(), status: 'todo', priority: 'normal' })
       const listed = await actAs(owner, () => listIssues())
       const row = listed.find(item => item.id === id)
       assert.ok(row, 'the list read succeeds with several saved prefixes')
       assert.match(row.identifier ?? '', /^MINE-[1-9][0-9]*$/)
+      const shared = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: other, role: 'member' }], 'Numbered shared tasks')
+      await pool.query('update mikka_workspaces set kind=\'team\' where id=$1', [shared.id])
+      const sharedId = randomUUID()
+      await db.insert(issues).values({ id: sharedId, userId: owner, workspaceId: shared.id, ownershipState: 'bound', scope: 'workspace', title: 'shared prefixed', content: content(), status: 'todo', priority: 'normal' })
+      const personalList = await actAs(owner, () => listWorkspaceIssues(workspaces.get(owner)!))
+      assert.deepEqual(personalList.map(item => item.id), [id])
+      const sharedList = await actAs(other, () => listWorkspaceIssues(shared.id))
+      assert.deepEqual(sharedList.map(item => item.id), [sharedId])
+      assert.match(sharedList[0].identifier ?? '', /^MINE-[1-9][0-9]*$/, 'a shared task keeps its creator\'s stable number and prefix')
+      assert.notEqual(sharedList[0].metadata.number, row.metadata.number, 'number allocation stays unique across the owner\'s workspaces')
     })
     await t.test('the counter owner lock remains compatible with FK KEY SHARE', async () => {
       const owner = await user()
@@ -120,7 +132,7 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
       const numbers = await Promise.all(Array.from({ length: 8 }, (_, i) => db.transaction(async (tx) => {
         const number = await allocateIssueNumbers(tx, owner)
         await new Promise((r) => setTimeout(r, 20))
-        await tx.insert(issues).values({ id: randomUUID(), userId: owner, title: `n${i}`, content: content(number), status: 'todo', priority: 'normal' } as typeof issues.$inferInsert)
+        await tx.insert(issues).values({ id: randomUUID(), userId: owner, workspaceId: workspaces.get(owner)!, ownershipState: 'bound', title: `n${i}`, content: content(number), status: 'todo', priority: 'normal' } as typeof issues.$inferInsert)
         return number
       })))
       assert.deepEqual([...numbers].sort((x, y) => x - y), [1, 2, 3, 4, 5, 6, 7, 8])
@@ -134,16 +146,35 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
       }), /fixture rollback/)
       const number = await db.transaction(async tx => {
         const allocated = await allocateIssueNumbers(tx, owner)
-        await tx.insert(issues).values({ id: randomUUID(), userId: owner, title: 'after rollback', content: content(allocated), status: 'todo', priority: 'normal' })
+        await tx.insert(issues).values({ id: randomUUID(), userId: owner, workspaceId: workspaces.get(owner)!, ownershipState: 'bound', title: 'after rollback', content: content(allocated), status: 'todo', priority: 'normal' })
         return allocated
       })
       assert.equal(number, 1)
     })
 
+    await t.test('subtree ranges and single allocations are disjoint, and a failed range rolls back', async () => {
+      const owner = await user()
+      await assert.rejects(db.transaction(async tx => {
+        assert.equal(await allocateIssueNumbers(tx, owner, 4), 1)
+        throw new Error('range rollback')
+      }), /range rollback/)
+      const sizes = [3, 1, 4, 2]
+      const ranges = await Promise.all(sizes.map(count => db.transaction(async tx => {
+        const first = await allocateIssueNumbers(tx, owner, count)
+        return Array.from({ length: count }, (_, index) => first + index)
+      })))
+      assert.deepEqual(ranges.flat().sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      assert.equal(await db.transaction(tx => allocateIssueNumbers(tx, owner)), 11)
+      for (const count of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+        await assert.rejects(db.transaction(tx => allocateIssueNumbers(tx, owner, count)), /Invalid issue number allocation/)
+      }
+      assert.equal(await db.transaction(tx => allocateIssueNumbers(tx, owner)), 12, 'invalid ranges consume no numbers')
+    })
+
     await t.test('allocation does not wait for an existing issue row lock', async () => {
       const owner = await user()
       const issueId = randomUUID()
-      await db.insert(issues).values({ id: issueId, userId: owner, title: 'locked existing issue', content: content(1), status: 'todo', priority: 'normal' })
+      await db.insert(issues).values({ id: issueId, userId: owner, workspaceId: workspaces.get(owner)!, ownershipState: 'bound', title: 'locked existing issue', content: content(1), status: 'todo', priority: 'normal' })
       const locked = await pool.connect()
       try {
         await locked.query('BEGIN')
@@ -158,7 +189,7 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
 
     await t.test('database rejects duplicate owner numbers but permits the same number for another owner', async () => {
       const owner = await user(), peer = await user()
-      const insert = (userId: string) => pool.query('INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,\'unique fixture\',$3,\'todo\',\'normal\')', [randomUUID(), userId, JSON.stringify(content(1))])
+      const insert = (userId: string) => pool.query('INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority) VALUES($1,$2,$3,\'bound\',\'unique fixture\',$4,\'todo\',\'normal\')', [randomUUID(), userId, workspaces.get(userId)!, JSON.stringify(content(1))])
       await insert(owner)
       await assert.rejects(insert(owner), (error: unknown) => (error as { code: string }).code === '23505')
       await insert(peer)

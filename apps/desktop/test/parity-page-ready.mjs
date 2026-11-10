@@ -4,6 +4,23 @@ import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { observedAction, publishedActions, rpcReadResult } from '../../../scripts/acceptance/read-action-transport.mjs'
 
+export async function selectWorkspaceMenuItem(page, item) {
+  // A switch assigns the locale home URL after its action finishes. The old URL
+  // and ready DOM are not proof that the new document has loaded. An already
+  // selected item is a product no-op and only closes its menu.
+  const moved = await item.getAttribute('aria-current') === 'true' ? undefined : page.waitForEvent('domcontentloaded')
+  void moved?.catch(() => {})
+  await item.click()
+  await moved
+}
+
+export async function selectParityWorkspace(page, { menuName, workspaceName, basePath }) {
+  await page.getByRole('button', { name: menuName, exact: true }).first().click()
+  await selectWorkspaceMenuItem(page, page.getByRole('menuitem', { name: workspaceName, exact: false }))
+  await page.waitForURL(url => url.pathname === `${basePath}/en` || url.pathname === `${basePath}/en/`)
+  await page.getByRole('button', { name: menuName, exact: true }).first().waitFor()
+}
+
 // The build publishes the exact action name beside its ID. Observe that real
 // transport only for reads whose successful empty state has no DOM of its own.
 // No requests, React internals, application state or response routes are added.
@@ -113,6 +130,14 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     const overview = page.getByRole('complementary', { name: messages.Shell.panel.label, exact: true })
     await overview.getByRole('heading', { name: messages.Nav.coordinator, exact: true }).waitFor()
     await overview.getByRole('tab', { name: messages.Shell.panel.computer, exact: true }).waitFor()
+    // A restored chat conservatively retains a history cursor. Complete this
+    // two-message fixture through the ordinary UI before comparing its layout.
+    const conversation = page.getByRole('region', { name: messages.Coordinator.conversation, exact: true })
+    const earlier = conversation.getByRole('button', { name: messages.Common.loadMore, exact: true })
+    if (await earlier.isVisible()) await earlier.click()
+    await earlier.waitFor({ state: 'hidden' })
+    await conversation.getByText('What should we review today?', { exact: true }).waitFor()
+    await conversation.getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
   } else if (name === 'all-threads' || name === 'bot-thread-list') {
     await threadRows(page.getByRole('region', { name: messages.Shell.panel.allThreads, exact: true }))
   } else if (name === 'projects' || name === 'team-projects') {
@@ -124,12 +149,8 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
       await apps.getByRole('link', { name: messages.Settings.integrations.openApp.replace('{name}', name), exact: true }).waitFor()
     }
     await expect(apps.locator('[data-slot="app-row-pending"]')).toHaveCount(0, { timeout: 45_000 })
-    const alerts = apps.getByRole('alert')
-    if (observed.linearUnavailable) {
-      await expect(alerts).toHaveCount(1)
-      await alerts.getByText(messages.Plugins.connectionStatusFailed.replace('{names}', messages.Settings.linear.title), { exact: true }).waitFor()
-      await expect(alerts.getByRole('button', { name: messages.Plugins.retry, exact: true })).toBeEnabled()
-    } else await expect(alerts).toHaveCount(0)
+    // An unreadable Linear flag is not a read failure either: no alert in any case.
+    await expect(apps.getByRole('alert')).toHaveCount(0)
   } else if (name === 'suggestions') {
     await text(messages.SuggestionsPage.empty)
     await page.getByRole('button', { name: messages.SuggestionsPage.connect, exact: true }).waitFor()
@@ -158,9 +179,10 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     // The fixture's creation event must finish rendering before comparison.
     await task.getByText(messages.Workspace.detail.createdTask, { exact: true }).waitFor()
     if (name === 'task-thread') {
-      // The task's thread list has no loading placeholder. The selected row
-      // proves that read is rendered; the scoped reply proves the right pane.
-      await task.getByRole('button', { name: messages.IssueThreads.open.replace('{name}', fixture.issueTitle), exact: true, pressed: true }).waitFor()
+      // 活动's Agent rows have no loading placeholder. The selected row, named
+      // after its Agent (one row per Agent stretch), proves that read is
+      // rendered; the scoped reply proves the right pane.
+      await task.getByRole('button', { name: messages.IssueThreads.open.replace('{name}', fixture.agentLabel), exact: true, pressed: true }).waitFor()
       await task.getByRole('list', { name: messages.IssueThreads.conversation, exact: true }).getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: true }).waitFor()
     }
   } else if (name === 'new-task') {

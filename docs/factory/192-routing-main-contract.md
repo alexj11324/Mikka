@@ -1,5 +1,10 @@
 # Personal Factory intake on main
 
+> Historical intake extraction against the source revision below. The statements
+> about absent Factory tables, dispatch and question endpoints describe that
+> revision. [Flow v2](1276-flow-v2.md) describes the integrated public contract,
+> implemented by [server.ts](../../lib/factory/server.ts).
+
 This extraction starts from main 4f52bbb2161d7016e95b95b5db3e3aa05afb89a2. Main has no Factory tables or dispatcher; PR316 remains an unmerged broad candidate. This PR reuses the existing v1 stage/binding vocabulary and transactional intake state, not the Skill, reviewer, publisher or monitor implementations from that candidate.
 
 ## Frozen intake interface

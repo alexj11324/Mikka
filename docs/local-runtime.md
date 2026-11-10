@@ -6,8 +6,12 @@ Claude Code or Codex, without replacing the person's own installed binaries.
 The task uses its real worktree and ordinary process environment; local
 configuration separation is only for preserving concurrent work and the
 person's files. Under [1800](design/decisions/2026-11-06-1800-machine-is-the-execution-boundary.md),
-real credentials are prepared before execution, provider calls are direct,
-and no extra remote permission check precedes a model or tool call.
+the selected native CLI authentication and authorized GitHub credential are
+prepared before execution, provider calls are direct, and no extra remote
+permission check precedes a model or tool call. Other task Secrets follow the
+separate [credential exposure boundary](design/decisions/2026-11-08-0240-credential-exposure-boundary.md).
+That decision records the remaining injection migration and does not establish
+runtime protection.
 The device reports OS, architecture, free disk, Docker and the install
 state of those Agents, not detected Agents. Registering the daemon or
 reporting a changed harness set creates hidden execution records. Their
@@ -87,7 +91,7 @@ do not set `CI=true` for a local server. `VERCEL_ENV=production` always
 disables them. Production
 deployments must not set this test switch. Vitest sets it for its disposable
 Git fixtures; the local acceptance harness (`pnpm test:local-loop`) sets it
-on both server and daemon. A production Next build alone does not enable test behavior.
+on both server and daemon. A production build alone does not enable test behavior.
 
 The daemon integration tests use the existing `mikka daemon login --token`
 path, an in-memory transport, a real daemon and temporary bare Git origins.
@@ -104,21 +108,22 @@ bootstrap and repeated application remain covered by
 `tests/migrate-empty-db.test.mjs`; do not run migrations on developer or
 production databases for verification.
 
-No-origin local repositories and uncommitted checkout visibility are recorded
-in `docs/design/decisions.md` as **待 Alex 确认**. Push approval and PR creation
-are the following MVP deliverable; this change grants no push approval.
+Repository-backed threads use independent worktrees from the remote branch.
+To include local uncommitted changes, commit and push them first. The original
+pending rows in `docs/design/decisions.md` are superseded by the accepted
+[thread isolation decision](design/decisions/2026-11-01-2245-thread-privacy-and-local-isolation.md).
 
 ## Local development without GitHub (`pnpm dev:local`)
 
-`pnpm dev:local` runs the whole loop on your own machine: Coordinator dispatch,
-the daemon's push, the pull request and the
-thread showing it, with no request to api.github.com. One command, hot reload,
-no `next build`:
+In cloud Linux, `pnpm dev:local` runs Coordinator dispatch, the daemon's push,
+a synthetic pull request and its thread projection against local GitHub
+substitutes, with hot reload. It starts these services.
 
 - the local fake services from `tests/mvp/services.mjs` on `127.0.0.1:3191`
   (GitHub API, plus the substitutes in `scripts/dev-local/services.mjs`), with a bare `file://` origin for the repository
   `mikka-e2e/core-loop` (default branch `trunk`);
-- `next dev` on `MIKKA_DEV_PORT` (3000) with `scripts/dev-local/preload.mjs`,
+- Vite + Nitro through `apps/api/scripts/dev.mjs` on `MIKKA_DEV_PORT` (3000)
+  with `scripts/dev-local/preload.mjs`,
   which sends `https://api.github.com` to the fake, and the AI Gateway and
   Resend to their substitutes only when no real key for them is set;
 - the daemon from source with `tsx`. Only the daemon's git sees a rewrite of
@@ -128,8 +133,10 @@ It runs only in local test-account mode (`localTestAccountsMode`,
 `scripts/test-accounts/database-target.mjs`): `MIKKA_LOCAL_TEST_ACCOUNTS=1`,
 `E2E_DATABASE_URL` set, and every database URL a loopback PostgreSQL with a
 user and password and a name ending in `_e2e`. Any `VERCEL` or `VERCEL_ENV`, or
-`NODE_ENV=production`, refuses it. Put the variables in `.env.development.local`
-(git-ignored); the script loads it.
+`NODE_ENV=production`, refuses it. Supply credentials through the cloud
+process environment. The script also reads existing `.env.development.local`
+and `.env.local` unless `MIKKA_DEV_SKIP_ENV_FILES=1`. Keep credentials out of
+those files.
 
 What is fake and what is real:
 
@@ -139,20 +146,26 @@ What is fake and what is real:
 | Repository | A local bare `file://` origin seeded with `README.md` |
 | GitHub identity | Synthetic: every local account is linked to GitHub account `4242`, which the fake lets write |
 | Model, a workspace's own key (Settings › 模型与订阅) | Real. Saving it needs `WORKSPACE_SECRETS_KEY`; without one, dev:local creates a random local key in `.cache/dev-local/workspace-secrets-key` (git-ignored, mode 0600) and reuses it, so saved keys still open after a restart |
-| The DeepSeek key, added automatically | `DEEPSEEK_API_KEY` comes from the environment or the named Infisical `dev:/vercel` secret. Use the configured `INFISICAL_PROJECT_ID` (or `MIKKA_DEV_INFISICAL_PROJECT`) with an existing `INFISICAL_TOKEN` or Universal Auth identity. The managed HTTP proxy is preserved. Setup runs immediately, then reconciles every 5 seconds; existing keys are reused, new Bots and workspaces receive the Flash choice, and individual failures back off from 30 seconds to 5 minutes. The key stays in process memory and sealed application storage. Missing Flash models never fall back to another real model. Without the key, the scripted substitute below remains available for development; real-model acceptance requires the key. |
+| The DeepSeek key, added automatically | `DEEPSEEK_API_KEY` comes from the environment or the named Infisical `dev:/vercel` secret. Use the configured `INFISICAL_PROJECT_ID` (or `MIKKA_DEV_INFISICAL_PROJECT`) with an existing `INFISICAL_TOKEN` or Universal Auth identity. The managed HTTP proxy is preserved. Setup runs immediately, then reconciles every 5 seconds; existing keys are reused, new Bots and workspaces receive the Flash choice, and individual failures back off from 30 seconds to 5 minutes. The key stays in process memory and sealed application storage. Missing Flash models never fall back to another real model. Without the key, the scripted substitute below remains available for development. The API-key path never gates a merge or acceptance. |
 | Mikka 默认 (ZeroCat, `https://zero.cat/v1`, `lib/abuse/zerocat.ts`; AI Gateway as fallback) | Not used locally: the Coordinator and Bots use DS 4.1 Flash through the DeepSeek key (below). With no `ZEROCAT_API_KEY` set, dev:local sets the placeholder `mikka-local-zerocat` and sends ZeroCat's `/v1/chat/completions` to a scripted model: it echoes (`Local model: <text>`), a message `/tool <name> <json>` calls that registered tool for real, and a tool result comes back as JSON |
 | Decisions (AI Gateway Decision API: triage, run outcome, push) | Local runs set no `AI_GATEWAY_API_KEY`, so the first choice of each question, `0.5` for a predicate |
 | Card verification and credit for Mikka 默认 (Stripe) | Every local workspace gets a verification and a $1000 local allowance, checked every 5 seconds |
 | Verification and password-reset mail ([Resend](https://resend.com/docs/api-reference/emails/send-email)) | Real with a real `RESEND_API_KEY`; otherwise a local outbox at `http://127.0.0.1:3191/mail` (JSON at `/mail.json`), one terminal line per mail |
-| Cron (the production minute Worker, `cloudflare/suggestions-cron`) | `scripts/dev-local/cron.mjs` calls the same `/api/cron/*` endpoints on the same schedule against `next dev`, with `CRON_SECRET` or a local placeholder ([securing cron jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs)) |
-| [Vercel Workflow](https://useworkflow.dev/docs/deploying/world/local-world) | The local world, as `next dev` always uses off Vercel |
+| Cron (the production minute Worker, `cloudflare/suggestions-cron`) | `scripts/dev-local/cron.mjs` calls the same `/api/cron/*` endpoints on the same schedule against the local API, with `CRON_SECRET` or a local placeholder ([securing cron jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs)) |
+| [Vercel Workflow](https://useworkflow.dev/docs/deploying/world/local-world) | The local world configured by `apps/api/scripts/dev.mjs` |
 | Database, auth, daemon, git clone/worktree/commit/push | Real |
 
 ### Which model local runs use
 
-Local development and acceptance runs use DeepSeek **DS 4.1 Flash**
-(`deepseek/deepseek-v4.1-flash`) through the workspace's own model API key,
-never Mikka 默认 and never the AI Gateway:
+The existing `dev:local` seeder selects an allowed DeepSeek Flash model
+through the workspace's own API key (`scripts/dev-local/seed-model-keys.ts`).
+It prefers a V4.1 Flash entry and also accepts the provider's `deepseek-flash`
+alias. Record the exact returned ID without asserting a version for the alias.
+Live model acceptance follows the [subscription policy](acceptance.md#live-model-acceptance).
+The DeepSeek/API-key leg never gates a merge or acceptance, and paid retries
+must not be used to unblock it.
+
+The existing development setup uses these settings.
 
 - The key is `DEEPSEEK_API_KEY` in the Mikka Infisical project, environment
   `dev`, folder `/vercel`. Read it with an existing identity
@@ -160,23 +173,19 @@ never Mikka 默认 and never the AI Gateway:
   only; never write it to a file, a commit, a log or a report.
 - `pnpm dev:local` adds it to every local account and picks DS 4.1 Flash for
   the Coordinator and the Bots (`scripts/dev-local/seed-model-keys.ts`). Outside
-  dev:local, add it as a DeepSeek key in Settings › 模型与订阅 and pick DS 4.1
-  Flash by hand.
+  dev:local, the same setup uses a DeepSeek key in Settings › 模型与订阅 with
+  an allowed Flash model selected.
 - Mikka 默认 (hosted, billed per call, served by ZeroCat, AI Gateway as fallback) is not
   used for local work, so a local run needs neither `ZEROCAT_API_KEY` nor a
   card verification.
 
-To try the real Mikka 默认 locally, set `ZEROCAT_BASE_URL=https://zero.cat/v1`
-and `ZEROCAT_API_KEY` in the shell that starts `pnpm dev:local` (or `next
-dev`). Read the key from Infisical `prod:/vercel` with an existing identity
-([infisical-cloud.md](infisical-cloud.md)) into that process environment only;
-never into `.env*`, a file, a commit, a log or a report. A real key turns the
-local substitute off and spends real credit.
-
-The base URL must be exactly `https://zero.cat/v1`; any other value is not
-called. Without either variable, or when ZeroCat fails before its first token,
-Mikka 默认 uses `deepseek/deepseek-v4.1-flash` on the AI Gateway instead (which
-dev:local also substitutes).
+The existing ZeroCat route accepts `ZEROCAT_BASE_URL=https://zero.cat/v1`
+and an existing process-delivered key. Other base URLs are refused. Without
+both settings, or on a failure before its first token, the route falls back to
+`deepseek/deepseek-v4.1-flash` on the AI Gateway. `dev:local` substitutes that
+Gateway too when no real key is present. This describes the retained runtime
+route. Authorized model acceptance follows the two official subscription
+paths above, and real API-key calls use only the policy's requested Flash model.
 
 First run: sign up at `http://localhost:3000/mikka`, then approve the device
 with the code the script prints. Ask the Coordinator to change
@@ -184,7 +193,7 @@ with the code the script prints. Ask the Coordinator to change
 unprivileged user for the daemon (bubblewrap).
 
 The placeholders (`AI_GATEWAY_API_KEY`, `ZEROCAT_API_KEY`, `RESEND_API_KEY`, `CRON_SECRET`) are
-set in the `next dev` process only. The test-account environment accepts the
+set in the application process only. The test-account environment accepts the
 exact model and mail placeholders only in local test-account mode after a
 random challenge proves that the current fetch path reaches the local
 transport. Real provider keys remain forbidden by that account harness.
@@ -193,9 +202,8 @@ API acceptance can call `POST http://127.0.0.1:3191/refresh` after registering
 an account or creating a Bot to apply local identity, credit and model setup
 immediately. Scans run serially, including requests that arrive during a prior
 scan. `.cache/dev-local/runtime.json` records the application origin, fixture
-repository and daemon data directory without credentials. The script compiles
-the daemon API routes before starting login so their first live-policy probes
-do not wait for a cold development compilation. Set
+repository and daemon data directory without credentials. The script probes
+the daemon API routes before starting login. Set
 `MIKKA_DEV_SKIP_ENV_FILES=1` when the owning acceptance harness supplies the
 complete environment and must not read local credential files.
 
@@ -223,7 +231,11 @@ real daemon CLI, using Node 24 in cloud Linux. Supply the same loopback
 existing account pool, registers/logs in through normal auth, approves the
 daemon's device login over HTTP and starts `dev:local` on port 3110. It reads
 the development DeepSeek key through the existing Infisical identity and
-does not read local environment credential files or set CI variables.
+does not read local environment credential files or set CI variables. The
+runner still requires a real DeepSeek key and asserts a Flash selection.
+This is a remaining harness limitation, so this command does not establish
+Claude Code or Codex subscription acceptance. An unavailable API-key leg
+must not hold a merge or acceptance open.
 
 The items cover real local commit/push with a synthetic GitHub PR receipt,
 a normal read-only model task, repository startup failure and its thread API
@@ -239,8 +251,11 @@ after failures, and any failure produces a nonzero exit status.
 Progress, per-step timeouts and 15-second heartbeats are written to
 `.cache/dev-local/progress.jsonl`. Each invocation retains its environment,
 source fingerprints and redacted service logs under
-`.cache/dev-local/acceptance-<id>/`; a source change during the run invalidates
-the overall result. Cleanup stops only its own child processes, revokes its
+`.cache/dev-local/acceptance-<id>/`. A change to a fingerprinted file during the
+run invalidates the overall result. The driver's fingerprint list omits
+`apps/`, which contains the Vite frontend and Nitro API. Keep the entire
+checkout fixed and record those sources separately when using this evidence.
+Cleanup stops only its own child processes, revokes its
 device credentials, releases its account lease and removes its daemon's
 temporary credential files. Disposable databases and repository evidence are
 retained for diagnosis.
@@ -280,7 +295,7 @@ The dedicated ordinary owner must have no E2B key, so existing cloud-first
 recovery cannot legitimately replace the intended B target. Once A has run
 the real Flash workload and saved a repository checkpoint, the runner checks
 Linux process ancestry and suspends A's isolated process groups, including
-detached native children. Next and the existing local minute cron continue.
+detached native children. The application and existing local minute cron continue.
 The normal 90-second lease expires without edits to server state or thresholds;
 B must really claim the server-created retry of the same Task and request epoch.
 The test reads the structured Handoff and frozen payer/owner identity, resumes

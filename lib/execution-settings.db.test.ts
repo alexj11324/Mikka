@@ -26,10 +26,19 @@ test(
       options: `-c search_path=${schema}`,
     });
     try {
+      // Install the real scoped PG handle before the first model/resource read.
+      mock.module(new URL("./workspace-db.ts", import.meta.url).href, {
+        namedExports: { workspaceDb: drizzle(pool), workspacePool: pool },
+      });
+      // Install the existing points fixture before the first model menu read.
+      // Points admission has its own DB tests; resource authorization below remains real.
+      mock.module(new URL("./points-fallback.ts", import.meta.url).href, {
+        namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) },
+      });
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
-      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY);
+      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,kind text NOT NULL DEFAULT 'team' CHECK (kind IN ('personal','team')));
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false,"modelSettings" jsonb);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now());
@@ -55,6 +64,7 @@ test(
       );
       await pool.query(migration);
       await pool.query(migration);
+      await pool.query(await readFile(new URL("../drizzle/20261101001200_bot_model_hosted_choice.sql", import.meta.url), "utf8"));
       // Un-sharing also stops runs on the owner's API keys (lib/model-api-key-runs.ts).
       await pool.query(
         await readFile(new URL("../drizzle/20261101021000_model_api_keys.sql", import.meta.url), "utf8"),
@@ -72,10 +82,13 @@ test(
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const personalPolicyMigration = await readFile(new URL("../drizzle/20261101020201_workspace_personal_policies.sql",import.meta.url),"utf8");
       await pool.query(personalPolicyMigration); await pool.query(personalPolicyMigration);
+      await pool.query(await readFile(new URL("../drizzle/20261109035020_organization_governance.sql", import.meta.url), "utf8"));
       const settings = new ExecutionSettings(pool),
         alice = { ownerId: "alice", workspaceId: randomUUID() },
         bob = { ...alice, ownerId: "bob" },
         other = { ...alice, workspaceId: randomUUID() };
+      await pool.query('INSERT INTO mikka_workspaces(id) VALUES ($1),($2)', [alice.workspaceId, other.workspaceId]);
+      await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'alice','Alice','active'),($1,'bob','Bob','active'),($2,'alice','Alice','active')`, [alice.workspaceId, other.workspaceId]);
       // As the migration does for existing connections: each person's subscriptions stay shared where they were connected.
       for (const scope of [alice, bob]) await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)', [scope.ownerId, scope.workspaceId]);
       const own = randomUUID(),
@@ -105,6 +118,60 @@ test(
         "dynamic-model",
       );
       assert.equal((await settings.botModels(bob)).length, 0);
+
+      // Temporary picks never overwrite a preference; the receipt names the stored clone.
+      const temporaryBot = randomUUID();
+      await pool.query("INSERT INTO bots VALUES ($1,$2,$3)", [temporaryBot, alice.ownerId, alice.workspaceId]);
+      await assert.rejects(settings.setTemporaryBotModel(bob, temporaryBot, binding), { code: "botNotFound" });
+      await assert.rejects(settings.setTemporaryBotModel(other, temporaryBot, binding), { code: "botNotFound" });
+      const temporary = await settings.setTemporaryBotModel(alice, temporaryBot, binding);
+      assert.ok(temporary);
+      assert.notEqual(temporary.bindingId, binding);
+      assert.match(temporary.revision, /^[0-9]+$/);
+      const savedTemporary = (await pool.query('SELECT "bindingId",xmin::text AS revision FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+        [alice.ownerId, alice.workspaceId, temporaryBot])).rows[0];
+      assert.deepEqual(savedTemporary, temporary);
+      assert.equal(await settings.setTemporaryBotModel(alice, temporaryBot, binding), null);
+      const conflictingBinding = randomUUID();
+      await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision","modelId",route) VALUES ($1::uuid,'alice',$2,$1::text,$3,1,'conflict-model','codex_cpa')`,
+        [conflictingBinding, alice.workspaceId, connection]);
+      const countBeforeConflict = (await pool.query('SELECT count(*)::int AS count FROM byos_bindings')).rows[0].count;
+      assert.equal(await settings.setTemporaryBotModel(alice, temporaryBot, conflictingBinding), null);
+      assert.equal((await pool.query('SELECT count(*)::int AS count FROM byos_bindings')).rows[0].count, countBeforeConflict, 'a clone created before the conflict is rolled back');
+      assert.deepEqual((await pool.query('SELECT "bindingId",xmin::text AS revision FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+        [alice.ownerId, alice.workspaceId, temporaryBot])).rows[0], temporary);
+      await pool.query('DELETE FROM byos_bindings WHERE id=$1', [conflictingBinding]);
+      assert.equal(await settings.restoreTemporaryBotModel(bob, temporaryBot, temporary), false);
+      assert.equal(await settings.restoreTemporaryBotModel(other, temporaryBot, temporary), false);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, bot, temporary), false);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, { ...temporary, bindingId: binding }), false);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, { ...temporary, revision: String(Number(temporary.revision) + 1) }), false);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, temporary), true);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, temporary), false);
+
+      const sameValue = await settings.setTemporaryBotModel(alice, temporaryBot, binding);
+      assert.ok(sameValue);
+      const rewritten = (await pool.query('UPDATE bot_model_choices SET "bindingId"="bindingId" WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3 RETURNING xmin::text AS revision',
+        [alice.ownerId, alice.workspaceId, temporaryBot])).rows[0];
+      assert.notEqual(rewritten.revision, sameValue.revision);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, sameValue), false, 'same value is a different committed row version');
+      const temporaryApiKey = randomUUID();
+      await pool.query('INSERT INTO model_api_keys (id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4) VALUES ($1,$2,\'custom\',\'openai\',\'fixture_ciphertext\',\'fixture_iv\',1,\'0000\')',
+        [temporaryApiKey, alice.ownerId]);
+      const apiKeyRewrite = (await pool.query('UPDATE bot_model_choices SET "bindingId"=NULL,"apiKeyId"=$4,"apiKeyModel"=\'fixture-model\' WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3 RETURNING xmin::text AS revision',
+        [alice.ownerId, alice.workspaceId, temporaryBot, temporaryApiKey])).rows[0];
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, { ...sameValue, revision: apiKeyRewrite.revision }), false, 'an API-key replacement is never cleared');
+      await pool.query('DELETE FROM model_api_keys WHERE id=$1', [temporaryApiKey]);
+      await pool.query('DELETE FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3', [alice.ownerId, alice.workspaceId, temporaryBot]);
+      const racing = await Promise.all([
+        settings.setTemporaryBotModel(alice, temporaryBot, binding),
+        settings.setTemporaryBotModel(alice, temporaryBot, binding),
+      ]);
+      assert.equal(racing.filter(Boolean).length, 1);
+      assert.equal(racing.filter(value => value === null).length, 1);
+      const winner = racing.find(value => value !== null)!;
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, winner), true);
+      assert.equal((await pool.query('SELECT 1 FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3', [alice.ownerId, alice.workspaceId, temporaryBot])).rowCount, 0);
 
       await assert.rejects(settings.setBotModel(bob, bot, binding));
       await assert.rejects(settings.setBotModel(other, bot, binding));
@@ -183,9 +250,6 @@ test(
         }),
       });
       stub("./db/index.ts", { pool });
-      stub("./workspace-db.ts", { workspaceDb: drizzle(pool) });
-      // Points and their fallback have their own tests (lib/bot-model-selection.test.ts, lib/points-fallback.db.test.ts): here Mikka 默认 has points.
-      stub("./points-fallback.ts", { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) });
       const actions = await import("../app/actions/execution-settings");
       const { freezeBotModel } = await import('./bot-model-selection');
       const { SubscriptionRepository } = await import('./subscription-repository');
@@ -199,6 +263,8 @@ test(
       assert.equal((await (await import('./bot-model-menu')).botModelMenu(pool,settings,alice,secondBot)).current.id,catalogue.bindingId,'the picker shows the visible option for a saved copied binding');
       const { COORDINATOR_MODEL } = await import('./coordinator/model');
       const unbound = {ownerId:'bob',workspaceId:randomUUID(),botId:randomUUID()};
+      await pool.query('INSERT INTO mikka_workspaces(id) VALUES ($1)', [unbound.workspaceId]);
+      await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'bob','Bob','active')`, [unbound.workspaceId]);
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3)',[unbound.botId,unbound.ownerId,unbound.workspaceId]);
       assert.deepEqual(await freezeBotModel(unbound,dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'a bot with no choice and no subscription runs on the hosted default');
       const revokedBot = randomUUID();
@@ -214,7 +280,7 @@ test(
       // with no share row and no switch; 分享给团队成员 and the admin switch decide only other members' use.
       const teamB = { ownerId: alice.ownerId, workspaceId: randomUUID() };
       const teamBot = randomUUID(), bobBot = randomUUID();
-      await pool.query('INSERT INTO mikka_workspaces VALUES ($1)', [teamB.workspaceId]);
+      await pool.query('INSERT INTO mikka_workspaces(id) VALUES ($1)', [teamB.workspaceId]);
       await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'alice','Alice','active'),($1,'bob','Bob','active')`, [teamB.workspaceId]);
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3),($4,$5,$3)',[teamBot,alice.ownerId,teamB.workspaceId,bobBot,'bob']);
       assert.equal((await pool.query('SELECT 1 FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2',[alice.ownerId,teamB.workspaceId])).rowCount,0,'nothing shared into team B');

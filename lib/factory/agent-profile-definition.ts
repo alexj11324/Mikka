@@ -5,6 +5,7 @@ import { digest } from '@/lib/agent-kit/definition'
 import type { OrderEntry } from '@/lib/model-order-plan'
 import type { DecisionExecution } from '@/lib/coordinator/decide'
 import { BUILTIN_AGENT_PROFILE_ID } from './agent-profile-reference'
+import type { ProfileMarkValue } from './agent-profile-mark'
 
 export { BUILTIN_AGENT_PROFILE_ID } from './agent-profile-reference'
 
@@ -33,7 +34,7 @@ export const agentProfileDefinitionSchema = z.strictObject({
 export type AgentProfileDefinition = z.infer<typeof agentProfileDefinitionSchema>
 export interface AgentProfileSkill { id: string; name: string; description: string; version: number; digest: string; content: string }
 export interface AgentProfileScope { ownerId: string; workspaceId: string }
-export interface AgentProfile extends AgentProfileDefinition {
+export interface AgentProfile extends AgentProfileDefinition, ProfileMarkValue {
   id: string; version: number; digest: string; createdAt: string; updatedAt: string; archivedAt: string | null
 }
 export interface AgentProfileSelection {

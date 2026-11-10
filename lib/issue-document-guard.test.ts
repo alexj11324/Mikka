@@ -5,8 +5,9 @@ import { issueDocuments, issues } from './db/schema'
 
 // A fake transaction that records every write exchangeDocument attempts; no database is opened.
 const ISSUE = '6a1f6f4e-6d2c-4a3c-9a52-6a3f2f0d0c11'
+const WORKSPACE = '6a1f6f4e-6d2c-4a3c-9a52-6a3f2f0d0c22'
 const state = { content: {} as unknown, stored: [] as unknown[], writes: [] as string[] }
-const rows = (table: unknown) => table === issues ? [{ id: ISSUE, userId: 'owner', scopeVersion: 1, content: state.content, scope: 'personal', linearSyncBlocked: true }] : table === issueDocuments ? state.stored : []
+const rows = (table: unknown) => table === issues ? [{ id: ISSUE, userId: 'owner', workspaceId: WORKSPACE, scopeVersion: 1, content: state.content, scope: 'personal', linearSyncPolicy: 'disabled', linearSyncBlocked: true }] : table === issueDocuments ? state.stored : []
 const tx = {
   select: () => ({ from: (table: unknown) => ({ where: () => ({ for: async () => rows(table), limit: async () => rows(table) }) }) }),
   insert: () => ({ values: () => ({ onConflictDoUpdate: async () => { state.writes.push('issue_documents') } }) }),
@@ -18,10 +19,20 @@ mock.module(new URL('./live/panels.ts', import.meta.url).href, { namedExports: {
   documentLiveWorkspace: async (_database: unknown, _workspaceDatabase: unknown, id: string, viewerId: string) => { assert.equal(id, ISSUE); assert.equal(viewerId, 'owner'); return null },
   documentChanged: async (executor: unknown, id: string) => { assert.equal(executor, tx); assert.equal(id, ISSUE) },
 } })
-const access = async () => ({ issue: { id: ISSUE, userId: 'owner', scopeVersion: 1 }, user: { id: 'owner', name: 'Owner', email: 'o@example.invalid' } })
+const access = async () => ({ issue: { id: ISSUE, userId: 'owner', workspaceId: WORKSPACE, scopeVersion: 1 }, user: { id: 'owner', name: 'Owner', email: 'o@example.invalid' } })
 mock.module(new URL('./issue-access.ts', import.meta.url).href, { namedExports: { requireIssueAccess: access, requireIssueAccessWithoutBody: access } })
-mock.module(new URL('./issue-scope-authorization.ts', import.meta.url).href, { namedExports: { requireLockedIssueScope: () => {} } })
+mock.module(new URL('./issue-scope-authorization.ts', import.meta.url).href, { namedExports: {
+  requireLockedIssueScope: (row: { workspaceId: string }, userId: string, version: number, workspaceId: string) => {
+    assert.equal(row.workspaceId, WORKSPACE); assert.equal(userId, 'owner'); assert.equal(version, 1); assert.equal(workspaceId, WORKSPACE)
+  },
+  requireCurrentIssueWorkspace: async (reader: { id: string }, workspaceId: string) => { assert.equal(reader.id, 'owner'); assert.equal(workspaceId, WORKSPACE) },
+  withIssueWorkspace: async (reader: { id: string }, workspaceId: string, access: { issueId: string; action: string }, work: () => Promise<unknown>) => {
+    assert.equal(reader.id, 'owner'); assert.equal(workspaceId, WORKSPACE)
+    assert.deepEqual(access, { issueId: ISSUE, action: 'canSteer' }); return work()
+  },
+} })
 mock.module(new URL('./issue-numbering.ts', import.meta.url).href, { namedExports: { allocateIssueNumbers: async () => { throw new Error('not reached') } } })
+mock.module(new URL('./task-workspace.ts', import.meta.url).href, { namedExports: { requireTaskWorkspace: async () => { throw new Error('not reached') } } })
 mock.module(new URL('./task-identifier-server.ts', import.meta.url).href, { namedExports: { issueView: () => { throw new Error('not reached') } } })
 mock.module(new URL('./linear-sync/dispatch.ts', import.meta.url).href, { namedExports: { dispatchLinearIssueSync: () => {} } })
 const exchangeDocument: typeof import('../app/actions/collaboration').exchangeDocument = async input => (await import('../app/actions/collaboration')).exchangeDocument(input)
@@ -47,7 +58,7 @@ test('valid issues.content with no issue_documents row still seeds and persists'
 
 test('issue creation rejects content the editor schema cannot render', async () => {
   const { createIssueForUserInTransaction } = await import('./issue-create')
-  const created = await createIssueForUserInTransaction(tx as never, 'owner', { title: 'T', content: { type: 'doc', content: [{ type: 'mystery' }] }, status: 'todo', priority: 'normal' }, { kind: 'user', id: 'owner' } as never)
+  const created = await createIssueForUserInTransaction(tx as never, 'owner', { title: 'T', content: { type: 'doc', content: [{ type: 'mystery' }] }, status: 'todo', priority: 'normal' }, { kind: 'user', id: 'owner' } as never, { workspaceId: WORKSPACE })
   assert.equal(created, null)
   assert.deepEqual(state.writes, ['issue_documents', 'issues.content'])
 })

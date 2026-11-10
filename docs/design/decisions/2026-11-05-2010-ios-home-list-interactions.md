@@ -5,6 +5,7 @@
   to a tap; follow OpenBot's interactions as well as its structure.
 - Rule: —
 - Replaces: —
+- Superseded in part by: Alex, 2026-11-07, on the device: 「为什么这个 BOT 是可以移动的呀？……这种东西怪得很」. Hold-to-drag is removed from the list and the pin grid; order stays newest first, and pinning stays (swipe and the long-press menu).
 
 - **Tap** opens the chat with the system's link transition.
 - **Long press** opens the system context menu over a live preview of the chat:

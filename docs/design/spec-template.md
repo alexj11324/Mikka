@@ -17,7 +17,7 @@ The job in one or two sentences, in the user's words.
 ## Where it lives
 
 Which column or page, what opens it, what it replaces. Use the glossary's
-words: bot list, chat, thread list.
+words: bot list, chat, task list, task conversation.
 
 ## Layout and states
 
@@ -30,6 +30,8 @@ The `rules.md` ids this feature touches (for example R-10, R-23), and any
 new rule it needs. A new rule needs Alex's decision and a file in `decisions/`.
 
 ## Components
+
+A paid block or component is listed as used as shipped (data and text only), with its library demo for the side-by-side ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
 
 What it is built from, one line per part: the existing component
 (`components.md`, the live screen for the same job, or `components/reui/`,

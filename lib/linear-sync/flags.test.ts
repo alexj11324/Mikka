@@ -17,8 +17,11 @@ test('only an explicit boolean flag enables global Linear sync', async () => {
   }
 })
 
-test('missing configuration, HTTP errors, invalid JSON, network and body timeouts fail closed', async () => {
-  assert.equal(await createLinearSyncGate({ fetcher: async () => { throw new Error('must not fetch') } })(''), 'unavailable')
+test('without a PostHog project the flag is off, never unreadable, and nothing is fetched', async () => {
+  for (const token of ['', undefined]) assert.equal(await createLinearSyncGate({ fetcher: async () => { throw new Error('must not fetch') } })(token), 'disabled')
+})
+
+test('HTTP errors, invalid JSON, network and body timeouts fail closed', async () => {
   for (const fetcher of [
     async () => new Response('', { status: 503 }),
     async () => new Response('', { status: 302, headers: { location: 'https://other.example.test' } }),

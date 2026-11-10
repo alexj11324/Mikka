@@ -15,3 +15,6 @@ export const newSheetOptions = (background: string) => ({
   headerStyle: { backgroundColor: background },
   contentStyle: { backgroundColor: background },
 })
+
+/** A review sheet (R3b 「第 N 行」, the pending batch): half height, growing to full for the keyboard (#1738). */
+export const reviewSheetOptions = (background: string) => ({ ...newSheetOptions(background), sheetAllowedDetents: [0.6, 1] })

@@ -56,7 +56,7 @@ async function finishOutbox(job: OutboxJob, result: Awaited<ReturnType<typeof sy
     const [issue] = await tx.select().from(issues).where(eq(issues.id, job.issueId)).for('update')
     const [claimed] = await tx.select().from(linearSyncOutbox).where(eq(linearSyncOutbox.id, job.id)).for('update')
     if (!claimed || claimed.status !== 'processing' || claimed.claimToken !== job.claimToken) return
-    const current = issue?.scope === 'workspace' && issue.scopeVersion === job.scopeVersion
+    const current = issue?.ownershipState === 'bound' && issue.linearSyncPolicy === 'explicit' && !issue.linearSyncBlocked && issue.scopeVersion === job.scopeVersion
     const changed = current && result && issue.updatedAt.getTime() > result.observedUpdatedAt.getTime()
     await tx.update(linearSyncOutbox).set({ status: changed ? 'queued' : 'done', claimToken: null, attempts: changed ? 0 : claimed.attempts,
       availableAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, job.id))
@@ -73,7 +73,7 @@ async function failOutbox(job: OutboxJob, error: unknown) {
     const [issue] = await tx.select().from(issues).where(eq(issues.id, job.issueId)).for('update')
     const [claimed] = await tx.select().from(linearSyncOutbox).where(eq(linearSyncOutbox.id, job.id)).for('update')
     if (!claimed || claimed.status !== 'processing' || claimed.claimToken !== job.claimToken) return
-    const current = issue?.scope === 'workspace' && issue.scopeVersion === job.scopeVersion
+    const current = issue?.ownershipState === 'bound' && issue.linearSyncPolicy === 'explicit' && !issue.linearSyncBlocked && issue.scopeVersion === job.scopeVersion
     await tx.update(linearSyncOutbox).set({ status: current ? status : 'done', claimToken: null,
       availableAt: new Date(Date.now() + retryDelay(job.attempts) * 1000), lastError: current ? message : null, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, job.id))
     if (!current || error instanceof LinearTargetNotVerifiedError) return
@@ -125,7 +125,7 @@ async function eventTeamState(team: typeof linearTeamSyncs.$inferSelect, remoteI
       const [candidateLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.linearIssueId, remoteId)).limit(1)
       const localId = publication?.issueId ?? candidateLink?.issueId ?? (/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(remoteId) ? remoteId : null)
       const [issue] = localId ? await tx.select().from(issues).where(eq(issues.id, localId)).for('update') : []
-      if (issue && (issue.scope !== 'workspace' || issue.linearSyncBlocked || issue.userId !== team.ownerId)) return false
+      if (issue && (issue.ownershipState !== 'bound' || !team.workspaceId || issue.workspaceId !== team.workspaceId || issue.linearSyncPolicy !== 'explicit' || issue.linearSyncBlocked || issue.userId !== team.ownerId)) return false
       const [link] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.linearIssueId, remoteId)).for('update')
       const [latestPublication] = await tx.select().from(linearIssuePublications).where(eq(linearIssuePublications.linearIssueId, remoteId)).limit(1)
       if (candidateLink && (!link || candidateLink.id !== link.id)) return false
@@ -145,7 +145,7 @@ async function withVerifiedInboundLink(link: typeof linearIssueLinks.$inferSelec
   await db.transaction(async tx => {
     const [issue] = await tx.select().from(issues).where(eq(issues.id, link.issueId)).for('update')
     const [current] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, link.id)).for('update')
-    if (!issue || issue.scope !== 'workspace' || issue.linearSyncBlocked || issue.userId !== link.ownerId || !current || !current.externalTargetVerified || current.issueId !== issue.id || current.ownerId !== issue.userId || current.teamSyncId !== link.teamSyncId || current.linearIssueId !== link.linearIssueId) return
+    if (!issue || issue.ownershipState !== 'bound' || issue.linearSyncPolicy !== 'explicit' || issue.linearSyncBlocked || issue.userId !== link.ownerId || !current || !current.externalTargetVerified || current.issueId !== issue.id || current.ownerId !== issue.userId || current.teamSyncId !== link.teamSyncId || current.linearIssueId !== link.linearIssueId) return
     const [owner] = await tx.select({ id: linearTeamSyncs.id }).from(linearTeamSyncs)
       .innerJoin(linearConnections, eq(linearConnections.userId, linearTeamSyncs.ownerId))
       .where(and(eq(linearTeamSyncs.id, current.teamSyncId), eq(linearTeamSyncs.ownerId, issue.userId), eq(linearTeamSyncs.active, true), eq(linearConnections.organizationId, organizationId))).for('update').limit(1)

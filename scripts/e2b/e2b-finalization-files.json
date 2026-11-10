@@ -13,6 +13,96 @@
       "controlOpsCommit": "0cc4ccaf65f5b2eb20b06d4dbcc272d793cfbb39",
       "sourceContextCommit": "d63b5e1b2e70baa368cf42ec6f9b13691571b6e0",
       "evidence": "docs/operations/evidence/1512-official-claude-ca.json"
+    },
+    {
+      "template": "claude",
+      "path": "/usr/local/share/e2b",
+      "fields": [
+        "mode"
+      ],
+      "entryKind": "directory",
+      "mode": {
+        "before": 493,
+        "after": 511
+      },
+      "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/42619272499",
+      "controlOpsCommit": "1e351dcfe9a4c93430f8e67fabef5b3dc97385e0",
+      "sourceContextCommit": "e78fccffd9dd878edd490b113ea80efcff1525e7",
+      "artifactId": 13676555208,
+      "artifactZipBytes": 3810,
+      "artifactZipSha256": "5639a4565249a7e169bd156d71d8c2fd4663c464ebe824cdd4813fbdf4942fd6",
+      "targetedOnly": true,
+      "releaseAccepted": false,
+      "evidence": "docs/operations/evidence/1506-official-base-conservation-control-20261109.json"
+    },
+    {
+      "template": "desktop",
+      "paths": [
+        "/etc/ssl/certs/1560546e.0",
+        "/etc/ssl/certs/e2b-ca.pem"
+      ],
+      "fields": [
+        "kind",
+        "sha256",
+        "target"
+      ],
+      "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/42628079564",
+      "controlOpsCommit": "08d822da081190364530343bf918bbcc2fbbf624",
+      "sourceContextCommit": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "artifactId": 13678489689,
+      "artifactZipBytes": 3748,
+      "artifactZipSha256": "3a51e3a158dbba0fb4c84e658215fec84a032fd155a1514845e522eff476fd4f",
+      "targetedOnly": true,
+      "releaseAccepted": false,
+      "evidence": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.json",
+      "evidenceBytes": 26988,
+      "evidenceSha256": "a438b3315bbd10bf470aed59ccb21fb502ceddc06102e49164eeeb9ca6416d3f"
+    },
+    {
+      "template": "claude",
+      "paths": [
+        "/etc/ssl/certs/1560546e.0",
+        "/etc/ssl/certs/e2b-ca.pem"
+      ],
+      "fields": [
+        "kind",
+        "sha256",
+        "target"
+      ],
+      "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/42661569263",
+      "controlOpsCommit": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+      "sourceContextCommit": "623a1afd8715433a58c3e88ce88f8fbcc29d1761",
+      "artifactId": 13694766815,
+      "artifactZipBytes": 2310,
+      "artifactZipSha256": "4e16df73b5ed7acfe366449d278b20e1fa20d0033ba2998f9741e7755cf0eb09",
+      "targetedOnly": true,
+      "releaseAccepted": false,
+      "evidence": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.json",
+      "evidenceBytes": 18164,
+      "evidenceSha256": "dc69062c8376cb2a10cf47b7455ff478f7872c709c31c128c1384ecfc7696632"
+    },
+    {
+      "template": "codex",
+      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "fields": [
+        "mode"
+      ],
+      "entryKind": "file",
+      "mode": {
+        "before": 420,
+        "after": 511
+      },
+      "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/42670291715",
+      "controlOpsCommit": "b75871ea1753f75769daa33b095704475cf9a4a2",
+      "sourceContextCommit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+      "artifactId": 13697989038,
+      "artifactZipBytes": 3353,
+      "artifactZipSha256": "2aa02beb720a3e3922bafa5ba81344529a22e76ea14588717de0f9e11255b268",
+      "targetedOnly": true,
+      "releaseAccepted": false,
+      "evidence": "docs/operations/evidence/1505-official-path-control-20261109.json",
+      "evidenceBytes": 31180,
+      "evidenceSha256": "ba526b6e177f786d4dcb62f17c6f84c08c93a1b963fe8a06af49d849f1f2bad0"
     }
   ],
   "additionalControls": [
@@ -47,6 +137,13 @@
   },
   "templates": {
     "claude": {
+      "/usr/local/share/e2b": {
+        "_kind": "directory",
+        "mode": {
+          "before": 493,
+          "after": 511
+        }
+      },
       "/usr/local/share/ca-certificates/e2b-ca.crt": {
         "sha256": "per-boot",
         "mode": {
@@ -72,7 +169,12 @@
     },
     "codex": {
       "/usr/local/share/ca-certificates/e2b-ca.crt": {
-        "sha256": "per-boot"
+        "_kind": "file",
+        "sha256": "per-boot",
+        "mode": {
+          "before": 420,
+          "after": 511
+        }
       }
     },
     "desktop": {
@@ -88,5 +190,5 @@
       }
     }
   },
-  "certificateRelinksSha256": "158beede3395bd38b001eae7b92d3fe440004ead6c583cf640fdbb31386d605a"
+  "certificateRelinksSha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52"
 }

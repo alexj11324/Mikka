@@ -52,6 +52,9 @@ export const TOKENS = {
   danger: { ios: 'systemRed', light: '#D70015', dark: '#FF453A', contrast: { light: '#D70015', dark: '#FF6961' } },
   merged: { ios: 'systemPurple', light: '#AF52DE', dark: '#BF5AF2' },
   prOpen: { ios: 'systemGreen', light: '#34C759', dark: '#30D158' },
+  /** An added and a removed line in a diff (#1738): a light wash of green and red, as GitHub draws them. */
+  diffAdd: { ios: { light: '#E6FFEC', dark: 'rgba(46, 160, 67, 0.18)' }, light: '#E6FFEC', dark: 'rgba(46, 160, 67, 0.18)' },
+  diffDel: { ios: { light: '#FFEBE9', dark: 'rgba(248, 81, 73, 0.18)' }, light: '#FFEBE9', dark: 'rgba(248, 81, 73, 0.18)' },
   orange: { ios: 'systemOrange', light: '#FF9500', dark: '#FF9F0A', contrast: { light: '#C93400', dark: '#FFB340' } },
   /** A pressed or selected row. */
   pressed: { ios: 'systemGray5', light: '#E5E5EA', dark: '#2C2C2E' },

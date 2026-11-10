@@ -1,116 +1,108 @@
 # Controlled Skill improvement
 
-- **Status:** draft implementation, 2026-10-25
-- **GitHub / Linear:** #237 / MIK-103; related #192–#195, #208, #230, #232
-- **Owner thread:** Backend & Infra, controlled self-improvement
+This reference maps the implemented controlled Skill improvement path for
+backend and daemon maintainers. Tracking began in #237 / MIK-103. Historical
+candidate evidence remains in [validation](self-improvement-validation.md) and
+[assignment wiring](self-improvement-assignment-wiring.md).
 
-## What the user does
+## Feedback and proposals
 
-Submit feedback on an existing finished thread, inspect its immutable score,
-and request an improvement proposal after enough distinct failures accumulate.
-The first implementation produces a Skill document diff and a fixed synthetic
-offline comparison. A proposal never activates a Skill or authorizes an action.
+A person submits feedback on a finished run. The server freezes the scorer,
+report, run/session and available Skill provenance in append-only ledgers.
+Feedback notes are bounded untrusted evidence. Silence and missing data remain
+unknown. Worker reports alone do not establish independent verification.
 
-## Where it lives
+`lib/self-improvement/store.ts` partitions failures by the server-owned bucket,
+rechecks current issue/run access and locks sources before writing. The
+[Decision API](decisions/2026-11-01-1500-self-improvement-and-profile-decided-by-decision-api.md)
+decides whether eligible distinct failures justify a proposal. No answer returns
+`decision_unavailable`, a negative answer returns `decision_not_ready`, and
+neither creates a proposal. The code caps each bucket at one new proposal per
+24 hours. The benchmark's 25 training cases are independent of that judgment.
 
-Authenticated backend API only; no UI or model calls. Main `c0f702f` has run
-reports and sessions but no feedback/scorer ledger or content-pinned Skill
-usage. Protocol Skill refs carry id/name only and are not wired into main's
-run schema. Historical usage is explicitly `unrecorded`, never backfilled as
-fact. #232 remains the Skill registry owner.
+`regression.ts` builds a `feedback_candidate_request_v1` from immutable source
+IDs and the builtin baseline. `store.ts` persists it as
+`awaiting_model_candidate`, with a `not_evaluated` result. `factory-bridge.ts`
+hands the request to an authorized Factory execute task. The generated candidate
+is limited to `lib/self-improvement/skills/run-report/SKILL.md`.
 
-## Interfaces and file boundary
+## HTTP and Coordinator entry points
 
-- `POST /api/self-improvement`: strict action `feedback` with eventId, runId,
-  verdict (`positive`, `negative`, `unknown`) and bounded untrusted note;
-  or action `propose` with runId. The browser session supplies identity.
-- `GET /api/self-improvement?runId=...`: authorized scores/proposals for that
-  run's owner, issue and agent/repository bucket. No caller workspace or policy.
-- `lib/self-improvement/{contract,scorer,regression,store,http,server}.ts`:
-  immutable server-owned scorer, Decision API proposal judgment (`proposal-judgment.ts`), transactions, allowlist and
-  synthetic comparison. No shell, network, model or publication adapter.
-- `drizzle/20261029044007_self_improvement.sql`: separate append-only ledgers;
-  no changes to shared Factory, protocol, registry or permission contracts.
-- `lib/issue-access.ts`: the identical optional transaction executor already
-  present in #192's candidate; no permission-rule change. Parent must dedupe it.
-- Tests: source tests run in CI's core unit job, and the isolated PG17 checks
-  in its database shards (`test:self-improvement-db`, `test:skill-semantic-db`).
+`app/api/self-improvement/route.ts` uses the existing API session/PAT resolver,
+acting-user scope and record-level workspace-token checks. POST requires the
+exact request origin and a streaming body no larger than 16 KiB. Strict command
+schemas live in `lib/self-improvement/schema.ts`.
 
-## Rules and controls
+| Action | Purpose |
+| --- | --- |
+| `feedback`, `propose` | Record a verdict or request the server's proposal judgment |
+| `select_baseline`, `rehearse` | Select the builtin on a queued run or dispatch a baseline rehearsal atomically |
+| `handoff`, `register_candidate` | Link Factory execution and register its exact committed candidate |
+| `freeze_benchmark`, `dispatch_training` | Freeze a private benchmark instance and dispatch training cases |
+| `begin_evaluation`, `dispatch_evaluation`, `compare_evaluation` | Bind both arms, dispatch cases and request the comparison |
+| `select_active` | Select the approved active version for an eligible run |
 
-R-01/02/10 unchanged; no frontend. Feedback is an untrusted signal, not truth,
-permission or executable instructions. Negative feedback or a failed report
-verification produces a failure signal; silence/missing data is unknown.
-Scores freeze scorer version/digest, report digest, session, commit when
-available, timestamps and missing Skill provenance. Reports are worker
-assertions, not independent verification evidence.
+GET accepts `runId` for scores/proposals or `proposalId` for linked Factory
+state. Responses use `Cache-Control: private, no-store`. Coordinator tools and
+durable steps in `workflows/coordinator/factory-tools.ts` and `factory-steps.ts`
+call the same services. `components/workspace/self-improvement.tsx` provides
+run feedback in the thread UI.
 
-Evidence stores source IDs without lifecycle foreign keys to live runs/issues,
-so existing Agent/run deletion remains available. Read access still requires
-a live owned run and current issue access. No deletion is performed here;
-retention and any later privileged erasure path belong to #210 and require
-separate coordination. Notes remain private, bounded, and untrusted.
+## Immutable source and execution evidence
 
-Whether to propose is the Decision API's `propose` answer over the distinct,
-not previously proposed failed runs per owner/issue/agent/repository/scorer/
-target (scorer v2, decision 2026-11-01-1500); the one code rule left is a
-runaway cap of one new proposal per bucket per 24 hours. The trigger is not an
-evaluation threshold and is not editable through the API or a candidate. Transaction locks and source claims make replays/concurrency
-idempotent. Every operation rechecks existing issue access and current run
-stop state. Cancellation/deletion/revocation prevents further writes/reads.
+`packages/protocol/src/skill-artifact.ts` owns the implemented artifact and
+assignment-receipt schemas. `assignments.ts` records the selected bytes at the
+actual claim boundary. An assignment receipt means the server prepared those
+bytes. It does not prove delivery, mounting or execution. Missing historical
+provenance remains `unrecorded`.
 
-The only target is the bundled, inactive `run-report` rehearsal Skill document.
-The service appends one server-authored reporting guideline; it never copies
-feedback into instructions. The document is not installed or claimed to have
-been used by historical runs. This is an offline candidate boundary pending
-#232's digest-pinned usage contract. Baseline/candidate bytes, digests and a
-server-generated diff are persisted. No arbitrary path or candidate input.
+The daemon verifies the assignment bindings and exact Skill bytes before adapter
+launch. `skill-mounts.ts` accepts a separate mount record through authenticated
+device completion, binding receipt, version, digest, session, live lease and
+execution/runtime evidence. Claim, resume and heartbeat preserve their existing
+source and lifecycle checks.
 
-The fixed synthetic benchmark tests the document's reporting requirements
-using the same cases and scorer for both versions. It is a deterministic
-document-contract rehearsal, not a model-quality benchmark or real Harness
-acceptance. A passing comparison stays `awaiting_independent_review` and gives
-no #193/#194 gate eligibility.
+`registry.ts` registers canonical bytes from the exact committed candidate and
+revalidates its Factory/run/source bindings. Its builtin candidate path and the
+workspace Skill branch (`team-skills.ts`) share immutable version resolution.
+The earlier [source-boundary proposal](self-improvement-skill-source-contract.md)
+is historical coordination material.
 
-## Existing owners and integration delta
+## Comparison and activation
 
-#195 owns incident/issue dedupe; this adds no incident, issue, webhook or wake.
-#192 owns stage/candidate state. #193 and #194 continue to require actual
-candidate SHA/repository/environment/scope plus independent runs and human
-approval. This proposal has content digests, not a fabricated commit: the
-parent must submit its reviewed diff via existing candidate creation and
-re-run both gates after a real commit. #208 remains external side-effect
-ledger owner; this service has no external side effects. #230's centralized
-policy, model budgets, approval and branch protection remain untouched.
-#232 requested future delta: trusted run assignment receipt containing Skill
-id, immutable version, digest and source; until then usage stays unrecorded.
-The [minimal proposed reference and trust boundary](self-improvement-skill-source-contract.md)
-are coordination material only. 现状（非决定）：#232 has no implemented receipt
-path yet.
+`report-benchmark.ts` owns the frozen reporting corpus, evaluator and verification
+command described in [the benchmark reference](self-improvement-benchmark.md).
+`evaluations.ts` freezes instances and assignments. `comparison-collector.ts`
+resolves authenticated run, artifact, mount and output evidence for both arms.
+Model text cannot supply trusted provenance or change the evaluator.
 
-## Out of scope
+`registered-evaluation.ts` gates paid semantic judgment through the
+`skillModelEvaluation` deployment switch. Its PostHog key is
+`mikka-skill-model-evaluation`, with legacy fallback
+`MIKKA_SKILL_MODEL_EVALUATION=1`. A disabled effective switch returns
+`decision_model_disabled`. Reading status does not request judgment.
 
-Model weight updates, automatic adoption/merge/deploy, active Skill writes,
-new scheduler/registry/approval system, arbitrary code or config patches,
-candidate-modified scorers/cases/thresholds, paid models, new credentials,
-memory-based authorization and deletion of test or application data.
+`activation.ts` plugs `activate_skill` into the existing Factory publication
+adapters. It requires the exact candidate, immutable artifact, passing evaluation,
+current scope and candidate-bound human approval. Factory monitoring reads the
+activation and subsequent adoption evidence. Withdrawal invalidates eligibility
+for the withdrawn version. A proposal, synthetic comparison or model report
+cannot authorize activation.
 
-## Done when
+## Verification and acceptance
 
-Real PG17 and HTTP cover persistence/restart, ten concurrent replays, payload
-conflicts, tenant/issue/agent/repository separation, unknown signals, frozen
-versions, trigger boundaries, candidate allowlist and negative regression.
-Record actual commands/results separately from synthetic run/report fixtures.
-Remote CI, independent code review and actual fixed-version Mikka runtime
-acceptance remain required. Parent coordinates production deployment and a
-sanitized real acceptance video on the PR; tests cannot close these gates.
+The maintained source suites are `test:self-improvement-unit` and
+`test:self-improvement-semantic-source`. Database coverage is in
+`test:self-improvement-db` and `test:skill-semantic-db`. Commands are defined in
+`package.json`. Builds, type checks and database/runtime checks run in cloud
+Linux or CI under `AGENTS.md`.
 
-## Research
+Use [acceptance.md](../acceptance.md) for a fixed revision, application origin,
+database/daemon environment and retained evidence. Live model acceptance covers
+official Claude Code with `claude-haiku-5-5` and official Codex with
+`gpt-6-luna` independently. Production uses the shared acceptance account and its
+authorized team workspace. No API-key/DeepSeek leg gates completion.
 
-[Warp documentation](https://docs.warp.dev/factories/measure-and-improve/self-improvement/)
-describes per-scorer failure aggregation and reviewed improvement PRs.
-[Warp engineering article](https://www.warp.dev/blog/self-improving-software-proactive-agents)
-describes Skill improvement, not model-weight RSI.
-The verified [demo Skill](https://github.com/warpdotdev-demos/issue-triage-loop/blob/main/.agents/skills/improve-triage-skill/SKILL.md)
-uses human feedback and PR review. Its weak-positive interpretation of silence
-is not adopted here; absent feedback remains unknown.
+The [earlier live completion plan](self-improvement-live-acceptance.md) records
+its original checklist. This source inventory does not establish a completed
+production candidate, activation or recovery run.

@@ -88,9 +88,9 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         {state === 'entry' && <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); setFromLink(false); void review(code) }}>
           <FieldGroup><Field>
             <FieldLabel htmlFor="device-code">{t('code')}</FieldLabel>
-            <Input id="device-code" autoFocus autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={32} value={code} placeholder="ABCD-EFGH" onChange={event => setCode(event.target.value)} />
+            <Input id="device-code" dir="ltr" className="font-mono tracking-wide" autoFocus autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={32} value={code} placeholder="ABCD-EFGH" onChange={event => setCode(event.target.value)} />
           </Field></FieldGroup>
-          <Button type="submit" size="sm" className={primary + ' self-start'} disabled={!code.trim()}>{t('continue')}</Button>
+          <Button type="submit" className={primary + ' self-start'} disabled={!code.trim()}>{t('continue')}</Button>
         </form>}
         {state === 'loading' && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner aria-hidden="true" />{t('loading')}</p>}
         {(state === 'review' || state === 'approving' || state === 'denying') && <>

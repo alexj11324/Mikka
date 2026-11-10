@@ -1,5 +1,27 @@
 # Where a thread runs, and reviewing its PR
 
+This page preserves the accepted 2026-11-06 run-location and Artifact frames.
+Later decisions govern navigation and task state presentation. Lists contain
+[tasks only](decisions/2026-11-07-2045-tasks-only-threads-inside.md). A task has
+[one conversation across attempts](decisions/2026-11-07-2300-one-conversation-per-task.md),
+with chronological activity and an attempt link scrolling to its section.
+Task rows use their own [state icons](decisions/2026-11-07-2230-one-icon-per-task-state.md)
+and [semantic colours](decisions/2026-11-08-0130-task-state-icon-colours.md).
+The older thread-list and iOS subtitle frames below are historical layout references.
+The [2026-11-08 coding-review decision](decisions/2026-11-08-1230-coding-workspace.md)
+also supersedes Part 2's PR-review layout with one dedicated review page,
+a final whole-PR diff and a separate 发给 Agent action. That is an accepted
+specification; frontend adapters and slots require a matching backend and
+version-bound acceptance evidence.
+
+The web implementation is `components/workspace/thread-run-place.tsx` and the
+`thread-header` UI slot. `MachineDetails` displays the machine facts and copies
+the sandbox ID. The older frame's Open computer action is not present in that
+component. Mobile uses Expo / React Native in `apps/mobile`, with machine DTOs
+in `apps/mobile/lib/thread-machine.ts`. Its task conversation screen follows
+the later task-title/current-Agent header. The SwiftUI popover described by
+the original frame is not an implementation instruction.
+
 - **Status:** accepted with two changes (Alex, 2026-11-06): icons only in the title bar; an Artifact button that is always there
 - **Figma:** file `zPe5LKycb2XuT1ivCLRw07`, page 「待 Alex 确认 · 线程运行位置与 PR 验收（2026-11-06）」 `1052:6875`
 - **Owner thread:** run-location mark and hover card (web, desktop, iOS) in this
@@ -33,7 +55,7 @@ Screenshots of the key frames are in [`thread-run-location/`](thread-run-locatio
   Agent mark has a tooltip 「Claude Code · Mikka Frontend 派出」. The mark
   component's 「显示名称」 property is off in headers and on inside the identity
   dialog. The desktop app uses the same web view.
-- **Hover card.** `HoverCard` (`components/ui/hover-card.tsx`, unused so far),
+- **Hover card.** `HoverCard` (`components/ui/hover-card.tsx`),
   288 wide. Title row: icon, name, status as dot + word (R-87).
   - Cloud: ID (full E2B sandbox ID, mono, copy button), 模板 (`claude` / `codex`
     / `desktop`), 创建, and 停止 once ended. Action 「打开电脑」, or 「看桌面」 for
@@ -43,24 +65,28 @@ Screenshots of the key frames are in [`thread-run-location/`](thread-run-locatio
 - **Cloud display name.** 「云电脑 <first 6 characters of the sandbox ID>」,
   for example 「云电脑 i8k2m3」. It is derived when the thread is read; the
   `devices` row keeps its locked name 「Thread computer」, so no column is added.
-- **iOS.** The nav subtitle becomes `<status> · <SF Symbol>` (`cloud`,
-  `laptopcomputer`, `server.rack`), with no name. A tap opens a SwiftUI popover kept as a
-  popover on iPhone, with the same rows plus 「复制 ID」 and 「打开电脑」.
-- **Thread list rows: no mark.** R-53 keeps a row to two lines, and the
-  全部线程 rows already carry the Agent mark and time (R-50). Where a thread runs
-  matters when it is open, not while scanning; the one case that matters in a
-  list (a run waiting for an offline computer) already shows `WaitingChip` with
-  the device.
+- **Original iOS frame.** The 2026-11-06 frame placed a machine symbol in the
+  nav subtitle and opened a popover. The later task conversation header leads
+  with the task title and current Agent, as recorded in
+  [2026-11-07-2300](decisions/2026-11-07-2300-one-conversation-per-task.md).
+- **Task list rows.** All top-level lists show tasks. A row uses its own
+  task-state icon and grey reason line. An offline device is a blocked reason,
+  with the task's octagon icon. See
+  [the task-state decision](decisions/2026-11-07-2300-one-conversation-per-task.md#icons).
 
 ### Data
 
-The thread read (`getIssueThread`; mobile `mobileThread`) gains one small
-`machine` object for the latest run: `kind` (cloud / computer / server), `name`,
-`platform`, `arch`, `online`, `lastSeenAt`, and for cloud `sandboxId`,
-`template` (`thread_machines.snapshotId`), `state`, `createdAt`, `endedAt`.
-It comes from `agent_runs.deviceId` → `devices` and `thread_machines` by run,
-read in the same query that already loads the thread. No new column, no
-polling; state changes arrive through the thread's existing live key.
+`getThreadMachine` in `app/actions/agents.ts` and
+`GET /api/mobile/threads/:id/machine` use `lib/thread-machine-view.ts`.
+The owner-only reader joins `agent_runs.deviceId` to `devices` and
+`thread_machines` in a separate indexed read. It selects the newest run with
+machine information, falling back to an earlier run while the newest has none.
+
+`lib/thread-machine.ts` defines `kind` (`cloud / laptop / server`), `state`,
+`name`, `platform`, `arch`, `hostname`, `lastSeenAt` and nullable `cloud`
+(`sandboxId`, `template`, `createdAt`, `endedAt`). A local device's online
+state uses existing presence checks. The web component reloads when run status
+changes and introduces no request polling timer.
 
 ## Part 2 · PR review (Artifact window)
 

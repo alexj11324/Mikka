@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, mock, test } from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import { measured } from '../tests/helpers/read-metrics'
 import { Pool } from 'pg'
 import { createRequestDatabaseScope } from './db/request-scope'
 import { mintDeviceEnrollment, consumeDeviceEnrollment } from './device-enrollment'
@@ -59,6 +60,34 @@ test('desktop account context reads only the current browser owner\'s active loc
   } finally { browserOwner = null }
 }))
 
+test('local setup owner view retains fresh session checks without reading unused devices', () => run(async () => {
+  const { GET } = await import('../app/api/devices/enrollment/route')
+  const request = (query = '?view=owner') => new Request('http://localhost/mikka/api/devices/enrollment' + query)
+  const previousOwner = browserOwner
+  try {
+    browserOwner = null
+    assert.equal((await GET(request())).status, 401)
+    for (const owner of ['setup-owner-a', 'setup-owner-b', 'setup-owner-a']) {
+      browserOwner = owner; freshSessionRead = false
+      const read = await measured(async () => {
+        const response = await GET(request())
+        assert.equal(response.status, 200)
+        assert.equal(response.headers.get('Cache-Control'), 'private, no-store')
+        return response.json()
+      })
+      assert.deepEqual(read.value, { ownerId: owner })
+      assert.equal(freshSessionRead, true, 'owner admission still requests the current database session')
+      assert.equal(read.statements, 0, 'the mocked auth boundary adds no SQL and the owner view does not query devices')
+      const full = await measured(async () => (await GET(request(''))).json())
+      assert.deepEqual(full.value, { ownerId: owner, deviceIds: [] })
+      assert.equal(full.statements, 1, 'the default verification view still reads current ownership from real Postgres')
+    }
+    browserOwner = null
+    assert.equal((await GET(request())).status, 401, 'a previous identity cannot survive sign-out')
+    for (const query of ['?view=', '?view=devices', '?view=owner&view=owner']) assert.equal((await GET(request(query))).status, 400)
+  } finally { browserOwner = previousOwner }
+}))
+
 test('owner token pagination preserves microsecond ordering and rejects foreign or malformed anchors', () => run(async () => {
   const { pool } = await import('./db')
   const { GET } = await import('../app/api/device-tokens/route')
@@ -101,6 +130,52 @@ test('owner token pagination preserves microsecond ordering and rejects foreign 
   }
 }))
 
+test('owner token metadata projects only recorded owner-bound device IDs without credential material or writes', () => run(async () => {
+  const { pool } = await import('./db')
+  const { GET } = await import('../app/api/device-tokens/route')
+  const owner = `links-${randomUUID()}`, foreign = `foreign-${randomUUID()}`
+  const [tokenId, boundToken, emptyToken, foreignToken, local, removed, cloud, badMapping, otherDevice] = Array.from({ length: 9 }, () => randomUUID())
+  const previousOwner = browserOwner
+  const request = () => new Request('http://localhost/mikka/api/device-tokens')
+  try {
+    await pool.query(`INSERT INTO devices(id,"ownerId",kind,"removedAt") VALUES
+      ($1,$6,'local',NULL),($2,$6,'local',now()),($3,$6,'cloud',NULL),($4,$6,'local',NULL),($5,$7,'local',NULL)`,
+    [local, removed, cloud, badMapping, otherDevice, owner, foreign])
+    await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash",name,"boundDeviceId") VALUES
+      ($1,$5,'private-hash-fixture','SSH',NULL),($2,$5,'private-bound-hash','Cloud',$6),
+      ($3,$5,'private-empty-hash','Empty',NULL),($4,$7,'private-foreign-hash','Foreign',NULL)`,
+    [tokenId, boundToken, emptyToken, foreignToken, owner, cloud, foreign])
+    await pool.query(`INSERT INTO device_token_devices("tokenId","deviceId","userId") VALUES
+      ($1,$4,$8),($1,$5,$8),($1,$6,$9),($1,$7,$8),($2,$10,$8),($3,$4,$8)`,
+    [tokenId, boundToken, foreignToken, local, removed, badMapping, otherDevice, owner, foreign, cloud])
+    const snapshot = async () => (await pool.query(`SELECT
+      (SELECT md5(string_agg(to_jsonb(t)::text,'' ORDER BY id)) FROM device_tokens t) AS tokens,
+      (SELECT md5(string_agg(to_jsonb(d)::text,'' ORDER BY id)) FROM devices d) AS devices,
+      (SELECT md5(string_agg(to_jsonb(b)::text,'' ORDER BY "tokenId","deviceId")) FROM device_token_devices b) AS links`)).rows[0]
+    const beforeRead = await snapshot()
+    browserOwner = owner; freshSessionRead = false
+    const response = await GET(request()), body = await response.json()
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('Cache-Control'), 'private, no-store')
+    assert.equal(freshSessionRead, true)
+    assert.deepEqual(body.tokens.find((row: { id: string }) => row.id === tokenId).deviceIds, [local, removed].sort())
+    assert.deepEqual(body.tokens.find((row: { id: string }) => row.id === boundToken).deviceIds, [cloud], 'bound and linked copies are deduplicated')
+    assert.deepEqual(body.tokens.find((row: { id: string }) => row.id === emptyToken).deviceIds, [])
+    assert.equal(body.tokens.some((row: { id: string }) => row.id === foreignToken), false)
+    for (const value of ['private-hash-fixture', 'private-bound-hash', 'private-empty-hash', 'private-foreign-hash', otherDevice, badMapping])
+      assert.equal(JSON.stringify(body).includes(value), false, 'foreign associations and credential hashes stay private')
+    assert.deepEqual(await snapshot(), beforeRead, 'the normal owner metadata route is read-only')
+    browserOwner = foreign
+    assert.deepEqual((await (await GET(request())).json()).tokens.map((row: { id: string; deviceIds: string[] }) => ({ id: row.id, deviceIds: row.deviceIds })),
+      [{ id: foreignToken, deviceIds: [] }], 'a corrupt foreign token link cannot expose the other owner device')
+  } finally {
+    browserOwner = previousOwner
+    await pool.query('DELETE FROM device_token_devices WHERE "tokenId"=ANY($1::uuid[])', [[tokenId, boundToken, emptyToken, foreignToken]])
+    await pool.query('DELETE FROM device_tokens WHERE id=ANY($1::uuid[])', [[tokenId, boundToken, emptyToken, foreignToken]])
+    await pool.query('DELETE FROM devices WHERE id=ANY($1::uuid[])', [[local, removed, cloud, badMapping, otherDevice]])
+  }
+}))
+
 test('registration grant is user-bound, expires, and has one concurrent winner', () => run(async () => {
   const { pool } = await import('./db')
   const token = await mintDeviceEnrollment('owner-a')
@@ -131,6 +206,7 @@ test('daemon acceptance follows real local enrollment and owner routes without a
     const { tokens } = await (await readTokens(request())).json()
     const token = enrollmentToken(tokens)
     assert.equal(token.boundDeviceId, null)
+    assert.deepEqual(token.deviceIds, [])
     assert.equal(token.revokedAt, null)
     const caller = await authenticateDevice(new Request('http://localhost/mikka/v1/devices/register', {
       headers: { authorization: `Bearer ${credential}` },
@@ -140,8 +216,10 @@ test('daemon acceptance follows real local enrollment and owner routes without a
     assert.equal(await linkDeviceToken(caller!, deviceId), true)
     const account = await (await readEnrollment(new Request('http://localhost/mikka/api/devices/enrollment'))).json()
     checkOwnedEnrollment(account, owner, deviceId)
-    assert.equal(enrollmentToken((await (await readTokens(request())).json()).tokens).boundDeviceId, null,
+    const registeredToken = enrollmentToken((await (await readTokens(request())).json()).tokens)
+    assert.equal(registeredToken.boundDeviceId, null,
       'registering a local device links device_token_devices instead of assigning a cloud scope')
+    assert.deepEqual(registeredToken.deviceIds, [deviceId], 'the owner readback exposes the real enrollment association')
     browserOwner = `foreign-${owner}`
     assert.deepEqual(await (await readTokens(request())).json(), { tokens: [], nextCursor: null })
     assert.throws(() => checkOwnedEnrollment(account, browserOwner!, deviceId), /OWNER_DEVICE/)

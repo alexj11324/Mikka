@@ -6,6 +6,7 @@
   thread list should show cards that look like the chat's thread card, and a
   card opens that thread's own conversation (the thread column's 对话 tab).
 - Rule: — (R-52 grouping and R-66 thread cards stand)
+- Superseded in part by: [2026-11-07-2045](2026-11-07-2045-tasks-only-threads-inside.md) (lists and chat dispatch cards show tasks and open the task before its conversation).
 - Replaces: —
 
 Every entry in a thread list (a bot's 线程 tab, 全部线程) is the chat's

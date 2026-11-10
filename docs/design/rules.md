@@ -1,7 +1,7 @@
 # Design rules
 
 These are decisions Alex has already made. Designs, specs and code follow
-them without asking again. To change a rule, Alex decides, the change is
+them without asking again. Scope: these rules govern Mikka's own UI. Paid blocks and components (BoardUI Pro, affectUI, beUI Pro) in the hosted layer are used as shipped, and where a rule here would change one's look (icons, avatars, logos, layout, spacing, colours, type, borders, motion, subtitles), the block wins ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)). To change a rule, Alex decides, the change is
 recorded as a file in [`decisions/`](decisions/README.md), and this file is
 edited in the same PR. A new rule's id (`R-xx`) is assigned by the
 coordinator when the work is dispatched ([dev workflow](../dev-workflow.md)
@@ -12,15 +12,23 @@ source wins in a conflict is in [`README.md`](README.md).
 
 ## Bots, chats and threads
 
-- **R-01** The left column is the bot list (bots and group chats). The right
-  column is 概览 with its tabs, the thread list (线程) being one of them, or
-  全部线程 (R-50). There is no "conversation list".
+- **R-01** The left column is the bot list (bots and group chats). In the
+  hosted shell each Bot can expand its dispatched tasks and Agent work beneath
+  its own row, like Capy's Captains; tasks are named for the work and use their
+  own state icon. Bots and groups retain their own avatars. This is not a
+  separate global Agent list ([2026-11-10](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
+  Child work titles use the existing generated short title and are limited
+  to 12 CJK characters or 6 words (60 characters maximum); the task code is
+  separate from that budget. A missing short title has a bounded text fallback;
+  the full task title stays in detail
+  ([short titles](decisions/2026-11-10-1341-sidebar-short-title-limits.md)).
+  The right column is 概览 with its tabs, including 任务, or 全部任务 (R-50).
 - **R-02** The right panel's 概览 header shows the bot selected on the left:
   the same bloub avatar and the same name as its left row, then the tabs
-  详情 / 线程 / PR / 电脑 (R-50). A thread's name appears only as a row in a
-  thread list, never as that header.
+  详情 / 任务 / PR / 电脑 (R-50). Task titles belong in their rows and
+  details; this header names the bot. In the hosted edition 概览 is a tab of the chat's work area instead (decision `2026-11-09-2330-overview-as-work-area-tab.md`).
 - **R-03** Choosing another bot on the left switches the centre chat, the
-  right threads and the computer together.
+  right task list and the computer together.
 - **R-04** Every bot comes with its own computer. There is no 新建云端电脑 entry
   anywhere, and no list of per-bot computers.
 - **R-05** 「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过
@@ -44,7 +52,7 @@ source wins in a conflict is in [`README.md`](README.md).
 
 - **R-10** An input box goes only where there is a conversation, and it is
   always the same composer (the Coordinator chat's: Grok style, attachment
-  button). Views that are not a conversation never get one: the thread list
+  button). Views that are not a conversation never get one: the task list
   and a bot's computer screen send instructions through the centre composer.
   An open thread is a conversation with the agent running it, so its detail
   ends in that composer and what is typed there goes to that agent, whether
@@ -66,7 +74,7 @@ source wins in a conflict is in [`README.md`](README.md).
   Group chats show a 24px avatar on the left of the bubbles at the bottom of
   each run and the name once per run, 12px Medium in the bot's colour (Figma
   `224:5023`). A group's 详情 is about people, not computers: the group
-  avatar and name, then its members (people and bots), recent threads and
+  avatar and name, then its members (people and bots), recent tasks and
   files. No cloud computer in a group; open a bot's own chat to see its.
 - **R-14** The user's messages sit in an accent-blue bubble with white text
   (`accent/default`); a bot's text sits in the light grey bubble. Charts,
@@ -75,28 +83,21 @@ source wins in a conflict is in [`README.md`](README.md).
   the user taps is their message but keeps its card shape, no blue bubble; the
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
-- **R-15** A task or thread mentioned in chat is an inline chip, not a large
-  card. Internal object chips are boxed: a faint accent fill (`--object-chip`),
-  rounded, then the title in the accent with no underline, at the text's own
-  size and line height, so a chip reads as a word of the sentence; a long title
-  wraps like the words around it, each line keeping the fill. The icon says what
-  it is: a task's status circle, a thread's bubble (R-52;
-  [decision](decisions/2026-11-04-2220-task-circle-thread-bubble.md)). A thread
-  chip shows its state only when it needs the person, 等待你 or 受阻: the dot on
-  the bubble and the word beside the title, on a tint (R-87); other states are in
-  its hover card. The task
-  number is in the hover card, not the chip. A thread chip opens the thread's own
-  conversation, as a thread card does (R-66); only a task chip opens the task. A
-  task and its thread are one piece of work (R-81): when a reply cites both, only
-  the thread is a chip and the task is its number in the sentence (「这个任务」 when
-  it has none, so the sentence still reads). A thread whose card sits under the same reply is named in the words
-  without a chip: the card is its one object there. Every mention of
-  an object in the words is its chip; it is the cards and lists under a reply that
-  never repeat it (R-66, R-83). Web sources and links keep the unboxed source chip
-  (R-14). A thread the reply dispatches is different: it is a thread card under
-  that reply (R-66). An Artifact waiting for acceptance is a bordered card under
-  the reply (icon, name, state such as 待你确认); clicking it opens the Artifact
-  window (R-56).
+- **R-15** A task mentioned in chat is an inline chip: its state icon (R-52)
+  and its code, such as 「◐ ALEX-45」, with the title, state and priority in
+  the hover card; a task with no code shows its title. Internal object chips
+  use the faint accent fill (`--object-chip`), rounded corners and accent
+  text at the surrounding text's size and line height. A thread mentioned in
+  chat is its title in the link colour, with no icon, fill, accent or state
+  badge; the title never repeats the task's code. Every mention uses the same
+  chip, with cards deduplicated under R-66. A dispatch's card represents its
+  task and opens that task. Web sources keep the unboxed source chip.
+  An Artifact waiting for acceptance is a bordered card under the reply
+  (icon, name, state such as 待你确认), opening the Artifact window (R-56).
+  Task-only cards and state icons supersede the former thread-bubble/dot
+  presentation ([2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md),
+  [2230](decisions/2026-11-07-2230-one-icon-per-task-state.md),
+  [0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)).
 - **R-16** The computer card in chat shows a title, a status, one sentence
   about the task and a big screen. It has no approval step: the bot operates
   until the person takes control (decisions 2026-10-30). It never shows an
@@ -134,13 +135,11 @@ source wins in a conflict is in [`README.md`](README.md).
   dropped. The Coordinator never
   acts on an event before the person says yes. Its own ideas also go in its
   chat.
-- **R-21** 建议 is its own rail page (R-55), not part of the right panel; the
-  panel's old 任务 section is the 线程 tab (R-50). 建议 is the normal-level
+- **R-21** 建议 is its own rail page (R-55), not part of the right panel (R-50). 建议 is the normal-level
   items in one list, newest first, each row with its app's icon (no per-app
   cards). The daily briefing is not in 建议; it is the Coordinator's 08:00 message, also
   sent right after the person connects an app. A thread started by the
-  orchestrator or a bot stays listed in the thread lists (R-52); they are not
-  a flat list of the board's issues. 建议 items are standalone cards, each one
+  orchestrator or a bot belongs inside its task, which is listed under R-52. 建议 items are standalone cards, each one
   sentence: a verb chip, the app's icon inline, the concrete thing and its
   reason, deadline or amount
   (「取消你的 Verizon 套餐，赶在 11 月 1 日自动扣款 $52.13 之前」); no
@@ -152,11 +151,13 @@ source wins in a conflict is in [`README.md`](README.md).
   card, or taps a 建议 card, which starts the task at once (no composer step) →
   the orchestrator runs it as a bot sub-agent (web, R-72) or dispatches a
   thread (a real task such as coding) → the card shows it running and leaves
-  建议 when done; a thread also shows up in the thread lists.
+  建议 when done; the dispatched task also shows up in the task lists.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
-  describes the task in a sentence and the Coordinator writes it. The dialog
-  shows a machine picker.
+  describes the task in a sentence and the Coordinator writes it, or types
+  the title themself in an optional title field above the description
+  ([decision](decisions/2026-11-10-1213-new-task-optional-title.md)). The
+  dialog shows a machine picker.
 - **R-23** Machine picker order: **Mikka Cloud** first; then the group
   **本机** (this Mac, a local Linux machine); then the group **Remote
   control** (VPS and SSH hosts reached through the user's machine). Settings ›
@@ -191,8 +192,11 @@ source wins in a conflict is in [`README.md`](README.md).
   personal workspace stay in Mikka. Personal and team workspaces are kept
   apart: a task or chat never moves between them
   ([decision 2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md), which replaces turning a
-  workspace task back into a personal one, issue #184). Teammates see agent runs on workspace issues only, never left-column
-  chats or private memory.
+  workspace task back into a personal one, issue #184). Content visibility uses
+  the resource ACL and restrictive Project/Thread parents, in addition to active
+  Workspace membership. Shared collaboration does not expose private Bot chats
+  or memory; historical private data remains private
+  ([#1849 decision](decisions/2026-11-10-0017-collaboration-governance.md)).
 
 ## Issue detail
 
@@ -213,22 +217,25 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   A group heading that names the
   workspace its settings apply to (设置's workspace group) is not a crumb and
   stays.
-- **R-62** 线程 lists the threads working on the issue, grouped as R-52:
-  status icon (never the bot's avatar, `glossary.md`), thread name, time, and
-  the opening of its last reply (R-53). Someone who cannot open the thread
-  sees no reply line. Clicking one opens it on
-  the right as a conversation that ends in the composer (R-10); people and
-  the agent talk there. Visibility follows Warp Factories (Alex:
-  「按照他们的去做」, [decision 2026-11-01-2300](decisions/2026-11-01-2300-thread-visibility-follows-warp.md)): a
-  thread a bot or the Coordinator dispatches in a workspace is visible to
-  every member who can access that bot, live and as a transcript, and
-  teammates only watch, never send messages. A person's private chat with
-  the Coordinator is theirs alone until they share it (team by default,
-  chosen people, or anyone with the link); people it is shared with view it,
-  can ask for edit access, which the owner approves, and otherwise fork a
-  copy to continue. The bot dispatches the thread; the Agent it hands the work
-  to (Codex, Claude Code) runs it, and where a thread carries an icon
-  other than its status, that icon is the Agent's mark (R-78).
+- **R-62** A task's 活动 lists its creation, its events and one row per Agent
+  stretch, oldest first: consecutive runs by the same Agent are one row, and
+  every row is labelled with its Agent's mark and name, never a 「换」 verb, as
+  Warp labels runs ([2026-11-09-0045](decisions/2026-11-09-0045-no-attempt-word.md)).
+  There is no per-run thread list. A row shows its stretch's latest run in the
+  run-result words (glossary: Run result) and
+  opens the task's single conversation at the stretch's first run (R-81),
+  ending in the shared composer (R-10). The task properties
+  show its dispatching bot, Agent/model and execution location. A reader who
+  cannot access the work sees no private transcript. Workspace visibility
+  follows [#1849](decisions/2026-11-10-0017-collaboration-governance.md)
+  and the enforced resource ACL. Authorized teammates can watch the
+  conversation and contribute according to their capabilities; triggering
+  execution or owner-funded resources requires separate authorization and budget.
+  The bot dispatches the work and the Agent runs it (R-78). A person's private
+  Bot chat stays private until its owner explicitly shares it. A shared link is
+  not permission to use the owner's private credential, device, Secret or memory.
+  Administrators without a content grant see only the separate management and
+  usage projection, never a private transcript or title.
 - **R-63** Activity: events (created, handed to, dispatched a thread,
   status changes) are plain one-line rows; one person's events in the same
   minute join into one row (「创建了任务，交给 Mikka Backend，自己负责」). A comment is a card with a 1px
@@ -247,32 +254,27 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the right column, as an open thread does; closing it brings the properties
   back. The home page is already that conversation and has no button.
   Figma: page 「AI 侧栏 · 全局」.
-- **R-66** When the Coordinator dispatches a thread, the chat shows one
-  thread card under its reply: status icon (never the bot's avatar), thread
-  name, then on the right the state's badge (its word on its tint, R-87) and one PR badge for the PRs it produced: the summary
-  state's git mark in its GitHub colour (any open: green; else any draft:
-  grey; else any merged: purple; else closed: red) and the count. Hovering
-  the badge, or tapping it on a phone, lists each PR (title; state mark,
-  state, repository #number, and +added −removed lines when known); a row
-  opens the PR. Every thread card carries it, in the chat and in the thread
-  lists ([decision](decisions/2026-11-02-0230-pr-badge-on-thread-cards.md)).
-  No step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
-  card in a chat: under the first reply that dispatched it, never again under
-  a later reply that names it; a later change of state is a sentence from the
-  Coordinator, not a second card, and a thread's repeated event line shows only
-  the latest one. The card has no log, input box or buttons besides the
-  PR badge. Clicking it
-  opens the thread conversation as R-82 says for every thread: on desktop in
-  the right column beside the chat, which stays; on a phone it pushes in full
-  screen ([decision](decisions/2026-11-01-1320-navigation-model.md)).
-  Figma: page 「线程卡片 · 聊天里派出线程」.
+- **R-66** A dispatch in chat shows one task card under the first reply that
+  dispatched or mentioned it. The card carries its state's icon, number,
+  title and one grey line with state, dispatching bot and time. It updates in
+  place; later mentions use inline references and repeated event lines retain
+  the latest state. It opens the task detail, from which the person opens the
+  task's conversation (R-82), on desktop beside the chat and on the phone as
+  a pushed page. It has no log, composer or progress checklist. This follows
+  [2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md) and replaces
+  the former directly opening thread card. Deliverables stay in the Artifact
+  window (R-85).
 - **R-81** A task has one thread at a time (Alex, 2026-11-01). Dispatching a
   task that already has a thread gives that thread the work: while it works
   the note goes in as a message; once it ended (done, failed, stopped) it runs
   again in the same thread, resuming the agent's session where it can. The
-  thread's id does not change. Only the person's explicit request for a new
+  thread's root identity does not change across its continuation runs. Only the person's explicit request for a new
   session or thread, or another agent, starts a new one; the old thread is
-  stopped and marked replaced. The server enforces this at every dispatch
+  stopped and marked replaced. The task still has one conversation joining
+  every run oldest first; a 活动 row opens it at that Agent stretch, and
+  replies go to the newest run
+  ([2300](decisions/2026-11-07-2300-one-conversation-per-task.md)).
+  The server enforces this at every dispatch
   entry, not the prompt ([decision](decisions/2026-11-01-1330-one-thread-per-task.md)).
   The person may name where it runs (one of their computers, or the cloud);
   a named computer that is offline gets the 没有可用的电脑 card, never another
@@ -282,16 +284,14 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 
 Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 
-- **R-50** The right panel is the right third of the window. Its header has
-  two pills on the left, 「概览」 (selected by default) and 「全部线程」, and
-  search, widen and close icons on the right. The pills switch only this
-  column; the centre chat is never removed or replaced. 概览 is the selected
-  bot's avatar and name (R-02), then the tabs 详情, 线程, PR, 电脑. 线程
-  lists only the threads this bot dispatched (for the Coordinator, the
-  threads it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
-  全部线程 lists the threads every bot dispatched; each row carries the small mark of the
-  Agent running it (R-78), the only thread list that shows one, beside a
-  relative time on the right (2 分钟前, 昨天).
+- **R-50** The right panel is the right third of the window. 概览 names the
+  selected bot (R-02), followed by 详情 / 任务 / PR / 电脑. 任务 lists the
+  tasks that bot dispatched. 电脑 shows its cloud computer (`AgentComputer`).
+  The window bar's 全部任务 entry opens all dispatched tasks in the right
+  column while keeping the centre chat. Search, widen and close act on that
+  column. A thread opens from its task's 活动 into the task's one conversation
+  ([2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md),
+  [2300](decisions/2026-11-07-2300-one-conversation-per-task.md)).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
   header's search, widen and close, and a list group's collapse chevron), the only
@@ -308,44 +308,42 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   each row has 删除, shown on hover or focus, and confirms first (Alex,
   2026-11-01: 「自己上传的文件，在资料库里可以删除」;
   [decision](decisions/2026-11-01-2255-library-delete-own-files.md)).
-- **R-52** Every thread list, web and phone, groups its rows in this order:
-  等待你（N）, 进行中（N）, 受阻（N）, 空闲（N）, 已解决（N）
-  (Waiting for you, Running, Blocked, Idle, Resolved;
-  [order](decisions/2026-11-02-0300-waiting-for-you-first.md)). A group header is
-  muted text (「等待你（2）」) followed by a thin rule filling the rest of
-  the row. 已解决 is collapsed by default behind a chevron. Never a 「今天」
-  or 「今天完成」 group
-  ([decision](decisions/2026-11-01-1250-five-thread-groups.md)).
-  - 进行中 follows the run's state: queued, preparing, running or finishing.
-  - Every other group follows how the run came out (`agent_runs.outcome`:
-    done, blocked, needs_input, failed, idle), judged by the decision model
-    when the run ends from its last reply, status, task and PRs
-    (`lib/run-outcome-judge.ts`); with no answer it stays empty and is asked
-    again an hour later. Code never guesses it from the status: a run that
-    "finished" saying it could not log in is 受阻.
-  - 受阻: blocked or failed, or paused on its quota: it needs something
-    outside the work fixed (login, credentials, proxy, permission) or nobody
-    took over after it failed. 等待你: needs_input, a run asking a question,
-    or a task with a PR to review. 空闲: idle, its task still open.
-  - 已解决 only when the outcome is done, or its task is done, cancelled or a
-    duplicate, or its PR is merged. A run nobody could judge sits under 受阻
-    (failed) or 等待你, never 已解决.
-  - Every row leads with the thread's bubble and its group's dot
-    (`ThreadStatusIcon`): 进行中 a pulsing grey dot, 等待你 amber, 受阻 red,
-    已解决 green, 空闲 a hollow ring. A circle is always a task, so a thread
-    borrows no circle icon (`icons/thread-not-circle`;
-    [decision](decisions/2026-11-04-2220-task-circle-thread-bubble.md)).
-  - A thread's state badge (an open thread, a task's 线程, a thread chip's
-    card) shows the same icon and the group's word, never the run's raw
-    status: a finished run nobody judged reads 等待你, not 已完成. Only a stop
-    on its way reads 正在停止….
-  - A task's existing threads fold into its newest one, which carries
-    「第 N 次尝试」 past the first and stays out of 已解决 until the task is
-    resolved; the task's own 线程 tab lists every attempt. (New work keeps one
-    thread per task, so this is for threads that already exist.)
-- **R-53** A thread row has two lines: the thread's title, then the opening of
-  its last reply quoted verbatim, cut to one line. No generated description,
-  no status word and no bot-name prefix (generating them costs compute).
+  Exception: a coding task's review page ([2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)) carries
+  actions (line comments, 发给 Agent, 附到评论, 批准合并). On a coding
+  task, the task panel's ⋯ menu also lists the code tools 改动 · 文件 · 终端 ·
+  预览, and its PR summary line opens the review page; these only open the
+  review page, and the rest of the panel stays read-only.
+- **R-52** Every list holds tasks, grouped **等待你 · 进行中 · 待办 · 已完成**.
+  已完成 starts collapsed. Each row carries its own state's icon, independent
+  of the group header's icon
+  ([states](decisions/2026-11-07-2230-one-icon-per-task-state.md),
+  [attempts](decisions/2026-11-07-2300-one-conversation-per-task.md)).
+  - 等你处理 uses a hand, for a question, approval or PR review. 受阻 uses an
+    octagon for login, key, permission, quota or an offline device. 失败 uses
+    a triangle. These states appear in 等待你. The window-bar hand counts
+    only 等你处理 tasks.
+  - 运行中 uses a ring and 排队中 a clock, under 进行中. Open tasks without an
+    active attempt appear in 待办 with their board icon. Closed tasks use
+    their board icon under 已完成.
+  - A dependency or manual blocked flag supplies its reason in the grey line
+    and keeps the task's own state and icon. It does not acquire the hand.
+  - `agent_runs.outcome` supplies the ended attempt's judgement, based on
+    its reply, status, task and PRs (`lib/run-outcome-judge.ts`). A finished
+    process alone does not prove success. A missing judgement cannot mark
+    an unresolved task complete.
+  - Task icons use semantic colours. 等你处理 is blue, 受阻 / 运行中 /
+    排队中 / 进行中 orange, 评审中 blue, 失败 red, 完成 green, and
+    待办 / 暂不处理 / 已取消 / 重复 grey. The reason line stays secondary text. There are no status
+    dots, corner marks or badges
+    ([colours](decisions/2026-11-08-0130-task-state-icon-colours.md)).
+  - An attempt shows its own result icon, never the hand. Running uses the
+    ring, waiting for the person uses pause, finished a check, failed a
+    triangle, blocked an octagon, and replaced no icon.
+- **R-53** A task row shows its state icon, number, title and date, with a
+  grey line for the reason, dispatching bot and schedule when present. Raw
+  error codes stay under 详情 inside the relevant attempt. The former
+  thread-list last-reply preview is superseded by
+  [2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md).
 - **R-54** The PR tab lists the PRs of the threads this bot dispatched, in groups 等待审查, 进行中, 已合并,
   with R-52's header style. Each row is the PR title and its number.
 - **R-55** 建议 is the second rail item. Its page is split 50/50 with a 1px
@@ -373,55 +371,57 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   tab of 2026-10-30).
 - **R-57** The local 浏览器 is an icon-only globe toggle at the right of the
   top bar, with no 「浏览器」 label. Turned on, it opens a right column with
-  the browser (URL bar and page). Selecting an element and annotating it puts
+  the browser (URL bar and page). In the hosted edition 浏览器 is a work-area tab opened from the New tab's Tools or ⌘⇧B, with no globe in a window bar (decision `2026-11-09-2330-overview-as-work-area-tab.md`). Selecting an element and annotating it puts
   a chip 「1 · <element> · <action> · <note>」 into the current chat's
   composer. The 浏览器 is the person's own and app-wide; it is not a bot's
   电脑 (R-50).
 
 ## Navigation
 
-- **R-82** One address says what is on screen, and every click goes through
-  `components/workspace/workspace-navigation.ts`; nothing else writes the
-  browser history or builds a workspace link (`scripts/navigation-policy.mjs`).
-  A move the person makes (another bot or group chat, a rail page, a task, a
-  thread, an Artifact) is a new history entry, so back and forward step
-  through it one move at a time and never leave Mikka while there is a step
-  inside it; a filter or a tab replaces the entry. Each object opens in one
-  place whatever the entry point: a bot or group chat in the centre; a thread
-  in the right column beside what is in the centre (the chat, or a task with
-  its properties), a thread of another bot included, its header naming the
-  bot that dispatched it; a task as its own page in the centre, as Linear; an
-  Artifact in its window over the page (R-56), which a move from inside it
-  closes; PRs and web pages in a new tab. Projects and teams live under 看板,
-  with no rail item of their own: on them 看板 is the current rail item and no
-  bot list sits beside the page. On
-  a phone the right column is a page pushed over the chat: the chat's pill in
-  the header opens 概览 (a group's 详情), and an open thread covers the screen
-  with its close in the header; every page but a task keeps the header's list
-  button, whose sheet is the bot list with the rail's items below it (a task's
-  own header carries the same button). A task page knows
-  where it was opened from: its address names that chat or page (`bot=`,
-  `section=`, `section=coordinator` for the Coordinator's chat), its first
-  crumb names it, and ✕ returns there. Opened by a move in the same page
-  load, ✕ is a step back, so the chat comes back as it was, its open thread
-  included; opened from a link, a reload or a notification at launch, ✕ goes
-  to the place the address names, and to 看板 when it names none. Its ↑↓ show
-  only when the board, a list or a project opened it. A notification or an
-  admin link to a thread opens it beside its task where the viewer can read
-  it. An address with an unknown section or a bot that is not the person's
-  rewrites itself to what is shown, without a new entry. 全部线程, the
-  threads every bot dispatched in R-52's groups, each row's second line opening
-  with the mark of the Agent running it and 「<Bot> 派出」, opens in the right
-  column from the window bar's button beside the globe (on a phone, the page
-  header's) on any page (`?threads=all`, `?threads=<bot>` for one dispatcher);
-  while threads wait on you that button carries 等待你's hand and their count
-  (Badge warning-light, 99+ past 99), and none leaves the icon alone;
-  a bot's panel keeps only the 线程 it dispatched. An open thread's header leads
-  with ←, back to the list it was opened from (全部线程, a bot's 线程, the task's
-  线程, the chat); Esc and the browser's back do the same; it has no status icon, the
-  badge under it says the state. Source: Alex,
-  2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)), 2026-11-02
-  ([decision](decisions/2026-11-02-0310-all-threads-from-the-window-bar.md)).
+- **R-82** One address describes what is on screen. All moves use
+  `components/workspace/workspace-navigation.ts`; `scripts/navigation-policy.mjs`
+  checks direct history writes and workspace links. A user move pushes
+  history and a filter or tab replaces it. Back and forward restore each move.
+  - Bot and group chats open in the centre. 看板 contains tasks, projects and
+    teams. A task opened from 看板 or a link is a centre page. Its origin
+    crumb and close action return to the source, defaulting to 看板; ↑↓
+    appear when it was opened from a list.
+  - A chat task card, task chip or right-panel task row opens the task view
+    as a tab in the chat's right work area, preserving the chat; its expand
+    button opens the same task as a page. A thread, Agent stretch or subagent
+    opened from a chat opens its own work-area tab, reused when already open
+    ([0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)). A row in 活动 (one per Agent
+    stretch, R-62) opens that task's one conversation, with ← back to the
+    task. The conversation joins runs oldest first, opens a selected stretch
+    at its first run and otherwise starts at the newest message. Its header
+    is the task title and current Agent; its composer addresses the newest run.
+    The hosted work-area task view starts with one large editable title,
+    its code and time, then compact properties, description, subtasks and
+    activity. The tab names the task; no second inner title bar repeats it.
+    Save, more and expand stay available
+    ([Capy layout](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
+  - 全部任务 opens from the window bar on every page, with the hand and the
+    count of 等你处理 tasks. A bot's 任务 tab lists its dispatched tasks.
+    Search hits in a task conversation resolve to the task. Legacy run IDs
+    and `?threads=` remain routing identifiers, not list labels.
+  - On the phone task detail and its conversation push over the task tab.
+    Bot · 任务 · 建议 · 设置 and search are the native tabs; the tab bar hides
+    on pushed chats and task pages. Workspaces switch in 设置 › 工作区.
+  - A coding task's summary line or 审阅 opens the dedicated review page,
+    with the task conversation beside its final diff. Code tools live in ⋯
+    under [1230](decisions/2026-11-08-1230-coding-workspace.md); there is no
+    attempt-based diff scope. Its selected UI layer and backend contract
+    determine implementation coverage.
+  - An Artifact opens in its shared window over the page (R-56). PRs and web
+    pages open in a new tab. Phone web uses a full-page right column and
+    retains a bot-list/header entry. Invalid addresses normalize to the
+    authorized visible location.
+  Sources are [navigation](decisions/2026-11-01-1320-navigation-model.md),
+  [task lists](decisions/2026-11-07-2045-tasks-only-threads-inside.md) and
+  [one conversation](decisions/2026-11-07-2300-one-conversation-per-task.md).
+  The UI is the official build ([one UI](decisions/2026-11-08-2133-one-ui.md));
+  default slots in this repository can retain older thread presentation
+  ([UI slots](../ui-overlay.md)).
 - **R-83** A reply's tool calls say what they did, not that a tool was used
   ([decision](decisions/2026-11-04-2221-chat-tool-groups-and-citations.md),
   spec `chat-tool-calls.md`). Two or more calls with nothing said between them
@@ -434,13 +434,12 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   「使用工具」 (`check-copy`). A call that failed, thrown or answered
   `{"error": …}`, is red and names its reason in words. An opened call says
   what it did in words first, ids never shown: a dispatch is 「交给」 and the
-  coding agent with its mark (R-74), never the bot, then its thread's chip, then
+  coding agent with its mark (R-74), never the bot, then its task reference, then
   its note as a quote (three lines; only a cut note opens to the rest); a thread
   the chat has not loaded is its state in words (「交给 Codex · 进行中」), the
   state the dispatch answered with, not the thread's state now. In a dispatch
-  the thread's chip is the only chip, so the reader can jump to the thread;
-  the dispatch's task gets none (an exception to R-15, which this keeps: only
-  the thread is a chip), and the chip carries its own state. A call whose
+  one task reference identifies the dispatched work and leads through its
+  task (R-15, R-66). A call whose
   object is a task (create, update or look up tasks) draws that task's chip. Other
   known tools name their object, query, count or status; an unknown tool lists
   at most six of its own fields, cut short. A failed call says nothing more in
@@ -471,9 +470,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
   value read-only. A person's own subscriptions and API keys are not such a
-  feature: they always run that person's own bots, with no switch; an admin
-  can switch off only 「分享给团队成员」 (decision
-  [2026-11-01-2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). A stored off is an admin's choice, never a leftover
+  feature. A person's subscriptions remain Account-owned and are not a public
+  resource pool. Organization connection and model policies govern admitted work
+  without revealing personal credentials; authorized owner use stays available
+  under [#1849](decisions/2026-11-10-0017-collaboration-governance.md).
+  A stored off is an admin's choice, never a leftover
   default: a migration that turns a default on also rewrites rows that hold
   the old default. A feature stays off only for real per-use cost, an
   incident kill switch or a recorded Alex decision (`decisions.md`). Safety
@@ -489,14 +490,19 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   asked about. Creating, sending, appending and adding never ask. An
   unavailable or refused judgment shows a card, never a silent write.
   Source: Alex, 2026-10-31.
-- **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…),
-  so wherever a thread or run is drawn with an icon, the icon is that
-  Agent's mark (`HarnessMark`, R-74); a thread whose Agent is unknown takes
-  the neutral thread mark. A bot never does coding work: it appears only
-  where it dispatched or owns the work (「<Bot> 派出线程」, the 概览 header),
-  never as a thread's or run's icon, and neither does the Coordinator's
-  avatar. Status icons stay where a list shows status (R-62, R-66).
-  Source: Alex, 2026-11-01 (decision `2026-11-01-0110-agent-mark-on-threads`).
+- **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…)
+  in an Agent 配置. Where an Agent stretch is drawn with a mark (the line where
+  the Agent changes, a plan step, the execution identity), the main mark is
+  its Agent 配置's mark and the Agent's own mark (`HarnessMark`, R-74) sits
+  beside it, smaller, or in the details; a stretch with no Agent 配置 takes
+  the Agent's mark, and one whose Agent is unknown the neutral thread mark.
+  A thread mentioned in text has no mark (R-15). A bot never does coding
+  work: it appears only where it dispatched or owns the work (「<Bot> 派出线程」,
+  the 概览 header), never as a thread's or run's icon, and neither does the
+  Coordinator's avatar. Status icons stay where a list shows status (R-62,
+  R-66). Source: Alex, 2026-11-01 (decision
+  `2026-11-01-0110-agent-mark-on-threads`), revised 2026-11-10
+  ([0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)).
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
@@ -509,8 +515,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   text for these things fails review. Build them with the shared label
   components, not by hand.
 - **R-72** Two kinds of work. A real task, such as coding, is a thread: a full
-  coding agent (Claude Code, Codex) does it, and it is listed in the thread
-  list. A web task is the bot's own: the bot runs it as a sub-agent (分身) with
+  coding agent (Claude Code, Codex) does it, and the dispatched task appears in
+  the task list. A web task is the bot's own: the bot runs it as a sub-agent (分身) with
   its own browser on the bot's cloud 电脑 (not the local 浏览器, R-57), and can
   run several at once. A sub-agent is never listed
   as a thread and has no name or avatar of its own; in the chat it shows as
@@ -554,6 +560,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 
 ## Look
 
+The Look rules (R-30 to R-39) and the avatar, icon and chip rules elsewhere
+are Mikka's look. They are never applied inside a paid block, which keeps the
+library's shipped look ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
+
 - **R-30** Greys are pure neutral: `rgba(0,0,0,a)` and `#737373 / #A3A3A3 /
   #171717` in light mode, the same idea in dark. Never slate, zinc or teal
   tinted. Main content is near-black (`text-foreground`); grey is for
@@ -586,7 +596,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   search as `style/search-input`.
 - **R-32** Type follows Comma (decision `2026-11-01-1204-type-follows-comma`):
   Inter Variable for text and Geist Mono for code, self-hosted from
-  `app/fonts/` through `next/font/local` (no runtime font CDN, no metric
+  `app/fonts/`, registered by the shared renderer's `@font-face` rules in
+  `apps/desktop/src/renderer/styles.css` (no runtime font CDN, no metric
   fallback, `font-display: block`), then the system stack `"SF Pro Display",
   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, …, sans-serif`. No
   Chinese font is named: Chinese takes the system font (PingFang on a Mac), and
@@ -669,6 +680,16 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   what it holds. A list row's hover and selected fill cover the whole row edge
   to edge; buttons and switches inside it stay separately clickable.
   `pnpm lint:ui` fails a frame inside a frame as `style/nested-frame`.
+- **R-91** Top rows carry the important things. The first row of a panel,
+  page or screen holds the object's state (for a coding task: PR and failed checks right
+  under the title). Tools and secondary actions go into the header's 「⋯」
+  menu, tools first (for a coding task: 改动 +N −M, 文件, 终端, 预览, with
+  their shortcuts), then a divider and items such as the branch name, copy
+  link and permissions; shortcut hints go into tooltips. They are not visible
+  buttons on the header row (Alex: 「只要求你把这些东西放进省略号里边…不是放在
+  省略号的外边」). Secondary
+  actions, branch names, counts and shortcut hints go into 「⋯」 or a
+  tooltip, not a row of their own (Alex, 2026-11-08; [2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)).
 
 ## Design review
 
@@ -686,9 +707,11 @@ design that fails any of them is sent back before it reaches Alex.
   an inbox detail. A one-to-one bot chat uses the existing coordinator chat.
   No design draws a third chat style or adds a new chat component.
 - **R-85** Deliverables (PR, diff, recording, screenshot, test output) live
-  only on the acceptance page (the Artifact window, R-56). The task's
+  on the acceptance page (the Artifact window, R-56). Coding-task diffs, PR
+  checks and review actions also live on the dedicated review page under
+  [1230](decisions/2026-11-08-1230-coding-workspace.md). The task's
   activity timeline and the bot's comments carry one plain sentence about
-  progress and at most an 「打开会话」 link, never deliverable chips.
+  progress and at most an 「打开任务」 link, never deliverable chips.
 - **R-86** A bot asks the person its questions in its own chat with them. The
   task page shows only that a question is waiting (stage 「在问你」 and a
   「去回答」 button that jumps to the message); after the answer, the activity
@@ -697,7 +720,8 @@ design that fails any of them is sent back before it reaches Alex.
   and a word together, at body size, on a tinted background where it needs
   attention (for example 高 red with `CircleAlert`, 中 amber with
   `TriangleAlert`, 低 grey with `Info`). Never colour alone, never pale small
-  text.
+  text. Task and attempt rows follow R-52's coloured glyph plus state text
+  presentation, without status badges or dots.
 - **R-88** At 1440 wide, no screen leaves an empty area larger than about a
   third of the viewport. A list with a detail pane keeps the list narrow
   (about 320px) and fills the detail with the thing to act on (for example
@@ -762,13 +786,13 @@ How a design is reviewed:
     服务器 → 电脑」; [0400](decisions/2026-11-05-0400-per-agent-model-lists.md)).
     In plain words, as short as it can be, and each line still passes the delete
     test: if removing it loses nothing a newcomer needs, it goes.
-- **R-41** An empty state is one colloquial line plus one button (often
+- **R-41** An empty state is one concrete state line plus one button (often
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and
   `messages/en.json`; `pnpm i18n:check` must pass. Write Chinese first.
 - **R-43** Use the glossary's words: Bot, 对话, 线程, Agent, 资料库, 浏览器, 电脑.
-  Never 会话 for a left row or a run, and never 任务 for the panel's thread
-  tab. The right-side worker that does a thread's work (Claude Code, Codex) is
+  Never 会话 for a left row or a run. The panel's list tab is 任务;
+  threads are reached through their task. The right-side worker that does a thread's work (Claude Code, Codex) is
   an **Agent**, never harness or 执行器 in the UI; it runs on a 电脑 (your
   computer, an SSH server or Mikka Cloud). `scripts/check-copy.mjs` rejects harness and
   执行器 in `messages/`. 「Artifact」 is never translated. Built-in role names stay English

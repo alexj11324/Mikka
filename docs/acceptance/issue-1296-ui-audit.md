@@ -1,5 +1,9 @@
 # Issue #1296：移动端 UI、可用性与 Motion 审计及回归记录
 
+> 本文保留当次版本的三路模型证据与失败。现行验收使用共享 SMOKE 账号，
+> 官方 Claude Code 与 Codex 两条订阅路径独立记录。DeepSeek/API-key 路径
+> 已退出合并及验收门槛，后续执行按 [验收指南](../acceptance.md)。
+
 - 日期：2026-11-05。
 - 跟踪：[Mikka #1296](https://github.com/alexj11324/Mikka/issues/1296)。本文件记录本轮实现和证据，不修改 `AGENTS.md`、`docs/acceptance.md` 或现有合并/验收规则。
 - 状态：**合并前审计与 Docker 回归记录；最终发布结果记录在 Issue #1296 正文。** 没有把源码检查、单测、Expo Web 或既往 OTA 当作本次原生安装和生产验收。
@@ -212,7 +216,7 @@
 
 root 在模型菜单看到视觉已选勾号，但 DOM `aria-checked=null`、AX Value=0。它证明 `accessibilityState.checked` 的源码存在不足以确认 Web 可访问状态。flow 修复模型菜单，design 分区检查新建形状/颜色、群成员选择、ChoiceRow 及本轮 busy/disabled 控件；保留 native state，并为 Web 提供显式 ARIA。新建Bot的猫/橙色已通过真实DOM/AX检查，明确为aria-checked=true、AX Value=1；新群成员checkbox也已实测aria-checked=true、AX Value=1。插件分段tab原来AX均0，补显式aria-selected后应用/技能切换正确：选中项AX1、另一项AX0，各目标高44；不从这些控件外推全量通过。
 
-模型菜单375真实回归已确认aria-checked=true、AX Value=1、expanded=true，Shift+Tab焦点闭环。截图已保存（29924 bytes），由owner归档到[模型菜单证据](issue-1296-evidence/mikka-1296-model-menu-accessible-375.jpg)。聊天服务enabled=false时输入草稿后点击状态重试，草稿保留且发送disabled=true/aria-disabled=true；没有发送模型请求。
+模型菜单375真实回归已确认aria-checked=true、AX Value=1、expanded=true，Shift+Tab焦点闭环。截图已保存（29924 bytes），由owner归档到[模型菜单证据](issue-1296-evidence/model-menu-accessible-375.jpg)。聊天服务enabled=false时输入草稿后点击状态重试，草稿保留且发送disabled=true/aria-disabled=true；没有发送模型请求。
 
 ### E-WEB-07：头像产品/环境原因分离
 
