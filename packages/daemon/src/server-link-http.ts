@@ -18,6 +18,7 @@ import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-
 import { z } from "zod"
 import { chatFileDownloadSchema, chatFileTransferSchema, CHAT_FILE_MAX_BYTES } from '@mikka/protocol/chat-attachments'
 import { ToolApprovalGate, type RunControlMode, type ToolApprovalRequest } from "./agents/tool-approval"
+import { policyAskActions } from '@mikka/protocol/harness-approval'
 import { toolApprovalStateSchema, type ToolApprovalState } from '@mikka/protocol/tool-approval'
 import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
@@ -208,7 +209,7 @@ export class HttpServerLink implements ServerLink {
         try { check(); return true } catch { return false }
       },
       requestApproval: (runId, request, requestSignal) => this.requestToolApproval(assignment, request, requestSignal),
-    }, this.runControlMode, assignment.mode ?? 'execute')
+    }, this.runControlMode, policyAskActions(assignment.policy))
     this.runControls.add(gate)
     const abort = () => gate.revoke()
     gate.onRevoke(() => { this.runControls.delete(gate); signal.removeEventListener('abort', abort) })

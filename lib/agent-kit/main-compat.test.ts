@@ -40,12 +40,6 @@ function identityFixtureQuery(sql: string) {
  return null
 }
 
-/** The thread-mode row admission reads; this suite owns claim snapshot composition. */
-function threadModeFixture(sql:string){
-  if(sql.startsWith('INSERT INTO task_thread_modes')) return {rows:[]}
-  if(sql.startsWith('SELECT mode,version FROM task_thread_modes')) return {rows:[{mode:'execute',version:0}]}
-  return null
-}
 // This suite substitutes device authentication and DB IO to test only claim
 // snapshot composition. Real credential admission is covered by revocation DB tests.
 stub('../device-route.ts',{withDeviceRoute:<T>(handler:T)=>handler})
@@ -255,7 +249,7 @@ test('subscription provenance is copied across retries and participates in the d
 })
 test('cloud queue captures exact worker and parent snapshot in the same transaction as binding',async()=>{
  const calls:{sql:string,args:unknown[]}[]=[]
- const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});const identity=identityFixtureQuery(sql);if(identity)return identity;const thread=threadModeFixture(sql);if(thread)return thread;if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Cloud review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});const identity=identityFixtureQuery(sql);if(identity)return identity;if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Cloud review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
  await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'synthetic',model:binding.modelId,execution:parent})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[10] as string);assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(snapshot.parent.executionId,parent.id);assert.equal(calls.at(-1)!.sql,'COMMIT');assert.ok(calls.some(c=>c.sql.startsWith('INSERT INTO computer_run_bindings')))
@@ -266,7 +260,7 @@ test('with versioned definitions off, a cloud run still freezes its Agent and cr
  // Every cloud run freezes its definition when it is queued (orchestration.md § 5), with the model its caller chose.
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
- const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});const identity=identityFixtureQuery(sql);if(identity)return identity;const thread=threadModeFixture(sql);if(thread)return thread;if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});const identity=identityFixtureQuery(sql);if(identity)return identity;if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:binding.modelId})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[10] as string)
  assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
@@ -276,7 +270,7 @@ test('with versioned definitions off, a cloud run still freezes its Agent and cr
 test('a cloud subscription run must name its model explicitly with versioned definitions disabled',async()=>{
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
- const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});const identity=identityFixtureQuery(sql);if(identity)return identity;const thread=threadModeFixture(sql);if(thread)return thread;if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});const identity=identityFixtureQuery(sql);if(identity)return identity;if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  const pool={connect:async()=>client} as unknown as Parameters<typeof queue>[0]
  for(const model of ['auto','',undefined]){
   await assert.rejects(queue(pool,{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:model as string,threadRunId:'previous-run'}),/Run model missing \(run .+, thread previous-run\)/)
@@ -289,7 +283,7 @@ test('a cloud subscription run must name its model explicitly with versioned def
  assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
 })
 test('cloud request replay cannot substitute another parent execution',async()=>{
- const client={release(){},async query(sql:string){const thread=threadModeFixture(sql);if(thread)return thread;if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT r.'))return {rows:[{userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,runBotId:botId,botId,workspaceId:workspace,prompt:runPrompt('Review','','Review'),agentDefinition:{harness:'codex',parent:{executionId:randomUUID()}}}]};return {rows:[]}}}
+ const client={release(){},async query(sql:string){if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT r.'))return {rows:[{userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,runBotId:botId,botId,workspaceId:workspace,prompt:runPrompt('Review','','Review'),agentDefinition:{harness:'codex',parent:{executionId:randomUUID()}}}]};return {rows:[]}}}
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
  await assert.rejects(queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:binding.modelId,execution:parent,idempotencyKey:'same-call'}),/Task request changed/)
 })

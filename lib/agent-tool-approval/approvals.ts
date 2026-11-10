@@ -2,6 +2,7 @@ import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import type { Pool, PoolClient, QueryResultRow } from 'pg'
+import { policyRequiresApproval } from '@mikka/protocol/harness-approval'
 import { TOOL_APPROVAL_TTL_MS, toolApprovalEffectiveStatus, type ToolApprovalMethod, type ToolApprovalState, type ToolApprovalStatus } from '@mikka/protocol/tool-approval'
 import { recordAudit } from '@/lib/audit/record'
 import { RUN_APPROVAL_CHANNEL, notifyChannel } from '@/lib/db/listen'
@@ -60,14 +61,16 @@ export class RunToolApprovalStore {
     }, { guard: cliPolicyGuard(runId, userId, this.membership) })
   }
 
-  /** Store one exact request under the run's current mode and policy revision. */
+  /** Store one exact request under the run's current policy revision. */
   async request(actor: DeviceActor, runId: string, input: {
     policyRevision: string; requestId: string; harness: string; method: ToolApprovalMethod; tool: string; input: Record<string, unknown>
   }): Promise<ToolApprovalState> {
     return this.transaction(runId, actor.userId, async client => {
       const current = await lockCliRunPolicy(client, runId, actor.userId)
       if (current.revision !== input.policyRevision) throw new ApprovalUnavailable('policy_changed')
-      if (current.mode !== 'ask') throw new ApprovalUnavailable('mode_not_ask')
+      // Only a run whose policy resolves an action to `ask` may hold a request:
+      // a run that asks nothing has nothing to approve.
+      if (!policyRequiresApproval(current.policy)) throw new ApprovalUnavailable('policy_changed')
       const { rows: [run] } = await client.query<{ harness: string | null; readOnly: boolean }>(
         `SELECT coalesce(r."agentDefinition"->>'harness',a.harness) AS harness,coalesce((r."agentDefinition"->>'readOnly')::boolean,false) AS "readOnly"
          FROM agent_runs r JOIN agents a ON a.id=r."agentId" WHERE r.id=$1 AND r."userId"=$2 FOR SHARE`, [runId, actor.userId])
@@ -126,7 +129,6 @@ export class RunToolApprovalStore {
         if (row.status === desired) return stateOf(row)
         throw new ApprovalUnavailable('not_pending')
       }
-      if (current.mode !== 'ask') throw new ApprovalUnavailable('mode_not_ask')
       if (current.revision !== row.policyRevision) throw new ApprovalUnavailable('policy_changed')
       if (row.expiresAt.getTime() <= Date.now()) {
         await client.query(`UPDATE agent_tool_approvals SET status='expired',"decidedAt"=coalesce("decidedAt",now()) WHERE id=$1 AND status='pending'`, [approvalId])
@@ -158,7 +160,6 @@ export class RunToolApprovalStore {
         [approvalId, runId, actor.userId, actor.deviceId])
       if (!row) throw new ApprovalUnavailable()
       if (row.status !== 'approved') return stateOf(row)
-      if (current.mode !== 'ask') throw new ApprovalUnavailable('mode_not_ask')
       if (current.revision !== row.policyRevision) throw new ApprovalUnavailable('policy_changed')
       if (!current.workspaceId) throw new ApprovalUnavailable('policy_changed')
       await client.query(`UPDATE agent_tool_approvals SET status='consumed',"decidedAt"=coalesce("decidedAt",now()) WHERE id=$1 AND status='approved'`, [approvalId])

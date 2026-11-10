@@ -1,7 +1,6 @@
 import type { AnonymousCodexCandidate } from './anonymous-codex-spare'
 import type { AnonymousClaudeCandidate } from './anonymous-claude-spare'
 import { captureRunFailure } from "@mikka/protocol/run-failure"
-import { THREAD_MODES } from "@mikka/protocol/thread-mode"
 import { coordinatorCapable } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
@@ -643,11 +642,10 @@ export class Daemon {
     const supported = detected.filter((info) => this.adapters.has(info.harness))
     this.harnesses = hosted ? supported.map(info => {
       // The run's live gate stops a revoked run; Codex also verifies its
-      // pinned interface at initialize. Only a runner with that gate claims
-      // the thread modes it can actually enforce.
+      // pinned interface at initialize. Only a runner with that gate can ask
+      // a person about a single tool call, which is what it advertises.
       const toolApproval = this.supportsToolApproval(info)
-      return { ...info, ...this.modelReports.get(info.harness), toolApproval,
-        ...(toolApproval ? { threadModes: [...THREAD_MODES] } : {}), coordinator: false }
+      return { ...info, ...this.modelReports.get(info.harness), ...(toolApproval ? { toolApproval } : {}), coordinator: false }
     }) : await Promise.all(supported.map(info => this.localHarnessReport(info)))
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
@@ -1101,8 +1099,7 @@ export class Daemon {
   /** Advertise only a checked local runner, replacing any old readiness or failure. */
   private async localHarnessReport(info: HarnessInfo): Promise<HarnessInfo> {
     const toolApproval = this.supportsToolApproval(info)
-    const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness), toolApproval,
-      ...(toolApproval ? { threadModes: [...THREAD_MODES] } : {}), coordinator: coordinatorCapable(info) }
+    const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness), ...(toolApproval ? { toolApproval } : {}), coordinator: coordinatorCapable(info) }
     delete report.subscriptionBroker
     delete report.subscriptionModelCatalogue
     delete report.subscriptionPreflight

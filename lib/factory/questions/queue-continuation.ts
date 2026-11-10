@@ -84,8 +84,10 @@ export async function queueCloudQuestionContinuation(
   const runId = randomUUID();
   const copied = copyRunPrompt(origin, `${origin.prompt}\n\n${input.note ?? ''}`);
   const { prompt } = copied;
-  await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",source,status,mode,kind,"baseBranch",prompt,"agentDefinition",attempt,"promptTaskStart","promptTaskLength")
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued',$9,$10,$11,$12,$13,$14,$15,$16)`, [runId,userId,origin.issueId,origin.agentId,origin.deviceId,origin.deviceRepoId,origin.botId,origin.source,origin.mode,origin.kind,origin.baseBranch,prompt,JSON.stringify(retryWorkerDefinition(origin.agentDefinition,prompt)),origin.attempt,copied.promptTaskStart,copied.promptTaskLength]);
+  // A question continuation copies the origin's frozen definition, so it keeps
+  // the origin's read-only intent on the new run and touches nothing else.
+  await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",source,status,kind,"baseBranch",prompt,"agentDefinition",attempt,"promptTaskStart","promptTaskLength")
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued',$9,$10,$11,$12,$13,$14,$15)`, [runId,userId,origin.issueId,origin.agentId,origin.deviceId,origin.deviceRepoId,origin.botId,origin.source,origin.kind,origin.baseBranch,prompt,JSON.stringify(retryWorkerDefinition(origin.agentDefinition,prompt)),origin.attempt,copied.promptTaskStart,copied.promptTaskLength]);
   await tx.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId,binding.botId,binding.workspaceId,userId]);
   // Same transfer shape as adoptTaskMachine: history retains its scope; only
   // the task's own new run takes custody of the existing sandbox.

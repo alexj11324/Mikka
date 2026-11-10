@@ -4,7 +4,7 @@ import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { withBasePath } from '@/lib/base-path'
 import { verifyRunToken } from '@/lib/mcp/worker'
 import { authorizeRunApp } from '@/lib/run-app-mcp'
-import { runAppEntry, runAppToolkits, runThreadMode } from '@/lib/app-tools-server'
+import { runAppEntry, runAppToolkits, runReadOnly } from '@/lib/app-tools-server'
 import { CUSTOM_MCP_TOOLKIT } from '@/lib/plugins/run-mcp'
 
 export const dynamic = 'force-dynamic'
@@ -27,7 +27,7 @@ async function serve(request: Request, toolkit: string) {
     if (!auth) return Response.json({ error: 'runAppUnavailable' }, { status: 403 })
     return (await import('@/lib/plugins/run-mcp-handler')).customRunMcpHandler(request, auth)
   }
-  const scope = await authorizeRunApp((request as Request & { auth?: AuthInfo }).auth, toolkit, runAppToolkits, Date.now(), runThreadMode)
+  const scope = await authorizeRunApp((request as Request & { auth?: AuthInfo }).auth, toolkit, runAppToolkits, Date.now(), runReadOnly)
   const entry = scope && runAppEntry(scope)
   if (!entry) return Response.json({ error: 'runAppUnavailable' }, { status: 403, headers: { 'cache-control': 'no-store' } })
   let tools: Awaited<ReturnType<typeof entry.list>>

@@ -19,7 +19,6 @@ import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
 import type { Harness, RunKind } from "@mikka/protocol"
-import type { ThreadMode } from "@mikka/protocol/thread-mode"
 import { runQuestion, runRepositorySelection, type RunQuestion } from "@mikka/protocol/run"
 import { planHandoff, planSplitProblem } from "@mikka/protocol/plan"
 import {
@@ -122,8 +121,6 @@ export interface RunContextOptions {
   harness: Exclude<Harness, "mock">
   /** What the run is for; `plan` runs are told to write a spec (ADR ORV-205). */
   kind?: RunKind
-  /** The thread's frozen interaction mode (#1730). */
-  mode?: ThreadMode
   factoryCheck?: import('@mikka/protocol').RunAssignment['factoryCheck']
   verifyCommand?: string
   worktree: string
@@ -442,8 +439,10 @@ export class RunContext {
       this.skillsDir,
     )
     return [
-      runInstructions(this.worktree, this.options.policy, this.options.github, this.options.kind, this.options.mode),
-      this.options.kind === "plan" || this.options.mode === "plan" ? planInstructions() : "",
+      runInstructions(this.worktree, this.options.policy, this.options.github, this.options.kind),
+      // A `plan` kind is a factory stage that writes a spec (ADR ORV-205); a
+      // read-only policy is the run-level fact that it changes nothing.
+      this.options.kind === "plan" || this.options.policy?.readOnly ? planInstructions() : "",
       skills,
       PERSONAL_MESSAGE_INSTRUCTIONS,
       this.options.mailboxEnabled ? 'The supplied mailbox tools use this run’s existing authority. Use stable keys, explicit inbox/ACK; queued or acknowledged never means executed. Do not poll or infer approval.' : '',
@@ -614,12 +613,12 @@ function delivers(github: RunGitHub | undefined, policy: RunPolicy | undefined, 
 }
 
 /** Appended to the harness's system prompt (or the first message). */
-export function runInstructions(worktree: string, policy?: RunPolicy, github?: RunGitHub, kind?: string, mode: ThreadMode = "execute"): string {
+export function runInstructions(worktree: string, policy?: RunPolicy, github?: RunGitHub, kind?: string): string {
   return [
     "You are running as an Mikka agent, unattended, in a git worktree:",
     `${worktree}`,
     "Rules for this run:",
-    ...policyInstructions(runPolicy(policy), mode),
+    ...policyInstructions(runPolicy(policy)),
     ...(github ? [
       "- Git and gh have the person's own GitHub credential, as if they ran `gh auth login`: clone, fetch, commit, push, open pull requests and comment on any repository they authorized, as the task needs. Never print, copy or store the credential.",
     ] : []),

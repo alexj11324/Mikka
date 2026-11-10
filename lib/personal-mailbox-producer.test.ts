@@ -100,8 +100,6 @@ test('actual cloud producer pins the existing host-authorized Bot/workspace with
       assert.ok(sql.includes('c."ownerId"=$2') && sql.includes('c.epoch=$3'))
       return { rows: [{}], rowCount: 1 }
     }
-    if (sql.startsWith('INSERT INTO task_thread_modes')) return { rows: [] }
-    if (sql.startsWith('SELECT mode,version FROM task_thread_modes')) return { rows: [{ mode: 'execute', version: 0 }] }
     if (sql.startsWith('INSERT INTO agent_runs')) snapshot = JSON.parse(params[10] as string)
     return { rows: [] }
   } }

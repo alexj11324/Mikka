@@ -103,8 +103,6 @@ export interface SessionOptions {
    * is told to write a spec instead of code (ADR ORV-205).
    */
   kind?: RunKind
-  /** The thread's frozen interaction mode (#1730): plan, execute or ask. */
-  mode?: import('@mikka/protocol/thread-mode').ThreadMode
   factoryCheck?: import('@mikka/protocol').RunAssignment['factoryCheck']
   verifyCommand?: string
   /** The run's worktree; the CLI child runs here. */

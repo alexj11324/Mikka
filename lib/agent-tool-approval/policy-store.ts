@@ -3,7 +3,6 @@ import type { Pool, PoolClient } from 'pg'
 import type { JSONContent } from '@tiptap/core'
 import { z } from 'zod'
 import { applyApprovalMode, approvalModeSchema, intersectNetworkDomains, CONFIGURABLE_ACTIONS, networkAllowSchema, runPolicySchema, storedPermissionsSchema, type ConfigurableAction, type PermissionDecision, type RunPolicy } from '@mikka/protocol/agent-policy'
-import { applyThreadMode, threadModeSchema, type ThreadMode } from '@mikka/protocol/thread-mode'
 import { resolveTrustedRunPolicy } from './policy-snapshot'
 import { intersectRunPolicy } from '../run-assignment-policy'
 import type { MailboxTransactionLease, MailboxTransactionGuard } from '@/lib/mailbox-transaction-guard'
@@ -187,8 +186,8 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
 export async function lockCliRunPolicy(tx: PoolClient, runId: string, userId: string, options: { freezeHierarchy?: boolean } = {}) {
   // Policy must precede Factory/task/run locks. Read the task with the run,
   // then freeze any new hierarchy only after acquiring the policy locks.
-  const result = await tx.query<CliTaskRow & { botId: string | null; agentId: string; issueId: string | null; runWorkspaceId: string | null; policyCeiling: unknown; hierarchy: unknown; mode: string | null }>(`SELECT "botId","agentId","issueId",r."agentDefinition"->'policyCeiling' AS "policyCeiling",
-    r.cli_policy_hierarchy AS hierarchy,r."workspaceId" AS "runWorkspaceId",r.mode,i."workspaceId",i."ownershipState",i."scopeVersion",
+  const result = await tx.query<CliTaskRow & { botId: string | null; agentId: string; issueId: string | null; runWorkspaceId: string | null; policyCeiling: unknown; hierarchy: unknown }>(`SELECT "botId","agentId","issueId",r."agentDefinition"->'policyCeiling' AS "policyCeiling",
+    r.cli_policy_hierarchy AS hierarchy,r."workspaceId" AS "runWorkspaceId",i."workspaceId",i."ownershipState",i."scopeVersion",
     CASE WHEN jsonb_typeof(i.content)='object' THEN jsonb_build_object('attrs',i.content->'attrs') ELSE i.content END AS content
     FROM agent_runs r LEFT JOIN issues i ON i.id=r."issueId" WHERE r.id=$1 AND r."userId"=$2`, [runId,userId])
   const run = result.rows[0]
@@ -199,12 +198,6 @@ export async function lockCliRunPolicy(tx: PoolClient, runId: string, userId: st
   if (!task) await requirePolicyWorkspace(userId, run.runWorkspaceId)
   if (task) { const hierarchy = await cliHierarchy(task,run.hierarchy); if (hierarchy) task.hierarchy = hierarchy }
   const current = await lockCliAgentPolicy(tx,userId,run.agentId,run.botId,task,run.runWorkspaceId)
-  // The thread's frozen mode narrows the same policy the layers produced:
-  // plan is the existing read-only policy. The revision covers the mode, so a
-  // mode transition fences old approvals and stops a stale gate.
-  const mode: ThreadMode = threadModeSchema.parse(run.mode ?? 'execute')
-  const withMode = (policy: RunPolicy) => applyThreadMode(policy, mode)
-  const rehash = (revision: string) => createHash('sha256').update(JSON.stringify(['thread-mode-v1', mode, revision])).digest('hex')
   if (options.freezeHierarchy !== false && task?.hierarchy && run.hierarchy == null) {
     // Concurrent first readers may agree on the snapshot, but one may never
     // overwrite a different admitted hierarchy after waiting on the row lock.
@@ -212,12 +205,12 @@ export async function lockCliRunPolicy(tx: PoolClient, runId: string, userId: st
       AND (cli_policy_hierarchy IS NULL OR cli_policy_hierarchy=$3::jsonb) RETURNING id`, [runId,userId,task.hierarchy])
     if (!frozen.rowCount) throw new Error('agentPolicyChanged')
   }
-  if (run.policyCeiling == null) return { ...current, mode, policy: withMode(current.policy), revision: rehash(current.revision) }
+  if (run.policyCeiling == null) return current
   const ceiling = runPolicySchema.safeParse(run.policyCeiling)
   if (!ceiling.success) throw new Error('agentPolicyUnavailable')
-  const next = withMode(intersectRunPolicy(current.policy, ceiling.data))
-  return { ...current, mode, policy: next,
-    revision: rehash(createHash('sha256').update(JSON.stringify(['provider-policy-ceiling-v1', current.revision, ceiling.data])).digest('hex')) }
+  const next = intersectRunPolicy(current.policy, ceiling.data)
+  return { ...current, policy: next,
+    revision: createHash('sha256').update(JSON.stringify(['provider-policy-ceiling-v1', current.revision, ceiling.data])).digest('hex') }
 }
 
 /** A host prelocks policy before its Factory/issue/run locks. It verifies an

@@ -13,7 +13,6 @@ import { proposeAppToolCall } from '@/lib/pending-action-store'
 import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import { composioToolkitLister, isNoAuthToolkit } from '@/lib/plugins/catalog'
 import { MAX_RUN_APP_TOOLS, runAppTool, type RunAppScope } from '@/lib/run-app-mcp'
-import { resolveThreadMode, type ThreadMode } from '@mikka/protocol/thread-mode'
 
 type Client = NonNullable<ReturnType<typeof getComposio>>
 
@@ -24,9 +23,9 @@ export async function executeAppToolCall(client: Client, userId: string, call: A
   return { successful: result.successful, data: result.data, error: result.error, ...(result.logId ? { logId: result.logId } : {}) }
 }
 
-export function appToolDeps(userId: string, botId: string | null, client: Client, mode?: ThreadMode): AppToolDeps {
+export function appToolDeps(userId: string, botId: string | null, client: Client, readOnly?: boolean): AppToolDeps {
   return {
-    mode,
+    readOnly,
     appAllowed: async toolkit => (await import('@/lib/app-policy/store')).botMayUseApp(botId, toolkit),
     noAuth: toolkit => isNoAuthToolkit(composioToolkitLister(client), toolkit).catch(() => false),
     resolveAccount: (toolkit, selected) => resolveComposioAccount(userId, toolkit, client, kit => chosenComposioDefault(userId, kit), selected),
@@ -50,10 +49,10 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
   }
 }
 
-export async function runAppTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown, mode?: ThreadMode) {
+export async function runAppTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown, readOnly?: boolean) {
   const client = getComposio()
   if (!client) return { error: 'composioNotConfigured' }
-  const deps = appToolDeps(userId, botId, client, mode)
+  const deps = appToolDeps(userId, botId, client, readOnly)
   return operation === 'list' ? listAppTools(deps, input) : callAppTool(deps, input)
 }
 
@@ -67,16 +66,16 @@ export async function runAppToolkits(userId: string, botId: string | null): Prom
 }
 
 /** A run's MCP entry for one app: its tools, and each call through the same rules as a cloud Bot's call_app_tool. */
-/** The mode a run froze, or null when the run does not belong to the caller. */
-export async function runThreadMode(userId: string, runId: string): Promise<ThreadMode | null> {
-  const { rows: [run] } = await pool.query<{ mode: string }>('SELECT mode FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, userId])
-  return run ? resolveThreadMode(run.mode) : null
+/** Whether a run is read-only, or null when it does not belong to the caller. */
+export async function runReadOnly(userId: string, runId: string): Promise<boolean | null> {
+  const { rows: [run] } = await pool.query<{ readOnly: boolean }>(`SELECT coalesce((r."agentDefinition"->>'readOnly')::boolean,false) AS "readOnly" FROM agent_runs r WHERE id=$1 AND "userId"=$2`, [runId, userId])
+  return run ? run.readOnly : null
 }
 
 export function runAppEntry(scope: RunAppScope) {
   const client = getComposio()
   if (!client) return null
-  const deps = appToolDeps(scope.userId, scope.botId, client, scope.mode)
+  const deps = appToolDeps(scope.userId, scope.botId, client, scope.readOnly)
   const execute = deps.execute
   deps.execute = async (call, accountId) => {
     // Tool discovery / the write decision may wait on external services. Recheck at use, after those waits.

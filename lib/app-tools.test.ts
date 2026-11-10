@@ -70,19 +70,16 @@ test('explicit settings win over the judgment', async () => {
   assert.deepEqual(allowed.calls, ['record:HUBSPOT_DELETE_CONTACT', 'execute:HUBSPOT_DELETE_CONTACT:20261030_00', 'end:done'])
 })
 
-test('thread modes narrow app tools at the host path (#1730)', async () => {
-  // Plan reads only: a write is refused before any account, judge or record.
-  const plan = deps({ mode: 'plan' })
-  assert.deepEqual(await callAppTool(plan.deps, call('HUBSPOT_CREATE_CONTACT')), { error: 'threadModePlanReadOnly' })
-  assert.deepEqual(plan.calls, [])
-  assert.deepEqual(await callAppTool(plan.deps, call('HUBSPOT_LIST_CONTACTS')), { data: { id: 'c1' } })
-  // Ask cards every write, even when the stored setting allows it.
-  const ask = deps({ mode: 'ask', setting: async () => 'allow', judge: async () => 'allow' })
-  assert.deepEqual(await callAppTool(ask.deps, call('HUBSPOT_CREATE_CONTACT')), { status: 'awaiting_approval', actionId: 'card_1' })
-  assert.deepEqual(ask.calls, ['card:HUBSPOT_CREATE_CONTACT'])
-  assert.deepEqual(await callAppTool(ask.deps, call('HUBSPOT_LIST_CONTACTS')), { data: { id: 'c1' } })
-  // A deny still wins over Ask: the mode never widens an explicit refusal.
-  const denied = deps({ mode: 'ask', setting: async () => 'deny' })
+test('a read-only run refuses app writes at the host path', async () => {
+  // Read-only refuses a write before any account, judge or record: nothing
+  // would execute even if a person approved it, so it is a refusal.
+  const readOnly = deps({ readOnly: true })
+  assert.deepEqual(await callAppTool(readOnly.deps, call('HUBSPOT_CREATE_CONTACT')), { error: 'runReadOnly' })
+  assert.deepEqual(readOnly.calls, [])
+  // Reads still run.
+  assert.deepEqual(await callAppTool(readOnly.deps, call('HUBSPOT_LIST_CONTACTS')), { data: { id: 'c1' } })
+  // An explicit deny still wins: read-only never widens a refusal.
+  const denied = deps({ readOnly: true, setting: async () => 'deny' })
   assert.deepEqual(await callAppTool(denied.deps, call('HUBSPOT_CREATE_CONTACT')), { error: 'integrationActionDenied' })
 })
 

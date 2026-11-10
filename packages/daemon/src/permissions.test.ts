@@ -208,20 +208,33 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(settings.permissions?.deny).toContain("Bash(npm install:*)")
   })
 
-  it("names every risky Claude tool for Ask and denies Plan's changes and subagents (#1730)", () => {
-    const ask = claudePermissionRules(policy({}), "ask")
-    expect(ask.ask).toEqual(expect.arrayContaining(["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task", "Agent"]))
-    // Ask reaches the run-bound approval gate instead of denying the shell outright.
-    expect(ask.deny).not.toContain("Bash")
+  it("asks about a built-in only when its own policy action asks", () => {
+    // What is asked comes from the run's resolved policy, not a mode: an
+    // action left at `ask` names the tool that reaches the gate.
+    const installAsk = claudePermissionRules(policy({}))
+    expect(installAsk.ask).toEqual([])
+    // install_dependency: ask names the install commands, never the shell.
+    const asking = claudePermissionRules(policy({ install_dependency: "ask" }))
+    expect(asking.ask).toEqual(expect.arrayContaining(["Bash(npm install:*)"]))
+    expect(asking.deny).not.toContain("Bash")
+    // A non-gate action left at `ask` adds no CLI rule: the sandbox and the
+    // broker already enforce it, so nothing is routed to the callback.
+    // write_outside_repo and computer_use both default to `ask`, so a default
+    // run still asks nothing per tool.
+    expect(policy({}).permissions.write_outside_repo).toBe("ask")
+    expect(policy({}).permissions.computer_use).toBe("ask")
+    expect(claudePermissionRules(policy({})).ask).toEqual([])
+  })
+
+  it("denies a read-only run's changes and subagents, and says so in its brief", () => {
     const planPolicy = { ...policy({}), readOnly: true }
-    const plan = claudePermissionRules(planPolicy, "plan")
-    expect(plan.deny).toEqual(expect.arrayContaining(["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task", "Agent"]))
-    expect(plan.ask).toEqual([])
-    expect(claudeSettings(policy({}), "ask").permissions).toEqual(ask)
-    expect(policyInstructions(planPolicy, "plan")[0]).toContain("Plan mode")
-    expect(policyInstructions(policy({}), "ask")[0]).toContain("Ask mode")
-    // Execute keeps the old rules exactly.
-    expect(policyInstructions(policy({}))).not.toContainEqual(expect.stringContaining("mode"))
+    const rules = claudePermissionRules(planPolicy)
+    expect(rules.deny).toEqual(expect.arrayContaining(["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task", "Agent"]))
+    expect(rules.ask).toEqual([])
+    expect(claudeSettings(planPolicy).permissions).toEqual(rules)
+    expect(policyInstructions(planPolicy)[0]).toContain("read-only check")
+    // A writable run's brief says nothing about reading.
+    expect(policyInstructions(policy({}))).not.toContainEqual(expect.stringContaining("read-only"))
   })
 
   it("lets every Cursor tool call go ahead, git push included", async () => {

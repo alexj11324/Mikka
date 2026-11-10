@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     if (error instanceof ApprovalUnavailable) {
       if (error.revokeReason === 'not_pending') return respond({ error: 'approvalAlreadyDecided' }, 409)
       if (error.revokeReason === 'expired') return respond({ error: 'approvalExpired' }, 409)
-      if (error.revokeReason === 'mode_not_ask' || error.revokeReason === 'policy_changed') return respond({ error: 'approvalNoLongerApplies' }, 409)
+      if (error.revokeReason === 'policy_changed') return respond({ error: 'approvalNoLongerApplies' }, 409)
       return respond({ error: 'approvalUnavailable' }, 404)
     }
     return respond({ error: 'approvalUnavailable' }, 503)

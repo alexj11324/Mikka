@@ -12,8 +12,6 @@ const catalogReads: unknown[][] = []
 const query = { query: async (sql: string, args: unknown[]) => {
   if (sql.startsWith('SELECT 1 FROM byos_connections')) { catalogReads.push(args); return { rowCount: (args[0] === 'bob' ? sharedCatalogOffers : catalogOffers) ? 1 : 0, rows: [] } }
   if (sql.startsWith('SELECT state,paused,epoch,quota')) return { rows: [{ state: 'connected', paused: false, epoch: '1', quota }] }
-  if (sql.startsWith('INSERT INTO task_thread_modes')) return { rows: [] }
-  if (sql.startsWith('SELECT mode,version FROM task_thread_modes')) return { rows: [{ mode: 'execute', version: 0 }] }
   throw new Error(`unexpected fixture query: ${sql}`)
 } } as unknown as Pick<Pool, 'query'>
 mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports: {

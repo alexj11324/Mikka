@@ -29,7 +29,6 @@ import { ClaudeGenerationMetrics } from './generation-metrics'
 import { prepareClaudeSession, ClaudeProjectSettingsNotClaimable, type ClaudePrewarmBinding, type ClaudePreparation } from './claude-prewarm'
 import { runRuntimeTimings } from '../run-runtime-timing'
 import type { Readable, Writable } from "node:stream"
-import type { ThreadMode } from "@mikka/protocol/thread-mode"
 
 import {
   query,
@@ -165,21 +164,18 @@ export function claudeProjectDirName(cwd: string): string {
  * sandbox stays off (runs use no sandbox, decision 2026-11-01-2335), and the
  * workspace's command rules apply as Claude permission rules (ADR 0028).
  */
-export function claudeSettings(
-  workspace?: RunPolicy,
-  mode: ThreadMode = 'execute',
-): Settings {
+export function claudeSettings(workspace?: RunPolicy): Settings {
   return {
     sandbox: { enabled: false },
-    permissions: claudePermissionRules(runPolicy(workspace), mode),
+    permissions: claudePermissionRules(runPolicy(workspace)),
     // Keep the issue marker last in PR bodies without changing commit attribution.
     attribution: { pr: "" },
   }
 }
 
-/** Built-in tools a Plan run may use without asking: they only read. */
-const PLAN_READ_TOOLS = new Set(["Read", "Glob", "Grep", "LS", "NotebookRead", "WebFetch", "WebSearch", "TodoWrite"])
-/** The host hand-in tools enforce the mode themselves; an app entry follows
+/** Built-in tools that only read; they never reach the approval gate. */
+const PLANNING_READ_TOOLS = new Set(["Read", "Glob", "Grep", "LS", "NotebookRead", "WebFetch", "WebSearch", "TodoWrite"])
+/** The host hand-in tools enforce the policy themselves; an app entry follows
  * the same server-side app rules. Computer use has its own broker ask. */
 const isHostTool = (name: string) => name.startsWith("mcp__mikka__")
 const isComputerTool = (name: string) => name.startsWith("mcp__mikka_computer__")
@@ -526,6 +522,8 @@ export class ClaudeAdapter implements AgentAdapter {
   ): Promise<AgentSession> {
     const approval = requireRunToolApproval(options.runId, options.toolApproval)
     if (!await approval.checkLive()) { approval.revoke(); throw new Error('Run tool approval unavailable') }
+    // Read-only is the policy's own fact, not a mode the adapter must guess.
+    const policy = runPolicy(options.policy)
     const paths = runPaths(this.options.stateDir, options.runId)
     const runDir = await claimRunDir(paths)
     const externalAuth = this.options.subscriptionAuth
@@ -591,7 +589,6 @@ export class ClaudeAdapter implements AgentAdapter {
       mailboxEnabled: Boolean(options.mailbox),
       harness: "claude_code",
       kind: options.kind,
-      mode: options.mode,
       factoryCheck: options.factoryCheck,
       verifyCommand: options.verifyCommand,
       worktree: options.cwd,
@@ -721,7 +718,7 @@ export class ClaudeAdapter implements AgentAdapter {
         },
         settingSources: options.machineEnvironment ? ["user", "project", "local"] : [],
         settings: {
-          ...claudeSettings(options.policy, options.mode),
+          ...claudeSettings(options.policy),
           ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
         },
         mcpServers: {
@@ -736,13 +733,25 @@ export class ClaudeAdapter implements AgentAdapter {
           preset: "claude_code" as const,
           append: append,
         },
-        // Execute asks nothing per tool (decision 2026-11-01-2335). Ask
-        // routes each risky built-in to the run-bound approval gate; Plan
-        // allows reads and the host hand-in only.
-        ...(options.mode === "ask" ? {
+        // Two independent facts decide this, and neither is a thread mode:
+        //
+        // - A read-only policy changes nothing, so the CLI asks nothing and
+        //   is refused the tools that would. This is ADR 0046, and it applies
+        //   whatever the workspace allowed.
+        // - A run whose policy resolves an action to `ask` routes that
+        //   tool to the run-bound approval gate and waits for the person.
+        //   A policy with no such action keeps the historical behavior:
+        //   nothing is asked per tool (decision 2026-11-01-2335).
+        ...(policy.readOnly ? {
+          permissionMode: "default" as const,
+          canUseTool: async (name: string, args: Record<string, unknown>) =>
+            PLANNING_READ_TOOLS.has(name) || isHostTool(name) || isAppTool(name)
+              ? { behavior: "allow" as const, updatedInput: args }
+              : { behavior: "deny" as const, message: "This run only reads; hand your findings back instead of changing anything." },
+        } : approval.asksAny ? {
           permissionMode: "default" as const,
           canUseTool: async (name: string, args: Record<string, unknown>, context: CanUseToolContext) => {
-            if (PLAN_READ_TOOLS.has(name) || isHostTool(name) || isAppTool(name) || isComputerTool(name))
+            if (PLANNING_READ_TOOLS.has(name) || isHostTool(name) || isAppTool(name) || isComputerTool(name))
               return { behavior: "allow" as const, updatedInput: args }
             const approved = await approval.requestApproval({
               requestId: context?.requestId ?? context?.toolUseID ?? randomUUID(),
@@ -752,12 +761,6 @@ export class ClaudeAdapter implements AgentAdapter {
               ? { behavior: "allow" as const, updatedInput: args }
               : { behavior: "deny" as const, message: "The person did not approve this operation." }
           },
-        } : options.mode === "plan" ? {
-          permissionMode: "default" as const,
-          canUseTool: async (name: string, args: Record<string, unknown>) =>
-            PLAN_READ_TOOLS.has(name) || isHostTool(name) || isAppTool(name)
-              ? { behavior: "allow" as const, updatedInput: args }
-              : { behavior: "deny" as const, message: "Plan mode only reads; hand in a plan instead of changing anything." },
         } : {
           permissionMode: "bypassPermissions" as const,
           allowDangerouslySkipPermissions: true,

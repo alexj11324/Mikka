@@ -12,8 +12,6 @@ export const RUN_INVALID_REASONS = {
   sourceRunMismatch: 'An earlier run for this request does not match this dispatch.',
   taskIdentifierRequired: 'The task has no identifier for its branch.',
   branchInUse: 'The task branch is already used by another task in this repository.',
-  threadModeLocked: 'The thread is still working; change its mode after it ends.',
-  threadModeChanged: 'The thread mode changed; reload it and try again.',
 } as const
 
 export type RunInvalidReason = keyof typeof RUN_INVALID_REASONS

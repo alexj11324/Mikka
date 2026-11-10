@@ -59,13 +59,13 @@ export const harnessInfoSchema = z.object({
   subscriptionPreflight: subscriptionPreflightSchema.optional(),
   /** Set only by an E2B worker with the guarded Bot computer broker. */
   computerBroker: z.literal(true).optional(),
-  /** Run-scoped CLI approvals and policy-version checks are supported. */
-  toolApproval: z.literal(true).optional(),
   /**
-   * Thread interaction modes this runner enforces (#1730). Absent on an
-   * older daemon: only Execute is admitted, never a mode it cannot enforce.
+   * This runner can ask a person about one exact tool call and act on the
+   * answer: the live gate, the policy-revision check and the native callback
+   * are all present. Absent on an older daemon, which is therefore never
+   * given a run whose policy needs an ask.
    */
-  threadModes: z.array(z.enum(["plan", "execute", "ask"])).max(3).optional(),
+  toolApproval: z.literal(true).optional(),
   /**
    * The CLI exists but `installed` stays false because the daemon cannot run it
    * in a sandbox. `missing` names the absent packages; empty means the machine

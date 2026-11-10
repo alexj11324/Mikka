@@ -27,7 +27,6 @@ import {
   type PermissionDecision,
   type RunPolicy,
 } from "@mikka/protocol/agent-policy"
-import { threadModeInstructions, type ThreadMode } from "@mikka/protocol/thread-mode"
 
 
 export { PERMISSION_ACTIONS, PERMISSION_DEFAULTS }
@@ -132,8 +131,13 @@ const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
  * configurable effects cannot be authorized is unavailable as a capability.
  * `git push` is the agent's own judgment, as with the person's own `gh auth
  * login` (decision 2026-11-02-1600): no rule withholds it.
+ *
+ * What is asked comes from the run's resolved policy, never from a mode: an
+ * action the policy left at `ask` names the tools that reach the gate. A
+ * policy that allows everything asks nothing, as every run did before the
+ * gate existed.
  */
-export function claudePermissionRules(policy: RunPolicy, mode: ThreadMode = 'execute'): {
+export function claudePermissionRules(policy: RunPolicy): {
   allow: string[]
   ask: string[]
   deny: string[]
@@ -146,42 +150,37 @@ export function claudePermissionRules(policy: RunPolicy, mode: ThreadMode = 'exe
   const decision = policy.readOnly
     ? "deny"
     : policy.permissions.install_dependency
-  // Ask mode names every risky built-in tool; the adapter's canUseTool gate
-  // asks the person for each one. Reads are not listed and run directly.
-  const ask = [
-    ...(decision === "ask" ? install : []),
-    ...(mode === "ask" ? ASK_TOOLS : []),
-  ]
-  // Plan mode also refuses a subagent that would otherwise inherit the run
-  // and could act with its own tool surface.
-  const plan = mode === "plan" || policy.readOnly
+  // The install commands whose policy action is `ask`; the adapter's
+  // canUseTool gate asks the person before any of them runs. Reads are not
+  // listed and run directly. Nothing else is named here: the sandbox and the
+  // computer broker enforce their own actions, and naming a tool here would
+  // ask for it on every run.
+  const ask = decision === "ask" ? install : []
+  // A read-only run also refuses a subagent that would otherwise inherit the
+  // run and could act with its own tool surface.
+  const readOnly = policy.readOnly === true
   return {
     allow: [],
     ask,
     deny: [
-      // A policy that withholds the native shell keeps denying it in every
-      // mode: Ask only adds oversight, and an approval can never widen the
-      // policy the run was admitted with.
+      // A policy that withholds the native shell keeps denying it whatever
+      // else is asked: an approval can never widen the policy the run was
+      // admitted with.
       ...(!rawCliShellAvailable(policy) ? ['Bash','PowerShell','Monitor'] : []),
-      ...(plan ? READ_ONLY_TOOLS : []),
-      ...(plan ? ['Task', 'Agent'] : []),
+      ...(readOnly ? READ_ONLY_TOOLS : []),
+      ...(readOnly ? ['Task', 'Agent'] : []),
       ...(decision === "deny" ? install : []),
     ],
   }
 }
 
-/** Built-in tools that change the worktree or run a command; Ask mode names
- * them so the harness reaches the run-bound approval gate. */
-const ASK_TOOLS = ["Bash", "PowerShell", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task", "Agent"]
-
 /** Tools that change the worktree, denied to a read-only run (ADR 0046). */
 const READ_ONLY_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"]
 
 /** What the agent is told about this run's permissions. */
-export function policyInstructions(policy: RunPolicy, mode: ThreadMode = 'execute'): string[] {
+export function policyInstructions(policy: RunPolicy): string[] {
   const { permissions } = policy
   const lines: string[] = []
-  lines.push(...threadModeInstructions(mode))
   if (policy.readOnly)
     lines.push(
       "- This is a read-only check: you may read the worktree but not change it. Report what you found through `submit`; do not fix anything yourself."
