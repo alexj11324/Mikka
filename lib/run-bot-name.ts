@@ -39,7 +39,10 @@ export const runAgentName = sql<string>`case ${agents.harness} when 'claude_code
  * names a thread from this instead of reading whole prompts.
  */
 /** Only the recorded task range may name a thread; missing/invalid provenance never falls back to execution instructions. */
-export const runTaskPrompt = sql<string>`case when ${agentRuns.promptTaskStart} >= 0 and ${agentRuns.promptTaskLength} >= 0 and ${agentRuns.promptTaskStart} <= char_length(${agentRuns.prompt}) and ${agentRuns.promptTaskLength} <= char_length(${agentRuns.prompt}) - ${agentRuns.promptTaskStart} then substr(${agentRuns.prompt}, ${agentRuns.promptTaskStart} + 1, ${agentRuns.promptTaskLength}) else '' end`
+// These columns belong only to the current agent_runs row in every caller.
+// Keep the repeated projection compact for citation wire budgets; int8 subtraction
+// makes even invalid int32 extrema safe before CASE decides whether to slice.
+export const runTaskPrompt = sql<string>`case when "promptTaskStart">=0 and "promptTaskLength" between 0 and length(prompt)-"promptTaskStart"::int8 then substr(prompt,"promptTaskStart"+1,"promptTaskLength") else '' end`
 export const threadNamePrompt = sql<string>`left(ltrim(${runTaskPrompt}, E' \\t\\r\\n'), 400)`
 /**
  * A run's prompt up to the end of its first line with a letter, in a query

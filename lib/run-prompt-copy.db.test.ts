@@ -19,6 +19,15 @@ test('thread lists read only the recorded task range in real PostgreSQL, never a
     const rows = await drizzle(client).select({ task: runTaskPrompt, name: threadNameLines }).from(agentRuns)
     assert.deepEqual(rows.map(row => row.task).sort(), ['', '', '', task].sort())
     assert.deepEqual(rows.map(row => row.name).filter(Boolean), ['User task 🧪'])
+    // Partial ranges, negative values and int32-overflow sums must all fail
+    // closed. PostgreSQL LEAST ignores NULL, so test each missing half too.
+    await client.query('TRUNCATE agent_runs')
+    for (const [start, length] of [[null, 4], [0, null], [-1, 4], [0, -1], [2147483647, 1], [1, 2147483647], [2147483647, 2147483647], [-2147483648, 2147483647], [2147483647, -2147483648]]) {
+      await client.query('INSERT INTO agent_runs VALUES (gen_random_uuid(),$1,$2,$3)', ['INTERNAL_HOST_GUIDANCE', start, length])
+    }
+    const invalid = await drizzle(client).select({ task: runTaskPrompt, name: threadNameLines }).from(agentRuns)
+    assert.deepEqual(invalid.map(row => row.task), Array(9).fill(''))
+    assert.ok(invalid.every(row => !row.name))
   } finally {
     await client.query('ROLLBACK')
     client.release()
