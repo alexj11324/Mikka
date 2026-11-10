@@ -137,7 +137,7 @@ const captureDisplay = (display: number) => { if (!Number.isInteger(display) || 
 
 async function installCaptureScript(sandbox: Sandbox, signal?: AbortSignal) {
   // Machines provisioned by an older deployment lack it; writing it each time keeps them current.
-  // Bundled for the /v1/runs/*/screen route (next.config.mjs).
+  // Copied into .output/resources by apps/api/scripts/finalize-build.mjs.
   const script = await readFile(join(process.cwd(), 'scripts/e2b/screen-capture.sh'), { encoding: 'utf8', signal })
   signal?.throwIfAborted()
   await sandbox.files.write(CAPTURE_SCRIPT, script, { user: 'root', signal })

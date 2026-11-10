@@ -80,17 +80,28 @@ test('a thread icon never borrows a task\'s circle (R-52)', () => {
   assert.ok(!auditSource('components/workspace/issue-properties.tsx', 'import { CircleCheck } from "lucide-react";', policy).some(item => item.rule === 'icons/thread-not-circle'))
 })
 
-test('local fonts must be registered with their CSS variable', () => {
+test('local fonts are the registered files bound to their CSS variables', () => {
+  // Next rendered the document with next/font/local; the application now owns
+  // the declarations in apps/desktop/src/renderer/styles.css. Keep the same
+  // files, weight range and display policy, and the ui-policy.json registry.
+  const styles = readFileSync(new URL('../apps/desktop/src/renderer/styles.css', import.meta.url), 'utf8')
+  for (const font of policy.typography.localFonts) {
+    assert.ok(styles.includes(`app/${font.src.replace(/^app\//, '')}`), `${font.src} must be declared`)
+  }
+  assert.match(styles, /--font-inter: "Mikka Inter"/)
+  assert.match(styles, /--font-geist-mono: "Mikka Geist Mono"/)
+  assert.doesNotMatch(styles, /fonts\.googleapis|fonts\.gstatic/)
+  // The rule itself still rejects an unregistered file or variable.
   const approved = `import localFont from 'next/font/local';
     const fontSans = localFont({ src: '../fonts/InterVariable.woff2', variable: '--font-inter', weight: '100 900' });`
-  assert.deepEqual(auditSource('app/[locale]/layout.tsx', approved, policy), [])
+  assert.deepEqual(auditSource('components/example-font.tsx', approved, policy), [])
   for (const source of [approved.replace('InterVariable.woff2', 'Other-Variable.woff2'), approved.replace('--font-inter', '--font-other')]) {
-    assert.ok(auditSource('app/[locale]/layout.tsx', source, policy).some(d => d.rule === 'typography/font-family'))
+    assert.ok(auditSource('components/example-font.tsx', source, policy).some(d => d.rule === 'typography/font-family'))
   }
   const pair = `import localFont from 'next/font/local';
     const fontSans = localFont({ src: [{ path: '../fonts/InterVariable.woff2', style: 'normal' }, { path: '../fonts/InterVariable-Italic.woff2', style: 'italic' }], variable: '--font-inter' });`
-  assert.deepEqual(auditSource('app/[locale]/layout.tsx', pair, policy), [])
-  assert.ok(auditSource('app/[locale]/layout.tsx', pair.replace('InterVariable-Italic.woff2', 'Other-Italic.woff2'), policy).some(d => d.rule === 'typography/font-family'))
+  assert.deepEqual(auditSource('components/example-font.tsx', pair, policy), [])
+  assert.ok(auditSource('components/example-font.tsx', pair.replace('InterVariable-Italic.woff2', 'Other-Italic.woff2'), policy).some(d => d.rule === 'typography/font-family'))
 })
 
 test('component composition + business data/event wiring + layout are allowed', () => {
@@ -183,10 +194,11 @@ test('CSS cannot bypass typography restrictions', () => {
   assert.ok(auditCss('app/a.css', '@theme inline { --text-md: 16px }', policy).some(d => d.rule === 'typography/no-css-values'))
 })
 
-test('framework html/body shell is not mistaken for a handmade widget', () => {
-  assert.deepEqual(auditSource('app/layout.tsx', '<html lang="zh-CN"><body>{children}</body></html>', policy), [])
-  assert.deepEqual(auditSource('app/[locale]/layout.tsx', '<html lang={locale}><body>{children}</body></html>', policy), [])
-  assert.ok(auditSource('app/layout.tsx', '<html><body><button /></body></html>', policy).some(d => d.rule === 'components/no-handwritten-ui'))
+test('no source file is treated as a document shell: apps/frontend/index.html owns <html>/<body>', () => {
+  // The Next layout that used to render the document is gone, so a handmade
+  // <button> is caught wherever it appears, and the plain tags stay legal.
+  assert.ok(auditSource('app/api/widget/route.ts', '<html><body><button /></body></html>', policy).some(d => d.rule === 'components/no-handwritten-ui'))
+  assert.deepEqual(auditSource('app/api/widget/route.ts', '<html lang="zh-CN"><body>{children}</body></html>', policy), [])
 })
 
 test('plain layout containers stay legal: only elements with a component equivalent are banned', () => {

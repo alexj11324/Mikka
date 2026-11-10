@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { lstat, readFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { observedAction, publishedActions, rpcReadResult } from '../../../scripts/acceptance/read-action-transport.mjs'
@@ -25,22 +25,10 @@ export async function selectParityWorkspace(page, { menuName, workspaceName, bas
 // transport only for reads whose successful empty state has no DOM of its own.
 // No requests, React internals, application state or response routes are added.
 export async function readActionIds(applicationDirectory) {
-  const nitro = await lstat(join(applicationDirectory, '.output/mikka-build.json')).then(() => true, error => {
-    if (error.code === 'ENOENT') return false
-    throw error
-  })
-  if (nitro) {
-    const manifest = JSON.parse(await readFile(join(applicationDirectory, '.output/public/mikka/renderer-manifest.json'), 'utf8'))
-    return new Map([...publishedActions(manifest)].map(name => [name, name]))
-  }
-  const manifest = JSON.parse(await readFile(join(applicationDirectory, '.next/server/server-reference-manifest.json'), 'utf8'))
-  const names = new Map()
-  for (const [id, action] of Object.entries(manifest.node ?? {})) {
-    const module = /^app\/actions\/(.+)\.tsx?$/.exec(action.filename ?? '')?.[1]
-    if (module && action.exportedName) names.set(id, `${module}.${action.exportedName}`)
-  }
-  assert.ok(names.size, 'The tested production build must identify its real actions')
-  return names
+  // Only the Nitro application is a tested production build; a directory
+  // without its manifest has no real actions to identify.
+  const manifest = JSON.parse(await readFile(join(applicationDirectory, '.output/public/mikka/renderer-manifest.json'), 'utf8'))
+  return new Map([...publishedActions(manifest)].map(name => [name, name]))
 }
 
 export function observeReads(page, requirements, actionIds, basePath) {

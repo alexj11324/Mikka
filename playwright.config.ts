@@ -30,10 +30,9 @@ export default defineConfig({
     command: 'node scripts/start-app.mjs --port 3100',
     url: 'http://localhost:3100/mikka/sign-in',
     reuseExistingServer: false,
-    // Opt-in harness for the credential login card (mocked API, no vault), and
-    // loopback custom model providers for 「API 与订阅」 (lib/model-api-keys.ts), and both
+    // Loopback custom model providers for 「API 与订阅」 (lib/model-api-keys.ts), and both
     // subscription chat routes validated so seeded subscriptions are offered in bot chats.
-    env: { MIKKA_CREDENTIAL_HARNESS: '1', MIKKA_MODEL_KEY_LOOPBACK: '1', MIKKA_BYOS_VALIDATED_MODEL_ROUTES: 'claude_cpa,codex_cpa' },
+    env: { MIKKA_MODEL_KEY_LOOPBACK: '1', MIKKA_BYOS_VALIDATED_MODEL_ROUTES: 'claude_cpa,codex_cpa' },
     timeout: 60000,
   },
 })
