@@ -83,12 +83,34 @@ test('title truncation never splits a surrogate pair', () => {
   assert.equal(linkLine(text), LINK)
 })
 
+test('Slack control syntax in the task renders as text, never a mention', () => {
+  const text = slackCompletionMessage({
+    ...base,
+    identifier: 'MIK-42',
+    title: '<!channel> <!here> <@U123> & <https://evil.example|click>',
+  })
+  const header = head(text)
+  assert.equal(/<!(?:channel|here)\b/.test(header), false)
+  assert.equal(/<@U\d+>/.test(header), false)
+  assert.equal(header.includes('&lt;!channel&gt;'), true)
+  assert.equal(header.includes('&lt;@U123&gt;'), true)
+  assert.equal(header.includes('&amp;'), true)
+  assert.equal(linkLine(text), LINK, 'the bare URL is not escaped')
+})
+
 test('a link that fills the budget drops the label and stays whole', () => {
-  const longLink = `https://app.example.com/${'a'.repeat(366)}` // 390 code points
-  const text = slackCompletionMessage({ ...base, deepLink: longLink })
-  assert.equal(text, longLink)
-  assert.equal(text.includes('Done'), false, 'the status label is dropped')
-  assert.ok(Array.from(text).length <= SLACK_COMPLETION_MAX)
+  for (const size of [390, 400]) {
+    const link = `https://app.example.com/${'a'.repeat(size - 24)}`
+    const text = slackCompletionMessage({ ...base, deepLink: link })
+    assert.equal(Array.from(link).length, size)
+    assert.equal(text, link)
+    assert.equal(text.includes('Done'), false, 'the status label is dropped')
+    assert.ok(Array.from(text).length <= SLACK_COMPLETION_MAX, `${size}-code-point link stays within 400`)
+  }
+  const midLink = `https://app.example.com/${'a'.repeat(276)}` // 300 code points
+  const labelled = slackCompletionMessage({ ...base, title: 'Fix login redirect '.repeat(80), deepLink: midLink })
+  assert.match(head(labelled), /… — Done$/, 'a link that leaves room keeps the label')
+  assert.ok(Array.from(labelled).length <= SLACK_COMPLETION_MAX)
 })
 
 test('a link longer than the whole budget is returned alone, never truncated', () => {
@@ -96,6 +118,7 @@ test('a link longer than the whole budget is returned alone, never truncated', (
   const text = slackCompletionMessage({ ...base, deepLink: huge })
   assert.equal(text, huge)
   assert.equal(text.includes('Done'), false)
+  assert.ok(Array.from(text).length > SLACK_COMPLETION_MAX, 'the link wins over the soft budget')
 })
 
 test('control characters are removed from display text', () => {

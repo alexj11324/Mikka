@@ -5,7 +5,11 @@
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { withBasePath } from '@/lib/base-path'
 
-/** Slack renders 400 characters comfortably; the link always wins. Counted in code points. */
+/**
+ * The soft message budget in code points, used while the link leaves room for
+ * the label. The link is never truncated: a bare URL that is longer on its own
+ * is returned as-is.
+ */
 export const SLACK_COMPLETION_MAX = 400
 
 export const SLACK_RUN_STATUSES = ['succeeded', 'failed', 'stopped', 'cancelled'] as const
@@ -41,6 +45,13 @@ function oneLine(value: string): string {
   return value.replace(/[\s\p{Cc}]+/gu, ' ').trim()
 }
 
+const SLACK_ENTITIES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' }
+
+/** Slack control syntax (`<!channel>`, `<@U123>`) must render as text, not a mention. */
+function escapeSlackText(value: string): string {
+  return value.replace(/[&<>]/g, (char) => SLACK_ENTITIES[char])
+}
+
 /** Trim to `max` code points without splitting a surrogate pair. */
 function truncate(value: string, max: number): string {
   if (max <= 0) return ''
@@ -65,17 +76,20 @@ export interface SlackCompletionInput {
  * `Mikka: <identifier> <title> — <status>` plus the link, on one line. The
  * task label shrinks to keep the message within SLACK_COMPLETION_MAX; if the
  * link leaves no room for the label, the bare URL is the message. The link is
- * never truncated.
+ * never truncated or escaped. Task text is escaped so `<!channel>` and
+ * `<@U123>` render as text rather than mentions.
  */
 export function slackCompletionMessage(input: SlackCompletionInput): string {
   if (!isSlackRunStatus(input.status)) throw new TypeError('unknown run status')
   const deepLink = input.deepLink.trim()
   if (!HTTP_URL.test(deepLink)) throw new TypeError('deep link must be an http(s) URL without whitespace')
   const locale = slackCompletionLocale(input.locale)
-  const task = [input.identifier, input.title]
-    .map((value) => typeof value === 'string' ? oneLine(value) : '')
-    .filter(Boolean)
-    .join(' ') || EMPTY_TASK[locale]
+  const task = escapeSlackText(
+    [input.identifier, input.title]
+      .map((value) => typeof value === 'string' ? oneLine(value) : '')
+      .filter(Boolean)
+      .join(' ') || EMPTY_TASK[locale],
+  )
   const label = LABELS[locale][input.status]
   const head = `${PREFIX}${task}${SEPARATOR}${label}`
   const full = `${head}\n${deepLink}`
