@@ -42,8 +42,8 @@ What follows:
   Agent still use the person's own GitHub credential, so the page's line says
   "direct" rather than "never".
 - The run policy on the same page is the workspace layer
-  (`workspace_computer_policies.cli_run_policy`), the only run-policy surface;
-  per-Bot and per-worker layers are retired.
+  (`workspace_computer_policies.cli_run_policy`); per-Bot and per-worker layers
+  are retired, while team and project scopes still narrow a task.
 - Capy's comparable model — permissions on the MCP server plus a per-device
   access prompt — also authorizes a connection, not each agent. This decision
   matches that shape and removes the per-Bot enforcement layers.
