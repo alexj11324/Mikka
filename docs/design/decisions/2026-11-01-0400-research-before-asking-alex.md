@@ -3,7 +3,7 @@
 - Date: 2026-11-01
 - Source: Alex: 「所有的问题，在问我之前，必须去调研其他大厂产品。如果有这个答案，就不要再问我了」
 - Rule: —
-- Amended by: 2026-11-10-1730 (workspace-only app access).
+- Amended by: [2026-11-10-1730-workspace-app-permissions](2026-11-10-1730-workspace-app-permissions.md) (workspace-only app access).
 
 ## Rule
 

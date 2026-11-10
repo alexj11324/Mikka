@@ -4,7 +4,7 @@
 - Source: Alex, 2026-10-31: 「那你就按照这个最佳实践去做吧，指向我们的米卡就行了」
 - Rule: —
 - Replaces: —
-- Amended by: 2026-11-10-1730 (workspace-only app access).
+- Amended by: [2026-11-10-1730-workspace-app-permissions](2026-11-10-1730-workspace-app-permissions.md) (workspace-only app access).
 
 When the daemon launches Claude Code or Codex for a Bot run, the run can use
 the apps its owner connected in Mikka (Composio toolkits). Each app is its own

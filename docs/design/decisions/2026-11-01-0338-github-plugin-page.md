@@ -1,4 +1,4 @@
-# GitHub's plugin page: one workspace connection, repository access and read/write abilities
+# GitHub's plugin page: connection, repository access and abilities with their own allow / ask / deny
 
 - Date: 2026-11-01
 - Source: Alex, MVP bug triage relayed by the coordinator: 「插件这一块仍然没有，一些信息、读写工具之类全部都没有」 and 「按照道理来说应该直接跳转到 GitHub 才对啊，怎么还在中间跳到我们的网页端来了呀？」; layout and permission wiring approved by Alex's coordinator the same day

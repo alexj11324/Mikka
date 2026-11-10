@@ -33,7 +33,7 @@ What follows:
   backend makes this deny absolute, a dispatched Agent can still use the
   person's own credential.
 - The run policy on the same page is the workspace layer (workspace_computer_policies.cli_run_policy), and it is the only run-policy layer. Target contract: per-Bot and per-worker policy rows will be removed and no narrower layer will be read at execution; until then the current code still merges `agents.cli_run_policy` and `agent_kit_heads.cli_run_policy`.
-- Capy's model — allow, disable or read-only on the MCP server, and allow on a device — authorizes a connection or a device, never an individual agent. This decision adopts that shape: the workspace and the device are the only authorization surfaces, and no Bot-level layer remains.
+- Capy's model — allow, disable or read-only on the MCP server, and allow on a device — authorizes a connection or a device, never an individual agent. This decision adopts that shape: the workspace and the device are the only authorization surfaces, and no Bot-level layer remains in the target model.
 
 Cost if wrong: a team that needs per-Bot access has no surface; per-Bot access is intentionally unsupported because Capy has no such concept. Removing the Bot layer can only widen access where a Bot row was stricter; migrate those rows to the workspace rule before deleting them and record the diff.
 
