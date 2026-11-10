@@ -10,12 +10,13 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { projects, projectEvents } from '@/lib/db/projects'
 import { accessibleProjects, accessibleProjectReferences } from '@/lib/project-access'
 import { lockTeamRelations, requireTeam } from '@/lib/team-access'
-import { WorkspaceError } from '@/lib/workspace-access'
+import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
 import { notifyStoppedPolicyRuns, runPolicyStopSQL, type StoppedPolicyRun } from '@/lib/run-policy-stop'
 import { withTaskWorkspace } from '@/lib/task-workspace'
-import { withResourceAccess } from '@/lib/resource-access/store'
+import { lockResourcesAccess, withResourceAccess } from '@/lib/resource-access/store'
 import { ActionFailureError } from '@/lib/action-error'
+import { db } from '@/lib/db'
 
 async function result<T>(operation: () => Promise<T>) {
   const i18nText = await getTranslations();
@@ -61,8 +62,15 @@ export async function setIssueTeam(input: { issueId: string; teamId: string | nu
 }
 export async function listProjectTeams() {
   const user = await requireUser()
-  const allowed = await accessibleProjects(user)
-  return allowed.length ? workspaceDb.select().from(teamProjects).where(inArray(teamProjects.projectId, allowed.map(project => project.id))) : []
+  const workspaceId = (await loadWorkspaceContext(undefined, user)).workspace.id
+  return withTaskWorkspace(user, workspaceId, async () => {
+    const allowed = await accessibleProjectReferences(user, workspaceId)
+    if (!allowed.length) return []
+    return db.transaction(async tx => {
+      await lockResourcesAccess(tx, user.id, allowed.map(reference => ({ reference, action: 'canReadContent' as const })))
+      return workspaceDb.select().from(teamProjects).where(and(eq(teamProjects.workspaceId, workspaceId), inArray(teamProjects.projectId, allowed.map(project => project.id))))
+    })
+  })
 }
 export async function setProjectTeams(input: { projectId: string; revision: number; teamIds: string[]; primaryTeamId: string | null }) {
   const i18nText = await getTranslations();
@@ -72,7 +80,8 @@ export async function setProjectTeams(input: { projectId: string; revision: numb
     if (ids.length && (!parsed.primaryTeamId || !ids.includes(parsed.primaryTeamId))) throw new WorkspaceError(i18nText("FeatureCopy.c_2be374e2"))
     if (!ids.length && parsed.primaryTeamId) throw new WorkspaceError(i18nText("FeatureCopy.c_9aa6ec13"))
     const user = await requireUser()
-    const reference = (await accessibleProjectReferences(user)).find(item => item.id === parsed.projectId)
+    const selectedWorkspaceId = (await loadWorkspaceContext(undefined, user)).workspace.id
+    const reference = (await accessibleProjectReferences(user, selectedWorkspaceId)).find(item => item.id === parsed.projectId)
     if (!reference) throw new ActionFailureError('issueNotFound')
     return withTaskWorkspace(user, reference.workspaceId, () => workspaceDb.transaction(async tx => {
       await lockTeamRelations(tx)

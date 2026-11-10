@@ -1,5 +1,6 @@
 import 'server-only'
 import { inArray, sql } from 'drizzle-orm'
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { projectDb, projects } from '@/lib/db/projects'
 import { activeTaskWorkspaces, taskReaderScope } from '@/lib/task-workspace'
@@ -10,8 +11,11 @@ export type ProjectTransaction = Parameters<Parameters<typeof projectDb.transact
 
 /** Tenant and Enterprise admission precede APP content ACLs. Source Project
  * rows are read only after their stable IDs pass the authoritative ACL; no
- * request cache can preserve access after a grant or membership revocation. */
-export async function accessibleProjectReferences(reader: IssueReader, workspaceId?: string): Promise<ResourceReference[]> {
+ * request cache can preserve access after a grant or membership revocation.
+ * A selected Workspace is required: omitting it must never enumerate every
+ * tenant of a human who belongs to more than one. */
+export async function accessibleProjectReferences(reader: IssueReader, workspaceId: string): Promise<ResourceReference[]> {
+  if (!z.uuid().safeParse(workspaceId).success) return []
   const tenants = await activeTaskWorkspaces(reader, workspaceId)
   if (!tenants.length) return []
   const { rows } = await db.execute<{ id: string; workspaceId: string }>(sql`select id,"workspaceId" from resource_access_policies
@@ -20,7 +24,7 @@ export async function accessibleProjectReferences(reader: IssueReader, workspace
   return rows.map(row => ({ ...row, kind: 'project' }))
 }
 
-export async function accessibleProjects(reader: IssueReader, tx: ProjectTransaction | typeof projectDb = projectDb, workspaceId?: string) {
+export async function accessibleProjects(reader: IssueReader, tx: ProjectTransaction | typeof projectDb, workspaceId: string) {
   const references = await accessibleProjectReferences(reader, workspaceId)
   return references.length ? tx.select().from(projects).where(inArray(projects.id, references.map(row => row.id))) : []
 }

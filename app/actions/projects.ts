@@ -35,10 +35,10 @@ export async function listProjects() {
 }
 async function persistProject(reader: Exclude<IssueReader, string>, input: unknown, partial: boolean) {
   const owner = reader.id
+  const workspaceId = (await loadWorkspaceContext()).workspace.id
   const requestedId = typeof input === 'object' && input !== null && 'id' in input && typeof input.id === 'string' ? input.id : undefined
-  const reference = requestedId ? (await accessibleProjectReferences(reader)).find(item => item.id === requestedId) : undefined
+  const reference = requestedId ? (await accessibleProjectReferences(reader, workspaceId)).find(item => item.id === requestedId) : undefined
   if (requestedId && !reference) throw new ActionFailureError('issueNotFound')
-  const workspaceId = reference?.workspaceId ?? (await loadWorkspaceContext()).workspace.id
   const i18nText = await getTranslations();
   try {
     return await withTaskWorkspace(reader, workspaceId, () => projectDb.transaction(async tx => {
@@ -129,12 +129,14 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
 }
 
 export async function listProjectEvents(id: string) {
-  const i18nText = await getTranslations();
   const reader = await projectUser()
   z.uuid().parse(id)
-  const project = (await accessibleProjects(reader)).find(item => item.id === id)
-  if (!project) throw new Error(i18nText("FeatureCopy.c_bf32df66"))
-  return projectDb.select().from(projectEvents).where(and(eq(projectEvents.projectId, id), eq(projectEvents.userId, project.userId))).orderBy(desc(projectEvents.createdAt)).limit(100)
+  const workspaceId = (await loadWorkspaceContext(undefined, reader)).workspace.id
+  return withResourceAccess(reader, { kind: 'project', id, workspaceId }, 'canReadContent', async () => {
+    const [project] = await projectDb.select({ userId: projects.userId }).from(projects).where(eq(projects.id, id)).limit(1)
+    if (!project) throw new ActionFailureError('issueNotFound')
+    return projectDb.select().from(projectEvents).where(and(eq(projectEvents.projectId, id), eq(projectEvents.userId, project.userId))).orderBy(desc(projectEvents.createdAt)).limit(100)
+  })
 }
 export async function setProjectIssues(input: { id: string; revision: number; issueIds: string[] }) {
   const i18nText = await getTranslations();
@@ -143,8 +145,9 @@ export async function setProjectIssues(input: { id: string; revision: number; is
   if (!parsed.success) return { error: i18nText("Errors.projectIssuesInvalid") }
   const ids = [...new Set(parsed.data.issueIds)]
   try {
+    const workspaceId = (await loadWorkspaceContext(undefined, reader)).workspace.id
     for (const id of ids) await requireIssueAccess(id)
-    const reference = (await accessibleProjectReferences(reader)).find(item => item.id === input.id)
+    const reference = (await accessibleProjectReferences(reader, workspaceId)).find(item => item.id === input.id)
     if (!reference) throw new ActionFailureError('issueNotFound')
     return await withTaskWorkspace(reader, reference.workspaceId, () => projectDb.transaction(async tx => {
       await lockTeamRelations(tx)
