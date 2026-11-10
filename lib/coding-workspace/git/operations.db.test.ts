@@ -243,6 +243,10 @@ test('Git status, history, safe revert, Undo and checkpoint restore on PostgreSQ
       await pool.query(`INSERT INTO run_checkpoints("runId","userId","baseCommit",patch,files,"takenAt","updatedAt")
         VALUES($1,$2,$3,$4,$5,$6,$6)`, [f.runId, owner, taken.checkpoint.baseCommit,
         Buffer.from(taken.checkpoint.patch, 'base64'), taken.checkpoint.files, new Date(taken.checkpoint.takenAt)])
+      // Any review read normally establishes this binding first; the retained
+      // review row references it, so the fixture must do the same explicitly.
+      await pool.query(`INSERT INTO coding_workspace_bindings("runId","repoId","ownerId","workspaceId","repositoryKey")
+        VALUES($1,$2,$3,$4,$5) ON CONFLICT ("runId","repoId") DO NOTHING`, [f.runId, f.repoId, owner, workspaceId, repositoryKey])
       await pool.query(`INSERT INTO coding_workspace_checkpoint_reviews("runId","repoId","ownerId","workspaceId","snapshotId",
         "baseSha","headSha","treeSha",reason,"capturedAt") VALUES($1,$2,$3,$4,NULL,$5,$6,$7,NULL,$8)`,
       [f.runId, f.repoId, owner, workspaceId, review.revision.baseSha, review.revision.headSha,

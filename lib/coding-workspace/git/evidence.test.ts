@@ -34,7 +34,12 @@ test('complete base/current proofs are hash-verified before any revert content e
   assert.equal(verifyRevertProofs(file, revision, [proofs()[0]!]), null)
   assert.equal(verifyRevertProofs(file, revision, [{ ...proofs()[0]!, base64: Buffer.from('tampered').toString('base64') }, proofs()[1]!]), null)
   assert.equal(verifyRevertProofs(file, revision, [...proofs(), proofs()[0]!]), null)
-  assert.equal(verifyRevertProofs(file, revision, [proofs()[1]!, proofs()[0]!]), null)
+  // Proofs are identified by their blob hash, never by position: the set of
+  // required shas already fixes which bytes are the base and which are current.
+  const reversed = verifyRevertProofs(file, revision, [proofs()[1]!, proofs()[0]!])
+  assert.ok(reversed)
+  assert.deepEqual(reversed.base, base)
+  assert.deepEqual(reversed.before, before)
 })
 
 test('a hunk revert replaces exactly the selected new-side ranges', () => {
