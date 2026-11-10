@@ -3,6 +3,16 @@
 Agents such as Claude Code and Codex can drive Mikka through its MCP server at
 `https://app.aspectlylabs.com/mikka/api/mcp` (Streamable HTTP).
 
+Every call names one Mikka workspace and is authorized against it:
+`lib/mcp/workspace.ts` resolves the caller's workspace, checks membership and
+refuses a call with no resolvable workspace (`workspaceAccessDenied`).
+
+Target contract: each connection is scoped to one Mikka workspace, and the
+workspace's MCP-server policy (allow / disable / read-only) is checked before
+every call. Today an OAuth connection may name any workspace its user belongs
+to, and `workspace_app_policies` covers connected apps (allow / deny), not MCP
+servers.
+
 How to connect and the tool list for users are in the public docs:
 [aspectlylabs.com/mikka/docs/mcp](https://aspectlylabs.com/mikka/docs/mcp)
 (maintained in the separate `mikka-web` repository). This page covers the
@@ -44,6 +54,11 @@ plugin, configured in `lib/auth.ts`, tables in `drizzle/0009_oauth_provider.sql`
   consent page at `/oauth/consent`.
 - Access tokens (`mka_…`, one hour) and refresh tokens (`mkr_…`) are opaque and
   stored hashed. `lib/mcp/auth.ts` checks them against the database.
+- Target contract: each OAuth grant is pinned to one workspace
+  (`authInfo.extra.workspaceId`); a request naming another workspace returns
+  `workspaceAccessDenied`. Consent grants the current workspace only, and the
+  token cannot read or write another workspace. Run tokens already carry the
+  run's `workspaceId` and are pinned to it; OAuth grants are not pinned yet.
 
 ## Worker tools (inside a run)
 
@@ -61,7 +76,9 @@ serve these tools instead of the ones above (`lib/mcp/worker.ts`):
 | `submit_artifact` | `artifact_submitted` | `{ title, kind: 'markdown' \| 'html', content, artifactId? }`; one event per version |
 
 Each call writes one event with the run's `userId`, `runId` and `issueId` and
-wakes the Coordinator. Tokens are stored hashed (`run_tokens`,
+wakes the Coordinator. The event belongs to the run's bot, whose workspace
+places it in the right workspace; `coordinator_events` has no separate
+workspace column. Tokens are stored hashed (`run_tokens`,
 `drizzle/0012_run_tokens.sql`), live at most 24 hours, work only while the run
 is live, and are revoked when the run completes.
 

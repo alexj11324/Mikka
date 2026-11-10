@@ -2,11 +2,15 @@
 
 This first version handles explicit `@Mikka` mentions in one installed Slack workspace. It runs the existing Coordinator tools as the bound Mikka user, so it can list devices/agents, inspect issues, dispatch runs, send instructions, and check or stop runs. Each mention is a separate request, with its response in the same Slack thread. Include the issue/run id when following up. Run completion remains in Mikka; there are no unsolicited Slack completion messages yet.
 
+Target contract: the installation is bound to one Mikka workspace (`SLACK_WORKSPACE_ID`); a bound user must be an active member of that workspace, a sender without a resolvable Mikka workspace is ignored, the workspace's MCP-server policy applies, and the thread records the Slack channel/thread and message as its origin. Writing the final reply and links back to the originating Slack thread is also target contract and is not shipped.
+
 The Composio Slack connection is separate: it supplies user-authorized integration tools. A Slack bot needs its own installed bot token and Signing Secret. App configuration access/refresh tokens are operator credentials and must not be used as bot credentials.
 
 ## Cloud configuration
 
 Keep `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` in Infisical and deliver them through the deployment's native cloud Secret Sync. Set `SLACK_APP_ID`, `SLACK_TEAM_ID`, `SLACK_BOT_USER_ID`, and `SLACK_USER_BINDINGS` for that same installation. The binding is a JSON object mapping verified Slack member ids to existing Mikka user ids. Establish the binding from the member's authenticated Slack connection, not their display name or a message claiming an email address. Unbound senders are ignored.
+
+Target contract: `SLACK_WORKSPACE_ID` names the one Mikka workspace that owns the installation, and a bound user must be an active member of it; tools refuse another workspace. It is not implemented yet.
 
 `drizzle/0004_telegram_chat.sql` is applied by `scripts/migrate.mjs` like every other migration. Runtime DDL is disabled. No new Redis service is required. The Chat SDK's Postgres state supplies message deduplication and locks across serverless instances.
 
@@ -16,6 +20,6 @@ Keep `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` in Infisical and deliver them 
 2. In Event Subscriptions, enable events and use `https://<deployment-host>/mikka/api/webhooks/slack`. Slack must be able to reach this URL without an interactive Vercel login. Branches have no Vercel Preview; use the stable production origin after merge.
 3. Subscribe to the bot event `app_mention` and save. Socket Mode must be disabled for HTTP events.
 4. Invite Mikka into a test channel, then send `@Mikka list my agents and their devices`. Confirm a same-thread response with only the bound user's devices. Next, explicitly request a run for an existing issue and agent; confirm its run id in Mikka. An offline device may keep the run queued until it connects.
-5. Replay the same signed event to check that it does not dispatch twice; tampered, missing, or stale signatures must return 401. A signed URL-verification challenge returns 200 without calling the model or connecting to the database. Valid events for other workspaces/apps/unbound users return 204 without invoking tools.
+5. Replay the same signed event to check that it does not dispatch twice; tampered, missing, or stale signatures must return 401. A signed URL-verification challenge returns 200 without calling the model or connecting to the database. Valid events for other Slack workspaces, apps, or senders without a Mikka workspace binding return 204 without invoking tools.
 
 Long processing starts a durable Workflow after Slack's HTTP acknowledgement. The handler does not load or publish private Coordinator conversation history, memory, or other users' channel messages. It does not subscribe to ordinary channel chatter.
