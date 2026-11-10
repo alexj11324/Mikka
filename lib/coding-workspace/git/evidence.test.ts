@@ -45,6 +45,7 @@ test('complete base/current proofs are hash-verified before any revert content e
 test('a hunk revert replaces exactly the selected new-side ranges', () => {
   const computed = structuredPatch(file.path, file.path, base.toString(), before.toString(), undefined, undefined,
     { context: 3, stripTrailingCr: false, maxEditLength: 10_000, timeout: 100 })
+  assert.ok(computed)
   assert.equal(computed.hunks.length, 2)
   const first = hunkFingerprint(revision.version, file.fileVersion, computed.hunks[0]!)
   const reverted = revertHunks(file, revision.version, [first], before, base).toString()

@@ -421,7 +421,7 @@ async function dryRunCheckpoint(git: Git, root: WorkspaceRoot, identity: Workspa
     try { await runGit(worktree, ['apply', '--binary', '--3way', '--whitespace=nowarn', patchFile], tempEnv(), signal) }
     catch { applied = false }
     const raw = await runGit(worktree, ['status', '--porcelain=v2', '-z', '--untracked-files=all'], tempEnv(), signal)
-    const parsed = parsePorcelainV2(raw.stdout.toString('utf8'))
+    const parsed = parsePorcelainV2(raw.stdout.toString())
     const files: PlanFile[] = [], conflicts: PlanConflict[] = [], contents: RestorePlan['contents'] = new Map()
     const seen = new Set<string>()
     let total = 0

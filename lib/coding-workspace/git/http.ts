@@ -49,8 +49,8 @@ export function gitHttp(work: (input: GitInput) => Promise<GitResult>) {
         ? { kind: 'pat', id: z.uuid().parse(session.session.id.slice(4)) } : { kind: 'session', id: session.session.id } }
       const result = await work({ request, session, actor, runId, repoId: input.repoId, input })
       if (!await workspaceSessionStillValid(request, session)) return Response.json({ ok: false, code: 'authRequired' }, { status: 401, headers })
+      const live = result.live ?? undefined
       return await withReviewTransaction(pool, workspacePool, actor, runId, input.repoId, async (client, scope) => {
-        const live = result.live ?? undefined
         if (live && (live.runId !== scope.identity.runId || live.repoId !== scope.identity.repoId
           || live.ownerId !== scope.identity.ownerId || live.workspaceId !== scope.identity.workspaceId
           || live.repositoryKey !== scope.identity.repositoryKey))

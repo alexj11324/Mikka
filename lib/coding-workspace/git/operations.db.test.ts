@@ -155,9 +155,11 @@ test('Git status, history, safe revert, Undo and checkpoint restore on PostgreSQ
       await f.write('src/example.ts', 'export const answer = 43\n')
       const status = await exchange(f, signal => getRunGitStatus(dependencies, actor(), f.runId, f.repoId, signal))
       assert.ok(status.live)
-      assert.equal(status.value.commitSha, f.headSha)
-      assert.equal(status.value.branch.headSha, f.headSha)
-      assert.ok(status.value.entries.some(entry => entry.path === 'src/example.ts' && entry.worktree === 'modified'))
+      const live = status.value
+      if (!('entries' in live)) throw new Error('expected a live status')
+      assert.equal(live.commitSha, f.headSha)
+      assert.equal(live.branch.headSha, f.headSha)
+      assert.ok(live.entries.some(entry => entry.path === 'src/example.ts' && entry.worktree === 'modified'))
       const history = await exchange(f, signal => listRunGitHistory(dependencies, actor(), f.runId, f.repoId, { limit: 10 }, signal))
       assert.equal(history.value.commitSha, f.headSha)
       assert.equal(history.value.commits[0]?.sha, f.headSha)
@@ -168,10 +170,9 @@ test('Git status, history, safe revert, Undo and checkpoint restore on PostgreSQ
       const f = await fixture()
       await f.write('src/example.ts', 'export const answer = 43\n')
       const snapshot = await exchange(f, signal => captureDiffSnapshot(dependencies, actor(), f.runId, f.repoId, { source: 'working' }, signal))
-      const file = snapshot.files.find(candidate => candidate.path === 'src/example.ts')!
       const operationId = randomUUID()
       const preview = await exchange(f, signal => previewRevert(dependencies, actor(), f.runId, f.repoId,
-        { operationId, snapshotId: snapshot.id, path: file.path, target: { kind: 'file' } }, signal))
+        { operationId, snapshotId: snapshot.id, path: 'src/example.ts', target: { kind: 'file' } }, signal))
       assert.ok(preview.patch?.includes('-export const answer = 43'))
       assert.equal(typeof preview.afterContentBase64, 'string', 'the server retains the exact confirmed bytes internally')
       const applied = await exchange(f, signal => applyRevert(dependencies, actor(), f.runId, f.repoId, { operationId }, signal))

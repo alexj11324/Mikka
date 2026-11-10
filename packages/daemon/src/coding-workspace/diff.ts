@@ -12,7 +12,7 @@ import {
   WORKSPACE_DIFF_MAX_BLOB_BYTES, WORKSPACE_DIFF_MAX_FILES, diffFileVersionMaterial,
   type DiffFileMetadata, type DiffRevision, type WorkspaceDiffReadRequest,
 } from '@mikka/protocol/coding-workspace-review'
-import type { WorkspaceGitRevertPreviewResult } from '@mikka/protocol/coding-workspace-git'
+import type { GitWorkingFence, WorkspaceGitRevertPreviewResult } from '@mikka/protocol/coding-workspace-git'
 import { remoteKey } from '@mikka/protocol/repository'
 import { worktreeGitDir } from '../agents/publish'
 import { buildChildEnv } from '../env'
@@ -21,6 +21,9 @@ import { mountId, safeFile, type WorkspaceRoot } from './files'
 import { cleanAction, GitTextStats, CRLFCleaner, type CleanAction, type CleanAttributes } from './eol'
 
 const digest = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
+/** The fence mode is a closed set; an unknown mode is never guessed. */
+const fenceMode = (mode: string | null | undefined): GitWorkingFence['mode'] =>
+  mode === '100644' || mode === '100755' || mode === '120000' || mode === '160000' ? mode : null
 const oid = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/
 const MAX_SCAN_BYTES = 64 * 1024 * 1024
 const MAX_MANIFEST_BYTES = 1536 * 1024
@@ -471,7 +474,7 @@ export async function readWorkspaceRevertPreview(command: WorkspaceReadCommand, 
     if (file.newBlob === null && current !== null) throw new CodingWorkspaceError('workspace_version_conflict')
     // The observation fences exactly what the person is about to change;
     // the apply request must present these values or be refused.
-    const observedMode = current && (current.file.mode === '100644' || current.file.mode === '100755') ? current.file.mode : null
+    const observedMode = fenceMode(current?.file.mode)
     const before = {
       headSha: value.revision.headSha!, path: file.path, exists: current !== null,
       mode: observedMode,

@@ -14,7 +14,7 @@ export const isWorkspaceGitRequest = (request: WorkspaceReadRequest) => request.
 const denied = (code: 'workspace_version_conflict' | 'workspace_unsupported' | 'workspace_path_unavailable'): WorkspaceReadResult => ({ ok: false, code })
 const sameRevision = (left: Pick<DiffRevision, 'source' | 'baseSha' | 'headSha' | 'treeSha' | 'version'>,
   right: Pick<DiffRevision, 'source' | 'baseSha' | 'headSha' | 'treeSha' | 'version'>) =>
-  ['source', 'baseSha', 'headSha', 'treeSha', 'version'].every(key => left[key] === right[key])
+  (['source', 'baseSha', 'headSha', 'treeSha', 'version'] as const).every(key => left[key] === right[key])
 function masked(value: unknown, mask: Masker) { return isDeepStrictEqual(maskDeep(value, mask), value) }
 function undoShape(receipt: WorkspaceReadReceipt, path: string) {
   const undo = receipt.gitUndo
@@ -133,8 +133,7 @@ export function validateGitReceipt(request: WorkspaceReadRequest, receipt: Works
       if (!parsed.success) return null
       const value = parsed.data
       if (value.operationId !== request.operationId || value.previewVersion !== request.previewVersion
-        || value.checkpointId !== request.checkpointId || !sameRevision(value.revision, request.revision)
-        || value.headSha !== request.expected.headSha) return null
+        || value.checkpointId !== request.checkpointId || value.headSha !== request.expected.headSha) return null
       const undo = receipt.gitUndo
       if (undo) {
         for (const file of undo.files) {

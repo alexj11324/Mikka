@@ -77,7 +77,8 @@ export async function requestWorkspaceRead(database: Pool, membership: Workspace
         const result = workspaceReadResult.parse(row.result)
         if (result.ok) {
           Object.defineProperty(result, receiptPolicy, { value: row.maskPolicy ?? undefined })
-          Object.defineProperty(result, receiptIdentity, { value: result.identity })
+          // Public Git write DTOs are server-built and carry no identity.
+          if ('identity' in result) Object.defineProperty(result, receiptIdentity, { value: result.identity })
           await assertWorkspaceResultMaskPolicy(result, actor)
         }
         return result

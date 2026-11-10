@@ -1,10 +1,9 @@
 import 'server-only'
 import type { Pool } from 'pg'
-import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
+import { CodingWorkspaceError, type WorkspaceReadRequest } from '@mikka/protocol/coding-workspace'
 import {
   WORKSPACE_GIT_OPERATION_TTL_MS, WORKSPACE_GIT_UNDO_TTL_MS, WorkspaceGitError,
   type GitRevertApplied, type GitRevertFile, type GitRevertPreviewInternal, type GitRevertTarget, type GitUndone,
-  type WorkspaceReadRequest,
 } from '@mikka/protocol/coding-workspace-git'
 import type { DiffFileMetadata, DiffRevision } from '@mikka/protocol/coding-workspace-review'
 import { maskCheckpoint } from '../../secrets/checkpoint'
@@ -136,7 +135,7 @@ export async function undoLastOperation(dependencies: GitDependencies, actor: Re
     const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
     const files = row.undoFiles.map(file => {
       const bytes = Buffer.from(file.base64, 'base64')
-      const masked = maskCheckpoint({ patch: bytes }, mask).patch
+      const masked = maskCheckpoint({ patch: bytes, files: [] }, mask).patch
       if (!masked.equals(bytes)) throw new WorkspaceGitError('workspace_git_undo_unavailable')
       return { ...file, base64: masked.toString('base64'), sha256: gitDigest(masked) }
     })

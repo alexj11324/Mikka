@@ -40,7 +40,7 @@ const after = { exists: true, mode: '100644' as const, contentSha256: digest(bas
 
 test('a Git status receipt must carry the bound identity and a self-consistent fence', () => {
   const request: WorkspaceReadRequest = { kind: 'git_status' }
-  const result = { ok: true, identity, observedAt, availability: 'online', kind: 'git_status',
+  const result: WorkspaceReadReceipt['result'] = { ok: true, identity, observedAt, availability: 'online', kind: 'git_status',
     revision: working, commitSha: headSha, workingTreeVersion: working.version,
     branch: { headSha, baseSha, branch: 'main', detached: false, upstream: null }, entries: [], truncated: false }
   assert.equal(validateWorkspaceReceipt(request, identity, { result, files: [] }, mask)?.ok, true)
@@ -53,7 +53,7 @@ test('a Git status receipt must carry the bound identity and a self-consistent f
 
 test('a revert preview is rebuilt from verified blob proofs, never from the claim', () => {
   const request: WorkspaceReadRequest = { kind: 'git_revert_preview', operationId, revision, file, target: { kind: 'file' } }
-  const result = { ok: true, identity, observedAt, availability: 'online', kind: 'git_revert_preview',
+  const result: WorkspaceReadReceipt['result'] = { ok: true, identity, observedAt, availability: 'online', kind: 'git_revert_preview',
     operationId, revision, file: metadata, target: { kind: 'file' as const }, before: fence }
   const blobs = [{ sha: file.oldBlob!, base64: base.toString('base64') },
     { sha: file.newBlob!, base64: before.toString('base64') }]
@@ -77,7 +77,7 @@ test('a revert apply receipt must match the confirmed preview and its Undo captu
   const previewVersion = gitRevertPreviewVersion({ operationId, revision, file, target: { kind: 'file' }, before: fence, after })
   const request: WorkspaceReadRequest = { kind: 'git_revert_apply', operationId, previewVersion, revision, file,
     target: { kind: 'file' }, expected: fence, after, contentBase64: base.toString('base64') }
-  const result = { ok: true, identity, observedAt, availability: 'online', kind: 'git_revert_applied',
+  const result: WorkspaceReadReceipt['result'] = { ok: true, identity, observedAt, availability: 'online', kind: 'git_revert_applied',
     operationId, previewVersion, appliedAt: observedAt, headSha, idempotent: false,
     after: { headSha, path: file.path, exists: true, mode: '100644', size: base.length,
       contentSha256: digest(base), workingVersion: '6'.repeat(64) } }

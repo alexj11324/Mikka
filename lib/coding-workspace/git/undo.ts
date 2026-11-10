@@ -28,7 +28,7 @@ export async function retainGitUndo(database: WorkspaceQuery, request: Workspace
     for (const file of undo.files) {
       const bytes = Buffer.from(file.base64, 'base64')
       if (bytes.toString('base64') !== file.base64) return mark(database, request.operationId, ownerId, 'none')
-      const masked = maskCheckpoint({ patch: bytes }, mask).patch
+      const masked = maskCheckpoint({ patch: bytes, files: [] }, mask).patch
       if (!masked.equals(bytes)) changed = true
       total += masked.length
       stamped.push({ ...file, base64: masked.toString('base64'), sha256: digest(masked) })

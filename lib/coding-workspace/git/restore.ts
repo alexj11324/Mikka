@@ -1,10 +1,10 @@
 import 'server-only'
 import { gunzipSync } from 'node:zlib'
 import type { Pool } from 'pg'
-import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
+import { CodingWorkspaceError, type WorkspaceReadRequest } from '@mikka/protocol/coding-workspace'
 import {
   WORKSPACE_GIT_MAX_PATCH_BYTES, WORKSPACE_GIT_OPERATION_TTL_MS, WORKSPACE_GIT_UNDO_TTL_MS, WorkspaceGitError,
-  type GitCheckpointRestorePreview, type GitCheckpointRestored, type GitStatus, type WorkspaceReadRequest,
+  type GitCheckpointRestorePreview, type GitCheckpointRestored, type GitStatus,
 } from '@mikka/protocol/coding-workspace-git'
 import { runChanged } from '../../live/panels'
 import { requestWorkspaceRead } from '../requests'
