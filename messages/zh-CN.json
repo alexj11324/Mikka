@@ -2403,7 +2403,43 @@
       "shadowConfirmMany": "{workspace} 已有 {names}，在你的运行里用你自己的值？",
       "useMine": "用我的"
     },
+    "permissionsPage": {
+      "heading": "Bot 和成员可以做什么",
+      "detail": "锁定的项目对这个工作区的所有人禁止。",
+      "allowed": "允许",
+      "blocked": "禁止",
+      "allowedEmpty": "没有允许的项目",
+      "blockedEmpty": "没有禁止的项目",
+      "block": "禁止{name}",
+      "unblock": "允许{name}",
+      "readOnly": "只有管理员可以更改。",
+      "appColumn": "应用",
+      "accessColumn": "权限",
+      "summary": "{allowed} 项允许，{blocked} 项禁止"
+    },
     "audit": {
+      "adminOnly": "只有管理员可以查看审计日志。",
+      "categoryFilter": "类别",
+      "columns": {
+        "time": "时间",
+        "actor": "操作人",
+        "action": "操作",
+        "category": "类别",
+        "place": "地点"
+      },
+      "range": {
+        "label": "时间范围",
+        "today": "今天",
+        "yesterday": "昨天",
+        "last7": "最近 7 天",
+        "last30": "最近 30 天",
+        "last90": "最近 90 天",
+        "apply": "应用",
+        "pickEnd": "{start} – 选择结束日期",
+        "days": "{count} 天",
+        "choose": "选择时间范围",
+        "presets": "常用范围"
+      },
       "loading": "正在加载审计日志",
       "filter": "筛选",
       "filters": {
