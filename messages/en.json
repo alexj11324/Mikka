@@ -5409,7 +5409,7 @@
     "evidence": "Results and verification evidence",
     "artifact": "Artifact {number}",
     "approvalRequired": "Independent review and verification are recorded in Factory. Complete the required human acceptance in the task.",
-    "repositoryRemedy": "Select a repository you have authorized in Bot settings, then try again.",
+    "repositoryRemedy": "Select a repository you have authorized in the workspace settings, then try again.",
     "runtimeRemedy": "Connect your local Agent and keep it online, or configure an authorized cloud computer in runtime settings.",
     "toolRemedy": "Ask the Bot owner to enable task delegation in the existing Agent settings.",
     "authorizationRemedy": "Check your model, subscription or API key authorization and runtime settings, then try again. Other members’ personal credentials cannot be used.",

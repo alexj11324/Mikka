@@ -5409,7 +5409,7 @@
     "evidence": "成果与验证证据",
     "artifact": "Artifact {number}",
     "approvalRequired": "独立审查和验证已交回 Factory；仍需在任务中完成所要求的人工验收。",
-    "repositoryRemedy": "请在 Bot 设置中选择你已授权的仓库后重试。",
+    "repositoryRemedy": "请在工作区设置中选择你已授权的仓库后重试。",
     "runtimeRemedy": "请连接你的本地 Agent 并保持在线，或在运行设置中配置你有权使用的云端电脑。",
     "toolRemedy": "请由 Bot 所有者在现有 Agent 设置中启用任务委派能力。",
     "authorizationRemedy": "请检查你自己的模型、订阅或 API Key 授权与运行位置设置后重试；其他成员的个人凭据不会被代用。",
