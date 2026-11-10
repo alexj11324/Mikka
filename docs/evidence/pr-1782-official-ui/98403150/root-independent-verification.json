@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "reviewer": "root",
+  "product": "98403150bd6ac39683539bc278a9bf161e84dabf",
+  "productTree": "5bdc75978939051c8eab4ef50b053a59498f6b2d",
+  "overlay": "b92b0e1d48f75c92d059ee071162b72455e6af90",
+  "runId": 42732141834,
+  "runAttempt": 1,
+  "jobId": 129552534510,
+  "artifactId": 13725546924,
+  "zipBytes": 1139481,
+  "zipSha256": "b22deb6e662e8f3ca10aef514ababab19ba9be2c306d0dc7534c0be228d6c8d2",
+  "sourceAndArtifactChecksPassed": true,
+  "zipCrcVerified": true,
+  "originalMembers": [
+    {
+      "path": "index.html",
+      "bytes": 5820,
+      "sha256": "07a7835086e1f901e800645ea5fb7b03833fe559c0fd789b8fd325b8908f2024"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 29275,
+      "sha256": "70c817bdbb4059257318172d3ab6128eece1c6991e9d7327cbbd5d3227bc481a"
+    },
+    {
+      "path": "narrow-dark-delegation-and-history.png",
+      "bytes": 33078,
+      "sha256": "bfec81147854f0f241130b8cc4712316af061d5940daa810479da5548f84f3a7"
+    },
+    {
+      "path": "narrow-dark-empty-dispatcher.png",
+      "bytes": 4893,
+      "sha256": "58f5be80deee1a80a6545c4bca5c782e2b9beb83b1d06a6672da045235715001"
+    },
+    {
+      "path": "narrow-dark-human-and-delegate.png",
+      "bytes": 33078,
+      "sha256": "bfec81147854f0f241130b8cc4712316af061d5940daa810479da5548f84f3a7"
+    },
+    {
+      "path": "narrow-dark-project-error-editable.png",
+      "bytes": 41060,
+      "sha256": "9b7687dc3545501c4e7ac46e0dbccb68780b7bd7a4c04e8e2200c4ad5a1716db"
+    },
+    {
+      "path": "narrow-dark-task-groups-expanded.png",
+      "bytes": 34948,
+      "sha256": "1104f6cd5de2d4d34bf4235a179d3b77b3b13251243c0be957a2b963134d4b41"
+    },
+    {
+      "path": "narrow-light-delegation-and-history.png",
+      "bytes": 30092,
+      "sha256": "a04c8ceea3e49972d4d6c475f170347fbe41859df01a2afded4f45e54d3c7edf"
+    },
+    {
+      "path": "narrow-light-empty-dispatcher.png",
+      "bytes": 4622,
+      "sha256": "58d900b42be3b47ee13d8d2be4c06cde9ed9b2a7d31dabf4886f3f1fad2e8abe"
+    },
+    {
+      "path": "narrow-light-human-and-delegate.png",
+      "bytes": 30092,
+      "sha256": "a04c8ceea3e49972d4d6c475f170347fbe41859df01a2afded4f45e54d3c7edf"
+    },
+    {
+      "path": "narrow-light-project-error-editable.png",
+      "bytes": 39477,
+      "sha256": "a282e1c81091dd4f81333fb2859b1c39488565858f477d42ec34ffe070327b53"
+    },
+    {
+      "path": "narrow-light-task-groups-expanded.png",
+      "bytes": 30751,
+      "sha256": "eb687599feb26ed60362a7c0e19e2e0c793234679282e38c8efa1eae489dbb2a"
+    },
+    {
+      "path": "source-pair.json",
+      "bytes": 1958,
+      "sha256": "59294ff9f1d9cbb8c213834c91ef468db94e3bc9588b42a67ba13e12fd203f1a"
+    },
+    {
+      "path": "wide-dark-delegation-and-history.png",
+      "bytes": 87978,
+      "sha256": "444505bb6e46e53b1da91900d1b767965c90de388bed15af2e83b39bffa6f6bb"
+    },
+    {
+      "path": "wide-dark-empty-dispatcher.png",
+      "bytes": 64997,
+      "sha256": "c04c5cab830e52442ca16c759180d860aa0331465da09757dce14f3d74a8af3a"
+    },
+    {
+      "path": "wide-dark-human-and-delegate.png",
+      "bytes": 87978,
+      "sha256": "444505bb6e46e53b1da91900d1b767965c90de388bed15af2e83b39bffa6f6bb"
+    },
+    {
+      "path": "wide-dark-project-error-editable.png",
+      "bytes": 139027,
+      "sha256": "963c2f829249a42b1e6f85970b8fbf0c2d090a77df609dd8e6372b2df3437f66"
+    },
+    {
+      "path": "wide-dark-task-groups-expanded.png",
+      "bytes": 97927,
+      "sha256": "34d8f0cff5f2d07f6da6f6067abca0abd16a04855b9ba77befd4e02136c44ffe"
+    },
+    {
+      "path": "wide-light-delegation-and-history.png",
+      "bytes": 81687,
+      "sha256": "9f2b305e6ddbb592d4a1bf4e3c3bf1757e03b01eeee795e8b9480cfe9b886d48"
+    },
+    {
+      "path": "wide-light-empty-dispatcher.png",
+      "bytes": 60846,
+      "sha256": "4a9fdbf8cd4d81d2bd455b0c9ca798df27d697da687d4122474a04a3e4181d61"
+    },
+    {
+      "path": "wide-light-human-and-delegate.png",
+      "bytes": 81687,
+      "sha256": "9f2b305e6ddbb592d4a1bf4e3c3bf1757e03b01eeee795e8b9480cfe9b886d48"
+    },
+    {
+      "path": "wide-light-project-error-editable.png",
+      "bytes": 131593,
+      "sha256": "ddf5354ed442c9dff58145b0137c8e2f59aad8f1636b6b6df08744c98344b225"
+    },
+    {
+      "path": "wide-light-task-groups-expanded.png",
+      "bytes": 89555,
+      "sha256": "6ed988118fc75aa2736a8508cc1c44fccaf7eb63397c6d9fa693bce701fc0584"
+    }
+  ],
+  "semanticChecks": 12,
+  "screens": 20,
+  "uniquePngDigests": 16,
+  "rootActuallyViewedAllScreens": [
+    "narrow-dark-delegation-and-history.png",
+    "narrow-dark-empty-dispatcher.png",
+    "narrow-dark-human-and-delegate.png",
+    "narrow-dark-project-error-editable.png",
+    "narrow-dark-task-groups-expanded.png",
+    "narrow-light-delegation-and-history.png",
+    "narrow-light-empty-dispatcher.png",
+    "narrow-light-human-and-delegate.png",
+    "narrow-light-project-error-editable.png",
+    "narrow-light-task-groups-expanded.png",
+    "wide-dark-delegation-and-history.png",
+    "wide-dark-empty-dispatcher.png",
+    "wide-dark-human-and-delegate.png",
+    "wide-dark-project-error-editable.png",
+    "wide-dark-task-groups-expanded.png",
+    "wide-light-delegation-and-history.png",
+    "wide-light-empty-dispatcher.png",
+    "wide-light-human-and-delegate.png",
+    "wide-light-project-error-editable.png",
+    "wide-light-task-groups-expanded.png"
+  ],
+  "visualFindings": [
+    "Wide light/dark task drawer visibly shows three waiting/blocked/failed entries, one still-open task, one completed task, distinct shapes and global hand count one.",
+    "Narrow light/dark task groups are legible at 390x844; existing avatar/time masks partly obscure the drawer title and unused background, so no narrow global-hand visual claim is made.",
+    "All four detail views show human Test owner and separate Ada delegate, delegation activity, historical Done with current task In Progress.",
+    "All four project forms show the actual stale revision error, retained draft and enabled Save changes; narrow form remains within the viewport.",
+    "Human/delegate and historical-attempt captures share the same page, yielding 20 files and 16 unique digests."
+  ],
+  "manifestCleanup": {
+    "browser": true,
+    "extension": true,
+    "base": true,
+    "workspaceName": true,
+    "lease": true
+  },
+  "runtimeShutdown": "passed",
+  "workspaceNameRestored": true,
+  "independentAuditSha256": "7556a0bed1eec548fafe4812c1a9af0a8d4127cf9a3bf52bb512e81b6472b8c7",
+  "testCountsFromIndependentRawJobAudit": {
+    "controller": {
+      "passed": 48,
+      "failed": 0,
+      "skipped": 0
+    },
+    "realChromium": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    "semanticChecks": 12,
+    "pngFiles": 20,
+    "uniquePngDigests": 16,
+    "visualInspections": 20
+  },
+  "scope": {
+    "isolatedOfficialUiProductionBuild": true,
+    "syntheticIdentities": true,
+    "ownerUiAndBusinessRpc": true,
+    "peerNormalAuthenticationAndInitializationOnly": true,
+    "peerTerminalAuthorityTested": false,
+    "productionAcceptance": false,
+    "externalCloudServiceConfigured": false,
+    "browserResponseMocks": 0
+  },
+  "rootFreshApiObservation": {
+    "runCompletedSuccess": true,
+    "attempt": 1,
+    "head": "bbf6b105e644168307b78edf1ebff382af2a0ac5",
+    "artifactId": 13725546924,
+    "artifactDigestMatches": true
+  }
+}
