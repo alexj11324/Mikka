@@ -61,7 +61,8 @@ test('the person locale drives the copy; missing or unknown falls back to Englis
 
 test('a long title shrinks to the 400-character budget; the link is byte-for-byte intact', () => {
   const text = slackCompletionMessage({ ...base, title: 'Fix login redirect '.repeat(80) })
-  assert.ok(text.length <= SLACK_COMPLETION_MAX, `${text.length} characters`)
+  const length = Array.from(text).length
+  assert.ok(length <= SLACK_COMPLETION_MAX, `${length} code points`)
   assert.equal(linkLine(text), LINK)
   assert.match(head(text), /^Mikka: MIK-42 Fix login redirect /)
   assert.match(head(text), /… — Done$/, 'the title gives way with an ellipsis')
@@ -70,8 +71,37 @@ test('a long title shrinks to the 400-character budget; the link is byte-for-byt
 
 test('the identifier survives title truncation', () => {
   const text = slackCompletionMessage({ ...base, title: 'x'.repeat(2_000) })
-  assert.ok(text.length <= SLACK_COMPLETION_MAX)
+  assert.ok(Array.from(text).length <= SLACK_COMPLETION_MAX)
   assert.match(head(text), /^Mikka: MIK-42 /)
+})
+
+test('title truncation never splits a surrogate pair', () => {
+  const text = slackCompletionMessage({ ...base, identifier: null, title: '😀'.repeat(300) })
+  assert.equal(/\p{Cs}/u.test(text), false, 'no lone surrogate')
+  assert.ok(Array.from(text).length <= SLACK_COMPLETION_MAX)
+  assert.match(head(text), /… — Done$/)
+  assert.equal(linkLine(text), LINK)
+})
+
+test('a link that fills the budget drops the label and stays whole', () => {
+  const longLink = `https://app.example.com/${'a'.repeat(366)}` // 390 code points
+  const text = slackCompletionMessage({ ...base, deepLink: longLink })
+  assert.equal(text, longLink)
+  assert.equal(text.includes('Done'), false, 'the status label is dropped')
+  assert.ok(Array.from(text).length <= SLACK_COMPLETION_MAX)
+})
+
+test('a link longer than the whole budget is returned alone, never truncated', () => {
+  const huge = `https://app.example.com/${'a'.repeat(476)}` // 500 code points
+  const text = slackCompletionMessage({ ...base, deepLink: huge })
+  assert.equal(text, huge)
+  assert.equal(text.includes('Done'), false)
+})
+
+test('control characters are removed from display text', () => {
+  const text = slackCompletionMessage({ ...base, identifier: 'MIK\u0000-42', title: 'Fix\u001bthe\u0007issue' })
+  assert.equal(/[\p{Cc}]/u.test(head(text)), false)
+  assert.match(head(text), /^Mikka: MIK -42 Fix the issue — Done$/)
 })
 
 test('an absent identifier or title is omitted without leaving double spaces', () => {
