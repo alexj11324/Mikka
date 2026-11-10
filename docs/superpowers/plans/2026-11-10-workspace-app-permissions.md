@@ -23,8 +23,7 @@ Base commit: `5adf87270` on `feat/bot-permissions-surface`
 - A task that needs a database may write the test and document that CI is the
   gate if no disposable database is available.
 - Everything user-visible is in `messages/en.json` and `messages/zh-CN.json`.
-- The page authorizes a workspace, not a Bot. A Bot has no permission layer of
-  its own; do not keep or add one.
+- The page authorizes a workspace, not a Bot. There is no Bot-level permission layer or per-Bot setting; do not add one, and remove every per-Bot policy read in this change.
 
 ## Tasks
 
@@ -43,8 +42,9 @@ Base commit: `5adf87270` on `feat/bot-permissions-surface`
    stated, no Bot selector, one row per app, tool count and read/write marks
    appear, and a failed catalogue says so.
 4. **Hosted overlay finalize** — `/Users/alexjiang/mikka-hosted-ui` only:
-   hide the Bot picker for `scope: 'workspace'`, show the workspace note,
-   keep the run section, and typecheck. Commit in that repository when green.
+   remove the Bot picker for every scope; the page never selects a Bot. Show
+   the workspace note, keep the run section, and typecheck. Commit in that
+   repository when green.
 5. **Messages audit** — `messages/en.json` and `messages/zh-CN.json` only:
    every new key exists in both locales, no stale "Bot permissions" copy, and
    the HostedPermissions block matches workspace scope.
@@ -52,9 +52,9 @@ Base commit: `5adf87270` on `feat/bot-permissions-surface`
    references only: remove stale per-Bot claims and document the workspace
    scope, tool catalogue endpoint, and GitHub deny semantics.
 7. **Security review** — read-only. Review `call_app_tool`, the legacy write
-   path, and `github_call` enforcement for deny/ask/read-only behavior and
-   workspace-vs-Bot layering. Write findings to
-   `tasks/bot-permissions-security-review.md`; do not edit code.
+   path, and `github_call` enforcement for allow / read-only / disabled behavior
+   and workspace-only enforcement; assert that no per-Bot policy is read. Write
+   findings to `tasks/bot-permissions-security-review.md`; do not edit code.
 8. **Batch CI diagnostic** — `/Users/alexjiang/Desktop/vibe/Mikka-batch`
    only. Read manual CI run `42857391654` logs, extract the DB 3/4
    `review_refusal_debug` / `factory_repair_debug` lines, identify why
