@@ -40,7 +40,9 @@ test('the tier reaches the Coordinator but not the chat', () => {
   const text = eventPrompt({ kind: 'run_finished', issueId: null, runId: 'r1', payload: { status: 'failed', stopReason: 'error' }, tier: 'attention' })
   assert.match(text, /\nTriage: this needs the person/)
   const [item] = chatItems([{ position: 1, createdAt: new Date(), message: { role: 'user', content: text } }])
-  assert.equal(item.text, '[Event] Run r1 ended with status failed (error).')
+  assert.equal(item.from, 'event')
+  assert.equal(item.text, '', 'legacy event DTOs contain no model control body or triage instruction')
+  assert.equal(item.line?.kind, 'other', 'an unattributed legacy event stays a closed generic line')
   assert.doesNotMatch(eventPrompt({ kind: 'issue_done', issueId: 'i1', runId: null, payload: { title: 'Login', previousStatus: 'review' }, tier: 'result' }), /Triage/)
 })
 
