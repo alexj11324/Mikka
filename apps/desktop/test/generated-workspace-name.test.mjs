@@ -27,9 +27,11 @@ function fixture() {
     ['user', [row({ id: OWNER, name: ownerName })]],
     ['mikka_workspaces', [row({ id: ID, userId: OWNER, kind: 'personal', name: originalName, slug: null })]],
     ['workspace_audit_events', []],
+    ['resource_access_events', []],
   ])
   const peer = new Map([['user', [row({ id: PEER, name: 'Private peer' })]]])
   const events = []
+  const retained = []
   const lease = { id: 'lease-test', generation: 1, pairId: 'pair-test' }
   const accounts = [
     { role: 'owner', user_id: OWNER, baseline: fingerprint(owner) },
@@ -40,6 +42,8 @@ function fixture() {
   const client = { async query(sql, args) {
     assert.match(sql, /^SELECT /)
     if (sql.includes('FROM mikka_test_accounts.accounts')) return { rows: structuredClone(accounts) }
+    if (sql.includes("to_regclass('mikka_test_accounts.retained_audit')")) return { rows: [{ receipts: 'mikka_test_accounts.retained_audit' }] }
+    if (sql.includes('FROM mikka_test_accounts.retained_audit')) return { rows: args[0] === OWNER ? structuredClone(retained) : [] }
     assert.ok(sql.includes('jsonb_set(to_jsonb(w)'))
     assert.deepEqual(args, [ID, originalName, OWNER])
     return { rows: [{ data: JSON.stringify({ ...owner.get('mikka_workspaces')[0].value, name: args[1] }) }] }
@@ -75,7 +79,7 @@ function fixture() {
     },
     peer: { userId: PEER },
   }
-  return { scope, owner, peer, events, originalName, englishName, ownerName, replaceWorkspace,
+  return { scope, owner, peer, events, originalName, englishName, ownerName, replaceWorkspace, retained,
     failResponse() { responseFailure = true }, changeAfterRestore() { changeAfterRestore = true } }
 }
 
@@ -95,6 +99,24 @@ test('restores only a proven localized generated name through normal authenticat
   assert.equal(result.peerMatchesSealedBaseline, true)
   const published = JSON.stringify(result)
   for (const privateValue of [OWNER, PEER, ID, f.ownerName, f.originalName, f.englishName, 'private-audit']) assert.equal(published.includes(privateValue), false)
+})
+
+test('name restoration shares the pool exact audit receipts without accepting a changed or unregistered row', async () => {
+  for (const variant of ['receipted', 'changed', 'unregistered']) {
+    const f = fixture(), helper = await captureGeneratedWorkspaceName(f.scope)
+    f.replaceWorkspace({ name: f.englishName })
+    const audit = row({ id: 'retained-fixture-event', ownerId: OWNER, action: 'delete', source: 'source_deleted' })
+    f.owner.set('resource_access_events', [audit])
+    if (variant !== 'unregistered') f.retained.push({ table_name: 'resource_access_events', record_id: audit.value.id, fingerprint: createHash('sha256').update(audit.text).digest('hex') })
+    if (variant === 'changed') f.owner.set('resource_access_events', [row({ ...audit.value, action: 'changed' })])
+    if (variant === 'receipted') {
+      assert.equal((await helper.restore({ drained: true })).phase, 'restored')
+      assert.deepEqual(f.owner.get('resource_access_events'), [audit], 'immutable audit is retained in full')
+    } else {
+      await assert.rejects(helper.restore({ drained: true }), { code: 'WORKSPACE_NAME_CLEANUP_UNPROVEN' })
+      assert.deepEqual(f.events, ['revoke'], 'an unproven footprint never reaches the restore RPC')
+    }
+  }
 })
 
 test('unchanged name needs no reauthentication or RPC and drain is mandatory', async () => {

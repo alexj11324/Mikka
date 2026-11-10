@@ -39,7 +39,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
     const [current] = await db.select({ version: sql<string>`md5(${issueDocuments.state})` }).from(issueDocuments)
       .where(and(eq(issueDocuments.issueId, issue.id), eq(issueDocuments.userId, issue.userId))).limit(1)
     if (current?.version === parsed.known) {
-      await requireCurrentIssueWorkspace(user, issue.workspaceId)
+      await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       return { version: current.version, workspaceId }
     }
   }
@@ -47,7 +47,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
   const exchange = () => db.transaction(async tx => {
     const [locked] = await tx.select({ id: issues.id, userId: issues.userId, scopeVersion: issues.scopeVersion, workspaceId: issues.workspaceId, content: issues.content, scope: issues.scope, linearSyncPolicy: issues.linearSyncPolicy, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-    if (!writing) await requireCurrentIssueWorkspace(user, issue.workspaceId)
+    if (!writing) await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
     const [stored] = await tx.select().from(issueDocuments).where(and(eq(issueDocuments.issueId, issue.id), eq(issueDocuments.userId, issue.userId))).limit(1)
     const doc = new Y.Doc()
     try {
@@ -77,7 +77,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
       return { changed, syncEligible: Boolean(link), version: documentVersion(state), update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
     } finally { doc.destroy() }
   })
-  const result = writing ? await withIssueWorkspace(user, issue.workspaceId, exchange) : await exchange()
+  const result = writing ? await withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canSteer' }, exchange) : await exchange()
   if (result.changed && result.syncEligible) dispatchLinearIssueSync(issue.id)
   return { update: result.update, version: result.version, workspaceId }
 }
@@ -86,7 +86,7 @@ export async function listMembers(id: string) {
   const result = await db.transaction(async tx => {
   const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-  await requireCurrentIssueWorkspace(user, issue.workspaceId)
+  await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
   const members = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image, createdAt: issueMembers.createdAt }).from(issueMembers)
     .innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId))).orderBy(issueMembers.createdAt, users.id)
   const [owner] = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(issues)
@@ -103,7 +103,7 @@ export async function inviteMember(id: string, email: string): Promise<ActionRes
     if (issue.userId !== user.id) return { error: 'memberOwnerOnly' }
     const parsed = z.email().max(254).safeParse(email.trim().toLowerCase())
     if (!parsed.success) return { error: 'memberInvalidEmail' }
-    return withIssueWorkspace(user, issue.workspaceId, () => db.transaction(async tx => {
+    return withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canManageAccess' }, () => db.transaction(async tx => {
       const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(and(eq(issues.id, id), eq(issues.userId, user.id))).for('update')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
       const [member] = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(users).where(eq(users.email, parsed.data)).limit(1)
@@ -121,7 +121,7 @@ export async function removeMember(id: string, memberId: string): Promise<Action
     if (issue.userId !== user.id) return { error: 'memberOwnerOnly' }
     const parsed = z.string().min(1).max(128).safeParse(memberId)
     if (!parsed.success) return { error: 'validationGeneric' }
-    const clearedAssignee = await withIssueWorkspace(user, issue.workspaceId, () => db.transaction(async tx => {
+    const clearedAssignee = await withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canManageAccess' }, () => db.transaction(async tx => {
       const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, user.id))).for('update')
       requireLockedIssueScope(latest, user.id, issue.scopeVersion, issue.workspaceId)
       const removed = await tx.delete(issueMembers).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, user.id), eq(issueMembers.memberId, parsed.data))).returning({ memberId: issueMembers.memberId })

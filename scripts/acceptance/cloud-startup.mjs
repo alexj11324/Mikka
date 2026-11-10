@@ -282,13 +282,13 @@ function readDispatchOutput(output) {
 }
 
 /** A bounded NDJSON read, never a polling loop. Only safe identifiers/times leave. */
-async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false }, now) {
+async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false, probe }, now) {
   const marker = `STARTUP_OK_${record.sampleId}`
   const toolInput = { issueId: record.issueId, repo: REPOSITORY, target: deviceId ? { deviceId } : 'cloud', profileId,
     // The owned lease probe executes Python; read-only runs intentionally have
     // no native shell. Ordinary startup checks keep their read-only policy.
-    ...(agentId ? { agentId } : {}), readOnly: !leaseAudit,
-    note: `Read one line of README (or list the repository root if absent), then reply ${marker}. Do not modify files, create branches, commit, push, open a PR, send messages, or spawn other agents.` }
+    ...(agentId ? { agentId } : {}), readOnly: !(leaseAudit || probe),
+    note: probe?.instructions ?? `Read one line of README (or list the repository root if absent), then reply ${marker}. Do not modify files, create branches, commit, push, open a PR, send messages, or spawn other agents.` }
   const text = `执行已有测试任务 ${record.issueId}，不要创建另一项任务。请调用一次 dispatch_run，参数如下：${JSON.stringify(toolInput)}。使用已固定模型的指定 Profile，不另传 model，不换 Profile、订阅或电脑。派发完成后只汇报 runId。`
   const trace = sampledRequestTrace()
   record.requestTraceId = trace.traceId
@@ -896,7 +896,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   deviceId, agentId, sourceCommit, expectedBuild, repository = REPOSITORY, titlePrefix = '测试 1505',
   sampleId = randomUUID(), timeoutMs = 240000, requireReply = true, minToolCalls = deviceId ? 0 : 1,
   runtimeEvidence: runtimeEvidenceMode = 'optional', officialTiming = 'disabled',
-  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued }) {
+  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued, createCaseProbe }) {
   assert(client && ['request', 'json', 'rpc'].every(key => typeof client[key] === 'function'), 'client_required')
   assert(UUID.test(botId ?? '') && UUID.test(profileId ?? ''), 'fixture_required')
   assert(scope?.ownerId && scope.adminId && scope.ownerId !== scope.adminId && scope.botId === botId
@@ -915,8 +915,14 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     assert(typeof build === 'string' && (!expectedBuild || build === expectedBuild), 'build_mismatch')
     assert(!record.build || build === record.build, 'build_changed'); record.build = build
   })
-  let initialPinPassed = false, finalPinAttempted = false
+  let initialPinPassed = false, finalPinAttempted = false, probe
   try {
+    if (createCaseProbe) {
+      probe = await createCaseProbe({ client, record, scope, now })
+      assert(typeof probe?.instructions === 'string' && probe.instructions.length > 0 && probe.instructions.length <= 10000
+        && ['createIssue', 'observe', 'afterRelease'].every(key => typeof probe[key] === 'function'), 'fixture_scope_invalid')
+      record.requireReplyAfterTool = true
+    }
     await pin()
     initialPinPassed = true
     record.phase = 'session_identity'
@@ -933,11 +939,12 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'issue_create'
     const leaseDriver = leaseAudit ? await import('./cloud-lease-audit.mjs') : null
     const leaseInstructions = leaseDriver ? await leaseDriver.leaseAuditInstructions(sampleId, harness) : ''
-    const created = await client.rpc('issues.saveIssue', [{ title: record.title, status: 'todo', priority: 'low', content: {
+    const issueInput = { title: record.title, status: 'todo', priority: 'low', content: {
       type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Read one line of README in ${REPOSITORY} and reply STARTUP_OK_${sampleId}. Read only; no files, branches, commits, PRs, external messages, or additional agents.\n${leaseInstructions}` }] }],
-    } }])
+    } }
+    const created = probe ? await probe.createIssue(issueInput) : await client.rpc('issues.saveIssue', [issueInput])
     assert(UUID.test(created.issue?.id ?? ''), 'issue_create_failed'); record.issueId = created.issue.id
-    await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit }, now)
+    await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit, probe }, now)
     record.phase = 'coordinator_stop'
     await client.rpc('coordinator.stopCoordinatorTurn', [botId])
     record.coordinatorStopped = true
@@ -954,11 +961,13 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
       } catch (error) { fail('bootstrap_publication_failed', error) }
     }
     record.phase = 'execution_watch'
-    await watchRun(client, record, timeoutMs, WebSocketImpl, now, undefined, leaseDriver ? {
-      observe: detail => {
+    await watchRun(client, record, timeoutMs, WebSocketImpl, now, undefined, leaseDriver || probe ? {
+      ...(probe?.signal ? { signal: probe.signal } : {}),
+      observe: async (detail, live) => {
         const complete = observeChunks(record, detail, now())
-        record.leaseAudit = leaseDriver.leaseAuditReceipt(detail.chunks, record.runId, harness)
-        return complete
+        if (leaseDriver) record.leaseAudit = leaseDriver.leaseAuditReceipt(detail.chunks, record.runId, harness)
+        const probeComplete = probe ? await probe.observe(detail, live) : true
+        return complete && probeComplete
       },
     } : undefined)
     record.phase = 'subscription_proof'
@@ -993,7 +1002,15 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
         record.failure ??= record.stopFailure; record.error ??= record.failure.code
       }
     }
-    await cleanupCase(client, record, deviceId ? 'device' : 'cloud', { timeoutMs, WebSocketImpl, now })
+    await cleanupCase(client, record, deviceId ? 'device' : 'cloud', { timeoutMs, WebSocketImpl, now, ...(probe ? { preserveIssue: true } : {}) })
+    if (probe) {
+      try { await probe.afterRelease() }
+      catch (error) {
+        record.status = 'failed'
+        record.cleanup.status = 'failed'
+        record.cleanup.errors.push({ step: 'case_probe_after_release', code: safeError(error) })
+      }
+    }
     if (record.cleanup.status !== 'passed' && !record.failure) {
       record.failure = startupFailure(new Error(record.cleanup.errors[0]?.code), 'cleanup'); record.error = record.failure.code
     }
@@ -1002,7 +1019,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
 }
 
 export async function runCloudStartup(options, { env = process.env, fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, now = Date.now,
-  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued } = {}) {
+  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued, createCaseProbe, caseProfileInstructions } = {}) {
   const { email, password } = smokeAcceptanceAccount(env)
   assert(typeof WebSocketImpl === 'function', 'node_websocket_required')
   const client = createSessionClient(options.origin, fetchImpl), fixtureId = randomUUID()
@@ -1091,7 +1108,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
         const created = await client.json('/api/factory/agent-profiles', post({ workspaceId: scope.workspaceId, requestId: randomUUID(), profile: {
           name: `测试1505 ${fixtureId.slice(0, 8)} ${harness}`, description: 'Temporary startup measurement', enabled: true,
           harness, model: { mode: 'fixed', harness, model: MODELS[harness], source: candidate.source }, effort: 'low', roles: [],
-          instructions: 'This is a read-only startup test. Do not modify files, commit, push, create a PR, send external messages, or spawn agents.', skills: [],
+          instructions: caseProfileInstructions ?? 'This is a read-only startup test. Do not modify files, commit, push, create a PR, send external messages, or spawn agents.', skills: [],
         } }))
         phase = 'profile_validation'
         assert(UUID.test(created.profile?.id ?? '') && Number.isInteger(created.profile.version) && created.profile.version > 0, 'profile_create_failed')
@@ -1113,7 +1130,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       }
       report.phase = 'profile_validation'
       const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, profile, scope, harness, sampleId,
-        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl, onCandidateRunQueued })
+        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl, onCandidateRunQueued, createCaseProbe })
       report.samples.push(sample)
       const versionFailure = sample.versionPinFailure?.code ?? (['startup_build_mismatch', 'startup_build_changed',
         'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error) ? sample.error : null)

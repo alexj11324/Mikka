@@ -10,6 +10,8 @@ mock.module(new URL('../abuse/runtime.ts',import.meta.url).href,{namedExports:{
   hostedUsage:{reserve:async()=>{reservations++},settle:async(_id:string,cost:number|null)=>{settlements.push(cost)}},
 }})
 mock.module(new URL('../abuse/alerts.ts',import.meta.url).href,{namedExports:{checkAbuseAlerts:async()=>{}}})
+// This transport unit owns no DB; real payer resolution and revocation run in billing/credit-share PG suites.
+mock.module(new URL('../credit-shares.ts',import.meta.url).href,{namedExports:{withSharedCredits:async(workspaceId:string,attempt:(payer:string)=>unknown)=>attempt(workspaceId)}})
 mock.module(new URL('./runtime.ts',import.meta.url).href,{namedExports:{assertUnmanagedModelTransport:async(identity:unknown)=>{
   assert.deepEqual(identity,scope);checks++
   if(deniedAt===(checks===1?'prepare':'send'))throw new Error('modelRouteDenied')

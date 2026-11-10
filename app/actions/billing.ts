@@ -87,7 +87,12 @@ export async function getHostedUsage(workspaceId?: string) {
     // The person's own subscription serves them in every workspace (#838): with one connected, 连接订阅 is no way on.
     const { pool } = await import('@/lib/db')
     const subscribed = (await pool.query(`SELECT 1 FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND "removedAt" IS NULL LIMIT 1`, [actor.userId])).rowCount !== 0
-    return { ...await hostedUsage.status(actor.workspaceId), workspaceId: actor.workspaceId, personal, subscribed, recent:actor.role === 'admin' ? await hostedUsage.recent(actor.workspaceId) : [] }
+    const account = await (await import('@/lib/billing/organization-account')).resolvePlatformBillingAccount(actor.workspaceId)
+    const { hostedBillingScope } = await import('@/lib/abuse/context')
+    const status = await hostedBillingScope.run({ workspaceId: actor.workspaceId, ownerId: actor.userId, actorId: actor.userId,
+      billingAccountWorkspaceId: account.accountWorkspaceId, billingOrganizationId: account.organizationId }, () => hostedUsage.status(account.accountWorkspaceId))
+    return { ...status, workspaceId: actor.workspaceId, billingAccount: account, personal, subscribed,
+      recent: actor.role === 'admin' ? await hostedUsage.recent(account.accountWorkspaceId, actor.workspaceId) : [] }
   })
 }
 

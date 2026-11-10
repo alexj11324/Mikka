@@ -133,7 +133,9 @@ for (const mode of ['resume', 'local', 'legacy'] as const) it(`keeps the origina
 for (const [end, retain] of [['policy-denied', false], ['stop', false], ['approved-stop', false], ['lease', false], ['stop', true]] as const)
 it(`reaps the real Git child when ${end} wins during the speculative clone (retain=${retain})`, async () => {
   const files = tempDir(), started = join(files, 'started'), stopped = join(files, 'stopped'), helper = join(files, 'ssh.cjs')
-  writeFileSync(helper, `const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(started)},String(process.pid));process.on('SIGTERM',()=>{fs.writeFileSync(${JSON.stringify(stopped)},'term');process.exit(0)});setTimeout(()=>process.exit(1),30000)`)
+  // Publishing readiness lets the parent cancel immediately, so the signal
+  // handler must already be installed when the started marker becomes visible.
+  writeFileSync(helper, `const fs=require('node:fs');process.on('SIGTERM',()=>{fs.writeFileSync(${JSON.stringify(stopped)},'term');process.exit(0)});fs.writeFileSync(${JSON.stringify(started)},String(process.pid));setTimeout(()=>process.exit(1),30000)`)
   let completeWithChildDead = false
   const f = await fixture({ remote: 'ssh://git@fixture.invalid/owner/repository.git', retain,
     environment: { GIT_SSH_COMMAND: `${process.execPath} ${helper}`, GIT_SSH_VARIANT: 'ssh' }, onComplete() {

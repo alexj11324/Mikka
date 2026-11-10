@@ -2,7 +2,6 @@ import 'server-only'
 import { and, eq, getTableColumns } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
-import { currentUser } from '@/lib/acting-user'
 import { actingContext } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
@@ -21,6 +20,9 @@ type IssueAccess<T = Issue> = { issue: T; teamId: string | null }
 type RequestIssueAccess<T = Issue> = IssueAccess<T> & { user: Awaited<ReturnType<typeof requireUser>> }
 
 export async function requireUser() {
+  // Explicit-user readers (including verified webhooks) do not need to
+  // initialize session/OAuth state merely by importing this module.
+  const { currentUser } = await import('@/lib/acting-user')
   const user = await currentUser()
   if (!user) throw new ActionFailureError('authRequired')
   return user

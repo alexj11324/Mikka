@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
+mock.module(new URL('../billing/organization-account.ts', import.meta.url).href, { namedExports: {
+  resolvePlatformBillingAccount: async (workspaceId: string) => ({ organizationId: null, accountWorkspaceId: workspaceId }),
+} })
 
 // The default model: ZeroCat first, admitted on its own route and billed from
 // token usage; its Gateway route only when ZeroCat fails before the first token.

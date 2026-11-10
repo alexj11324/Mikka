@@ -1,6 +1,6 @@
 import 'server-only'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { AuthContext } from 'better-auth'
 import { decryptOAuthToken, setTokenUtil } from 'better-auth/oauth2'
 import { db } from '@/lib/db'
@@ -10,6 +10,8 @@ import { resolveAppOrigin } from '@/lib/auth-config'
 import { withBasePath } from '@/lib/base-path'
 import { readGitHubAppConfig } from './app-config'
 import { GitHubAccessError } from './user-access-error'
+import { exchangeGitHubOAuthToken, type GitHubOAuthToken } from './oauth-token'
+import { remainingRequestBudget, type RequestBudget } from '../request-budget'
 
 // Plugins → GitHub connects a GitHub account for repository access without
 // touching the Better Auth login identity. It reuses the GitHub App's callback
@@ -20,7 +22,7 @@ export const GITHUB_CALLBACK_PATH = withBasePath('/api/auth/callback/github')
 const STATE_TTL_SECONDS = 600
 
 export type GitHubConnection = { githubAccountId: string; githubLogin: string }
-type TokenResponse = { access_token: string; expires_in?: number; refresh_token?: string; refresh_token_expires_in?: number }
+type TokenResponse = GitHubOAuthToken
 
 // The origin the link starts on, never the sign-in proxy hub: the proxy relays
 // sign-in only, and a preview's link landing on the hub would reach production
@@ -79,15 +81,7 @@ export function githubConnectUser(state: string | null, cookie: string | undefin
 }
 
 async function postToken(params: Record<string, string>): Promise<TokenResponse> {
-  const { clientId, clientSecret } = await connectionClient()
-  const response = await fetch('https://github.com/login/oauth/access_token', {
-    method: 'POST', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(10_000),
-    headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'Mikka' },
-    body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, ...params }),
-  })
-  const body = await response.json().catch(() => null) as Partial<TokenResponse> | null
-  if (!response.ok || typeof body?.access_token !== 'string' || !body.access_token) throw new Error('GitHub token exchange failed')
-  return body as TokenResponse
+  return exchangeGitHubOAuthToken(await connectionClient(), params)
 }
 
 async function githubUser(token: string): Promise<GitHubConnection> {
@@ -159,7 +153,8 @@ export async function disconnectGitHub(userId: string) {
  * within `minValidityMs`; null without a connection. `expiresAt` is null for a
  * token GitHub gave no expiry.
  */
-export async function githubConnectionToken(userId: string, { minValidityMs = 60_000 }: { minValidityMs?: number } = {}): Promise<{ token: string; githubAccountId: string; expiresAt: Date | null } | null> {
+export async function githubConnectionToken(userId: string, { minValidityMs = 60_000, budget }: { minValidityMs?: number; budget?: RequestBudget } = {}): Promise<{ token: string; githubAccountId: string; expiresAt: Date | null } | null> {
+  if (budget) remainingRequestBudget(budget)
   const fresh = (expiresAt: Date | null) => !expiresAt || expiresAt.getTime() > Date.now() + minValidityMs
   const [row] = await db.select().from(githubConnections).where(eq(githubConnections.userId, userId)).limit(1)
   if (!row) return null
@@ -167,14 +162,22 @@ export async function githubConnectionToken(userId: string, { minValidityMs = 60
   // GitHub rotates the refresh token on use, so concurrent refreshes (several
   // runs of one person) must not each spend it: one holds the row, the others
   // wait and read the token it saved.
-  return db.transaction(async tx => {
+  const credential = await db.transaction(async tx => {
+    if (budget) {
+      const timeout = String(Math.min(2000, remainingRequestBudget(budget)))
+      await tx.execute(sql`SELECT set_config('lock_timeout',${timeout},true),set_config('statement_timeout',${timeout},true)`)
+    }
     const [locked] = await tx.select().from(githubConnections).where(eq(githubConnections.userId, userId)).for('update')
     if (!locked) return null
     if (fresh(locked.accessTokenExpiresAt)) return { token: await unseal(locked.accessToken), githubAccountId: locked.githubAccountId, expiresAt: locked.accessTokenExpiresAt }
     if (!locked.refreshToken || (locked.refreshTokenExpiresAt && locked.refreshTokenExpiresAt.getTime() <= Date.now())) throw new Error('GitHub connection expired')
+    if (budget) remainingRequestBudget(budget, 12_000)
     const token = await postToken({ grant_type: 'refresh_token', refresh_token: await unseal(locked.refreshToken) })
     const sealed = await sealedTokens(token)
     await tx.update(githubConnections).set({ ...sealed, updatedAt: new Date() }).where(eq(githubConnections.userId, userId))
     return { token: token.access_token, githubAccountId: locked.githubAccountId, expiresAt: sealed.accessTokenExpiresAt }
   })
+  // Never throw for a caller cancellation inside the refresh transaction.
+  if (budget) remainingRequestBudget(budget)
+  return credential
 }
