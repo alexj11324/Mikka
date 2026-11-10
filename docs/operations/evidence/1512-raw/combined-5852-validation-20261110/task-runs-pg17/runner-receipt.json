@@ -1,0 +1,432 @@
+{
+  "schema": "issue1512-task-runs-pg17-v1",
+  "runId": "42729547296",
+  "attempt": "1",
+  "control": {
+    "opsSha": "fa33ec67c1b89aa0251c578276b09b7c85aa5c90",
+    "opsTree": "fa8291f04ad77a8b9720010368bfd23da70c412c",
+    "workflowBlob": "66519d40eb0f54d6d8bc93e6f6b6bd6bf514a3d7",
+    "manifestSha256": "27a3436cf5f65f8df43b190e3e59feaa7ad582f0e8caaf413a5d0460a908cb19",
+    "driverSha256": "36ffce799cffe19b49ed695cacd3068983e0f4ea09d00a7eb7123eb7b12b3e1b",
+    "node": "v24.22.2",
+    "pnpm": "10.34.3",
+    "capturedAt": "2026-11-10T00:36:20.016Z",
+    "cachePolicy": {
+      "actionsCache": false,
+      "persistentPnpmCache": false,
+      "nodeCompileCache": false,
+      "tsxDiskCache": false,
+      "dependencyInstalls": 1,
+      "independentTestProcesses": true
+    },
+    "initialSourceProof": {
+      "phase": "red",
+      "point": "before-install",
+      "head": "01d436073027acd94fcc0d43fb75e435d2ddd7ac",
+      "actualWorktreeTree": "028c27f1443cfb9c98564a0bed2412d467b0288f",
+      "appBlob": "f2213c69a435b967feb8d9f335213394c2e08630",
+      "appBytes": 14442,
+      "appSha256": "685edce7f5f2e06da09ddf360167b97d223a80ea632adeb2d7d2edf1874ad021",
+      "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb",
+      "testBytes": 46882,
+      "testSha256": "477adde1d597484dba5d986c0521d978319fc7f264a932cbbb3a575766f05a93"
+    }
+  },
+  "red": {
+    "sha": "01d436073027acd94fcc0d43fb75e435d2ddd7ac",
+    "tree": "028c27f1443cfb9c98564a0bed2412d467b0288f",
+    "parent": "565429bc8749e1007b5ec30c2b4a4b92f43fa5ed",
+    "sourceBlob": "f2213c69a435b967feb8d9f335213394c2e08630",
+    "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb"
+  },
+  "green": {
+    "sha": "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+    "tree": "41aff4c08572a384f15ec113f0e41add8b936b69",
+    "parent": "565429bc8749e1007b5ec30c2b4a4b92f43fa5ed",
+    "sourceBlob": "e2c0a834f2a4ef8cb10c836302f0929f02db6051",
+    "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb"
+  },
+  "startedAt": "2026-11-10T00:37:09.616Z",
+  "resource": {
+    "id": "132946b0c977170810a8d7d75bd25ae27fa516a8091b78da75935f311673a422",
+    "name": "/issue1512-taskruns-pg-42729547296-1",
+    "image": "postgres:17",
+    "imageId": "sha256:eb0fb2377534e65aad04f37838956b3dfb888e1a3dd3c1acf957bc6557eb6c7d",
+    "labels": {
+      "mikka.github-attempt": "1",
+      "mikka.github-run": "42729547296",
+      "mikka.github-sha": "fa33ec67c1b89aa0251c578276b09b7c85aa5c90",
+      "mikka.issue": "1512",
+      "mikka.runner": "task-runs-pg"
+    },
+    "ports": {
+      "5432/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "5432"
+        }
+      ]
+    },
+    "running": true,
+    "health": "healthy"
+  },
+  "phases": [
+    {
+      "phase": "red",
+      "sourceProof": {
+        "phase": "red",
+        "point": "before-test",
+        "head": "01d436073027acd94fcc0d43fb75e435d2ddd7ac",
+        "actualWorktreeTree": "028c27f1443cfb9c98564a0bed2412d467b0288f",
+        "appBlob": "f2213c69a435b967feb8d9f335213394c2e08630",
+        "appBytes": 14442,
+        "appSha256": "685edce7f5f2e06da09ddf360167b97d223a80ea632adeb2d7d2edf1874ad021",
+        "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb",
+        "testBytes": 46882,
+        "testSha256": "477adde1d597484dba5d986c0521d978319fc7f264a932cbbb3a575766f05a93"
+      },
+      "database": {
+        "database": "mikka_e2e",
+        "role": "e2e",
+        "version": "170011",
+        "port": 5432,
+        "oid": "16384"
+      },
+      "startedAt": "2026-11-10T00:37:09.917Z",
+      "verdict": "EXPECTED_QUERY_ASSERTION_RED",
+      "assertionFailure": {
+        "name": "the real task-run action reads no team metadata and still reads current tenant membership",
+        "diagnostic": "\n      ---\n      duration_ms: 8.174932\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:9:8786'\n      failureType: 'testCodeFailure'\n      error: |-\n        task runs consume only the predicate, never team settings or link pages\n        \n        3 !== 0\n        \n      code: 'ERR_ASSERTION'\n      name: 'AssertionError'\n      expected: 0\n      actual: 3\n      operator: 'strictEqual'\n      stack: |-\n        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:485:14)\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:473:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async Test.processPendingSubtests (node:internal/test_runner/test:974:7)\n      ..."
+      },
+      "summary": {
+        "tests": 16,
+        "pass": 14,
+        "fail": 2,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "afterTestProof": {
+        "phase": "red",
+        "point": "after-test",
+        "head": "01d436073027acd94fcc0d43fb75e435d2ddd7ac",
+        "actualWorktreeTree": "028c27f1443cfb9c98564a0bed2412d467b0288f",
+        "appBlob": "f2213c69a435b967feb8d9f335213394c2e08630",
+        "appBytes": 14442,
+        "appSha256": "685edce7f5f2e06da09ddf360167b97d223a80ea632adeb2d7d2edf1874ad021",
+        "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb",
+        "testBytes": 46882,
+        "testSha256": "477adde1d597484dba5d986c0521d978319fc7f264a932cbbb3a575766f05a93"
+      },
+      "finishedAt": "2026-11-10T00:37:38.556Z"
+    },
+    {
+      "phase": "green",
+      "sourceProof": {
+        "phase": "green",
+        "point": "before-test",
+        "head": "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+        "actualWorktreeTree": "41aff4c08572a384f15ec113f0e41add8b936b69",
+        "appBlob": "e2c0a834f2a4ef8cb10c836302f0929f02db6051",
+        "appBytes": 14472,
+        "appSha256": "551510320c17617074afa87aa85c812787972cdf3b66746ece85d3064fe16a14",
+        "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb",
+        "testBytes": 46882,
+        "testSha256": "477adde1d597484dba5d986c0521d978319fc7f264a932cbbb3a575766f05a93"
+      },
+      "database": {
+        "database": "mikka_e2e",
+        "role": "e2e",
+        "version": "170011",
+        "port": 5432,
+        "oid": "30893"
+      },
+      "startedAt": "2026-11-10T00:37:39.881Z",
+      "verdict": "COMPLETE_ACTION_READ_EGRESS_GREEN",
+      "summary": {
+        "tests": 16,
+        "pass": 16,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "afterTestProof": {
+        "phase": "green",
+        "point": "after-test",
+        "head": "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+        "actualWorktreeTree": "41aff4c08572a384f15ec113f0e41add8b936b69",
+        "appBlob": "e2c0a834f2a4ef8cb10c836302f0929f02db6051",
+        "appBytes": 14472,
+        "appSha256": "551510320c17617074afa87aa85c812787972cdf3b66746ece85d3064fe16a14",
+        "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb",
+        "testBytes": 46882,
+        "testSha256": "477adde1d597484dba5d986c0521d978319fc7f264a932cbbb3a575766f05a93"
+      },
+      "finishedAt": "2026-11-10T00:38:08.073Z"
+    }
+  ],
+  "commands": [
+    {
+      "phase": "red",
+      "label": "migration-bootstrap",
+      "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+      "args": [
+        "--experimental-strip-types",
+        "--test",
+        "tests/migrate-empty-db.test.mjs"
+      ],
+      "startedAt": "2026-11-10T00:37:09.918Z",
+      "finishedAt": "2026-11-10T00:37:13.700Z",
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "red-migration-bootstrap-stdout.log",
+        "bytes": 1152,
+        "sha256": "6aadc99e9a5710ba9df1b4d7cd83e03cbcc75c7cd7e5824469aff0194a7341f3"
+      },
+      "stderr": {
+        "file": "red-migration-bootstrap-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "phase": "red",
+      "label": "e2e-setup",
+      "executable": "pnpm",
+      "args": [
+        "test:e2e:setup"
+      ],
+      "startedAt": "2026-11-10T00:37:13.701Z",
+      "finishedAt": "2026-11-10T00:37:15.338Z",
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "red-e2e-setup-stdout.log",
+        "bytes": 20970,
+        "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+      },
+      "stderr": {
+        "file": "red-e2e-setup-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "phase": "red",
+      "label": "environment-bind",
+      "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+      "args": [
+        "scripts/test-accounts/bootstrap.mjs",
+        "--output",
+        "/home/runner/work/_temp/issue1512-task-runs-pg/red-environment.json"
+      ],
+      "startedAt": "2026-11-10T00:37:15.339Z",
+      "finishedAt": "2026-11-10T00:37:15.484Z",
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "red-environment-bind-stdout.log",
+        "bytes": 153,
+        "sha256": "5a4e37a1d875a77f6400ab890f1db689a88d5c170045642c8818a6d83ce1a465"
+      },
+      "stderr": {
+        "file": "red-environment-bind-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "phase": "red",
+      "label": "action-read-egress",
+      "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+      "args": [
+        "--test-reporter=tap",
+        "--import",
+        "tsx",
+        "--import",
+        "./tests/fixtures/activity-runtime.mjs",
+        "--test",
+        "tests/action-read-egress.db.test.ts"
+      ],
+      "startedAt": "2026-11-10T00:37:15.485Z",
+      "finishedAt": "2026-11-10T00:37:38.299Z",
+      "code": 1,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "red-action-read-egress-stdout.log",
+        "bytes": 7185,
+        "sha256": "08149c200abe80b0075a4642f0ab06f3dbf783aa98bbbe847d3be82f583a0d32"
+      },
+      "stderr": {
+        "file": "red-action-read-egress-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "phase": "green",
+      "label": "migration-bootstrap",
+      "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+      "args": [
+        "--experimental-strip-types",
+        "--test",
+        "tests/migrate-empty-db.test.mjs"
+      ],
+      "startedAt": "2026-11-10T00:37:39.881Z",
+      "finishedAt": "2026-11-10T00:37:43.415Z",
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "green-migration-bootstrap-stdout.log",
+        "bytes": 1152,
+        "sha256": "a34e5098aad4a8245a3879b28a9b9163e65c7b6239db828040c76a6d3287e9c6"
+      },
+      "stderr": {
+        "file": "green-migration-bootstrap-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "phase": "green",
+      "label": "e2e-setup",
+      "executable": "pnpm",
+      "args": [
+        "test:e2e:setup"
+      ],
+      "startedAt": "2026-11-10T00:37:43.416Z",
+      "finishedAt": "2026-11-10T00:37:45.069Z",
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "green-e2e-setup-stdout.log",
+        "bytes": 20970,
+        "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+      },
+      "stderr": {
+        "file": "green-e2e-setup-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "phase": "green",
+      "label": "environment-bind",
+      "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+      "args": [
+        "scripts/test-accounts/bootstrap.mjs",
+        "--output",
+        "/home/runner/work/_temp/issue1512-task-runs-pg/green-environment.json"
+      ],
+      "startedAt": "2026-11-10T00:37:45.070Z",
+      "finishedAt": "2026-11-10T00:37:45.191Z",
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "green-environment-bind-stdout.log",
+        "bytes": 153,
+        "sha256": "3b8cafa3252a101b5777188ad96b4745abe828e03b79c11730ea0fb1f82b5a6c"
+      },
+      "stderr": {
+        "file": "green-environment-bind-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "phase": "green",
+      "label": "action-read-egress",
+      "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+      "args": [
+        "--test-reporter=tap",
+        "--import",
+        "tsx",
+        "--import",
+        "./tests/fixtures/activity-runtime.mjs",
+        "--test",
+        "tests/action-read-egress.db.test.ts"
+      ],
+      "startedAt": "2026-11-10T00:37:45.191Z",
+      "finishedAt": "2026-11-10T00:38:07.813Z",
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "stdout": {
+        "file": "green-action-read-egress-stdout.log",
+        "bytes": 6095,
+        "sha256": "3b6d5c0c9a88bf02660dbfa6a9758ccee3d0eba6caec1aaf0021349ff7f40e42"
+      },
+      "stderr": {
+        "file": "green-action-read-egress-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "verdict": "VALID_QUERY_ASSERTION_RED_AND_COMPLETE_FILE_GREEN",
+  "initialDatabase": {
+    "database": "mikka_e2e",
+    "role": "e2e",
+    "version": "170011",
+    "port": 5432,
+    "oid": "16384"
+  },
+  "catalogBefore": [
+    {
+      "datname": "mikka_e2e",
+      "oid": "16384"
+    },
+    {
+      "datname": "postgres",
+      "oid": "5"
+    },
+    {
+      "datname": "template0",
+      "oid": "4"
+    },
+    {
+      "datname": "template1",
+      "oid": "1"
+    }
+  ],
+  "databaseReset": {
+    "startedAt": "2026-11-10T00:37:38.556Z",
+    "oldDatabaseOid": "16384",
+    "removed": [
+      {
+        "datname": "bootstrap_3c282eb9f8bb4300bceedf21af4e2c67",
+        "oid": "16386"
+      },
+      {
+        "datname": "bootstrap_54800bc5f93b4c57999170c938ada946",
+        "oid": "21274"
+      }
+    ],
+    "newDatabase": {
+      "database": "mikka_e2e",
+      "role": "e2e",
+      "version": "170011",
+      "port": 5432,
+      "oid": "30893"
+    },
+    "finishedAt": "2026-11-10T00:37:39.617Z"
+  },
+  "finishedAt": "2026-11-10T00:38:08.074Z"
+}

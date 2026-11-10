@@ -1,0 +1,201 @@
+{
+  "schema": "issue1512.local-node22-failure/v1",
+  "observedAtUtc": "2026-11-10T01:15:11Z",
+  "repository": "alexj11324/Mikka",
+  "head": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "tree": "42d33eb7faf77d7049607523599de9374e065660",
+  "actualCheckout": "9faa0e581b370237fe541ce3087c28a334ddb798",
+  "workflow": {
+    "runId": 42731843507,
+    "attempt": 1,
+    "name": "Local device Node 22",
+    "conclusion": "failure",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42731843507"
+  },
+  "job": {
+    "id": 129551876738,
+    "name": "macos-arm (22.22.1)",
+    "status": "completed",
+    "conclusion": "failure",
+    "startedAt": "2026-11-10T00:56:19Z",
+    "completedAt": "2026-11-10T00:59:54Z",
+    "failedStep": {
+      "name": "Real npm, LaunchAgent, enrollment and reconnect",
+      "status": "completed",
+      "conclusion": "failure",
+      "number": 8,
+      "started_at": "2026-11-10T00:59:30Z",
+      "completed_at": "2026-11-10T00:59:48Z"
+    }
+  },
+  "originals": {
+    "plain": {
+      "gitBlob": "989174f5612eaffa364b517728571cefb88d9763",
+      "bytes": 52535,
+      "sha256": "4cdac33e42025ea5993ef21ff1ffb45f4bc57d41007488ccff3321aa7aaeac6f"
+    },
+    "wrapper": {
+      "gitBlob": "5ad1917235eb0b7d2fbfa31872af8679db89f83a",
+      "bytes": 54086,
+      "sha256": "dfc770d8c07c0f3e07296d5cfefe0afd592408cf96097d15685ae883207e3777"
+    },
+    "actionsOriginalReadCount": 1,
+    "artifactZipReadCount": 0
+  },
+  "source": {
+    "path": "scripts/acceptance/local-installer-macos.ts",
+    "gitBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+    "bytes": 9689,
+    "sha256": "eb6b97e018e194d5fadbbe2ef14810952f7421bbf77fa87982ef1d3e6ec4a680",
+    "sourceRef": "5852aa8832c07fdeef43665dd5e156ce5516e3ea"
+  },
+  "execution": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "22.22.1",
+    "npmStarted": true,
+    "registrations": 2,
+    "heartbeats": 2,
+    "enrollments": 1,
+    "socketPathBytes": 73,
+    "states": [
+      {
+        "step": "check",
+        "status": "running"
+      },
+      {
+        "step": "check",
+        "status": "running"
+      },
+      {
+        "step": "install",
+        "status": "running"
+      },
+      {
+        "step": "service",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "online"
+      },
+      {
+        "step": "service",
+        "status": "running"
+      },
+      {
+        "step": "service",
+        "status": "failed",
+        "cause": "service_failed"
+      }
+    ],
+    "firstOnlineObserved": true,
+    "restartRequestedBySourceLine": 137,
+    "restartResult": "failed",
+    "assertion": {
+      "sourceLine": 139,
+      "actual": "failed",
+      "expected": "online",
+      "operator": "strictEqual"
+    },
+    "installer": {
+      "status": "captured",
+      "exitCode": 1,
+      "stderrBytes": 627,
+      "stderrSha256": "f323432d8393e6192f2d0f76f97ae0ac72979c9bc616ce558d34eecfdb46900c",
+      "truncated": false,
+      "commandKind": "launchctl bootstrap gui/<uid> <fixture LaunchAgent plist>",
+      "errorCategory": "launchctl_bootstrap_io_error",
+      "errorNumber": 5,
+      "cause": "service_failed",
+      "underlyingOsReason": "unknown"
+    },
+    "lastStatusProjection": {
+      "signedIn": true,
+      "server": "online",
+      "runsCount": 0
+    }
+  },
+  "daemonObservedEvents": [
+    {
+      "at": "2026-11-10T00:59:45.087Z",
+      "event": "daemon started"
+    },
+    {
+      "at": "2026-11-10T00:59:45.122Z",
+      "event": "device registered"
+    },
+    {
+      "at": "2026-11-10T00:59:46.745Z",
+      "event": "daemon stopped"
+    }
+  ],
+  "unrelatedDiagnostic": {
+    "gateway404FallbackObserved": true,
+    "classification": "isolated fixture gateway route is absent; daemon reports long-poll fallback before restart. Not assigned as bootstrap EIO cause.",
+    "cliMissingHarnesses": [
+      "claude_code",
+      "codex"
+    ],
+    "productionModelCallsObserved": 0
+  },
+  "cleanup": {
+    "observedDaemonStoppedEvent": true,
+    "sourceFinally": {
+      "lines": [
+        158,
+        164
+      ],
+      "bestEffortLaunchctlBootout": true,
+      "serverCloseAllConnections": true,
+      "awaitServerClose": true,
+      "environmentRestored": true,
+      "awaitRemoveFixtureHome": true
+    },
+    "evidenceBoundary": "Finally operations above are source-defined. No independent final process inventory, successful bootout receipt, or post-removal filesystem read is present. Do not claim confirmed no leftover LaunchAgent/process from these logs alone.",
+    "bootoutExitCode": null,
+    "finalProcessAbsent": null,
+    "finalFixtureDirectoryAbsent": null,
+    "artifactUploadStep": "success",
+    "githubPostStepsComplete": true
+  },
+  "limits": {
+    "noProductCauseProvenBeyondBootstrapEio": true,
+    "sourceDiagnosisOwner": "/root/current_source_review",
+    "notNativeBudgetAttempt": true,
+    "noRerun": true,
+    "noSourceOrRefChanges": true,
+    "noResourcesCreatedByReader": true,
+    "notProductionAcceptance": true
+  },
+  "privacy": {
+    "closedProjection": true,
+    "rawStderrOrDaemonLogCopied": false,
+    "patternScan": [
+      {
+        "kind": "private_key",
+        "matches": 0
+      },
+      {
+        "kind": "github_token",
+        "matches": 0
+      },
+      {
+        "kind": "aws_access_key",
+        "matches": 0
+      },
+      {
+        "kind": "signed_download_url",
+        "matches": 0
+      },
+      {
+        "kind": "jwt",
+        "matches": 0
+      }
+    ]
+  }
+}

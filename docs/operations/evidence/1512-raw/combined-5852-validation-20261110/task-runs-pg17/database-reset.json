@@ -1,0 +1,22 @@
+{
+  "startedAt": "2026-11-10T00:37:38.556Z",
+  "oldDatabaseOid": "16384",
+  "removed": [
+    {
+      "datname": "bootstrap_3c282eb9f8bb4300bceedf21af4e2c67",
+      "oid": "16386"
+    },
+    {
+      "datname": "bootstrap_54800bc5f93b4c57999170c938ada946",
+      "oid": "21274"
+    }
+  ],
+  "newDatabase": {
+    "database": "mikka_e2e",
+    "role": "e2e",
+    "version": "170011",
+    "port": 5432,
+    "oid": "30893"
+  },
+  "finishedAt": "2026-11-10T00:37:39.617Z"
+}

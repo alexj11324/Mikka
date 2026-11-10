@@ -1,0 +1,149 @@
+{
+  "schema": "issue1512-formal-ci-pg-binding-v1",
+  "ci": {
+    "runId": 42731843562,
+    "attempt": 1,
+    "event": "pull_request",
+    "workflowPath": ".github/workflows/ui-policy.yml",
+    "headSha": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "mergeSha": "9faa0e581b370237fe541ce3087c28a334ddb798",
+    "sourceTree": "42d33eb7faf77d7049607523599de9374e065660"
+  },
+  "headCommit": {
+    "sha": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "node_id": "C_kwDOVRYxA9oAKDU4NTJhYTg4MzJjMDdmZGVlZjQzNjY1ZGQ1ZTE1NmNlNTUxNmUzZWE",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "html_url": "https://github.com/alexj11324/Mikka/commit/5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "author": {
+      "name": "Zhixuan Jiang",
+      "email": "zhixuanj@andrew.cmu.edu",
+      "date": "2026-11-10T00:54:02Z"
+    },
+    "committer": {
+      "name": "Zhixuan Jiang",
+      "email": "zhixuanj@andrew.cmu.edu",
+      "date": "2026-11-10T00:54:02Z"
+    },
+    "tree": {
+      "sha": "42d33eb7faf77d7049607523599de9374e065660",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/42d33eb7faf77d7049607523599de9374e065660"
+    },
+    "message": "chore: merge current main into observability fixes\n\nRetain fresh Organization sharing and approval checks outside the existing application policy memo. Preserve both sides' read-path regressions and regenerate route manifests with the canonical generator.\n\nIncludes the PostgreSQL-verified task-run visibility fix. Formal CI, Native budgets, and production trace acceptance remain to be verified.\n\nRelated to #1512.",
+    "parents": [
+      {
+        "sha": "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/363065a84264e6a32134e64ef6aa2b3c690d0a02",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/363065a84264e6a32134e64ef6aa2b3c690d0a02"
+      },
+      {
+        "sha": "60401d31fb33b7f272cb0262df58d3d2008280b4",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/60401d31fb33b7f272cb0262df58d3d2008280b4",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/60401d31fb33b7f272cb0262df58d3d2008280b4"
+      }
+    ],
+    "verification": {
+      "verified": false,
+      "reason": "unsigned",
+      "signature": null,
+      "payload": null,
+      "verified_at": null
+    }
+  },
+  "mergeCommit": {
+    "sha": "9faa0e581b370237fe541ce3087c28a334ddb798",
+    "node_id": "C_kwDOVRYxA9oAKDlmYWEwZTU4MWIzNzAyMzdmZTU0MWNlMzA4N2MyOGEzMzRkZGI3OTg",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/9faa0e581b370237fe541ce3087c28a334ddb798",
+    "html_url": "https://github.com/alexj11324/Mikka/commit/9faa0e581b370237fe541ce3087c28a334ddb798",
+    "author": {
+      "name": "Zhixuan Jiang",
+      "email": "zhixuanj@andrew.cmu.edu",
+      "date": "2026-11-10T00:54:21Z"
+    },
+    "committer": {
+      "name": "GitHub",
+      "email": "noreply@github.com",
+      "date": "2026-11-10T00:54:21Z"
+    },
+    "tree": {
+      "sha": "42d33eb7faf77d7049607523599de9374e065660",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/42d33eb7faf77d7049607523599de9374e065660"
+    },
+    "message": "Merge 5852aa8832c07fdeef43665dd5e156ce5516e3ea into 60401d31fb33b7f272cb0262df58d3d2008280b4",
+    "parents": [
+      {
+        "sha": "60401d31fb33b7f272cb0262df58d3d2008280b4",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/60401d31fb33b7f272cb0262df58d3d2008280b4",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/60401d31fb33b7f272cb0262df58d3d2008280b4"
+      },
+      {
+        "sha": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/5852aa8832c07fdeef43665dd5e156ce5516e3ea"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "reason": "valid",
+      "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJq8ms9CRC1aQ7uu5UhlAAA+QYQACI6Y0zyAUkT4F/N4ZAftAVk\nMaNSApVOBpfLWYbghvKifpm7KntbAy0LBuQYeDKz3XjukSryo/poXasaYx3X9UFn\n3Yju/l0MEFT0ybZVYgw0d0OAzM88yI6XjRcYxwPld21yd3sPA+mEz7Ek6xaCpNbS\nmViz7Uu9TueWJo6RgxxP51Ia7ScNMfH5bED16gxOJsOk8A2HCqhYXcMLVjbbyXWh\n3ylCeb9Rds9oYbjbiY9vlsOMup0kb2AVfyv+nF/ljV8eovH+dtjRM8+YHSbxRgfC\n3DxXD9gL17CYtsVArzNNKRxotODVHioh1jpHkMRa1Dpc2Zmy1FaiGzN9YKeDXyTf\nupbQE5MpuG3LTG1vx5mPfZv6cXqT2PbUt6bMJRstJ6OFaDbyHiU/0QDEDNNnDG5Z\ncrJrG4fneoQdzU0ef7EVCzbjLBFX660VTi5VI/RP4nQCZOdflzHu9in2i2y7jLmQ\nDfSD1MUBpt7Task48yFEb8Hx98q8XGhm6TBED4SjvbGLvRr1qM+egzrdGzM4+qmG\ngPXrpkgFJgSTxY7OEHH6M2sQ3xOkzy9jjcN+tGZWK2EUID3+FzVkzOVu/enU23+9\ncNC8F1UuDxNdBDNHlto4XKmiPsjMxvNJ44uI+lzicdoScs1ZRIBp1xLcGc/qPUqS\nSNYJp2PYrn9Dc0IqlHPf\n=g9Vn\n-----END PGP SIGNATURE-----\n",
+      "payload": "tree 42d33eb7faf77d7049607523599de9374e065660\nparent 60401d31fb33b7f272cb0262df58d3d2008280b4\nparent 5852aa8832c07fdeef43665dd5e156ce5516e3ea\nauthor Zhixuan Jiang <zhixuanj@andrew.cmu.edu> 1794272061 +0000\ncommitter GitHub <noreply@github.com> 1794272061 +0000\n\nMerge 5852aa8832c07fdeef43665dd5e156ce5516e3ea into 60401d31fb33b7f272cb0262df58d3d2008280b4\n",
+      "verified_at": "2026-11-10T00:54:21Z"
+    }
+  },
+  "pgJobs": [
+    {
+      "id": 129552003890,
+      "name": "Database checks (1/4)"
+    },
+    {
+      "id": 129552003952,
+      "name": "Database checks (3/4)"
+    },
+    {
+      "id": 129552004043,
+      "name": "Database checks (2/4)"
+    },
+    {
+      "id": 129552004198,
+      "name": "Database checks (4/4)"
+    }
+  ],
+  "dbSummaryName": "Production build and browser interactions",
+  "targetPackageScript": "test:activity-actor-db",
+  "targetCommand": "MIKKA_READ_METRICS_TRACE=1 node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/activity-actor-db.test.ts tests/document-sync-egress.db.test.ts tests/issue-list-egress.db.test.ts tests/thread-list-egress.db.test.ts tests/action-read-egress.db.test.ts tests/citation-egress.db.test.ts tests/read-single-flight.db.test.ts tests/live-revision-reads.db.test.ts tests/coordinator-chat-egress.db.test.ts tests/mobile-chat-pages.db.test.ts tests/request-query-count.db.test.ts tests/bot-summary-bytes.db.test.ts tests/thread-detail-bytes.db.test.ts tests/read-cache-detail-egress.db.test.ts tests/read-cache-scope.db.test.ts",
+  "targetSources": {
+    "actionTest": {
+      "bytes": 46882,
+      "blob": "96b172fcf95ec30b81b0943f15efe8dece3954fb",
+      "sha256": "477adde1d597484dba5d986c0521d978319fc7f264a932cbbb3a575766f05a93",
+      "testNames": [
+        "task run rows keep the newest owner run and the 200-row limit without unused fields",
+        "one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows",
+        "task thread lists retain exact titles, summaries and privacy while details retain full errors",
+        "team link reads page through all authorized pairs and retain explicit-id scope checks",
+        "thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields",
+        "task-run visibility skips unused team metadata without weakening fresh workspace authority"
+      ]
+    },
+    "liveTest": {
+      "bytes": 20805,
+      "blob": "d996a7428d1aba0ebc4dfc605b0a2d6fe3cde7f9",
+      "sha256": "dc9e1956af9efbd93d5a3161d0374487aedc2982d22479775d3efa813eb795d3",
+      "testNames": [
+        "one write seen by 3 tabs and 2 devices: the echo and a duplicate push read nothing again",
+        "a revision rises once per publish across its fan-out and a reader sees the latest",
+        "prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows",
+        "authorized selected-workspace revision plan co-reads exactly the requested Team keys"
+      ]
+    }
+  },
+  "readerPolicy": {
+    "assigned": "PostgreSQL shards and DB summary only",
+    "readTerminalOnly": true,
+    "eachOriginalJobLogReadsAtMost": 1,
+    "persistBeforeAnalysis": true,
+    "readOtherOriginals": false,
+    "artifactZipReads": 0,
+    "additionalResources": 0
+  },
+  "limitations": "Job head/checkout and actual suite selection must be corroborated in terminal logs. Metadata alone is not a test count."
+}

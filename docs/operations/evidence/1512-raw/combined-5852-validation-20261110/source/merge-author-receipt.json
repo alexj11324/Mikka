@@ -1,0 +1,168 @@
+{
+  "schema": "mikka.source-merge-handwritten-resolution.v1",
+  "repository": "alexj11324/Mikka",
+  "plannedParents": [
+    "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+    "60401d31fb33b7f272cb0262df58d3d2008280b4"
+  ],
+  "actualGitMergeBase": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c",
+  "inputs": {
+    "oursTree": "41aff4c08572a384f15ec113f0e41add8b936b69",
+    "theirsTree": "11e72d382b42b1bd21b1c90f25c071ca4f82756d",
+    "baseTree": "218c5f664969e76f6c90e720807f00e816ec865b"
+  },
+  "classification": {
+    "unchanged": 6650,
+    "gOnly": 66,
+    "mainOnly": 204,
+    "sameBoth": 0,
+    "conflict": 5
+  },
+  "candidates": [
+    {
+      "path": "lib/personal-policy.ts",
+      "mode": "100644",
+      "bytes": 9486,
+      "sha256": "147b0f4fd1c736e12dc1d4f615a13f618f6de525c4f58c12341d605155a2e651",
+      "gitBlob": "0c938df220721879bf2e41f5ac77909c36dd3feb",
+      "base": "bbb9684619cbfa8faca236a78e6f8f61148d9a94",
+      "ours": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+      "theirs": "0b8ba955d8f404a4f4754fb6453194020dbb5d8b"
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "mode": "100644",
+      "bytes": 23914,
+      "sha256": "312f2464a98dc77556d8cf4c04056213421f934accfe17e948ea11c48fec1773",
+      "gitBlob": "04c5ed8d4a2f724b6999609dbb9732c53c10ced1",
+      "base": "bb2de016988758cbf34c00a8284a084c19b9e809",
+      "ours": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96",
+      "theirs": "65ee2f6218fa7c12af4c50e65c550f0f133e3dc1"
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "mode": "100644",
+      "bytes": 20805,
+      "sha256": "dc9e1956af9efbd93d5a3161d0374487aedc2982d22479775d3efa813eb795d3",
+      "gitBlob": "d996a7428d1aba0ebc4dfc605b0a2d6fe3cde7f9",
+      "base": "960eb24ff24aba996a681bc47468290cf6200398",
+      "ours": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351",
+      "theirs": "7af463f49b0930a7154d75c152b900fc887edd44"
+    }
+  ],
+  "strictUnifiedPatches": [
+    {
+      "side": "G",
+      "bytes": 15758,
+      "sha256": "fac6095a0843f6cc3c2f89859dedab7b63ea4c889f07577037ecbe5151a747cc",
+      "gitBlob": "5958fe8976fb97ea07cc6f99e1e60e87050f9586"
+    },
+    {
+      "side": "main",
+      "bytes": 25475,
+      "sha256": "4dd454b4c61bb97471021ea11e5b185c0bc0498d2097f0af19c7ddcdd86f2a18",
+      "gitBlob": "50716dc7356d33fdd628a3e6d5d8289e2305e37b"
+    }
+  ],
+  "patchChecks": [
+    {
+      "path": "lib/personal-policy.ts",
+      "from": "g",
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "from": "main",
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "from": "g",
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "from": "main",
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "from": "g",
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "from": "main",
+      "forwardExact": true,
+      "reverseExact": true
+    }
+  ],
+  "resolutions": [
+    {
+      "path": "lib/personal-policy.ts",
+      "rule": "Keep every main Organization policy and approval call unchanged; only the existing APP workspace_personal_policies SELECT enters readBatchSubscriptionPolicy. workspaceResourcePolicy is awaited before memo lookup on every call."
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "rule": "Retain the actual main governance implementation with its exact policy/approval query fixture and six-step Organization regression. Extend only policy workspace fixture admission to two fixed UUIDs used by existing observation tests. Update old APP read-order expectations to main's metadata-first consumers; returned own/borrowed results and exception identity assertions remain. Add deny→allow freshness within both batch and standalone APP memo lifetimes.",
+      "exactExpectationAdaptations": [
+        {
+          "oldText": "test('a refused batch policy still permits own keys and skips every shared credential read'",
+          "newText": "test('a refused batch policy still permits own keys and returns no borrowed credential'",
+          "count": 1
+        },
+        {
+          "oldText": "assert.deepEqual(f.calls, ['policy', 'own-keys'])",
+          "newText": "assert.deepEqual(f.calls, ['own-keys', 'shared-keys', 'policy', 'shared-owners'])",
+          "count": 2
+        },
+        {
+          "oldText": "assert.equal(f.calls.length, 2, 'an independent batch retries the original read once')",
+          "newText": "assert.equal(f.calls.filter(call => call === 'policy').length, 2, 'an independent batch retries the original policy read once')",
+          "count": 1
+        },
+        {
+          "oldText": "assert.deepEqual(after.calls, ['policy', 'own-keys', 'shared-keys', 'shared-owners'])",
+          "newText": "assert.deepEqual(after.calls, ['own-keys', 'shared-keys', 'policy', 'shared-owners'])",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "rule": "Exact main bytes followed by the exact G-only appended selected-Team revision test; retain main's real active workspace membership fan-out fixture and cleanup."
+    }
+  ],
+  "generator": {
+    "bundle": {
+      "bytes": 608968,
+      "sha256": "a49a5e7d009d7ef76b430b53478b0a25c83e5c4a7e08aaa12d9468491873086c",
+      "gitBlob": "8f785d681a7f6a6c3f0b845171a9333493adc8b9",
+      "fileCount": 257
+    },
+    "status": "inputs frozen; actual canonical execution delegated to native_diag_runner; generated outputs not supplied or simulated"
+  },
+  "otherBranch": {
+    "number": 1844,
+    "head": "deea549f7feea1f935ad0e0a8fcad237c4073890",
+    "relativeToBasePathCount": 24,
+    "overlapWithMainChanges": [],
+    "existing21PathsAlreadyExactInG": true,
+    "notIntegrated": [
+      "scripts/acceptance/cloud-startup.test.mjs",
+      "scripts/e2b/validate-template-subscriptions.mjs",
+      "scripts/e2b/validate-template-subscriptions.test.mjs"
+    ]
+  },
+  "boundaries": [
+    "No refs/commits/workflows/resources/tests changed or executed by this review.",
+    "This normal merge adds actual main changes to G; the isolated G PG result cannot prove the new combined tree.",
+    "No diagnostic overlay enters the business union.",
+    "A final complete tree awaits actual canonical generated outputs; this receipt is not an execution or CI PASS."
+  ]
+}

@@ -1,0 +1,281 @@
+{
+  "schema": "issue1512.macos-reconnect-source-review.v1",
+  "createdAt": "2026-11-10T01:23:29.398Z",
+  "repository": "alexj11324/Mikka",
+  "task": "Read-only diagnosis of formal5852 Node22 reconnect service failure",
+  "source": {
+    "featureCommit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "actualCheckout": "9faa0e581b370237fe541ce3087c28a334ddb798",
+    "tree": "42d33eb7faf77d7049607523599de9374e065660",
+    "sourceIndex": [
+      {
+        "path": "scripts/acceptance/local-installer-macos.ts",
+        "gitBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+        "bytes": 9689,
+        "sha256": "eb6b97e018e194d5fadbbe2ef14810952f7421bbf77fa87982ef1d3e6ec4a680",
+        "mode": "100644"
+      },
+      {
+        "path": "apps/desktop/src/main/ssh-install.ts",
+        "gitBlob": "678df02e8bbf82ad49e894de20edc750b36cafcc",
+        "bytes": 18756,
+        "sha256": "2180a5f03d0ddc692e206f126d07f14715d1b4e48025347d48a9d755c96222f5",
+        "mode": "100644"
+      },
+      {
+        "path": "apps/desktop/src/main/local-install.ts",
+        "gitBlob": "ce08ed88e72d13501142ea306175d5a003fa1e80",
+        "bytes": 3737,
+        "sha256": "8a1078d267d7dc548f232f128748cb53b174e0b99705fb9e21d0e72a769346c6",
+        "mode": "100644"
+      },
+      {
+        "path": "packages/daemon/src/service.ts",
+        "gitBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+        "bytes": 6054,
+        "sha256": "5834bcddac2a5437157279930ecaf1aa5d30641c2f49535944fdbaa6c9ea563d",
+        "mode": "100644"
+      },
+      {
+        "path": "packages/daemon/test/service.test.ts",
+        "gitBlob": "eae448c2b24c426465c78ea3de2df40ae3080b02",
+        "bytes": 5655,
+        "sha256": "99c4ade36b6a130e1fd36622e056f2635bf3520fad5caea5a8ffe41703ad9195",
+        "mode": "100644"
+      },
+      {
+        "path": "packages/daemon/src/cli.ts",
+        "gitBlob": "0be92f49ab119d6bc10ccfe25286acb1efffe6fd",
+        "bytes": 10817,
+        "sha256": "36993fe5d42d55e30fb0c0333b99f041e44cf8b87eaaf15f6f480a864a386393",
+        "mode": "100644"
+      },
+      {
+        "path": "packages/daemon/src/main.ts",
+        "gitBlob": "abe9cf6dc0dd634fb76458b0a192f76258d32b43",
+        "bytes": 95949,
+        "sha256": "05042381de1fa1aa881d577b98676c4136ecbfc88226e646a739cfb0c8538cef",
+        "mode": "100644"
+      },
+      {
+        "path": "packages/protocol/src/daemon.ts",
+        "gitBlob": "d22e9b6fc77ffe302f53530fd5798ae9e900f650",
+        "bytes": 8459,
+        "sha256": "15217b34166fd05d634881cee888e3702dbf96324fceb18eb141a8671cbb2201",
+        "mode": "100644"
+      },
+      {
+        "path": "packages/daemon/src/rpc/server.ts",
+        "gitBlob": "b73abd9fc91a6d6419c65a0254dba9104a62cf7b",
+        "bytes": 5205,
+        "sha256": "1e2602b62fa96f46b0fe1a955d9e69b9026e12c4733f39819e8a44dcca8c143c",
+        "mode": "100644"
+      },
+      {
+        "path": "apps/desktop/src/main/ssh-install.test.ts",
+        "gitBlob": "52810ede706bb0acdc0a2bb3317f5e67bf61bbb1",
+        "bytes": 21407,
+        "sha256": "dc2209b5c944ca3241f8035399c036bca02f1038f1265d8aa34a408ff28f62bd",
+        "mode": "100644"
+      },
+      {
+        "path": "apps/desktop/src/main/local-install.test.ts",
+        "gitBlob": "2b7b09bafe65b75541bb3f391fece9cec199f8eb",
+        "bytes": 4912,
+        "sha256": "6cfd699eda4db73e6f81a88a8552d4aaf29a340de967ab30d3a6770934adf942",
+        "mode": "100644"
+      },
+      {
+        "path": ".github/workflows/local-device-node22.yml",
+        "gitBlob": "d195f389292e1a84967fd9864063ac536b91bbaf",
+        "bytes": 3548,
+        "sha256": "c90f7c1a31cdfc33a8e397b234945b5580859bdb7d70270119ff62f155d4ba69",
+        "mode": "100644"
+      }
+    ]
+  },
+  "evidence": {
+    "runId": 42731843507,
+    "attempt": 1,
+    "jobId": 129551876738,
+    "raw": {
+      "gitBlob": "989174f5612eaffa364b517728571cefb88d9763",
+      "bytes": 52535,
+      "sha256": "4cdac33e42025ea5993ef21ff1ffb45f4bc57d41007488ccff3321aa7aaeac6f"
+    },
+    "wrapperGitBlob": "5ad1917235eb0b7d2fbfa31872af8679db89f83a",
+    "originalReader": "/root/acceptance_review",
+    "thisReviewActionsLogDownloads": 0,
+    "originalReusedViaGit": true,
+    "fixture": {
+      "platform": "darwin",
+      "arch": "arm64",
+      "node": "22.22.1",
+      "npmStarted": true,
+      "registrations": 2,
+      "heartbeats": 2,
+      "enrollments": 1,
+      "socketPathBytes": 73,
+      "states": [
+        {
+          "step": "check",
+          "status": "running"
+        },
+        {
+          "step": "check",
+          "status": "running"
+        },
+        {
+          "step": "install",
+          "status": "running"
+        },
+        {
+          "step": "service",
+          "status": "running"
+        },
+        {
+          "step": "connect",
+          "status": "running"
+        },
+        {
+          "step": "connect",
+          "status": "online"
+        },
+        {
+          "step": "service",
+          "status": "running"
+        },
+        {
+          "step": "service",
+          "status": "failed",
+          "cause": "service_failed"
+        }
+      ]
+    }
+  },
+  "established": [
+    {
+      "fact": "First installation, enrollment, registration and online observation succeeded before the reconnect assertion.",
+      "source": "acceptance lines117-137; frozen fixture states/counters"
+    },
+    {
+      "fact": "The failed assertion at acceptance line139 follows restartLocal, not beginLocal.",
+      "source": "acceptance lines136-140"
+    },
+    {
+      "fact": "restart() selects Node again, rewrites/restarts the service using service install, then waits online. The failed service command prevents this second waitOnline from running.",
+      "source": "ssh-install lines319-325"
+    },
+    {
+      "fact": "installService writes the intended plist, ignores every bootout rejection, then immediately runs bootstrap once.",
+      "source": "service lines35-42"
+    },
+    {
+      "fact": "The captured installer stderr reports launchctl bootstrap Bootstrap failed:5 Input/output error; installer process exitCode is1. This does not establish launchctl's numeric exit code independently.",
+      "source": "frozen fixture installer diagnostics"
+    },
+    {
+      "fact": "The old daemon's log already contains daemon stopped before fixture catch captured logs and before fixture finally's cleanup bootout.",
+      "source": "acceptance lines146-159; frozen daemon log"
+    },
+    {
+      "fact": "Gateway404 is explicitly followed by long-poll fallback and occurred while the first installation became online; it is not the failing command.",
+      "source": "frozen daemon log"
+    },
+    {
+      "fact": "The lastStatus field is the previously saved status output, not a successful new post-bootstrap observation.",
+      "source": "acceptance execute lines105-109 and restart command flow"
+    },
+    {
+      "fact": "The CLI and local RPC expose no daemon service restart or daemon.restart command. Internal restartService is used from device commands and auto-update maintenance, using SIGUSR2, normal daemon.stop and exit1.",
+      "source": "cli lines108-113,195-199,245-253; main handlers1787+,maintenance1468-1484/1879-1920; service47-59"
+    },
+    {
+      "fact": "The installService transition itself has no existing service.test command-state regression; installer reconnect test mocks the service-install command as successful.",
+      "source": "service.test full file; ssh-install.test279-287"
+    }
+  ],
+  "causeClassification": {
+    "provenFailureBoundary": "Repeated service installation at reconnect: bootout then bootstrap",
+    "provenProductRobustnessGap": "All bootout errors are discarded, so absence, rejection and incomplete teardown are not distinguishable from retained evidence.",
+    "notEstablished": [
+      "Whether the actual bootout failed and its error was ignored",
+      "Whether bootout succeeded while launchd registration removal was not yet complete",
+      "Whether another launchd domain/definition/system error produced this EIO5",
+      "Whether this is a new5852 regression rather than a pre-existing path"
+    ],
+    "notCausesEstablishedByThisEvidence": [
+      "No Node discovery or npm install failure in this attempt",
+      "No enrollment failure in this attempt",
+      "No waitOnline deadline expiration: the second waitOnline is not reached"
+    ],
+    "onlineAssertionRetained": true
+  },
+  "replacementAssessment": [
+    {
+      "option": "Replace service install with kickstart -k",
+      "decision": "Not justified as a drop-in fix",
+      "reason": "Potentially bypasses normal daemon stop and preserves the already loaded definition, losing intended Node/server/data-dir/flags rewrite semantics. This source review did not execute launchctl."
+    },
+    {
+      "option": "Use existing daemon.drain",
+      "decision": "Not equivalent",
+      "reason": "CLI onDrained exits0 while the plist restarts on unsuccessful exit; drain does not promise restart."
+    },
+    {
+      "option": "Send SIGUSR2 directly",
+      "decision": "Not a complete installer replacement",
+      "reason": "Normal cleanup exists, but there is no local RPC/CLI contract for it; must preserve selected config and prove replacement generation before an old online PID could satisfy waitOnline."
+    },
+    {
+      "option": "Compare only on-disk plist then signal",
+      "decision": "Insufficient proof",
+      "reason": "Disk bytes alone do not prove the active launchd registration uses the same definition."
+    },
+    {
+      "option": "Retry bootstrap on all EIO5",
+      "decision": "Reject",
+      "reason": "Would hide distinct errors and is not supported by a proven transient state."
+    },
+    {
+      "option": "Increase online timeout",
+      "decision": "Reject",
+      "reason": "The failing bootstrap command precedes the second online polling loop."
+    }
+  ],
+  "minimalNextEvidence": {
+    "entry": "Existing isolated macOS acceptance sequence: first install -> online -> restartLocal -> online assertion, with all assertions/timeout preserved.",
+    "closedProjection": [
+      "phase",
+      "command kind: bootout/bootstrap/service-target probe",
+      "timestamp or monotonic elapsed",
+      "exitCode",
+      "signal",
+      "validated service-target state category, if independently defined"
+    ],
+    "restrictions": [
+      "Do not record credential files, ambient launchctl output, full environment or secrets",
+      "Do not automatically retry or change bootstrap on this diagnostic step",
+      "Do not use launchctl print internal text keys as a stable API",
+      "A nonzero probe exit or an absent old PID alone is not proof that the service registration is absent"
+    ],
+    "conditionalFix": "If a stable unregistered predicate and actual teardown race are established, preserve intended definition updates, fail on real bootout errors, then perform one bounded state-confirmed bootstrap. The present review does not claim that fix is already causally established."
+  },
+  "testDesignOnly": [
+    "Production installService transition should distinguish first install confirmed absence from failed bootout; a real bootout error must not be silently followed by bootstrap.",
+    "A teardown-in-progress case must not bootstrap until an explicit registration-absence predicate is satisfied; deadline failure must retain the original cause.",
+    "A configuration change must still install the newly selected Node, entry, server, data-dir and flags.",
+    "A same-definition restart optimization, if later adopted, must prove a replacement process and preserve graceful stop; old online status is not sufficient.",
+    "Keep the actual macOS first install/reconnect, no re-enrollment and owner verification assertions unchanged."
+  ],
+  "limits": {
+    "testsExecuted": 0,
+    "resourcesCreated": 0,
+    "actionsLogOrZipDownloads": 0,
+    "sourceFilesModified": 0,
+    "refsModified": 0,
+    "productFixImplemented": false,
+    "noProductionAccess": true,
+    "rootExternalLaunchctlDocumentationReview": "Root separately reviewed the launchctl manual; this receipt establishes repository source and frozen-log facts only."
+  }
+}

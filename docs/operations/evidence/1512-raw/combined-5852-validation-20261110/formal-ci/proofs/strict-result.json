@@ -1,0 +1,66 @@
+{
+  "schema": "issue1512.strict-result/v1",
+  "head": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "actualCheckout": "9faa0e581b370237fe541ce3087c28a334ddb798",
+  "tree": "42d33eb7faf77d7049607523599de9374e065660",
+  "runId": 42731843562,
+  "attempt": 1,
+  "jobId": 129563816535,
+  "conclusion": "success",
+  "completedAt": "2026-11-10T01:24:43Z",
+  "sourceOfFact": {
+    "plain": {
+      "gitBlob": "963d15e5f70da55c11c432712bdd3abab310b6d4",
+      "bytes": 14086,
+      "sha256": "a1db382d0f2bfa1a0dceae21d56e6fdfff9ef4e446a5149ab6e0cc69c0636161"
+    },
+    "wrapper": {
+      "gitBlob": "26f5ceeb8a91d0afb5c027d14cc5630f2976f34d",
+      "bytes": 14609,
+      "sha256": "64e84962f10c31f9386aba2f7d003baf87cefabc15a596491381a9163519d37e"
+    },
+    "rawReadCount": 1
+  },
+  "changesResult": "success",
+  "expectedResults": [
+    {
+      "name": "CORE",
+      "expected": "true",
+      "actual": "success"
+    },
+    {
+      "name": "INTEGRATION",
+      "expected": "true",
+      "actual": "success"
+    },
+    {
+      "name": "SOURCE",
+      "expected": "true",
+      "actual": "success"
+    },
+    {
+      "name": "DAEMON",
+      "expected": "true",
+      "actual": "success"
+    },
+    {
+      "name": "IMAGE",
+      "expected": "true",
+      "actual": "success"
+    },
+    {
+      "name": "DESKTOP",
+      "expected": "true",
+      "actual": "success"
+    },
+    {
+      "name": "ANALYTICS",
+      "expected": "true",
+      "actual": "success"
+    }
+  ],
+  "actualShell": "bash -e",
+  "boundary": "This source/unit/daemon/image/desktop/analytics aggregate does not include the Database checks or separate Local device Node 22 workflow. Its success does not erase those observed failures or establish the Native numeric budget.",
+  "productionAcceptance": "not performed by this job",
+  "nativeBudget": "owned by native_diag_runner; not inferred from job success"
+}

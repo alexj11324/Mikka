@@ -1,0 +1,367 @@
+{
+  "version": 1,
+  "title": "Independent review of three handwritten files in G363065 plus main60401",
+  "verdict": "PASS; no concrete source or test-merge blocker identified",
+  "scope": {
+    "repository": "alexj11324/Mikka",
+    "expectedParents": [
+      "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+      "60401d31fb33b7f272cb0262df58d3d2008280b4"
+    ],
+    "commonBase": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c",
+    "paths": [
+      "lib/personal-policy.ts",
+      "lib/personal-policy.test.ts",
+      "tests/live-revision-reads.db.test.ts"
+    ],
+    "generatedFilesReviewed": false,
+    "wholeTreeUnionReviewed": false
+  },
+  "identities": {
+    "policyBase": {
+      "bytes": 8535,
+      "sha256": "12de39231eea7fd56ae09cc4b0b601d196dcbab9748d02a0de3f3ddbbc22bb12",
+      "gitBlob": "bbb9684619cbfa8faca236a78e6f8f61148d9a94"
+    },
+    "policyOurs": {
+      "bytes": 8694,
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6",
+      "gitBlob": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+    },
+    "policyMain": {
+      "bytes": 9327,
+      "sha256": "5b5dcebc45ed185cd2c017ec01f9646f4c924eaac21e30d83700ce050774e8e5",
+      "gitBlob": "0b8ba955d8f404a4f4754fb6453194020dbb5d8b"
+    },
+    "policyNew": {
+      "bytes": 9486,
+      "sha256": "147b0f4fd1c736e12dc1d4f615a13f618f6de525c4f58c12341d605155a2e651",
+      "gitBlob": "0c938df220721879bf2e41f5ac77909c36dd3feb"
+    },
+    "testBase": {
+      "bytes": 2560,
+      "sha256": "6f8e71d5ed5bd981d1ab887a79be4db96fa7074e3ab329fd4d4b0eb880e05231",
+      "gitBlob": "bb2de016988758cbf34c00a8284a084c19b9e809"
+    },
+    "testOurs": {
+      "bytes": 19713,
+      "sha256": "f0b2950fbb7bc87ef207f0c8357b394c51d21d36c734e469b82165a69c19c12f",
+      "gitBlob": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96"
+    },
+    "testMain": {
+      "bytes": 5512,
+      "sha256": "c06c5c60e10ac73058d7eb62e9aec6f49bc4357aa298ec0ce19bf0aea8a9d316",
+      "gitBlob": "65ee2f6218fa7c12af4c50e65c550f0f133e3dc1"
+    },
+    "testNew": {
+      "bytes": 23914,
+      "sha256": "312f2464a98dc77556d8cf4c04056213421f934accfe17e948ea11c48fec1773",
+      "gitBlob": "04c5ed8d4a2f724b6999609dbb9732c53c10ced1"
+    },
+    "liveBase": {
+      "bytes": 16071,
+      "sha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f",
+      "gitBlob": "960eb24ff24aba996a681bc47468290cf6200398"
+    },
+    "liveOurs": {
+      "bytes": 18747,
+      "sha256": "db04b75ea5d222f34ed61c67680f4850b5486ea0df8edd5a97008dcf0d85247e",
+      "gitBlob": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351"
+    },
+    "liveMain": {
+      "bytes": 18129,
+      "sha256": "814b3ec876474dc0bf1305234257bb23e7049032d087098d577bc14c3ad5b969",
+      "gitBlob": "7af463f49b0930a7154d75c152b900fc887edd44"
+    },
+    "liveNew": {
+      "bytes": 20805,
+      "sha256": "dc9e1956af9efbd93d5a3161d0374487aedc2982d22479775d3efa813eb795d3",
+      "gitBlob": "d996a7428d1aba0ebc4dfc605b0a2d6fe3cde7f9"
+    },
+    "modelKeys": {
+      "bytes": 27203,
+      "sha256": "670cb9aeef9db30045d74255fe85d568b6cfce8652de65ffe7b86f039be66662",
+      "gitBlob": "c78df341b5e7e88b5aad929306f28030516c83d4"
+    },
+    "resourceAccess": {
+      "bytes": 3199,
+      "sha256": "5acf0a7916125be65bcd83d30517a73a40eccb776a0125584d1741629853052d",
+      "gitBlob": "f7cbb97f5dafd95eaf16f25c8e02dfa4831e1bb4"
+    },
+    "readBatchContext": {
+      "bytes": 8621,
+      "sha256": "e4045985f5cca7d09cbfcf86473f24a51c200d1162a498697a817bff54c1a651",
+      "gitBlob": "ec8497366c9c46cdac494814bd832beb1828c880"
+    },
+    "manifest": {
+      "bytes": 6556,
+      "sha256": "c7ea0cbbdfba69909d2aa88228093e1b1d4f811308528c41409db5ed40de8f7e",
+      "gitBlob": "9e44d94a057a8a4546e20f8ce0341fb460754baa"
+    },
+    "oursPatch": {
+      "bytes": 15758,
+      "sha256": "fac6095a0843f6cc3c2f89859dedab7b63ea4c889f07577037ecbe5151a747cc",
+      "gitBlob": "5958fe8976fb97ea07cc6f99e1e60e87050f9586"
+    },
+    "mainPatch": {
+      "bytes": 25475,
+      "sha256": "4dd454b4c61bb97471021ea11e5b185c0bc0498d2097f0af19c7ddcdd86f2a18",
+      "gitBlob": "50716dc7356d33fdd628a3e6d5d8289e2305e37b"
+    }
+  },
+  "strictPatchRoundTrips": [
+    {
+      "parent": "Ours",
+      "path": "lib/personal-policy.ts",
+      "added": 10,
+      "removed": 3,
+      "hunks": 5,
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "parent": "Ours",
+      "path": "lib/personal-policy.test.ts",
+      "added": 68,
+      "removed": 6,
+      "hunks": 7,
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "parent": "Ours",
+      "path": "tests/live-revision-reads.db.test.ts",
+      "added": 27,
+      "removed": 2,
+      "hunks": 2,
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "parent": "Main",
+      "path": "lib/personal-policy.ts",
+      "added": 5,
+      "removed": 2,
+      "hunks": 2,
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "parent": "Main",
+      "path": "lib/personal-policy.test.ts",
+      "added": 356,
+      "removed": 2,
+      "hunks": 6,
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "parent": "Main",
+      "path": "tests/live-revision-reads.db.test.ts",
+      "added": 40,
+      "removed": 0,
+      "hunks": 1,
+      "forwardExact": true,
+      "reverseExact": true
+    }
+  ],
+  "mechanical": {
+    "product": "Removing only the added readBatchSubscriptionPolicy import and its APP SELECT wrapper from candidate yields main byte-for-byte; applying the same inverse to ours yields common base byte-for-byte.",
+    "mainPolicyGuardOutsideMemo": true,
+    "allOtherMainProductBytesPreserved": true,
+    "liveTest": "candidate === main whole file + exact suffix(ours after common-base file); no old/main test changes dropped.",
+    "existingPolicyTopLevelTests": [
+      {
+        "name": "a shared credential check returns its current authorization in one read",
+        "newName": "a shared credential check returns its current authorization in one read",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "repeated permission checks observe revoke and restore without reusing an earlier grant",
+        "newName": "repeated permission checks observe revoke and restore without reusing an earlier grant",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "a failed authorization read propagates its original cause without another query",
+        "newName": "a failed authorization read propagates its original cause without another query",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "a Native read batch shares its workspace policy across the real key and subscription readers",
+        "newName": "a Native read batch shares its workspace policy across the real key and subscription readers",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "a refused batch policy still permits own keys and skips every shared credential read",
+        "newName": "a refused batch policy still permits own keys and returns no borrowed credential",
+        "present": true,
+        "exactBody": false
+      },
+      {
+        "name": "concurrent batches never share a policy observation, while sibling reads join only their batch",
+        "newName": "concurrent batches never share a policy observation, while sibling reads join only their batch",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "a batch policy belongs to its actual request database executor and exact workspace",
+        "newName": "a batch policy belongs to its actual request database executor and exact workspace",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "a failed batch policy preserves its original rejection and cannot poison the next request",
+        "newName": "a failed batch policy preserves its original rejection and cannot poison the next request",
+        "present": true,
+        "exactBody": false
+      },
+      {
+        "name": "bound after-work reads fresh after both fulfilled and rejected batch lifetimes",
+        "newName": "bound after-work reads fresh after both fulfilled and rejected batch lifetimes",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "only the policy is shared: credential shares and own-key reads remain fresh in the batch",
+        "newName": "only the policy is shared: credential shares and own-key reads remain fresh in the batch",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "ordinary policy readers observe changes on every call without touching batch metadata",
+        "newName": "ordinary policy readers observe changes on every call without touching batch metadata",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "afterJob cannot reuse a foreground policy while its parent read batch is still active",
+        "newName": "afterJob cannot reuse a foreground policy while its parent read batch is still active",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "cron and workflow jobs cannot inherit an active foreground policy observation",
+        "newName": "cron and workflow jobs cannot inherit an active foreground policy observation",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "standalone read-only policy consumers share one observation and keep every credential read",
+        "newName": "standalone read-only policy consumers share one observation and keep every credential read",
+        "present": true,
+        "exactBody": false
+      },
+      {
+        "name": "standalone policy refusal and absence are observed again by the next read",
+        "newName": "standalone policy refusal and absence are observed again by the next read",
+        "present": true,
+        "exactBody": false
+      },
+      {
+        "name": "standalone observations isolate parallel reads, exact workspaces and actual executors",
+        "newName": "standalone observations isolate parallel reads, exact workspaces and actual executors",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "standalone policy failures retain their original cause and do not poison the next read",
+        "newName": "standalone policy failures retain their original cause and do not poison the next read",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "standalone observation closes on fulfillment and rejection before bound after-work runs",
+        "newName": "standalone observation closes on fulfillment and rejection before bound after-work runs",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "standalone foreground observation never supplies policy to after, cron or workflow work",
+        "newName": "standalone foreground observation never supplies policy to after, cron or workflow work",
+        "present": true,
+        "exactBody": true
+      },
+      {
+        "name": "standalone read-only observation preserves the surrounding Native batch policy",
+        "newName": "standalone read-only observation preserves the surrounding Native batch policy",
+        "present": true,
+        "exactBody": true
+      }
+    ],
+    "mainApprovalTestExact": true
+  },
+  "authorizationReview": [
+    {
+      "finding": "workspaceResourcePolicy remains awaited on every memberSubscriptionsAllowed invocation before entering any APP memo lookup.",
+      "evidence": "candidate personal-policy.ts; real main resource-access.ts f7cbb97f5dafd95eaf16f25c8e02dfa4831e1bb4"
+    },
+    {
+      "finding": "Only SELECT subscriptions FROM workspace_personal_policies and its original absent-row default are wrapped. Organization policy results and approvals are not stored in subscriptionPolicies.",
+      "evidence": "candidate exact product diff and retained read-batch-context ec8497366c9c46cdac494814bd832beb1828c880"
+    },
+    {
+      "finding": "othersMayUse still performs its local fresh share/admin query and calls real organizationResourceAllowed. pooledOwners still reads current lender metadata first, then current workspace policy, then one current approval decision for each lender. Share mutation still invokes assertOrganizationResourceShare.",
+      "evidence": "all remaining main personal-policy product bytes exact"
+    },
+    {
+      "finding": "Main usableApiKeys first reads own/shared metadata; only actual shared resources enter memberSubscriptionsAllowed and individual organizationResourceAllowed calls. The merge does not revert this ordering or alter own-credential behavior.",
+      "evidence": "main model-api-keys.ts c78df341b5e7e88b5aad929306f28030516c83d4"
+    },
+    {
+      "finding": "The real governance helper reads workspace policy from workspacePool, returns false for deny, then reads approval. Explicit denied approval remains false even when the rule is allow.",
+      "evidence": "main resource-access.ts exact source"
+    },
+    {
+      "finding": "Existing executor/workspace/lifetime cache scope, close/failure behavior, and after/cron/workflow bypass remain outside this three-file change.",
+      "evidence": "retained read-batch-context and unchanged existing test bodies"
+    }
+  ],
+  "testMergeReview": [
+    {
+      "finding": "The added Workspace mock is a strict SQL boundary fixture, not an all-allow mock of governance functions. The real resource-access module decides policy and approval.",
+      "detail": "It permits only the exact policy query for literal workspace plus the two existing UUID fixtures; approval query and parameters remain exact; every other operation fails."
+    },
+    {
+      "finding": "Main's six-step local-share grant, deny, approval-required/no-approval, approved, denied, and allow-with-explicit-denied test body is byte-identical.",
+      "detail": "The final false assertion, six APP reads and six fresh policy reads are preserved."
+    },
+    {
+      "finding": "The new regression runs within both Native read-batch and standalone read-only observation lifetimes.",
+      "detail": "It checks true -> deny false -> allow true while APP SELECT count stays1 and fresh Workspace policy count is3, demonstrating the new guard remains outside memo."
+    },
+    {
+      "finding": "Twenty existing literal top-level policy tests remain; sixteen bodies are byte-identical and four are adapted only for main's real metadata-before-policy behavior.",
+      "detail": "The four adapted bodies retain denial results and original error identity/500 assertions; exact order now includes own-keys/shared-keys before policy and shared-owners before its policy check. The retry count now counts policy calls specifically because the consumer now performs metadata reads first."
+    },
+    {
+      "finding": "No refusal assertion was converted to acceptance and no foreground/background or executor/workspace isolation assertion was removed.",
+      "detail": "Strict parent patches plus explicit existing-body comparison cover the only altered cases."
+    },
+    {
+      "finding": "The Live DB candidate preserves all main bytes and adds only the exact existing authorized-selected-workspace revision helper regression.",
+      "detail": "Its statement/ref/row/byte checks and explicit boundary that it is not a membership-admission test remain unchanged."
+    }
+  ],
+  "intentionallyAdaptedTests": [
+    "a refused batch policy still permits own keys and skips every shared credential read -> a refused batch policy still permits own keys and returns no borrowed credential",
+    "a failed batch policy preserves its original rejection and cannot poison the next request",
+    "standalone read-only policy consumers share one observation and keep every credential read",
+    "standalone policy refusal and absence are observed again by the next read"
+  ],
+  "boundaries": {
+    "method": "Read-only source review, exact Git object hashes, independent line diffs, strict patch forward/reverse reconstruction. No Node/browser/PG/application test execution by this reviewer.",
+    "mainAndGCommitIdentities": "Supplied by Root and source reviewer; this review binds the three source triplets and direct dependencies, not the complete209/71-path union.",
+    "canonicalGeneratedFiles": "Owned by native_diag_runner actual generator execution, outside this review.",
+    "taskRunPG": "Root reports run42729547296/A1 RED16/14/2 with only intended assertion cause and GREEN16/16; this review did not reread its original logs or repeat those tests.",
+    "noAcceptanceInference": "No claim that this source merge passes combined CI, runtime or final Native budget; original acceptance rules/windows remain unchanged.",
+    "originalLogsOrZipRead": false,
+    "resourcesStarted": false,
+    "refsChanged": false,
+    "sourceEditedByReviewer": false,
+    "extraTestsRequested": false
+  }
+}

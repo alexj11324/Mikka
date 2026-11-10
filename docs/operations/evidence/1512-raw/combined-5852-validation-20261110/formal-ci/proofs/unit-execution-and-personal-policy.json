@@ -1,0 +1,2512 @@
+{
+  "version": 1,
+  "purpose": "5852 actual unit execution and complete merged personal-policy coverage",
+  "head": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "run": 42731843562,
+  "attempt": 1,
+  "actualCheckout": "9faa0e581b370237fe541ce3087c28a334ddb798",
+  "tree": "42d33eb7faf77d7049607523599de9374e065660",
+  "parents": [
+    "60401d31fb33b7f272cb0262df58d3d2008280b4",
+    "5852aa8832c07fdeef43665dd5e156ce5516e3ea"
+  ],
+  "source": {
+    "path": "lib/personal-policy.test.ts",
+    "gitBlob": "04c5ed8d4a2f724b6999609dbb9732c53c10ced1",
+    "bytes": 23914,
+    "sha256": "312f2464a98dc77556d8cf4c04056213421f934accfe17e948ea11c48fec1773"
+  },
+  "execution": [
+    {
+      "lane": "core",
+      "jobId": 129552004014,
+      "nodeVersions": [
+        "24.22.2"
+      ],
+      "command": "node scripts/ci/run-units.mjs core",
+      "ciUnits": [
+        "[\"ci-core-2\",\"ci-core-3\",\"ci-core-4\",\"ci-core-5\",\"ci-core-6\",\"ci-core-7\",\"ci-core-8\",\"ci-core-9\",\"ci-core-10\",\"ci-core-11\",\"ci-core-12\",\"ci-core-13\",\"ci-core-14\",\"ci-core-15\",\"ci-core-16\",\"ci-core-17\",\"ci-core-18\",\"ci-core-19\",\"ci-core-20\",\"ci-core-21\",\"ci-core-22\",\"ci-core-23\",\"ci-core-24\",\"ci-core-25\",\"ci-core-26\",\"ci-core-27\",\"ci-core-28\",\"ci-core-29\",\"ci-core-30\",\"ci-core-31\",\"ci-core-32\",\"ci-core-33\",\"ci-core-34\",\"ci-core-35\",\"ci-core-36\",\"ci-core-37\",\"ci-core-38\",\"ci-core-39\",\"ci-core-40\",\"ci-core-41\",\"ci-core-42\",\"ci-core-43\",\"ci-core-44\",\"ci-core-45\",\"ci-core-46\",\"ci-core-47\",\"ci-core-48\",\"ci-core-49\",\"ci-core-50\",\"ci-core-51\",\"ci-core-52\",\"ci-core-53\",\"ci-core-54\",\"ci-core-55\",\"ci-core-56\",\"ci-core-57\",\"ci-integration-2\",\"ci-integration-3\",\"ci-integration-4\",\"ci-integration-5\",\"ci-integration-6\",\"ci-integration-7\",\"ci-integration-8\",\"ci-integration-9\",\"ci-integration-10\",\"ci-integration-11\",\"ci-integration-12\",\"ci-integration-13\",\"ci-integration-14\",\"ci-integration-15\",\"ci-integration-16\",\"ci-integration-17\",\"ci-integration-18\",\"ci-integration-19\",\"ci-integration-20\",\"ci-integration-21\",\"ci-integration-22\",\"ci-integration-23\",\"ci-integration-24\",\"ci-integration-25\",\"ci-integration-26\",\"ci-integration-27\",\"ci-integration-28\",\"ci-integration-29\",\"ci-core-triage\",\"ci-core-governance\",\"ci-integration-factory-activity\"]"
+      ],
+      "targets": [
+        {
+          "target": "core-2",
+          "line": 512
+        },
+        {
+          "target": "core-3",
+          "line": 515
+        },
+        {
+          "target": "core-4",
+          "line": 776
+        },
+        {
+          "target": "core-5",
+          "line": 833
+        },
+        {
+          "target": "core-6",
+          "line": 908
+        },
+        {
+          "target": "core-7",
+          "line": 946
+        },
+        {
+          "target": "core-8",
+          "line": 1506
+        },
+        {
+          "target": "core-9",
+          "line": 1524
+        },
+        {
+          "target": "core-10",
+          "line": 1543
+        },
+        {
+          "target": "core-11",
+          "line": 1575
+        },
+        {
+          "target": "core-12",
+          "line": 1597
+        },
+        {
+          "target": "core-13",
+          "line": 1615
+        },
+        {
+          "target": "core-14",
+          "line": 1663
+        },
+        {
+          "target": "core-15",
+          "line": 1670
+        },
+        {
+          "target": "core-16",
+          "line": 1712
+        },
+        {
+          "target": "core-17",
+          "line": 1827
+        },
+        {
+          "target": "core-18",
+          "line": 1919
+        },
+        {
+          "target": "core-19",
+          "line": 1963
+        },
+        {
+          "target": "core-20",
+          "line": 1999
+        },
+        {
+          "target": "core-21",
+          "line": 2380
+        },
+        {
+          "target": "core-22",
+          "line": 2507
+        },
+        {
+          "target": "core-23",
+          "line": 2539
+        },
+        {
+          "target": "core-24",
+          "line": 2595
+        },
+        {
+          "target": "core-25",
+          "line": 2619
+        },
+        {
+          "target": "core-26",
+          "line": 2705
+        },
+        {
+          "target": "core-27",
+          "line": 2716
+        },
+        {
+          "target": "core-28",
+          "line": 2768
+        },
+        {
+          "target": "core-29",
+          "line": 2845
+        },
+        {
+          "target": "core-30",
+          "line": 2883
+        },
+        {
+          "target": "core-31",
+          "line": 3495
+        },
+        {
+          "target": "core-32",
+          "line": 3755
+        },
+        {
+          "target": "core-33",
+          "line": 3870
+        },
+        {
+          "target": "core-34",
+          "line": 3905
+        },
+        {
+          "target": "core-35",
+          "line": 4428
+        },
+        {
+          "target": "core-36",
+          "line": 4533
+        },
+        {
+          "target": "core-37",
+          "line": 4720
+        },
+        {
+          "target": "core-38",
+          "line": 4956
+        },
+        {
+          "target": "core-39",
+          "line": 5050
+        },
+        {
+          "target": "core-40",
+          "line": 5099
+        },
+        {
+          "target": "core-41",
+          "line": 5557
+        },
+        {
+          "target": "core-42",
+          "line": 5568
+        },
+        {
+          "target": "core-43",
+          "line": 5614
+        },
+        {
+          "target": "core-44",
+          "line": 5758
+        },
+        {
+          "target": "core-45",
+          "line": 5816
+        },
+        {
+          "target": "core-46",
+          "line": 6159
+        },
+        {
+          "target": "core-47",
+          "line": 6256
+        },
+        {
+          "target": "core-48",
+          "line": 6345
+        },
+        {
+          "target": "core-49",
+          "line": 6368
+        },
+        {
+          "target": "core-50",
+          "line": 6396
+        },
+        {
+          "target": "core-51",
+          "line": 6435
+        },
+        {
+          "target": "core-52",
+          "line": 6484
+        },
+        {
+          "target": "core-53",
+          "line": 6530
+        },
+        {
+          "target": "core-54",
+          "line": 6765
+        },
+        {
+          "target": "core-55",
+          "line": 6921
+        },
+        {
+          "target": "core-56",
+          "line": 7166
+        },
+        {
+          "target": "core-57",
+          "line": 7190
+        },
+        {
+          "target": "core-triage",
+          "line": 7534
+        },
+        {
+          "target": "core-governance",
+          "line": 7579
+        }
+      ],
+      "targetCount": 58,
+      "successfulTargets": [
+        "core-2",
+        "core-3",
+        "core-4",
+        "core-5",
+        "core-6",
+        "core-7",
+        "core-8",
+        "core-9",
+        "core-10",
+        "core-11",
+        "core-12",
+        "core-13",
+        "core-14",
+        "core-15",
+        "core-16",
+        "core-17",
+        "core-18",
+        "core-19",
+        "core-20",
+        "core-21",
+        "core-22",
+        "core-23",
+        "core-24",
+        "core-25",
+        "core-26",
+        "core-27",
+        "core-28",
+        "core-29",
+        "core-30",
+        "core-31",
+        "core-32",
+        "core-33",
+        "core-34",
+        "core-35",
+        "core-36",
+        "core-37",
+        "core-38",
+        "core-39",
+        "core-40",
+        "core-41",
+        "core-42",
+        "core-43",
+        "core-44",
+        "core-45",
+        "core-46",
+        "core-47",
+        "core-48",
+        "core-49",
+        "core-50",
+        "core-51",
+        "core-52",
+        "core-53",
+        "core-54",
+        "core-55",
+        "core-56",
+        "core-57",
+        "core-triage",
+        "core-governance"
+      ],
+      "successFooterLine": 7902,
+      "cacheSkipped": true,
+      "targetBlocks": [
+        {
+          "target": "core-2",
+          "startLine": 512,
+          "endLine": 514,
+          "script": null,
+          "summary": []
+        },
+        {
+          "target": "core-3",
+          "startLine": 515,
+          "endLine": 775,
+          "script": "ci-tasks: > next-app@0.0.1 test:factory-check-independence /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 244",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 244",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-4",
+          "startLine": 776,
+          "endLine": 832,
+          "script": "ci-tasks: > next-app@0.0.1 test:factory-routing /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 21",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 21",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-5",
+          "startLine": 833,
+          "endLine": 907,
+          "script": "ci-tasks: > next-app@0.0.1 test:self-improvement-semantic-source /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 22",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 22",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 34",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 34",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-6",
+          "startLine": 908,
+          "endLine": 945,
+          "script": null,
+          "summary": [
+            "ci-tasks: ℹ tests 13",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 13",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-7",
+          "startLine": 946,
+          "endLine": 1505,
+          "script": "ci-tasks: > next-app@0.0.1 test:ui-policy /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 305",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 305",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 135",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 135",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-8",
+          "startLine": 1506,
+          "endLine": 1523,
+          "script": "ci-tasks: > next-app@0.0.1 test:idle-budget /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 9",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 9",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-9",
+          "startLine": 1524,
+          "endLine": 1542,
+          "script": "ci-tasks: > next-app@0.0.1 test:motion /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 5",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 5",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-10",
+          "startLine": 1543,
+          "endLine": 1574,
+          "script": "ci-tasks: > next-app@0.0.1 test:i18n /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 14",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 14",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-11",
+          "startLine": 1575,
+          "endLine": 1596,
+          "script": null,
+          "summary": [
+            "ci-tasks: ℹ tests 10",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 10",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-12",
+          "startLine": 1597,
+          "endLine": 1614,
+          "script": "ci-tasks: > next-app@0.0.1 test:ssh-target /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 5",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 5",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-13",
+          "startLine": 1615,
+          "endLine": 1662,
+          "script": "ci-tasks: > next-app@0.0.1 test:linear-sync /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 34",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 34",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-14",
+          "startLine": 1663,
+          "endLine": 1669,
+          "script": null,
+          "summary": []
+        },
+        {
+          "target": "core-15",
+          "startLine": 1670,
+          "endLine": 1711,
+          "script": "ci-tasks: > next-app@0.0.1 test:release-security /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 7",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 7",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-16",
+          "startLine": 1712,
+          "endLine": 1826,
+          "script": "ci-tasks: > next-app@0.0.1 test:mailbox-verification /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 14",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 14",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-17",
+          "startLine": 1827,
+          "endLine": 1918,
+          "script": "ci-tasks: > next-app@0.0.1 test:factory-approval /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 155",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 155",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-18",
+          "startLine": 1919,
+          "endLine": 1962,
+          "script": "ci-tasks: > next-app@0.0.1 test:personal-mailbox-core /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 17",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 17",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-19",
+          "startLine": 1963,
+          "endLine": 1998,
+          "script": "ci-tasks: > next-app@0.0.1 test:factory-monitor /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 15",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 15",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-20",
+          "startLine": 1999,
+          "endLine": 2379,
+          "script": "ci-tasks: > next-app@0.0.1 test:execution-rules /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 101",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 101",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 1",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 1",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-21",
+          "startLine": 2380,
+          "endLine": 2506,
+          "script": "ci-tasks: > next-app@0.0.1 test:abuse /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 200",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 200",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 53",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 53",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-22",
+          "startLine": 2507,
+          "endLine": 2538,
+          "script": "ci-tasks: > next-app@0.0.1 test:self-hosting /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 8",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 8",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 3",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 3",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-23",
+          "startLine": 2539,
+          "endLine": 2594,
+          "script": "ci-tasks: > next-app@0.0.1 test:self-hosted-byok /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 31",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 31",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-24",
+          "startLine": 2595,
+          "endLine": 2618,
+          "script": "ci-tasks: > next-app@0.0.1 test:cloud-services /home/runner/work/Mikka/Mikka",
+          "summary": []
+        },
+        {
+          "target": "core-25",
+          "startLine": 2619,
+          "endLine": 2704,
+          "script": "ci-tasks: > next-app@0.0.1 test:hosted-usage /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 11",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 11",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 18",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 18",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-26",
+          "startLine": 2705,
+          "endLine": 2715,
+          "script": null,
+          "summary": [
+            "ci-tasks: ℹ tests 3",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 3",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-27",
+          "startLine": 2716,
+          "endLine": 2767,
+          "script": "ci-tasks: > next-app@0.0.1 test:model-admission /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 14",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 14",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 3",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 3",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-28",
+          "startLine": 2768,
+          "endLine": 2844,
+          "script": "ci-tasks: > next-app@0.0.1 test:agent-kit /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 13",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 13",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-29",
+          "startLine": 2845,
+          "endLine": 2882,
+          "script": null,
+          "summary": [
+            "ci-tasks: ℹ tests 46",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 46",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-30",
+          "startLine": 2883,
+          "endLine": 3494,
+          "script": "ci-tasks: > next-app@0.0.1 test:agent-kit-compat /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 56",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 56",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 224",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 224",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-31",
+          "startLine": 3495,
+          "endLine": 3754,
+          "script": "ci-tasks: > next-app@0.0.1 test:coordinator-events /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 10",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 10",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 143",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 143",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 97",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 97",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-32",
+          "startLine": 3755,
+          "endLine": 3869,
+          "script": "ci-tasks: > next-app@0.0.1 test:schedules /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 63",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 63",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-33",
+          "startLine": 3870,
+          "endLine": 3904,
+          "script": "ci-tasks: > next-app@0.0.1 test:run-recovery /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 13",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 13",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-34",
+          "startLine": 3905,
+          "endLine": 4427,
+          "script": "ci-tasks: > next-app@0.0.1 test:mvp-fixtures /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 50",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 50",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 214",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 214",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 10",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 10",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-35",
+          "startLine": 4428,
+          "endLine": 4532,
+          "script": "ci-tasks: > next-app@0.0.1 test:credentials /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 23",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 23",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 37",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 37",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 10",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 10",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-36",
+          "startLine": 4533,
+          "endLine": 4719,
+          "script": "ci-tasks: > next-app@0.0.1 test:run-publication /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 33",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 33",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 4",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 4",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 11",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 11",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 3",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 3",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 21",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 21",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 3",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 3",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 26",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 26",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-37",
+          "startLine": 4720,
+          "endLine": 4955,
+          "script": "ci-tasks: > next-app@0.0.1 test:coordinator-stream /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 149",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 149",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-38",
+          "startLine": 4956,
+          "endLine": 5049,
+          "script": null,
+          "summary": [
+            "ci-tasks: ℹ tests 85",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 85",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-39",
+          "startLine": 5050,
+          "endLine": 5098,
+          "script": "ci-tasks: > next-app@0.0.1 test:mobile-push /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 11",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 11",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-40",
+          "startLine": 5099,
+          "endLine": 5556,
+          "script": "ci-tasks: > next-app@0.0.1 test:mobile /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 34",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 34",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 20",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 20",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 260",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 260",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-41",
+          "startLine": 5557,
+          "endLine": 5567,
+          "script": "ci-tasks: > next-app@0.0.1 test:coordinator-native-relay /home/runner/work/Mikka/Mikka",
+          "summary": []
+        },
+        {
+          "target": "core-42",
+          "startLine": 5568,
+          "endLine": 5613,
+          "script": "ci-tasks: > next-app@0.0.1 test:coordinator-native-scope /home/runner/work/Mikka/Mikka",
+          "summary": []
+        },
+        {
+          "target": "core-43",
+          "startLine": 5614,
+          "endLine": 5757,
+          "script": "ci-tasks: > next-app@0.0.1 test:coordinator-issue-tools /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 18",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 18",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 78",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 78",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-44",
+          "startLine": 5758,
+          "endLine": 5815,
+          "script": "ci-tasks: > next-app@0.0.1 test:signup-turnstile /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 22",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 22",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 4",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 4",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 2",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 2",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-45",
+          "startLine": 5816,
+          "endLine": 6158,
+          "script": "ci-tasks: > next-app@0.0.1 test:cloud-limits /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 107",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 107",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 11",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 11",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-46",
+          "startLine": 6159,
+          "endLine": 6255,
+          "script": "ci-tasks: > next-app@0.0.1 test:analytics /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 31",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 31",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-47",
+          "startLine": 6256,
+          "endLine": 6344,
+          "script": "ci-tasks: > next-app@0.0.1 test:artifacts /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 17",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 17",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 2",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 2",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 135",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 135",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-48",
+          "startLine": 6345,
+          "endLine": 6367,
+          "script": "ci-tasks: > next-app@0.0.1 test:factory-config /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 7",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 7",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-49",
+          "startLine": 6368,
+          "endLine": 6395,
+          "script": "ci-tasks: > next-app@0.0.1 test:user-message-text /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 4",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 4",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-50",
+          "startLine": 6396,
+          "endLine": 6434,
+          "script": "ci-tasks: > next-app@0.0.1 test:run-info /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 7",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 7",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 8",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 8",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-51",
+          "startLine": 6435,
+          "endLine": 6483,
+          "script": "ci-tasks: > next-app@0.0.1 test:thread-changes /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 19",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 19",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 6",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 6",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-52",
+          "startLine": 6484,
+          "endLine": 6529,
+          "script": null,
+          "summary": []
+        },
+        {
+          "target": "core-53",
+          "startLine": 6530,
+          "endLine": 6764,
+          "script": "ci-tasks: > next-app@0.0.1 test:dev-local /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 195",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 195",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 9",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 9",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-54",
+          "startLine": 6765,
+          "endLine": 6920,
+          "script": "ci-tasks: > next-app@0.0.1 test:lib-units /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 90",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 90",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 1",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 1",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 30",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 30",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-55",
+          "startLine": 6921,
+          "endLine": 7165,
+          "script": "ci-tasks: > next-app@0.0.1 test:project-decisions /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 21",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 21",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 73",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 73",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-56",
+          "startLine": 7166,
+          "endLine": 7189,
+          "script": "ci-tasks: > next-app@0.0.1 test:unread /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 11",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 11",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-57",
+          "startLine": 7190,
+          "endLine": 7533,
+          "script": "ci-tasks: > next-app@0.0.1 test:issue-readonly-dom /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 186",
+            "ci-tasks: ℹ suites 4",
+            "ci-tasks: ℹ pass 186",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 9",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 9",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 19",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 19",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 132",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 132",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 28",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 28",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-triage",
+          "startLine": 7534,
+          "endLine": 7578,
+          "script": null,
+          "summary": [
+            "ci-tasks: ℹ tests 34",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 34",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "core-governance",
+          "startLine": 7579,
+          "endLine": 7901,
+          "script": "ci-tasks: > next-app@0.0.1 test:governance /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 12",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 12",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 28",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 28",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 64",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 64",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 183",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 183",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        }
+      ]
+    },
+    {
+      "lane": "integration",
+      "jobId": 129552003968,
+      "nodeVersions": [
+        "24.22.2"
+      ],
+      "command": "node scripts/ci/run-units.mjs integration",
+      "ciUnits": [
+        "[\"ci-core-2\",\"ci-core-3\",\"ci-core-4\",\"ci-core-5\",\"ci-core-6\",\"ci-core-7\",\"ci-core-8\",\"ci-core-9\",\"ci-core-10\",\"ci-core-11\",\"ci-core-12\",\"ci-core-13\",\"ci-core-14\",\"ci-core-15\",\"ci-core-16\",\"ci-core-17\",\"ci-core-18\",\"ci-core-19\",\"ci-core-20\",\"ci-core-21\",\"ci-core-22\",\"ci-core-23\",\"ci-core-24\",\"ci-core-25\",\"ci-core-26\",\"ci-core-27\",\"ci-core-28\",\"ci-core-29\",\"ci-core-30\",\"ci-core-31\",\"ci-core-32\",\"ci-core-33\",\"ci-core-34\",\"ci-core-35\",\"ci-core-36\",\"ci-core-37\",\"ci-core-38\",\"ci-core-39\",\"ci-core-40\",\"ci-core-41\",\"ci-core-42\",\"ci-core-43\",\"ci-core-44\",\"ci-core-45\",\"ci-core-46\",\"ci-core-47\",\"ci-core-48\",\"ci-core-49\",\"ci-core-50\",\"ci-core-51\",\"ci-core-52\",\"ci-core-53\",\"ci-core-54\",\"ci-core-55\",\"ci-core-56\",\"ci-core-57\",\"ci-integration-2\",\"ci-integration-3\",\"ci-integration-4\",\"ci-integration-5\",\"ci-integration-6\",\"ci-integration-7\",\"ci-integration-8\",\"ci-integration-9\",\"ci-integration-10\",\"ci-integration-11\",\"ci-integration-12\",\"ci-integration-13\",\"ci-integration-14\",\"ci-integration-15\",\"ci-integration-16\",\"ci-integration-17\",\"ci-integration-18\",\"ci-integration-19\",\"ci-integration-20\",\"ci-integration-21\",\"ci-integration-22\",\"ci-integration-23\",\"ci-integration-24\",\"ci-integration-25\",\"ci-integration-26\",\"ci-integration-27\",\"ci-integration-28\",\"ci-integration-29\",\"ci-core-triage\",\"ci-core-governance\",\"ci-integration-factory-activity\"]"
+      ],
+      "targets": [
+        {
+          "target": "integration-2",
+          "line": 513
+        },
+        {
+          "target": "integration-3",
+          "line": 516
+        },
+        {
+          "target": "integration-4",
+          "line": 566
+        },
+        {
+          "target": "integration-5",
+          "line": 714
+        },
+        {
+          "target": "integration-6",
+          "line": 749
+        },
+        {
+          "target": "integration-7",
+          "line": 957
+        },
+        {
+          "target": "integration-8",
+          "line": 1563
+        },
+        {
+          "target": "integration-9",
+          "line": 1743
+        },
+        {
+          "target": "integration-10",
+          "line": 2124
+        },
+        {
+          "target": "integration-11",
+          "line": 2370
+        },
+        {
+          "target": "integration-12",
+          "line": 2423
+        },
+        {
+          "target": "integration-13",
+          "line": 2445
+        },
+        {
+          "target": "integration-14",
+          "line": 2473
+        },
+        {
+          "target": "integration-15",
+          "line": 2491
+        },
+        {
+          "target": "integration-16",
+          "line": 2733
+        },
+        {
+          "target": "integration-17",
+          "line": 2809
+        },
+        {
+          "target": "integration-18",
+          "line": 3129
+        },
+        {
+          "target": "integration-19",
+          "line": 3232
+        },
+        {
+          "target": "integration-20",
+          "line": 3286
+        },
+        {
+          "target": "integration-21",
+          "line": 3307
+        },
+        {
+          "target": "integration-22",
+          "line": 3752
+        },
+        {
+          "target": "integration-23",
+          "line": 3841
+        },
+        {
+          "target": "integration-24",
+          "line": 3896
+        },
+        {
+          "target": "integration-25",
+          "line": 3915
+        },
+        {
+          "target": "integration-26",
+          "line": 3981
+        },
+        {
+          "target": "integration-27",
+          "line": 4499
+        },
+        {
+          "target": "integration-28",
+          "line": 4542
+        },
+        {
+          "target": "integration-29",
+          "line": 4888
+        },
+        {
+          "target": "integration-factory-activity",
+          "line": 4913
+        }
+      ],
+      "targetCount": 29,
+      "successfulTargets": [
+        "integration-2",
+        "integration-3",
+        "integration-4",
+        "integration-5",
+        "integration-6",
+        "integration-7",
+        "integration-8",
+        "integration-9",
+        "integration-10",
+        "integration-11",
+        "integration-12",
+        "integration-13",
+        "integration-14",
+        "integration-15",
+        "integration-16",
+        "integration-17",
+        "integration-18",
+        "integration-19",
+        "integration-20",
+        "integration-21",
+        "integration-22",
+        "integration-23",
+        "integration-24",
+        "integration-25",
+        "integration-26",
+        "integration-27",
+        "integration-28",
+        "integration-29",
+        "integration-factory-activity"
+      ],
+      "successFooterLine": 5011,
+      "cacheSkipped": true,
+      "targetBlocks": [
+        {
+          "target": "integration-2",
+          "startLine": 513,
+          "endLine": 515,
+          "script": null,
+          "summary": []
+        },
+        {
+          "target": "integration-3",
+          "startLine": 516,
+          "endLine": 565,
+          "script": "ci-tasks: > next-app@0.0.1 test:active-agents /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 16",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 16",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 9",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 8",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 1",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-4",
+          "startLine": 566,
+          "endLine": 713,
+          "script": "ci-tasks: > next-app@0.0.1 test:test-accounts /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 48",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 48",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 1",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 1",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-5",
+          "startLine": 714,
+          "endLine": 748,
+          "script": null,
+          "summary": [
+            "ci-tasks: ℹ tests 73",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 73",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 10",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 10",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-6",
+          "startLine": 749,
+          "endLine": 956,
+          "script": "ci-tasks: > next-app@0.0.1 test:groups /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 12",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 11",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 1",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 82",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 82",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-7",
+          "startLine": 957,
+          "endLine": 1562,
+          "script": "ci-tasks: > next-app@0.0.1 test:live-lists /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: # tests 25",
+            "ci-tasks: # suites 0",
+            "ci-tasks: # pass 25",
+            "ci-tasks: # fail 0",
+            "ci-tasks: # cancelled 0",
+            "ci-tasks: # skipped 0",
+            "ci-tasks: # todo 0"
+          ]
+        },
+        {
+          "target": "integration-8",
+          "startLine": 1563,
+          "endLine": 1742,
+          "script": "ci-tasks: > next-app@0.0.1 test:group-turns /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 119",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 110",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 9",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 5",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 5",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-9",
+          "startLine": 1743,
+          "endLine": 2123,
+          "script": "ci-tasks: > next-app@0.0.1 test:integrations /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 97",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 97",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 9",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 9",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 71",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 71",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 14",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 14",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 21",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 21",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 6",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 6",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 4",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 4",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 7",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 7",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-10",
+          "startLine": 2124,
+          "endLine": 2369,
+          "script": "ci-tasks: > next-app@0.0.1 test:github /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 170",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 170",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-11",
+          "startLine": 2370,
+          "endLine": 2422,
+          "script": "ci-tasks: > next-app@0.0.1 test:request-log /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 7",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 7",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 22",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 22",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-12",
+          "startLine": 2423,
+          "endLine": 2444,
+          "script": "ci-tasks: > next-app@0.0.1 test:legacy-reads /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 9",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 9",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-13",
+          "startLine": 2445,
+          "endLine": 2472,
+          "script": "ci-tasks: > next-app@0.0.1 test:slack /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 12",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 12",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-14",
+          "startLine": 2473,
+          "endLine": 2490,
+          "script": "ci-tasks: > next-app@0.0.1 test:telegram /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 5",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 5",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-15",
+          "startLine": 2491,
+          "endLine": 2732,
+          "script": "ci-tasks: > next-app@0.0.1 test:agent /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 82",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 81",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 1",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 22",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 22",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-16",
+          "startLine": 2733,
+          "endLine": 2808,
+          "script": "ci-tasks: > next-app@0.0.1 test:acceptance /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 40",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 40",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-17",
+          "startLine": 2809,
+          "endLine": 3128,
+          "script": "ci-tasks: > next-app@0.0.1 test:suggestions /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 109",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 109",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 22",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 22",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-18",
+          "startLine": 3129,
+          "endLine": 3231,
+          "script": "ci-tasks: > next-app@0.0.1 test:captures /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 11",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 11",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 33",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 33",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 104",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 104",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-19",
+          "startLine": 3232,
+          "endLine": 3285,
+          "script": "ci-tasks: > next-app@0.0.1 test:db-runner /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 31",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 31",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-20",
+          "startLine": 3286,
+          "endLine": 3306,
+          "script": "ci-tasks: > next-app@0.0.1 test:csv /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 8",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 8",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-21",
+          "startLine": 3307,
+          "endLine": 3751,
+          "script": "ci-tasks: > next-app@0.0.1 test:settings /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 43",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 43",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 29",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 29",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 83",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 83",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 152",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 152",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-22",
+          "startLine": 3752,
+          "endLine": 3840,
+          "script": "ci-tasks: > next-app@0.0.1 test:settings-backend /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 35",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 35",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-23",
+          "startLine": 3841,
+          "endLine": 3895,
+          "script": "ci-tasks: > next-app@0.0.1 test:workspace-settings /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 18",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 18",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-24",
+          "startLine": 3896,
+          "endLine": 3914,
+          "script": "ci-tasks: > next-app@0.0.1 test:settings-prefs /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 6",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 6",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-25",
+          "startLine": 3915,
+          "endLine": 3980,
+          "script": "ci-tasks: > next-app@0.0.1 test:account /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 9",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 9",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 24",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 24",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-26",
+          "startLine": 3981,
+          "endLine": 4498,
+          "script": "ci-tasks: > next-app@0.0.1 test:issues /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 264",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 264",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 33",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 33",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 23",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 23",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 2",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 2",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 4",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 4",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 2",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 2",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 3",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 3",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 25",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 25",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-27",
+          "startLine": 4499,
+          "endLine": 4541,
+          "script": "ci-tasks: > next-app@0.0.1 test:issue-search /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 30",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 30",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-28",
+          "startLine": 4542,
+          "endLine": 4887,
+          "script": "ci-tasks: > @mikka/protocol@0.0.1 test /home/runner/work/Mikka/Mikka/packages/protocol",
+          "summary": [
+            "ci-tasks: ℹ tests 39",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 39",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 4",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 4",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-29",
+          "startLine": 4888,
+          "endLine": 4912,
+          "script": null,
+          "summary": [
+            "ci-tasks: ℹ tests 4",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 4",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        },
+        {
+          "target": "integration-factory-activity",
+          "startLine": 4913,
+          "endLine": 5010,
+          "script": "ci-tasks: > next-app@0.0.1 test:factory-activity /home/runner/work/Mikka/Mikka",
+          "summary": [
+            "ci-tasks: ℹ tests 10",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 10",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 53",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 53",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0",
+            "ci-tasks: ℹ tests 9",
+            "ci-tasks: ℹ suites 0",
+            "ci-tasks: ℹ pass 9",
+            "ci-tasks: ℹ fail 0",
+            "ci-tasks: ℹ cancelled 0",
+            "ci-tasks: ℹ skipped 0",
+            "ci-tasks: ℹ todo 0"
+          ]
+        }
+      ]
+    }
+  ],
+  "personalPolicy": {
+    "staticCases": 22,
+    "expandedDynamicCases": [
+      "a missing share does not issue an additional read or write",
+      "a refused share does not issue an additional read or write"
+    ],
+    "totalExpectedCases": 24,
+    "observedExactlyOncePass": 24,
+    "cases": [
+      {
+        "title": "a shared credential check returns its current authorization in one read",
+        "matches": [
+          {
+            "line": 2347,
+            "text": "ci-tasks: ✔ a shared credential check returns its current authorization in one read (4.398661ms)"
+          }
+        ]
+      },
+      {
+        "title": "repeated permission checks observe revoke and restore without reusing an earlier grant",
+        "matches": [
+          {
+            "line": 2350,
+            "text": "ci-tasks: ✔ repeated permission checks observe revoke and restore without reusing an earlier grant (1.308676ms)"
+          }
+        ]
+      },
+      {
+        "title": "a failed authorization read propagates its original cause without another query",
+        "matches": [
+          {
+            "line": 2351,
+            "text": "ci-tasks: ✔ a failed authorization read propagates its original cause without another query (0.581007ms)"
+          }
+        ]
+      },
+      {
+        "title": "a Native read batch shares its workspace policy across the real key and subscription readers",
+        "matches": [
+          {
+            "line": 2352,
+            "text": "ci-tasks: ✔ a Native read batch shares its workspace policy across the real key and subscription readers (3.416058ms)"
+          }
+        ]
+      },
+      {
+        "title": "a refused batch policy still permits own keys and returns no borrowed credential",
+        "matches": [
+          {
+            "line": 2353,
+            "text": "ci-tasks: ✔ a refused batch policy still permits own keys and returns no borrowed credential (2.126581ms)"
+          }
+        ]
+      },
+      {
+        "title": "concurrent batches never share a policy observation, while sibling reads join only their batch",
+        "matches": [
+          {
+            "line": 2354,
+            "text": "ci-tasks: ✔ concurrent batches never share a policy observation, while sibling reads join only their batch (2.94744ms)"
+          }
+        ]
+      },
+      {
+        "title": "a batch policy belongs to its actual request database executor and exact workspace",
+        "matches": [
+          {
+            "line": 2355,
+            "text": "ci-tasks: ✔ a batch policy belongs to its actual request database executor and exact workspace (409.26776ms)"
+          }
+        ]
+      },
+      {
+        "title": "a failed batch policy preserves its original rejection and cannot poison the next request",
+        "matches": [
+          {
+            "line": 2356,
+            "text": "ci-tasks: ✔ a failed batch policy preserves its original rejection and cannot poison the next request (3.386323ms)"
+          }
+        ]
+      },
+      {
+        "title": "bound after-work reads fresh after both fulfilled and rejected batch lifetimes",
+        "matches": [
+          {
+            "line": 2357,
+            "text": "ci-tasks: ✔ bound after-work reads fresh after both fulfilled and rejected batch lifetimes (2.273592ms)"
+          }
+        ]
+      },
+      {
+        "title": "only the policy is shared: credential shares and own-key reads remain fresh in the batch",
+        "matches": [
+          {
+            "line": 2358,
+            "text": "ci-tasks: ✔ only the policy is shared: credential shares and own-key reads remain fresh in the batch (1.383999ms)"
+          }
+        ]
+      },
+      {
+        "title": "ordinary policy readers observe changes on every call without touching batch metadata",
+        "matches": [
+          {
+            "line": 2359,
+            "text": "ci-tasks: ✔ ordinary policy readers observe changes on every call without touching batch metadata (0.923884ms)"
+          }
+        ]
+      },
+      {
+        "title": "afterJob cannot reuse a foreground policy while its parent read batch is still active",
+        "matches": [
+          {
+            "line": 2360,
+            "text": "ci-tasks: ✔ afterJob cannot reuse a foreground policy while its parent read batch is still active (42.273715ms)"
+          }
+        ]
+      },
+      {
+        "title": "cron and workflow jobs cannot inherit an active foreground policy observation",
+        "matches": [
+          {
+            "line": 2361,
+            "text": "ci-tasks: ✔ cron and workflow jobs cannot inherit an active foreground policy observation (2.803152ms)"
+          }
+        ]
+      },
+      {
+        "title": "standalone read-only policy consumers share one observation and keep every credential read",
+        "matches": [
+          {
+            "line": 2362,
+            "text": "ci-tasks: ✔ standalone read-only policy consumers share one observation and keep every credential read (2.946189ms)"
+          }
+        ]
+      },
+      {
+        "title": "standalone policy refusal and absence are observed again by the next read",
+        "matches": [
+          {
+            "line": 2363,
+            "text": "ci-tasks: ✔ standalone policy refusal and absence are observed again by the next read (5.802751ms)"
+          }
+        ]
+      },
+      {
+        "title": "standalone observations isolate parallel reads, exact workspaces and actual executors",
+        "matches": [
+          {
+            "line": 2364,
+            "text": "ci-tasks: ✔ standalone observations isolate parallel reads, exact workspaces and actual executors (5.269622ms)"
+          }
+        ]
+      },
+      {
+        "title": "standalone policy failures retain their original cause and do not poison the next read",
+        "matches": [
+          {
+            "line": 2365,
+            "text": "ci-tasks: ✔ standalone policy failures retain their original cause and do not poison the next read (1.309267ms)"
+          }
+        ]
+      },
+      {
+        "title": "standalone observation closes on fulfillment and rejection before bound after-work runs",
+        "matches": [
+          {
+            "line": 2366,
+            "text": "ci-tasks: ✔ standalone observation closes on fulfillment and rejection before bound after-work runs (2.432907ms)"
+          }
+        ]
+      },
+      {
+        "title": "standalone foreground observation never supplies policy to after, cron or workflow work",
+        "matches": [
+          {
+            "line": 2367,
+            "text": "ci-tasks: ✔ standalone foreground observation never supplies policy to after, cron or workflow work (2.679426ms)"
+          }
+        ]
+      },
+      {
+        "title": "standalone read-only observation preserves the surrounding Native batch policy",
+        "matches": [
+          {
+            "line": 2368,
+            "text": "ci-tasks: ✔ standalone read-only observation preserves the surrounding Native batch policy (1.002924ms)"
+          }
+        ]
+      },
+      {
+        "title": "the same local share cannot bypass a fresh Organization deny or approval decision",
+        "matches": [
+          {
+            "line": 2369,
+            "text": "ci-tasks: ✔ the same local share cannot bypass a fresh Organization deny or approval decision (3.989264ms)"
+          }
+        ]
+      },
+      {
+        "title": "Organization deny remains fresh inside both read-only policy observation lifetimes",
+        "matches": [
+          {
+            "line": 2370,
+            "text": "ci-tasks: ✔ Organization deny remains fresh inside both read-only policy observation lifetimes (2.127943ms)"
+          }
+        ]
+      },
+      {
+        "title": "a missing share does not issue an additional read or write",
+        "matches": [
+          {
+            "line": 2348,
+            "text": "ci-tasks: ✔ a missing share does not issue an additional read or write (0.229476ms)"
+          }
+        ]
+      },
+      {
+        "title": "a refused share does not issue an additional read or write",
+        "matches": [
+          {
+            "line": 2349,
+            "text": "ci-tasks: ✔ a refused share does not issue an additional read or write (0.122685ms)"
+          }
+        ]
+      }
+    ]
+  },
+  "originals": [
+    {
+      "jobId": 129552004014,
+      "plain": {
+        "gitBlob": "a2e1fb11deeb33629a61a6a2cd40cb43feaa57fe",
+        "bytes": 1028571,
+        "sha256": "def2ebfb84f41b76e6eb16a924ad638277fa35c5cb6f9b4e4cb51480a79b2dd0"
+      },
+      "wrapper": {
+        "gitBlob": "ed5dfe9fead18bed3495ac806b360ff1ce827be4",
+        "bytes": 1049804,
+        "sha256": "68da2ac9ab8af5282d1d9b4ecc9526bdc95f2f21ddc8117652efb2ba0eb2092f"
+      },
+      "originalReadCount": 1
+    },
+    {
+      "jobId": 129552003968,
+      "plain": {
+        "gitBlob": "471b9375f26f9b62c16f52cca0d4e1e1ff9b1eee",
+        "bytes": 682673,
+        "sha256": "9d8bab1a995e9c4632069567df28285d5383e779bde6617b0251a4e07e9f1a58"
+      },
+      "wrapper": {
+        "gitBlob": "02be42cdb54a99e4dce4120f69a5996950300418",
+        "bytes": 706061,
+        "sha256": "97195c5c2e3c133cdff98561f55c48019e8fafa566c036fc0fb4524d468f6f5e"
+      },
+      "originalReadCount": 1
+    }
+  ],
+  "limits": [
+    "These are actual unit and integration results, not database-shard proof.",
+    "PG4 job129552004198 failed and is separately owned; no PG original was read here.",
+    "Native result and full-workflow aggregation remain pending.",
+    "No test was rerun or new source/ref/resource operation performed."
+  ]
+}

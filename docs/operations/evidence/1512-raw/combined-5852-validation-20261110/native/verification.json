@@ -1,0 +1,1286 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.formal-native-5852.original-verification",
+  "owner": "/root/native_diag_runner",
+  "verifiedAt": "2026-11-10 01:32:39 UTC",
+  "source": {
+    "head": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "actualCheckout": "9faa0e581b370237fe541ce3087c28a334ddb798",
+    "actualTree": "42d33eb7faf77d7049607523599de9374e065660",
+    "mergeParents": [
+      "60401d31fb33b7f272cb0262df58d3d2008280b4",
+      "5852aa8832c07fdeef43665dd5e156ce5516e3ea"
+    ],
+    "nativeCheckoutObserved": true,
+    "checkoutLog": {
+      "sha": "d59d7c4ee9b6ac5494283a2e27c29205058fa0ef",
+      "bytes": 264287,
+      "sha256": "2f76effb39e640741b99a15c17b3a52d9087123e28b74ae896272429de4f58a9"
+    },
+    "checkoutLogExcerpts": [
+      {
+        "line": 118,
+        "text": "2026-11-10T01:04:18.0482440Z ##[group]Checking out the ref"
+      },
+      {
+        "line": 119,
+        "text": "2026-11-10T01:04:18.0485210Z [command]/opt/homebrew/bin/git checkout --progress --force refs/remotes/pull/1799/merge"
+      },
+      {
+        "line": 200,
+        "text": "2026-11-10T01:04:20.8317550Z [command]/opt/homebrew/bin/git log -1 --format=%H"
+      },
+      {
+        "line": 201,
+        "text": "2026-11-10T01:04:20.8411360Z 9faa0e581b370237fe541ce3087c28a334ddb798"
+      },
+      {
+        "line": 268,
+        "text": "2026-11-10T01:04:24.7685670Z node: v24.22.2"
+      },
+      {
+        "line": 2865,
+        "text": "2026-11-10T01:24:16.0702020Z \u001b[36;1mnode scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/desktop-evidence\u001b[0m"
+      },
+      {
+        "line": 2885,
+        "text": "2026-11-10T01:24:17.3330640Z   \"files\": 314,"
+      },
+      {
+        "line": 2889,
+        "text": "2026-11-10T01:24:17.3333130Z   \"result\": \"passed\","
+      }
+    ],
+    "gitCommitReadback": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "content": "{\"sha\":\"9faa0e581b370237fe541ce3087c28a334ddb798\",\"node_id\":\"C_kwDOVRYxA9oAKDlmYWEwZTU4MWIzNzAyMzdmZTU0MWNlMzA4N2MyOGEzMzRkZGI3OTg\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/9faa0e581b370237fe541ce3087c28a334ddb798\",\"html_url\":\"https://github.com/alexj11324/Mikka/commit/9faa0e581b370237fe541ce3087c28a334ddb798\",\"author\":{\"name\":\"Zhixuan Jiang\",\"email\":\"zhixuanj@andrew.cmu.edu\",\"date\":\"2026-11-10T00:54:21Z\"},\"committer\":{\"name\":\"GitHub\",\"email\":\"noreply@github.com\",\"date\":\"2026-11-10T00:54:21Z\"},\"tree\":{\"sha\":\"42d33eb7faf77d7049607523599de9374e065660\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/trees/42d33eb7faf77d7049607523599de9374e065660\"},\"message\":\"Merge 5852aa8832c07fdeef43665dd5e156ce5516e3ea into 60401d31fb33b7f272cb0262df58d3d2008280b4\",\"parents\":[{\"sha\":\"60401d31fb33b7f272cb0262df58d3d2008280b4\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/60401d31fb33b7f272cb0262df58d3d2008280b4\",\"html_url\":\"https://github.com/alexj11324/Mikka/commit/60401d31fb33b7f272cb0262df58d3d2008280b4\"},{\"sha\":\"5852aa8832c07fdeef43665dd5e156ce5516e3ea\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/5852aa8832c07fdeef43665dd5e156ce5516e3ea\",\"html_url\":\"https://github.com/alexj11324/Mikka/commit/5852aa8832c07fdeef43665dd5e156ce5516e3ea\"}],\"verification\":{\"verified\":true,\"reason\":\"valid\",\"signature\":\"-----BEGIN PGP SIGNATURE-----\\n\\nwsFcBAABCAAQBQJq8ms9CRC1aQ7uu5UhlAAA+QYQACI6Y0zyAUkT4F/N4ZAftAVk\\nMaNSApVOBpfLWYbghvKifpm7KntbAy0LBuQYeDKz3XjukSryo/poXasaYx3X9UFn\\n3Yju/l0MEFT0ybZVYgw0d0OAzM88yI6XjRcYxwPld21yd3sPA+mEz7Ek6xaCpNbS\\nmViz7Uu9TueWJo6RgxxP51Ia7ScNMfH5bED16gxOJsOk8A2HCqhYXcMLVjbbyXWh\\n3ylCeb9Rds9oYbjbiY9vlsOMup0kb2AVfyv+nF/ljV8eovH+dtjRM8+YHSbxRgfC\\n3DxXD9gL17CYtsVArzNNKRxotODVHioh1jpHkMRa1Dpc2Zmy1FaiGzN9YKeDXyTf\\nupbQE5MpuG3LTG1vx5mPfZv6cXqT2PbUt6bMJRstJ6OFaDbyHiU/0QDEDNNnDG5Z\\ncrJrG4fneoQdzU0ef7EVCzbjLBFX660VTi5VI/RP4nQCZOdflzHu9in2i2y7jLmQ\\nDfSD1MUBpt7Task48yFEb8Hx98q8XGhm6TBED4SjvbGLvRr1qM+egzrdGzM4+qmG\\ngPXrpkgFJgSTxY7OEHH6M2sQ3xOkzy9jjcN+tGZWK2EUID3+FzVkzOVu/enU23+9\\ncNC8F1UuDxNdBDNHlto4XKmiPsjMxvNJ44uI+lzicdoScs1ZRIBp1xLcGc/qPUqS\\nSNYJp2PYrn9Dc0IqlHPf\\n=g9Vn\\n-----END PGP SIGNATURE-----\\n\",\"payload\":\"tree 42d33eb7faf77d7049607523599de9374e065660\\nparent 60401d31fb33b7f272cb0262df58d3d2008280b4\\nparent 5852aa8832c07fdeef43665dd5e156ce5516e3ea\\nauthor Zhixuan Jiang <zhixuanj@andrew.cmu.edu> 1794272061 +0000\\ncommitter GitHub <noreply@github.com> 1794272061 +0000\\n\\nMerge 5852aa8832c07fdeef43665dd5e156ce5516e3ea into 60401d31fb33b7f272cb0262df58d3d2008280b4\\n\",\"verified_at\":\"2026-11-10T00:54:21Z\"}}",
+        "title": "9faa0e581b370237fe541ce3087c28a334ddb798",
+        "modified_date": null,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/9faa0e581b370237fe541ce3087c28a334ddb798",
+        "display_url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/9faa0e581b370237fe541ce3087c28a334ddb798",
+        "display_title": "9faa0e581b370237fe541ce3087c28a334ddb798",
+        "structuredContent": {
+          "title": "9faa0e581b370237fe541ce3087c28a334ddb798",
+          "content": "{\"sha\":\"9faa0e581b370237fe541ce3087c28a334ddb798\",\"node_id\":\"C_kwDOVRYxA9oAKDlmYWEwZTU4MWIzNzAyMzdmZTU0MWNlMzA4N2MyOGEzMzRkZGI3OTg\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/9faa0e581b370237fe541ce3087c28a334ddb798\",\"html_url\":\"https://github.com/alexj11324/Mikka/commit/9faa0e581b370237fe541ce3087c28a334ddb798\",\"author\":{\"name\":\"Zhixuan Jiang\",\"email\":\"zhixuanj@andrew.cmu.edu\",\"date\":\"2026-11-10T00:54:21Z\"},\"committer\":{\"name\":\"GitHub\",\"email\":\"noreply@github.com\",\"date\":\"2026-11-10T00:54:21Z\"},\"tree\":{\"sha\":\"42d33eb7faf77d7049607523599de9374e065660\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/trees/42d33eb7faf77d7049607523599de9374e065660\"},\"message\":\"Merge 5852aa8832c07fdeef43665dd5e156ce5516e3ea into 60401d31fb33b7f272cb0262df58d3d2008280b4\",\"parents\":[{\"sha\":\"60401d31fb33b7f272cb0262df58d3d2008280b4\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/60401d31fb33b7f272cb0262df58d3d2008280b4\",\"html_url\":\"https://github.com/alexj11324/Mikka/commit/60401d31fb33b7f272cb0262df58d3d2008280b4\"},{\"sha\":\"5852aa8832c07fdeef43665dd5e156ce5516e3ea\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/5852aa8832c07fdeef43665dd5e156ce5516e3ea\",\"html_url\":\"https://github.com/alexj11324/Mikka/commit/5852aa8832c07fdeef43665dd5e156ce5516e3ea\"}],\"verification\":{\"verified\":true,\"reason\":\"valid\",\"signature\":\"-----BEGIN PGP SIGNATURE-----\\n\\nwsFcBAABCAAQBQJq8ms9CRC1aQ7uu5UhlAAA+QYQACI6Y0zyAUkT4F/N4ZAftAVk\\nMaNSApVOBpfLWYbghvKifpm7KntbAy0LBuQYeDKz3XjukSryo/poXasaYx3X9UFn\\n3Yju/l0MEFT0ybZVYgw0d0OAzM88yI6XjRcYxwPld21yd3sPA+mEz7Ek6xaCpNbS\\nmViz7Uu9TueWJo6RgxxP51Ia7ScNMfH5bED16gxOJsOk8A2HCqhYXcMLVjbbyXWh\\n3ylCeb9Rds9oYbjbiY9vlsOMup0kb2AVfyv+nF/ljV8eovH+dtjRM8+YHSbxRgfC\\n3DxXD9gL17CYtsVArzNNKRxotODVHioh1jpHkMRa1Dpc2Zmy1FaiGzN9YKeDXyTf\\nupbQE5MpuG3LTG1vx5mPfZv6cXqT2PbUt6bMJRstJ6OFaDbyHiU/0QDEDNNnDG5Z\\ncrJrG4fneoQdzU0ef7EVCzbjLBFX660VTi5VI/RP4nQCZOdflzHu9in2i2y7jLmQ\\nDfSD1MUBpt7Task48yFEb8Hx98q8XGhm6TBED4SjvbGLvRr1qM+egzrdGzM4+qmG\\ngPXrpkgFJgSTxY7OEHH6M2sQ3xOkzy9jjcN+tGZWK2EUID3+FzVkzOVu/enU23+9\\ncNC8F1UuDxNdBDNHlto4XKmiPsjMxvNJ44uI+lzicdoScs1ZRIBp1xLcGc/qPUqS\\nSNYJp2PYrn9Dc0IqlHPf\\n=g9Vn\\n-----END PGP SIGNATURE-----\\n\",\"payload\":\"tree 42d33eb7faf77d7049607523599de9374e065660\\nparent 60401d31fb33b7f272cb0262df58d3d2008280b4\\nparent 5852aa8832c07fdeef43665dd5e156ce5516e3ea\\nauthor Zhixuan Jiang <zhixuanj@andrew.cmu.edu> 1794272061 +0000\\ncommitter GitHub <noreply@github.com> 1794272061 +0000\\n\\nMerge 5852aa8832c07fdeef43665dd5e156ce5516e3ea into 60401d31fb33b7f272cb0262df58d3d2008280b4\\n\",\"verified_at\":\"2026-11-10T00:54:21Z\"}}",
+          "display_url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/9faa0e581b370237fe541ce3087c28a334ddb798"
+        }
+      },
+      "isError": false
+    },
+    "harness": {
+      "sha": "6b1c3704e48d35f14fae9c864535981fcd6e7eec",
+      "bytes": 33541,
+      "sha256": "548b1e4688d872929c5e9ce9d74ebb6348f35fc7e89257769777130ccf37283f"
+    },
+    "harnessChange": "main selectFixture waits for the new DOMContentLoaded; not the same harness as d2c/R2",
+    "diagnosticOverlay": false,
+    "readDiagnosticSidecarPresent": false,
+    "actualNodeVersion": "24.22.2",
+    "actualDaemons": [
+      {
+        "mode": "bundled",
+        "daemon": {
+          "source": "local_daemon_hello",
+          "status": "connected",
+          "daemonVersion": "0.0.567",
+          "protocolVersion": 3
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.567",
+          "installedRevision": "08327db0f3e7b78fc296f82232ecf0afda6ecd5b"
+        }
+      },
+      {
+        "mode": "hosted",
+        "daemon": {
+          "source": "local_daemon_hello",
+          "status": "connected",
+          "daemonVersion": "0.0.567",
+          "protocolVersion": 3
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.567",
+          "installedRevision": "08327db0f3e7b78fc296f82232ecf0afda6ecd5b"
+        }
+      }
+    ]
+  },
+  "originals": [
+    {
+      "name": "mac-acceptance-package.json",
+      "sha": "aa706d7b15db85e0d17a407c2b23c17f3dbafc2f",
+      "bytes": 957,
+      "sha256": "c208158751aad9b7a0880273722a21d2aa5532e683fd06974a101cc5e2cb1682"
+    },
+    {
+      "name": "native-crypto.json",
+      "sha": "f6797e05fdc0ad99b6f9a9ba07e0d5e84fb91b6b",
+      "bytes": 2868,
+      "sha256": "d3d80f9068448e19b7251421ae05703cf79c20620809225cf39318013e0080a4"
+    },
+    {
+      "name": "lifecycle.json",
+      "sha": "16c6f5fc542c369f4cb9769c047fa1d492f1c57a",
+      "bytes": 693516,
+      "sha256": "d408d1ba3710d5d7da9a43e41a0b6cef4a5cdbcb7b08dc73c8d923dc5d099b3c"
+    },
+    {
+      "name": "parity.json",
+      "sha": "3d88dfd75d39b783a232a91c81339bfaf8593d08",
+      "bytes": 117713,
+      "sha256": "0dde81148d9f55d1d9b17acac4604b111846c79d3ef50e26208794af40acd674"
+    },
+    {
+      "name": "smoke.json",
+      "sha": "7715591700595e92dbefc4275093ddfde28aa634",
+      "bytes": 3144,
+      "sha256": "c22c0d265584f2fd9b8adad1b35e7d1e9065717c1622dbefff6477a13392b163"
+    }
+  ],
+  "verifier": {
+    "helperGitBlob": "5cc66fff9c158dcdd23c5dacf4e84f0ef6f89128",
+    "function": "utility:verifyNativeOriginals",
+    "source": "function verifyNativeOriginals(n,smoke,parity,crypto,pkg,expected){\n  const errors=[],sum=o=>Object.values(o).reduce((a,b)=>a+b,0),eq=(a,b,label)=>{if(a!==b)errors.push({label,actual:a,expected:b});},keysEqual=(a,b)=>JSON.stringify(Object.keys(a).sort())===JSON.stringify(Object.keys(b).sort());\n  const q=n.queryCounts,ds=q.rpcActions.queryDiagnostics,scalar=[\"queryCalls\",\"pgProtocolReceiveBytes\",\"pgProtocolSendBytes\",\"closedConnections\",\"unknownReadings\"],bucket=[\"queryOperations\",\"unattributedSources\"];\n  const stats={records:0,checkpoints:0,segments:0,bucketCells:0,ordinalRows:0},windows={};\n  eq(n.revision,expected.checkout,\"lifecycle.revision\");eq(smoke.revision,expected.checkout,\"smoke.revision\");eq(parity.appRevision,expected.checkout,\"parity.appRevision\");eq(parity.harnessRevision,expected.checkout,\"parity.harnessRevision\");eq(crypto.revision,expected.checkout,\"crypto.revision\");\n  eq(n.result,\"passed\",\"lifecycle.result\");eq(smoke.result,\"passed\",\"smoke.result\");eq(parity.result,\"passed\",\"parity.result\");eq(crypto.passed,true,\"crypto.passed\");eq(pkg.passed,true,\"package.passed\");\n  for(const [name,w] of Object.entries(q.windows)){\n    eq(w.status,\"complete\",name+\".status\");const cp=w.checkpoints,sg=w.segments;stats.checkpoints+=cp.length;stats.segments+=sg.length;\n    eq(cp.length,sg.length+1,name+\".checkpoint count\");\n    const record=(v,label)=>{stats.records++;eq(sum(v.queryOperations),v.queryCalls,label+\".operation sum\");eq(sum(v.unattributedSources),v.queryOperations.unattributed,label+\".unattributed sum\");eq(Object.keys(v.queryOperations).length,17,label+\".operation bucket count\");eq(Object.keys(v.unattributedSources).length,78,label+\".source bucket count\");stats.bucketCells+=Object.keys(v.queryOperations).length+Object.keys(v.unattributedSources).length;};\n    for(let i=0;i<cp.length;i++)record(cp[i].snapshot,name+\".cp\"+i);\n    const delta=(v,a,b,label)=>{for(const k of scalar)eq(v[k],b[k]-a[k],label+\".\"+k);for(const key of bucket){if(!keysEqual(v[key],a[key])||!keysEqual(v[key],b[key]))errors.push({label:label+\".\"+key+\" keys\"});for(const k of Object.keys(v[key]))eq(v[key][k],b[key][k]-a[key][k],label+\".\"+key+\".\"+k);}eq(v.startedAt,new Date(a.endedAt).toISOString(),label+\".startedAt\");eq(v.finishedAt,new Date(b.endedAt).toISOString(),label+\".finishedAt\");eq(v.durationMs,b.endedAt-a.endedAt,label+\".durationMs\");};\n    for(let i=0;i<sg.length;i++){record(sg[i],name+\".segment\"+i);delta(sg[i],cp[i].snapshot,cp[i+1].snapshot,name+\".segment\"+i);}\n    record(w.total,name+\".total\");delta(w.total,cp[0].snapshot,cp.at(-1).snapshot,name+\".total\");\n    for(const k of scalar)eq(w.total[k],sg.reduce((s,g)=>s+g[k],0),name+\".segments.\"+k);\n    for(const b of bucket)for(const k of Object.keys(w.total[b]))eq(w.total[b][k],sg.reduce((s,g)=>s+g[b][k],0),name+\".segments.\"+b+\".\"+k);\n    const d=ds.windows[name];eq(d.fromQueryCalls,cp[0].snapshot.queryCalls,name+\".diagnostic start\");eq(d.toQueryCalls,cp.at(-1).snapshot.queryCalls,name+\".diagnostic end\");eq(d.expectedQueries,w.total.queryCalls,name+\".diagnostic expected\");eq(d.queries.length,d.capturedQueries,name+\".diagnostic captured\");eq(d.uncapturedQueries,d.expectedQueries-d.queries.length,name+\".uncaptured count\");\n    const projection=(rows,v,label)=>{const ops=Object.fromEntries(Object.keys(v.queryOperations).map(k=>[k,0])),sources=Object.fromEntries(Object.keys(v.unattributedSources).map(k=>[k,0]));for(const row of rows){const key=ds.scopeKeys[row[3]];if(key in sources){sources[key]++;ops.unattributed++;}else if(key in ops)ops[key]++;else errors.push({label:label+\".unknownScope\",index:row[3]});}for(const k of Object.keys(ops))eq(ops[k],v.queryOperations[k],label+\".ops.\"+k);for(const k of Object.keys(sources))eq(sources[k],v.unattributedSources[k],label+\".sources.\"+k);};\n    let uc=0,us=0;for(let i=0;i<d.queries.length;i++){const row=d.queries[i];eq(row.length,4,name+\".ordinal columns\");eq(row[0],d.fromQueryCalls+i+1,name+\".ordinal contiguous \"+i);if(!ds.contexts[row[1]])errors.push({label:name+\".context index\",index:row[1]});if(!ds.statements[row[2]])errors.push({label:name+\".statement index\",index:row[2]});if(ds.contexts[row[1]]?.status===\"unknown\")uc++;if(ds.statements[row[2]]?.status===\"unknown\")us++;}\n    stats.ordinalRows+=d.queries.length;eq(uc,d.unknownContextQueries,name+\".unknown contexts\");eq(us,d.unknownStatementQueries,name+\".unknown statements\");projection(d.queries,w.total,name+\".ordinal total\");\n    eq(d.segments.length,sg.length,name+\".diagnostic segments\");\n    for(let i=0;i<sg.length;i++){eq(d.segments[i].phase,sg[i].phase,name+\".diagnostic segment phase\");eq(d.segments[i].fromQueryCalls,cp[i].snapshot.queryCalls,name+\".diagnostic segment from\");eq(d.segments[i].toQueryCalls,cp[i+1].snapshot.queryCalls,name+\".diagnostic segment to\");projection(d.queries.filter(r=>r[0]>d.segments[i].fromQueryCalls&&r[0]<=d.segments[i].toQueryCalls),sg[i],name+\".ordinal segment\"+i);}\n    const rpc={};for(const [kind,collection]of [[\"physical\",q.rpcActions.windows],[\"logical\",q.rpcActions.logical.windows]]){const r=collection[name],fields=[\"startedInWindow\",\"completedInWindow\",\"crossesStart\",\"crossesEnd\",\"completionNotObserved\",\"completionWithoutStart\"];rpc[kind]=Object.fromEntries(fields.map(k=>[k,r.actions.reduce((s,a)=>s+a[k],0)]));eq(r.startedAt,w.total.startedAt,name+\".\"+kind+\".start\");eq(r.finishedAt,w.total.finishedAt,name+\".\"+kind+\".end\");}\n    windows[name]={status:w.status,phase:w.phase,pair:w.pair??null,checkpoints:cp.length,segments:sg.map(x=>({phase:x.phase,queryCalls:x.queryCalls,receiveBytes:x.pgProtocolReceiveBytes,sendBytes:x.pgProtocolSendBytes})),total:{queryCalls:w.total.queryCalls,receiveBytes:w.total.pgProtocolReceiveBytes,sendBytes:w.total.pgProtocolSendBytes,unknownReadings:w.total.unknownReadings},diagnostics:{status:d.status,ordinalRows:d.queries.length,uncaptured:d.uncapturedQueries,unknownContext:uc,unknownStatement:us,reasons:d.reasons},rpc};\n  }\n  if(windows.nativeLogin.total.queryCalls>windows.webLogin.total.queryCalls)errors.push({label:\"native full-window exceeds web\"});\n  if(windows[\"startup-bundled\"].total.queryCalls>windows[\"startup-hosted\"].total.queryCalls)errors.push({label:\"native first startup exceeds hosted\"});\n  eq(windows[\"startup-bundled\"].pair,1,\"bundled FIRST\");eq(windows[\"startup-hosted\"].pair,1,\"hosted FIRST\");eq(ds.capture.overflow,false,\"diagnostic overflow\");eq(ds.capture.droppedQueries,0,\"diagnostic dropped\");\n  eq(n.coldStart.pairs,5,\"unchanged cold pair count\");for(const c of n.checks)eq(c.result,\"passed\",\"lifecycle check \"+c.name);for(const c of smoke.checks)eq(c.result,\"passed\",\"smoke check \"+c.name);\n  eq(parity.screens.length,parity.requiredScreens.length*parity.themes.length,\"parity completeness\");eq(parity.maximumChangedRatio,0.001,\"parity threshold\");eq(parity.colorThreshold,0,\"parity color threshold\");\n  const seen=new Set();let changed=0,compared=0,max=0,masked=0;\n  for(const s of parity.screens){const id=s.name+\"|\"+s.theme;if(seen.has(id))errors.push({label:\"duplicate parity \"+id});seen.add(id);eq(s.passed,true,\"parity passed \"+id);eq(s.maximumRatio,parity.maximumChangedRatio,\"parity threshold \"+id);eq(s.maskGeometryMatches,true,\"parity mask geometry \"+id);if(!parity.requiredScreens.includes(s.name)||!parity.themes.includes(s.theme))errors.push({label:\"unexpected parity \"+id});if(s.changedRatio>parity.maximumChangedRatio)errors.push({label:\"parity over threshold \"+id});if(Math.abs(s.changedRatio-s.changedPixels/s.comparedPixels)>1e-12)errors.push({label:\"parity pixel ratio \"+id});changed+=s.changedPixels;compared+=s.comparedPixels;max=Math.max(max,s.changedRatio);if(s.masks.length)masked++;}\n  eq(parity.pageErrors.length,0,\"parity page errors\");eq(crypto.launches.length,3,\"crypto launches\");eq(crypto.distinctProcesses,3,\"crypto distinct processes\");eq(crypto.sameImmutablePackage,true,\"crypto immutable package\");\n  for(const [i,l]of crypto.launches.entries()){eq(l.passed,true,\"crypto passed\"+i);eq(l.processExited,true,\"crypto process exited\"+i);eq(l.keychainLog.lookupFailureCount,0,\"crypto keychain failures\"+i);eq(l.keychainLog.truncated,false,\"crypto log truncation\"+i);}\n  return {schemaVersion:1,head:expected.head,tree:expected.tree,actualCheckout:expected.checkout,arithmetic:{...stats,errors},windows,scope:q.scope,exclusions:q.exclusions,background:q.background,boundary:q.boundary,login:q.login,startup:q.startup,cold:n.coldStart,parity:{screens:parity.screens.length,required:parity.requiredScreens.length,themes:parity.themes,maximumChangedRatio:parity.maximumChangedRatio,colorThreshold:parity.colorThreshold,totalComparedPixels:compared,changedPixels:changed,maxObserved:max,maskedScreens:masked,masks:parity.masksAllowed,excludedDesktopOnly:parity.excludedDesktopOnly,pageErrors:parity.pageErrors},crypto,smoke,cleanup:{lifecycle:n.cleanupStages,lifecycleNative:n.nativeCleanup,lifecycleWorkspace:n.workspaceNameCleanup,lifecycleObservation:n.accountObservation,parity:parity.cleanup,parityNative:parity.nativeCleanup,parityWorkspace:parity.workspaceNameCleanup},nativeSetup:n.nativeSetup,limitations:{diagnosticsIncomplete:Object.values(windows).some(x=>x.diagnostics.status!==\"complete\"),unknownFineAttributionPreserved:true,installedDaemonSeparateFromCandidate:true,rootViewedParityPngPixels:false,productionAcceptance:false,apiProcessProtocolBytesAreNotWholeNetworkBytes:true}};\n}",
+    "expected": {
+      "head": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+      "tree": "42d33eb7faf77d7049607523599de9374e065660",
+      "checkout": "9faa0e581b370237fe541ce3087c28a334ddb798"
+    }
+  },
+  "verification": {
+    "schemaVersion": 1,
+    "head": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "tree": "42d33eb7faf77d7049607523599de9374e065660",
+    "actualCheckout": "9faa0e581b370237fe541ce3087c28a334ddb798",
+    "arithmetic": {
+      "records": 24,
+      "checkpoints": 12,
+      "segments": 8,
+      "bucketCells": 2280,
+      "ordinalRows": 1226,
+      "errors": [
+        {
+          "label": "native full-window exceeds web"
+        }
+      ]
+    },
+    "windows": {
+      "webLogin": {
+        "status": "complete",
+        "phase": "ordinary-login-to-usable-workspace",
+        "pair": null,
+        "checkpoints": 4,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "queryCalls": 21,
+            "receiveBytes": 6744,
+            "sendBytes": 6284
+          },
+          {
+            "phase": "web-navigation-to-dom-content-loaded",
+            "queryCalls": 0,
+            "receiveBytes": 0,
+            "sendBytes": 0
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "queryCalls": 417,
+            "receiveBytes": 89207,
+            "sendBytes": 272437
+          }
+        ],
+        "total": {
+          "queryCalls": 438,
+          "receiveBytes": 95951,
+          "sendBytes": 278721,
+          "unknownReadings": 0
+        },
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 438,
+          "uncaptured": 0,
+          "unknownContext": 87,
+          "unknownStatement": 127,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 35,
+            "completedInWindow": 35,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 35,
+            "completedInWindow": 35,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      },
+      "nativeLogin": {
+        "status": "complete",
+        "phase": "ordinary-login-to-usable-workspace",
+        "pair": null,
+        "checkpoints": 4,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "queryCalls": 21,
+            "receiveBytes": 6744,
+            "sendBytes": 6284
+          },
+          {
+            "phase": "native-pkce-and-automatic-renderer-to-public-session",
+            "queryCalls": 16,
+            "receiveBytes": 3975,
+            "sendBytes": 5280
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "queryCalls": 411,
+            "receiveBytes": 89056,
+            "sendBytes": 287444
+          }
+        ],
+        "total": {
+          "queryCalls": 448,
+          "receiveBytes": 99775,
+          "sendBytes": 299008,
+          "unknownReadings": 0
+        },
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 448,
+          "uncaptured": 0,
+          "unknownContext": 91,
+          "unknownStatement": 128,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 15,
+            "completedInWindow": 15,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 41,
+            "completedInWindow": 41,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      },
+      "startup-bundled": {
+        "status": "complete",
+        "phase": "authenticated-launch-to-usable-workspace",
+        "pair": 1,
+        "checkpoints": 2,
+        "segments": [
+          {
+            "phase": "launch-to-usable",
+            "queryCalls": 116,
+            "receiveBytes": 26881,
+            "sendBytes": 58087
+          }
+        ],
+        "total": {
+          "queryCalls": 116,
+          "receiveBytes": 26881,
+          "sendBytes": 58087,
+          "unknownReadings": 0
+        },
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 116,
+          "uncaptured": 0,
+          "unknownContext": 36,
+          "unknownStatement": 29,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 5,
+            "completedInWindow": 2,
+            "crossesStart": 0,
+            "crossesEnd": 3,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 15,
+            "completedInWindow": 8,
+            "crossesStart": 0,
+            "crossesEnd": 7,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      },
+      "startup-hosted": {
+        "status": "complete",
+        "phase": "authenticated-launch-to-usable-workspace",
+        "pair": 1,
+        "checkpoints": 2,
+        "segments": [
+          {
+            "phase": "launch-to-usable",
+            "queryCalls": 224,
+            "receiveBytes": 51672,
+            "sendBytes": 147044
+          }
+        ],
+        "total": {
+          "queryCalls": 224,
+          "receiveBytes": 51672,
+          "sendBytes": 147044,
+          "unknownReadings": 0
+        },
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 224,
+          "uncaptured": 0,
+          "unknownContext": 53,
+          "unknownStatement": 70,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      }
+    },
+    "scope": "all actual pg.Client.query calls and PostgreSQL protocol bytes in the primary API process; no sampling",
+    "exclusions": [
+      "test-account lease/session tracking and fixture SQL in the separate harness process",
+      "PostgreSQL connection handshake and TCP/TLS overhead"
+    ],
+    "background": "all concurrent primary API background traffic is included; no guessed subtraction or per-request attribution",
+    "boundary": "query calls started and protocol bytes transferred by each checkpoint; in-flight response bytes can cross a checkpoint",
+    "login": {
+      "authentication": "normal email sign-in and get-session through the original leased-account helper; freshly saved private storageState",
+      "native": "the same email authentication, then real PKCE with the authenticated browser session and initial renderer/workspace selection",
+      "web": "the same email authentication, then a new actual Chromium context and the same workspace selection",
+      "externalOAuthChallenge": false,
+      "sessionCache": "normal signed-cookie cache, no manual flush; cache hits are not measured",
+      "comparable": true,
+      "comparisonBasis": "common ordinary authentication and same usable workspace; native includes its additional PKCE transport",
+      "order": "short Web context closes first; native and hosted retain the final ordinary login through the unchanged lifecycle checks",
+      "protocolPhases": "native handoff overlaps automatic renderer navigation; these concurrent queries are not falsely separated",
+      "accountAndWorkspace": "same leased owner and existing seeded fixture",
+      "locale": "zh-CN"
+    },
+    "startup": {
+      "samples": "first pair only from the unchanged five-pair lifecycle sequence",
+      "clients": "bundled Electron and the preserved hosted Web renderer in the same compiled Electron shell",
+      "sessionCache": "same retained authenticated app profile/workspace; normal profile and OS caches, no purge",
+      "backend": "same primary API and fixed source; server is already warm",
+      "performanceThreshold": "none"
+    },
+    "cold": {
+      "pairs": 5,
+      "bundledMedianMs": 3564.64,
+      "hostedMedianMs": 3266.66,
+      "differenceMs": 297.98,
+      "bundledFaster": false,
+      "improvementPercent": -9.12
+    },
+    "parity": {
+      "screens": 102,
+      "required": 51,
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "maximumChangedRatio": 0.001,
+      "colorThreshold": 0,
+      "totalComparedPixels": 132192000,
+      "changedPixels": 117,
+      "maxObserved": 0.00002777777777777778,
+      "maskedScreens": 56,
+      "masks": [
+        "avatars",
+        "timestamps"
+      ],
+      "excludedDesktopOnly": [
+        "data-desktop-only: server row, Settings › 服务器"
+      ],
+      "pageErrors": []
+    },
+    "crypto": {
+      "version": 1,
+      "passed": true,
+      "platform": "darwin",
+      "architecture": "arm64",
+      "revision": "9faa0e581b370237fe541ce3087c28a334ddb798",
+      "launches": [
+        {
+          "mode": "bundled",
+          "profile": "a",
+          "phase": "create",
+          "passed": true,
+          "crypto": {
+            "passed": true,
+            "phase": "create",
+            "available": true,
+            "verifiedCanaries": 0,
+            "encrypted": true,
+            "decrypted": true,
+            "identityMatches": true
+          },
+          "processExited": true,
+          "keychainLog": {
+            "observation": "after-launch-return",
+            "lookupFailureCount": 0,
+            "knownStatusCodes": [],
+            "truncated": false
+          }
+        },
+        {
+          "mode": "hosted",
+          "profile": "b",
+          "phase": "continue",
+          "passed": true,
+          "crypto": {
+            "passed": true,
+            "phase": "continue",
+            "available": true,
+            "verifiedCanaries": 1,
+            "encrypted": true,
+            "decrypted": true,
+            "identityMatches": true
+          },
+          "processExited": true,
+          "keychainLog": {
+            "observation": "after-launch-return",
+            "lookupFailureCount": 0,
+            "knownStatusCodes": [],
+            "truncated": false
+          }
+        },
+        {
+          "mode": "bundled",
+          "profile": "b",
+          "phase": "verify",
+          "passed": true,
+          "crypto": {
+            "passed": true,
+            "phase": "verify",
+            "available": true,
+            "verifiedCanaries": 2,
+            "encrypted": true,
+            "decrypted": true,
+            "identityMatches": true
+          },
+          "processExited": true,
+          "keychainLog": {
+            "observation": "after-launch-return",
+            "lookupFailureCount": 0,
+            "knownStatusCodes": [],
+            "truncated": false
+          }
+        }
+      ],
+      "package": {
+        "version": 1,
+        "variant": "acceptance",
+        "passed": true,
+        "signatureVerifiedStrictDeep": true,
+        "bundleIdentifier": "com.aspectlylabs.mikka.dev",
+        "urlScheme": "mikka-dev-auth",
+        "architecture": "arm64",
+        "identity": {
+          "adHoc": true,
+          "teamIdentifier": "none",
+          "hardenedRuntime": true,
+          "cdHash": "df07b4842c8b048e474e037cf2aae85b281b5c2f"
+        },
+        "signedBundleCount": 9,
+        "entitlements": {
+          "hardenedRuntime": true,
+          "devOnlyLibraryValidationException": true,
+          "unexpected": false,
+          "executables": 5,
+          "libraries": 4,
+          "librariesWithoutEntitlements": 4
+        },
+        "fuses": {
+          "RunAsNode": false,
+          "EnableCookieEncryption": false,
+          "EnableNodeOptionsEnvironmentVariable": false,
+          "EnableNodeCliInspectArguments": true,
+          "EnableEmbeddedAsarIntegrityValidation": false,
+          "OnlyLoadAppFromAsar": true,
+          "LoadBrowserProcessSpecificV8Snapshot": false,
+          "GrantFileProtocolExtraPrivileges": true
+        }
+      },
+      "sameImmutablePackage": true,
+      "distinctProcesses": 3,
+      "cleanup": "passed"
+    },
+    "smoke": {
+      "version": 1,
+      "revision": "9faa0e581b370237fe541ce3087c28a334ddb798",
+      "environmentId": "local-2618e651-f063-480f-860e-7ad01306d387",
+      "origin": "http://localhost:3000",
+      "database": "mikka_e2e",
+      "startedAt": "2026-11-10T01:14:37.500Z",
+      "checks": [
+        {
+          "name": "packaged local origin and isolated renderer",
+          "result": "passed"
+        },
+        {
+          "name": "local document CSP blocks external renderer fetches",
+          "result": "passed"
+        },
+        {
+          "name": "server choice: probe states, probed-only selection, the page follows the chosen server and returns",
+          "result": "passed"
+        },
+        {
+          "name": "system browser shows the signed-in account, then loopback and single-use PKCE session handoff",
+          "result": "passed"
+        },
+        {
+          "name": "the callback page opens the Dev build's own app link",
+          "result": "passed"
+        },
+        {
+          "name": "opening the app link brings the packaged app to the front",
+          "result": "passed"
+        },
+        {
+          "name": "no browser session credential in renderer-accessible state",
+          "result": "passed"
+        },
+        {
+          "name": "native badge, payload validation, device and quota bridge",
+          "result": "passed"
+        },
+        {
+          "name": "settings deep link and shared devices page",
+          "result": "passed"
+        },
+        {
+          "name": "sign-out clears the main-owned session",
+          "result": "passed"
+        }
+      ],
+      "builtInDiscovery": "ok",
+      "cleanupStages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "electron-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "nativeCleanup": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 0,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 0,
+          "device_tokens": 0,
+          "device_enrollments": 0,
+          "devices": 0
+        }
+      },
+      "workspaceNameCleanup": {
+        "captured": true,
+        "phase": "restored",
+        "restored": true,
+        "initialName": {
+          "en": false,
+          "zhCN": true
+        },
+        "initialOwnerMatchesSealedBaseline": true,
+        "beforeName": {
+          "en": true,
+          "zhCN": false
+        },
+        "peerMatchesSealedBaseline": true,
+        "onlyGeneratedNameDifference": true,
+        "afterName": {
+          "en": false,
+          "zhCN": true
+        },
+        "ownerMatchesSealedBaseline": true
+      },
+      "accountObservation": {
+        "observed": true,
+        "state": "released",
+        "blockedReason": null,
+        "owner": {
+          "matchesSealedBaselineBefore": true,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 0,
+          "changes": []
+        },
+        "peer": {
+          "matchesSealedBaselineBefore": true,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 0,
+          "changes": []
+        }
+      },
+      "finishedAt": "2026-11-10T01:15:16.067Z",
+      "result": "passed"
+    },
+    "cleanup": {
+      "lifecycle": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "fixtures",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "lifecycleNative": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 2,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        }
+      },
+      "lifecycleWorkspace": {
+        "captured": true,
+        "phase": "unchanged",
+        "restored": false,
+        "initialName": {
+          "en": false,
+          "zhCN": true
+        },
+        "initialOwnerMatchesSealedBaseline": false,
+        "beforeName": {
+          "en": false,
+          "zhCN": true
+        },
+        "peerMatchesSealedBaseline": true,
+        "afterName": {
+          "en": false,
+          "zhCN": true
+        },
+        "ownerMatchesSealedBaseline": true
+      },
+      "lifecycleObservation": {
+        "observed": true,
+        "state": "released",
+        "blockedReason": null,
+        "owner": {
+          "matchesSealedBaselineBefore": false,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 1,
+          "changes": [
+            {
+              "table": "workspace_audit_outbox",
+              "beforeRows": 1,
+              "afterRows": 0,
+              "changedFieldValueSets": [
+                "createdAt",
+                "id",
+                "workspaceId"
+              ],
+              "otherChangedFieldCount": 3
+            }
+          ]
+        },
+        "peer": {
+          "matchesSealedBaselineBefore": false,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 1,
+          "changes": [
+            {
+              "table": "workspace_audit_outbox",
+              "beforeRows": 1,
+              "afterRows": 0,
+              "changedFieldValueSets": [
+                "createdAt",
+                "id",
+                "workspaceId"
+              ],
+              "otherChangedFieldCount": 3
+            }
+          ]
+        }
+      },
+      "parity": "passed",
+      "parityNative": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        }
+      },
+      "parityWorkspace": {
+        "captured": true,
+        "phase": "restored",
+        "restored": true,
+        "initialName": {
+          "en": false,
+          "zhCN": true
+        },
+        "initialOwnerMatchesSealedBaseline": false,
+        "beforeName": {
+          "en": true,
+          "zhCN": false
+        },
+        "peerMatchesSealedBaseline": true,
+        "onlyGeneratedNameDifference": true,
+        "afterName": {
+          "en": false,
+          "zhCN": true
+        },
+        "ownerMatchesSealedBaseline": true
+      }
+    },
+    "nativeSetup": [
+      {
+        "mode": "bundled",
+        "ready": true,
+        "deadlineMs": 480000,
+        "elapsedMs": 7142,
+        "reads": 23,
+        "navigationInterruptions": 0,
+        "transitions": [
+          {
+            "elapsedMs": 50,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": false,
+              "signedIn": false,
+              "server": "unregistered"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "running",
+              "step": "service",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          },
+          {
+            "elapsedMs": 2290,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": false,
+              "signedIn": false,
+              "server": "unregistered"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "running",
+              "step": "connect",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          },
+          {
+            "elapsedMs": 4411,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": false,
+              "signedIn": true,
+              "server": "unregistered"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "running",
+              "step": "connect",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          },
+          {
+            "elapsedMs": 4748,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": true,
+              "signedIn": true,
+              "server": "unregistered"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "running",
+              "step": "connect",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          },
+          {
+            "elapsedMs": 5334,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": true,
+              "signedIn": true,
+              "server": "online"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "running",
+              "step": "connect",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          },
+          {
+            "elapsedMs": 7142,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": true,
+              "signedIn": true,
+              "server": "online"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "online",
+              "step": "connect",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          }
+        ],
+        "overflow": false,
+        "failure": null,
+        "daemon": {
+          "source": "local_daemon_hello",
+          "status": "connected",
+          "daemonVersion": "0.0.567",
+          "protocolVersion": 3
+        },
+        "environment": {
+          "available": true,
+          "profileMatches": true,
+          "overrideMatches": true,
+          "files": {
+            "daemon.sock": "socket",
+            "daemon.secret": "file",
+            "daemon.pid": "file",
+            "daemon.lock": "directory",
+            "device.json": "file"
+          },
+          "service": {
+            "platform": "darwin",
+            "definition": "file",
+            "profile": "matches",
+            "dev": true,
+            "installedVersion": "0.0.567",
+            "installedRevision": "08327db0f3e7b78fc296f82232ecf0afda6ecd5b"
+          }
+        }
+      },
+      {
+        "mode": "hosted",
+        "ready": true,
+        "deadlineMs": 480000,
+        "elapsedMs": 64,
+        "reads": 1,
+        "navigationInterruptions": 0,
+        "transitions": [
+          {
+            "elapsedMs": 64,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": true,
+              "signedIn": true,
+              "server": "online"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "online",
+              "step": "service",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          }
+        ],
+        "overflow": false,
+        "failure": null,
+        "daemon": {
+          "source": "local_daemon_hello",
+          "status": "connected",
+          "daemonVersion": "0.0.567",
+          "protocolVersion": 3
+        },
+        "environment": {
+          "available": true,
+          "profileMatches": true,
+          "overrideMatches": true,
+          "files": {
+            "daemon.sock": "socket",
+            "daemon.secret": "file",
+            "daemon.pid": "file",
+            "daemon.lock": "directory",
+            "device.json": "file"
+          },
+          "service": {
+            "platform": "darwin",
+            "definition": "file",
+            "profile": "matches",
+            "dev": true,
+            "installedVersion": "0.0.567",
+            "installedRevision": "08327db0f3e7b78fc296f82232ecf0afda6ecd5b"
+          }
+        }
+      }
+    ],
+    "limitations": {
+      "diagnosticsIncomplete": true,
+      "unknownFineAttributionPreserved": true,
+      "installedDaemonSeparateFromCandidate": true,
+      "rootViewedParityPngPixels": false,
+      "productionAcceptance": false,
+      "apiProcessProtocolBytesAreNotWholeNetworkBytes": true
+    }
+  },
+  "separatedVerdicts": {
+    "structuralArithmeticErrors": [],
+    "fullQueryBudget": {
+      "native": 448,
+      "web": 438,
+      "difference": 10,
+      "passed": false
+    },
+    "firstQueryBudget": {
+      "native": 116,
+      "hosted": 224,
+      "pair": 1,
+      "passed": true,
+      "physicalCrossesEnd": 3,
+      "logicalCrossesEnd": 7
+    },
+    "coldStartLatency": {
+      "pairs": 5,
+      "bundledMedianMs": 3564.64,
+      "hostedMedianMs": 3266.66,
+      "differenceMs": 297.98,
+      "bundledFaster": false,
+      "improvementPercent": -9.12
+    },
+    "functional": "passed in original reports",
+    "overallCI": "failure",
+    "nativeJob": "success",
+    "productionAcceptance": {
+      "passed": 0,
+      "required": 2
+    }
+  },
+  "preservedRules": {
+    "allFourOriginalWindows": true,
+    "allBucketsAndOrdinalsPreservedInOriginal": true,
+    "unknownSubtraction": false,
+    "windowChanged": false,
+    "pairReselection": false,
+    "rerun": false,
+    "completeQueryCountsDoNotImplyCompleteCausalAttribution": true
+  },
+  "cleanupBoundaries": {
+    "originalAppCleanup": {
+      "lifecycle": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "fixtures",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "lifecycleNative": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 2,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        }
+      },
+      "lifecycleWorkspace": {
+        "captured": true,
+        "phase": "unchanged",
+        "restored": false,
+        "initialName": {
+          "en": false,
+          "zhCN": true
+        },
+        "initialOwnerMatchesSealedBaseline": false,
+        "beforeName": {
+          "en": false,
+          "zhCN": true
+        },
+        "peerMatchesSealedBaseline": true,
+        "afterName": {
+          "en": false,
+          "zhCN": true
+        },
+        "ownerMatchesSealedBaseline": true
+      },
+      "lifecycleObservation": {
+        "observed": true,
+        "state": "released",
+        "blockedReason": null,
+        "owner": {
+          "matchesSealedBaselineBefore": false,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 1,
+          "changes": [
+            {
+              "table": "workspace_audit_outbox",
+              "beforeRows": 1,
+              "afterRows": 0,
+              "changedFieldValueSets": [
+                "createdAt",
+                "id",
+                "workspaceId"
+              ],
+              "otherChangedFieldCount": 3
+            }
+          ]
+        },
+        "peer": {
+          "matchesSealedBaselineBefore": false,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 1,
+          "changes": [
+            {
+              "table": "workspace_audit_outbox",
+              "beforeRows": 1,
+              "afterRows": 0,
+              "changedFieldValueSets": [
+                "createdAt",
+                "id",
+                "workspaceId"
+              ],
+              "otherChangedFieldCount": 3
+            }
+          ]
+        }
+      },
+      "parity": "passed",
+      "parityNative": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        }
+      },
+      "parityWorkspace": {
+        "captured": true,
+        "phase": "restored",
+        "restored": true,
+        "initialName": {
+          "en": false,
+          "zhCN": true
+        },
+        "initialOwnerMatchesSealedBaseline": false,
+        "beforeName": {
+          "en": true,
+          "zhCN": false
+        },
+        "peerMatchesSealedBaseline": true,
+        "onlyGeneratedNameDifference": true,
+        "afterName": {
+          "en": false,
+          "zhCN": true
+        },
+        "ownerMatchesSealedBaseline": true
+      }
+    },
+    "postgresStopReceiptAvailable": false,
+    "postgresStatement": "The unmodified formal workflow starts local PostgreSQL but emits no explicit stop/probe receipt; no separate PG stop is claimed.",
+    "ghaJobTerminal": true,
+    "ghaCompletedAt": "2026-11-10T01:24:28Z",
+    "extractionVMCleanup": "Separate exact stop/delete/GET404 receipt in terminal index"
+  },
+  "limitations": [
+    "FIRST is the original pair-1 query count, not a claim that all startup performance measures passed.",
+    "Bundled FIRST has original cross-end calls, and all unknown attribution is preserved without deduction.",
+    "Daemon 0.0.567 and main-derived harness changes prevent assigning all inter-run changes to the task-run visibility fix.",
+    "No Native parity PNG pixel viewing by this agent; parity assessment uses the preserved original report and numeric consistency checks.",
+    "This is pre-production Native evidence; production acceptance remains 0/2."
+  ]
+}

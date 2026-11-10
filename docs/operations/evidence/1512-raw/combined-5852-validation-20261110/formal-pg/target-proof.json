@@ -1,0 +1,136 @@
+{
+  "suiteGroupHeader": "##[group]pnpm test:activity-actor-db (mikka_s03_activity_actor_e2e, 126.4s)",
+  "sourceLineStart": 4206,
+  "sourceLineEnd": 4439,
+  "summary": {
+    "tests": 79,
+    "suites": 0,
+    "pass": 77,
+    "fail": 2,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "duration_ms": 125097.040938
+  },
+  "action": [
+    {
+      "kind": "parent-or-top-level",
+      "name": "task run rows keep the newest owner run and the 200-row limit without unused fields",
+      "status": "pass",
+      "line": "✔ task run rows keep the newest owner run and the 200-row limit without unused fields (5893.690303ms)"
+    },
+    {
+      "kind": "parent-or-top-level",
+      "name": "one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows",
+      "status": "pass",
+      "line": "✔ one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows (18.150891ms)"
+    },
+    {
+      "kind": "parent-or-top-level",
+      "name": "task thread lists retain exact titles, summaries and privacy while details retain full errors",
+      "status": "pass",
+      "line": "✔ task thread lists retain exact titles, summaries and privacy while details retain full errors (4961.412186ms)"
+    },
+    {
+      "kind": "parent-or-top-level",
+      "name": "team link reads page through all authorized pairs and retain explicit-id scope checks",
+      "status": "pass",
+      "line": "✔ team link reads page through all authorized pairs and retain explicit-id scope checks (58.660661ms)"
+    },
+    {
+      "kind": "parent-or-top-level",
+      "name": "thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields",
+      "status": "pass",
+      "line": "✔ thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields (471.855631ms)"
+    },
+    {
+      "kind": "child",
+      "name": "identity projections are bounded and every read has a fixed action source",
+      "status": "pass",
+      "line": "  ✔ identity projections are bounded and every read has a fixed action source (75.794199ms)"
+    },
+    {
+      "kind": "child",
+      "name": "both actions preserve owner, peer, missing and null-issue boundaries",
+      "status": "pass",
+      "line": "  ✔ both actions preserve owner, peer, missing and null-issue boundaries (131.952438ms)"
+    },
+    {
+      "kind": "child",
+      "name": "the changes result still returns valid checkpoints and rejects unreadable gzip",
+      "status": "pass",
+      "line": "  ✔ the changes result still returns valid checkpoints and rejects unreadable gzip (66.207559ms)"
+    },
+    {
+      "kind": "child",
+      "name": "the newest checkpoint follows only the same owner and workspace chain",
+      "status": "pass",
+      "line": "  ✔ the newest checkpoint follows only the same owner and workspace chain (46.903373ms)"
+    },
+    {
+      "kind": "child",
+      "name": "a cyclic chain fails before returning checkpoint content",
+      "status": "pass",
+      "line": "  ✔ a cyclic chain fails before returning checkpoint content (15.1624ms)"
+    },
+    {
+      "kind": "child",
+      "name": "suspension and removal are read afresh, including Bot threads without an issue",
+      "status": "pass",
+      "line": "  ✔ suspension and removal are read afresh, including Bot threads without an issue (86.688445ms)"
+    },
+    {
+      "kind": "parent-or-top-level",
+      "name": "task-run visibility skips unused team metadata without weakening fresh workspace authority",
+      "status": "fail",
+      "line": "✖ task-run visibility skips unused team metadata without weakening fresh workspace authority (128.314514ms)"
+    },
+    {
+      "kind": "child",
+      "name": "the existing no-links option keeps the exact real predicate and avoids two pages of unused links",
+      "status": "pass",
+      "line": "  ✔ the existing no-links option keeps the exact real predicate and avoids two pages of unused links (14.12423ms)"
+    },
+    {
+      "kind": "child",
+      "name": "the real task-run action reads no team metadata and still reads current tenant membership",
+      "status": "fail",
+      "line": "  ✖ the real task-run action reads no team metadata and still reads current tenant membership (12.456016ms)"
+    },
+    {
+      "kind": "child",
+      "name": "token pinning and foreign-workspace denial remain on the original action path",
+      "status": "pass",
+      "line": "  ✔ token pinning and foreign-workspace denial remain on the original action path (14.784472ms)"
+    },
+    {
+      "kind": "child",
+      "name": "suspension and removal are fresh on every call even with trusted principal provenance",
+      "status": "pass",
+      "line": "  ✔ suspension and removal are fresh on every call even with trusted principal provenance (41.959292ms)"
+    }
+  ],
+  "live": [
+    {
+      "status": "pass",
+      "name": "one write seen by 3 tabs and 2 devices: the echo and a duplicate push read nothing again",
+      "line": "✔ one write seen by 3 tabs and 2 devices: the echo and a duplicate push read nothing again (1216.501088ms)"
+    },
+    {
+      "status": "pass",
+      "name": "a revision rises once per publish across its fan-out and a reader sees the latest",
+      "line": "✔ a revision rises once per publish across its fan-out and a reader sees the latest (31.2311ms)"
+    },
+    {
+      "status": "pass",
+      "name": "prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows",
+      "line": "✔ prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows (11.249706ms)"
+    },
+    {
+      "status": "pass",
+      "name": "authorized selected-workspace revision plan co-reads exactly the requested Team keys",
+      "line": "✔ authorized selected-workspace revision plan co-reads exactly the requested Team keys (4.421819ms)"
+    }
+  ],
+  "failureFooter": "✖ failing tests:\n\ntest at tests/action-read-egress.db.test.ts:9:8786\n✖ the real task-run action reads no team metadata and still reads current tenant membership (12.456016ms)\n  AssertionError [ERR_ASSERTION]: the operation still performs its fresh workspace-membership read\n  \n  0 !== 1\n  \n      at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:479:14)\n      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:473:5)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 0,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n"
+}

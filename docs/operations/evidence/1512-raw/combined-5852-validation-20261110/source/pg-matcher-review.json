@@ -1,0 +1,89 @@
+{
+  "schema": "mikka.independent-test-matcher-review.v1",
+  "repository": "alexj11324/Mikka",
+  "reviewedSource": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "reviewedTree": "42d33eb7faf77d7049607523599de9374e065660",
+  "path": "tests/action-read-egress.db.test.ts",
+  "decision": "PASS: exact test-only projection matcher correction; no source-level blocker",
+  "identities": [
+    {
+      "kind": "old",
+      "gitBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb",
+      "bytes": 46882,
+      "sha256": "477adde1d597484dba5d986c0521d978319fc7f264a932cbbb3a575766f05a93"
+    },
+    {
+      "kind": "candidate",
+      "gitBlob": "4ace316509651d81aaeff3055156c3e5227439b3",
+      "bytes": 46912,
+      "sha256": "1249e1d24a1ceef137653f8a1945f7f77e96147d78dd061e5d6808b3e2090210"
+    },
+    {
+      "kind": "product",
+      "gitBlob": "d7bb0250c4174540eb0c4661a4998a5cfbd6cfd2",
+      "bytes": 10071,
+      "sha256": "7b3714e94b498393c130cd275a7b2c80e029407363be846d0bd25734fb22063c"
+    }
+  ],
+  "differences": [
+    {
+      "line": 479,
+      "old": "      assert.equal(result.reads.filter(read => read.fields.join(',') === 'id,kind'",
+      "new": "      assert.equal(result.reads.filter(read => read.fields.join(',') === 'id,kind,organizationId'"
+    },
+    {
+      "line": 484,
+      "old": "          read.fields.join(',') === 'id,kind' && read.text.includes('from \"mikka_workspaces\"')).length }))",
+      "new": "          read.fields.join(',') === 'id,kind,organizationId' && read.text.includes('from \"mikka_workspaces\"')).length }))"
+    }
+  ],
+  "checks": {
+    "changedLines": 2,
+    "totalLineCountUnchanged": true,
+    "forwardExact": "old.replaceAll(the exact id,kind matcher, the exact id,kind,organizationId matcher) equals candidate byte for byte",
+    "reverseExact": true,
+    "allOtherBytesUnchanged": true,
+    "actualProductProjection": {
+      "path": "lib/task-workspace.ts",
+      "blob": "d7bb0250c4174540eb0c4661a4998a5cfbd6cfd2",
+      "function": "activeTaskWorkspaces",
+      "line": 113,
+      "orderedFields": [
+        "id",
+        "kind",
+        "organizationId"
+      ],
+      "tableAlias": "readerWorkspace = alias(workspaces, 'w')",
+      "memberJoinAndOrganizationLeftJoinPreserved": true
+    },
+    "preservedAssertions": [
+      "fresh workspace-membership reads strictly equal 1",
+      "unused team metadata reads strictly equal 0",
+      "selected run IDs and personal-workspace run result",
+      "Live owner/workspace/revisions",
+      "all reads have /actions/task-runs/read route",
+      "token pin and foreign workspace refusal including enterprise principal",
+      "fresh suspended/removed membership refusal",
+      "real predicate equality and two-page no-links comparison",
+      "all cleanup and fixture setup bytes"
+    ],
+    "productSourceChangeInThisPatch": false
+  },
+  "evidence": {
+    "failureProof": "41bc2de9eaf7275ac85ff5207ca35ffb36f8951c",
+    "frozenSuite": "b83d69b18f15c824e8182ee212d35b5403c46e9b",
+    "observedFailure": {
+      "fileLine": 479,
+      "actual": 0,
+      "expected": 1,
+      "code": "ERR_ASSERTION",
+      "meaning": "The two-field projection matcher counted zero. The failing invocation did not reach the later metadata-zero assertion."
+    }
+  },
+  "boundaries": [
+    "Only immutable Git source and the existing frozen Git proof were read; no Actions job log or ZIP was fetched.",
+    "No tests, VM, account, production operation, source ref, or commit was executed or modified by this review.",
+    "This is a static review of the exact candidate test blob, not a claim that the corrected test or a future commit has passed CI.",
+    "The product projection is already present in the fixed 5852 source; the proposed patch changes only how its existing test counts that read."
+  ]
+}

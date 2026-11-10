@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.canonical-generator.fresh-main60401.closed-receipt",
+  "owner": "/root/native_diag_runner",
+  "observedAt": "2026-11-10 00:50:48 UTC",
+  "input": {
+    "gitBlob": "8f785d681a7f6a6c3f0b845171a9333493adc8b9",
+    "bytes": 608968,
+    "sha256": "a49a5e7d009d7ef76b430b53478b0a25c83e5c4a7e08aaa12d9468491873086c",
+    "files": 257,
+    "sourceBytes": 520102,
+    "source": {
+      "mergeBase": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c",
+      "ours": {
+        "commit": "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+        "tree": "41aff4c08572a384f15ec113f0e41add8b936b69"
+      },
+      "theirs": {
+        "commit": "60401d31fb33b7f272cb0262df58d3d2008280b4",
+        "tree": "11e72d382b42b1bd21b1c90f25c071ca4f82756d"
+      },
+      "plannedParents": [
+        "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+        "60401d31fb33b7f272cb0262df58d3d2008280b4"
+      ],
+      "conflictsOutsideInputs": [
+        "lib/personal-policy.ts",
+        "lib/personal-policy.test.ts",
+        "tests/live-revision-reads.db.test.ts",
+        "apps/api/generated/routes.json",
+        "apps/api/generated/routes.ts"
+      ]
+    }
+  },
+  "executionProof": {
+    "sha": "cebde0589e8c94aaaa4582ed1f9ef074b3e8160e",
+    "bytes": 93360,
+    "sha256": "028e7de24608f2f66a71fca95c63052d0decda0b62d75f09ade1d066d41d3987"
+  },
+  "outputs": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "bytes": 80790,
+      "sha256": "cc812ad33df3edcdff6696804e8d7c5c1723a07c284eec26f3a556615102932d",
+      "gitBlob": "d05fee405fabc4816b08486d8e55313fef3a3fc6",
+      "readbackExact": true
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "bytes": 83353,
+      "sha256": "3aca1717b50616a526c33faf7b8850134a2ec9cabfa4bc19b90d2c4df0c2b257",
+      "gitBlob": "986e783a6e4bc0bfe8f2dfa2c15b282631caa4f6",
+      "readbackExact": true
+    }
+  ],
+  "actual": {
+    "nodeVersion": "v24.22.1",
+    "typescriptVersion": "5.9.3",
+    "command": [
+      "node",
+      "apps/api/scripts/generate-routes.mjs"
+    ],
+    "commandExecutions": 1,
+    "stdout": "{\"routes\":256,\"methods\":343}\n",
+    "stderr": "",
+    "exitCode": 0
+  },
+  "resources": {
+    "name": "issue1512-canonical-60401d31-20261110",
+    "sessionId": "sbx_h4i5H6tab6mvca0ndvdtpKqTP2iv",
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "persistent": false,
+    "ports": [],
+    "createdAt": "2026-11-10T00:48:45.752Z",
+    "deadline": "2026-11-10T01:03:45.752Z",
+    "stoppedAt": "2026-11-10T00:50:24.428Z",
+    "durationMs": 98653,
+    "activeCpuDurationMs": 4366,
+    "deleted": true,
+    "readback404": true,
+    "ownedRunningVMs": 0,
+    "providerReportedRuntimeLabel": "node22",
+    "actualNodeVersion": "v24.22.1"
+  },
+  "rawResources": {
+    "create": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"result\": {\n    \"sandbox\": {\n      \"name\": \"issue1512-canonical-60401d31-20261110\",\n      \"currentSessionId\": \"sbx_h4i5H6tab6mvca0ndvdtpKqTP2iv\",\n      \"status\": \"running\",\n      \"statusUpdatedAt\": 1794271725815,\n      \"persistent\": false,\n      \"workloadType\": \"sandbox\",\n      \"region\": \"iad1\",\n      \"failoverRegions\": [],\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"runtime\": \"node22\",\n      \"architecture\": \"amd64\",\n      \"image\": \"vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219\",\n      \"timeout\": 900000,\n      \"snapshotExpiration\": 604800000,\n      \"networkPolicy\": {\n        \"mode\": \"custom\",\n        \"allowedDomains\": [\n          \"api.github.com\",\n          \"registry.npmjs.org\"\n        ]\n      },\n      \"cwd\": \"/vercel\",\n      \"tags\": {\n        \"issue\": \"1512\",\n        \"owner\": \"native-diag-runner\",\n        \"source\": \"60401d31\",\n        \"task\": \"canonical-routes\"\n      },\n      \"createdAt\": 1794271725815,\n      \"updatedAt\": 1794271725815\n    },\n    \"session\": {\n      \"id\": \"sbx_h4i5H6tab6mvca0ndvdtpKqTP2iv\",\n      \"runtime\": \"node22\",\n      \"architecture\": \"amd64\",\n      \"requestedAt\": 1794271725752,\n      \"startedAt\": 1794271725775,\n      \"status\": \"running\",\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"timeout\": 900000,\n      \"region\": \"iad1\",\n      \"cwd\": \"/vercel\",\n      \"workloadType\": \"sandbox\",\n      \"createdAt\": 1794271725752,\n      \"updatedAt\": 1794271725784,\n      \"interactivePort\": 26661,\n      \"networkPolicy\": {\n        \"mode\": \"custom\",\n        \"allowedDomains\": [\n          \"api.github.com\",\n          \"registry.npmjs.org\"\n        ]\n      },\n      \"sourceSandboxName\": \"issue1512-canonical-60401d31-20261110\",\n      \"projectId\": \"prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH\"\n    },\n    \"routes\": []\n  }\n}"
+        }
+      ],
+      "structuredContent": null,
+      "isError": false
+    },
+    "stop": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"result\": {\n    \"sandbox\": {\n      \"name\": \"issue1512-canonical-60401d31-20261110\",\n      \"currentSessionId\": \"sbx_h4i5H6tab6mvca0ndvdtpKqTP2iv\",\n      \"status\": \"stopped\",\n      \"statusUpdatedAt\": 1794271824632,\n      \"persistent\": false,\n      \"workloadType\": \"sandbox\",\n      \"region\": \"iad1\",\n      \"failoverRegions\": [],\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"runtime\": \"node22\",\n      \"architecture\": \"amd64\",\n      \"image\": \"vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219\",\n      \"timeout\": 900000,\n      \"snapshotExpiration\": 604800000,\n      \"networkPolicy\": {\n        \"mode\": \"custom\",\n        \"allowedDomains\": [\n          \"api.github.com\",\n          \"registry.npmjs.org\"\n        ]\n      },\n      \"totalEgressBytes\": 140548,\n      \"totalIngressBytes\": 5350646,\n      \"totalActiveCpuDurationMs\": 4366,\n      \"totalDurationMs\": 98653,\n      \"cwd\": \"/vercel\",\n      \"tags\": {\n        \"issue\": \"1512\",\n        \"owner\": \"native-diag-runner\",\n        \"source\": \"60401d31\",\n        \"task\": \"canonical-routes\"\n      },\n      \"createdAt\": 1794271725815,\n      \"updatedAt\": 1794271725815\n    },\n    \"session\": {\n      \"id\": \"sbx_h4i5H6tab6mvca0ndvdtpKqTP2iv\",\n      \"runtime\": \"node22\",\n      \"architecture\": \"amd64\",\n      \"requestedAt\": 1794271725752,\n      \"startedAt\": 1794271725775,\n      \"requestedStopAt\": 1794271824199,\n      \"stoppedAt\": 1794271824428,\n      \"status\": \"stopped\",\n      \"duration\": 98653,\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"timeout\": 900000,\n      \"region\": \"iad1\",\n      \"cwd\": \"/vercel\",\n      \"workloadType\": \"sandbox\",\n      \"createdAt\": 1794271725752,\n      \"updatedAt\": 1794271725784,\n      \"interactivePort\": 26661,\n      \"networkPolicy\": {\n        \"mode\": \"custom\",\n        \"allowedDomains\": [\n          \"api.github.com\",\n          \"registry.npmjs.org\"\n        ]\n      },\n      \"activeCpuDurationMs\": 4366,\n      \"networkTransfer\": {\n        \"ingress\": 5350646,\n        \"egress\": 140548\n      },\n      \"sourceSandboxName\": \"issue1512-canonical-60401d31-20261110\",\n      \"projectId\": \"prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH\"\n    }\n  }\n}"
+        }
+      ],
+      "structuredContent": null,
+      "isError": false
+    },
+    "delete": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"result\": {\n    \"sandbox\": {\n      \"name\": \"issue1512-canonical-60401d31-20261110\",\n      \"currentSessionId\": \"sbx_h4i5H6tab6mvca0ndvdtpKqTP2iv\",\n      \"status\": \"stopped\",\n      \"statusUpdatedAt\": 1794271824632,\n      \"persistent\": false,\n      \"workloadType\": \"sandbox\",\n      \"region\": \"iad1\",\n      \"failoverRegions\": [],\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"runtime\": \"node22\",\n      \"architecture\": \"amd64\",\n      \"image\": \"vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219\",\n      \"timeout\": 900000,\n      \"snapshotExpiration\": 604800000,\n      \"networkPolicy\": {\n        \"mode\": \"custom\",\n        \"allowedDomains\": [\n          \"api.github.com\",\n          \"registry.npmjs.org\"\n        ]\n      },\n      \"totalEgressBytes\": 140548,\n      \"totalIngressBytes\": 5350646,\n      \"totalActiveCpuDurationMs\": 4366,\n      \"totalDurationMs\": 98653,\n      \"cwd\": \"/vercel\",\n      \"tags\": {\n        \"issue\": \"1512\",\n        \"owner\": \"native-diag-runner\",\n        \"source\": \"60401d31\",\n        \"task\": \"canonical-routes\"\n      },\n      \"createdAt\": 1794271725815,\n      \"updatedAt\": 1794271725815\n    }\n  }\n}"
+        }
+      ],
+      "structuredContent": null,
+      "isError": false
+    },
+    "readback": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"error\":{\"message\":\"Vercel API request failed (404: not_found). Named sandbox 'issue1512-canonical-60401d31-20261110' not found for this project.\",\"recovery\":\"Check the API message, arguments, target team and resource state. Correct the request before retrying.\",\"remediation\":{\"actor\":\"agent\",\"action\":\"correct_request\"},\"status\":404,\"code\":\"not_found\",\"operation\":\"GET /v2/sandboxes/{name}\",\"requestId\":\"iad1:iad1::vk72x-1794271826598-9467f30d5629\"},\"cliFallback\":{\"commandTemplate\":\"vercel api /v2/sandboxes/{name} --method GET\",\"guidance\":\"Check the API message, arguments, target team and resource state. Correct the request before retrying.\",\"kind\":\"api\",\"argv\":[\"vercel\",\"api\",\"/v2/sandboxes/{name}\",\"--method\",\"GET\"],\"help\":\"vercel api --help\",\"limitations\":\"Same endpoint and method only after translating inputs. --input preserves JSON object bodies, not top-level arrays or primitives; use MCP for those forms. CLI authentication and default team can differ. JSONL stays text instead of MCP aggregation; response field selection, bounds and error handling differ.\",\"contextBindings\":{\"teamId\":\"teamId\",\"projectId\":\"projectId\"},\"instructions\":\"Replace path placeholders with URL-encoded values. Add query inputs to the URL (repeat the key for arrays; omit null/undefined), headers with --header, and a JSON object body file with --input. Preserve schema defaults and coercions; an omitted optional JSON body on POST/PUT/PATCH is {} in MCP. Set teamId explicitly when supported; a slug alone does not override the CLI default team. Preserve required inputs and scoped context. Do not use -F for query parameters or --paginate unless all pages are intended. Native alternatives have limited input/output parity.\",\"inputs\":[{\"key\":\"name\",\"name\":\"name\",\"location\":\"path\",\"required\":true},{\"key\":\"projectId\",\"name\":\"projectId\",\"location\":\"query\",\"required\":false},{\"key\":\"resume\",\"name\":\"resume\",\"location\":\"query\",\"required\":false},{\"key\":\"teamId\",\"name\":\"teamId\",\"location\":\"query\",\"required\":false},{\"key\":\"slug\",\"name\":\"slug\",\"location\":\"query\",\"required\":false}],\"targetInstructions\":\"Fill team/project placeholders from tool inputs or route context and apply explicit scope selectors. Reuse known IDs without identity/team probes; discover only missing scope or diagnose a CLI access/not-found error. Never use a different CLI default.\",\"context\":{\"teamId\":\"team_C7lwxVVvnUicFli6112mvxpv\",\"projectId\":\"prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH\"}}}"
+        }
+      ],
+      "structuredContent": {
+        "error": {
+          "message": "Vercel API request failed (404: not_found). Named sandbox 'issue1512-canonical-60401d31-20261110' not found for this project.",
+          "recovery": "Check the API message, arguments, target team and resource state. Correct the request before retrying.",
+          "remediation": {
+            "actor": "agent",
+            "action": "correct_request"
+          },
+          "status": 404,
+          "code": "not_found",
+          "operation": "GET /v2/sandboxes/{name}",
+          "requestId": "iad1:iad1::vk72x-1794271826598-9467f30d5629"
+        },
+        "cliFallback": {
+          "commandTemplate": "vercel api /v2/sandboxes/{name} --method GET",
+          "guidance": "Check the API message, arguments, target team and resource state. Correct the request before retrying.",
+          "kind": "api",
+          "argv": [
+            "vercel",
+            "api",
+            "/v2/sandboxes/{name}",
+            "--method",
+            "GET"
+          ],
+          "help": "vercel api --help",
+          "limitations": "Same endpoint and method only after translating inputs. --input preserves JSON object bodies, not top-level arrays or primitives; use MCP for those forms. CLI authentication and default team can differ. JSONL stays text instead of MCP aggregation; response field selection, bounds and error handling differ.",
+          "contextBindings": {
+            "teamId": "teamId",
+            "projectId": "projectId"
+          },
+          "instructions": "Replace path placeholders with URL-encoded values. Add query inputs to the URL (repeat the key for arrays; omit null/undefined), headers with --header, and a JSON object body file with --input. Preserve schema defaults and coercions; an omitted optional JSON body on POST/PUT/PATCH is {} in MCP. Set teamId explicitly when supported; a slug alone does not override the CLI default team. Preserve required inputs and scoped context. Do not use -F for query parameters or --paginate unless all pages are intended. Native alternatives have limited input/output parity.",
+          "inputs": [
+            {
+              "key": "name",
+              "name": "name",
+              "location": "path",
+              "required": true
+            },
+            {
+              "key": "projectId",
+              "name": "projectId",
+              "location": "query",
+              "required": false
+            },
+            {
+              "key": "resume",
+              "name": "resume",
+              "location": "query",
+              "required": false
+            },
+            {
+              "key": "teamId",
+              "name": "teamId",
+              "location": "query",
+              "required": false
+            },
+            {
+              "key": "slug",
+              "name": "slug",
+              "location": "query",
+              "required": false
+            }
+          ],
+          "targetInstructions": "Fill team/project placeholders from tool inputs or route context and apply explicit scope selectors. Reuse known IDs without identity/team probes; discover only missing scope or diagnose a CLI access/not-found error. Never use a different CLI default.",
+          "context": {
+            "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+            "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+          }
+        },
+        "error_code": "INVALID_ARGUMENT"
+      },
+      "isError": true
+    }
+  },
+  "boundaries": {
+    "applicationRuns": 0,
+    "databaseRuns": 0,
+    "modelCalls": 0,
+    "tests": 0,
+    "oldActionsLogsRead": 0,
+    "oldArtifactsRead": 0,
+    "businessRefsWritten": 0,
+    "generatedOutputsHandwritten": false
+  }
+}

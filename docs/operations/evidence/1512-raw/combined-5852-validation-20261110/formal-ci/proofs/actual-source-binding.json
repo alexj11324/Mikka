@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "head": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "runId": 42731843562,
+  "attempt": 1,
+  "sourceOfActualCheckout": {
+    "job": 129552003697,
+    "command": "git log -1 --format=%H",
+    "plain": {
+      "gitBlob": "03229ab5d94e7e73227882910d8a8719e43c172f",
+      "bytes": 126776,
+      "sha256": "b500703fca6ae72da25ebf3034fa1eedcba288d5c035f5422cea9f8fc546b7d9"
+    }
+  },
+  "actual": {
+    "sha": "9faa0e581b370237fe541ce3087c28a334ddb798",
+    "tree": "42d33eb7faf77d7049607523599de9374e065660",
+    "parents": [
+      "60401d31fb33b7f272cb0262df58d3d2008280b4",
+      "5852aa8832c07fdeef43665dd5e156ce5516e3ea"
+    ]
+  },
+  "inputSource": {
+    "path": "lib/personal-policy.test.ts",
+    "gitBlob": "04c5ed8d4a2f724b6999609dbb9732c53c10ced1",
+    "bytes": 23914,
+    "sha256": "312f2464a98dc77556d8cf4c04056213421f934accfe17e948ea11c48fec1773"
+  },
+  "status": "source binding verified; personal-policy runtime execution not yet observed",
+  "rawOriginalReadsForThisProof": 1
+}

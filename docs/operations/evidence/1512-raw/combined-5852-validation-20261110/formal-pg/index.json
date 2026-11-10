@@ -1,0 +1,225 @@
+{
+  "schema": "issue1512-formal-ci-pg-verdict-v1",
+  "verdict": "FAIL_CURRENT_SOURCE_FRESH_MEMBERSHIP_OBSERVATION",
+  "headSha": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "actualCheckoutSha": "9faa0e581b370237fe541ce3087c28a334ddb798",
+  "tree": "42d33eb7faf77d7049607523599de9374e065660",
+  "runId": 42731843562,
+  "attempt": 1,
+  "bindingProofBlob": "9e4020051b0b577a4c054562b9cd6c6f01b38db9",
+  "shards": [
+    {
+      "id": 129552003890,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-10T00:56:55Z",
+      "completedAt": "2026-11-10T01:01:37Z",
+      "originalRead": false
+    },
+    {
+      "id": 129552003952,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-10T01:01:39Z",
+      "completedAt": "2026-11-10T01:06:04Z",
+      "originalRead": false
+    },
+    {
+      "id": 129552004043,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-10T00:59:34Z",
+      "completedAt": "2026-11-10T01:04:17Z",
+      "originalRead": false
+    },
+    {
+      "id": 129552004198,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-10T00:59:45Z",
+      "completedAt": "2026-11-10T01:04:00Z",
+      "originalRead": true
+    }
+  ],
+  "targetShard": {
+    "jobId": 129552004198,
+    "selection": {
+      "shard": "4/4",
+      "total": 73,
+      "scripts": [
+        "test:activity-actor-db",
+        "test:artifact-migration-db",
+        "test:captures-db",
+        "test:computer-db",
+        "test:coordinator-native",
+        "test:device-enrollment-db",
+        "test:factory",
+        "test:factory-approval-db",
+        "test:factory-routing-db",
+        "test:issue-search-db",
+        "test:model-admission-db",
+        "test:pat-db",
+        "test:project-decisions-db",
+        "test:run-recovery-db",
+        "test:self-improvement-db",
+        "test:settings-prefs-db",
+        "test:user-facts-db",
+        "test:workspace-admin-db"
+      ]
+    },
+    "successfullyCompletedSuites": [
+      "test:workspace-admin-db",
+      "test:computer-db",
+      "test:self-improvement-db",
+      "test:coordinator-native",
+      "test:factory",
+      "test:factory-approval-db",
+      "test:project-decisions-db",
+      "test:model-admission-db",
+      "test:artifact-migration-db",
+      "test:run-recovery-db",
+      "test:issue-search-db",
+      "test:pat-db",
+      "test:captures-db",
+      "test:user-facts-db",
+      "test:device-enrollment-db",
+      "test:settings-prefs-db",
+      "test:factory-routing-db"
+    ],
+    "failedSuites": [
+      "test:activity-actor-db"
+    ],
+    "errors": [
+      "##[error]test:activity-actor-db exited with 1",
+      "##[error]Process completed with exit code 1."
+    ],
+    "packageScript": "test:activity-actor-db",
+    "testCommand": "MIKKA_READ_METRICS_TRACE=1 node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/activity-actor-db.test.ts tests/document-sync-egress.db.test.ts tests/issue-list-egress.db.test.ts tests/thread-list-egress.db.test.ts tests/action-read-egress.db.test.ts tests/citation-egress.db.test.ts tests/read-single-flight.db.test.ts tests/live-revision-reads.db.test.ts tests/coordinator-chat-egress.db.test.ts tests/mobile-chat-pages.db.test.ts tests/request-query-count.db.test.ts tests/bot-summary-bytes.db.test.ts tests/thread-detail-bytes.db.test.ts tests/read-cache-detail-egress.db.test.ts tests/read-cache-scope.db.test.ts",
+    "suiteSummary": {
+      "tests": 79,
+      "suites": 0,
+      "pass": 77,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 125097.040938
+    },
+    "derivedSuiteBlob": "b83d69b18f15c824e8182ee212d35b5403c46e9b",
+    "targetProofBlob": "41bc2de9eaf7275ac85ff5207ca35ffb36f8951c"
+  },
+  "targetFiles": {
+    "sources": {
+      "actionTest": {
+        "bytes": 46882,
+        "blob": "96b172fcf95ec30b81b0943f15efe8dece3954fb",
+        "sha256": "477adde1d597484dba5d986c0521d978319fc7f264a932cbbb3a575766f05a93",
+        "testNames": [
+          "task run rows keep the newest owner run and the 200-row limit without unused fields",
+          "one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows",
+          "task thread lists retain exact titles, summaries and privacy while details retain full errors",
+          "team link reads page through all authorized pairs and retain explicit-id scope checks",
+          "thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields",
+          "task-run visibility skips unused team metadata without weakening fresh workspace authority"
+        ]
+      },
+      "liveTest": {
+        "bytes": 20805,
+        "blob": "d996a7428d1aba0ebc4dfc605b0a2d6fe3cde7f9",
+        "sha256": "dc9e1956af9efbd93d5a3161d0374487aedc2982d22479775d3efa813eb795d3",
+        "testNames": [
+          "one write seen by 3 tabs and 2 devices: the echo and a duplicate push read nothing again",
+          "a revision rises once per publish across its fan-out and a reader sees the latest",
+          "prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows",
+          "authorized selected-workspace revision plan co-reads exactly the requested Team keys"
+        ]
+      }
+    },
+    "actionRead": {
+      "selected": true,
+      "all16Observed": true,
+      "pass": 14,
+      "fail": 2,
+      "allOriginal11Pass": true,
+      "newChildrenPass": 3,
+      "newChildrenFail": 1,
+      "parentAggregateFail": 1
+    },
+    "liveRevision": {
+      "selected": true,
+      "all4Observed": true,
+      "pass": 4,
+      "fail": 0
+    }
+  },
+  "failure": {
+    "file": "tests/action-read-egress.db.test.ts",
+    "line": 479,
+    "leaf": "the real task-run action reads no team metadata and still reads current tenant membership",
+    "message": "the operation still performs its fresh workspace-membership read",
+    "code": "ERR_ASSERTION",
+    "actual": 0,
+    "expected": 1,
+    "operator": "strictEqual",
+    "targetMetadataQueryAssertionReached": false,
+    "queryCountDiagnosticEmitted": false,
+    "cause": "Not yet determined by this log reader. The source/fixture reviewer must distinguish a real missing authority read from a SQL observation matcher change; no assertion or acceptance rule was weakened."
+  },
+  "dbSummary": {
+    "jobId": 129556318908,
+    "status": "completed",
+    "conclusion": "failure",
+    "observedEnvironment": {
+      "CHANGES_RESULT": "success",
+      "EXPECT_DB": "true",
+      "DB_RESULT": "failure"
+    },
+    "gateExited": 1
+  },
+  "cleanup": {
+    "observedCommandsAndOutputs": [
+      "Stop and remove container: dfb6fa53ed504a5f90ab1d7c617e9660_postgres17_0ee4ad",
+      "##[command]/usr/bin/docker rm --force 6f7058a433966bebe4e16a96d0e6d2c1ffc38a3910b0ed3361410696149d04b0",
+      "6f7058a433966bebe4e16a96d0e6d2c1ffc38a3910b0ed3361410696149d04b0",
+      "Remove container network: github_network_ecdccaa50a5a413daeefc1c276ae0af1",
+      "##[command]/usr/bin/docker network rm github_network_ecdccaa50a5a413daeefc1c276ae0af1",
+      "github_network_ecdccaa50a5a413daeefc1c276ae0af1"
+    ],
+    "terminalJobCleanupCompleted": true
+  },
+  "originals": [
+    {
+      "jobId": 129552004198,
+      "reads": 1,
+      "plainBlob": "005762bdac2c79f8d5fdcfd584ce17fa64404a8b",
+      "plainBytes": 1407476,
+      "plainSha256": "5b006762fde71b6d2a475d212e4a696e20b6424c2b9d7a3eead98c6660d355a8",
+      "responseBlob": "006476b3961b786fc02cdd7cee4b55fc6a5fe129",
+      "responseBytes": 1484915,
+      "responseSha256": "caab1e4d832bb6c38d2b50a3fb398439d67d284674474248c53cb7ac7fa208a3"
+    },
+    {
+      "jobId": 129556318908,
+      "reads": 1,
+      "plainBlob": "82059ae77a9fe24407e00a63c8faf9c7f4969bbe",
+      "plainBytes": 13378,
+      "plainSha256": "3c0910c246d7022ecfbd0e51e2d45c77bdd63d8e398d455c35fd0cec7800d3dc",
+      "responseBlob": "72ff45eee529680eea4ce2bf2a25441afe479688"
+    }
+  ],
+  "scope": {
+    "otherShardCounts": "Only terminal status reported; their original logs were not read",
+    "originalJobLogsRead": 2,
+    "eachOriginalReadOnce": true,
+    "otherGateOriginalsRead": 0,
+    "artifactZipsRead": 0,
+    "extraVMs": 0,
+    "extraPostgresResources": 0,
+    "reruns": 0,
+    "sourceMutations": 0
+  }
+}

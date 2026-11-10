@@ -1,0 +1,2195 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.canonical-generator.fresh-main60401.actual-execution",
+  "startedAt": "2026-11-10T00:48:57.027468+00:00",
+  "finishedAt": "2026-11-10T00:48:58.341313+00:00",
+  "nodeVersion": "v24.22.1",
+  "typescriptVersion": "5.9.3",
+  "source": {
+    "mergeBase": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c",
+    "ours": {
+      "commit": "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+      "tree": "41aff4c08572a384f15ec113f0e41add8b936b69"
+    },
+    "theirs": {
+      "commit": "60401d31fb33b7f272cb0262df58d3d2008280b4",
+      "tree": "11e72d382b42b1bd21b1c90f25c071ca4f82756d"
+    },
+    "plannedParents": [
+      "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+      "60401d31fb33b7f272cb0262df58d3d2008280b4"
+    ],
+    "conflictsOutsideInputs": [
+      "lib/personal-policy.ts",
+      "lib/personal-policy.test.ts",
+      "tests/live-revision-reads.db.test.ts",
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts"
+    ]
+  },
+  "toolchain": {
+    "node": "record actual runtime; full CI remains Node 24",
+    "typescript": {
+      "version": "5.9.3",
+      "package": "typescript",
+      "tarball": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+      "lockBlob": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+      "rootPackageBlob": "15694f93bdaa65ce04d1f2dfa5325e44b7f59511",
+      "importer": {
+        "specifier": "^5.9.3",
+        "version": "5.9.3"
+      },
+      "lockResolutionExcerpt": "  typescript@5.9.3:\n    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}\n    engines: {node: '>=14.17'}\n    hasBin: true"
+    }
+  },
+  "closure": {
+    "allAppRouteLeavesFromCompleteRecursiveTrees": true,
+    "reexportDiscovery": "static export-from scan; sole non-type re-export is app/api/agent/route.ts -> ./images/route; canonical TypeScript AST remains execution authority",
+    "reexports": [
+      {
+        "from": "app/api/agent/route.ts",
+        "specifier": "./images/route",
+        "to": "app/api/agent/images/route.ts"
+      }
+    ],
+    "runtimeModuleImportsExecuted": false
+  },
+  "inputSchema": "mikka.canonical-route-generator-inputs.v1",
+  "input": {
+    "gitBlob": "8f785d681a7f6a6c3f0b845171a9333493adc8b9",
+    "bytes": 608968,
+    "sha256": "a49a5e7d009d7ef76b430b53478b0a25c83e5c4a7e08aaa12d9468491873086c",
+    "files": [
+      {
+        "path": "app/.well-known/oauth-authorization-server/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3f2cd5d3548d89099b3e2c8c07f917f956e37cde",
+        "bytes": 600,
+        "sha256": "ada6dfad26735edfba08872ae321977c36862204de22afcdea5f751c73c45ef0"
+      },
+      {
+        "path": "app/.well-known/oauth-protected-resource/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c87d4cbf93bd56c4033b780122beca2eac9dff29",
+        "bytes": 1040,
+        "sha256": "de6070f812d8535742c0cc1dc22c9edd5a38cdfd9dbbbbe42d3da4a97bcd8dfb"
+      },
+      {
+        "path": "app/api/acceptance/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3c89e22ccc1026a1706ef8f7598a975a3e6e21fa",
+        "bytes": 1746,
+        "sha256": "23b678e873220a8378c72718978d2981fdc49182bf768666ce3a5aa63291b1dd"
+      },
+      {
+        "path": "app/api/account/deletion/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "12c8f2bdd8e06b1e8facd05fcdb22b6e4271c02a",
+        "bytes": 3824,
+        "sha256": "3dfe69c342ef74ab646a1e9d307d8649ab4bcfbf9be52cefb621f9d148bf9cac"
+      },
+      {
+        "path": "app/api/account/export/[token]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e10c5a5c406cbc0d52a108eabeb9493bcb1dc8be",
+        "bytes": 2103,
+        "sha256": "0579169d8d4d0e0364805608b86ea20beb5928b0e94292ea125b5d2ed54185d5"
+      },
+      {
+        "path": "app/api/agent-cli-policy/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "32fdec5344889e03790926fabf317549ec0ddcc9",
+        "bytes": 2318,
+        "sha256": "19862adf06437994a520dd9189c704b59ab01c32ea0dc5b1c3f6c58fab7b530b"
+      },
+      {
+        "path": "app/api/agent/images/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e1d4e29f7ccfefc454103eab055c6ad6022c0c4d",
+        "bytes": 1302,
+        "sha256": "6c9d0ca64a523d87cf72da1971a01b168686545a527fb123663a93466796deca"
+      },
+      {
+        "path": "app/api/agent/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dce02d41b361508864bd6f203284040742957fe4",
+        "bytes": 124,
+        "sha256": "162086055032c63beb21b8080aa86274c409f41d2bbb14c6d6716f705ed86bda"
+      },
+      {
+        "path": "app/api/agent/sessions/active/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "49388bb1be3cbf35624b7cf9b93ea721a6d5023e",
+        "bytes": 726,
+        "sha256": "66f8f6e5665a0367cb6238ed92333505998927de8953d18d9fc2e768a854dddb"
+      },
+      {
+        "path": "app/api/agent/sessions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "593cb8713e3fff10004ac44f3f144393c4d2d1c1",
+        "bytes": 1248,
+        "sha256": "55b1ae203c510c1800a711587b1341aaa706c0958b1e8eef2345a6498ffe3af6"
+      },
+      {
+        "path": "app/api/approved-writes/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "305a67e2f9a70b1aeb22b32c97bdf57bd0e0abbe",
+        "bytes": 774,
+        "sha256": "ee03103d1ab4428b074b465be7777982a3421d6e894d006b91eceee0d97baf2b"
+      },
+      {
+        "path": "app/api/artifacts/[artifactId]/versions/[version]/download/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1294998e0ca66a75d1ab7a1695118a6913ab896e",
+        "bytes": 1065,
+        "sha256": "c703982f643228dce7380a9b4ad5898a12ee081001a999c2b69a68bc23ce7022"
+      },
+      {
+        "path": "app/api/artifacts/[artifactId]/versions/[version]/frame/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "02edeff3946a904fc2fb9407412980b54ed2b266",
+        "bytes": 772,
+        "sha256": "ef3a1975396468a664c07b5ee38ba33f053ec0e770fd653b0d4753f035059a7b"
+      },
+      {
+        "path": "app/api/artifacts/shared/[token]/frame/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b1be3f1a8e164d7b2cc7477faeebefbbbd8d5c96",
+        "bytes": 614,
+        "sha256": "0158c37f4e2c841b7302edec6c8632f4867b20bc5384c876a262db017ea4941f"
+      },
+      {
+        "path": "app/api/artifacts/shared/[token]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1ec482ea24ac349892dd41558c25842e61cff6c8",
+        "bytes": 1354,
+        "sha256": "473962b68de6ed28877f0c91a2847e168776784e764d0c2d39d599ca64d55dfa"
+      },
+      {
+        "path": "app/api/auth/[...all]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "348f8cc58cf7313bb94531d25f00b24f174dac78",
+        "bytes": 1300,
+        "sha256": "d682964070749f20543f8b785835c31c3fcfe8e9b508ac6f67f9e700c2768138"
+      },
+      {
+        "path": "app/api/avatars/[userId]/[hash]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9eabe08df551da08fb70988dded56f887c88d7fd",
+        "bytes": 1248,
+        "sha256": "24d5c78e6debcea63e36b320fe2f90dcf0896ffd9d77555078ddfaee87a948a3"
+      },
+      {
+        "path": "app/api/billing/stripe/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "758a88193cdc641ca1a47d206cae78c0e02e3732",
+        "bytes": 1598,
+        "sha256": "063fa1ae630c5177aec353f14818752b219768b413519c07f18d1620281d1258"
+      },
+      {
+        "path": "app/api/bots/[botId]/computer/handback/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "343f8badbca8aab73f103f929fbb9e207cb3a30f",
+        "bytes": 256,
+        "sha256": "f2a7adda910d287770bb1c5d79c29788d9b0c48379f1965ddac2156be7b8c317"
+      },
+      {
+        "path": "app/api/bots/[botId]/computer/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "135e614ec6966cb0ec3e4191090b3f48e83e33f3",
+        "bytes": 243,
+        "sha256": "8083b00f5fc78981b388c5faeaf69bf76f43fae00c5c5edc0f2a3fb0a2cc2b45"
+      },
+      {
+        "path": "app/api/bots/[botId]/computer/runs/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7a4bd67e87316d9cbc630d4c1f78b309a561f81e",
+        "bytes": 7865,
+        "sha256": "a3734801629270494ed9e8aa930f263c664b923613fc22b9b9d997a85402aea6"
+      },
+      {
+        "path": "app/api/bots/[botId]/computer/runtimes/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cf2b12aee94ddf33f20d98239f4872720594049b",
+        "bytes": 1564,
+        "sha256": "f86a553df99fe7e05779d638977d7eb3cd08baa1fe7c13859e382d3441dd5298"
+      },
+      {
+        "path": "app/api/bots/[botId]/computer/subscription/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9ed00318cd8b7a1cf3b8e6c01c507e706c5f3661",
+        "bytes": 2065,
+        "sha256": "d967fe91091662837077132d1222fc2e2a7cf374257b8e362847d4f66292bcbd"
+      },
+      {
+        "path": "app/api/bots/[botId]/computer/takeover/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c22a4fb18f11fb99190c2baa483f73e43fa1a219",
+        "bytes": 256,
+        "sha256": "3bd6ae36a9e6dbd2131454c9328bc8f49c2f7a9d63d65985b2bb79f09a5d6b96"
+      },
+      {
+        "path": "app/api/bots/[botId]/computer/viewer/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d6a70f3a52d6c9ea2a9d9300c203657b87a509a8",
+        "bytes": 254,
+        "sha256": "754db786656154a14a337f43ef0bc02e41afdab20a191973cc7dd985fcd50c11"
+      },
+      {
+        "path": "app/api/bots/[botId]/computer/wake/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "254c17c2d7679b95b6e7194599128568e4029b8d",
+        "bytes": 252,
+        "sha256": "d33c070b266e7be0b1bef90958f1aca2dfe43732488ceda6e525105e4b387428"
+      },
+      {
+        "path": "app/api/bots/[botId]/definition/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ad032662d8efd67e82e2ba114ce7e6b47dab99b9",
+        "bytes": 2034,
+        "sha256": "3820c7abc020e03bc0d80a0fd41a1d29fb53d69e8413e8b3ebef3f609502a161"
+      },
+      {
+        "path": "app/api/bots/[botId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "19fa4dab8ee85b0cf746c6cd1ca8a00f78bb2bb9",
+        "bytes": 2171,
+        "sha256": "942486a5b184a947fedd5fccaf9f01231244c226d087f2cc277848a9fcf69c19"
+      },
+      {
+        "path": "app/api/bots/[botId]/subagents/[id]/credentials/challenge/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f9520cf8f410019a56c2f0121157bf6d49154962",
+        "bytes": 287,
+        "sha256": "85e88cff4d7fa2b72b9fe96567f7bc7918e254391c264c57d5556d80fe485786"
+      },
+      {
+        "path": "app/api/bots/[botId]/subagents/[id]/credentials/login/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a99155a450ec68695257fa55201ada2dd6beb772",
+        "bytes": 313,
+        "sha256": "f41c5953fbf6d8819bb0c508a8f9458dec89d7d235b897473774b3c8b0d9a1f0"
+      },
+      {
+        "path": "app/api/bots/[botId]/subagents/[id]/credentials/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b9f41c2ca4bec2af18882e6c8f1809def2dffb36",
+        "bytes": 314,
+        "sha256": "cff328ce6f23062d589dbde9fcbdf4b1b35d7577fd52d165c9c87465e1846e54"
+      },
+      {
+        "path": "app/api/bots/[botId]/subagents/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "165c3a84a39c20d81ebf720a2917c630cd4e5fc5",
+        "bytes": 269,
+        "sha256": "6cab13d9790d4b68d168f6e522685f698aeedc3d5b580bb4f930e5fadf3a5303"
+      },
+      {
+        "path": "app/api/bots/[botId]/subagents/[id]/stop/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7fba49309efb94ad211915b03a3eb57fb5bf6aa3",
+        "bytes": 278,
+        "sha256": "008d880f975468c7e6a2ade0031075130dfe69bd2b839dbb27bc003dc0a86fe5"
+      },
+      {
+        "path": "app/api/bots/[botId]/subagents/[id]/viewer/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b160ec954f54a4f55e2b908199335819a89a2d31",
+        "bytes": 280,
+        "sha256": "16579db175f20d8ee9f030b6b57bd16f08ed9e9fb82abd147e0b06eeb10b2a5e"
+      },
+      {
+        "path": "app/api/bots/[botId]/subagents/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "61fc530e9103a522ffcdab1488342579df0ecb2e",
+        "bytes": 242,
+        "sha256": "15628428b8eb5ea327822b616501c8585143c609fa352a70708af6d6404b9877"
+      },
+      {
+        "path": "app/api/bots/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "112f68a80d8bf919bded575cfee893b2bf72d539",
+        "bytes": 182,
+        "sha256": "5e3b0f6227008db2b6c4192cf710ace44463789c5761dd3e6aa59e6498d76ba8"
+      },
+      {
+        "path": "app/api/captures/[captureId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d4437224385ba7e995267131ca9de29bc9c50042",
+        "bytes": 970,
+        "sha256": "bf678225f435f88718ee70ea1b68dc75b18a3e83c602693cdedcc21d09e5c0ff"
+      },
+      {
+        "path": "app/api/captures/shared/[token]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f733f3ef4aac8865b7efea9864bc8863166a639b",
+        "bytes": 601,
+        "sha256": "6a97782b2062ff4aa248708e6c89eeae9bcc5160ed0dd7d9f6d52703055e43d7"
+      },
+      {
+        "path": "app/api/chat/attachments/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ab511874c619a12c61c0d2432460a72f14896a19",
+        "bytes": 3112,
+        "sha256": "e3c8d68148a951501ab4b0beef0ba49410c8123dc07f877d875cebcff0d53a90"
+      },
+      {
+        "path": "app/api/chat/attachments/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2d7d09511bf1a1cdb78e82583c4065a99b05a482",
+        "bytes": 3395,
+        "sha256": "2885d169e6fa4b72b4b28ea8d15a7f69f56910a344de754093d0d45e69e9c5f8"
+      },
+      {
+        "path": "app/api/cloud/callback/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "66b2d7e3b12a5948fc0249229cbc8e9d400549af",
+        "bytes": 188,
+        "sha256": "48fbde3a07c3a3033e6bd92563c4ed71094687f3f9ac1a17bf80815fff6e5a93"
+      },
+      {
+        "path": "app/api/cloud/connect/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "46676d37ef02a4996eac45a6a21639e86e1d652d",
+        "bytes": 187,
+        "sha256": "5d70adcdbb2dcdcc1c4b0e9dc206e22ec1b75a3aa2aeb6baea7625a5dcddd677"
+      },
+      {
+        "path": "app/api/cloud/disconnect/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7abc09f38c26bc02acd143ef4c35c53bbe64800d",
+        "bytes": 193,
+        "sha256": "a52a20207068dc7cd286a5d227e64ccd59c748665cbf67533d76f533a13969d5"
+      },
+      {
+        "path": "app/api/cloud/models/billing/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ceee1e83d7bf0025732b714c98814843a900339e",
+        "bytes": 1453,
+        "sha256": "107110296a27a822dfa985683bafa57630045abab530aab250bab27f57565540"
+      },
+      {
+        "path": "app/api/cloud/status/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "09d462a279c56163691f1f7ef08c709aebc30f03",
+        "bytes": 184,
+        "sha256": "4691fd3ea02011422aa086af8b228e4e3ae6a38f2c4e30c7ae585a9993c74ba8"
+      },
+      {
+        "path": "app/api/cloud/webhooks/github/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c4a3736f812528de240fa11c43d2bacf6e557c63",
+        "bytes": 916,
+        "sha256": "624e22768719cb0a8cbbeb06c66c87977688da17e2172597ac036f68f9c9b199"
+      },
+      {
+        "path": "app/api/computer/approvals/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6498572d378f515ff1ce639a8d365526e1ca52f1",
+        "bytes": 1921,
+        "sha256": "2d4d3fecb778bbf7bea538224d7c101dff8ebd9d4a89ccccc6ac7fb9b564ad30"
+      },
+      {
+        "path": "app/api/computer/events/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "141f888308ba4a36a4ebed3c099407ab3a4eaf30",
+        "bytes": 1722,
+        "sha256": "c307052c163c79d60f662bfdcd3ba56681c36289ffbe16c3a4fc42429d70f7d9"
+      },
+      {
+        "path": "app/api/conversation-links/[id]/messages/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "692b7df2d063133ce153c5becdbc795faca258f0",
+        "bytes": 341,
+        "sha256": "fe4121dc908a7ef54927033d21dcf28236f8c090daa8da1817a4f48849190a04"
+      },
+      {
+        "path": "app/api/conversations/[id]/decisions/replay/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4036ccdcf595d0bbd9e1252ac5fc7e5f28dcc0e1",
+        "bytes": 308,
+        "sha256": "0f518edcf202b3e9d29be1ea3c458d97cc7c22684a9b68c3eacb4bd436e8f25b"
+      },
+      {
+        "path": "app/api/conversations/[id]/decisions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "830e7e1647f5e3ae4f00cb14c4d385e9953e0627",
+        "bytes": 433,
+        "sha256": "30cfc8113e76fc4d34c5212faaafebbc96e6680cc68d2b7700286b81a670b6b5"
+      },
+      {
+        "path": "app/api/conversations/[id]/members/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "944e235794427aa46f4a0bde086533337dad2436",
+        "bytes": 541,
+        "sha256": "12687add59c130b598ba3203201426056a353f0c698005a634a57e12230d213e"
+      },
+      {
+        "path": "app/api/conversations/[id]/messages/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dd7371bde805fb7f77951800b3d8768bc959fb23",
+        "bytes": 443,
+        "sha256": "f29ba5ba2b01cacfca005ba7ad3b28393a6e672343caaf25275d74f51f026ae4"
+      },
+      {
+        "path": "app/api/conversations/[id]/read/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5d8b2af7eec1fb29183c84dc7d1f326a37192dd4",
+        "bytes": 1881,
+        "sha256": "f4021a167ab0f9968a18a93e1377968447d32e5655b4b8b6c17427610d48e868"
+      },
+      {
+        "path": "app/api/conversations/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cc8d1c2770065e094826375ac3b152048ccd3205",
+        "bytes": 289,
+        "sha256": "6ccd03981e38bf21397ea09bdea5e27821d98289076c6942a301450c8869dd7d"
+      },
+      {
+        "path": "app/api/conversations/[id]/stop/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0a0e05f432c66d4ea245c88d5cd11f5d432c5249",
+        "bytes": 383,
+        "sha256": "5bb4a94bd2c32613491e631c5970819f181fc1f05da2d5dfe319da5517dddddd"
+      },
+      {
+        "path": "app/api/conversations/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1b8c25ead7ae3ede7795c43537f8890af1430bdf",
+        "bytes": 291,
+        "sha256": "3d18fce6ff0759821f8482a5a9cf4cdcecaf312e7439c45ba47a10b0bac99118"
+      },
+      {
+        "path": "app/api/coordinator/attention/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c0b84808dc2a8503cac2bed82f4feecc315e98bb",
+        "bytes": 1717,
+        "sha256": "a6d5899d86046fbc5b02bb8ab37b2f47d5c3f391b7c8a1624bec63992b3abf20"
+      },
+      {
+        "path": "app/api/coordinator/messages/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b6e7b570c4026906f67a8f878703ad87a9624d06",
+        "bytes": 4542,
+        "sha256": "407191fe9c217b60d166bea69f30018c7dd9b9e7fec3d93d81d813460918a7fe"
+      },
+      {
+        "path": "app/api/coordinator/runtime/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ef308ce1ed2a29ec1408557d235410223a4a4e6",
+        "bytes": 1935,
+        "sha256": "cea72e01b9b56bc51e6d5c3cc9041c192c1f423a958c25653726de73a4591858"
+      },
+      {
+        "path": "app/api/coordinator/stream/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b99e9cacf1d23e9651a278855ceb31816e555428",
+        "bytes": 6031,
+        "sha256": "1843db486151b4f496242bd19e32b1aafb2e5ec8f6e36179689cfb51bf605f31"
+      },
+      {
+        "path": "app/api/credentials/oidc/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4ed7f1a4f1564c2a68d202cece5d150a0052e482",
+        "bytes": 2520,
+        "sha256": "7933cac9b39855623d74610005a29ca472b1fc45723245e9bc3373f75c8f8e31"
+      },
+      {
+        "path": "app/api/credentials/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "460a0ec91d30ac63d783930a6f509040eb0ae174",
+        "bytes": 365,
+        "sha256": "b21d3e06380142353b590903c42a9addbc5b28950bfa98af768dace3f8f501e3"
+      },
+      {
+        "path": "app/api/cron/account-deletions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5fe6d6095ad8e74931053c58077cf695a45a277f",
+        "bytes": 786,
+        "sha256": "eb35be12b2d06eea7588a4324239007a7f494d04b12664218aac1cf3272589c1"
+      },
+      {
+        "path": "app/api/cron/audit-retention/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8b043ae414a2abace7ec659e007f728fbd680550",
+        "bytes": 905,
+        "sha256": "f19dced1f8886db018169713acd4331aff9a0ab46d99cdfefee1b55fc6ad4b0c"
+      },
+      {
+        "path": "app/api/cron/briefings/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bc39647ae206f4907d9087f776de2f909c5201c6",
+        "bytes": 1321,
+        "sha256": "d67ce6ee4b39770322e64eb83775b62757ebb8d23b05460d13fc3ae49efa2b61"
+      },
+      {
+        "path": "app/api/cron/coordinator-wakes/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "119221387c6e5e26016393df6f8242cfa3816770",
+        "bytes": 1354,
+        "sha256": "ee6f3c589638df57a0605773ecc12368913488c8a7655fa8d20af8e90467c526"
+      },
+      {
+        "path": "app/api/cron/credential-cleanup/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7420a90b7ad379f60aa6096cfc62355afdf7fd15",
+        "bytes": 569,
+        "sha256": "07b5946c538862e59d70cdd12a6e0ec1c247d11f677190c52004fb64eae457d6"
+      },
+      {
+        "path": "app/api/cron/linear-sync/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a4507573c44a88711578ca53984b7f86393e0ac9",
+        "bytes": 551,
+        "sha256": "2119981bec6ca444ef3f0395bf440eb63bab11aa1fb1ddd58377beffc0126723"
+      },
+      {
+        "path": "app/api/cron/ops-monitor/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5080d6982cd6166421d67e0d30194315c9e158a0",
+        "bytes": 1552,
+        "sha256": "2b11737af62870819d3d3ecd12cd21cf5de02877bda73b8cc39c6b38c49a831f"
+      },
+      {
+        "path": "app/api/cron/reconcile/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f55d4c174a2ffa3b65824cc06b34e05f3055dc48",
+        "bytes": 3323,
+        "sha256": "f1055269834dbe7b0591693d0272823d34ca0b7d2c96df5750b6244b371e86d6"
+      },
+      {
+        "path": "app/api/cron/run-recovery/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ae14f06b42be3c6f2f4c7f921af0cde64a48565a",
+        "bytes": 1351,
+        "sha256": "fa6111eae1770993c7d2113b13bca26922120c9224959dbfa859beb23d8356d9"
+      },
+      {
+        "path": "app/api/cron/schedules/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5a4371929dd682c25a56889b52885c62af3a96c0",
+        "bytes": 954,
+        "sha256": "5db3aa06e178cdd33601d7847c27798726927744aa4ce7657cfd91df76ca6587"
+      },
+      {
+        "path": "app/api/cron/subscriptions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "959190962883f0bcdbecded4ed237311e334258f",
+        "bytes": 1239,
+        "sha256": "c7da207085fa9101048c8498cf3d35a68046143bcff404f5e9dbaa4edbcae908"
+      },
+      {
+        "path": "app/api/cron/suggestions-reconcile/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d688d805c5fe0a992865fd452dcf5732d45226b6",
+        "bytes": 2585,
+        "sha256": "f00bf46451269876bc56a45770737e7f37cfca05af58fe0ed762665478d0003d"
+      },
+      {
+        "path": "app/api/cron/user-facts/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ac579c2508e86c0e5783b70f3cb2111bb9685150",
+        "bytes": 1264,
+        "sha256": "0d1bf999aba2847b3c562b6520b20557a399fb0a44722595ec88dc9754a3389e"
+      },
+      {
+        "path": "app/api/desktop/begin/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e20730817db24ac84be972fe738ac1c7531885eb",
+        "bytes": 1974,
+        "sha256": "c60a9bfef2b79d74a4bd1310f30510a89f6b4e73f152ddfbda0b4ad3899c35da"
+      },
+      {
+        "path": "app/api/desktop/config/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f0fe46ae0f785dadf30954e9391daec6691d7c66",
+        "bytes": 306,
+        "sha256": "bfd648370967aab90b78d326edc874805096674c5d8fbc8a529d461c1e0f739f"
+      },
+      {
+        "path": "app/api/desktop/discovery/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b17124a1dbb0554605cd559bcd5c1d3a8ebfa7be",
+        "bytes": 972,
+        "sha256": "5abe1de4b69b19f7685ec31abf5517e6667bddf708b557bf444eea78f5ccf0dc"
+      },
+      {
+        "path": "app/api/desktop/exchange/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1e7c9b3ff10cef491d8eb893502a0338887ff3ee",
+        "bytes": 3755,
+        "sha256": "1b3cb2abb5f15a3cda75e66eefcc0cc0fdbddc326cda96e4091f6a7a66be7f9c"
+      },
+      {
+        "path": "app/api/desktop/finish/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7c32e6b72e0cc3996fa189cb35f0736df99ca58c",
+        "bytes": 3952,
+        "sha256": "440be798afb6e44788dc72c917490e67ad117f41c999fb039cb1fdf5cb155f85"
+      },
+      {
+        "path": "app/api/desktop/return/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4b4c6b3a7f0455d09475ffc71047c40f3a23bf3f",
+        "bytes": 3441,
+        "sha256": "0dc038c8958b0a797862999d4fd20ea4ad8c34280e0070c8e293f16b3cd701da"
+      },
+      {
+        "path": "app/api/desktop/rpc/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "42466e8c8e23e0aca573390a141edb2956819189",
+        "bytes": 1748,
+        "sha256": "9983459187c605d4344fa04981be50ee7adca650d17e22b3f92b4d0f7dad8a3f"
+      },
+      {
+        "path": "app/api/device-tokens/[tokenId]/revoke/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cdbf1d1c31e1c5556c500207b213c7a460bb99a4",
+        "bytes": 1378,
+        "sha256": "ab4b013b0030ecc407065f75f86227fb80c144a7fae59a63cf7991d442bcd9f6"
+      },
+      {
+        "path": "app/api/device-tokens/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d8d8fd72b9cc7717b64839bc971f66dc1edd0881",
+        "bytes": 2392,
+        "sha256": "2b96bd139451ae1f1abdd1a92ac6cce82af51e64c15aa550f18eeba591271bc3"
+      },
+      {
+        "path": "app/api/devices/[deviceId]/commands/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "21391c50d1a8bf7325aebea0e35dec9b666a9eae",
+        "bytes": 1812,
+        "sha256": "89c93bc677ba5938dbc399382cc4e2a50817f09da593a0e135b52d9e9a09923f"
+      },
+      {
+        "path": "app/api/devices/computer/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "745536fec06feae3f2c5f2c69ce03425beea3e99",
+        "bytes": 2201,
+        "sha256": "248ddab360d6d736b940af14cf7f68fcd432d0d911ee2f3b786e693d3922c5c2"
+      },
+      {
+        "path": "app/api/devices/enrollment/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ad314e0e15565b27c705d40a22181151b5157abe",
+        "bytes": 2145,
+        "sha256": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4"
+      },
+      {
+        "path": "app/api/devices/ssh/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8935176a16859c459371eb145d537e511f191610",
+        "bytes": 212,
+        "sha256": "2626cc2b4623bdfdb7387ab0debef43b2a9cb334eaced7a85f5f446ae950d799"
+      },
+      {
+        "path": "app/api/enterprise/link/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a9d04fba61a1571cd82cd6e27c39e0192c36ccc5",
+        "bytes": 1139,
+        "sha256": "81fb5e614f4ae9cab6f7528e316252c90d44f6be53dc8c8629fa7f35bf27f9b3"
+      },
+      {
+        "path": "app/api/enterprise/logout-target/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1dec5749ecccecec3979cbfb8367db73128f22ef",
+        "bytes": 658,
+        "sha256": "8db131f5874878e3db9a41ee223bc83b5c65f8c90c2f08296a36381e03213f37"
+      },
+      {
+        "path": "app/api/factory/agent-profiles/[profileId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "be0ef7585acdca34e423c31c4ef5ec4abd7c9475",
+        "bytes": 568,
+        "sha256": "29539c7066307e778b4e7aafcdcae7b3b063aae9d3feb5478c4fbebe5bd5d138"
+      },
+      {
+        "path": "app/api/factory/agent-profiles/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "38b779de150dd4dc004ac2dc5be45b59c6d705b0",
+        "bytes": 253,
+        "sha256": "30043b81aea21e265ce8e9df6ba36bb520cdf7f806b6a9636b39b15538f369fb"
+      },
+      {
+        "path": "app/api/factory/monitor-incidents/[incidentId]/links/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "04653947ca3ee4f743a07b4d74c5a442a595cc0c",
+        "bytes": 1893,
+        "sha256": "b013371406e029e702fdc8ec7ebbc35acaa854dfcf56960e6836c41b0054b391"
+      },
+      {
+        "path": "app/api/factory/questions/[questionId]/recover/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6423bb1714867813a5d115cf09997aab89bbdab8",
+        "bytes": 2603,
+        "sha256": "37483d40644f08b98f86fc7e5b2873339870c3f145e7ad58d21920b8651a3cf6"
+      },
+      {
+        "path": "app/api/factory/questions/[questionId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "422f98e3875e98cd13a903a49633562531e1dde7",
+        "bytes": 2210,
+        "sha256": "5376f4734e6c897a560e8b391d6fe0b5674bf473d5d4270410ee11b93ddc0f85"
+      },
+      {
+        "path": "app/api/factory/questions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e7d9dafb3fcff734729111e57737329db04c2e12",
+        "bytes": 1493,
+        "sha256": "522c2a5ae912c72f12fad7791f2c2ca3fab1a69e61a5ebe6957086772497b10c"
+      },
+      {
+        "path": "app/api/factory/tasks/[taskId]/activity/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a43ead29f82a940a168d033943c23230a49e6668",
+        "bytes": 1572,
+        "sha256": "534334f4e4f55d9b0510c98a71799626991d11c2a1a9f459668e1d8c4ebb0dbe"
+      },
+      {
+        "path": "app/api/factory/tasks/[taskId]/approval/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d3b583a364b8ac587485fab4d38189fbcc28f6a5",
+        "bytes": 2321,
+        "sha256": "f009352cede7ffe2b6923332e2287db16f8d4bbf597134a23c61a2b7a3ba6b92"
+      },
+      {
+        "path": "app/api/factory/tasks/[taskId]/dispatch/cloud/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1e28dd6f3e8cee067e96dcb7664376c4ef3ab7ac",
+        "bytes": 1318,
+        "sha256": "a6cac37abd34116b83e232ef3c19e0d6b43dd6d3d94042dd5b5078de7dfcbc26"
+      },
+      {
+        "path": "app/api/factory/tasks/[taskId]/dispatch/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ad97792fbf204032f6d761d3e44a3e0b475dd1ae",
+        "bytes": 1318,
+        "sha256": "7e3eb0c555524d862ff33d316d56f3cb3996ff490a50af9b9b302a8d4dc3fdf6"
+      },
+      {
+        "path": "app/api/factory/tasks/[taskId]/evidence/[captureId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b53d8ab4b4759e52c65d31a844c2469f2e058378",
+        "bytes": 1537,
+        "sha256": "d65f73022bebe924c2f75caed41023f27344fd2178cd0aba09ad2ed1daec94d8"
+      },
+      {
+        "path": "app/api/factory/tasks/[taskId]/flow/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a487de842b2654e3c63ec566bdd76edfba899110",
+        "bytes": 1775,
+        "sha256": "cbe2821ef8c5c476592edf7ea5fb244e11d58ee3b5ef559676f5d4ae3a57c51c"
+      },
+      {
+        "path": "app/api/factory/tasks/[taskId]/media/[captureId]/poster/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "07fd68dc01f60f515fe50cdc7974ee37ef7add90",
+        "bytes": 485,
+        "sha256": "c3f4a50167504fd641299c32261c24c1da80fc4a75466b9116527717aba8be67"
+      },
+      {
+        "path": "app/api/factory/tasks/[taskId]/media/[captureId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b57c6ed302d6bc5a3edf1c8ab7f7a7537569c074",
+        "bytes": 450,
+        "sha256": "a0600f48f5d8b9fa5d81c75df7e20808c8a7b255efa8e031e9faf3675d3369c2"
+      },
+      {
+        "path": "app/api/factory/tasks/[taskId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d513b56dd3a5327bcfed4340c81689aaaf346938",
+        "bytes": 2016,
+        "sha256": "d01a4cded6bc27856402eb63ef90c2514150111149ea150a2efe779f91efe9e6"
+      },
+      {
+        "path": "app/api/factory/tasks/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d09f99faee9718518ab389b037ec28deda932949",
+        "bytes": 4159,
+        "sha256": "6c84f889ccb33e59c75cac7fc6b324e55010b6df67178aa9e7b6dfac40af0eac"
+      },
+      {
+        "path": "app/api/factory/tasks/route/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7a78c2825e9d1ed492dcf4c139d634be1b2b8939",
+        "bytes": 1430,
+        "sha256": "4b5fa2aaf119d3307c7060edbc45cf3840bb710eb7ebf51ad745b07743bf14d2"
+      },
+      {
+        "path": "app/api/github/manifest/callback/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6af0a19454e7168912f28b1529b4cac596cb5281",
+        "bytes": 300,
+        "sha256": "5e32cf78530b3abba2dff2839feba5c4dcc75d9040e41131fcd65eb4b249dcbb"
+      },
+      {
+        "path": "app/api/github/manifest/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "362a44535c9a8f26adaa697d7eb90361cace5c18",
+        "bytes": 394,
+        "sha256": "424aa220f08ca23e91ed0716fb89a448da70c60c9faa81ba1721d2f206578481"
+      },
+      {
+        "path": "app/api/github/pull-request-status/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9e43927d6d0810812072a3644488d1057b990e81",
+        "bytes": 2732,
+        "sha256": "68ba42e52386acbde9ac9d3500067dd094a9de36fb48e6c7e615e3202c7fccfc"
+      },
+      {
+        "path": "app/api/health/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "07983f9a74579ea99241dc4c86ca6e0c623b0af3",
+        "bytes": 497,
+        "sha256": "9a58bb4807888258c039a34baa23a8218aff063c694a50503541ed5e64b70164"
+      },
+      {
+        "path": "app/api/integrations/composio/callback/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0750bdd6b58c4f913eb7f87aca06206b88528587",
+        "bytes": 5869,
+        "sha256": "1699abff1d8e90edfcc83c464dc524ef5f95e9655c029d84bde0e0e6154870dc"
+      },
+      {
+        "path": "app/api/integrations/composio/catalog/[toolkit]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "077b7dee5bdf64d38aaa616969e0cb506b71df30",
+        "bytes": 879,
+        "sha256": "04fcf901514aec6e1f628cf12de3f60399c8395ca7224bc5369ac097bc1d3e65"
+      },
+      {
+        "path": "app/api/integrations/composio/catalog/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5173fcd06c23b2b92bca5f98474a4ae069cf1bbb",
+        "bytes": 738,
+        "sha256": "e3f1799245d796b6970a33b9728499f398e46a097f9d39c506d79eb83a1a2424"
+      },
+      {
+        "path": "app/api/integrations/composio/credentials/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0b2c44bec4231c2275a5fe2b3556d07bfee53be6",
+        "bytes": 1284,
+        "sha256": "79020583067a36077dbd3e76cc810bc66f3253a3cc8612a34ae4bb54c157b5cf"
+      },
+      {
+        "path": "app/api/integrations/composio/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "628c21fc5aa7d99dcf4526a736e1b6a7167dc160",
+        "bytes": 9846,
+        "sha256": "245df0057e1673aaf4502fcf9ca5fdc9f879474d6609def12061a7bce2b75807"
+      },
+      {
+        "path": "app/api/integrations/github/connect/intent/confirm/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "be006185d4ba3b9f2fc5883c699b2bccb7c064fa",
+        "bytes": 1420,
+        "sha256": "8ef72f70f15833da5d2edb31acbeab77e2f84628c395341741a467a4db35e828"
+      },
+      {
+        "path": "app/api/integrations/github/connect/intent/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c5850444163c6b87727364e18d1cd987eacaa306",
+        "bytes": 1796,
+        "sha256": "1f903a6f9a8706e1bf9125bbe32827f4d1d7196c2c03fdbc92959a4df948abff"
+      },
+      {
+        "path": "app/api/integrations/github/connect/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8157d679a8159e4abefcc761cbf9ba5072ed9d5f",
+        "bytes": 2985,
+        "sha256": "6bb45e47f884b8b0b685a6428f6b5e1cfa2d8090d072da3a262ad1d3ffd5140b"
+      },
+      {
+        "path": "app/api/integrations/github/install/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "411c570c58cf2e3c99ad2fbec95e2276c9054ec3",
+        "bytes": 1360,
+        "sha256": "7eaa7d4da7df0917328fb6ee3f352eb121ea21f357885d83db46fccec2d9c623"
+      },
+      {
+        "path": "app/api/integrations/github/permissions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "53a35e9f3fd0851ddbcee9dd241a0c9517c3da02",
+        "bytes": 2430,
+        "sha256": "907c0bb40a8c70c9faefe5adbefec58ba35ad61b70091c17202d9e4fe4703d61"
+      },
+      {
+        "path": "app/api/integrations/github/repositories/verification/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "85e87be4ed74bf591c4fa6af448842bd877af6c3",
+        "bytes": 3161,
+        "sha256": "bf17c03c602bb0f5e4a8084e4f2b39def81f3d2212de22d8b5c79b577b380205"
+      },
+      {
+        "path": "app/api/integrations/github/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "669b6f7913c03c93b8148f6d79bd86da7aa2e127",
+        "bytes": 3037,
+        "sha256": "78a314ec72094637728d50de942797e7277ca5856a2754352b9af7d552665c2f"
+      },
+      {
+        "path": "app/api/integrations/google/callback/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "541d80c86594aad690bd52c83220ccd787625a23",
+        "bytes": 1623,
+        "sha256": "537f10e95d9350223c492dea69f7ce7d184057946c44fc3782a59ad7110c15a5"
+      },
+      {
+        "path": "app/api/integrations/linear/callback/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fc065a995dcb7dd36260e7c8c1f3558aad30358c",
+        "bytes": 1885,
+        "sha256": "6bbbdd0c6c020edaec6a43690923aab4a9e5ab6bcb057387be817dca5b2c39ad"
+      },
+      {
+        "path": "app/api/integrations/linear/status/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "585bf6f218feb9b0d485aad8f7f035190eaffcee",
+        "bytes": 389,
+        "sha256": "b7ce55ad4d909d15e9c645ea16a5b42ba2230dbe6ace3309541e5d4e5d3b700b"
+      },
+      {
+        "path": "app/api/integrations/mcp/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e84ee14f3e3a7438aa2e83f74cf5537ddafcbf5c",
+        "bytes": 2031,
+        "sha256": "79cb7d4c89453d123f2ed724ca8e3d3688c03c5534d6545f6319bd230ab71537"
+      },
+      {
+        "path": "app/api/integrations/mcp/shares/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6e1c60f70ca1cfe28ffa523c5bb3e1721fc90144",
+        "bytes": 701,
+        "sha256": "d450b093e5517282b41f6a49e6b712675ee8f33e8a0be7b4bafa04fa483ecf31"
+      },
+      {
+        "path": "app/api/issues/search/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "61ccadd4102633dfef00b0e1e0495c47cc522d87",
+        "bytes": 2886,
+        "sha256": "fabfa106b3654b3b19e2f1aecc74d0c4f43190ca7b471005746127ac8f4910df"
+      },
+      {
+        "path": "app/api/live/ticket/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "312f16abd669c2f7587a4121e81192ef2ea9a4d1",
+        "bytes": 2566,
+        "sha256": "c02163e7edee8d6dd0f8c05304ea3e0421bc354e4828613e34edf6f619ae4212"
+      },
+      {
+        "path": "app/api/mcp/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fe280bd30e5cf962dd38f91d9c75bf0cfab4e852",
+        "bytes": 22945,
+        "sha256": "2d7a9689d2950876251582474f08a57b1a605fc61cb71d1e4a60ab7fa823cdfa"
+      },
+      {
+        "path": "app/api/mobile/artifacts/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4cdcfc8c5be4f98b2d2bbd590f7a0deb299ba003",
+        "bytes": 1782,
+        "sha256": "6cf7143e83d77fce84f7c220813797a659df99e417de9f135a0299b3ef244b14"
+      },
+      {
+        "path": "app/api/mobile/bots/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3f4f2da7ff4d1f89ff240bd86daef62fb08894f6",
+        "bytes": 3252,
+        "sha256": "c53c7cd44ff37cc47e024b7bae32ba446acf09a295bd645b9ae671f9c488b2be"
+      },
+      {
+        "path": "app/api/mobile/bots/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d3766db706f6a55f0847da7d5b0bbf2081b93508",
+        "bytes": 1323,
+        "sha256": "2b70b87ea6014206eae99d4ae132f174f9d4012912f21aa94056278ec19bcfb3"
+      },
+      {
+        "path": "app/api/mobile/chat-order/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f385a57901e2c56f4136da5f5202b235f8891129",
+        "bytes": 1771,
+        "sha256": "53d4662caebacf50f41c6dcbce05a47089c355a229e4c199d7f56d9cf2aee54c"
+      },
+      {
+        "path": "app/api/mobile/chat/image/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e6512a495080763eefb2d86cfb8321bc3a5b830f",
+        "bytes": 2447,
+        "sha256": "a24ae5b0e31a7bbc9b1fe27ed712b7cc7e62d8a79d2345e1a207e2d20ff5c329"
+      },
+      {
+        "path": "app/api/mobile/chat/retry/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0df8f886ca1cd00b4111c37f5bc7778c66ca8b2e",
+        "bytes": 2306,
+        "sha256": "19c5cf47f4f90fb565adb103d466719f63503af89a8a5cf2085f37dbdcba0342"
+      },
+      {
+        "path": "app/api/mobile/chat/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7610aa359967de502d6a6c6f53dd9a8f1d073312",
+        "bytes": 7915,
+        "sha256": "479f666a4bbd214de0012e8b19e4ab64fb7a65dbe9fc27eac15e9b4208d509e0"
+      },
+      {
+        "path": "app/api/mobile/chat/stop/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1522d82f8417892f05eb67d93d52abd33afb5de9",
+        "bytes": 1721,
+        "sha256": "b3407c3590b1e5488324cfa538c6e2245105c0c150938fb102579756d6187024"
+      },
+      {
+        "path": "app/api/mobile/groups/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9b2c1e4e73721410e3f09ec54acf8b905eb8dc2f",
+        "bytes": 1610,
+        "sha256": "7026d9b5fcf35701046e3e312f6b3c3a9d801869d4b4cfe94d2902d0388ca24c"
+      },
+      {
+        "path": "app/api/mobile/home/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cdc7be520e323316ae5e867ce4e9acfb489f63b0",
+        "bytes": 4256,
+        "sha256": "f8df6890ded9a816153473159cf510191893256b0b4bf05bd5ec72ea40a57846"
+      },
+      {
+        "path": "app/api/mobile/model/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3dafb8efb5792af91aaa26a386e9426a9a2478a6",
+        "bytes": 4840,
+        "sha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17"
+      },
+      {
+        "path": "app/api/mobile/open/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0038c938b8d597fcb398848abf8c40e4a5f1bfec",
+        "bytes": 5897,
+        "sha256": "b480abfc4e7a12917755e26d1e6662e7d1a5d4a51a4c65e20fc38c0824a222c2"
+      },
+      {
+        "path": "app/api/mobile/pending-actions/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9f81532860dc099fc5e33a14d5ace3e611e4711c",
+        "bytes": 1666,
+        "sha256": "5b2faf507ecdd174036caae23329be22f18394788acffa9039ee90fc9bbdd7cf"
+      },
+      {
+        "path": "app/api/mobile/preferences/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f9d04f742705f69f7f38af1ebbd61f3d86ca402c",
+        "bytes": 1586,
+        "sha256": "13fe0612951a7a73f382bf095bbfc2cdd111d5abbeba1643059b2bc796afe2d8"
+      },
+      {
+        "path": "app/api/mobile/push-tokens/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "eaebbd60485c0eb5e4d0c5ef5cc07927b23bc680",
+        "bytes": 3963,
+        "sha256": "1a487f5cc4d42af4db45318ac438a1351662e6e446ffcc4dbdf2f8f2cd0286d6"
+      },
+      {
+        "path": "app/api/mobile/reactions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0518da76151f8e8f5029c4425ac9546f90790d63",
+        "bytes": 2053,
+        "sha256": "1bcb27533a05aaf1d15ec8cf46d50648953ca90a1ece0939d7958e5850081477"
+      },
+      {
+        "path": "app/api/mobile/settings/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9db425480686cdeec53521d5ca299025180be81e",
+        "bytes": 3035,
+        "sha256": "a416e1d3d409737b8d74347b4877ef2d003f12f5072e1b80b649989f60cbbc59"
+      },
+      {
+        "path": "app/api/mobile/tasks/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "31046f2ce6779efefca3e9f58e79736049fe9e24",
+        "bytes": 1460,
+        "sha256": "6377496ce86ce98f591498b21c10e61149c223e9f13a7477f208a75a181cca42"
+      },
+      {
+        "path": "app/api/mobile/tasks/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "51bba311f0c2de69fac71c6dce9330902c7b8a8c",
+        "bytes": 3432,
+        "sha256": "f5503cef4f7685ce91b1faa0ef50b522386f175594c85db5ed651c4f3deddb2c"
+      },
+      {
+        "path": "app/api/mobile/threads/[id]/continue/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "92c00b7c561b5847dff211f8c99bc779e8e926a3",
+        "bytes": 2419,
+        "sha256": "c404467feb4ea3a96f3f10fd873eb3c8619ad12f1f6a949e3e4688ce0bcbfe30"
+      },
+      {
+        "path": "app/api/mobile/threads/[id]/machine/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "267e56ef44f4ffaa47229b4bcd4df111173f3b4d",
+        "bytes": 1475,
+        "sha256": "76dca1228bbcf0af62700249b8bb07ba7072e76f3f8b2faa8fdeaf2c9cd7ab38"
+      },
+      {
+        "path": "app/api/mobile/threads/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1e95d0028980210e1eb9142237e4518d5fdf11e6",
+        "bytes": 4882,
+        "sha256": "afd445ea24e6c82ecbb32f84bb77c6f13889ea75fb714c52eff17d72625c289b"
+      },
+      {
+        "path": "app/api/mobile/threads/[id]/stop/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0b33c8dbef803c5583494ea3d616cc951df59b5e",
+        "bytes": 1476,
+        "sha256": "d6790ecc50cc9c10ae2e296ac8ed635e353cdfd6dc3ef515893786b4729af725"
+      },
+      {
+        "path": "app/api/mobile/threads/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e1b975ca19b7daa87187cdb70ef040e95c4fcb86",
+        "bytes": 990,
+        "sha256": "1a0b019a66f983626063cf390d2250c1cdb6effb7db0df415a8ab7b73e9d52ee"
+      },
+      {
+        "path": "app/api/organizations/[organizationId]/approvals/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1fa451bc6dc1ee5f2dbee5160f1991adec1ebecd",
+        "bytes": 1134,
+        "sha256": "cd203312dc57d6d5bfa0b10b6f4ce4bddc31f774640afa70d0df9cc5e153e574"
+      },
+      {
+        "path": "app/api/organizations/[organizationId]/audit-log/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3113add583e737da4ae60ab2e87cef27845434c5",
+        "bytes": 1614,
+        "sha256": "ad77cbd405eb78deb48fa44ed027811559a6c3f5528047f67e5db432d157f071"
+      },
+      {
+        "path": "app/api/organizations/[organizationId]/identity/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "055a1565943afc164cf8ac48af4dec56e6f1b29b",
+        "bytes": 1172,
+        "sha256": "d43347dc9bb57194d79cc76b270b49600738f08f0002b5dc8c31ea7716e3af3b"
+      },
+      {
+        "path": "app/api/organizations/[organizationId]/members/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1c1d619ee35bca845647a2e20964eed87edb0dcf",
+        "bytes": 1593,
+        "sha256": "036b5df41e35b354861597231988421a5437441c7ea0fcb3a66a7f74410439a5"
+      },
+      {
+        "path": "app/api/organizations/[organizationId]/policy/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0763a8843a01dda19a3e0a5043687f642365658f",
+        "bytes": 1068,
+        "sha256": "c448977a637fd27c9f80e6b6c715bb43c85d94d7fb235d9e9846d03819cec945"
+      },
+      {
+        "path": "app/api/organizations/[organizationId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "30e7a685aa8642201f108d35c87e991ee888ccbc",
+        "bytes": 1341,
+        "sha256": "b8fc718d704bb3843de16f2bf3824b720f1c25a215236ad993017bb87568724e"
+      },
+      {
+        "path": "app/api/organizations/[organizationId]/workspaces/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5b7705714d9887a685997ccb02e2e6b3a0b9aa91",
+        "bytes": 1308,
+        "sha256": "8873399a0179ba4dde0e6c485241079ed338fd9674e757be61a2a6c4b0e200cc"
+      },
+      {
+        "path": "app/api/organizations/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0c2802f27521d9d25057d21385009487a94e613e",
+        "bytes": 785,
+        "sha256": "d6fa7a0ea44f3201ff345a19ae6cb3b3c91e6686b75cde87ac6c7bee1caa3cdd"
+      },
+      {
+        "path": "app/api/pending-actions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cf225d2ab0f918928bf87baae7b37763acdd9f85",
+        "bytes": 990,
+        "sha256": "eaa1ecacbfda5731507987c914c29672a539f728ad055b23bc24a54594c15ba8"
+      },
+      {
+        "path": "app/api/projects/[projectId]/decisions/from-message/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4f6bf60e865e7f96ef97db796b55713534a3c13a",
+        "bytes": 298,
+        "sha256": "47d3f1b2997e6e7a78939be5b25734d56c840ae6eb0a62e2e4dd872a71a34123"
+      },
+      {
+        "path": "app/api/projects/[projectId]/decisions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5740f75a0ba195dd1cbf47a73b05c1e846aee227",
+        "bytes": 445,
+        "sha256": "9d01814e2fbc07fddd4816cd8b55213fa995dfef25939fcb821a302b81cb118b"
+      },
+      {
+        "path": "app/api/projects/[projectId]/map/nodes/[nodeId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c682d67236536aced826c50f7127a674b3cf517d",
+        "bytes": 479,
+        "sha256": "5115d2aa8b8f452cb526d5b62df3e8504eb6c0323c4190afd491e362c8240241"
+      },
+      {
+        "path": "app/api/projects/[projectId]/map/overview/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5b6737bc352a39e8fa2938436b7dac8d547e7ae4",
+        "bytes": 446,
+        "sha256": "1249625a2175e3d7735179e7666de0872a3b8e98aa16dd2473c242d3e5ab73e3"
+      },
+      {
+        "path": "app/api/projects/[projectId]/map/path/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "254cb4d3d4ffc56c255fb5627afb3f0ddb791a25",
+        "bytes": 438,
+        "sha256": "3f3673cc2a348fd6dac579f5ac5fc5220b7b1d7232843003ccfc8decb551b864"
+      },
+      {
+        "path": "app/api/projects/[projectId]/map/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c43b51dbec31135400a0d830ff251bb4472ad032",
+        "bytes": 433,
+        "sha256": "558aebd8c6b6d7634898cba6a494b4704ee4dde4c6f3abde5d5353d1ef45c15a"
+      },
+      {
+        "path": "app/api/projects/[projectId]/map/sources/[sourceRef]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4b1deebefdb0c47a114ee9b1299cdf592c0a4cc2",
+        "bytes": 492,
+        "sha256": "1a2ac97ee5bd2c17596735783efecef27e4f2ff75e1c1874c8cfb9dbf9d7f777"
+      },
+      {
+        "path": "app/api/runs/[runId]/evidence/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "83d2d7898d0c6a88770610eb85a8309475084049",
+        "bytes": 2383,
+        "sha256": "e0818cf6420a3c1ed1fa34e346716a3abb4c1e8ca55d77eff89ae1caaf8a3536"
+      },
+      {
+        "path": "app/api/runs/github-token/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3f5a4f5a4159252ef2ee5727789dc50b247e8533",
+        "bytes": 1059,
+        "sha256": "902eb9193e3af8fc9ddf35a1eed66bf08d3ee625d4d637fed2d1193670074942"
+      },
+      {
+        "path": "app/api/runs/mcp/[toolkit]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b4ca13b5ce8919474ae67f51534b8398aa6cc991",
+        "bytes": 2762,
+        "sha256": "a89ce5cce11e96b7588f0e84abd485dc5f09d9a58016a5631f21617f987b3aeb"
+      },
+      {
+        "path": "app/api/scim/v2/[connectionId]/[[...resource]]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "18235fb26cee5ab29faefab4123d59016da0fa1c",
+        "bytes": 694,
+        "sha256": "2876ca9fbbac12159a88a412f1e4a49331c5b11c568765747774222b043ceee3"
+      },
+      {
+        "path": "app/api/search/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "be55f9d78d3c49c86f4668aa7354954ccd1f2e07",
+        "bytes": 2402,
+        "sha256": "276c412e105af607495eb724c5559b61656e5a0d89ef23cf5a9d51c7cb1211ae"
+      },
+      {
+        "path": "app/api/secrets/delivery/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "30e93b6b5c5890aa19fde194954b8c7f8c7c23fb",
+        "bytes": 1214,
+        "sha256": "d7090f753f8af5da218953a744e79e3f22ab9af95482625e725021b9bdd35f0c"
+      },
+      {
+        "path": "app/api/self-improvement/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "694fdc7cd75c50b2a5acaba4882bab2de6a91b2f",
+        "bytes": 1007,
+        "sha256": "ed8d66c7910ce7c761e16b63b465cdd39afba70ccd2e1761595c8022b3847ce0"
+      },
+      {
+        "path": "app/api/server/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3d21c75b12d8b3f67982336efe85727762022e81",
+        "bytes": 246,
+        "sha256": "a83d54ed97c9ac9bbda8b2d45043f5be9d3db427f86425039892556941daea9f"
+      },
+      {
+        "path": "app/api/settings/[read]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2735cd2f2ed63b4c755554cdfb5c002dc6be38e4",
+        "bytes": 5533,
+        "sha256": "17806db00cdde5941c101a2d7b50fbf056fd14703166786fd04245818dc33d8e"
+      },
+      {
+        "path": "app/api/skills/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a78c3e2b1da98bc83e4e81fbf0ee61118778da1b",
+        "bytes": 1634,
+        "sha256": "3116dd2c167eb45a1f36b99aa5ead921e8f18b84130bba54d85285eaf0b22476"
+      },
+      {
+        "path": "app/api/skills/search/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2f3e64f5dfb675a188c45deb39726f9d0be66641",
+        "bytes": 2239,
+        "sha256": "25176c47f725d048467bed224881baea31439c18a62a299d05cd8bfe96c55bff"
+      },
+      {
+        "path": "app/api/subscriptions/callback/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "59047e7b2bebe0666ec15cbd89630be2ab7afb99",
+        "bytes": 306,
+        "sha256": "5c3713d7e23733cf00ec0ebc310e584daf6d98adff0be79d5c8309589d55cca3"
+      },
+      {
+        "path": "app/api/subscriptions/enrollments/bind/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a3f32d10a28fc940dfb9ef1abf6eba57805b0187",
+        "bytes": 2667,
+        "sha256": "ab69644ff3bfb6108acbd5ff4ef348aec891c188f629872fbeae513419ba471e"
+      },
+      {
+        "path": "app/api/subscriptions/enrollments/handoff/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7c905c459a61400b693f0b120b9387858b1e1264",
+        "bytes": 835,
+        "sha256": "afd589f2fef711ec5650d3d0cbe29c587cc744f91ed478a1cbd6dc00db129d18"
+      },
+      {
+        "path": "app/api/subscriptions/enrollments/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "97c27ff59d0d0fb1872c669a94c23ac23c9d98d9",
+        "bytes": 940,
+        "sha256": "aebcdb0ea6c9df5e2f0f7f0432509ee6354b58912935772e879131e43a767cbb"
+      },
+      {
+        "path": "app/api/subscriptions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c1cc076546903c850ba9683074a1c6d9c27b12a9",
+        "bytes": 722,
+        "sha256": "17ebc3b27689c997dd758751c263262600f32504cf325d7c78c4bb444e98183c"
+      },
+      {
+        "path": "app/api/subscriptions/usage/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d278f6a5ed31e07ec6cc98ce57eb3e9abf9d0d74",
+        "bytes": 300,
+        "sha256": "c29f91f671f61c6dbee1570f2baaa8e6b28ae5dd3e79a5dea6686d600f0094bb"
+      },
+      {
+        "path": "app/api/suggestions/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2d4fd47c1ee7fb1c1a5561d9ed7b85b0464f82c4",
+        "bytes": 1048,
+        "sha256": "52ea38838065ec24273c469bb6e501ee733b90676538b9af20bc2f44b9ecc1c8"
+      },
+      {
+        "path": "app/api/suggestions/[id]/start/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a6d4be1c1f667e8b09840a08a85c386b303a8849",
+        "bytes": 1584,
+        "sha256": "4bbd05f3ec67d39a691094ce7e2bc2b8558d37d1fa5c9ecb80237c33f728814a"
+      },
+      {
+        "path": "app/api/suggestions/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "909ac51ed946887ec8f1276be13fb900e57265d4",
+        "bytes": 4143,
+        "sha256": "5564176cdb07576e4e60b4aa6a6deb0a9e86f226830cfb71765d7b16cda26fe1"
+      },
+      {
+        "path": "app/api/teams/[teamId]/members/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8c193e4315f5de193161426d0fe6132484ccb0bd",
+        "bytes": 1456,
+        "sha256": "3c1f1fbb02dbc04def1a5fca54e85e7c35a70c5ee1c0dea01b4a84f1a21d2ae9"
+      },
+      {
+        "path": "app/api/teams/directory/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "978f0f093f48933e562413da0ff952cf3f155acd",
+        "bytes": 1836,
+        "sha256": "8d28594474c7616dec482eb78a82ed167550b8a40c10558a471bd6d03d756c87"
+      },
+      {
+        "path": "app/api/test-environment/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4787a0c75ed2651387385861add7b89085636baf",
+        "bytes": 1625,
+        "sha256": "fd4a60e047080b65d1b8257abb014354a72b392675ccc2596e1d1f06a950a5db"
+      },
+      {
+        "path": "app/api/test-workspace/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e6b10b6ef9a748017ccfd86458b36c58cf0a3f4",
+        "bytes": 2003,
+        "sha256": "63f66ebc69b559eb4c57c397400b5f9df24aedb77f9503d1161c2a78b4c15947"
+      },
+      {
+        "path": "app/api/threads/[runId]/credentials/challenge/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f1b28e2af2faad49f0784d11f6060b31e581421e",
+        "bytes": 245,
+        "sha256": "abd27e9a3864099fcc45e5dda7f9fd263c20e849d06fcd82c806da8963136624"
+      },
+      {
+        "path": "app/api/threads/[runId]/credentials/login/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c58c4589f70919e9356a976a089920fd3389ddef",
+        "bytes": 271,
+        "sha256": "818adb34baa23ce865b747e3d3f017d2c80ea5848ef8bc11b75534c6f3d94841"
+      },
+      {
+        "path": "app/api/threads/[runId]/credentials/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d536350518e2e781f70c6f8338d28882335f59f3",
+        "bytes": 272,
+        "sha256": "ae3b2710990ff220482115b77effcee56e99bb058e805ff19e995c271a0c130f"
+      },
+      {
+        "path": "app/api/threads/[runId]/machine/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "39681bce488d7ad650d739f5fead0308cb1ec138",
+        "bytes": 1576,
+        "sha256": "22f11d9eb506b07d33f1947016ba0df8011f1fb94ce8d8975eee6f9ffedbf1c5"
+      },
+      {
+        "path": "app/api/version/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "75e6b47b7a38cf5bfd050ded0f11b2fbabf4751d",
+        "bytes": 949,
+        "sha256": "c8c7456968162edcb99e61b6054ca2407ef8b73e248ddc29f719a5209c640727"
+      },
+      {
+        "path": "app/api/web/begin/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3070a253a274c916a02c391c51fd3fdf9137abfe",
+        "bytes": 1747,
+        "sha256": "2648e6d5de58ed0a8807a09def881fffdcf8f2a1b932f3dca5f55369fcdf1696"
+      },
+      {
+        "path": "app/api/web/complete/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ffbb0abed53ef8253b1f62e60d6fe10d10d925d5",
+        "bytes": 1623,
+        "sha256": "9ae5aa810c6dee2fb27bc30b0b2f40002b32231325fc2318891de3d0ba60a805"
+      },
+      {
+        "path": "app/api/web/exchange/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8a63dccaf3b03fc10b95d0ec9a656a244c52c2cf",
+        "bytes": 3252,
+        "sha256": "37964b9af40b266b39e0f0a4537c0c6f4357c1c51429692f30f3d0c759854e56"
+      },
+      {
+        "path": "app/api/web/return/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "225d22a7c9d7cf44cfdee39dd9f55a5caa372269",
+        "bytes": 2628,
+        "sha256": "106a56dd995bf58cf963bc5d04402c6d4ce967b56fbff22d14f5ba07784c657c"
+      },
+      {
+        "path": "app/api/web/revoke/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "da07f3849ca2f22424de416597753e36cb1a81e1",
+        "bytes": 1152,
+        "sha256": "bc4a3e01effdf4ef88e44029e1fe7cfc221e02848cd21b1c7b6c71f2c8a33681"
+      },
+      {
+        "path": "app/api/webhooks/composio/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "68dac6755e49a9a71222351226967cb4115d018c",
+        "bytes": 1506,
+        "sha256": "19adb585f3b6c61adef69448a059fc0db442a9c2038d6c857481db8e483835b2"
+      },
+      {
+        "path": "app/api/webhooks/github/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f85610174c9f4f3030a2e557874435b2103d0ad6",
+        "bytes": 1920,
+        "sha256": "7b7d07203fd1f2be46d676f90809953c84bfc3ddcdd132e1b1c7c1a409384e8e"
+      },
+      {
+        "path": "app/api/webhooks/linear/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "408b6fe4c816232097807bd270f5553457147457",
+        "bytes": 2317,
+        "sha256": "b566d22ac335332ce9233e474edbe1dfab48d01f168a817b19463bbddcf15983"
+      },
+      {
+        "path": "app/api/webhooks/slack/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3148652bbb84e3be86716b4e72ef7605da384a3f",
+        "bytes": 1484,
+        "sha256": "b1e491789af5f7523d91f5e13be4ccb43615dbd6d775e64f42a4e07dd202cb37"
+      },
+      {
+        "path": "app/api/webhooks/telegram/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "573985463f3c2bd11d097fdab69e298a6507ae8f",
+        "bytes": 947,
+        "sha256": "e96c30af77922ebe8ad025aad0d204cd9b6ad32316743fdeeb70592d2e1df34b"
+      },
+      {
+        "path": "app/api/workspace/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "10c6f56fc11e998e4adcf4602066dcba10e331b2",
+        "bytes": 1479,
+        "sha256": "524b229c3d61c626d88a4f39149e300b55f219df94b3d99f559fe3ae9514751f"
+      },
+      {
+        "path": "app/api/workspace/switcher/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "91b864094d0f6527ddedef2c3a8da6ac6cb3e4ba",
+        "bytes": 1234,
+        "sha256": "107c80be7d00666dae2c73ae2031540af53d993f8f2e033b9c34879808bc389b"
+      },
+      {
+        "path": "app/api/workspaces/[workspaceId]/audit-log/retention/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0f46f096b4402a9c16b02f609a3e47d01ffba4c5",
+        "bytes": 2392,
+        "sha256": "547891abc802b2549994cbfafb7a65bf7669f2ec460ec106202c024f965551e7"
+      },
+      {
+        "path": "app/api/workspaces/[workspaceId]/audit-log/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c472ad5e6fbf3f33a660e7cafabcacfac12b7370",
+        "bytes": 3683,
+        "sha256": "fba01c0d44c97d74ce0be6cb88391acbb46dae9b87689a10d0796487a94cf7ac"
+      },
+      {
+        "path": "app/api/workspaces/[workspaceId]/computer-policy/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "db23ab19983653bda9bce52266780a546a11de0f",
+        "bytes": 1427,
+        "sha256": "d91c056a0b5d5c129c784be0dbe850ea220418e899f474729f47a7b840bda195"
+      },
+      {
+        "path": "app/api/workspaces/[workspaceId]/governance/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a7a4757f9372ee36e4e2bfc2496ddf6768fe691f",
+        "bytes": 2928,
+        "sha256": "4a7225a7c0c1f681a90de2ad2385beb20616eca1476405878e9620845c8c28bd"
+      },
+      {
+        "path": "app/api/workspaces/[workspaceId]/governance/usage/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "10a075e94fc5b68a71fd580de9803bea0675020c",
+        "bytes": 1051,
+        "sha256": "a442da7db3ad144a94c7fb93a4100f27846137ce86b699f48eb1c3564275a7ce"
+      },
+      {
+        "path": "app/api/workspaces/[workspaceId]/model-admission/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "42a58b61755ec425cb8996bd94a81189bf1ad560",
+        "bytes": 1127,
+        "sha256": "0509851de5373ea456b2ce596f004b70e9f22b849e371315e61f60d2ec55ddd0"
+      },
+      {
+        "path": "app/api/workspaces/[workspaceId]/skills/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "44691ab830705c6ca2c262ee657584b80e7a705d",
+        "bytes": 911,
+        "sha256": "8e3d967fd9f4b1dfdaa41afa6f966d44697e797e96c8c062f8683717bb3ab81c"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/commands/ack/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "26808e5c257397b1adfda1824f1cfcce036cc735",
+        "bytes": 1074,
+        "sha256": "7b1ec357e64d0b05651e4d0752314a629df47caf6d71e00fb81be5032111dba4"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/commands/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6e0063777d281f86f240daa9257e6b2a4f90946c",
+        "bytes": 5599,
+        "sha256": "0459c12b0b463183cd6d2d996ee74bb212d9c9ec2a05d419423c8b1fb0ce3d20"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/computer/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "144411752c8faa50cb79561eb7ec3d85f5f26888",
+        "bytes": 1858,
+        "sha256": "3f5a551a71fb202514a96199450f85f987a00a1d6c9e2955d4210974b150bc22"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/coordinator/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "de4bc0100be80cc1ddbf3230c5cd0bb88fb8db6e",
+        "bytes": 3042,
+        "sha256": "559e9f4c322587e50099625e875750a3644d78f508a848154984428c5c78cc47"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/fs/requests/[requestId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6da94d8f6e64568d214929396e40018ae0c5b54a",
+        "bytes": 798,
+        "sha256": "0b3dd2077657e897ab254ff2cde4808439c0cbbfc0dcdbc76e789ed7ed3c8956"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/fs/requests/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9090daaf602f585e62bcf3fa2c204f16e50fa6a6",
+        "bytes": 1043,
+        "sha256": "fdfb777085d3821aeb0b4fb54da74857e0198b7eb67e9422f5242a5d7358ff76"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/gateway/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f73be7416f5e8665effb4b8a09faf0222f159cc9",
+        "bytes": 2096,
+        "sha256": "3c5a79fbfc2a2a7d18d9261a2786489515cd5ef8409313648e23b432941bd8d8"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/github-token/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4a5f9b9c895a71a5dba2933ca93ee0213484b34b",
+        "bytes": 1153,
+        "sha256": "cc13635353aeaeca38dbfaf1f8d651af57780d46aa3b77f990dd1b2edbad9ba5"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/heartbeat/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7f2aec2241f2842e12ce7be6bfee68f13d2db9b3",
+        "bytes": 9566,
+        "sha256": "b32fa96dd7fa77afca9900389f1a11266293eccfd7ce8b89e02d734a0de1395c"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+        "bytes": 1983,
+        "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/[runId]/attachments/[id]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9c47b15b484794f448ea12563ba766097653c3ca",
+        "bytes": 2917,
+        "sha256": "8e276cb00cdd9162b7c904ca7c74739f3f4d84917bffa438828cb0a5f96fbbf9"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "235dbf58773f3646721479ecc4686d9d2f61aa81",
+        "bytes": 45725,
+        "sha256": "ed0e980b5748c6345e9c9feeedcfa0346e46bd86c5938848fb2c756faefe59fe"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/[runId]/computer-authority/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6845ea6a3f43882a033194105ca1927125be64c2",
+        "bytes": 1168,
+        "sha256": "d2691ac74323509fd19007e2b3a55d16b0f7923b58ed1e6805d4dd6fb1154f8e"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/[runId]/credentials/login/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5930d661c1259e8f7b2daf00fa14a90ab7a024ef",
+        "bytes": 2029,
+        "sha256": "73cfbfc0e5c7d26c47bdf8eb30e938fe73d09dec0a82c8a41af0da3954284be0"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/[runId]/subscription-lease/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d0f57d34d81026c1a2efd051b483016386b483d0",
+        "bytes": 801,
+        "sha256": "53005357743284c771bfd40d7ba6f88ace83314c32f85e0dc0b553ca2d4f5e26"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/[runId]/subscription/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e91f5e3259560c323d93ada5c580bacea4d9f75",
+        "bytes": 863,
+        "sha256": "9899ab4c45d292cdae590beb190cc0d41a0c3539592d58320b7e9b10151e05bb"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+        "bytes": 1305,
+        "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c"
+      },
+      {
+        "path": "app/v1/devices/enroll/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "abb066cefe122890ebaaf6bfe1cf126518ef6aaa",
+        "bytes": 530,
+        "sha256": "7e312fc0e2cca4a32bb7f3f264f4a71a06fd4bd37fd305ad807f323b30ea58e1"
+      },
+      {
+        "path": "app/v1/devices/register/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "31a4233e453241fc8d9d061ab88bc0b2197d506e",
+        "bytes": 3326,
+        "sha256": "49651433d1adb9a477bca74a42b64980f050aac8eb0a19807367a78cc141b1f1"
+      },
+      {
+        "path": "app/v1/mailbox/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "325e6c8bdd9bdd5fe0151c8640d7ef216b5c9dfa",
+        "bytes": 995,
+        "sha256": "b20009f85b74ec703b9072bf319d969f5bdca65691eed0faeb4bc42c963e0617"
+      },
+      {
+        "path": "app/v1/runs/[runId]/captures/[captureId]/complete/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1949deeb553812977424eb60d93d3e315035cd3e",
+        "bytes": 970,
+        "sha256": "34a334e7e2c7d83e18ad5054b5628a3b7e6b559018fb82c56d80961947bb6cab"
+      },
+      {
+        "path": "app/v1/runs/[runId]/captures/[captureId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c0bc1fd28ec6fd077ec8fefd44568efdee9a8f28",
+        "bytes": 1942,
+        "sha256": "aeae9a79482bf7aaba557750de33d4c65086837cd14692b428cfe2e25c405ad9"
+      },
+      {
+        "path": "app/v1/runs/[runId]/captures/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c185e2f3c5a0297d1d89170224552e1f2535e1d8",
+        "bytes": 1181,
+        "sha256": "b69245de5ec3e1728ef4b622ca003e010c14b4d2a03d4bd8965dd7866fc911d0"
+      },
+      {
+        "path": "app/v1/runs/[runId]/checkpoint/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "070d149a164deac38d587c32510c760842ea528c",
+        "bytes": 4184,
+        "sha256": "a498321fd6872af2e98709fe78d714157073f3073ba107aeeb66326da9eec371"
+      },
+      {
+        "path": "app/v1/runs/[runId]/complete/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9f42a40b8087f88d6d68c4657fa4751ffa1b2a1c",
+        "bytes": 3839,
+        "sha256": "0174eb18a3003b554a4cfd996dc516ce36cef29dd868bfe5e72656b035967991"
+      },
+      {
+        "path": "app/v1/runs/[runId]/decision/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7c5eec6109eb9f450261c8e5e9751aea9840c83e",
+        "bytes": 3115,
+        "sha256": "4fef1c992e2883384c6fac677713da1d6998d8f71a196f7e5bda70d23b6fb7d5"
+      },
+      {
+        "path": "app/v1/runs/[runId]/events/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "931ce04d1ddf51a3fccc940d9e9fabc2ac8ec1d4",
+        "bytes": 3010,
+        "sha256": "0a1326bfdb882a5627d075e6e789f0ea3f2d39edc07d323ad431b62c6efe7c6c"
+      },
+      {
+        "path": "app/v1/runs/[runId]/policy-snapshot/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "562293d0fd9a1549693a0659ad87e00ee5c18d42",
+        "bytes": 2910,
+        "sha256": "28375daadf349272d7a0bcf995cdc000b50a46517319612c1e3aadf49f5ad52d"
+      },
+      {
+        "path": "app/v1/runs/[runId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "aaa34f13004b1fd33435c8b81256cc769b3ce8a1",
+        "bytes": 3885,
+        "sha256": "ad1efc5fdfe71d2c19a5aed882af8b93c754a315addf67dd5e6611224fe8d11c"
+      },
+      {
+        "path": "app/v1/runs/[runId]/screen/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d80ab5cc7b15b9ee6cb9f2a35b0e3b9cafa9df9e",
+        "bytes": 2728,
+        "sha256": "555b2393a908f8090fdc56cf2656abed0e9a8be388c9a0fbf7a39b4d22026d4e"
+      },
+      {
+        "path": "app/v1/runs/[runId]/skill-receipt/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0d8e1e3a7f53867b3cd8bcc8770f4f635057eec4",
+        "bytes": 1298,
+        "sha256": "51760ed5a44693d0dd8919c53ddfcdf7bf8c8d21bd1593f17f8c781cfe657455"
+      },
+      {
+        "path": "app/v1/runs/[runId]/tool-approval/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "24938c59691474f4ad96c8864171bdd94b489881",
+        "bytes": 5110,
+        "sha256": "20557762165127bd0f548041265b7d1d3ffbdee769b3bf79e2f3736ad9d7e346"
+      },
+      {
+        "path": "app/v1/task-secrets/[runId]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cd5004f62247c6b785486ccd4157ef138c402ded",
+        "bytes": 339,
+        "sha256": "8b9677d86e78dbad178a9f04fd694867050535246795269b6d18b6be0e21da8b"
+      },
+      {
+        "path": "app/w/[slug]/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d354b45c71d755c9552accc9779bc6921f39fb38",
+        "bytes": 1815,
+        "sha256": "81b2bf4e97dc883186dc8141c5ccf2e79628bd2b6e66ebb13ef83dd80633f262"
+      },
+      {
+        "path": "apps/api/routes/browser-rpc.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c731e2c79c2b930cfedcdd774c943e1bfa4090e8",
+        "bytes": 1379,
+        "sha256": "6f97894370c05d358f6d9e5b5f845603134ad80d91fae93a2f4cbbf056674363"
+      },
+      {
+        "path": "apps/api/routes/oauth-consent.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c5c943041d78544b228cfaa1311d503d9e22c141",
+        "bytes": 1271,
+        "sha256": "6cfb8845a90b74c51aa75483bbdd1133cca4fd1089dece39b645dc7af71a4883"
+      },
+      {
+        "path": "apps/api/scripts/generate-routes.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2431a145d316e10fcdb74a6040efcdea2b6a9f00",
+        "bytes": 6166,
+        "sha256": "db8865da2530e549b83f369f2de609da9ae73a9b262b387bf3c33046c0df7433"
+      }
+    ]
+  },
+  "dependency": {
+    "tarballBytes": 4377468,
+    "tarballSha256": "10e108c9cf7d5f2879053dff18515fb405abf2ccef63eaaf017d9c571687a1d3",
+    "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+    "installedOnlyTypescript": true
+  },
+  "command": [
+    "node",
+    "apps/api/scripts/generate-routes.mjs"
+  ],
+  "cwd": "/vercel/sandbox/issue1512-canonical-60401",
+  "commandExecutions": 1,
+  "exitCode": 0,
+  "stdout": "{\"routes\":256,\"methods\":343}\n",
+  "stderr": "",
+  "outputs": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "bytes": 80790,
+      "sha256": "cc812ad33df3edcdff6696804e8d7c5c1723a07c284eec26f3a556615102932d",
+      "gitBlob": "d05fee405fabc4816b08486d8e55313fef3a3fc6"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "bytes": 83353,
+      "sha256": "3aca1717b50616a526c33faf7b8850134a2ec9cabfa4bc19b90d2c4df0c2b257",
+      "gitBlob": "986e783a6e4bc0bfe8f2dfa2c15b282631caa4f6"
+    }
+  ],
+  "owner": "/root/native_diag_runner",
+  "vm": {
+    "name": "issue1512-canonical-60401d31-20261110",
+    "sessionId": "sbx_h4i5H6tab6mvca0ndvdtpKqTP2iv",
+    "createdAt": "2026-11-10T00:48:45.752Z",
+    "deadline": "2026-11-10T01:03:45.752Z",
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "persistent": false,
+    "ports": [],
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219"
+  },
+  "transfer": {
+    "path": "/vercel/sandbox/issue1512-canonical-60401/canonical-result.json.gz",
+    "gzipBytes": 54808,
+    "gzipSha256": "f1e73b2bc3521e488d83f51fb807c9ab38627eb2ab474d57f2fa3a05610272e4",
+    "jsonBytes": 237627,
+    "jsonSha256": "dab9b5a7e21752336db395b5f6fde2404256cac6503b2ad9d989f6c056a3ce9b",
+    "chunks": 38,
+    "gzipCrcVerified": true,
+    "gzipSha256Verified": true,
+    "uncompressedSha256Verified": true
+  },
+  "generatorExecutionScript": "import pathlib, urllib.request, urllib.parse, json, hashlib, base64, tarfile, io, subprocess, gzip, datetime, sys\nroot=pathlib.Path(\"/vercel/sandbox/issue1512-canonical-60401\")\nroot.mkdir(mode=0o700,parents=True,exist_ok=False)\ndef h(data): return hashlib.sha256(data).hexdigest()\ndef git(data): return hashlib.sha1((\"blob \"+str(len(data))+\"\\0\").encode()+data).hexdigest()\ndef safe(path):\n    p=pathlib.PurePosixPath(path)\n    if p.is_absolute() or not p.parts or \"..\" in p.parts or \"\\\\\" in path or \":\" in p.parts[0] or str(p)!=path: raise RuntimeError(\"unsafe_path\")\n    return p\ndef get(url,limit):\n    with urllib.request.urlopen(urllib.request.Request(url,headers={\"User-Agent\":\"issue1512-canonical-input-verifier\",\"Accept\":\"application/vnd.github+json\"}),timeout=30) as r:\n        if urllib.parse.urlsplit(r.geturl()).hostname != urllib.parse.urlsplit(url).hostname: raise RuntimeError(\"unexpected_redirect\")\n        data=r.read(limit+1)\n    if len(data)>limit: raise RuntimeError(\"size_limit\")\n    return data\nstarted=datetime.datetime.now(datetime.timezone.utc).isoformat()\nrawapi=get(\"https://api.github.com/repos/alexj11324/Mikka/git/blobs/8f785d681a7f6a6c3f0b845171a9333493adc8b9\",1500000)\napi=json.loads(rawapi)\nif api[\"sha\"]!=\"8f785d681a7f6a6c3f0b845171a9333493adc8b9\" or api[\"encoding\"]!=\"base64\": raise RuntimeError(\"input_api_identity\")\nraw=base64.b64decode(api[\"content\"])\nif len(raw)!=608968 or h(raw)!=\"a49a5e7d009d7ef76b430b53478b0a25c83e5c4a7e08aaa12d9468491873086c\" or git(raw)!=api[\"sha\"]: raise RuntimeError(\"input_hash\")\npack=json.loads(raw); files=pack[\"files\"]\nif len(files)!=257: raise RuntimeError(\"input_count\")\nseen=set(); verified=[]\nfor f in files:\n    if set(f)!={\"path\",\"mode\",\"type\",\"sha\",\"bytes\",\"sha256\",\"content\"} or f[\"mode\"]!=\"100644\" or f[\"type\"]!=\"blob\": raise RuntimeError(\"input_schema\")\n    path=safe(f[\"path\"])\n    if f[\"path\"] in seen: raise RuntimeError(\"duplicate_path\")\n    seen.add(f[\"path\"]); data=f[\"content\"].encode(\"utf-8\")\n    if len(data)!=f[\"bytes\"] or h(data)!=f[\"sha256\"] or git(data)!=f[\"sha\"]: raise RuntimeError(\"file_hash\")\n    dest=root/path; dest.parent.mkdir(parents=True,exist_ok=True)\n    with dest.open(\"xb\") as o: o.write(data)\n    verified.append({k:v for k,v in f.items() if k!=\"content\"})\nnode=subprocess.run([\"node\",\"--version\"],cwd=root,capture_output=True,text=True,timeout=15)\nif node.returncode or not node.stdout.strip().startswith(\"v24.\"): raise RuntimeError(\"node24_required:\"+node.stdout.strip())\ntgz=get(\"https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz\",15000000)\nsri=\"sha512-\"+base64.b64encode(hashlib.sha512(tgz).digest()).decode()\nif sri!=\"sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==\": raise RuntimeError(\"typescript_integrity\")\ndeps=root/\"node_modules\"/\"typescript\"; deps.mkdir(parents=True)\nwith tarfile.open(fileobj=io.BytesIO(tgz),mode=\"r:gz\") as tar:\n    total=0; names=set()\n    for m in tar.getmembers():\n        path=safe(m.name)\n        if path.parts[0]!=\"package\" or m.name in names or not (m.isfile() or m.isdir()): raise RuntimeError(\"unsafe_tar_member\")\n        names.add(m.name); total+=m.size\n        if total>60000000: raise RuntimeError(\"tar_expanded_limit\")\n        rel=pathlib.PurePosixPath(*path.parts[1:])\n        target=deps/rel\n        if m.isdir(): target.mkdir(parents=True,exist_ok=True); continue\n        target.parent.mkdir(parents=True,exist_ok=True)\n        with tar.extractfile(m) as src,target.open(\"xb\") as out: out.write(src.read())\nts=subprocess.run([\"node\",\"-p\",\"require('typescript/package.json').version\"],cwd=root,capture_output=True,text=True,timeout=15)\nif ts.returncode or ts.stdout.strip()!=\"5.9.3\": raise RuntimeError(\"typescript_version\")\nif next(f[\"sha\"] for f in verified if f[\"path\"]==\"apps/api/scripts/generate-routes.mjs\")!=\"2431a145d316e10fcdb74a6040efcdea2b6a9f00\": raise RuntimeError(\"canonical_script_identity\")\ncommand=[\"node\",\"apps/api/scripts/generate-routes.mjs\"]\nr=subprocess.run(command,cwd=root,capture_output=True,timeout=60)\noutputs=[]\nfor path in [\"apps/api/generated/routes.json\",\"apps/api/generated/routes.ts\"]:\n    data=(root/path).read_bytes()\n    outputs.append({\"path\":path,\"bytes\":len(data),\"sha256\":h(data),\"gitBlob\":git(data),\"content\":data.decode(\"utf-8\")})\nreceipt={\"schemaVersion\":1,\"kind\":\"issue1512.canonical-generator.actual-execution\",\"startedAt\":started,\"finishedAt\":datetime.datetime.now(datetime.timezone.utc).isoformat(),\"nodeVersion\":node.stdout.strip(),\"typescriptVersion\":ts.stdout.strip(),\"source\":pack[\"source\"],\"toolchain\":pack[\"toolchain\"],\"closure\":pack[\"closure\"],\"inputSchema\":pack[\"schema\"],\"input\":{\"gitBlob\":api[\"sha\"],\"bytes\":len(raw),\"sha256\":h(raw),\"files\":verified},\"dependency\":{\"tarballBytes\":len(tgz),\"tarballSha256\":h(tgz),\"integrity\":sri,\"installedOnlyTypescript\":True},\"command\":command,\"cwd\":str(root),\"commandExecutions\":1,\"exitCode\":r.returncode,\"stdout\":r.stdout.decode(),\"stderr\":r.stderr.decode(),\"outputs\":outputs}\nrawout=(json.dumps(receipt,ensure_ascii=False,separators=(\",\",\":\"))+\"\\n\").encode()\nout=root/\"canonical-result.json\";out.write_bytes(rawout)\ngz=gzip.compress(rawout,compresslevel=9,mtime=0);(root/\"canonical-result.json.gz\").write_bytes(gz)\nprint(json.dumps({\"exitCode\":r.returncode,\"nodeVersion\":node.stdout.strip(),\"typescriptVersion\":ts.stdout.strip(),\"stdout\":r.stdout.decode(),\"stderr\":r.stderr.decode(),\"outputs\":[{k:v for k,v in x.items() if k!=\"content\"} for x in outputs],\"bundle\":{\"path\":str(root/\"canonical-result.json.gz\"),\"gzipBytes\":len(gz),\"gzipSha256\":h(gz),\"jsonBytes\":len(rawout),\"jsonSha256\":h(rawout)}}))\nsys.exit(r.returncode)\n",
+  "rawCommandResult": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"items\": [\n      {\n        \"command\": {\n          \"id\": \"cmd_47aa0c4e215741c38c8204889b49\",\n          \"name\": \"python3\",\n          \"args\": [\n            \"-c\",\n            \"import pathlib, urllib.request, urllib.parse, json, hashlib, base64, tarfile, io, subprocess, gzip, datetime, sys\\nroot=pathlib.Path(\\\"/vercel/sandbox/issue1512-canonical-60401\\\")\\nroot.mkdir(mode=0o700,parents=True,exist_ok=False)\\ndef h(data): return hashlib.sha256(data).hexdigest()\\ndef git(data): return hashlib.sha1((\\\"blob \\\"+str(len(data))+\\\"\\\\0\\\").encode()+data).hexdigest()\\ndef safe(path):\\n    p=pathlib.PurePosixPath(path)\\n    if p.is_absolute() or not p.parts or \\\"..\\\" in p.parts or \\\"\\\\\\\\\\\" in path or \\\":\\\" in p.parts[0] or str(p)!=path: raise RuntimeError(\\\"unsafe_path\\\")\\n    return p\\ndef get(url,limit):\\n    with urllib.request.urlopen(urllib.request.Request(url,headers={\\\"User-Agent\\\":\\\"issue1512-canonical-input-verifier\\\",\\\"Accept\\\":\\\"application/vnd.github+json\\\"}),timeout=30) as r:\\n        if urllib.parse.urlsplit(r.geturl()).hostname != urllib.parse.urlsplit(url).hostname: raise RuntimeError(\\\"unexpected_redirect\\\")\\n        data=r.read(limit+1)\\n    if len(data)>limit: raise RuntimeError(\\\"size_limit\\\")\\n    return data\\nstarted=datetime.datetime.now(datetime.timezone.utc).isoformat()\\nrawapi=get(\\\"https://api.github.com/repos/alexj11324/Mikka/git/blobs/8f785d681a7f6a6c3f0b845171a9333493adc8b9\\\",1500000)\\napi=json.loads(rawapi)\\nif api[\\\"sha\\\"]!=\\\"8f785d681a7f6a6c3f0b845171a9333493adc8b9\\\" or api[\\\"encoding\\\"]!=\\\"base64\\\": raise RuntimeError(\\\"input_api_identity\\\")\\nraw=base64.b64decode(api[\\\"content\\\"])\\nif len(raw)!=608968 or h(raw)!=\\\"a49a5e7d009d7ef76b430b53478b0a25c83e5c4a7e08aaa12d9468491873086c\\\" or git(raw)!=api[\\\"sha\\\"]: raise RuntimeError(\\\"input_hash\\\")\\npack=json.loads(raw); files=pack[\\\"files\\\"]\\nif len(files)!=257: raise RuntimeError(\\\"input_count\\\")\\nseen=set(); verified=[]\\nfor f in files:\\n    if set(f)!={\\\"path\\\",\\\"mode\\\",\\\"type\\\",\\\"sha\\\",\\\"bytes\\\",\\\"sha256\\\",\\\"content\\\"} or f[\\\"mode\\\"]!=\\\"100644\\\" or f[\\\"type\\\"]!=\\\"blob\\\": raise RuntimeError(\\\"input_schema\\\")\\n    path=safe(f[\\\"path\\\"])\\n    if f[\\\"path\\\"] in seen: raise RuntimeError(\\\"duplicate_path\\\")\\n    seen.add(f[\\\"path\\\"]); data=f[\\\"content\\\"].encode(\\\"utf-8\\\")\\n    if len(data)!=f[\\\"...[truncated]\"\n          ],\n          \"cwd\": \"/vercel\",\n          \"sessionId\": \"sbx_h4i5H6tab6mvca0ndvdtpKqTP2iv\",\n          \"startedAt\": 1794271736938,\n          \"exitCode\": null\n        }\n      },\n      {\n        \"data\": \"{\\\"exitCode\\\": 0, \\\"nodeVersion\\\": \\\"v24.22.1\\\", \\\"typescriptVersion\\\": \\\"5.9.3\\\", \\\"stdout\\\": \\\"{\\\\\\\"routes\\\\\\\":256,\\\\\\\"methods\\\\\\\":343}\\\\n\\\", \\\"stderr\\\": \\\"\\\", \\\"outputs\\\": [{\\\"path\\\": \\\"apps/api/generated/routes.json\\\", \\\"bytes\\\": 80790, \\\"sha256\\\": \\\"cc812ad33df3edcdff6696804e8d7c5c1723a07c284eec26f3a556615102932d\\\", \\\"gitBlob\\\": \\\"d05fee405fabc4816b08486d8e55313fef3a3fc6\\\"}, {\\\"path\\\": \\\"apps/api/generated/routes.ts\\\", \\\"bytes\\\": 83353, \\\"sha256\\\": \\\"3aca1717b50616a526c33faf7b8850134a2ec9cabfa4bc19b90d2c4df0c2b257\\\", \\\"gitBlob\\\": \\\"986e783a6e4bc0bfe8f2dfa2c15b282631caa4f6\\\"}], \\\"bundle\\\": {\\\"path\\\": \\\"/vercel/sandbox/issue1512-canonical-60401/canonical-result.json.gz\\\", \\\"gzipBytes\\\": 54808, \\\"gzipSha256\\\": \\\"f1e73b2bc3521e488d83f51fb807c9ab38627eb2ab474d57f2fa3a05610272e4\\\", \\\"jsonBytes\\\": 237627, \\\"jsonSha256\\\": \\\"dab9b5a7e21752336db395b5f6fde2404256cac6503b2ad9d989f6c056a3ce9b\\\"}}\\n\",\n        \"stream\": \"stdout\"\n      },\n      {\n        \"command\": {\n          \"id\": \"cmd_47aa0c4e215741c38c8204889b49\",\n          \"name\": \"python3\",\n          \"args\": [\n            \"-c\",\n            \"import pathlib, urllib.request, urllib.parse, json, hashlib, base64, tarfile, io, subprocess, gzip, datetime, sys\\nroot=pathlib.Path(\\\"/vercel/sandbox/issue1512-canonical-60401\\\")\\nroot.mkdir(mode=0o700,parents=True,exist_ok=False)\\ndef h(data): return hashlib.sha256(data).hexdigest()\\ndef git(data): return hashlib.sha1((\\\"blob \\\"+str(len(data))+\\\"\\\\0\\\").encode()+data).hexdigest()\\ndef safe(path):\\n    p=pathlib.PurePosixPath(path)\\n    if p.is_absolute() or not p.parts or \\\"..\\\" in p.parts or \\\"\\\\\\\\\\\" in path or \\\":\\\" in p.parts[0] or str(p)!=path: raise RuntimeError(\\\"unsafe_path\\\")\\n    return p\\ndef get(url,limit):\\n    with urllib.request.urlopen(urllib.request.Request(url,headers={\\\"User-Agent\\\":\\\"issue1512-canonical-input-verifier\\\",\\\"Accept\\\":\\\"application/vnd.github+json\\\"}),timeout=30) as r:\\n        if urllib.parse.urlsplit(r.geturl()).hostname != urllib.parse.urlsplit(url).hostname: raise RuntimeError(\\\"unexpected_redirect\\\")\\n        data=r.read(limit+1)\\n    if len(data)>limit: raise RuntimeError(\\\"size_limit\\\")\\n    return data\\nstarted=datetime.datetime.now(datetime.timezone.utc).isoformat()\\nrawapi=get(\\\"https://api.github.com/repos/alexj11324/Mikka/git/blobs/8f785d681a7f6a6c3f0b845171a9333493adc8b9\\\",1500000)\\napi=json.loads(rawapi)\\nif api[\\\"sha\\\"]!=\\\"8f785d681a7f6a6c3f0b845171a9333493adc8b9\\\" or api[\\\"encoding\\\"]!=\\\"base64\\\": raise RuntimeError(\\\"input_api_identity\\\")\\nraw=base64.b64decode(api[\\\"content\\\"])\\nif len(raw)!=608968 or h(raw)!=\\\"a49a5e7d009d7ef76b430b53478b0a25c83e5c4a7e08aaa12d9468491873086c\\\" or git(raw)!=api[\\\"sha\\\"]: raise RuntimeError(\\\"input_hash\\\")\\npack=json.loads(raw); files=pack[\\\"files\\\"]\\nif len(files)!=257: raise RuntimeError(\\\"input_count\\\")\\nseen=set(); verified=[]\\nfor f in files:\\n    if set(f)!={\\\"path\\\",\\\"mode\\\",\\\"type\\\",\\\"sha\\\",\\\"bytes\\\",\\\"sha256\\\",\\\"content\\\"} or f[\\\"mode\\\"]!=\\\"100644\\\" or f[\\\"type\\\"]!=\\\"blob\\\": raise RuntimeError(\\\"input_schema\\\")\\n    path=safe(f[\\\"path\\\"])\\n    if f[\\\"path\\\"] in seen: raise RuntimeError(\\\"duplicate_path\\\")\\n    seen.add(f[\\\"path\\\"]); data=f[\\\"content\\\"].encode(\\\"utf-8\\\")\\n    if len(data)!=f[\\\"...[truncated]\"\n          ],\n          \"cwd\": \"/vercel\",\n          \"sessionId\": \"sbx_h4i5H6tab6mvca0ndvdtpKqTP2iv\",\n          \"startedAt\": 1794271736938,\n          \"exitCode\": 0,\n          \"durationMs\": 1428\n        }\n      }\n    ],\n    \"context\": {\n      \"totalItems\": 3,\n      \"returnedItems\": 3,\n      \"truncated\": false\n    }\n  },\n  \"truncated\": true,\n  \"truncation\": {\n    \"arrays\": 0,\n    \"omittedArrayItems\": 0,\n    \"objects\": 0,\n    \"omittedObjectKeys\": 0,\n    \"strings\": 2,\n    \"omittedStringChars\": 7254,\n    \"depth\": 0,\n    \"budget\": 0\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  },
+  "boundaries": {
+    "applicationRuns": 0,
+    "databaseRuns": 0,
+    "modelCalls": 0,
+    "tests": 0,
+    "oldActionsLogsRead": 0,
+    "oldArtifactsRead": 0,
+    "businessRefsWritten": 0,
+    "generatedFilesHandwritten": false
+  }
+}

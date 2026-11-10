@@ -1,0 +1,227 @@
+{
+  "schema": "issue1512.cp53.archive-verification/v1",
+  "observedAt": "2026-11-10T01:53:54Z",
+  "scope": "Independent readback of already frozen Git blobs; no Actions original log or ZIP re-download.",
+  "source": {
+    "head": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "tree": "42d33eb7faf77d7049607523599de9374e065660",
+    "actualCheckout": "9faa0e581b370237fe541ce3087c28a334ddb798",
+    "attempt": 1,
+    "mainRunId": 42731843562
+  },
+  "archive": {
+    "existingPayloadPaths": 79,
+    "distinctBlobs": 71,
+    "existingPayloadBytes": 11869367,
+    "allBytesSha256AndGitBlobRecomputed": true,
+    "hashMismatches": 0,
+    "missingPayloads": 0,
+    "newSignedUrlCandidates": 0,
+    "priorEvidencePrefixAbsent": true,
+    "parentCommit": "756901d5c1c2d1acbd5fdc127cffed158132a7bb",
+    "parentTree": "19196dea5caba0809647f4b45c1fb39912d5f68a"
+  },
+  "nativeRecalculation": {
+    "verifierSourceBlob": "5cc66fff9c158dcdd23c5dacf4e84f0ef6f89128",
+    "allFiveOriginalJsonInputsUsed": true,
+    "arithmetic": {
+      "records": 24,
+      "checkpoints": 12,
+      "segments": 8,
+      "bucketCells": 2280,
+      "ordinalRows": 1226,
+      "errors": [
+        {
+          "label": "native full-window exceeds web"
+        }
+      ]
+    },
+    "structuralOrArithmeticErrors": 0,
+    "budgetFailures": 1,
+    "windows": {
+      "webLogin": {
+        "queryCalls": 438,
+        "receiveBytes": 95951,
+        "sendBytes": 278721,
+        "unknownReadings": 0,
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 438,
+          "uncaptured": 0,
+          "unknownContext": 87,
+          "unknownStatement": 127,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 35,
+            "completedInWindow": 35,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 35,
+            "completedInWindow": 35,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      },
+      "nativeLogin": {
+        "queryCalls": 448,
+        "receiveBytes": 99775,
+        "sendBytes": 299008,
+        "unknownReadings": 0,
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 448,
+          "uncaptured": 0,
+          "unknownContext": 91,
+          "unknownStatement": 128,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 15,
+            "completedInWindow": 15,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 41,
+            "completedInWindow": 41,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      },
+      "startup-bundled": {
+        "queryCalls": 116,
+        "receiveBytes": 26881,
+        "sendBytes": 58087,
+        "unknownReadings": 0,
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 116,
+          "uncaptured": 0,
+          "unknownContext": 36,
+          "unknownStatement": 29,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 5,
+            "completedInWindow": 2,
+            "crossesStart": 0,
+            "crossesEnd": 3,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 15,
+            "completedInWindow": 8,
+            "crossesStart": 0,
+            "crossesEnd": 7,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      },
+      "startup-hosted": {
+        "queryCalls": 224,
+        "receiveBytes": 51672,
+        "sendBytes": 147044,
+        "unknownReadings": 0,
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 224,
+          "uncaptured": 0,
+          "unknownContext": 53,
+          "unknownStatement": 70,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      }
+    },
+    "nativeFunctional": "passed",
+    "fullBudget": "failed",
+    "firstBudget": "passed_with_cross_end_requests_preserved",
+    "originalFirstPair": 1,
+    "windowChanges": 0,
+    "pairReselections": 0,
+    "unknownDeductions": 0,
+    "coldLatencyIsNotANewGate": true
+  },
+  "candidate907d": {
+    "sha": "907d281478d587fce6895ec6f48bec25f75dc085",
+    "tree": "80426e816c67be18a3b5836f52c57e027bdc6d8d",
+    "parents": [
+      "5852aa8832c07fdeef43665dd5e156ce5516e3ea"
+    ],
+    "scope": "Two test projection matcher strings only. Static review is not a new PG pass.",
+    "candidateBlob": "4ace316509651d81aaeff3055156c3e5227439b3",
+    "reviewBlob": "11fd0c639f2aec4d22e8d7fc5d847e71ff9383c7",
+    "runtimeValidation": "not performed in this archive"
+  },
+  "productionAcceptance": {
+    "passed": 0,
+    "required": 2,
+    "status": "not started"
+  },
+  "operationsByArchiveAgent": {
+    "originalActionsLogReads": 0,
+    "artifactZipDownloads": 0,
+    "workflowDispatches": 0,
+    "reruns": 0,
+    "appOrDatabaseRuns": 0,
+    "modelCalls": 0,
+    "resourcesCreated": 0,
+    "sourceRefWrites": 0,
+    "evidenceRefWrites": 0
+  },
+  "limits": [
+    "Frozen evidence preserves original statuses and unknowns; old successful PG evidence does not replace formal5852 failure.",
+    "Native SUCCESS is not a complete query-budget pass.",
+    "Strict UI gate excludes both the database result and separate Local Node22 workflow.",
+    "Mac fixture finally is present in source, but original run lacks independent final process/directory/bootout receipt.",
+    "Hosted Native job terminal and orphan cleanup do not constitute an explicit PostgreSQL stop/probe receipt.",
+    "No parity PNG pixels, production PostHog pixels, live production cases or subscription-runtime applicability were newly verified by this archive."
+  ]
+}

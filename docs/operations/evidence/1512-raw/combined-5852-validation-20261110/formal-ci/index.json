@@ -1,0 +1,247 @@
+{
+  "schema": "issue1512.formal5852-ci-reader-index/v1",
+  "createdAt": "2026-11-10T01:30:15.777Z",
+  "repository": "alexj11324/Mikka",
+  "head": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "actualCheckout": "9faa0e581b370237fe541ce3087c28a334ddb798",
+  "tree": "42d33eb7faf77d7049607523599de9374e065660",
+  "attempt": 1,
+  "mainRunId": 42731843562,
+  "status": "terminal_ci_failed_native_budget_reported_failed_production_not_run",
+  "payloadCount": 19,
+  "payloadBytes": 4496797,
+  "archiveFileCountIncludingIndex": 20,
+  "indexSelfExcludedFromManifest": true,
+  "files": [
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "3ba6d054308ac363dcbc9a320e7a9cce9ffa9f90",
+      "bytes": 4347,
+      "sha256": "2d6b00714aa508ee84f711517f0c13079cca4375a414d2847f27a341aa26fa22"
+    },
+    {
+      "path": "metadata/exact-head-final.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "cdefb8ff575508760b3c5df19541d86356851356",
+      "bytes": 225241,
+      "sha256": "9a1870393395d6e36b99cca60226640b017b90de1b74f8a3af289ac98418b7e4"
+    },
+    {
+      "path": "original-responses/129551876738.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "5ad1917235eb0b7d2fbfa31872af8679db89f83a",
+      "bytes": 54086,
+      "sha256": "dfc770d8c07c0f3e07296d5cfefe0afd592408cf96097d15685ae883207e3777",
+      "role": "full original log tool response",
+      "jobId": 129551876738
+    },
+    {
+      "path": "original-responses/129552003697.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "fcea91c9780368496c199778058efea1f29d2880",
+      "bytes": 144119,
+      "sha256": "c1bb63d228cc64fdfe9ec5961e4ac0f8a622085bc1c902d17c5dcd9b7b399ae4",
+      "role": "full original log tool response",
+      "jobId": 129552003697
+    },
+    {
+      "path": "original-responses/129552003908.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "af037646459f2fddaa5811eff6d834b29af0adac",
+      "bytes": 140492,
+      "sha256": "6a328db030717c622be65b510a215cc6aef9e5049723fbe4a88c732b69340f13",
+      "role": "full original log tool response",
+      "jobId": 129552003908
+    },
+    {
+      "path": "original-responses/129552003968.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "02be42cdb54a99e4dce4120f69a5996950300418",
+      "bytes": 706061,
+      "sha256": "97195c5c2e3c133cdff98561f55c48019e8fafa566c036fc0fb4524d468f6f5e",
+      "role": "full original log tool response",
+      "jobId": 129552003968
+    },
+    {
+      "path": "original-responses/129552004014.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "ed5dfe9fead18bed3495ac806b360ff1ce827be4",
+      "bytes": 1049804,
+      "sha256": "68da2ac9ab8af5282d1d9b4ecc9526bdc95f2f21ddc8117652efb2ba0eb2092f",
+      "role": "full original log tool response",
+      "jobId": 129552004014
+    },
+    {
+      "path": "original-responses/129563816535.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "26f5ceeb8a91d0afb5c027d14cc5630f2976f34d",
+      "bytes": 14609,
+      "sha256": "64e84962f10c31f9386aba2f7d003baf87cefabc15a596491381a9163519d37e",
+      "role": "full original strict log tool response",
+      "jobId": 129563816535
+    },
+    {
+      "path": "originals/129551876738.log",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "989174f5612eaffa364b517728571cefb88d9763",
+      "bytes": 52535,
+      "sha256": "4cdac33e42025ea5993ef21ff1ffb45f4bc57d41007488ccff3321aa7aaeac6f",
+      "role": "single original terminal job log",
+      "jobId": 129551876738
+    },
+    {
+      "path": "originals/129552003697.log",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "03229ab5d94e7e73227882910d8a8719e43c172f",
+      "bytes": 126776,
+      "sha256": "b500703fca6ae72da25ebf3034fa1eedcba288d5c035f5422cea9f8fc546b7d9",
+      "role": "single original terminal job log",
+      "jobId": 129552003697
+    },
+    {
+      "path": "originals/129552003908.log",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "1d6cc7f993be182e11df26e04d6ca366aa7fb284",
+      "bytes": 138001,
+      "sha256": "f68c1f2a913856daba69142247f7d8b5ac4a1e172c2deb3c188801674ee398a2",
+      "role": "single original terminal job log",
+      "jobId": 129552003908
+    },
+    {
+      "path": "originals/129552003968.log",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "471b9375f26f9b62c16f52cca0d4e1e1ff9b1eee",
+      "bytes": 682673,
+      "sha256": "9d8bab1a995e9c4632069567df28285d5383e779bde6617b0251a4e07e9f1a58",
+      "role": "single original terminal job log",
+      "jobId": 129552003968
+    },
+    {
+      "path": "originals/129552004014.log",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "a2e1fb11deeb33629a61a6a2cd40cb43feaa57fe",
+      "bytes": 1028571,
+      "sha256": "def2ebfb84f41b76e6eb16a924ad638277fa35c5cb6f9b4e4cb51480a79b2dd0",
+      "role": "single original terminal job log",
+      "jobId": 129552004014
+    },
+    {
+      "path": "originals/129563816535.log",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "963d15e5f70da55c11c432712bdd3abab310b6d4",
+      "bytes": 14086,
+      "sha256": "a1db382d0f2bfa1a0dceae21d56e6fdfff9ef4e446a5149ab6e0cc69c0636161",
+      "role": "single original strict terminal log",
+      "jobId": 129563816535
+    },
+    {
+      "path": "proofs/actual-source-binding.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "bb2617afa2c126ca0c9f67dbc16c1f5bb5f9a4db",
+      "bytes": 1009,
+      "sha256": "c28c9f73df4811b422974cd1df47f89af90719e6bf1a15dc71589f5dfc834446",
+      "role": "early immutable source binding; later runtime execution superseded by execution proof"
+    },
+    {
+      "path": "proofs/local-node22-failure.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "be24851657129e8f7d246ecad600ae7e635c652f",
+      "bytes": 5532,
+      "sha256": "401458f9843273302d366ef5c18d15b33507a1684b171247326b561fa10607d7"
+    },
+    {
+      "path": "proofs/strict-result.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "508eb97c40cfe0c58b2279a2e0ff7fe4ad8cd477",
+      "bytes": 1870,
+      "sha256": "94a105db6877204287d1a4e9362c89eb468831159a1bd3e8633cdd495fda31c2"
+    },
+    {
+      "path": "proofs/unit-execution-and-personal-policy.json",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "802dfe9409b2538205d3b2338a95030f3b7b2284",
+      "bytes": 83071,
+      "sha256": "5e85c686910f6712529fe36e59dcf8d34f0fa9efe926e04a6bda3e4088295bb8"
+    },
+    {
+      "path": "sources/lib/personal-policy.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "gitBlob": "04c5ed8d4a2f724b6999609dbb9732c53c10ced1",
+      "bytes": 23914,
+      "sha256": "312f2464a98dc77556d8cf4c04056213421f934accfe17e948ea11c48fec1773",
+      "role": "actual selected merged test source; existing repository blob"
+    }
+  ],
+  "integrity": {
+    "allPayloadBytesSha256GitBlobRecomputed": true,
+    "allNewBlobsRemoteReadbackExact": true,
+    "sourceBlobFetchedAtExactHeadAndRehashed": true,
+    "originalReadCounts": {
+      "129552003697": 1,
+      "129552003908": 1,
+      "129552004014": 1,
+      "129552003968": 1,
+      "129551876738": 1,
+      "129563816535": 1
+    },
+    "originalActionsLogReads": 6,
+    "artifactZipReads": 0,
+    "refWrites": 0
+  },
+  "externalEvidence": {
+    "pgIndex": "a82455dfbc8aeabec77a78bb9f7e99e87086cc36",
+    "pgFinalMetadata": "d8bdc67920bf8134796789a9fbd88e17b3ec0210",
+    "nativeIndex": "owned by native_diag_runner; Root attaches separately without this reader re-fetching",
+    "nativeBudgetRootReport": {
+      "fullNative": 448,
+      "fullWeb": 438,
+      "firstBundled": 116,
+      "firstHosted": 224,
+      "independentlyRecomputedByThisReader": false
+    },
+    "productionCases": 0
+  },
+  "closure": {
+    "workflowRuns": {
+      "total": 12,
+      "success": 10,
+      "failure": 2
+    },
+    "jobs": {
+      "total": 41,
+      "success": 34,
+      "failure": 3,
+      "skipped": 4
+    },
+    "checks": {
+      "total": 42,
+      "success": 35,
+      "failure": 3,
+      "skipped": 4
+    },
+    "unresolvedThirdPartySuites": 6,
+    "prOpen": true,
+    "prMergeableState": "blocked",
+    "noFullPassClaim": true
+  }
+}

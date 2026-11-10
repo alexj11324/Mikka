@@ -1,0 +1,649 @@
+{
+  "schema": "mikka.issue1512.historical-probe-applicability-5852.v1",
+  "observedAt": "2026-11-10T01:00:00Z",
+  "candidate": {
+    "commit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "tree": "42d33eb7faf77d7049607523599de9374e065660"
+  },
+  "priorSourceReview": "4cb08d969c98591fd36ab504072afbcddea274d2",
+  "actualHistoricalExecution": {
+    "source": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+    "runId": 42552094175
+  },
+  "source": {
+    "historicalReview": "4cb08d969c98591fd36ab504072afbcddea274d2",
+    "currentHead": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "currentTree": "42d33eb7faf77d7049607523599de9374e065660",
+    "probeDependencies": [
+      {
+        "path": "scripts/ops/run-trace-benchmark.ts",
+        "before": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+        "after": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+        "same": true,
+        "current5852": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "apps/api/runtime/request-trace.ts",
+        "before": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+        "after": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+        "same": true,
+        "current5852": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/tracing/node.ts",
+        "before": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+        "after": "00775a5928228262a66b12b845ee0dc18f6c6047",
+        "same": false,
+        "current5852": "00775a5928228262a66b12b845ee0dc18f6c6047",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/tracing/config.ts",
+        "before": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+        "after": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+        "same": true,
+        "current5852": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/tracing/context.ts",
+        "before": "fe005d26c2ea903250683d9351334b95ef328383",
+        "after": "fe005d26c2ea903250683d9351334b95ef328383",
+        "same": true,
+        "current5852": "fe005d26c2ea903250683d9351334b95ef328383",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/tracing/spans.ts",
+        "before": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+        "after": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+        "same": true,
+        "current5852": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/tracing/sampling.ts",
+        "before": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+        "after": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+        "same": true,
+        "current5852": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/tracing/sanitize.ts",
+        "before": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+        "after": "9857985199066a39fdc96ba73f7047d21ba6406f",
+        "same": false,
+        "current5852": "9857985199066a39fdc96ba73f7047d21ba6406f",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/tracing/logs.ts",
+        "before": "ac6a917887a94a6a673410753d4645e2dba25d21",
+        "after": "ac6a917887a94a6a673410753d4645e2dba25d21",
+        "same": true,
+        "current5852": "ac6a917887a94a6a673410753d4645e2dba25d21",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/tracing/flush.ts",
+        "before": "0149083f1f9e36adca769c2e799afe84a90bd139",
+        "after": "0149083f1f9e36adca769c2e799afe84a90bd139",
+        "same": true,
+        "current5852": "0149083f1f9e36adca769c2e799afe84a90bd139",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/tracing/labels.ts",
+        "before": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+        "after": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+        "same": true,
+        "current5852": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "packages/protocol/src/tracing.ts",
+        "before": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+        "after": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+        "same": true,
+        "current5852": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "packages/protocol/src/coded-error.ts",
+        "before": "53c619750e667cba008192495928112da5de16f1",
+        "after": "53c619750e667cba008192495928112da5de16f1",
+        "same": true,
+        "current5852": "53c619750e667cba008192495928112da5de16f1",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "packages/protocol/src/trace-context.ts",
+        "before": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+        "after": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+        "same": true,
+        "current5852": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/base-path-config.mjs",
+        "before": "a5338d3516d88e4f911031a316ae5187a379ba33",
+        "after": "a5338d3516d88e4f911031a316ae5187a379ba33",
+        "same": true,
+        "current5852": "a5338d3516d88e4f911031a316ae5187a379ba33",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "scripts/test-accounts/database-target.mjs",
+        "before": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+        "after": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+        "same": true,
+        "current5852": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "packages/protocol/src/local-test-mode.ts",
+        "before": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+        "after": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+        "same": true,
+        "current5852": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "scripts/server-test.mjs",
+        "before": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+        "after": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+        "same": true,
+        "current5852": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "packages/protocol/package.json",
+        "before": "52a7ed583d756b1575697556e29a6f65438d2410",
+        "after": "52a7ed583d756b1575697556e29a6f65438d2410",
+        "same": true,
+        "current5852": "52a7ed583d756b1575697556e29a6f65438d2410",
+        "sameAsPriorCandidate": true
+      },
+      {
+        "path": "lib/posthog-config.ts",
+        "before": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+        "after": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+        "same": true,
+        "current5852": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+        "sameAsPriorCandidate": true
+      }
+    ]
+  },
+  "dependency": {
+    "sections": {
+      "packages": {
+        "oldCount": 2362,
+        "currentCount": 2381,
+        "changed": [],
+        "removed": [],
+        "added": [
+          "'@authenio/xml-encryption@6.0.2'",
+          "'@better-auth/sso@1.7.12'",
+          "'@nodable/entities@3.1.0'",
+          "'@xmldom/is-dom-node@1.0.1'",
+          "anynum@1.0.1",
+          "fast-xml-builder@1.3.1",
+          "fast-xml-parser@5.12.0",
+          "is-unsafe@2.0.3",
+          "path-expression-matcher@1.6.2",
+          "samlify@2.15.1",
+          "strnum@2.5.1",
+          "tldts-core@7.4.20",
+          "tldts@7.4.19",
+          "xml-crypto@6.4.0",
+          "xml-escape@1.1.0",
+          "xml-naming@0.3.0",
+          "xml@1.0.1",
+          "xpath@0.0.33",
+          "xpath@0.0.35"
+        ]
+      },
+      "snapshots": {
+        "oldCount": 2438,
+        "currentCount": 2457,
+        "changed": [],
+        "removed": [],
+        "added": [
+          "'@authenio/xml-encryption@6.0.2'",
+          "'@better-auth/sso@1.7.12(patch_hash=df295fc634aab5294da3c99dda5d8fe160e24af563a9f32d67240699cb1e36d2)(@better-auth/core@1.7.12(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.2)(@opentelemetry/api@1.10.0)(better-call@1.4.4(zod@4.6.7))(jose@6.2.12)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.2)(better-auth@1.7.12(@opentelemetry/api@1.10.0)(drizzle-orm@0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1))(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(solid-js@2.0.0-rc.0)(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@25.9.9)(happy-dom@15.11.7)(vite@8.3.6(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.0))))(better-call@1.4.4(zod@4.6.7))'",
+          "'@nodable/entities@3.1.0'",
+          "'@xmldom/is-dom-node@1.0.1'",
+          "anynum@1.0.1",
+          "fast-xml-builder@1.3.1",
+          "fast-xml-parser@5.12.0",
+          "is-unsafe@2.0.3",
+          "path-expression-matcher@1.6.2",
+          "samlify@2.15.1",
+          "strnum@2.5.1",
+          "tldts-core@7.4.20",
+          "tldts@7.4.19",
+          "xml-crypto@6.4.0",
+          "xml-escape@1.1.0",
+          "xml-naming@0.3.0",
+          "xml@1.0.1",
+          "xpath@0.0.33",
+          "xpath@0.0.35"
+        ]
+      }
+    },
+    "rootRuntime": [
+      {
+        "name": "@chat-adapter/state-pg",
+        "before": "^4.43.0",
+        "after": "^4.43.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/api",
+        "before": "1.10.0",
+        "after": "1.10.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/api-logs",
+        "before": "0.223.0",
+        "after": "0.223.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/core",
+        "before": "2.12.0",
+        "after": "2.12.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/exporter-logs-otlp-proto",
+        "before": "0.223.0",
+        "after": "0.223.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/exporter-trace-otlp-proto",
+        "before": "0.223.0",
+        "after": "0.223.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/instrumentation",
+        "before": "0.223.0",
+        "after": "0.223.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/instrumentation-pg",
+        "before": "0.76.0",
+        "after": "0.76.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/resources",
+        "before": "2.12.0",
+        "after": "2.12.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/sdk-logs",
+        "before": "0.223.0",
+        "after": "0.223.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/sdk-trace-base",
+        "before": "2.12.0",
+        "after": "2.12.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/sdk-trace-node",
+        "before": "2.12.0",
+        "after": "2.12.0",
+        "equal": true
+      },
+      {
+        "name": "@opentelemetry/semantic-conventions",
+        "before": "1.43.0",
+        "after": "1.43.0",
+        "equal": true
+      },
+      {
+        "name": "@vercel/functions",
+        "before": "3.10.2",
+        "after": "3.10.2",
+        "equal": true
+      },
+      {
+        "name": "pg",
+        "before": "^8.23.1",
+        "after": "^8.23.1",
+        "equal": true
+      }
+    ],
+    "beforePackageManager": "pnpm@10.34.3",
+    "currentPackageManager": "pnpm@10.34.3",
+    "enginesEqual": true,
+    "method": "Exact pinned lock package/snapshot record text comparison; not a runtime or new performance measurement.",
+    "targetedRuntimeRecordChecks": [
+      {
+        "section": "packages",
+        "key": "'@opentelemetry/api-logs@0.223.0'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/api-logs@0.223.0'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "packages",
+        "key": "'@opentelemetry/api@1.10.0'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/api@1.10.0'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "packages",
+        "key": "'@opentelemetry/api@1.9.0'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/api@1.9.0'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/context-async-hooks@2.12.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/core@2.12.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/core@2.12.0(@opentelemetry/api@1.9.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/exporter-logs-otlp-proto@0.223.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/exporter-logs-otlp-proto@0.223.0(@opentelemetry/api@1.9.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/exporter-trace-otlp-proto@0.223.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/exporter-trace-otlp-proto@0.223.0(@opentelemetry/api@1.9.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/instrumentation-pg@0.76.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/instrumentation@0.223.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/otlp-exporter-base@0.223.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/otlp-exporter-base@0.223.0(@opentelemetry/api@1.9.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/otlp-transformer@0.223.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/otlp-transformer@0.223.0(@opentelemetry/api@1.9.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/resources@2.12.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/resources@2.12.0(@opentelemetry/api@1.9.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/sdk-logs@0.223.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/sdk-logs@0.223.0(@opentelemetry/api@1.9.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/sdk-metrics@2.12.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/sdk-metrics@2.12.0(@opentelemetry/api@1.9.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/sdk-trace-node@2.12.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/sdk-trace@2.12.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/sdk-trace@2.12.0(@opentelemetry/api@1.9.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "packages",
+        "key": "'@opentelemetry/semantic-conventions@1.43.0'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/semantic-conventions@1.43.0'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@opentelemetry/sql-common@0.42.0(@opentelemetry/api@1.10.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "'@vercel/functions@3.10.2(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0)'",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "packages",
+        "key": "pg-cloudflare@1.4.1",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "pg-cloudflare@1.4.1",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "packages",
+        "key": "pg-connection-string@2.14.1",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "pg-connection-string@2.14.1",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "packages",
+        "key": "pg-int8@1.0.1",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "pg-int8@1.0.1",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "pg-pool@3.14.0(pg@8.23.1)",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "packages",
+        "key": "pg-protocol@1.16.1",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "pg-protocol@1.16.1",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "packages",
+        "key": "pg-types@2.2.0",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "pg-types@2.2.0",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "packages",
+        "key": "pg@8.23.1",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "pg@8.23.1",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "packages",
+        "key": "tsx@4.23.15",
+        "bothPresent": true,
+        "equal": true
+      },
+      {
+        "section": "snapshots",
+        "key": "tsx@4.23.15",
+        "bothPresent": true,
+        "equal": true
+      }
+    ],
+    "recordParser": "Exact two-space package/snapshot mapping headers, including inline empty maps; all section header lines accounted for."
+  },
+  "disposition": {
+    "retained": "Completed historical finite Web HTTP/PG controlled-failure retention and scoped latency baseline.",
+    "changedSincePriorReview": "None of the 20 probe source dependencies or previously pinned runtime package/snapshot records changed; the current lock adds unrelated Organization SSO/XML packages only.",
+    "runtimeNotReexecuted": true,
+    "measurementNotRelabeled": true,
+    "oldUnmeasuredChangesPreserved": [
+      "serverless exporter drain; benchmark uses serverless:false",
+      "additional closed transport enum branch in sanitizer"
+    ],
+    "exclusions": [
+      "production collector network",
+      "whole daemon or CLI cost",
+      "provider latency",
+      "current-source production concurrency"
+    ],
+    "rerun": "No new concrete invalidation found; do not repeat the unchanged probe merely for a newer App SHA.",
+    "requiredNext": "Actual source-bound production trace/AI/Logs/Replay and Native gate remain pending."
+  }
+}
