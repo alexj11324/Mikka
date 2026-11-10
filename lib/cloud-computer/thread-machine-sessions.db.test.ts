@@ -36,7 +36,7 @@ test('real PG: VM intervals follow confirmed lifecycle and stay inside the Facto
         "ownerId" text REFERENCES "user"(id) ON DELETE CASCADE,"workspaceId" uuid NOT NULL,"botId" uuid,
         "sandboxId" text UNIQUE,state text,"runningSince" timestamptz,"createdAt" timestamptz DEFAULT now(),
         "endedAt" timestamptz,"lifecycleAt" timestamptz,lifecycle jsonb NOT NULL DEFAULT '{}',"operationId" uuid NOT NULL DEFAULT gen_random_uuid(),
-        "workerLeaseId" uuid,"workerLeaseUntil" timestamptz,epoch integer NOT NULL DEFAULT 1);`)
+        "workerLeaseId" uuid,"workerLeaseUntil" timestamptz,epoch integer NOT NULL DEFAULT 1,"restoreStartedAt" timestamptz);`)
     await pool.query('INSERT INTO "user" VALUES ($1),($2)', [owner, otherOwner])
     await pool.query('INSERT INTO bots VALUES ($1,$2,$3),($4,$2,$3),($5,$2,$6)', [bot, owner, workspace, chatBot, foreignBot, otherWorkspace])
     await pool.query('INSERT INTO factory_tasks VALUES ($1,$2,$3,$4,$5)', [task.id, owner, task.issueId, chatBot, workspace])
