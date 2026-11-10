@@ -17,8 +17,8 @@ const BASE_MIGRATIONS = [
   '20261101140000_coordinator_bots.sql',
 ]
 const NEW_MIGRATIONS = [
-  '20261110250000_workspace_only_app_permissions.sql',
-  '20261110250001_retire_worker_run_policy.sql',
+  '20261110230000_workspace_only_app_permissions.sql',
+  '20261110230001_retire_worker_run_policy.sql',
 ]
 const BASE_SCHEMA = `
   create table "user"(id text primary key);

@@ -490,8 +490,11 @@ appTools.maxRetries = 0
 export async function accountWrite(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  // 团队权限 › 允许使用的应用 blocks the app for a named Bot; the workspace's
-  // one app setting (deny / ask / allow) decides inside writeAccountAction.
+  // Two app surfaces, both checked before anything is sent: 团队权限 › 允许使用的应用
+  // blocks the app outright for a named Bot, and the workspace's own app setting
+  // (deny / ask / allow, 设置 › 应用与运行权限) decides inside writeAccountAction
+  // through lib/operations/account-write-setting.ts. Reading only the first let the
+  // Coordinator send mail while the same app's call_app_tool was denied (ALE-8).
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return writeAccountAction(userId, action, input, accountId, botId ?? null)
 }

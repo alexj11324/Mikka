@@ -57,3 +57,32 @@ test('the browser gate takes the workspace layer only', () => {
   assert.doesNotMatch(authority, /agent_kit_heads/)
   assert.match(authority, /browserPermission\(effect,computer,workspace\)/)
 })
+
+test('every first-class write path reads the workspace app policy, not only the 允许使用的应用 block', () => {
+  // ALE-8: the Coordinator's accountWrite checked only appBlockedForBot (workspace_app_policies) and the first-class
+  // writes were missing from the workspace key map, so Gmail set to 不允许 blocked call_app_tool(GMAIL_*) while
+  // send_email still sent. Both the step and the store must reach the workspace layer now.
+  const steps = source['workflows/coordinator/steps.ts']
+  assert.match(steps, /writeAccountAction\(userId, action, input, accountId, botId \?\? null\)/)
+  const store = source['lib/pending-action-store.ts']
+  assert.match(store, /accountWriteSetting\(db, userId, botId, action\)/)
+  assert.match(store, /accountWriteOutcome\(setting/)
+  // The key map carries the three actions, so a deny saved for the app reaches them.
+  const keys = readFileSync(join(root, 'lib/operations/app-permission-keys.ts'), 'utf8')
+  for (const action of ['send_email', 'create_calendar_event', 'update_calendar_event']) {
+    assert.match(keys, new RegExp(`^\\s*${action}: '(gmail|googlecalendar)'`, 'm'), `${action} is in the workspace key map`)
+  }
+  // An approval re-reads the workspace instead of trusting the card forever.
+  const pending = source['lib/pending-actions.ts']
+  assert.match(pending, /approvalPolicyBlock\(userId, row\)/)
+  assert.match(pending, /accountWriteSetting\(db, userId, row\.botId, row\.action\)/)
+})
+
+test('the page maps a stored legacy action key back to its app with the action -> app map', () => {
+  // LEGACY_APP_ACTIONS runs app -> action; using it to read a stored key backwards hid a disconnected app whose only
+  // stored key was `send_slack_message`.
+  const page = source['components/settings/bot-permissions.tsx']
+  assert.match(page, /import \{[^}]*LEGACY_WRITE_ACTIONS[^}]*\} from '@\/lib\/operations\/app-permission-keys'/)
+  assert.match(page, /LEGACY_WRITE_ACTIONS\[key\]/)
+  assert.doesNotMatch(page, /LEGACY_APP_ACTIONS\[key\]/)
+})

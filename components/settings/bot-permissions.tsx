@@ -11,7 +11,7 @@ import { OWN_APP_STATES_KEY, fetchOwnAppStates } from '@/components/plugins/plug
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { withBasePath } from '@/lib/base-path'
 import { CONFIGURABLE_ACTIONS, CONFIGURABLE_PERMISSIONS, type PermissionDecision } from '@mikka/protocol/agent-policy'
-import { LEGACY_APP_ACTIONS, appPermissionValue, withAppPermissions } from '@/lib/operations/app-permission-keys'
+import { LEGACY_APP_ACTIONS, LEGACY_WRITE_ACTIONS, appPermissionValue, withAppPermissions } from '@/lib/operations/app-permission-keys'
 import { OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import type { BotPermissionAction, BotPermissionApp, BotPermissionAppTools, PermissionChoice, PermissionValue, SettingsBotPermissionsProps } from '@/components/slots/settings-bot-permissions-contract'
 
@@ -41,7 +41,8 @@ async function agentPolicy<T>(body: unknown): Promise<T> {
 
 /** The page's own error: a failed read, or a workspace with no Bot to anchor
  * its policy. Without a Bot the save and catalogue routes have no target, so
- * the page says why instead of failing silently. */
+ * the page says why instead of failing silently. `bots` is undefined until the
+ * list loads, so an empty array means loaded-and-empty, not still-reading. */
 export function botPermissionsErrorKey(input: { bots: unknown[] | undefined; workspaceId?: string; readFailed: boolean }): 'readFailed' | 'noBotInWorkspace' | null {
   if (input.readFailed) return 'readFailed'
   if (input.workspaceId && input.bots?.length === 0) return 'noBotInWorkspace'
@@ -69,13 +70,21 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
   // Catalogue reads are lazy: GitHub plus the legacy write apps load with the page, every other app on open.
   const [catalogues, setCatalogues] = useState<Record<string, BotPermissionAppTools | 'loading'>>({})
   const started = useRef(new Set<string>())
-  // The workspace-scoped routes resolve their workspace through a Bot the person owns in it. The page has no Bot
-  // picker: any Bot in the workspace names the same workspace.
+  // The workspace-scoped routes resolve their workspace through a Bot the person owns in it, so the page reads and
+  // saves through one anchor. `listOwnerBots` orders the person's Coordinator first, so the anchor is that row when it
+  // exists; the page has no Bot picker because any Bot in the workspace names the same workspace. A workspace the
+  // person owns no Bot in has no anchor, and the page says so instead of silently doing nothing (ALE-8).
   const anchor = bots?.[0] ?? null
   const botId = anchor?.id ?? null
   // The worker the run policy is read through: the person's first agent. The workspace's run policy is the same for
   // every Bot.
   const agentId = agents?.[0]?.id ?? null
+  // A save or catalogue read with no anchor cannot reach the workspace routes. Throwing keeps that visible: the
+  // `save` wrapper turns it into the page's own error line rather than a control that quietly does nothing.
+  function requireAnchor(): string {
+    if (!botId) throw new PermissionsReadError('noBotInWorkspace')
+    return botId
+  }
 
   // The workspace's policy is the page's only source of truth; no Bot layer is read or applied.
   const workspace = useSWR(botId && workspaceId ? ['workspace-write-policy', workspaceId, botId] : null, () => botId ? definition<WritePolicy>(botId, { view: 'workspace_write_policy' }) : null, { revalidateOnFocus: false })
@@ -106,8 +115,10 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
   const connected = apps.connectedToolkits().filter(id => appState(apps.accountsFor(id)).on)
   const ownConnected = OWN_APPS.filter(id => id === 'github' && own.data?.states[id] === 'connected')
   const known = new Set([...ownConnected, ...connected])
-  // A legacy write key names the same app's choice, so an app stored only under the old key still appears.
-  const withSettings = [...new Set(Object.keys(stored).map(key => LEGACY_APP_ACTIONS[key] ?? key))].filter(id => known.has(id))
+  // A legacy write key names the same app's choice, so an app stored only under the old key still appears. The map is
+  // action -> app (`LEGACY_WRITE_ACTIONS`, not `LEGACY_APP_ACTIONS`, which runs the other way): reading it backwards
+  // left a disconnected app whose only stored key was `send_slack_message` out of the page entirely.
+  const withSettings = [...new Set(Object.keys(stored).map(key => LEGACY_WRITE_ACTIONS[key] ?? key))].filter(id => known.has(id))
   const appList: BotPermissionApp[] | null = apps.loading || (!own.data && !own.error) || !bots || workspace.isLoading || !workspaceId ? null : [...new Set([...ownConnected, ...connected, ...withSettings])].map(id => {
     const account = apps.accountsFor(id).find(item => item.enabled)
     const catalogue = catalogues[id]
@@ -133,11 +144,12 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
     // `coordinator` is not an app-tools Bot id; without a real Bot in this workspace there is nothing to read through.
     if (!botId || started.current.has(id)) return
     started.current.add(id)
+    const anchorId = botId
     setCatalogues(previous => ({ ...previous, [id]: 'loading' }))
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 12_000)
     // The route already bounds the catalogue (`private, max-age=60`), so the browser cache serves a reopen.
-    fetch(withBasePath(`/api/bots/${botId}/app-tools?app=${encodeURIComponent(id)}`), { credentials: 'same-origin', signal: controller.signal })
+    fetch(withBasePath(`/api/bots/${anchorId}/app-tools?app=${encodeURIComponent(id)}`), { credentials: 'same-origin', signal: controller.signal })
       .then(async response => {
         const body = await response.json().catch(() => null) as (BotPermissionAppTools & { error?: string }) | null
         if (!response.ok || !body || typeof body.count !== 'number') throw new Error('catalogueUnavailable')
@@ -189,10 +201,12 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
         await run.mutate()
         return
       }
-      // Both kinds save the workspace's one policy.
-      if (!writable || !workspace.data || !botId) return
+      // Both kinds save the workspace's one policy. A page that loaded no policy cannot save one; an anchor that is
+      // missing is reported, not swallowed.
+      if (!admin || !workspace.data) return
+      const anchorId = requireAnchor()
       const permissions = withAppPermissions(workspace.data.permissions, ids, value === 'default' ? null : value)
-      await definition(botId, { body: { action: 'set_workspace_write_policy', permissions, expectedVersion: workspace.data.version } })
+      await definition(anchorId, { body: { action: 'set_workspace_write_policy', permissions, expectedVersion: workspace.data.version } })
       await workspace.mutate()
     }) },
     onLoadTools: loadTools,

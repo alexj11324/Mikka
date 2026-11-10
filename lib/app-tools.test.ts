@@ -120,6 +120,31 @@ test('a legacy-only deny (send_slack_message) governs call_app_tool for the same
   assert.deepEqual(appCallSettingKeys('slack_send_message', 'slack'), ['slack_send_message', 'slack', 'send_slack_message'])
 })
 
+test('the first-class mail and calendar writes are governed by their app key, as call_app_tool already was', () => {
+  // ALE-8: Gmail set to 不允许 blocked call_app_tool(GMAIL_*) but not the Coordinator's send_email, because these
+  // actions were missing from the workspace key map. Each now resolves its app's stored choice.
+  for (const [action, app] of [['send_email', 'gmail'], ['create_calendar_event', 'googlecalendar'], ['update_calendar_event', 'googlecalendar']] as const) {
+    assert.equal(appCallSetting({ workspace: { [app]: 'deny' } }, action, app), 'deny', action)
+    assert.equal(appCallSetting({ workspace: { [app]: 'ask' } }, action, app), 'ask', action)
+    assert.equal(appCallSetting({ workspace: { [app]: 'allow' } }, action, app), 'allow', action)
+    assert.equal(appCallSetting({ workspace: {} }, action, app), null, action)
+  }
+})
+
+test('an unreadable setting leaves the call to the judge instead of refusing it (decision 2026-11-01-1330)', async () => {
+  // The P1 note in #1880 said an unreadable layer should refuse. The ruling in
+  // lib/operations/write-judgment.ts and docs/design/decisions/2026-11-01-1330 says it names nothing, so the
+  // judge decides and its own fallback lets the call through. `deps.setting` returns null for an unreadable layer;
+  // here the judge's own answer is the last word.
+  let judged = 0
+  const allowed = deps({ setting: async () => null, judge: async () => { judged++; return 'allow' } })
+  assert.equal((await callAppTool(allowed.deps, call('SLACK_SEND_MESSAGE', 'slack')) as { status?: string }).status, 'done')
+  assert.equal(judged, 1)
+  // And a judge that asks still cards, so an unreadable layer is not a blanket allow either.
+  const asked = deps({ setting: async () => null, judge: async () => 'ask' })
+  assert.deepEqual(await callAppTool(asked.deps, call('SLACK_SEND_MESSAGE', 'slack')), { status: 'awaiting_approval', actionId: 'card_1' })
+})
+
 test('an uncertain write stays running and is not resent', async () => {
   const { deps: d, calls } = deps({ execute: async () => { throw new Error('timeout') } })
   assert.deepEqual(await callAppTool(d, call('HUBSPOT_CREATE_CONTACT')), { error: 'operationUncertain', actionId: 'rec_1' })

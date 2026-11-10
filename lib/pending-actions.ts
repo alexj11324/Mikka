@@ -5,7 +5,6 @@ import { ActionFailureError } from '@/lib/action-error'
 import { appToolCallSchema, APP_TOOL_ACTION } from '@/lib/app-tools'
 import { COMPOSIO_ACTIONS, isApprovalAction } from '@/lib/composio-actions'
 import { accountWriteSetting, appToolWriteSetting } from '@/lib/operations/account-write-setting'
-import { botMayUseApp } from '@/lib/app-policy/store'
 import { runComposioAction } from '@/lib/composio'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { actionDecidedEvent } from '@/lib/coordinator-events'
@@ -37,7 +36,6 @@ export async function decidePendingAction(userId: string, id: string, approve: b
   let outcome: Record<string, string> = {}
   // A card is not a permanent grant: the workspace's one setting is read again
   // at approval, so a policy that turned deny after the proposal cannot run.
-  // An unreadable layer fails closed instead of executing on an unknown choice.
   const blocked = approve ? await approvalPolicyBlock(userId, row) : null
   if (approve || (row.action === 'browser_operation' || row.action === 'credential_operation')) {
     if (blocked) {
@@ -69,26 +67,41 @@ export async function decidePendingAction(userId: string, id: string, approve: b
   return { status, error }
 }
 
-/** The workspace's current decision for an approved card, or null to run it.
- * First-class mail and calendar writes and store-app calls consult the same
- * workspace layer, and the 团队权限 app block is rechecked for a named Bot.
- * An unreadable layer or app block fails closed. */
+/**
+ * The workspace's current decision for an approved card, or null to run it.
+ *
+ * The person has already approved this exact input, so `ask` needs no second
+ * card and `allow` runs: only a `deny` recorded after the proposal withholds
+ * it. The 团队权限 › 允许使用的应用 block is rechecked for a named Bot, because
+ * a card approved before the block was set must not run either. An unreadable
+ * layer names nothing (decision 2026-11-01-1330), so the approval stands.
+ *
+ * This is deliberately narrower than the pre-dispatch gate
+ * (lib/operations/account-write-gate.ts): there `ask` makes the card, here the
+ * card already happened.
+ */
 async function approvalPolicyBlock(userId: string, row: { action: string; botId: string | null; input: unknown }): Promise<string | null> {
   let toolkit: string
   let setting: 'allow' | 'ask' | 'deny' | null
-  try {
-    if (isApprovalAction(row.action)) {
-      toolkit = COMPOSIO_ACTIONS[row.action].toolkit
-      setting = await accountWriteSetting(db, userId, row.botId, row.action)
-    } else if (row.action === APP_TOOL_ACTION) {
-      const call = appToolCallSchema.safeParse(row.input)
-      if (!call.success) return 'invalidIntegrationInput'
-      toolkit = call.data.toolkit
-      setting = await appToolWriteSetting(db, userId, row.botId, call.data.tool, call.data.toolkit)
-    } else return null
-    if (row.botId && !(await botMayUseApp(row.botId, toolkit))) return 'integrationBlockedByWorkspace'
-  } catch {
-    return 'integrationPolicyUnavailable'
+  if (isApprovalAction(row.action)) {
+    toolkit = COMPOSIO_ACTIONS[row.action].toolkit
+    setting = await accountWriteSetting(db, userId, row.botId, row.action)
+  } else if (row.action === APP_TOOL_ACTION) {
+    const call = appToolCallSchema.safeParse(row.input)
+    if (!call.success) return 'invalidIntegrationInput'
+    toolkit = call.data.toolkit
+    setting = await appToolWriteSetting(db, userId, row.botId, call.data.tool, call.data.toolkit)
+  } else return null
+  if (row.botId) {
+    try {
+      // Loaded here, as steps.ts does: the store's module graph reaches Next, and
+      // this file is imported by suites that never approve an app card.
+      const { botMayUseApp } = await import('@/lib/app-policy/store')
+      if (!(await botMayUseApp(row.botId, toolkit))) return 'integrationBlockedByWorkspace'
+    } catch (failure) {
+      // An unreadable app policy names nothing either; log it and let the approval stand.
+      console.error('Workspace app block unreadable: approval stands', { toolkit, cause: failure instanceof Error ? failure.name : 'unknown' })
+    }
   }
   return setting === 'deny' ? 'integrationActionDenied' : null
 }

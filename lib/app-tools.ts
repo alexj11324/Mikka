@@ -61,7 +61,7 @@ export type AppToolDeps = {
   getTool: (slug: string) => Promise<AppTool>
   /** `accountId` is null only for an app that needs no connection (its tools run on the person's id alone). */
   execute: (call: AppToolCall, accountId: string | null) => Promise<AppToolExecution>
-  /** The workspace's explicit setting for this tool or app, or null when none names it. */
+  /** The workspace's explicit setting for this tool or app, or null when none names it, including when the layer cannot be read. */
   setting: (tool: string, toolkit: string) => Promise<AppToolDecision | null>
   /** The shared R-77 judge: `ask` for a destructive, unjudged or refused call. */
   judge: WriteJudge
@@ -166,15 +166,10 @@ export async function callAppTool(deps: AppToolDeps, raw: unknown) {
   const call: AppToolCall = { toolkit, tool: tool.slug, name: tool.name.slice(0, 200), version: tool.version, arguments: args }
 
   // The person's explicit setting wins; otherwise the Decisions API judges every call, reads included (readOnlyHint is one of its inputs).
-  // A layer that cannot be read fails closed with a code the model can act
-  // on; the diagnostic stays server-side and names nothing stored.
-  let setting: AppToolDecision | null
-  try {
-    setting = await deps.setting(toolSettingKey(tool.slug), toolkit)
-  } catch (failure) {
-    console.error('app_tool_policy_unavailable', { toolkit, tool: tool.slug, cause: failure instanceof Error ? failure.name : 'unknown' })
-    return { error: 'integrationPolicyUnavailable' }
-  }
+  // A layer that cannot be read names nothing, so the call goes to the judge
+  // exactly as an unset key does (decision 2026-11-01-1330); `deps.setting`
+  // logs the failure by name and returns null rather than refusing.
+  const setting = await deps.setting(toolSettingKey(tool.slug), toolkit)
   if (setting === 'deny') return { error: 'integrationActionDenied' }
   const card = setting === 'ask' || (setting === null && await deps.judge({ action: toolSettingKey(tool.slug), tool: tool.slug, annotations: tool.tags, input: args }) === 'ask')
   if (card) return deps.propose(call, ready.accountId)
