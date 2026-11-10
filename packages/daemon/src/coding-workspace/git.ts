@@ -303,6 +303,7 @@ async function readWorkspaceRevertApply(command: WorkspaceReadCommand, entry: Jo
     if (observed.exists === request.after.exists && observed.contentSha256 === request.after.contentSha256
       && (!observed.exists || observed.mode === request.after.mode)) {
       const result = workspaceGitRevertApplyResult.parse({ ok: true, identity: opened.parsed.identity, kind: 'git_revert_applied',
+        observedAt: new Date().toISOString(), availability: 'online',
         operationId: request.operationId, previewVersion: request.previewVersion, appliedAt: new Date().toISOString(), headSha: head,
         after: fenceOf(request.file.path, head, observed), idempotent: true })
       return { result, files: [] }
@@ -325,6 +326,7 @@ async function readWorkspaceRevertApply(command: WorkspaceReadCommand, entry: Jo
       || (after.exists && after.mode !== request.after.mode)) throw conflict()
     if ((await headSha(git)) !== head) throw conflict()
     const result = workspaceGitRevertApplyResult.parse({ ok: true, identity: opened.parsed.identity, kind: 'git_revert_applied',
+      observedAt: new Date().toISOString(), availability: 'online',
       operationId: request.operationId, previewVersion: request.previewVersion, appliedAt: new Date().toISOString(), headSha: head,
       after: fenceOf(request.file.path, head, after), idempotent: false })
     const undo: GitUndoFile = { path: request.file.path, existed: observed.exists, mode: observed.mode,

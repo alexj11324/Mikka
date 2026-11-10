@@ -33,6 +33,14 @@ test('porcelain v2 detached heads and missing upstream stay explicit', () => {
   assert.throws(() => parsePorcelainV2('1 nope\0'))
 })
 
+test('porcelain v2 names the record it cannot read and skips ignored paths', () => {
+  // An ignored path is never tracked, so it cannot join a restore plan.
+  assert.deepEqual(parsePorcelainV2('! build/\0? notes.md\0').entries.map(entry => entry.path), ['notes.md'])
+  // The message carries the record itself: `status_parse` alone cannot be
+  // traced back to whichever repository printed it.
+  assert.throws(() => parsePorcelainV2('x unreadable\0'), /status_parse: "x unreadable"/)
+})
+
 test('git log parsing normalizes offsets and marks HEAD/base without inventing authorship', () => {
   const first = sha('1'), second = sha('2')
   const output = [

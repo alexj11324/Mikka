@@ -55,6 +55,9 @@ export function parsePorcelainV2(output: string): ParsedStatus {
   const fields = output.split('\0')
   const branch: ParsedBranch = { headSha: null, branch: null, detached: false, upstream: null }
   const entries: ParsedStatusEntry[] = []
+  // An unexplained `status_parse` used to say nothing about what Git actually
+  // printed, which made a repository-specific record impossible to identify.
+  const unreadable = (field: string) => new Error(`status_parse: ${JSON.stringify(field.slice(0, 120))}`)
   for (let index = 0; index < fields.length; index++) {
     const field = fields[index]!
     if (!field) continue
@@ -63,27 +66,29 @@ export function parsePorcelainV2(output: string): ParsedStatus {
       entries.push({ path: field.slice(2), previousPath: null, index: null, worktree: null, conflicted: false, untracked: true })
       continue
     }
+    // Ignored paths are never tracked, so they cannot appear in a restore plan.
+    if (field.startsWith('! ')) continue
     if (field.startsWith('1 ')) {
       const match = /^1 (.)(.) \S+ \S+ \S+ \S+ \S+ \S+ ([\s\S]+)$/.exec(field)
-      if (!match) throw new Error('status_parse')
+      if (!match) throw unreadable(field)
       entries.push({ path: match[3]!, previousPath: null, index: state(match[1]!), worktree: state(match[2]!), conflicted: false, untracked: false })
       continue
     }
     if (field.startsWith('2 ')) {
       const match = /^2 (.)(.) \S+ \S+ \S+ \S+ \S+ \S+ \S+ ([\s\S]+)$/.exec(field)
       const previousPath = fields[index + 1]
-      if (!match || previousPath === undefined) throw new Error('status_parse')
+      if (!match || previousPath === undefined) throw unreadable(field)
       index++
       entries.push({ path: match[3]!, previousPath, index: state(match[1]!), worktree: state(match[2]!), conflicted: false, untracked: false })
       continue
     }
     if (field.startsWith('u ')) {
       const match = /^u (.)(.) \S+ \S+ \S+ \S+ \S+ \S+ \S+ \S+ ([\s\S]+)$/.exec(field)
-      if (!match) throw new Error('status_parse')
+      if (!match) throw unreadable(field)
       entries.push({ path: match[3]!, previousPath: null, index: 'conflicted', worktree: 'conflicted', conflicted: true, untracked: false })
       continue
     }
-    throw new Error('status_parse')
+    throw unreadable(field)
   }
   return { branch, entries: entries.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0) }
 }
