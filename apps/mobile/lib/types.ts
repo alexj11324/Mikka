@@ -252,6 +252,8 @@ export interface Preferences {
 }
 
 export interface Settings {
+  /** Fresh finance entry scope; absent on older servers. */
+  billingScope?: { kind: 'workspace' | 'organization'; id: string } | null
   user: Person
   workspace: Workspace
   workspaces: Workspace[]
