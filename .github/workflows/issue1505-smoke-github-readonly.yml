@@ -1,4 +1,4 @@
-# Disabled issue1506 reuse of the reviewed read-only connection contract.
+# Bounded issue1506 reuse of the reviewed read-only connection contract.
 # Bind actual APP/tree and one finite deadline only after shared-account handoff.
 # Does not revoke or renew any historical child. Cleanup must use this run's new receipt.
 name: Issue 1506 read-only Smoke GitHub prepare
@@ -17,7 +17,7 @@ concurrency:
   queue: max
 jobs:
   prepare:
-    if: false && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/issues-1504-1506' && github.run_attempt == 1
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/issues-1504-1506' && github.run_attempt == 1
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
@@ -46,32 +46,32 @@ jobs:
           import datetime,hashlib,json,os,pathlib,re,subprocess
           root=pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()
           assert pathlib.Path.cwd().resolve()==root
-          assert re.fullmatch(r'[a-f0-9]{40}','7848e79df9c5af67e526aeed1c828858db392066'), 'app_source_unbound'
-          assert re.fullmatch(r'[a-f0-9]{40}','87b4344eebdc24b12ffdafa9101d0c9f51ad6b70'), 'app_tree_unbound'
+          assert re.fullmatch(r'[a-f0-9]{40}','32523d5955479de800a94ba002c551666c4ddeb1'), 'app_source_unbound'
+          assert re.fullmatch(r'[a-f0-9]{40}','b0e93134333a6697b4c7456e48cebf7bced9d306'), 'app_tree_unbound'
           assert 'root-reviewed-1506-r7-20261109t1622'.startswith('root-reviewed-1506-'), 'go_unbound'
           assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1506-r7-20261109t1622'
           assert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'
           assert os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
           assert os.environ.get('GITHUB_REF')=='refs/heads/acceptance/issues-1504-1506'
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-10T02:13:23+00:00')
           def git(*args): return subprocess.check_output(['git','-C',str(root),*args],text=True).strip()
           assert git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
-          assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==['ddace2a2424a698ed23570971e7cbadee4e3f9f1']
-          try: git('cat-file','-e','ddace2a2424a698ed23570971e7cbadee4e3f9f1^{commit}')
+          assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==['5d08fe6f771a3d85c5f4c2bafba1dc35bedc6811']
+          try: git('cat-file','-e','5d08fe6f771a3d85c5f4c2bafba1dc35bedc6811^{commit}')
           except subprocess.CalledProcessError:
-              subprocess.run(['git','-C',str(root),'fetch','--no-tags','--depth=1','https://github.com/alexj11324/Mikka.git','ddace2a2424a698ed23570971e7cbadee4e3f9f1'],check=True,timeout=60,stdout=subprocess.DEVNULL)
-          assert git('rev-parse','ddace2a2424a698ed23570971e7cbadee4e3f9f1^{tree}')=='eff173143c80a6079e6a9abdd1dc6ea537ab05ae'
+              subprocess.run(['git','-C',str(root),'fetch','--no-tags','--depth=1','https://github.com/alexj11324/Mikka.git','5d08fe6f771a3d85c5f4c2bafba1dc35bedc6811'],check=True,timeout=60,stdout=subprocess.DEVNULL)
+          assert git('rev-parse','5d08fe6f771a3d85c5f4c2bafba1dc35bedc6811^{tree}')=='32ff7a84a4e16780797098ffa1ce87bd2e2b5d46'
           expected={"scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-runner.mjs":"7c8fd8874a27d47447b5e8eeffe87c115a2ab138a20e946aaac5bec6132331ef","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly.test.mjs":"ffa4fb2004471bc4831eb8d4099b7c3bf0130a540b1583eac6412ebe01dd292b"}
           allowed={'.github/workflows/issue1505-smoke-github-readonly.yml'}
-          assert set(git('diff','--name-only','ddace2a2424a698ed23570971e7cbadee4e3f9f1','HEAD').splitlines())==allowed
-          raw=git('diff','--raw','--no-renames','--abbrev=40','ddace2a2424a698ed23570971e7cbadee4e3f9f1','HEAD').splitlines()
+          assert set(git('diff','--name-only','5d08fe6f771a3d85c5f4c2bafba1dc35bedc6811','HEAD').splitlines())==allowed
+          raw=git('diff','--raw','--no-renames','--abbrev=40','5d08fe6f771a3d85c5f4c2bafba1dc35bedc6811','HEAD').splitlines()
           entries=[line.split('\t',1) for line in raw]
           assert len(entries)==len(allowed) and all(len(entry)==2 for entry in entries)
           assert {entry[1] for entry in entries}==allowed
           for header,path in entries:
               fields=header.split()
               assert len(fields)==5 and fields[0]==':100644' and fields[1]=='100644' and fields[4]=='M',path
-              assert fields[2]=='296ded3f7af989c6bf6d90f851a94b5928404886' and re.fullmatch(r'[a-f0-9]{40}',fields[3]),path
+              assert fields[2]=='12f5ec5082fe89d4d0ca14fae6b6cab0d5cb4f0d' and re.fullmatch(r'[a-f0-9]{40}',fields[3]),path
           assert not git('diff','--name-only','HEAD')
           for path,want in expected.items():
               assert hashlib.sha256((root/path).read_bytes()).hexdigest()==want,path
@@ -83,9 +83,9 @@ jobs:
           with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
               assert response.status==200
               actual=json.load(response)
-          assert actual['object']['sha']=='7848e79df9c5af67e526aeed1c828858db392066','main_changed'
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
-          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'operatorParent':'ddace2a2424a698ed23570971e7cbadee4e3f9f1','appSource':'7848e79df9c5af67e526aeed1c828858db392066','appTree':'87b4344eebdc24b12ffdafa9101d0c9f51ad6b70','files':len(expected),'productDelta':False}))
+          assert actual['object']['sha']=='32523d5955479de800a94ba002c551666c4ddeb1','main_changed'
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-10T02:13:23+00:00')
+          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'operatorParent':'5d08fe6f771a3d85c5f4c2bafba1dc35bedc6811','appSource':'32523d5955479de800a94ba002c551666c4ddeb1','appTree':'b0e93134333a6697b4c7456e48cebf7bced9d306','files':len(expected),'productDelta':False}))
           PY
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -96,7 +96,7 @@ jobs:
       - name: Check out the exact bound application independently of the operator carrier
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 7848e79df9c5af67e526aeed1c828858db392066
+          ref: 32523d5955479de800a94ba002c551666c4ddeb1
           path: app-source
           persist-credentials: false
           fetch-depth: 1
@@ -111,8 +111,8 @@ jobs:
           def git(where,*args): return subprocess.check_output(['git','-C',str(where),*args],text=True).strip()
           assert git(operator,'rev-parse','HEAD')==os.environ['GITHUB_SHA']
           assert not git(operator,'diff','--name-only','HEAD')
-          assert git(app,'rev-parse','HEAD')=='7848e79df9c5af67e526aeed1c828858db392066'
-          assert git(app,'rev-parse','HEAD^{tree}')=='87b4344eebdc24b12ffdafa9101d0c9f51ad6b70'
+          assert git(app,'rev-parse','HEAD')=='32523d5955479de800a94ba002c551666c4ddeb1'
+          assert git(app,'rev-parse','HEAD^{tree}')=='b0e93134333a6697b4c7456e48cebf7bced9d306'
           assert not git(app,'diff','--name-only','HEAD')
           assert not git(app,'ls-files','--others','--exclude-standard')
           expected={"scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-runner.mjs":"7c8fd8874a27d47447b5e8eeffe87c115a2ab138a20e946aaac5bec6132331ef","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly.test.mjs":"ffa4fb2004471bc4831eb8d4099b7c3bf0130a540b1583eac6412ebe01dd292b"}
@@ -140,7 +140,7 @@ jobs:
               assert plain_file(app,relative).read_bytes()==source,relative
           assert set(git(app,'ls-files','--others','--exclude-standard').splitlines())==allowed
           assert not git(app,'diff','--name-only','HEAD')
-          print(json.dumps({'status':'passed','operator':os.environ['GITHUB_SHA'],'appSource':'7848e79df9c5af67e526aeed1c828858db392066','appTree':'87b4344eebdc24b12ffdafa9101d0c9f51ad6b70','overlayFiles':len(allowed),'productDelta':False}))
+          print(json.dumps({'status':'passed','operator':os.environ['GITHUB_SHA'],'appSource':'32523d5955479de800a94ba002c551666c4ddeb1','appTree':'b0e93134333a6697b4c7456e48cebf7bced9d306','overlayFiles':len(allowed),'productDelta':False}))
           PY
       - name: Install the existing application dependencies with frozen lock and normal scripts
         working-directory: app-source
@@ -161,8 +161,8 @@ jobs:
           def git(where,*args): return subprocess.check_output(['git','-C',str(where),*args],text=True).strip()
           assert git(operator,'rev-parse','HEAD')==os.environ['GITHUB_SHA']
           assert not git(operator,'diff','--name-only','HEAD')
-          assert git(app,'rev-parse','HEAD')=='7848e79df9c5af67e526aeed1c828858db392066'
-          assert git(app,'rev-parse','HEAD^{tree}')=='87b4344eebdc24b12ffdafa9101d0c9f51ad6b70'
+          assert git(app,'rev-parse','HEAD')=='32523d5955479de800a94ba002c551666c4ddeb1'
+          assert git(app,'rev-parse','HEAD^{tree}')=='b0e93134333a6697b4c7456e48cebf7bced9d306'
           assert not git(app,'diff','--name-only','HEAD')
           expected={"scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-runner.mjs":"7c8fd8874a27d47447b5e8eeffe87c115a2ab138a20e946aaac5bec6132331ef","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly.test.mjs":"ffa4fb2004471bc4831eb8d4099b7c3bf0130a540b1583eac6412ebe01dd292b"}
           allowed=set(expected)|{".github/workflows/issue1505-smoke-github-readonly.yml"}
@@ -179,7 +179,7 @@ jobs:
               target=plain_file(app,relative).read_bytes()
               assert target==source,relative
               if relative in expected: assert hashlib.sha256(target).hexdigest()==expected[relative],relative
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-10T02:13:23+00:00')
           import json,os,urllib.request
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,req,fp,code,msg,headers,newurl): return None
@@ -188,8 +188,8 @@ jobs:
           with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
               assert response.status==200
               actual=json.load(response)
-          assert actual['object']['sha']=='7848e79df9c5af67e526aeed1c828858db392066','main_changed'
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
+          assert actual['object']['sha']=='32523d5955479de800a94ba002c551666c4ddeb1','main_changed'
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-10T02:13:23+00:00')
           PY
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -265,8 +265,8 @@ jobs:
           def git(where,*args): return subprocess.check_output(['git','-C',str(where),*args],text=True).strip()
           assert git(operator,'rev-parse','HEAD')==os.environ['GITHUB_SHA']
           assert not git(operator,'diff','--name-only','HEAD')
-          assert git(app,'rev-parse','HEAD')=='7848e79df9c5af67e526aeed1c828858db392066'
-          assert git(app,'rev-parse','HEAD^{tree}')=='87b4344eebdc24b12ffdafa9101d0c9f51ad6b70'
+          assert git(app,'rev-parse','HEAD')=='32523d5955479de800a94ba002c551666c4ddeb1'
+          assert git(app,'rev-parse','HEAD^{tree}')=='b0e93134333a6697b4c7456e48cebf7bced9d306'
           assert not git(app,'diff','--name-only','HEAD')
           expected={"scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-runner.mjs":"7c8fd8874a27d47447b5e8eeffe87c115a2ab138a20e946aaac5bec6132331ef","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly.test.mjs":"ffa4fb2004471bc4831eb8d4099b7c3bf0130a540b1583eac6412ebe01dd292b"}
           allowed=set(expected)|{".github/workflows/issue1505-smoke-github-readonly.yml"}
@@ -283,7 +283,7 @@ jobs:
               target=plain_file(app,relative).read_bytes()
               assert target==source,relative
               if relative in expected: assert hashlib.sha256(target).hexdigest()==expected[relative],relative
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-10T02:13:23+00:00')
           import json,os,urllib.request
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,req,fp,code,msg,headers,newurl): return None
@@ -292,8 +292,8 @@ jobs:
           with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
               assert response.status==200
               actual=json.load(response)
-          assert actual['object']['sha']=='7848e79df9c5af67e526aeed1c828858db392066','main_changed'
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
+          assert actual['object']['sha']=='32523d5955479de800a94ba002c551666c4ddeb1','main_changed'
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-10T02:13:23+00:00')
           PY
           node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --prepare
       - name: Preserve the exact fresh receipt and any uncertain outcome
