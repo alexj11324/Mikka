@@ -13,15 +13,29 @@ export interface WaitingQuestionItem {
   line?: EventLine | null
 }
 
-/** Statuses that mean the task has a newer run doing something: nothing waits on the person meanwhile. */
-const ACTIVE = new Set(['queued', 'preparing', 'running', 'finishing', 'paused'])
+/** Statuses that mean the task is already running a newer attempt: nothing waits on the person meanwhile. */
+const ACTIVE = new Set(['queued', 'preparing', 'running', 'finishing'])
 const CLOSED_ISSUE = new Set(['done', 'canceled', 'duplicate'])
 
-/** A run that ended on a question asked the person: `asked_human` is recorded at completion, before the outcome judge answers. */
-function waitsOnPerson(run: { status: string; outcome: string | null; stopReason?: string | null }): boolean {
-  if (run.status === 'waiting_input') return true
+/**
+ * `needsReply` in `localTaskState`'s order (hooks/use-bot-tasks.ts), the same
+ * order as the inbox: a closed task, a newer active attempt, quota, a merged
+ * pull request, a failed run, or a task waiting for review is not an answer
+ * the person owes. `asked_human` sits where `needs_input` does: it is recorded
+ * when the run completes, before the outcome judge answers.
+ */
+function needsReply(issue: { status?: string } | undefined, run: { status: string; outcome: string | null; stopReason?: string | null }, pullRequests: readonly { state: string }[]): boolean {
+  const status = issue?.status
+  if (status && CLOSED_ISSUE.has(status)) return false
   if (ACTIVE.has(run.status)) return false
-  return run.outcome === 'needs_input' || run.stopReason === 'asked_human'
+  if (run.status === 'waiting_input') return true
+  if (run.status === 'paused') return false
+  if (pullRequests.some(pr => pr.state === 'merged')) return false
+  if (run.outcome === 'failed' || run.outcome === 'blocked') return false
+  if (status === 'review' || pullRequests.some(pr => pr.state === 'open' || pr.state === 'draft')) return false
+  if (run.outcome === 'needs_input' || run.stopReason === 'asked_human') return true
+  if (run.status === 'failed') return false
+  return false
 }
 
 /**
@@ -29,11 +43,11 @@ function waitsOnPerson(run: { status: string; outcome: string | null; stopReason
  * a stored transcript line: the chat shows one sentence above the composer and
  * draws no `runQuestion` row (decision 2026-11-10).
  *
- * A `runQuestion` event only says a question was asked once. Whether it is
- * still waiting follows the inbox's order (lib/inbox/store.ts): a closed task
- * or a merged pull request is not waiting; an active newest run is not waiting;
- * a live `waiting_input`, a judged `needs_input`, or a `stopped/asked_human`
- * run is. Answering starts a continuation run on the same task, so the newest
+ * A `runQuestion` event only says a question was asked once. Whether the
+ * person still owes an answer follows `localTaskState`/the inbox: a closed
+ * task, a newer active attempt, quota, a merged pull request, a failed run or
+ * a task waiting for review is not an answer owed; a live `waiting_input`, a
+ * judged `needs_input`, or a run that ended `asked_human` is. Answering starts a continuation run on the same task, so the newest
  * run moves on and the sentence disappears.
  *
  * - Only the latest non-stale `runQuestion` event counts.
@@ -62,9 +76,7 @@ export function waitingQuestionRuns(
     // loaded: wait for the next chat read rather than trust the asking run.
     const newest = run.issue ? run.issue.run : { status: run.status, outcome: run.outcome ?? null, stopReason: run.stopReason ?? null }
     if (!newest) continue
-    if (run.issue?.status && CLOSED_ISSUE.has(run.issue.status)) continue
-    if ((run.pullRequests ?? []).some(pr => pr.state === 'merged')) continue
-    if (!waitsOnPerson(newest)) continue
+    if (!needsReply(run.issue ?? undefined, newest, run.pullRequests ?? [])) continue
     rows.push({ runId: line.runId, title: runTitle(run) })
   }
   return rows.reverse()

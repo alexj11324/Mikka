@@ -13,7 +13,7 @@ type Newest = { status: string; outcome: string | null; stopReason?: string | nu
  * An answered question keeps the old run `stopped/needs_input` and starts a
  * continuation on the same task, so `newest` is what decides that it moved on.
  */
-function run(id: string, options: { status?: string; outcome?: string | null; stopReason?: string | null; issue?: string; issueStatus?: string; merged?: boolean; title?: string; newest?: Newest } = {}) {
+function run(id: string, options: { status?: string; outcome?: string | null; stopReason?: string | null; issue?: string; issueStatus?: string; merged?: boolean; openPr?: boolean; title?: string; newest?: Newest } = {}) {
   const status = options.status ?? 'stopped'
   const outcome = options.outcome === undefined ? (status === 'stopped' ? 'needs_input' : null) : options.outcome
   const stopReason = options.stopReason ?? (status === 'stopped' && outcome === 'needs_input' ? 'asked_human' : null)
@@ -30,7 +30,7 @@ function run(id: string, options: { status?: string; outcome?: string | null; st
     createdAt: '2026-11-10T19:00:00Z',
     finishedAt: status === 'waiting_input' ? null : '2026-11-10T19:30:00Z',
     name: options.title ?? `what ${id} was asked`,
-    pullRequests: options.merged ? [{ url: 'https://github.com/o/r/pull/1', state: 'merged' as const }] : [],
+    pullRequests: options.merged ? [{ url: 'https://github.com/o/r/pull/1', state: 'merged' as const }] : options.openPr ? [{ url: 'https://github.com/o/r/pull/1', state: 'open' as const }] : [],
     issue: options.issue ? { id: options.issue, number: 1, identifier: 'ALEX-1', title: '登录页白屏', status: options.issueStatus ?? 'todo', run: options.newest === undefined ? { status, outcome, stopReason } : options.newest } : null,
   } satisfies CitationSource
 }
@@ -123,4 +123,21 @@ test('a closed task or a merged pull request ends the question', () => {
 
 test('an issue whose newest run has not loaded waits for the next chat read', () => {
   assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { issue: 'i1', newest: null }) }), new Set()), [])
+})
+
+test('a task waiting for review or with an open pull request is not owed an answer', () => {
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { issue: 'i1', issueStatus: 'review' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { issue: 'i1', openPr: true }) }), new Set()), [])
+})
+
+test('quota and failed runs are not questions the person owes an answer to', () => {
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'paused', outcome: 'needs_input' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'failed' }) }), new Set()), [])
+})
+
+test('a live waiting_input still shows on a merged task, as the thread badge does', () => {
+  assert.deepEqual(
+    waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'waiting_input', issue: 'i1', merged: true }) }), new Set()),
+    [{ runId: 'r1', title: '登录页白屏' }],
+  )
 })
