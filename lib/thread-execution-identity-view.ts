@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { withBasePath } from './base-path'
 import { executionIdentityLabelsSchema } from './execution-identity-label-view'
+import { profileColorSchema, profileGlyphSchema } from './factory/agent-profile-mark'
 import { MODEL_ROUTING_DIFFICULTIES, MODEL_ROUTING_EFFORTS, MODEL_ROUTING_REASONS, MODEL_ROUTING_TIERS } from './model-routing'
 
 /** Shared allowlist for the server evidence projection and its client reader. */
@@ -44,6 +45,8 @@ const evidence = z.object({ run: z.object({
   agentProfile: z.object({
     profileId: z.string().min(1).max(200), name: z.string().max(80), version: z.number().int().positive(), digest: z.string().max(200),
     source: z.enum(['explicit', 'decision', 'default']), reason: z.string().max(4000),
+    // Presentation only; an older server or an unknown id leaves the dialog to derive it.
+    icon: profileGlyphSchema.optional().catch(undefined), color: profileColorSchema.optional().catch(undefined),
   }).nullable().optional(),
 }) })
 

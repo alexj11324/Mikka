@@ -30,12 +30,12 @@ mock.module('@/i18n/navigation', { namedExports: { usePathname: () => browser.lo
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
 mock.module('swr', { defaultExport: (key: unknown) => ({ data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } } : [], mutate: refreshed }), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
 mock.module('@/lib/app-build', { namedExports: { APP_BUILD: '' } })
-mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}) } })
+mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { useSession: () => ({ data: null }) } } })
 mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshed } })
 mock.module('@/lib/use-presence', { namedExports: { usePresence: (open: boolean) => ({ value: open, open, onOpenChangeComplete: nothing }) } })
 mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspace() }) } })
 mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () => ({ data: { sessions: [] } }) } })
-mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing } })
+mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing, useOpenerFocus: () => () => true } })
 mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
   useLiveIssueList: () => emptyList, useLiveThreadList: () => emptyList,
@@ -44,7 +44,7 @@ mock.module('@/hooks/use-live-lists', { namedExports: {
 for (const [file, names] of [
   ['../../app/actions/projects.ts', ['listProjects']], ['../../app/actions/teams.ts', ['listTeams']],
   ['../../app/actions/team-relations.ts', ['listProjectTeams']], ['../../app/actions/workspace-secrets.ts', ['saveE2BKey']],
-  ['../../app/actions/bots.ts', ['listBots']], ['../../app/actions/agents.ts', ['getThreadName']],
+  ['../../app/actions/bots.ts', ['listBots']], ['../../app/actions/agents.ts', ['getThreadName', 'findThreadIssue']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, async () => []])) })
 
 // Exercise the production lazy/Suspense boundary, with its chunk deliberately
@@ -56,17 +56,18 @@ mock.module('next/dynamic', { defaultExport: delayedDynamic })
 for (const [file, names] of [
   // The real app-frame slot also exports an unused rail; its account menu is outside this shell-state fixture.
   ['../workspace-menu.tsx', ['WorkspaceMenu']],
-  ['../nav/bot-list.tsx', ['BotList']], ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
+  ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
   ['../onboarding/onboarding.tsx', ['Onboarding']], ['../teams/team-home.tsx', ['TeamHome']],
   ['./issue-list.tsx', ['IssueList']], ['./board-page.tsx', ['BoardPage']],
   ['../nav/context-panel.tsx', ['ContextPanel']],
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
   ['../nav/group-avatar.tsx', ['GroupPillAvatar']], ['../browser/browser-pane.tsx', ['BrowserPane']],
   ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']], ['./group-chat-view.tsx', ['GroupChatView']],
-  ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed']],
+  ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
   ['./create-issue-dialog.tsx', ['CreateIssueDialog']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, empty])) })
+mock.module('@/components/nav/bot-list', { namedExports: { BotList: empty, useChatNav: () => ({ entries: [], reloadGroups: async () => {} }) } })
 mock.module('@/components/nav/thread-list', { namedExports: { threadName: () => '' } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty, COORDINATOR_AVATAR: {} } })
 mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: empty, AllThreadsToggle: empty, waitingCount: () => 0 } })

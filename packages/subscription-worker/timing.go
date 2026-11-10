@@ -54,11 +54,12 @@ type timingKey struct{}
 type startupTimingKey struct{}
 type startupTiming struct{ configToServe, dbInit float64 }
 type timingRecorder struct {
-	mu       sync.Mutex
-	started  time.Time
-	values   [timingMetricCount]float64
-	observed [timingMetricCount]bool
-	backend  string
+	mu        sync.Mutex
+	started   time.Time
+	values    [timingMetricCount]float64
+	observed  [timingMetricCount]bool
+	backend   string
+	transport *httpTransportTiming
 }
 
 // Called only by the private entry point after its original initialization.
@@ -172,6 +173,15 @@ func encodeTimingMessage(encoder *json.Encoder, message map[string]any, timing *
 		encoded, err := json.Marshal(message)
 		if err != nil || len(encoded) > timingTerminalMaxBytes {
 			delete(message, "timing")
+		}
+		// Preserve the original timing inclusion decision. The new optional
+		// diagnostic is dropped on its own if it would exceed the same IPC cap.
+		if transport := timing.transportSnapshot(); transport != nil {
+			message["transportTiming"] = transport
+			encoded, err := json.Marshal(message)
+			if err != nil || len(encoded) > timingTerminalMaxBytes {
+				delete(message, "transportTiming")
+			}
 		}
 	}
 	return encoder.Encode(message)

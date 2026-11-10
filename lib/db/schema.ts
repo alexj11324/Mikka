@@ -54,7 +54,8 @@ export const issues = pgTable('issues', {
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc())])
+}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc()),
+  check('issues_short_title_compact', sql`mikka_issue_short_title_valid(${table.shortTitle})`)])
 export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
   issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),
@@ -477,7 +478,7 @@ export const runPublications = pgTable('run_publications', {
   status: text('status').$type<'assigned' | 'pending' | 'processing' | 'awaiting_approval' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
   workflowRunId: text('workflowRunId'), leaseToken: uuid('leaseToken'), leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   attempts: integer('attempts').notNull().default(0),
-  pullRequest: jsonb('pullRequest').$type<{ url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed'; additions?: number; deletions?: number } | null>(),
+  pullRequest: jsonb('pullRequest').$type<import('../run-publication-result').PublishedPullRequest | null>(),
   errorCode: text('errorCode'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),

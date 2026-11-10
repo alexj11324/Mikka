@@ -35,7 +35,8 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   task: { id: string; revision: number; metadata: IssueMetadata }
   /** Replaces the assignee button's avatar, as the board card's avatar group (R-25). */
   assigneeAvatar?: ReactNode
-  section?: 'all' | 'assignee' | 'properties' | 'project' | 'labels' | 'pullRequests'
+  /** 'dialog': only the dialog, opened by `request` for any target but the assignee (a layer draws the values). */
+  section?: 'all' | 'assignee' | 'properties' | 'project' | 'labels' | 'pullRequests' | 'dialog'
   request?: MetadataRequest | null
   compact?: boolean; disabled?: boolean
   onSaved: (issue: MetadataSavedIssue) => void
@@ -45,14 +46,11 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   const tColors = useTranslations('Metadata.colors')
   const tPrState = useTranslations('Metadata.prState')
   const tCommon = useTranslations('Common')
-  const actionError = useActionError()
   const colorLabel = (value: IssueLabel['color']) => tColors.has(value as never) ? tColors(value as never) : value
   const prStates = (['open', 'draft', 'merged', 'closed'] as const).map(value => ({ value, label: tPrState(value), icon: PULL_REQUEST_ICONS[value] }))
   const titles: Record<Target, string> = { project: tProperty('setProject'), labels: tProperty('editLabels'), pullRequests: tProperty('managePullRequests'), invite: tProperty('invite') }
   const [target, setTarget] = useState<Target | null>(null)
-  const [pending, setPending] = useState(false)
-  const saving = useRef(false)
-  const [error, setError] = useState('')
+  const { pending, error, setError, persist, project: moveToProject } = useIssueMetadataSave({ task, disabled, onSaved, onBusyChange })
   const [name, setName] = useState('')
   const [color, setColor] = useState<IssueLabel['color']>('violet')
   const [labels, setLabels] = useState<IssueLabel[]>([])
@@ -63,7 +61,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   const busy = disabled || pending
   useEffect(() => {
     if (!request || request.target === 'assignee') return
-    const matches = section === 'all' || section === request.target || (section === 'assignee' && request.target === 'invite')
+    const matches = section === 'all' || section === 'dialog' || section === request.target || (section === 'assignee' && request.target === 'invite')
     if (matches) {
       setError(''); setTarget(request.target); setName(request.target === 'project' ? task.metadata.project ?? '' : '')
       setLabels(task.metadata.labels); setPrs(task.metadata.pullRequests); setPrState('open')
@@ -73,17 +71,6 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   function open(value: Target) {
     setError(''); setTarget(value); setName(value === 'project' ? task.metadata.project ?? '' : '')
     setLabels(task.metadata.labels); setPrs(task.metadata.pullRequests); setPrState('open')
-  }
-  async function persist(patch: IssueMetadataPatch, inviteEmail?: string) {
-    if (saving.current || disabled) return false
-    saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
-    try {
-      const result = await updateIssueMetadata({ id: task.id, revision: task.revision, patch, inviteEmail })
-      if (!('issue' in result) || !result.issue) { setError(actionError(result.error ?? 'issueMetadataSaveFailed')); return false }
-      onSaved(result.issue)
-      return true
-    } catch { setError(tProperty('saveFailedRetry')); return false }
-    finally { saving.current = false; setPending(false); onBusyChange?.(false) }
   }
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -97,21 +84,12 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
     if (await persist(patch, target === 'invite' ? name.trim().toLowerCase() : undefined)) setTarget(null)
   }
   async function project(value: string | null) {
-    if (saving.current || disabled) return
-    const selected = options?.projectRecords.find(item => item.name === value)
-    if (value && !selected) { setError(tProperty('selectExistingProject')); return }
-    saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
-    try {
-      const result = await moveIssueToProject({ issueId: task.id, revision: task.revision, projectId: selected?.id ?? null })
-      if (!('issue' in result) || !result.issue) { setError(actionError(result.error ?? 'projectMoveFailed')); return }
-      onSaved(result.issue); setTarget(null)
-    } catch { setError(tProperty('projectLinkFailedRetry')) }
-    finally { saving.current = false; setPending(false); onBusyChange?.(false) }
+    if (await moveToProject(value, options?.projectRecords)) setTarget(null)
   }
   const metadata = task.metadata
   return <>
     {(section === 'all' || section === 'assignee') && <IssueAssigneeMenu request={request} id={task.id} assignee={metadata.assignee} avatar={assigneeAvatar} compact={compact} disabled={busy} onChange={assignee => persist({ assignee })} onInvite={() => open('invite')} />}
-    {section !== 'assignee' && <>
+    {section !== 'assignee' && section !== 'dialog' && <>
       {(section === 'all' || section === 'properties' || section === 'project') && <Button variant={section === 'project' ? 'ghost' : 'outline'} size={section === 'project' ? 'sm' : 'xs'} type="button" className={cn(section === 'project' ? ROW_VALUE : 'h-auto max-w-full justify-start whitespace-normal rounded-full text-left')} disabled={busy} onClick={() => open('project')} title={metadata.project ?? tProperty('setProject')} aria-label={tProperty('projectAria', { name: metadata.project ?? tProperty('unset') })}><Box data-icon="inline-start" className="shrink-0" /><span className={cn(section === 'project' && 'truncate', !metadata.project && 'text-muted-foreground')}>{metadata.project ?? tProperty('addToProject')}</span></Button>}
       {(section === 'all' || section === 'properties' || section === 'labels') && <>
       {metadata.labels.map(label => <Button key={label.name} variant="outline" size="xs" type="button" className="max-w-full rounded-full" disabled={busy} onClick={() => open('labels')} aria-label={tProperty('editLabelAria', { name: label.name })}><LabelDot color={label.color} /><span className="truncate">{label.name}</span></Button>)}
@@ -124,7 +102,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
       <Button variant={metadata.pullRequests.length ? 'ghost' : 'outline'} size={metadata.pullRequests.length ? 'icon-xs' : 'xs'} type="button" className="rounded-full" disabled={busy} onClick={() => open('pullRequests')} aria-label={tProperty('managePullRequestsAria')}><Link2 data-icon="inline-start" />{!metadata.pullRequests.length && tProperty('pullRequests')}</Button>
       </>}
     </>}
-    {error && !target && <FieldError className="w-full text-xs">{error}</FieldError>}
+    {error && !target && section !== 'dialog' && <FieldError className="w-full text-xs">{error}</FieldError>}
     <Dialog open={target !== null} onOpenChange={value => { if (!value && !pending) { setTarget(null); setError('') } }}>
       <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-md">
         <DialogHeader><DialogTitle>{target ? titles[target] : tProperty('taskProperties')}</DialogTitle></DialogHeader>
@@ -153,4 +131,38 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
       </DialogContent>
     </Dialog>
   </>
+}
+
+/** The metadata saves behind IssueMetadataControls, for it and for a layer that draws the values itself. */
+export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyChange }: { task: { id: string; revision: number }; disabled?: boolean; onSaved: (issue: MetadataSavedIssue) => void; onBusyChange?: (busy: boolean) => void }) {
+  const tProperty = useTranslations('Metadata.property')
+  const actionError = useActionError()
+  const [pending, setPending] = useState(false)
+  const saving = useRef(false)
+  const [error, setError] = useState('')
+  async function persist(patch: IssueMetadataPatch, inviteEmail?: string) {
+    if (saving.current || disabled) return false
+    saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
+    try {
+      const result = await updateIssueMetadata({ id: task.id, revision: task.revision, patch, inviteEmail })
+      if (!('issue' in result) || !result.issue) { setError(actionError(result.error ?? 'issueMetadataSaveFailed')); return false }
+      onSaved(result.issue)
+      return true
+    } catch { setError(tProperty('saveFailedRetry')); return false }
+    finally { saving.current = false; setPending(false); onBusyChange?.(false) }
+  }
+  /** Moves the task to an existing project (null: none); false when it did not. */
+  async function project(value: string | null, records: { id: string; name: string }[] | undefined) {
+    if (saving.current || disabled) return false
+    const selected = records?.find(item => item.name === value)
+    if (value && !selected) { setError(tProperty('selectExistingProject')); return false }
+    saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
+    try {
+      const result = await moveIssueToProject({ issueId: task.id, revision: task.revision, projectId: selected?.id ?? null })
+      if (!('issue' in result) || !result.issue) { setError(actionError(result.error ?? 'projectMoveFailed')); return false }
+      onSaved(result.issue); return true
+    } catch { setError(tProperty('projectLinkFailedRetry')); return false }
+    finally { saving.current = false; setPending(false); onBusyChange?.(false) }
+  }
+  return { pending, error, setError, persist, project }
 }

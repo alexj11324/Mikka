@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { copyRunPrompt } from '../../run-prompt-copy';
 import type { Pool, PoolClient } from 'pg';
 import type { agentRuns } from '../../db/schema';
 import { retryWorkerDefinition } from '../../agent-kit/worker';
@@ -81,9 +82,10 @@ export async function queueCloudQuestionContinuation(
   if (!admitted) return null;
   const { origin, binding } = admitted, originId = origin.id;
   const runId = randomUUID();
-  const prompt = `${origin.prompt}\n\n${input.note ?? ''}`;
-  await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",source,status,kind,"baseBranch",prompt,"agentDefinition",attempt)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued',$9,$10,$11,$12,$13)`, [runId,userId,origin.issueId,origin.agentId,origin.deviceId,origin.deviceRepoId,origin.botId,origin.source,origin.kind,origin.baseBranch,prompt,JSON.stringify(retryWorkerDefinition(origin.agentDefinition,prompt)),origin.attempt]);
+  const copied = copyRunPrompt(origin, `${origin.prompt}\n\n${input.note ?? ''}`);
+  const { prompt } = copied;
+  await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",source,status,kind,"baseBranch",prompt,"agentDefinition",attempt,"promptTaskStart","promptTaskLength")
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued',$9,$10,$11,$12,$13,$14,$15)`, [runId,userId,origin.issueId,origin.agentId,origin.deviceId,origin.deviceRepoId,origin.botId,origin.source,origin.kind,origin.baseBranch,prompt,JSON.stringify(retryWorkerDefinition(origin.agentDefinition,prompt)),origin.attempt,copied.promptTaskStart,copied.promptTaskLength]);
   await tx.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId,binding.botId,binding.workspaceId,userId]);
   // Same transfer shape as adoptTaskMachine: history retains its scope; only
   // the task's own new run takes custody of the existing sandbox.

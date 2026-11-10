@@ -25,7 +25,7 @@ let TaskProfileNotice: typeof import('./task-profile-picker')['TaskProfileNotice
 let taskProfileSelectable: typeof import('../settings/factory-profiles-data')['taskProfileSelectable']
 let data: AgentProfilesView | undefined
 const choices: Array<string | null> = []
-const profile = (name: string): AgentProfile => ({ id: randomUUID(), name, description: '', roles: [name], harness: 'codex', model: { mode: 'inherit' }, enabled: true, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64), createdAt: '2026-11-05T00:00:00Z', updatedAt: '2026-11-05T00:00:00Z', archivedAt: null })
+const profile = (name: string): AgentProfile => ({ id: randomUUID(), name, description: '', roles: [name], icon: 'chevrons', color: 'teal', harness: 'codex', model: { mode: 'inherit' }, enabled: true, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64), createdAt: '2026-11-05T00:00:00Z', updatedAt: '2026-11-05T00:00:00Z', archivedAt: null })
 const view = (state: ProfileAvailability): AgentProfilesView => {
   const profiles = ['Frontend', 'Backend', 'Review'].map(profile)
   return { profiles, catalog: { models: [], skills: [] }, defaultAvailability: { ...state }, availability: Object.fromEntries(profiles.map(item => [item.id, { ...state }])) }

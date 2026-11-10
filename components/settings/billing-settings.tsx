@@ -9,7 +9,11 @@ import { useBillingPlan, useCreditBalance, useFreeAllowance } from '@/hooks/sett
  * V15 计费: reads and Stripe redirects here (hooks/settings/use-billing.ts); the
  * page is the settings-billing slot.
  */
-export function BillingSettings({ workspaceId, personal = false }: { workspaceId: string; /** Card verification belongs to the person: its USD 1 lands in their personal workspace, so only that 计费 offers it (C19). */ personal?: boolean }) {
+export function BillingSettings({ workspaceId, personal = false, admin = true }: { workspaceId: string; /** Card verification belongs to the person: its USD 1 lands in their personal workspace, so only that 计费 offers it (C19). */ personal?: boolean; /** The billing-consistency change (#1852) opens 计费 to Organization admins; until it lands, a non-workspace-admin keeps seeing nothing. */ admin?: boolean }) {
+  return admin ? <BillingSettingsPage workspaceId={workspaceId} personal={personal} /> : null
+}
+
+function BillingSettingsPage({ workspaceId, personal }: { workspaceId: string; personal: boolean }) {
   const computerBilling = useGatedFeature('computerBilling')
   const plan = useBillingPlan(workspaceId)
   const balance = useCreditBalance(workspaceId)

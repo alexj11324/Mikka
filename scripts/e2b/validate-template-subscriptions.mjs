@@ -25,6 +25,18 @@ const GATE_CODES = new Set([
 ].map(code => `template_gate_${code}`))
 const STARTUP_CODES = new Set(STARTUP_FAILURE_CODES)
 const FAILURE_PHASES = new Set(STARTUP_FAILURE_PHASES)
+// Public dispatch outcomes from coordinator/steps, repository-resolution,
+// thread-dispatch and Factory profile/task admission. Never pass arbitrary
+// provider identifiers through merely because they match a code-shaped regex.
+const DISPATCH_REFUSAL_CODES = new Set([
+  'factoryLifecycleUnavailable', 'repositoryRequired', 'repositoryNotFound', 'repositoryAmbiguous',
+  'githubNotConnected', 'githubNotConfigured', 'githubReconnectRequired', 'githubUnavailable', 'githubRepositoryForbidden',
+  'deviceNotFound', 'machineUnavailable', 'issueNotFound', 'agentNoDevice', 'modelNotAllowed', 'executionAccountUnavailable', 'runInvalid',
+  'threadModelUnavailable', 'threadReplaced', 'threadStopping',
+  'agentProfileNotFound', 'agentProfileDisabled', 'agentProfileUnavailable', 'agentProfilePinConflict', 'agentProfileScopeNotFound',
+  'agentProfileSelectionInvalid', 'agentProfileArchived', 'agentProfileVersionConflict', 'agentProfileModelUnavailable', 'agentProfileDecisionUnavailable',
+  'factoryTransition', 'factoryReplayMismatch', 'factoryStopped', 'factoryStale', 'factoryRunStillActive', 'factorySourceMismatch',
+])
 const safeCode = error => GATE_CODES.has(error?.message) || STARTUP_CODES.has(error?.message) ? error.message : 'template_gate_failed'
 const SAMPLE_STATUSES = new Set(['running', 'failed', 'execution_proved_awaiting_server_timing'])
 const RUN_STATUSES = new Set(['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing', 'succeeded', 'completed', 'stopped', 'failed', 'cancelled'])
@@ -67,6 +79,33 @@ function startupFailure(record) {
     ...(code === 'startup_http_error' && Number.isInteger(httpStatus) && httpStatus >= 400 && httpStatus <= 599 ? { httpStatus } : {}) }
 }
 
+/** Socket metadata only. Unknown fields and native close/error text never leave the driver. */
+function liveObserverDiagnostic(value) {
+  const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  const timestamp = value => typeof value === 'string' && value.length === 24 && Number.isFinite(Date.parse(value))
+    && new Date(value).toISOString() === value
+  const optionalTime = value => value === null || timestamp(value)
+  const count = value => Number.isSafeInteger(value) && value >= 0
+  const first = value?.firstFailure, reads = value?.detailReads
+  if (!object(value) || value.version !== 1 || !object(first) || !object(reads)
+    || !['close', 'error'].includes(first.event) || !timestamp(first.at)
+    || typeof first.scopeHash !== 'string' || !/^[a-f0-9]{16}$/.test(first.scopeHash)
+    || !(first.readyState === null || Number.isInteger(first.readyState) && first.readyState >= 0 && first.readyState <= 3)
+    || !['openedAt', 'readyAt', 'lastNotificationAt'].every(key => optionalTime(value[key])) || !timestamp(value.shutdownAt)
+    || !count(reads.started) || !count(reads.completed) || reads.completed > reads.started
+    || !optionalTime(reads.lastCompletedAt) || typeof reads.inFlightAtFailure !== 'boolean') return undefined
+  return {
+    version: 1,
+    firstFailure: { event: first.event, at: first.at, scopeHash: first.scopeHash, readyState: first.readyState,
+      ...(first.event === 'close' && Number.isInteger(first.code) && first.code >= 0 && first.code <= 65535 ? { code: first.code } : {}),
+      ...(first.event === 'close' && typeof first.wasClean === 'boolean' ? { wasClean: first.wasClean } : {}) },
+    openedAt: value.openedAt, readyAt: value.readyAt, lastNotificationAt: value.lastNotificationAt,
+    detailReads: { started: reads.started, completed: reads.completed, lastCompletedAt: reads.lastCompletedAt,
+      inFlightAtFailure: reads.inFlightAtFailure },
+    shutdownAt: value.shutdownAt,
+  }
+}
+
 /** Mirrors only the final receipt's binding predicates, never their raw inputs. */
 function bootstrapReceiptChecks(kind, proof, sample, expectedScope) {
   const harness = kind === 'claude' ? 'claude_code' : 'codex'
@@ -94,6 +133,10 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
   const sample = acceptance?.samples?.[0]
   const sampleFailure = startupFailure(sample)
   const failure = sampleFailure ?? startupFailure(acceptance)
+  const liveObserver = error && sample?.status === 'failed' && sampleFailure?.phase === 'execution_watch'
+    && sampleFailure.code === 'startup_live_disconnected' ? liveObserverDiagnostic(sample.liveObserver) : undefined
+  const dispatchRefusal = error && sampleFailure?.phase === 'coordinator_stream' && sampleFailure.code === 'startup_dispatch_refused'
+    ? { code: DISPATCH_REFUSAL_CODES.has(sample?.dispatchRefusal?.code) ? sample.dispatchRefusal.code : 'unavailable' } : undefined
   const harness = kind === 'claude' ? 'claude_code' : 'codex'
   const runIdHash = UUID.test(sample?.runId ?? '') ? createHash('sha256').update(sample.runId).digest('hex').slice(0, 16) : null
   const timing = runIdHash ? readRuntimeTiming(sample?.runtimeTiming, { runIdHash, harness }) : null
@@ -140,6 +183,8 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
     sampleStatus: SAMPLE_STATUSES.has(sample?.status) ? sample.status : 'unavailable',
     sampleError: sampleFailure?.code ?? null,
     ...(error && failure ? { failure } : {}),
+    ...(dispatchRefusal ? { dispatchRefusal } : {}),
+    ...(liveObserver ? { liveObserver } : {}),
     cleanupErrors: [...cleanup], ...(observation ? { observation } : {}), ...(fixture ? { fixture } : {}),
     ...(cleanupFailures.length ? { cleanupFailures: cleanupFailures.slice(0, 8), cleanupFailuresTruncated: cleanupFailures.length > 8 } : {}),
     // Only the existing strict candidateReceipt can populate this proof. A
@@ -152,12 +197,17 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
     ...(cleanup.has('device_remove_failed') && UUID.test(deviceId ?? '') ? { registeredDeviceId: deviceId } : {}) }
 }
 
-export function candidateReceipt(report, kind, proof, acceptance, expectedScope) {
-  const [, harness, model] = KINDS.find(row => row[0] === kind)
+function assertCandidateExecution(acceptance) {
   const sample = acceptance.samples?.[0]
   check(acceptance.mode === 'candidate' && acceptance.status === 'candidate_subscription_proved' && acceptance.samples?.length === 1 && !acceptance.error
     && !acceptance.cleanup?.errors?.length && sample?.status === 'execution_proved_awaiting_server_timing'
     && sample.cleanup?.status === 'passed' && acceptance.officialTiming?.enabled === true && acceptance.officialTiming.cleaned === true, 'execution_failed')
+  return sample
+}
+
+export function candidateReceipt(report, kind, proof, acceptance, expectedScope) {
+  const [, harness, model] = KINDS.find(row => row[0] === kind)
+  const sample = assertCandidateExecution(acceptance)
   check(sample.harness === harness && sample.execution?.harness === harness && sample.execution?.model === model
     && sample.execution?.deviceId === proof.deviceId && sample.execution?.credentialType === 'subscription'
     && sample.credentialRoute === 'subscription' && sample.replyVerified === true
@@ -308,6 +358,9 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
             deviceId, agentId: matching[0].id, revision: report.sourceCommit, expectedBuild: version.build,
             timeoutMs: 240000, maxStartupMs: 5000, minToolCalls: 1,
             runtimeEvidence: 'required', officialTiming: 'enabled' }, { env, fetchImpl, onCandidateRunQueued })
+          // A refused dispatch never publishes bootstrap input. Preserve its
+          // failure before reading a proof that this candidate cannot have made.
+          assertCandidateExecution(acceptance)
           stage = 'receipt'
           let bootstrapReceipt
           try { bootstrapReceipt = JSON.parse(await sandbox.files.read('/home/user/.mikka/template-acceptance/bootstrap-proof.json', { user: 'root' })) }

@@ -12,12 +12,21 @@ source wins in a conflict is in [`README.md`](README.md).
 
 ## Bots, chats and threads
 
-- **R-01** The left column is the bot list (bots and group chats). The right
-  column is 概览 with its tabs, including 任务, or 全部任务 (R-50). There is no "conversation list".
+- **R-01** The left column is the bot list (bots and group chats). In the
+  hosted shell each Bot can expand its dispatched tasks and Agent work beneath
+  its own row, like Capy's Captains; tasks are named for the work and use their
+  own state icon. Bots and groups retain their own avatars. This is not a
+  separate global Agent list ([2026-11-10](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
+  Child work titles use the existing generated short title and are limited
+  to 12 CJK characters or 6 words (60 characters maximum); the task code is
+  separate from that budget. A missing short title has a bounded text fallback;
+  the full task title stays in detail
+  ([short titles](decisions/2026-11-10-1341-sidebar-short-title-limits.md)).
+  The right column is 概览 with its tabs, including 任务, or 全部任务 (R-50).
 - **R-02** The right panel's 概览 header shows the bot selected on the left:
   the same bloub avatar and the same name as its left row, then the tabs
   详情 / 任务 / PR / 电脑 (R-50). Task titles belong in their rows and
-  details; this header names the bot.
+  details; this header names the bot. In the hosted edition 概览 is a tab of the chat's work area instead (decision `2026-11-09-2330-overview-as-work-area-tab.md`).
 - **R-03** Choosing another bot on the left switches the centre chat, the
   right task list and the computer together.
 - **R-04** Every bot comes with its own computer. There is no 新建云端电脑 entry
@@ -74,19 +83,21 @@ source wins in a conflict is in [`README.md`](README.md).
   the user taps is their message but keeps its card shape, no blue bubble; the
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
-- **R-15** A task mentioned in chat is an inline chip. Internal object chips
+- **R-15** A task mentioned in chat is an inline chip: its state icon (R-52)
+  and its code, such as 「◐ ALEX-45」, with the title, state and priority in
+  the hover card; a task with no code shows its title. Internal object chips
   use the faint accent fill (`--object-chip`), rounded corners and accent
-  text at the surrounding text's size and line height. A long title wraps,
-  keeping its fill on each line. A task uses its state icon (R-52), and its
-  number is in the hover card. Every mention uses the same chip, with cards
-  deduplicated under R-66. A dispatch's card represents its task and opens
-  that task. A run reference associated with a task leads through that task
-  to its one conversation (R-82). Web sources keep the unboxed source chip.
+  text at the surrounding text's size and line height. A thread mentioned in
+  chat is its title in the link colour, with no icon, fill, accent or state
+  badge; the title never repeats the task's code. Every mention uses the same
+  chip, with cards deduplicated under R-66. A dispatch's card represents its
+  task and opens that task. Web sources keep the unboxed source chip.
   An Artifact waiting for acceptance is a bordered card under the reply
   (icon, name, state such as 待你确认), opening the Artifact window (R-56).
   Task-only cards and state icons supersede the former thread-bubble/dot
   presentation ([2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md),
-  [2230](decisions/2026-11-07-2230-one-icon-per-task-state.md)).
+  [2230](decisions/2026-11-07-2230-one-icon-per-task-state.md),
+  [0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)).
 - **R-16** The computer card in chat shows a title, a status, one sentence
   about the task and a big screen. It has no approval step: the bot operates
   until the person takes control (decisions 2026-10-30). It never shows an
@@ -143,8 +154,10 @@ source wins in a conflict is in [`README.md`](README.md).
   建议 when done; the dispatched task also shows up in the task lists.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
-  describes the task in a sentence and the Coordinator writes it. The dialog
-  shows a machine picker.
+  describes the task in a sentence and the Coordinator writes it, or types
+  the title themself in an optional title field above the description
+  ([decision](decisions/2026-11-10-1213-new-task-optional-title.md)). The
+  dialog shows a machine picker.
 - **R-23** Machine picker order: **Mikka Cloud** first; then the group
   **本机** (this Mac, a local Linux machine); then the group **Remote
   control** (VPS and SSH hosts reached through the user's machine). Settings ›
@@ -203,8 +216,10 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   stays.
 - **R-62** A task's 活动 lists its creation, its events and one row per Agent
   stretch, oldest first: consecutive runs by the same Agent are one row, and
-  where the Agent changes the row reads 「换 Codex」 ([2026-11-09-0045](decisions/2026-11-09-0045-no-attempt-word.md)).
-  There is no per-run thread list. A row shows the stretch's latest state and
+  every row is labelled with its Agent's mark and name, never a 「换」 verb, as
+  Warp labels runs ([2026-11-09-0045](decisions/2026-11-09-0045-no-attempt-word.md)).
+  There is no per-run thread list. A row shows its stretch's latest run in the
+  run-result words (glossary: Run result) and
   opens the task's single conversation at the stretch's first run (R-81),
   ending in the shared composer (R-10). The task properties
   show its dispatching bot, Agent/model and execution location. A reader who
@@ -351,7 +366,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   tab of 2026-10-30).
 - **R-57** The local 浏览器 is an icon-only globe toggle at the right of the
   top bar, with no 「浏览器」 label. Turned on, it opens a right column with
-  the browser (URL bar and page). Selecting an element and annotating it puts
+  the browser (URL bar and page). In the hosted edition 浏览器 is a work-area tab opened from the New tab's Tools or ⌘⇧B, with no globe in a window bar (decision `2026-11-09-2330-overview-as-work-area-tab.md`). Selecting an element and annotating it puts
   a chip 「1 · <element> · <action> · <note>」 into the current chat's
   composer. The 浏览器 is the person's own and app-wide; it is not a bot's
   电脑 (R-50).
@@ -366,12 +381,20 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     teams. A task opened from 看板 or a link is a centre page. Its origin
     crumb and close action return to the source, defaulting to 看板; ↑↓
     appear when it was opened from a list.
-  - A chat task card or right-panel task row opens task detail in the right
-    column (`?task=`), preserving the chat. A row in 活动 (one per Agent
+  - A chat task card, task chip or right-panel task row opens the task view
+    as a tab in the chat's right work area, preserving the chat; its expand
+    button opens the same task as a page. A thread, Agent stretch or subagent
+    opened from a chat opens its own work-area tab, reused when already open
+    ([0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)). A row in 活动 (one per Agent
     stretch, R-62) opens that task's one conversation, with ← back to the
     task. The conversation joins runs oldest first, opens a selected stretch
     at its first run and otherwise starts at the newest message. Its header
     is the task title and current Agent; its composer addresses the newest run.
+    The hosted work-area task view starts with one large editable title,
+    its code and time, then compact properties, description, subtasks and
+    activity. The tab names the task; no second inner title bar repeats it.
+    Save, more and expand stay available
+    ([Capy layout](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
   - 全部任务 opens from the window bar on every page, with the hand and the
     count of 等你处理 tasks. A bot's 任务 tab lists its dispatched tasks.
     Search hits in a task conversation resolve to the task. Legacy run IDs
@@ -460,14 +483,19 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   asked about. Creating, sending, appending and adding never ask. An
   unavailable or refused judgment shows a card, never a silent write.
   Source: Alex, 2026-10-31.
-- **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…),
-  so wherever a thread or run is drawn with an icon, the icon is that
-  Agent's mark (`HarnessMark`, R-74); a thread whose Agent is unknown takes
-  the neutral thread mark. A bot never does coding work: it appears only
-  where it dispatched or owns the work (「<Bot> 派出线程」, the 概览 header),
-  never as a thread's or run's icon, and neither does the Coordinator's
-  avatar. Status icons stay where a list shows status (R-62, R-66).
-  Source: Alex, 2026-11-01 (decision `2026-11-01-0110-agent-mark-on-threads`).
+- **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…)
+  in an Agent 配置. Where an Agent stretch is drawn with a mark (the line where
+  the Agent changes, a plan step, the execution identity), the main mark is
+  its Agent 配置's mark and the Agent's own mark (`HarnessMark`, R-74) sits
+  beside it, smaller, or in the details; a stretch with no Agent 配置 takes
+  the Agent's mark, and one whose Agent is unknown the neutral thread mark.
+  A thread mentioned in text has no mark (R-15). A bot never does coding
+  work: it appears only where it dispatched or owns the work (「<Bot> 派出线程」,
+  the 概览 header), never as a thread's or run's icon, and neither does the
+  Coordinator's avatar. Status icons stay where a list shows status (R-62,
+  R-66). Source: Alex, 2026-11-01 (decision
+  `2026-11-01-0110-agent-mark-on-threads`), revised 2026-11-10
+  ([0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)).
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,

@@ -39,3 +39,9 @@ export function GroupPillAvatar({ id, title }: { id: string; title: string }) {
   const { data: members } = useGroupMembers(id)
   return <GroupAvatar title={title} members={members} />
 }
+
+/** Sidebar reuse of an already read member list; mounting a row never starts a member request. */
+export function CachedGroupAvatar({ id, title }: { id: string; title: string }) {
+  const { data: members } = useSWR<GroupMember[]>(groupMembersKey(id), null)
+  return <GroupAvatar title={title} members={members} />
+}

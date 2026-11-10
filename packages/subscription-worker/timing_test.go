@@ -7,9 +7,13 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/http/httptest"
+	"net/http/httptrace"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -180,5 +184,144 @@ func TestPlainModelTimingUsesExistingTransportAndKeepsRequestAndRefusal(t *testi
 				}
 			}
 		}
+	}
+}
+
+func TestPlainModelTransportTimingKeepsRealTLSReuseAndOriginalTerminal(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.Header.Get("Authorization") != "Bearer fixture-private-token" {
+			t.Error("authorization changed")
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"fixture-private-body\"}}\n\n")
+	}))
+	defer server.Close()
+	target, _ := url.Parse(server.URL)
+	base := server.Client().Transport
+	model := CPAPlainModel{Provider: "claude", Client: &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		copy := request.Clone(request.Context())
+		copy.URL.Scheme, copy.URL.Host = target.Scheme, target.Host
+		copy.Host = target.Host
+		return base.RoundTrip(copy)
+	})}}
+	var parentHooks atomic.Int32
+	for n := 0; n < 2; n++ {
+		parent := httptrace.WithClientTrace(context.Background(), &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { parentHooks.Add(1) }})
+		ctx, timing := withRequestTiming(parent)
+		result, err := model.ExecuteStream(ctx, &core.Auth{Metadata: map[string]any{"access_token": "fixture-private-token"}}, ex.Request{Model: "fixture-model", Payload: []byte(`{"messages":[{"role":"user","content":"fixture-private-prompt"}]}`)}, ex.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for chunk := range result.Chunks {
+			if chunk.Err == nil || chunk.Err.Error() != "reconnect_required" {
+				t.Fatal("stream refusal changed")
+			}
+		}
+		var output bytes.Buffer
+		if err := encodeTimingMessage(json.NewEncoder(&output), map[string]any{"id": "fixture", "error": "reconnect_required"}, timing); err != nil {
+			t.Fatal(err)
+		}
+		var frame map[string]any
+		if err := json.Unmarshal(output.Bytes(), &frame); err != nil {
+			t.Fatal(err)
+		}
+		if frame["error"] != "reconnect_required" || frame["id"] != "fixture" {
+			t.Fatal("original terminal changed")
+		}
+		transport, ok := frame["transportTiming"].(map[string]any)
+		if !ok {
+			t.Fatal("HTTP transport evidence missing from original terminal")
+		}
+		if frame["timing"].(map[string]any)["httpHeadersMs"] == nil {
+			t.Fatal("legacy timing missing")
+		}
+		for _, key := range []string{"getConnMs", "gotConnMs", "wroteRequestMs", "firstByteMs", "headersMs", "firstEventMs"} {
+			if transport[key] == nil {
+				t.Errorf("missing actual callback %s", key)
+			}
+		}
+		if transport["firstTextMs"] != nil || transport["dnsStartMs"] != nil || transport["dnsDoneMs"] != nil {
+			t.Fatal("unobserved phases became zero")
+		}
+		if transport["getConnCalls"] != float64(1) || transport["writeCalls"] != float64(1) || transport["reused"] != (n == 1) {
+			t.Fatalf("unexpected connection receipt: %v", transport)
+		}
+		if n == 0 && (transport["tlsStartMs"] == nil || transport["tlsDoneMs"] == nil || transport["connectStartMs"] == nil || transport["connectDoneMs"] == nil) {
+			t.Fatal("new TLS connection was not observed")
+		}
+		if n == 1 && (transport["tlsStartMs"] != nil || transport["connectStartMs"] != nil) {
+			t.Fatal("reuse invented a handshake")
+		}
+		if bytes.Contains(output.Bytes(), []byte("fixture-private")) || bytes.Contains(output.Bytes(), []byte(target.Host)) {
+			t.Fatal("transport diagnostics retained private data")
+		}
+	}
+	if calls.Load() != 2 || parentHooks.Load() != 2 {
+		t.Fatal("observation changed calls or replaced existing context hooks")
+	}
+}
+
+func TestPlainModelTransportTimingCancellationDoesNotWaitForNewEvidence(t *testing.T) {
+	entered, stopped := make(chan struct{}), make(chan struct{})
+	server := httptest.NewTLSServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		// Consume the real POST so the HTTP/1 server can observe connection cancellation.
+		_, _ = io.Copy(io.Discard, r.Body)
+		close(entered)
+		<-r.Context().Done()
+		close(stopped)
+	}))
+	defer server.Close()
+	target, _ := url.Parse(server.URL)
+	base := server.Client().Transport
+	model := CPAPlainModel{Provider: "claude", Client: &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		copy := request.Clone(request.Context())
+		copy.URL.Scheme, copy.URL.Host = target.Scheme, target.Host
+		copy.Host = target.Host
+		return base.RoundTrip(copy)
+	})}}
+	parent, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx, timing := withRequestTiming(parent)
+	done := make(chan error, 1)
+	go func() {
+		_, err := model.ExecuteStream(ctx, &core.Auth{Metadata: map[string]any{"access_token": "fixture-private-token"}}, ex.Request{Model: "fixture-model", Payload: []byte(`{"messages":[]}`)}, ex.Options{})
+		done <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("request never arrived")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("cancellation disappeared")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("observation delayed cancellation")
+	}
+	select {
+	case <-stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("request context was replaced")
+	}
+	var output bytes.Buffer
+	if encodeTimingMessage(json.NewEncoder(&output), map[string]any{"id": "cancel", "error": "cancelled"}, timing) != nil {
+		t.Fatal("terminal encoding failed")
+	}
+	var frame map[string]any
+	_ = json.Unmarshal(output.Bytes(), &frame)
+	http, ok := frame["transportTiming"].(map[string]any)
+	if !ok {
+		t.Fatal("partial transport evidence missing")
+	}
+	if http["headersMs"] != nil || http["firstByteMs"] != nil || http["firstTextMs"] != nil {
+		t.Fatal("cancellation fabricated a response")
+	}
+	if frame["timing"].(map[string]any)["httpHeadersMs"] == nil {
+		t.Fatal("legacy failed-Do timing changed")
 	}
 }

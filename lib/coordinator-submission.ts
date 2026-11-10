@@ -8,6 +8,7 @@ import { coordinatorEvents } from './db/schema'
 import type { db } from './db'
 import { MESSAGE_MAX } from './message-limits'
 import { taskDestinationSchema, type TaskDestination } from './task-destination'
+import { taskTitleInputSchema } from './task-title-input'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { agentProfileReferenceSchema } from './factory/agent-profile-reference'
 
@@ -34,7 +35,7 @@ export async function personalSubmissionRecorded(executor: Pick<typeof db, 'sele
   const [prior] = await executor.select({ userId: coordinatorEvents.userId, botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, issueId: coordinatorEvents.issueId, runId: coordinatorEvents.runId, payload: coordinatorEvents.payload })
     .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, submissionKey(userId, botId, id))).limit(1)
   if (!prior) return false
-  if (prior.userId !== userId || prior.botId !== botId || prior.kind !== 'user_message' || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(prior.payload, { text })) throw new SubmissionConflictError()
+  if (prior.userId !== userId || prior.botId !== botId || prior.kind !== 'user_message' || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(withoutHostSession(prior.payload), { text })) throw new SubmissionConflictError()
   return true
 }
 
@@ -44,7 +45,7 @@ export async function personalSubmissionRecorded(executor: Pick<typeof db, 'sele
  * included (resolved where the message enters), or a suggestion's stored one
  * (null only on a suggestion from before it stored one).
  */
-export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; profileId?: string; humanSessionId?: string; filesValidated?: true }) {
+export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string; humanSessionId?: string; filesValidated?: true }) {
   const submissionId = personalSubmissionInput.shape.submissionId.parse(options.submissionId)
   const botId = options.botId
   if (!options.filesValidated && splitChatFiles(text).files.length) {
@@ -55,10 +56,11 @@ export async function recordPersonalSubmission(executor: Executor, userId: strin
   const images = normalizeUserImages(options.images)
   const taskDestination = options.taskDestination ? taskDestinationSchema.parse(options.taskDestination) : undefined
   const profileId = agentProfileReferenceSchema.optional().parse(options.profileId)
+  const taskTitle = taskTitleInputSchema.optional().parse(options.taskTitle)
   const dedupeKey = submissionId
     ? submissionKey(userId, botId, submissionId)
     : `user_message:${randomUUID()}`
-  const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, ...(images.length ? { images } : {}), ...(taskDestination ? { taskDestination } : {}), ...(profileId ? { profileId } : {}), ...(options.humanSessionId ? { humanSessionId: options.humanSessionId } : {}) } }
+  const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, source: 'person', ...(images.length ? { images } : {}), ...(taskDestination ? { taskDestination } : {}), ...(profileId ? { profileId } : {}), ...(taskTitle ? { taskTitle } : {}), ...(options.humanSessionId ? { humanSessionId: options.humanSessionId } : {}) } }
   const [inserted] = await executor.insert(coordinatorEvents).values({ id: randomUUID(), ...event })
     .onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
   if (inserted) return { duplicate: false, eventId: inserted.id }
@@ -91,7 +93,9 @@ export class PersonalSubmissionBodyError extends Error {
 
 // Replays keep the first immutable provenance. A later session cannot upgrade
 // a prior API message to browser authorization or rewrite its original receipt.
+// A host-only audience label added after that receipt is not part of its body.
 function withoutHostSession(payload:Record<string,unknown>){
-  const {humanSessionId:_hostSession,...content}=payload
+  const {humanSessionId:_hostSession,source,...content}=payload
+  if(source!==undefined && source!=='person')return {...content,source}
   return content
 }

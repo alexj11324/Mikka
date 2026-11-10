@@ -118,7 +118,7 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
         throw new ActionFailureError('runInvalid', { reason: 'taskDestinationMismatch' })
       const definition = await rebindExecutionDevice(tx, run, target.deviceId)
       if (!definition) throw new ActionFailureError('executionAccountUnavailable')
-      const recovery = await (await import('./factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run.prompt, run.attempt + 1), tx)
+      const recovery = await (await import('./factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run, run.attempt + 1), tx)
       if (recovery.blocked) return { retried: false, blocked: recovery.blocked }
       const retryId = crypto.randomUUID()
       // The active-task admission gate must see A as terminal. Token revocation
@@ -128,6 +128,7 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
       await revokeRunTokens(run.id)
       await acceptLocalRun({ id: retryId, userId: run.userId, issueId: run.issueId, botId: run.botId, source: run.source,
         deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentId: target.agentId, prompt: recovery.prompt,
+        promptTaskStart: recovery.promptTaskStart, promptTaskLength: recovery.promptTaskLength,
         definition: retryWorkerDefinition(definition, recovery.prompt)!, continuation: true,
         ...(admission.requestEventId ? { requestEventId: admission.requestEventId } : {}) }, tx)
       const { rows: [retry] } = await tx.query<Run>(`UPDATE agent_runs SET "retryOf"=$2,attempt=$3,kind=$4,"baseBranch"=$5,cli_policy_hierarchy=$6 WHERE id=$1 RETURNING *`,
