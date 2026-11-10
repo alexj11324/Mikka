@@ -54,6 +54,10 @@ test('runtime events read as lines in the person\'s language, with the thread as
   await expect(chat.locator('[data-event-line="runRetried"]')).toContainText('换了一台机器继续')
   for (const leak of ['[Event]', 'asks the person', 'send_to_run', runId, issueId]) await expect(chat.getByText(leak, { exact: false })).toHaveCount(0)
   await attachLightDark(page, testInfo, 'chat-event-lines')
+  // The thread in the sentence is a control, not a label: opening it addresses that thread, the same move a thread
+  // card makes. Checked after the screenshots so the turn reads as the person left it.
+  await waiting.getByRole('button', { name: '改用 msw 还是只改这两个测试', exact: true }).click()
+  await expect(page).toHaveURL(url => url.searchParams.get('thread') === runId)
 })
 
 test('a failed reply says 回复失败 with 重试, never the step error; later it keeps 重新发送 (C4, C5)', async ({ page }, testInfo) => {

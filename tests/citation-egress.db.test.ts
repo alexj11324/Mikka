@@ -64,6 +64,13 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
       // Every cited run's task carries the task's newest thread, so its card names the task's current state, not this run's.
       assert.deepEqual(source.issue, index === 3 ? null : { id: issueId, title: task.title, number: 12, identifier: source.issue?.identifier ?? null, status: 'doing', run: { status: 'waiting_input', outcome: null, stopReason: null } })
       assert.deepEqual(source.pullRequests, index === 3 ? [] : readIssueMetadata(task.content).pullRequests)
+      // A cited thread with a task serializes two runs: the thread itself and its
+      // task's newest run (`issue.run`). Each states its own stopReason once — the
+      // chat reads the thread's for a task-free wait and the task's for needsReply —
+      // so a third copy never appears. The task-free thread (index 3) serializes
+      // only itself.
+      assert.equal(JSON.stringify(source).match(/"stopReason"/g)?.length ?? 0, index === 3 ? 1 : 2,
+        `run ${index}: one stopReason per serialized run`)
     }
     assert.equal((sources[runs[0]] as { name: string }).name, 'Fix the login bug that drops a session when the token refre…')
     assert.equal((sources[runs[0]] as { summary: string }).summary, 'Fixed the race.')
@@ -72,6 +79,8 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
     const cited = (await citationSources(owner, [`[[issue:${issueId}]]`]))[issueId]
     assert.ok(cited?.kind === 'issue')
     assert.deepEqual(cited.run, { status: 'waiting_input', outcome: null, stopReason: null }, 'the newest of its threads')
+    assert.equal(JSON.stringify(cited).match(/"stopReason"/g)?.length ?? 0, 1,
+      'a cited task states its newest run’s stopReason once')
     assert.deepEqual(cited.pullRequests, readIssueMetadata(task.content).pullRequests)
 
     // The list projection: only the report's summary, no provenance.

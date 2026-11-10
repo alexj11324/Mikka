@@ -269,10 +269,19 @@ test('detail and activity revalidate current access while returning only changed
       // control cannot make an upstream SQL/payload regression pass. The Task
       // review hint adds a bounded boolean column (and its correlated SQL) to
       // the citation reads; statement counts are unchanged. `issueLatestRun`
-      // now also carries stopReason, so the chat can tell a run that ended on
-      // a question from one the judge moved on: +13 written (the projection
-      // text) and +6 read (the extra null element) on each citation read. The
-      // connection reads keep their old numbers: the history budget absorbs it.
+      // now also selects stopReason, so the chat can tell a run that ended on a
+      // question from one the judge moved on. The byte budget moves by exactly
+      // the text it adds, measured per read:
+      //
+      //   linkedCitation      3122 + written 13 ("stopReason" 12 + comma 1) + read 6 (",null" 5 + 1) = 3141
+      //   unlinkedCitation    3660 + written 13 + read 6 = 3679
+      //   unlinkedRunCitation 9605 + written 13 + read 6 = 9624
+      //   revokedCitation     2106 + written 13 + read 0 = 2119
+      //
+      // revokedCitation reads no rows — a revoked owner gets `{}` back (asserted
+      // below) — so its result carries no extra ",null"; only the projection
+      // text grows. The connection reads keep their old numbers: their budget
+      // already covers the extra byte of result text.
       const originalIdentifierReadMetrics = {
         linkedConnections: { statements: 14, read: 3490, written: 5497 },
         unlinkedConnections: { statements: 14, read: 3192, written: 5346 },
@@ -407,8 +416,9 @@ test('detail and activity revalidate current access while returning only changed
       // Captured on the same fixture against old main 3c32675c; these are
       // actual revoked-owner measurements, not inferred from the linked case.
       // The direct citation carries the nine-byte codingReview hint from the
-      // Task review feature; its statement count is unchanged. It also carries
-      // `issueLatestRun`'s stopReason now (+13 written, the projection text).
+      // Task review feature; its statement count is unchanged. It also selects
+      // `issueLatestRun`'s stopReason now: +13 written (the projection text),
+      // +0 read, because a revoked owner gets `{}` back instead of rows.
       for (const [label, result, statementLimit, originalTotal] of [
         ['revokedConnections', revokedConnections, 12, 7464],
         ['revokedCitation', revokedCitation, 3, 2119],
