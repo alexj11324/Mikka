@@ -88,7 +88,7 @@ WebUI, LibreChat, Lobe Chat, Dify, Cal.com):
   密钥与环境 (N5: secrets masked in output vs. environment variables, egress
   allowlist), 审计日志 (N6: admin only, 90 days, IP).
 - Moved: 登录/登录设备 from 账户 to 安全; 导出/已共享链接 to 数据与隐私;
-  电脑操作 from Bot to 应用与运行权限 (S-H rebased onto N4).
+  电脑操作 from Bot to 团队权限 (S-H rebased onto 团队权限).
 - Renamed: 已保存的登录 → 登录与密钥 (adds 我的密钥), 设备 → 我的电脑.
 - 通知: channel × event pills (手机 / 邮件 / Telegram), 安静时段; the daily
   reminder count is a status line, not a section.
