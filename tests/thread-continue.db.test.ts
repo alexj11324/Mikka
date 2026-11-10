@@ -83,7 +83,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   await t.test('a dispatch records its entry and a person continuation is an app entry', async () => {
     const c = await person()
-    const originRef = { kind: 'telegram', chatId: '42', messageId: 7 }
+    const originRef = { kind: 'telegram' as const, chatId: '42', messageId: 7 }
     const initial = await steps.dispatchRun(c.id, {
       issueId: c.issueId, repo: 'octo/repo', requestKey: `origin:${randomUUID()}`, origin: 'telegram', originRef,
     }, undefined, c.botId) as unknown as { runId: string }
