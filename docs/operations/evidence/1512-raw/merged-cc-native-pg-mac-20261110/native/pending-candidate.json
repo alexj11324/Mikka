@@ -1,0 +1,118 @@
+{
+  "schema": "mikka.issue1512.native-workspace-pending-candidate.v1",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "purpose": "Only coalesce equal fresh workspace-membership/Organization-link SELECTs admitted before dispatch in the same trusted Native foreground readBatch.",
+  "status": "frozen source and tests; no runtime, RED/GREEN, Native budget or production acceptance claim",
+  "base_commit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "base_tree": "42d33eb7faf77d7049607523599de9374e065660",
+  "prepared_pg_projection_fix": {
+    "commit": "907d281478d587fce6895ec6f48bec25f75dc085",
+    "tree": "80426e816c67be18a3b5836f52c57e027bdc6d8d",
+    "blob": "4ace316509651d81aaeff3055156c3e5227439b3",
+    "changes": "two existing id,kind matcher strings become id,kind,organizationId"
+  },
+  "main_compatibility_reference": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+  "files": [
+    {
+      "path": "lib/desktop-rpc/workspace-choices.ts",
+      "sha": "f3480c04c9f81b0f963a9fd8ecc6e29a668cf0c0",
+      "before": null,
+      "bytes": 5623,
+      "sha256": "dd745f3e70b4e5e3fa334bc6c90e613d0a35436c4f28ed36fa4c95371e2a1433",
+      "readback_verified": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "sha": "ed6d0490005919a412decd65271e879fc9c58c60",
+      "before": "ec8497366c9c46cdac494814bd832beb1828c880",
+      "bytes": 8722,
+      "sha256": "4ea0a21eee0b108b96f4d53dd5426c2945f3464e02a25a6691ae71176e15f8f6",
+      "readback_verified": true
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "sha": "55e1ae30e46ee6f1a861c507e25efeffb26552f8",
+      "before": "0b5144fbde68d8a01f49988468ed1b8bc8488450",
+      "bytes": 10522,
+      "sha256": "61574d892d718395127ffd9c0bc13dc722afa7f6d8b06de7ece1242e2f9e4f24",
+      "readback_verified": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "sha": "dc6af1b78e66695688b0bef35d493a8f5b727f7d",
+      "before": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5",
+      "bytes": 36415,
+      "sha256": "1bbb234bb539baff3779ad8a188190bcc9a9ce859c08be0c82ad5bf8b5d9a65e",
+      "readback_verified": true
+    },
+    {
+      "path": "tests/action-read-egress.db.test.ts",
+      "sha": "69e13d4fc18e00b49bbe1cef0cc97ec8c057eec0",
+      "before": "96b172fcf95ec30b81b0943f15efe8dece3954fb",
+      "prepared_before": "4ace316509651d81aaeff3055156c3e5227439b3",
+      "bytes": 64952,
+      "sha256": "496c587e04270edaa2a4fc9e4442ee1b1c3256035edb37b1a67d4949b559ed68",
+      "readback_verified": true
+    }
+  ],
+  "checks": {
+    "all_candidate_blobs_fetched_back": true,
+    "all_candidate_git_blob_sha1_verified": true,
+    "all_candidate_sha256_computed_from_full_utf8_bytes": true,
+    "all_5852_path_hashes_matched": true,
+    "existing_pg_4ace_full_prefix_unchanged": true,
+    "existing_pg_lines": 518,
+    "appended_pg_lines": 255,
+    "product_v1_unchanged_from_prior_review": true,
+    "static_product_review_blob": "32b8fd1ec91bcf76710df3f003b458087d35b44c",
+    "independent_pg_final_review": "858cf1f0d39421cf22dd786c741ea7bcea5b2c1a",
+    "independent_final_static_review_result": "No static blocker in product v1 or PG candidate 69e13d4fc18e00b49bbe1cef0cc97ec8c057eec0; runtime remains pending."
+  },
+  "constraints": [
+    "No observation sharing across Native batches, request objects, principal/acting identities, user IDs, Native sessions, requested workspace IDs, token pins, SQL families, or actual database executors.",
+    "Remove a pending entry before read callback construction and Drizzle thenable assimilation. No in-flight, completed, rejected, or cross-request result cache.",
+    "All transaction and nested-savepoint reads bypass. Closed/expired scopes and after/cron/workflow work bypass.",
+    "Preserve the exact fixed scalar SELECT and independent per-caller Organization policy, token pin, workspace kind and selected-workspace validation.",
+    "Clone each returned array and scalar row object per consumer. Retain existing Personal workspace/share and auth behavior.",
+    "Do not change the Native <= Web query-count acceptance threshold or omit Dock badge, notification, initial reconnect/backfill reads."
+  ],
+  "unit_tests_added": [
+    "equal undispatched reads: one actual callback and independent scalar copies",
+    "dispatch removal precedes callback construction and Drizzle thenable assimilation",
+    "in-flight/completed read cannot hide revocation or restoration",
+    "synchronous/asynchronous failures cannot poison subsequent callers",
+    "family/executor/request/session/user/requested-workspace/pin/principal/acting isolation",
+    "transaction/non-Native/unknown-principal/deferred/expired bypass",
+    "parallel and successive Native batch isolation"
+  ],
+  "pg_tests_added": [
+    "five same-scope authenticated callers: exactly one unmodified membership/link SELECT; each consumer retains its own scalar copies; subsequent batch reads fresh",
+    "completed same-batch reads observe suspension, removal and restoration",
+    "held real Pool SELECT result cannot absorb later membership revocation",
+    "held real Pool SELECT result cannot absorb a newly attached archived Organization",
+    "each caller independently executes current Organization policy checks even when choices are coalesced",
+    "independent same-requested-workspace user and pin partitioning; separate requested-workspace, principal, request and Native-session partitioning; forbidden foreign/cross-pin denial",
+    "top-level Workspace transaction and nested-savepoint bypass",
+    "after/cron/workflow, closed retained ALS and non-Native bypass"
+  ],
+  "pg_barrier": {
+    "interception": "exact Workspace Pool instance query method, preserving its own-property descriptor",
+    "match": "exact full id/name/kind/role/organizationId projection + from/join prefix + owner parameter",
+    "timing": "underlying real query finishes before its returned Promise is held; entry has already been dispatched",
+    "revoker": "a real PoolClient is checked out before the observed Pool query and remains exclusively leased through mutation and restoration",
+    "observed_backend_pid_count": null,
+    "cleanup": "release gate; await all tracked caller promises settle; restore membership/Organization fixture while revoker is still held; restore exact query descriptor; release revoker in nested finally; finally remove fixture rows",
+    "bounded_wait": "single 10-second diagnostic timeout for each barrier wait; no polling"
+  },
+  "execution_plan": {
+    "red": "prepared 907d source plus identical new PG file only; run real isolated PostgreSQL gate, preserving every existing PG assertion. Coalescing budget assertions should be red without the product change.",
+    "green": "same prepared 907d source plus all five candidate files; run same PG gate and added unit counterexamples.",
+    "after_green": "Parent combines unchanged candidate with current main, runs required checks and exact-source Native/Web aggregate and production chain acceptance before considering #1512 closure.",
+    "resources_started_by_this_agent": 0,
+    "formal_refs_written": false,
+    "ci_or_vm_started": false,
+    "tests_executed_by_this_agent": false,
+    "actions_originals_refetched": false
+  }
+}

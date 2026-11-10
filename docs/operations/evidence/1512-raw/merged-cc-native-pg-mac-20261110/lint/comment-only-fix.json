@@ -1,0 +1,24 @@
+{
+  "schema": "issue1512-native-pending-single-thenable-lint-comment.v1",
+  "path": "lib/desktop-rpc/read-batch-context.test.ts",
+  "beforeBlob": "dc6af1b78e66695688b0bef35d493a8f5b727f7d",
+  "afterBlob": "69b2d9707493b5aa3c6f841099421ba8fe8f2a1d",
+  "afterBytes": 36549,
+  "afterSha256": "668cd5eb34ea157bd31a97c0e168246f68e8eb4c185f63eca11d0415d8b4a5b1",
+  "change": "// oxlint-disable-next-line unicorn/no-thenable -- Match Drizzle query builders to test dispatch cleanup before assimilation.",
+  "onlyOneCommentLineAdded": true,
+  "removingExactCommentRestoresAllOriginalBytes": true,
+  "existingRepositoryPatterns": [
+    {
+      "path": "tests/support/fake-workflow.ts",
+      "blob": "db82c89c25afeedaac3afe16d6f1fe2702d4f340"
+    },
+    {
+      "path": "tests/fixtures/scope-store-runtime.mjs",
+      "blob": "f90ff4e183490ec2662cc0a48fd1e5710ae58c77"
+    }
+  ],
+  "observedFailure": "Source/site-search oxlint --deny-warnings rejected the intentional thenable fixture at old line462; exact rule unicorn/no-thenable.",
+  "runtimeOrAssertionChanges": false,
+  "lintRuntimeExecuted": false
+}

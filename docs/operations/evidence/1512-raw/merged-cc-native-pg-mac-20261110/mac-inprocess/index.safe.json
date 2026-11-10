@@ -1,0 +1,242 @@
+{
+  "schema": "issue1512.macos-inprocess-evidence-index.v1",
+  "repository": "alexj11324/Mikka",
+  "branch": "ops/1512-macos-restart-20261110",
+  "archivePath": "docs/operations/evidence/1512-raw/macos-inprocess-diagnostic-20261110",
+  "archiveParent": "63b020064269cf66c6ee551b451ffd911f9489d2",
+  "controlCommit": "299fbddd8c8f252959088a8cafabde962636b945",
+  "formalSource": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "actualRunId": 42745131850,
+  "actualRunAttempt": 1,
+  "closureRunId": 42745834949,
+  "closureRunAttempt": 1,
+  "reader": "/root/mac_inprocess_diag",
+  "interpretation": "Diagnostic success, no established product root cause or fix; the original formal5852 bootstrap5 failure remains historical evidence.",
+  "downloadCounts": {
+    "packageJobLog": 1,
+    "macosJobLog": 1,
+    "packageZip": 0,
+    "diagnosticZip": 0,
+    "historicalActionsLogs": 0
+  },
+  "ownedResourceCounts": {
+    "extractionVMsCreated": 0,
+    "activeExtractionVMs": 0
+  },
+  "filesIndexed": 30,
+  "totalIndexedBytes": 479758,
+  "selfExclusion": "This index is excluded from its own byte/hash inventory; its Git blob and archive commit are the external entry points.",
+  "verification": "Every listed payload's UTF-8 bytes, Git blob SHA1 and SHA256 were checked before archive construction.",
+  "files": [
+    {
+      "path": "source/packages/daemon/src/service.ts",
+      "gitBlob": "a650a67ab4fc24d4014d0513b11b2e5f8bc6c639",
+      "bytes": 9415,
+      "sha256": "dcf6d9b0ea4e4fc06086b76a45f318606d4447ec2010a980d048a58dc91c4ccb",
+      "kind": "executed diagnostic source"
+    },
+    {
+      "path": "source/scripts/acceptance/local-installer-macos.ts",
+      "gitBlob": "af24a8b53480a9a394658d87e6da6a47480dc5ec",
+      "bytes": 11604,
+      "sha256": "0798cce4a2f464b53d03e5b3cc90dc5816db38d28b042951035fc475e5b4d297",
+      "kind": "executed diagnostic source"
+    },
+    {
+      "path": "source/scripts/acceptance/local-installer-inprocess-diagnostic.mjs",
+      "gitBlob": "df7774974e60776ec196b3c76aa558f1a5aff493",
+      "bytes": 5293,
+      "sha256": "f5af6ff0684d4f0b8a4a23ed59947d0694c463494a5d73dde4277347a9d85c0e",
+      "kind": "executed diagnostic source"
+    },
+    {
+      "path": "source/scripts/ops/issue1512-macos-restart-controller.mjs",
+      "gitBlob": "adb484a5e5606149570afccca5c3bba55eaea600",
+      "bytes": 13032,
+      "sha256": "039e7d33af1424b5675abee35ba584b4f7b93fffb03884f48ae03e9bf0ab84d6",
+      "kind": "executed diagnostic source"
+    },
+    {
+      "path": "source/.github/workflows/issue1512-mac-restart.yml",
+      "gitBlob": "1d42e9f078262cb2eb8297dce30e2671a78e9edd",
+      "bytes": 5285,
+      "sha256": "f15c7964e422be90386316a094f62881b6613651d6097f4a7104c471039a6cc2",
+      "kind": "executed diagnostic source"
+    },
+    {
+      "path": "source/.github/issue1512-mac-restart.json",
+      "gitBlob": "f1dc34377e0aa051bb2b3644abbc84a5ce7412d8",
+      "bytes": 3658,
+      "sha256": "254d3014080bb6895e3ffc8a808497027357362ee1f2d3801b8465199b84a5b0",
+      "kind": "executed diagnostic source"
+    },
+    {
+      "path": "static/preparation-proof.safe.json",
+      "gitBlob": "fa852cc6d7d876ae0d9c01a2e34bf2047338317b",
+      "bytes": 7685,
+      "sha256": "0e5ad2d294f18edb7b5271be1d63cd091a00b22616178928c438a73550ca327e",
+      "kind": "static checks"
+    },
+    {
+      "path": "static/independent-review.safe.json",
+      "gitBlob": "99285a1907a72b53849c64f88d357bee3c3ee4d6",
+      "bytes": 8347,
+      "sha256": "a4cdd8ca45013db9fd734e8e713ec38696c96986b74b34dc17314fe0325450ea",
+      "kind": "independent static review"
+    },
+    {
+      "path": "originals/package-job.response.json",
+      "gitBlob": "8a7806255df7b0db06726263476d4acb3510c141",
+      "bytes": 50666,
+      "sha256": "04af1f4a326140f264e5f392671ffda104fc9db4ff78abd19876fac0123f6bf8",
+      "kind": "unchanged single-read tool response"
+    },
+    {
+      "path": "originals/package-job.log",
+      "gitBlob": "b4a314f93260e6623c9128ee7a2711d4b3b42652",
+      "bytes": 49488,
+      "sha256": "fb90f4e26390d962390cc09e35950c4c0f7ed3773a4608c8277a9675c077b82b",
+      "kind": "exact decoded log string"
+    },
+    {
+      "path": "originals/macos-job.response.json",
+      "gitBlob": "81e0ef69286af175ed059d1d5a019adeaa7325ff",
+      "bytes": 69061,
+      "sha256": "95d046fc646f193a1cec9383dca27d4d11a25ae19a9f9dd216900967686ffc59",
+      "kind": "unchanged single-read tool response"
+    },
+    {
+      "path": "originals/macos-job.log",
+      "gitBlob": "a542fbbc0ca7cf2afa4cb8641a112fc55fded90e",
+      "bytes": 67480,
+      "sha256": "850bd4e7bf38c0c729d49a2aa20aa3205f2cab8158d88b2e82d074a60ea8c5f2",
+      "kind": "exact decoded log string"
+    },
+    {
+      "path": "derived/build-source-binding.from-log.json",
+      "gitBlob": "6c5a974e9e3c7daa569a51ab18a55121b566b5dc",
+      "bytes": 830,
+      "sha256": "b461800b38529e8a53898e8fdcbe08d8cb5c81f3efb71a0af32e6184ecbf237c",
+      "kind": "JSON stdout payload extracted from frozen original log; not an artifact member"
+    },
+    {
+      "path": "derived/package-binding.from-log.json",
+      "gitBlob": "d4668b5d9d41342e51251b13a8e4806ada4df851",
+      "bytes": 992,
+      "sha256": "a104084f4fdc18a3ff2a4c909050cfc213fb12a7c24b1e152be853eb021739ee",
+      "kind": "JSON stdout payload extracted from frozen original log; not an artifact member"
+    },
+    {
+      "path": "derived/fixture-result.from-log.json",
+      "gitBlob": "06bbf51080d45959aa992ebe60c5fb1b27ac2060",
+      "bytes": 2184,
+      "sha256": "2ae9e0e718da6d52179102f0b75f55a30e3c2178cbd84ead7f7759db6ed6c9f3",
+      "kind": "JSON stdout payload extracted from frozen original log; not an artifact member"
+    },
+    {
+      "path": "derived/controller-cleanup.from-log.json",
+      "gitBlob": "97670e11000bf22549f47607ba95024d708c271d",
+      "bytes": 965,
+      "sha256": "a9158c1cfee65e71e2ca6250ad1fbbc7d498a03460ae79c0a084927a95a1b5e5",
+      "kind": "JSON stdout payload extracted from frozen original log; not an artifact member"
+    },
+    {
+      "path": "metadata/actual-run.response.json",
+      "gitBlob": "acc5921bf63c69e526505b667cdbc978849ffc21",
+      "bytes": 26017,
+      "sha256": "c4c463ad3f0fe7dec47c84a0b82600d7c538887bff9fd182061ef622a9633bc1",
+      "kind": "unchanged tool response"
+    },
+    {
+      "path": "metadata/actual-jobs.response.json",
+      "gitBlob": "cff7c2b99475a5046dd5db046e5f6e75c38f7648",
+      "bytes": 19056,
+      "sha256": "f768e3fc92c7567c191e11032ca113edb66d68b734586762aa8d63b6c40d3170",
+      "kind": "unchanged tool response"
+    },
+    {
+      "path": "metadata/artifacts.response.json",
+      "gitBlob": "90cc6d7ca7a2391e1c5318ebb5ea19152565ce15",
+      "bytes": 1899,
+      "sha256": "fb3f8a87175f85b55e6bbc1b05d18c342a63d5029c9cf5e0205aa54721e2cb1e",
+      "kind": "unchanged tool response"
+    },
+    {
+      "path": "closure/update-ref.response.json",
+      "gitBlob": "bc792cbeafd69869c1bb177d2380534078196a99",
+      "bytes": 161,
+      "sha256": "0aad31566ba642e38c47f18ab55ad16470654eade0b74575427dd592d966998e",
+      "kind": "unchanged tool response"
+    },
+    {
+      "path": "closure/ref-readback.response.json",
+      "gitBlob": "84f7d2227cbd29f8b2282cb5641556c29801555b",
+      "bytes": 1616,
+      "sha256": "85cede3cb98b6068ba3d916bcb5c8742e5d07cff824e0e6811ece9c6c89a00b6",
+      "kind": "unchanged tool response"
+    },
+    {
+      "path": "closure/runs.response.json",
+      "gitBlob": "80c4276ac2e70cf180450039c097545318a92662",
+      "bytes": 26170,
+      "sha256": "b03d29b43105fe5aad1c99030ecb45a5122fc60181a3cf8b13333292d78b913b",
+      "kind": "unchanged tool response"
+    },
+    {
+      "path": "closure/jobs.response.json",
+      "gitBlob": "a901e9f90f32448e4f1d3ace2c86eae460f7a7e7",
+      "bytes": 4600,
+      "sha256": "6d69355c400e35212e5af76ebcd2c27a89e1025411679df23657653e9a89d2b9",
+      "kind": "unchanged tool response"
+    },
+    {
+      "path": "closure/workflow.disabled.yml",
+      "gitBlob": "e4abc46fca8dd55142d8716f600689b9e31e19fc",
+      "bytes": 4993,
+      "sha256": "5cb8b31962281848e8e5bcb8c8a4ffd95dc13a924342e92537507b264b16db2a",
+      "kind": "normal closing commit source"
+    },
+    {
+      "path": "closure/manifest.disabled.json",
+      "gitBlob": "b0593d4ca107bcbb5cf93b3ebf5793dc726a1f35",
+      "bytes": 3659,
+      "sha256": "48b72ed945cb5a7d25cf391f3f85563842a83ea9d8d0aa42fff7177d25528f05",
+      "kind": "normal closing commit source"
+    },
+    {
+      "path": "historical/formal-5852-macos.log",
+      "gitBlob": "989174f5612eaffa364b517728571cefb88d9763",
+      "bytes": 52535,
+      "sha256": "4cdac33e42025ea5993ef21ff1ffb45f4bc57d41007488ccff3321aa7aaeac6f",
+      "kind": "previously frozen formal failure log; original Actions not reread"
+    },
+    {
+      "path": "historical/wrapper-diagnostic-result.safe.json",
+      "gitBlob": "9236028bad545490051d680deafe1ef631896f8f",
+      "bytes": 8261,
+      "sha256": "813a977b24375c1430f6f193f105a7785f57d88207862ea71fdaca9dfe1da033",
+      "kind": "previously archived prior diagnostic result"
+    },
+    {
+      "path": "timing-comparison.safe.json",
+      "gitBlob": "be24f370ce454801be05cb232ebad591dc11b733",
+      "bytes": 8425,
+      "sha256": "700c9aee14fdec53199cfed3196aa9ec26ddce0bc67a0b241599e3bb1b91cdab",
+      "kind": "bounded derived interpretation"
+    },
+    {
+      "path": "result.safe.json",
+      "gitBlob": "6d892af12b5723fb1b6187de5b3a66070514a4e7",
+      "bytes": 12089,
+      "sha256": "e750d79feca2ac1ec2d065aba5c99b13b6ccecc47355226162b20d9382fa6d5e",
+      "kind": "bounded derived interpretation"
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "8190d9fc090b34550b391534e5c9968d5ef55007",
+      "bytes": 4292,
+      "sha256": "2d60236be43ad56410a34c1939155887b7231420f5a801e6d652befe4a0bf02d",
+      "kind": "human-readable bounded evidence guide"
+    }
+  ]
+}

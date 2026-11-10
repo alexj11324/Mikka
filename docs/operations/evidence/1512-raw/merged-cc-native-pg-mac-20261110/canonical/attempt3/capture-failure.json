@@ -1,0 +1,91 @@
+{
+  "schema": "issue1512.maincc-bounded-error.v1",
+  "sessionId": "sbx_s4PFEDSKnJTjcRzN8gu49tVdnekC",
+  "rawCommandSha": "60747d1a5bda584854773838714aef06c7bf5cb6",
+  "captureMeta": {
+    "files": 9,
+    "bytes": 56820,
+    "sha256": "b8ec413c2c09d590901a8da14b2dfb067ebce4b47172ed8ab3c3becd6961904b",
+    "rawBytes": 242219,
+    "rawSha256": "4e4f455c59b94765f4663e6c23637ab8031012f68e46695ab6a6064aafe20f31"
+  },
+  "receipt": {
+    "schema": "issue1512.maincc-execution-receipt.v1",
+    "startedAt": "2026-11-10T02:32:46.941Z",
+    "finishedAt": "2026-11-10T02:32:48.796Z",
+    "platform": "linux",
+    "arch": "x64",
+    "node": "24.22.1",
+    "typescript": "5.9.3",
+    "source": {
+      "base": "60401d31fb33b7f272cb0262df58d3d2008280b4",
+      "head": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+      "main": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "treePending": true,
+      "scope": "Exact route declarations for normal three-way union; pending Native workspace and Mac service changes do not add or modify routes."
+    },
+    "inputSha256": "b51f4b1a9a46028f644ddc012f819e2d84862d83658c0d0baeb3673c47b18186",
+    "inputGitBlob": "b7c286836a1c89e9ea5cc9d9d68f80b5627fdd3f",
+    "verifiedSourceFiles": 267,
+    "sourceHashMismatches": 0,
+    "commands": [
+      {
+        "name": "canonical",
+        "args": [
+          "apps/api/scripts/generate-routes.mjs"
+        ],
+        "startedAt": "2026-11-10T02:32:47.250Z",
+        "finishedAt": "2026-11-10T02:32:48.094Z",
+        "exitCode": 0,
+        "signal": null,
+        "errorCode": null,
+        "stdoutBytes": 29,
+        "stdoutSha256": "354b38f0261c72514c6e6c6b76ff343854dbb75ee7de185888a93ba753edc48d",
+        "stderrBytes": 0,
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "template-merge-tests",
+        "args": [
+          "--test",
+          "--test-reporter=tap",
+          "scripts/e2b/validate-template-subscriptions.test.mjs"
+        ],
+        "startedAt": "2026-11-10T02:32:48.095Z",
+        "finishedAt": "2026-11-10T02:32:48.795Z",
+        "exitCode": 1,
+        "signal": null,
+        "errorCode": null,
+        "stdoutBytes": 9140,
+        "stdoutSha256": "ed5bf699d59b7431e838d95f241bdb60833b62f577177578e14f2842b11a4145",
+        "stderrBytes": 0,
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "outputs": [
+      {
+        "path": "apps/api/generated/routes.json",
+        "bytes": 81056,
+        "sha256": "50f188df2546244bb5d60a75e1ee86f057ba45a090285b7f45ebb3ce255b489b",
+        "gitBlob": "c5e744cdecf8488fa3eb3c74eb47aadb3aee4bba"
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "bytes": 83606,
+        "sha256": "299807d8b1d1a4fd3813963afe9238aed1329f682c30bb9fb0e2f5d0920d2aa8",
+        "gitBlob": "355db84f571bd92b2b9035b6b62fdda97b12403a"
+      }
+    ],
+    "canonicalSummary": {
+      "routes": 257,
+      "methods": 345
+    },
+    "validation": "Real Node execution of the frozen canonical generator and merged template gate tests. No PostgreSQL, product server, production credentials or model configured.",
+    "status": "failed"
+  },
+  "outputs": [],
+  "failed": {
+    "name": "TypeError",
+    "message": "b.push is not a function"
+  }
+}

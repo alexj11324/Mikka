@@ -1,0 +1,26 @@
+{
+  "schema": "issue1512.maincc-output-truncation.v1",
+  "priorResponse": "279cb6e14b8554d37ba4f99aab02a3b616d6dc4e",
+  "observed": {
+    "node": "24.22.1",
+    "typescript": "5.9.3",
+    "canonicalExit": 0,
+    "testExit": 1,
+    "testStdoutBytes": 4542,
+    "testStdoutSha256": "d1889aaffaa5c5891158badd08940a6288413142fbb5c14729de7b88c0e0432e",
+    "canonicalJson": {
+      "gitBlob": "c5e744cdecf8488fa3eb3c74eb47aadb3aee4bba",
+      "bytes": 81056,
+      "sha256": "50f188df2546244bb5d60a75e1ee86f057ba45a090285b7f45ebb3ce255b489b"
+    },
+    "canonicalTs": {
+      "gitBlob": "355db84f571bd92b2b9035b6b62fdda97b12403a",
+      "bytes": 83606,
+      "sha256": "299807d8b1d1a4fd3813963afe9238aed1329f682c30bb9fb0e2f5d0920d2aa8"
+    },
+    "routes": 257,
+    "methods": 345
+  },
+  "limits": "The tool truncated the stdout data string around 2048 characters despite context.truncated=false. It proves test exit1, but failed test names/full TAP were not recovered before cleanup.",
+  "correction": "Capture launcher stdout/stderr on disk; export gzipped complete file bundle through bounded sub-2KiB output chunks; verify raw/gzip/file hashes before cleanup. Explicit TAP reporter changes output only; preserve prior failure and do not interpret this diagnostic as a pass."
+}

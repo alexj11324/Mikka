@@ -1,0 +1,249 @@
+{
+  "schema": "issue1512.merge-risk-G-incremental-supplement.v1",
+  "observedAt": "2026-11-10 03:01:20 UTC",
+  "scope": {
+    "from": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "merge": "c0fab83818b75c487089f554f2d350abd33b146b",
+    "head": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+    "tree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0",
+    "actualChangedFiles": 73,
+    "focus": "Pending-only authority boundary and five main-merge conflicts; not a replacement for full PR gates."
+  },
+  "draftGitBlob": "f492eeaac5b8f9e6e9356b16aa7acf8ee67ba182",
+  "mergeRisk": "medium",
+  "categories": {
+    "alignment": "good",
+    "impact": "large",
+    "verification": "decent",
+    "rollbackCost": "medium",
+    "errorDetection": "decent"
+  },
+  "sources": [
+    {
+      "role": "AGENTS.md",
+      "gitBlob": "fa963e4d0a342002661c58772d370484e8af740a",
+      "bytes": 22984,
+      "sha256": "7e89cb779a7da12e7d76da89c14d2d42c8ea9513da497cc6de22ff917657f98a"
+    },
+    {
+      "role": ".claude/skills/merge-risk/SKILL.md",
+      "gitBlob": "c8a545a237d7be29c0302d4aba3f1a8b7cfe9851",
+      "bytes": 2862,
+      "sha256": "1a11fcb7503eeb92a901755c0f729216cfdb8674a4ac2b0890e019d594e1ae17"
+    },
+    {
+      "role": "mergeReview",
+      "gitBlob": "c62bb998e6c2b5ff04c82a8472a519d81bc2ccea",
+      "bytes": 9150,
+      "sha256": "7fb37d233453abfa3d6ec2aa22e70c23aeda8875c06ef644a2283784d6adb13e"
+    },
+    {
+      "role": "canonicalProof",
+      "gitBlob": "9258c6e9e9554b0af82ff6de98182b6e3f2c5c65",
+      "bytes": 1634,
+      "sha256": "cf9e8ac893f89a8bc3f72bfb2dfd14fe07e372c8977cecd2cdda387745403d4c"
+    },
+    {
+      "role": "generationInputs",
+      "gitBlob": "b7c286836a1c89e9ea5cc9d9d68f80b5627fdd3f",
+      "bytes": 609357,
+      "sha256": "b51f4b1a9a46028f644ddc012f819e2d84862d83658c0d0baeb3673c47b18186"
+    },
+    {
+      "role": "mergeTreeProof",
+      "gitBlob": "75ba70c07c39ee8cc3872735343e62f02a2b484c",
+      "bytes": 1196170,
+      "sha256": "e3314f7502886b11a73389f69b0125ed364928284160c986bcc0e084073f22f3"
+    },
+    {
+      "role": "pgExecutionProof",
+      "gitBlob": "4a19a84ece023ce29c1965ee0e448ea4b8aa2cc5",
+      "bytes": 38377,
+      "sha256": "6adf14e0d70225d4f24dcd8c023646726a3c69f6de297fca67c3747571ce8e36"
+    },
+    {
+      "role": "pgReceipt",
+      "gitBlob": "f4637dbb9e994e70de7bfa5477659d312445389b",
+      "bytes": 29357,
+      "sha256": "1e339193bd5a885703443991b048cb0a1b54a77ac07c5201ff25b86df727d4f9"
+    },
+    {
+      "role": "pgCleanup",
+      "gitBlob": "48e9145696c86476324b6cc9e71a8c0166779e59",
+      "bytes": 620,
+      "sha256": "ed3c8ab032c7f6c5d6995e9dd7657088b8d7ca568ef84827e006bd6c3759ed37"
+    }
+  ],
+  "staticEvidence": {
+    "nativeProductAndPgCases": "858cf1f0d39421cf22dd786c741ea7bcea5b2c1a",
+    "entry": "d85b6bc8b2a430482477e4054e37e104cd53ad56",
+    "baselineApplicability": "dd92cf65bed3449e88d6f7c541d0c679b8ee3648",
+    "fiveConflictResolutions": {
+      "app/actions/coordinator.ts": "23179358e0af9db78d084973ecc197f0fb749e91",
+      "scripts/e2b/validate-template-subscriptions.mjs": "281c7dc61a7522a66291cf9496d80a41274e1319",
+      "scripts/e2b/validate-template-subscriptions.test.mjs": "ccc3d2ab527e9051f8261e3ad0909434d4be38ab",
+      "apps/api/generated/routes.json": "c5e744cdecf8488fa3eb3c74eb47aadb3aee4bba",
+      "apps/api/generated/routes.ts": "355db84f571bd92b2b9035b6b62fdda97b12403a"
+    },
+    "canonicalInputCheck": {
+      "inputFiles": 258,
+      "total": 520559,
+      "declaredTotal": 520559,
+      "issues": [],
+      "mergeProofLeaves": 6950,
+      "leafDiff": []
+    },
+    "canonicalOutputChecks": [
+      {
+        "kind": "json",
+        "gitBlob": "c5e744cdecf8488fa3eb3c74eb47aadb3aee4bba",
+        "bytes": 81056,
+        "sha256": "50f188df2546244bb5d60a75e1ee86f057ba45a090285b7f45ebb3ce255b489b",
+        "verified": true
+      },
+      {
+        "kind": "ts",
+        "gitBlob": "355db84f571bd92b2b9035b6b62fdda97b12403a",
+        "bytes": 83606,
+        "sha256": "299807d8b1d1a4fd3813963afe9238aed1329f682c30bb9fb0e2f5d0920d2aa8",
+        "verified": true
+      }
+    ]
+  },
+  "actualIsolatedExecution": {
+    "runId": 42745526739,
+    "jobId": 129596578091,
+    "attempt": 1,
+    "units": [
+      {
+        "phase": "merge",
+        "label": "template-subscriptions-unit",
+        "code": 0,
+        "summary": {
+          "tests": 33,
+          "pass": 33,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "beforeHead": "c0fab83818b75c487089f554f2d350abd33b146b",
+        "beforeTree": "c4540c9d0954eb341a359fe72c74c0421b17fd73",
+        "afterHead": "c0fab83818b75c487089f554f2d350abd33b146b",
+        "afterTree": "c4540c9d0954eb341a359fe72c74c0421b17fd73"
+      },
+      {
+        "phase": "green",
+        "label": "native-read-batch-unit",
+        "code": 0,
+        "summary": {
+          "tests": 30,
+          "pass": 30,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "beforeHead": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+        "beforeTree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0",
+        "afterHead": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+        "afterTree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0"
+      }
+    ],
+    "phases": [
+      {
+        "phase": "red",
+        "code": 1,
+        "summary": {
+          "tests": 25,
+          "pass": 22,
+          "fail": 3,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "verdict": "EXACT_TWO_QUERY_ASSERTIONS_RED",
+        "beforeHead": "f5d208e1b34f893a0caf70d821d767380ab8fe0a",
+        "beforeTree": "669d51d72d9920053656855b2bf75cc3c44f63d7",
+        "afterHead": "f5d208e1b34f893a0caf70d821d767380ab8fe0a",
+        "afterTree": "669d51d72d9920053656855b2bf75cc3c44f63d7"
+      },
+      {
+        "phase": "green",
+        "code": 0,
+        "summary": {
+          "tests": 25,
+          "pass": 25,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "verdict": "COMPLETE_ACTION_READ_EGRESS_GREEN",
+        "beforeHead": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+        "beforeTree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0",
+        "afterHead": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+        "afterTree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0"
+      }
+    ],
+    "databaseReset": {
+      "startedAt": "2026-11-10T02:52:35.961Z",
+      "oldDatabaseOid": "16384",
+      "removed": [
+        {
+          "datname": "bootstrap_41c6eb2eb2c24561af0edc6678e27604",
+          "oid": "16386"
+        },
+        {
+          "datname": "bootstrap_7845fdca79f1467cb628535fe6957114",
+          "oid": "21790"
+        }
+      ],
+      "newDatabase": {
+        "database": "mikka_e2e",
+        "role": "e2e",
+        "version": "170011",
+        "port": 5432,
+        "oid": "32429"
+      },
+      "finishedAt": "2026-11-10T02:52:37.766Z"
+    },
+    "cleanup": {
+      "stopped": true,
+      "containerRemoved": true,
+      "networkRemoved": true,
+      "removedAnonymousVolumes": 1,
+      "errors": []
+    },
+    "closure": {
+      "commit": "a329346ab540876905f06a6e3314305d9c9cbbbe",
+      "runId": 42745982355,
+      "conclusion": "skipped",
+      "guard": false,
+      "enabled": false
+    },
+    "evidenceBoundary": "Read the immutable derived proof, full receipt and cleanup; compare all source/file bindings and command-stream metadata against reviewed manifests. Original Actions job log/TAP were read once by the assigned owner and also verified by root; this reviewer did not duplicate their reads."
+  },
+  "historicalTemplateFailure": {
+    "status": "Retained genuine earlier tiny-VM exit1; no fabricated pass.",
+    "minimumFixtureGapReportedByRoot": "That VM input omitted .github/workflows/e2b-runtime-release.yml while the first template test reads it; enough to cause at least one failure, not established as the sole cause without the lost full TAP.",
+    "currentDisposition": "Same fixed template source passes33/33 in complete checkout; no product/expectation weakening is requested."
+  },
+  "remainingGates": [
+    "All required formal CI on exact G head (currently running, not inherited from isolated gate).",
+    "Actual Native full login/startup query budget against same-source Web.",
+    "Formal Mac Node22 install/reconnect acceptance without weakening its assertions.",
+    "Issue1512 genuine production subscription runs and complete PostHog trace/AI/Logs/Replay evidence."
+  ],
+  "publication": {
+    "prEdited": false,
+    "branchChanged": false,
+    "ciTriggered": false
+  },
+  "reviewerOperations": {
+    "newActionsOriginalReads": 0,
+    "artifactDownloads": 0,
+    "codeOrDatabaseExecutions": 0,
+    "resourcesCreated": 0
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schema": "issue1512.minimal-fixture-missing-static-input.v1",
+  "observedAt": "2026-11-10 02:58:58 UTC",
+  "earlierExecutionManifest": {
+    "blob": "999b798d7f5e7734cdd222e389c5639edf3763ea",
+    "files": 267,
+    "requiredWorkflowIncluded": false
+  },
+  "test": {
+    "blob": "ccc3d2ab527e9051f8261e3ad0909434d4be38ab",
+    "name": "the production gate logs in as SMOKE without pinning an owner workspace or bot",
+    "fileRead": "  const workflow = await readFile(new URL('../../.github/workflows/e2b-runtime-release.yml', import.meta.url), 'utf8')\n  assert.match(workflow, /secre"
+  },
+  "requiredWorkflow": {
+    "path": ".github/workflows/e2b-runtime-release.yml",
+    "mergeBlob": "7a592d975ac7594e723822f597b512defa4526b2"
+  },
+  "newFullCheckoutExecution": {
+    "runId": 42745526739,
+    "jobId": 129596578091,
+    "source": "c0fab83818b75c487089f554f2d350abd33b146b",
+    "tapBlob": "e95a995bc757e0e8fd62ca3b65e6bd568a071079",
+    "tests": 33,
+    "pass": 33,
+    "fail": 0,
+    "skipped": 0
+  },
+  "conclusion": "The earlier declared minimal VM fixture omitted a file read by the first test. This is a concrete input-completeness defect sufficient to cause at least that test to fail in a fresh fixture. The full current checkout passes the unchanged entire merged test file.",
+  "limitations": [
+    "Earlier real exit code 1 is preserved.",
+    "The earlier complete diagnostic stdout was lost; this static finding does not prove it was the only earlier failure or reconstruct the missing TAP.",
+    "No product code or assertion was changed to obtain the new 33/33 result.",
+    "No extra resource or test was run for this static finding."
+  ]
+}

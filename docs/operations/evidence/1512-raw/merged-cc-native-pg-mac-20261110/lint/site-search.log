@@ -1,0 +1,1166 @@
+﻿2026-11-10T02:58:19.2571902Z Current runner version: '2.338.2'
+2026-11-10T02:58:19.2598726Z ##[group]Runner Image Provisioner
+2026-11-10T02:58:19.2599740Z Hosted Compute Agent
+2026-11-10T02:58:19.2600598Z Version: 20261028.624
+2026-11-10T02:58:19.2601361Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-10T02:58:19.2602120Z Build Date: 2026-10-28T21:51:42Z
+2026-11-10T02:58:19.2602805Z Worker ID: {db00c175-4ea6-44d1-a1c7-f867d85a9443}
+2026-11-10T02:58:19.2603630Z Region: eastus
+2026-11-10T02:58:19.2604193Z Cloud: Azure
+2026-11-10T02:58:19.2604793Z ##[endgroup]
+2026-11-10T02:58:19.2606281Z ##[group]Operating System
+2026-11-10T02:58:19.2606936Z Ubuntu
+2026-11-10T02:58:19.2607614Z 24.04.5
+2026-11-10T02:58:19.2608145Z LTS
+2026-11-10T02:58:19.2608717Z ##[endgroup]
+2026-11-10T02:58:19.2609354Z ##[group]Runner Image
+2026-11-10T02:58:19.2610491Z Image: ubuntu-24.04
+2026-11-10T02:58:19.2611212Z Version: 20261101.360.1
+2026-11-10T02:58:19.2612534Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-10T02:58:19.2614220Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-10T02:58:19.2615284Z ##[endgroup]
+2026-11-10T02:58:19.2616398Z ##[group]GITHUB_TOKEN Permissions
+2026-11-10T02:58:19.2618651Z Contents: read
+2026-11-10T02:58:19.2619300Z Metadata: read
+2026-11-10T02:58:19.2620365Z ##[endgroup]
+2026-11-10T02:58:19.2622567Z Secret source: Actions
+2026-11-10T02:58:19.2623631Z Cache mode: write
+2026-11-10T02:58:19.2624744Z Prepare workflow directory
+2026-11-10T02:58:19.3192456Z Prepare all required actions
+2026-11-10T02:58:19.3241688Z Getting action download info
+2026-11-10T02:58:19.4886615Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-10T02:58:19.6005409Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-11-10T02:58:19.8092745Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-10T02:58:19.8914399Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-10T02:58:20.1593288Z Complete job name: site-search
+2026-11-10T02:58:20.2371995Z ##[group]Checking docker version
+2026-11-10T02:58:20.2386226Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2026-11-10T02:58:21.4299621Z '1.48'
+2026-11-10T02:58:21.4311466Z Docker daemon API version: '1.48'
+2026-11-10T02:58:21.4312038Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2026-11-10T02:58:21.4610744Z '1.48'
+2026-11-10T02:58:21.4635022Z Docker client API version: '1.48'
+2026-11-10T02:58:21.4643634Z ##[endgroup]
+2026-11-10T02:58:21.4649006Z ##[group]Clean up resources from previous jobs
+2026-11-10T02:58:21.4657177Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=6e07fd"
+2026-11-10T02:58:21.4886499Z ##[command]/usr/bin/docker network prune --force --filter "label=6e07fd"
+2026-11-10T02:58:21.5061206Z ##[endgroup]
+2026-11-10T02:58:21.5062040Z ##[group]Create local container network
+2026-11-10T02:58:21.5075925Z ##[command]/usr/bin/docker network create --label 6e07fd github_network_65e105b8c43d4a028bd5740d7ee33e51
+2026-11-10T02:58:21.5678020Z e409bec0b34e3042925f030085fcac381cdfdf06c87de5f15680a5bc7779764b
+2026-11-10T02:58:21.5710985Z ##[endgroup]
+2026-11-10T02:58:21.5748861Z ##[group]Starting postgres service container
+2026-11-10T02:58:21.5781240Z ##[command]/usr/bin/docker pull postgres:17
+2026-11-10T02:58:21.8487417Z 17: Pulling from library/postgres
+2026-11-10T02:58:21.9290464Z 37fb86c2a767: Pulling fs layer
+2026-11-10T02:58:21.9291038Z 56c5b61c6d2b: Pulling fs layer
+2026-11-10T02:58:21.9291485Z c2f4b34f5119: Pulling fs layer
+2026-11-10T02:58:21.9291941Z d717e9509665: Pulling fs layer
+2026-11-10T02:58:21.9292391Z 046371a447cc: Pulling fs layer
+2026-11-10T02:58:21.9293230Z c97a680633a2: Pulling fs layer
+2026-11-10T02:58:21.9293679Z f0f18338e0da: Pulling fs layer
+2026-11-10T02:58:21.9294117Z 0eab0a63b06d: Pulling fs layer
+2026-11-10T02:58:21.9294563Z 9de238338a9a: Pulling fs layer
+2026-11-10T02:58:21.9295011Z 275aa943d416: Pulling fs layer
+2026-11-10T02:58:21.9295496Z 5760334e16b5: Pulling fs layer
+2026-11-10T02:58:21.9295821Z d35c08e535dc: Pulling fs layer
+2026-11-10T02:58:21.9296298Z 4f0fb6572de8: Pulling fs layer
+2026-11-10T02:58:21.9296680Z ceeafc939069: Pulling fs layer
+2026-11-10T02:58:21.9297068Z d717e9509665: Waiting
+2026-11-10T02:58:21.9297387Z 046371a447cc: Waiting
+2026-11-10T02:58:21.9297697Z 9de238338a9a: Waiting
+2026-11-10T02:58:21.9298130Z 275aa943d416: Waiting
+2026-11-10T02:58:21.9298542Z 4f0fb6572de8: Waiting
+2026-11-10T02:58:21.9298985Z ceeafc939069: Waiting
+2026-11-10T02:58:21.9299390Z 5760334e16b5: Waiting
+2026-11-10T02:58:21.9299987Z d35c08e535dc: Waiting
+2026-11-10T02:58:21.9300428Z c97a680633a2: Waiting
+2026-11-10T02:58:21.9300838Z 0eab0a63b06d: Waiting
+2026-11-10T02:58:21.9747062Z 56c5b61c6d2b: Verifying Checksum
+2026-11-10T02:58:21.9747658Z 56c5b61c6d2b: Download complete
+2026-11-10T02:58:22.0028165Z c2f4b34f5119: Verifying Checksum
+2026-11-10T02:58:22.0028674Z c2f4b34f5119: Download complete
+2026-11-10T02:58:22.0194570Z d717e9509665: Verifying Checksum
+2026-11-10T02:58:22.0195681Z d717e9509665: Download complete
+2026-11-10T02:58:22.0610580Z c97a680633a2: Verifying Checksum
+2026-11-10T02:58:22.0611751Z c97a680633a2: Download complete
+2026-11-10T02:58:22.0612290Z 046371a447cc: Verifying Checksum
+2026-11-10T02:58:22.0612744Z 046371a447cc: Download complete
+2026-11-10T02:58:22.0748522Z 37fb86c2a767: Verifying Checksum
+2026-11-10T02:58:22.0749492Z 37fb86c2a767: Download complete
+2026-11-10T02:58:22.0860167Z 0eab0a63b06d: Verifying Checksum
+2026-11-10T02:58:22.0860722Z 0eab0a63b06d: Download complete
+2026-11-10T02:58:22.0902755Z f0f18338e0da: Verifying Checksum
+2026-11-10T02:58:22.0903365Z f0f18338e0da: Download complete
+2026-11-10T02:58:22.1123422Z 275aa943d416: Download complete
+2026-11-10T02:58:22.1191660Z 5760334e16b5: Verifying Checksum
+2026-11-10T02:58:22.1192232Z 5760334e16b5: Download complete
+2026-11-10T02:58:22.1404926Z d35c08e535dc: Verifying Checksum
+2026-11-10T02:58:22.1408248Z d35c08e535dc: Download complete
+2026-11-10T02:58:22.1473609Z 4f0fb6572de8: Verifying Checksum
+2026-11-10T02:58:22.1474492Z 4f0fb6572de8: Download complete
+2026-11-10T02:58:22.1734407Z ceeafc939069: Verifying Checksum
+2026-11-10T02:58:22.1735561Z ceeafc939069: Download complete
+2026-11-10T02:58:22.6648234Z 9de238338a9a: Verifying Checksum
+2026-11-10T02:58:22.6649256Z 9de238338a9a: Download complete
+2026-11-10T02:58:23.1572340Z 37fb86c2a767: Pull complete
+2026-11-10T02:58:23.9078619Z 56c5b61c6d2b: Pull complete
+2026-11-10T02:58:24.0790731Z c2f4b34f5119: Pull complete
+2026-11-10T02:58:24.1133749Z d717e9509665: Pull complete
+2026-11-10T02:58:24.4166069Z 046371a447cc: Pull complete
+2026-11-10T02:58:24.4768325Z c97a680633a2: Pull complete
+2026-11-10T02:58:24.4849187Z f0f18338e0da: Pull complete
+2026-11-10T02:58:24.4941721Z 0eab0a63b06d: Pull complete
+2026-11-10T02:58:27.5196414Z 9de238338a9a: Pull complete
+2026-11-10T02:58:27.5541379Z 275aa943d416: Pull complete
+2026-11-10T02:58:27.5645470Z 5760334e16b5: Pull complete
+2026-11-10T02:58:27.5761701Z d35c08e535dc: Pull complete
+2026-11-10T02:58:27.5854235Z 4f0fb6572de8: Pull complete
+2026-11-10T02:58:27.5939520Z ceeafc939069: Pull complete
+2026-11-10T02:58:27.5978874Z Digest: sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
+2026-11-10T02:58:27.5993094Z Status: Downloaded newer image for postgres:17
+2026-11-10T02:58:27.6001939Z docker.io/library/postgres:17
+2026-11-10T02:58:27.6071071Z ##[command]/usr/bin/docker create --name 0d56813859334e758de99d20cfb1c023_postgres17_413e5e --label 6e07fd --network github_network_65e105b8c43d4a028bd5740d7ee33e51 --network-alias postgres -p 5432:5432 --health-cmd "pg_isready -U e2e -d mikka_e2e" --health-interval 5s --health-timeout 5s --health-retries 10 -e "POSTGRES_USER=e2e" -e "POSTGRES_PASSWORD=e2e-local-only" -e "POSTGRES_DB=mikka_e2e" -e GITHUB_ACTIONS=true -e CI=true postgres:17
+2026-11-10T02:58:27.6359552Z da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23
+2026-11-10T02:58:27.6385343Z ##[command]/usr/bin/docker start da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23
+2026-11-10T02:58:28.4078381Z da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23
+2026-11-10T02:58:28.4105489Z ##[command]/usr/bin/docker ps --all --filter id=da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23 --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-11-10T02:58:28.4258088Z da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23 Up Less than a second (health: starting)
+2026-11-10T02:58:28.4282636Z ##[command]/usr/bin/docker port da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23
+2026-11-10T02:58:28.4436262Z 5432/tcp -> 0.0.0.0:5432
+2026-11-10T02:58:28.4440728Z 5432/tcp -> [::]:5432
+2026-11-10T02:58:28.4485112Z ##[endgroup]
+2026-11-10T02:58:28.4486477Z ##[group]Starting workspace-postgres service container
+2026-11-10T02:58:28.4487822Z ##[command]/usr/bin/docker pull postgres:17
+2026-11-10T02:58:28.6116394Z 17: Pulling from library/postgres
+2026-11-10T02:58:28.6189022Z Digest: sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
+2026-11-10T02:58:28.6193001Z Status: Image is up to date for postgres:17
+2026-11-10T02:58:28.6200852Z docker.io/library/postgres:17
+2026-11-10T02:58:28.6224480Z ##[command]/usr/bin/docker create --name c4ea30e808e64c698e75f27b086ba2c4_postgres17_68dbf0 --label 6e07fd --network github_network_65e105b8c43d4a028bd5740d7ee33e51 --network-alias workspace-postgres -p 5433:5432 --health-cmd "pg_isready -U workspace_e2e -d mikka_workspace_e2e" --health-interval 5s --health-timeout 5s --health-retries 10 -e "POSTGRES_USER=workspace_e2e" -e "POSTGRES_PASSWORD=workspace-local-only" -e "POSTGRES_DB=mikka_workspace_e2e" -e GITHUB_ACTIONS=true -e CI=true postgres:17
+2026-11-10T02:58:28.6658752Z dbda028f9e10134937684344aa3fb15b05ce4f7c31fad38e7aba974f2187c010
+2026-11-10T02:58:28.6678077Z ##[command]/usr/bin/docker start dbda028f9e10134937684344aa3fb15b05ce4f7c31fad38e7aba974f2187c010
+2026-11-10T02:58:28.8273418Z dbda028f9e10134937684344aa3fb15b05ce4f7c31fad38e7aba974f2187c010
+2026-11-10T02:58:28.8304589Z ##[command]/usr/bin/docker ps --all --filter id=dbda028f9e10134937684344aa3fb15b05ce4f7c31fad38e7aba974f2187c010 --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-11-10T02:58:28.8536022Z dbda028f9e10134937684344aa3fb15b05ce4f7c31fad38e7aba974f2187c010 Up Less than a second (health: starting)
+2026-11-10T02:58:28.8563165Z ##[command]/usr/bin/docker port dbda028f9e10134937684344aa3fb15b05ce4f7c31fad38e7aba974f2187c010
+2026-11-10T02:58:28.8791687Z 5432/tcp -> 0.0.0.0:5433
+2026-11-10T02:58:28.8792940Z 5432/tcp -> [::]:5433
+2026-11-10T02:58:28.8834709Z ##[endgroup]
+2026-11-10T02:58:28.8846770Z ##[group]Waiting for all services to be ready
+2026-11-10T02:58:28.8861493Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23
+2026-11-10T02:58:28.9127082Z starting
+2026-11-10T02:58:28.9154632Z postgres service is starting, waiting 2 seconds before checking again.
+2026-11-10T02:58:30.9158587Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23
+2026-11-10T02:58:30.9307111Z starting
+2026-11-10T02:58:30.9323040Z postgres service is starting, waiting 3 seconds before checking again.
+2026-11-10T02:58:34.5357716Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23
+2026-11-10T02:58:34.5507596Z healthy
+2026-11-10T02:58:34.5526844Z postgres service is healthy.
+2026-11-10T02:58:34.5527733Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" dbda028f9e10134937684344aa3fb15b05ce4f7c31fad38e7aba974f2187c010
+2026-11-10T02:58:34.5667950Z healthy
+2026-11-10T02:58:34.5685055Z workspace-postgres service is healthy.
+2026-11-10T02:58:34.5685710Z ##[endgroup]
+2026-11-10T02:58:34.5967268Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-10T02:58:34.5967934Z with:
+2026-11-10T02:58:34.5968142Z   repository: alexj11324/Mikka
+2026-11-10T02:58:34.5970748Z   token: ***
+2026-11-10T02:58:34.5970961Z   ssh-strict: true
+2026-11-10T02:58:34.5971165Z   ssh-user: git
+2026-11-10T02:58:34.5971373Z   persist-credentials: true
+2026-11-10T02:58:34.5971597Z   clean: true
+2026-11-10T02:58:34.5971797Z   sparse-checkout-cone-mode: true
+2026-11-10T02:58:34.5972039Z   fetch-depth: 1
+2026-11-10T02:58:34.5972228Z   fetch-tags: false
+2026-11-10T02:58:34.5972422Z   show-progress: true
+2026-11-10T02:58:34.5972618Z   lfs: false
+2026-11-10T02:58:34.5972795Z   submodules: false
+2026-11-10T02:58:34.5973008Z   set-safe-directory: true
+2026-11-10T02:58:34.5973243Z   allow-unsafe-pr-checkout: false
+2026-11-10T02:58:34.5973729Z env:
+2026-11-10T02:58:34.5973918Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-10T02:58:34.5974152Z   CI: true
+2026-11-10T02:58:34.5974584Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T02:58:34.5975033Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T02:58:34.5975558Z   DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T02:58:34.5976148Z   SITE_SEARCH_WORKSPACE_DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T02:58:34.5976519Z   SITE_SEARCH_REQUIRE_DUAL_PG: 1
+2026-11-10T02:58:34.5976852Z   MIKKA_TEST_DEPLOYMENT_SHA: 383daa9386b7fa0db96ee9109fa5e5a428aec141
+2026-11-10T02:58:34.5977230Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-10T02:58:34.5977738Z   BETTER_AUTH_SECRET: synthetic-site-search-secret-not-a-real-credential
+2026-11-10T02:58:34.5978140Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-10T02:58:34.5978358Z   MIGRATE: 0
+2026-11-10T02:58:34.5978544Z ##[endgroup]
+2026-11-10T02:58:34.8607972Z Syncing repository: alexj11324/Mikka
+2026-11-10T02:58:34.8609797Z ##[group]Getting Git version info
+2026-11-10T02:58:34.8610710Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-10T02:58:34.8611595Z [command]/usr/bin/git version
+2026-11-10T02:58:34.8692562Z git version 2.56.0
+2026-11-10T02:58:34.8721283Z ##[endgroup]
+2026-11-10T02:58:34.8741025Z Temporarily overriding HOME='/home/runner/work/_temp/27140d73-d06a-45f2-bd45-550564c9b01c' before making global git config changes
+2026-11-10T02:58:34.8742355Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-10T02:58:34.8770724Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-10T02:58:34.8800855Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-10T02:58:34.8811392Z ##[group]Initializing the repository
+2026-11-10T02:58:34.8812291Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-10T02:58:34.8940015Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-10T02:58:34.8943867Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-10T02:58:34.8944858Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-10T02:58:34.8945551Z hint: call:
+2026-11-10T02:58:34.8945864Z hint:
+2026-11-10T02:58:34.8946309Z hint: 	git config --global init.defaultBranch <name>
+2026-11-10T02:58:34.8946838Z hint:
+2026-11-10T02:58:34.8947387Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-10T02:58:34.8948256Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-10T02:58:34.8948962Z hint:
+2026-11-10T02:58:34.8949355Z hint: 	git branch -m <name>
+2026-11-10T02:58:34.8949773Z hint:
+2026-11-10T02:58:34.8950615Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-10T02:58:34.8951616Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-10T02:58:34.8960659Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-10T02:58:34.9010607Z ##[endgroup]
+2026-11-10T02:58:34.9011232Z ##[group]Disabling automatic garbage collection
+2026-11-10T02:58:34.9014989Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-10T02:58:34.9049036Z ##[endgroup]
+2026-11-10T02:58:34.9049599Z ##[group]Setting up auth
+2026-11-10T02:58:34.9057576Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-10T02:58:34.9106719Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-10T02:58:34.9508903Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-10T02:58:34.9558082Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-10T02:58:34.9812513Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-10T02:58:34.9859273Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-10T02:58:35.0102996Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-10T02:58:35.0152124Z ##[endgroup]
+2026-11-10T02:58:35.0152795Z ##[group]Fetching the repository
+2026-11-10T02:58:35.0165646Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +383daa9386b7fa0db96ee9109fa5e5a428aec141:refs/remotes/pull/1799/merge
+2026-11-10T02:58:36.2244601Z From https://github.com/alexj11324/Mikka
+2026-11-10T02:58:36.2271740Z  * [new ref]         383daa9386b7fa0db96ee9109fa5e5a428aec141 -> pull/1799/merge
+2026-11-10T02:58:36.2273853Z ##[endgroup]
+2026-11-10T02:58:36.2274545Z ##[group]Determining the checkout info
+2026-11-10T02:58:36.2275215Z ##[endgroup]
+2026-11-10T02:58:36.2275598Z [command]/usr/bin/git sparse-checkout disable
+2026-11-10T02:58:36.2337898Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-10T02:58:36.2368281Z ##[group]Checking out the ref
+2026-11-10T02:58:36.2373535Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge
+2026-11-10T02:58:36.9470597Z Note: switching to 'refs/remotes/pull/1799/merge'.
+2026-11-10T02:58:36.9471008Z 
+2026-11-10T02:58:36.9471270Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-10T02:58:36.9471862Z changes and commit them, and you can discard any commits you make in this
+2026-11-10T02:58:36.9472429Z state without impacting any branches by switching back to a branch.
+2026-11-10T02:58:36.9472915Z 
+2026-11-10T02:58:36.9473224Z If you want to create a new branch to retain commits you create, you may
+2026-11-10T02:58:36.9473935Z do so (now or later) by using -c with the switch command. Example:
+2026-11-10T02:58:36.9474334Z 
+2026-11-10T02:58:36.9474500Z   git switch -c <new-branch-name>
+2026-11-10T02:58:36.9474779Z 
+2026-11-10T02:58:36.9474958Z Or undo this operation with:
+2026-11-10T02:58:36.9475215Z 
+2026-11-10T02:58:36.9475357Z   git switch -
+2026-11-10T02:58:36.9475641Z 
+2026-11-10T02:58:36.9475973Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-10T02:58:36.9476507Z 
+2026-11-10T02:58:36.9477094Z HEAD is now at 383daa9 Merge a5027a36fdd73229db1a22bde6ab3ec68ce63364 into cc389d61e8a85206d17616e4326a660283a1b2bd
+2026-11-10T02:58:36.9495520Z ##[endgroup]
+2026-11-10T02:58:36.9551067Z [command]/usr/bin/git log -1 --format=%H
+2026-11-10T02:58:36.9585347Z 383daa9386b7fa0db96ee9109fa5e5a428aec141
+2026-11-10T02:58:36.9818875Z ##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+2026-11-10T02:58:36.9819276Z with:
+2026-11-10T02:58:36.9819463Z   version: 10.34.3
+2026-11-10T02:58:36.9820181Z   dest: ~/setup-pnpm
+2026-11-10T02:58:36.9820419Z   run_install: null
+2026-11-10T02:58:36.9820613Z   cache: false
+2026-11-10T02:58:36.9820826Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-10T02:58:36.9821334Z   package_json_file: package.json
+2026-11-10T02:58:36.9821734Z   standalone: false
+2026-11-10T02:58:36.9821971Z env:
+2026-11-10T02:58:36.9822160Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-10T02:58:36.9822401Z   CI: true
+2026-11-10T02:58:36.9822861Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T02:58:36.9823309Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T02:58:36.9823883Z   DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T02:58:36.9824494Z   SITE_SEARCH_WORKSPACE_DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T02:58:36.9824906Z   SITE_SEARCH_REQUIRE_DUAL_PG: 1
+2026-11-10T02:58:36.9825247Z   MIKKA_TEST_DEPLOYMENT_SHA: 383daa9386b7fa0db96ee9109fa5e5a428aec141
+2026-11-10T02:58:36.9825626Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-10T02:58:36.9826019Z   BETTER_AUTH_SECRET: synthetic-site-search-secret-not-a-real-credential
+2026-11-10T02:58:36.9826404Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-10T02:58:36.9826627Z   MIGRATE: 0
+2026-11-10T02:58:36.9826813Z ##[endgroup]
+2026-11-10T02:58:37.1412398Z ##[group]Running self-installer...
+2026-11-10T02:58:37.5899098Z (node:2990) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-10T02:58:37.5901099Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-10T02:58:37.7240775Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-10T02:58:37.7328407Z Packages: +1
+2026-11-10T02:58:37.7329172Z +
+2026-11-10T02:58:38.1519378Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-10T02:58:38.1848056Z 
+2026-11-10T02:58:38.1848670Z dependencies:
+2026-11-10T02:58:38.1849514Z + pnpm 10.34.3 (12.18.0 is available)
+2026-11-10T02:58:38.1850292Z 
+2026-11-10T02:58:38.1874254Z Done in 843ms
+2026-11-10T02:58:38.2090021Z ##[endgroup]
+2026-11-10T02:58:38.2090639Z Installation Completed!
+2026-11-10T02:58:38.2274701Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-10T02:58:38.2275105Z with:
+2026-11-10T02:58:38.2275294Z   node-version: 24
+2026-11-10T02:58:38.2275498Z   cache: pnpm
+2026-11-10T02:58:38.2275698Z   always-auth: false
+2026-11-10T02:58:38.2275906Z   check-latest: false
+2026-11-10T02:58:38.2278265Z   token: ***
+2026-11-10T02:58:38.2278452Z env:
+2026-11-10T02:58:38.2278640Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-10T02:58:38.2278882Z   CI: true
+2026-11-10T02:58:38.2279233Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T02:58:38.2279672Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T02:58:38.2280418Z   DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T02:58:38.2281026Z   SITE_SEARCH_WORKSPACE_DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T02:58:38.2281421Z   SITE_SEARCH_REQUIRE_DUAL_PG: 1
+2026-11-10T02:58:38.2281766Z   MIKKA_TEST_DEPLOYMENT_SHA: 383daa9386b7fa0db96ee9109fa5e5a428aec141
+2026-11-10T02:58:38.2282189Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-10T02:58:38.2282585Z   BETTER_AUTH_SECRET: synthetic-site-search-secret-not-a-real-credential
+2026-11-10T02:58:38.2282977Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-10T02:58:38.2283202Z   MIGRATE: 0
+2026-11-10T02:58:38.2283450Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-10T02:58:38.2283772Z ##[endgroup]
+2026-11-10T02:58:38.3833274Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-10T02:58:38.3838907Z (node:3004) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-10T02:58:38.3840451Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-10T02:58:38.3843061Z ##[group]Environment details
+2026-11-10T02:58:38.8231311Z node: v24.22.2
+2026-11-10T02:58:38.8231731Z npm: 11.19.1
+2026-11-10T02:58:38.8232056Z yarn: 1.22.22
+2026-11-10T02:58:38.8232991Z ##[endgroup]
+2026-11-10T02:58:38.8257603Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-11-10T02:58:39.3061364Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-10T02:58:39.3902805Z Cache hit for: node-cache-Linux-x64-pnpm-bfd908f56e8101a62cefd84f983fdb8efcc8f9c9f5bfadac07ffbcf5376db19c
+2026-11-10T02:58:39.4015803Z (node:3004) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-10T02:58:40.4276167Z Received 134217728 of 1130910630 (11.9%), 128.0 MBs/sec
+2026-11-10T02:58:41.4305048Z Received 377487360 of 1130910630 (33.4%), 179.7 MBs/sec
+2026-11-10T02:58:42.4594747Z Received 578813952 of 1130910630 (51.2%), 182.3 MBs/sec
+2026-11-10T02:58:43.4561443Z Received 809500672 of 1130910630 (71.6%), 191.7 MBs/sec
+2026-11-10T02:58:44.4561129Z Received 1065353216 of 1130910630 (94.2%), 202.1 MBs/sec
+2026-11-10T02:58:45.0024696Z Received 1130910630 of 1130910630 (100.0%), 193.5 MBs/sec
+2026-11-10T02:58:45.0025846Z Cache Size: ~1079 MB (1130910630 B)
+2026-11-10T02:58:45.0216285Z [command]/usr/bin/tar -xf /home/runner/work/_temp/2ea0636a-b73f-4166-b1a5-46fcec9f5a69/cache.tzst -P -C /home/runner/work/Mikka/Mikka --use-compress-program unzstd
+2026-11-10T02:58:58.0468491Z Cache restored successfully
+2026-11-10T02:58:58.0963233Z Cache restored from key: node-cache-Linux-x64-pnpm-bfd908f56e8101a62cefd84f983fdb8efcc8f9c9f5bfadac07ffbcf5376db19c
+2026-11-10T02:58:58.1226788Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-10T02:58:58.1227217Z [36;1mpnpm install --frozen-lockfile[0m
+2026-11-10T02:58:58.1255391Z shell: /usr/bin/bash -e {0}
+2026-11-10T02:58:58.1255654Z env:
+2026-11-10T02:58:58.1255869Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-10T02:58:58.1256122Z   CI: true
+2026-11-10T02:58:58.1256752Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T02:58:58.1257220Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T02:58:58.1257749Z   DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T02:58:58.1258357Z   SITE_SEARCH_WORKSPACE_DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T02:58:58.1258742Z   SITE_SEARCH_REQUIRE_DUAL_PG: 1
+2026-11-10T02:58:58.1259088Z   MIKKA_TEST_DEPLOYMENT_SHA: 383daa9386b7fa0db96ee9109fa5e5a428aec141
+2026-11-10T02:58:58.1259479Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-10T02:58:58.1260194Z   BETTER_AUTH_SECRET: synthetic-site-search-secret-not-a-real-credential
+2026-11-10T02:58:58.1260648Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-10T02:58:58.1260882Z   MIGRATE: 0
+2026-11-10T02:58:58.1261128Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-10T02:58:58.1261426Z ##[endgroup]
+2026-11-10T02:58:58.5122941Z Scope: all 7 workspace projects
+2026-11-10T02:58:58.6270734Z Lockfile is up to date, resolution step is skipped
+2026-11-10T02:58:58.7354789Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-10T02:58:58.9536097Z Packages: +2204
+2026-11-10T02:58:58.9536904Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-10T02:58:59.7510705Z Progress: resolved 2204, reused 858, downloaded 0, added 0
+2026-11-10T02:59:00.7564060Z Progress: resolved 2204, reused 2092, downloaded 0, added 0
+2026-11-10T02:59:01.7574058Z Progress: resolved 2204, reused 2128, downloaded 0, added 336
+2026-11-10T02:59:02.7576066Z Progress: resolved 2204, reused 2128, downloaded 0, added 488
+2026-11-10T02:59:03.7602264Z Progress: resolved 2204, reused 2128, downloaded 0, added 693
+2026-11-10T02:59:04.7611417Z Progress: resolved 2204, reused 2128, downloaded 0, added 925
+2026-11-10T02:59:05.7611476Z Progress: resolved 2204, reused 2128, downloaded 0, added 1199
+2026-11-10T02:59:06.7591379Z Progress: resolved 2204, reused 2128, downloaded 0, added 1347
+2026-11-10T02:59:07.7605727Z Progress: resolved 2204, reused 2128, downloaded 0, added 1704
+2026-11-10T02:59:08.7606368Z Progress: resolved 2204, reused 2128, downloaded 0, added 2081
+2026-11-10T02:59:09.5513609Z Progress: resolved 2204, reused 2128, downloaded 0, added 2204, done
+2026-11-10T02:59:11.1505324Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-10T02:59:11.6522474Z 
+2026-11-10T02:59:11.6523003Z dependencies:
+2026-11-10T02:59:11.6523446Z + @ai-sdk/gateway 4.0.121
+2026-11-10T02:59:11.6523871Z + @ai-sdk/mcp 2.0.81
+2026-11-10T02:59:11.6524204Z + @ai-sdk/openai 4.0.99
+2026-11-10T02:59:11.6524623Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-10T02:59:11.6525028Z + @ai-sdk/react 4.0.152
+2026-11-10T02:59:11.6525384Z + @ai-sdk/workflow 2.0.80
+2026-11-10T02:59:11.6525698Z + @base-ui/react 1.9.0
+2026-11-10T02:59:11.6526238Z + @better-auth/core 1.7.12
+2026-11-10T02:59:11.6526754Z + @better-auth/expo 1.7.12
+2026-11-10T02:59:11.6527388Z + @better-auth/oauth-provider 1.7.12
+2026-11-10T02:59:11.6528046Z + @better-auth/sso 1.7.12
+2026-11-10T02:59:11.6528657Z + @chat-adapter/slack 4.43.0
+2026-11-10T02:59:11.6529397Z + @chat-adapter/state-pg 4.43.0
+2026-11-10T02:59:11.6530430Z + @chat-adapter/telegram 4.43.0
+2026-11-10T02:59:11.6531100Z + @composio/core 0.26.0
+2026-11-10T02:59:11.6531769Z + @dnd-kit/core 6.3.1
+2026-11-10T02:59:11.6532407Z + @dnd-kit/sortable 10.0.0
+2026-11-10T02:59:11.6533107Z + @dnd-kit/utilities 3.2.2
+2026-11-10T02:59:11.6533765Z + @e965/xlsx 0.20.3
+2026-11-10T02:59:11.6534418Z + @floating-ui/dom 1.8.0
+2026-11-10T02:59:11.6535602Z + @formatjs/intl-localematcher 0.8.14
+2026-11-10T02:59:11.6536317Z + @heroui/react 3.2.6
+2026-11-10T02:59:11.6536980Z + @heroui/styles 3.2.6
+2026-11-10T02:59:11.6537722Z + @internationalized/date 3.12.4
+2026-11-10T02:59:11.6538762Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-10T02:59:11.6539798Z + @modelcontextprotocol/server 2.3.1
+2026-11-10T02:59:11.6540915Z + @norbert_bodziony/bloub 0.4.1
+2026-11-10T02:59:11.6541450Z + @novnc/novnc 1.6.0
+2026-11-10T02:59:11.6541917Z + @opentelemetry/api 1.10.0
+2026-11-10T02:59:11.6542498Z + @opentelemetry/api-logs 0.223.0
+2026-11-10T02:59:11.6543071Z + @opentelemetry/core 2.12.0
+2026-11-10T02:59:11.6543752Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-10T02:59:11.6544520Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-10T02:59:11.6545262Z + @opentelemetry/instrumentation 0.223.0
+2026-11-10T02:59:11.6545929Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-10T02:59:11.6546567Z + @opentelemetry/resources 2.12.0
+2026-11-10T02:59:11.6547201Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-10T02:59:11.6547884Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-10T02:59:11.6548533Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-10T02:59:11.6549212Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-10T02:59:11.6550119Z + @openuidev/lang-core 1.0.1
+2026-11-10T02:59:11.6550667Z + @openuidev/react-lang 1.0.1
+2026-11-10T02:59:11.6551204Z + @openuidev/react-ui 0.18.1
+2026-11-10T02:59:11.6551702Z + @pierre/diffs 1.6.4
+2026-11-10T02:59:11.6552146Z + @shadcn/react 0.3.1
+2026-11-10T02:59:11.6552590Z + @solidjs/web 2.0.0-rc.0
+2026-11-10T02:59:11.6553084Z + @stripe/stripe-js 10.1.0
+2026-11-10T02:59:11.6553618Z + @tanstack/react-virtual 3.14.18
+2026-11-10T02:59:11.6554121Z + @tiptap/core 3.32.0
+2026-11-10T02:59:11.6554655Z + @tiptap/extension-collaboration 3.32.0
+2026-11-10T02:59:11.6555350Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-10T02:59:11.6556024Z + @tiptap/extension-highlight 3.32.0
+2026-11-10T02:59:11.6556595Z + @tiptap/extension-list 3.32.0
+2026-11-10T02:59:11.6557214Z + @tiptap/extension-mention 3.32.0
+2026-11-10T02:59:11.6557793Z + @tiptap/extension-table 3.32.0
+2026-11-10T02:59:11.6558379Z + @tiptap/extension-text-align 3.32.0
+2026-11-10T02:59:11.6558927Z + @tiptap/extensions 3.32.0
+2026-11-10T02:59:11.6559404Z + @tiptap/pm 3.32.0
+2026-11-10T02:59:11.6561045Z + @tiptap/react 3.32.0
+2026-11-10T02:59:11.6561626Z + @tiptap/starter-kit 3.32.0
+2026-11-10T02:59:11.6562477Z + @tiptap/suggestion 3.32.0
+2026-11-10T02:59:11.6562974Z + @tiptap/y-tiptap 3.0.10
+2026-11-10T02:59:11.6563459Z + @vercel/analytics 1.3.1
+2026-11-10T02:59:11.6563944Z + @vercel/functions 3.10.2
+2026-11-10T02:59:11.6564554Z + @vercel/oidc 4.0.2
+2026-11-10T02:59:11.6565209Z + @workflow/serde 5.0.0
+2026-11-10T02:59:11.6565937Z + @workflow/world-local 5.1.2
+2026-11-10T02:59:11.6566840Z + ai 7.0.148
+2026-11-10T02:59:11.6567442Z + aws4fetch 1.0.20
+2026-11-10T02:59:11.6568192Z + beautiful-mermaid 1.1.3
+2026-11-10T02:59:11.6568857Z + better-auth 1.7.12
+2026-11-10T02:59:11.6569524Z + chat 4.43.0
+2026-11-10T02:59:11.6570469Z + class-variance-authority 0.7.1
+2026-11-10T02:59:11.6571095Z + clsx 2.1.1
+2026-11-10T02:59:11.6571730Z + cmdk 1.1.1
+2026-11-10T02:59:11.6572313Z + cn 0.5.0
+2026-11-10T02:59:11.6572871Z + cookie 1.1.1
+2026-11-10T02:59:11.6592945Z + date-fns 4.1.0
+2026-11-10T02:59:11.6593324Z + diff 8.0.2
+2026-11-10T02:59:11.6593803Z + dompurify 3.4.17
+2026-11-10T02:59:11.6594262Z + drizzle-orm 0.45.4
+2026-11-10T02:59:11.6594677Z + e2b 2.61.0
+2026-11-10T02:59:11.6595137Z + embla-carousel-react 8.5.1
+2026-11-10T02:59:11.6595607Z + fflate 0.8.3
+2026-11-10T02:59:11.6596027Z + ffmpeg-static 5.3.0
+2026-11-10T02:59:11.6596490Z + file-type 22.3.0
+2026-11-10T02:59:11.6596875Z + h3 2.0.8
+2026-11-10T02:59:11.6597230Z + hono 4.13.13
+2026-11-10T02:59:11.6597629Z + input-otp 1.4.1
+2026-11-10T02:59:11.6598005Z + katex 0.16.47
+2026-11-10T02:59:11.6598408Z + lucide-react 1.60.0
+2026-11-10T02:59:11.6598828Z + mcp-handler 2.3.0
+2026-11-10T02:59:11.6599234Z + mermaid 12.2.0
+2026-11-10T02:59:11.6599601Z + motion 14.5.0
+2026-11-10T02:59:11.6600689Z + music-metadata 12.3.4
+2026-11-10T02:59:11.6601135Z + negotiator 1.1.0
+2026-11-10T02:59:11.6601485Z + next 16.4.1
+2026-11-10T02:59:11.6601843Z + next-intl 4.14.9
+2026-11-10T02:59:11.6602215Z + next-themes 0.4.6
+2026-11-10T02:59:11.6602599Z + nodemailer 10.3.1
+2026-11-10T02:59:11.6602976Z + officeparser 8.5.0
+2026-11-10T02:59:11.6603333Z + pg 8.23.1
+2026-11-10T02:59:11.6603695Z + posthog-js 1.438.13
+2026-11-10T02:59:11.6604081Z + posthog-node 5.55.2
+2026-11-10T02:59:11.6604438Z + react 19.3.1
+2026-11-10T02:59:11.6604815Z + react-day-picker 9.8.0
+2026-11-10T02:59:11.6605226Z + react-dom 19.3.1
+2026-11-10T02:59:11.6605559Z + react-markdown 10.1.0
+2026-11-10T02:59:11.6605851Z + react-resizable-panels 4.14.7
+2026-11-10T02:59:11.6606181Z + react-syntax-highlighter 16.1.1
+2026-11-10T02:59:11.6606458Z + recharts 3.10.1
+2026-11-10T02:59:11.6606691Z + rehype-katex 7.0.1
+2026-11-10T02:59:11.6606935Z + remark-gfm 4.0.1
+2026-11-10T02:59:11.6607153Z + remark-math 6.0.0
+2026-11-10T02:59:11.6607373Z + shadcn 4.22.1
+2026-11-10T02:59:11.6607578Z + sharp 0.35.5
+2026-11-10T02:59:11.6607775Z + shiki 4.5.0
+2026-11-10T02:59:11.6607986Z + solid-js 2.0.0-rc.0
+2026-11-10T02:59:11.6608208Z + sonner 1.7.4
+2026-11-10T02:59:11.6608402Z + srvx 1.0.8
+2026-11-10T02:59:11.6608589Z + swr 2.5.1
+2026-11-10T02:59:11.6608802Z + tailwind-merge 3.7.0
+2026-11-10T02:59:11.6609033Z + tw-animate-css 1.4.0
+2026-11-10T02:59:11.6609245Z + undici 7.24.5
+2026-11-10T02:59:11.6609456Z + unstorage 2.0.0-beta.0
+2026-11-10T02:59:11.6609694Z + use-intl 4.14.9
+2026-11-10T02:59:11.6610205Z + vaul 1.1.2
+2026-11-10T02:59:11.6610458Z + workflow 5.2.3
+2026-11-10T02:59:11.6610680Z + y-protocols 1.0.7
+2026-11-10T02:59:11.6610893Z + yjs 13.6.33
+2026-11-10T02:59:11.6611077Z + zod 4.6.7
+2026-11-10T02:59:11.6611187Z 
+2026-11-10T02:59:11.6611281Z devDependencies:
+2026-11-10T02:59:11.6611505Z + @playwright/test 1.64.1
+2026-11-10T02:59:11.6611762Z + @tailwindcss/postcss 4.3.3
+2026-11-10T02:59:11.6612012Z + @types/node 25.9.9
+2026-11-10T02:59:11.6612247Z + @types/pg 8.23.1
+2026-11-10T02:59:11.6612465Z + @types/react 19.3.0
+2026-11-10T02:59:11.6612694Z + @types/react-dom 19.3.0
+2026-11-10T02:59:11.6613003Z + @types/react-syntax-highlighter 15.5.13
+2026-11-10T02:59:11.6613388Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-10T02:59:11.6613687Z + esbuild 0.28.2
+2026-11-10T02:59:11.6613910Z + fake-indexeddb 6.2.4
+2026-11-10T02:59:11.6614308Z + happy-dom 15.11.7
+2026-11-10T02:59:11.6614511Z + js-yaml 4.3.2
+2026-11-10T02:59:11.6614721Z + nitro 3.0.261103-rc
+2026-11-10T02:59:11.6614930Z + nx 24.0.5
+2026-11-10T02:59:11.6615118Z + oxlint 1.89.0
+2026-11-10T02:59:11.6615324Z + postcss 8.5.31
+2026-11-10T02:59:11.6615545Z + prettier 3.9.10
+2026-11-10T02:59:11.6615812Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-10T02:59:11.6616080Z + rolldown 1.3.0
+2026-11-10T02:59:11.6616294Z + tailwindcss 4.3.3
+2026-11-10T02:59:11.6616529Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-10T02:59:11.6616751Z + tsx 4.23.15
+2026-11-10T02:59:11.6616962Z + typescript 5.9.3
+2026-11-10T02:59:11.6617187Z + wrangler 4.152.0
+2026-11-10T02:59:11.6617307Z 
+2026-11-10T02:59:11.9186914Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-10T02:59:12.0126059Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-10T02:59:12.0127126Z │                                                                              │
+2026-11-10T02:59:12.0128227Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-10T02:59:12.0129422Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-10T02:59:12.0130980Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-10T02:59:12.0132243Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-10T02:59:12.0133715Z │   to run scripts.                                                            │
+2026-11-10T02:59:12.0134664Z │                                                                              │
+2026-11-10T02:59:12.0135735Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-10T02:59:12.0287465Z Done in 13.8s using pnpm v10.34.3
+2026-11-10T02:59:12.1273566Z ##[group]Run pnpm test:integrations
+2026-11-10T02:59:12.1273947Z [36;1mpnpm test:integrations[0m
+2026-11-10T02:59:12.1294684Z shell: /usr/bin/bash -e {0}
+2026-11-10T02:59:12.1294936Z env:
+2026-11-10T02:59:12.1295137Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-10T02:59:12.1295395Z   CI: true
+2026-11-10T02:59:12.1295880Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T02:59:12.1296341Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T02:59:12.1296871Z   DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T02:59:12.1297482Z   SITE_SEARCH_WORKSPACE_DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T02:59:12.1297875Z   SITE_SEARCH_REQUIRE_DUAL_PG: 1
+2026-11-10T02:59:12.1298615Z   MIKKA_TEST_DEPLOYMENT_SHA: 383daa9386b7fa0db96ee9109fa5e5a428aec141
+2026-11-10T02:59:12.1299077Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-10T02:59:12.1299485Z   BETTER_AUTH_SECRET: synthetic-site-search-secret-not-a-real-credential
+2026-11-10T02:59:12.1300186Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-10T02:59:12.1300436Z   MIGRATE: 0
+2026-11-10T02:59:12.1300681Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-10T02:59:12.1300979Z ##[endgroup]
+2026-11-10T02:59:12.4793062Z 
+2026-11-10T02:59:12.4793641Z > next-app@0.0.1 test:integrations /home/runner/work/Mikka/Mikka
+2026-11-10T02:59:12.4798195Z > pnpm test:approved-writes && pnpm test:write-transactions && node --import tsx --test lib/auth-callback.test.ts lib/composio-actions.test.ts lib/app-tools.test.ts lib/run-app-mcp.test.ts lib/pending-action-view.test.ts lib/composio-pagination.test.ts lib/composio-accounts.test.ts lib/composio-connect.test.ts lib/skills-search.test.ts lib/search/search.test.ts lib/federated-search/input.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/pending-account-binding.test.ts lib/composio-disconnect.test.ts app/api/integrations/composio/route.test.ts app/api/integrations/composio/callback/route.test.ts && pnpm test:plugins && pnpm test:pending-actions-live
+2026-11-10T02:59:12.4802776Z 
+2026-11-10T02:59:12.8305688Z 
+2026-11-10T02:59:12.8306614Z > next-app@0.0.1 test:approved-writes /home/runner/work/Mikka/Mikka
+2026-11-10T02:59:12.8316033Z > node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/operations/calendar-conditional.test.ts lib/operations/slack-conversation-read.test.ts lib/operations/write-planning-model.test.ts lib/operations/write-planning-ingress.test.ts lib/operations/model-write-tools.test.ts lib/operations/model-write-registry.test.ts lib/operations/ledger-run.test.ts lib/operations/write-feature.test.ts lib/operations/write-policy.test.ts lib/operations/write-judgment.test.ts lib/operations/write-policy-store.test.ts lib/operations/policy-authorization.test.ts lib/operations/write-policy-settings.test.ts lib/operations/write-preparation.test.ts lib/operations/write-discovery.test.ts lib/operations/write-http.test.ts lib/operations/write-provider.test.ts lib/operations/write-route.test.ts lib/operations/write-view.test.ts lib/operations/write-client.test.ts scripts/approved-write-actions.test.tsx lib/operations/slack-delivery.test.ts lib/operations/write-notice.test.ts lib/live/approval-cache.test.ts scripts/approved-write-actions.live.test.tsx
+2026-11-10T02:59:12.8322081Z 
+2026-11-10T02:59:13.2582320Z ✔ approval scope uses only the matching authenticated account personal workspace, never a team or another account (1.42284ms)
+2026-11-10T02:59:13.2611529Z ✔ the actual infinite-cache key includes owner and session and retains pagination boundaries (4.022723ms)
+2026-11-10T02:59:13.2613922Z ✔ single-result invalidation cannot alias another session, action or proposal (0.487919ms)
+2026-11-10T02:59:13.2641381Z ✔ server read time keeps an expiry fixed across renders and a slow client clock (0.798267ms)
+2026-11-10T02:59:13.5065728Z ✔ conditional calendar transport pins account and ETag and fences immediately before send (3.716434ms)
+2026-11-10T02:59:13.5093706Z ✔ Calendar provider uses conditional proxy transport and never sends after revoked fence (360.760524ms)
+2026-11-10T02:59:13.5772525Z ✔ ledger claims only the bound host run and keeps its attempt token distinct (8.487751ms)
+2026-11-10T02:59:13.5774168Z ✔ tampered claimed run fails before invocation or provider execution (1.619948ms)
+2026-11-10T02:59:14.4792092Z (node:3485) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:14.4801225Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:14.4802969Z (node:3485) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:14.4852299Z ✔ registered model tool binds host owner, bot, execution and native call scope (583.193337ms)
+2026-11-10T02:59:14.4868362Z ✔ the default text-only route is not given effectful model tools (9.921451ms)
+2026-11-10T02:59:14.5506424Z ✔ model selects content, host receives call identity and chooses authorization (6.740446ms)
+2026-11-10T02:59:14.5521628Z ✔ disabled catalog exposes nothing and invalid or duplicate names fail closed (1.002026ms)
+2026-11-10T02:59:14.5539393Z ✔ allow needs no review; ask checks existing approval; deny never approves (6.883884ms)
+2026-11-10T02:59:14.5541432Z ✔ revocation, changed binding and wrong run cannot pass invocation (0.66021ms)
+2026-11-10T02:59:14.5543346Z ✔ failed-run readback is explicit and cannot reserve, claim, invoke or settle another effect (1.655494ms)
+2026-11-10T02:59:14.8268830Z ✔ Slack adapter fixes the documented endpoint and account; malformed and foreign responses fail closed (5.82284ms)
+2026-11-10T02:59:14.8303435Z ✔ provider binds local Slack read contract and lets model-selected direct conversation pass (2.842166ms)
+2026-11-10T02:59:14.8313148Z ✔ Slack provider executes the selected text once and rejects changed target before sending (14.373846ms)
+2026-11-10T02:59:14.9065711Z ✔ Slack sends one account-pinned request with correlation metadata after the final authority fence (2.841305ms)
+2026-11-10T02:59:14.9087831Z ✔ readback requires exact operation and approved payload metadata, follows the provider cursor, and never posts (1.155764ms)
+2026-11-10T02:59:14.9113338Z ✔ missing metadata, unreadable history and old uncorrelated writes stay unknown (0.581313ms)
+2026-11-10T02:59:14.9115190Z ✔ the product provider pins its proxy contract and checks the current owner connection before readback (5.841905ms)
+2026-11-10T02:59:14.9453339Z ✔ availability uses only a no-store GET and rejects failed or malformed responses (41.683407ms)
+2026-11-10T02:59:14.9455194Z ✔ disabled discovery is empty; another cookie owner response is never accepted under the current viewer (5.223587ms)
+2026-11-10T02:59:14.9457089Z ✔ reads and decisions use the new endpoint with exact durable action identity and no caller-selected authority (2.308832ms)
+2026-11-10T02:59:14.9458780Z ✔ a lost decision response is uncertain and is never retried by the client (1.45424ms)
+2026-11-10T02:59:15.6621035Z ✔ microsecond keyset pages cover all three actions without overlap or status-filter loss (35.849438ms)
+2026-11-10T02:59:15.6623654Z ✔ bad bindings and ambiguous intents become redacted attention items without poisoning the page (2.274738ms)
+2026-11-10T02:59:15.6626433Z ✔ unresolved discovery reaches older pending actions without completed history and binds cursors to the filter (12.02687ms)
+2026-11-10T02:59:15.6628536Z ✔ cursors cannot replace actor/session, escape shape limits or survive session expiry (6.433347ms)
+2026-11-10T02:59:15.6631166Z ✔ registered HTTP list wiring authenticates, rejects authority fields and never constructs write services (38.896545ms)
+2026-11-10T02:59:15.6992521Z ✔ personal writes ship on in every deployment scope without a Preview opt-in (1.835089ms)
+2026-11-10T02:59:15.7041105Z ✔ only the kill switch closes admission; the old variable no longer decides (0.446311ms)
+2026-11-10T02:59:15.7109201Z ✔ malformed requests fail before constructing an operation service (56.36883ms)
+2026-11-10T02:59:15.7113333Z ✔ browser authority is checked before operation creation (1.995538ms)
+2026-11-10T02:59:15.7121406Z ✔ native session bearer passes the real human session identity and cannot fall back to cookies (2.22173ms)
+2026-11-10T02:59:15.7123558Z ✔ session and infrastructure failures are sanitized unavailable outcomes, conflicts retain their code (6.975468ms)
+2026-11-10T02:59:15.7125603Z ✔ session identity and durable IDs reach service; unknown stays unresolved on repeat (3.125323ms)
+2026-11-10T02:59:15.7127528Z ✔ real HTTP envelope passes request signal/actor and preserves unconfirmed vs committed without diagnostics (1.512258ms)
+2026-11-10T02:59:15.7129493Z Write judgment fallback: allowed without a Decisions answer { action: 'send_email', tool: 'GMAIL_SEND_EMAIL' }
+2026-11-10T02:59:15.7170002Z ✔ only a call the Decisions API judges destructive asks (1.404086ms)
+2026-11-10T02:59:15.7261972Z ✔ an unavailable, refused or failed judgment shows no card: the agent's own call goes ahead, logged as a fallback (2.087269ms)
+2026-11-10T02:59:15.7298350Z ✔ the one predicate sees the action, tool, MCP annotations and concrete arguments (1.563814ms)
+2026-11-10T02:59:15.7304902Z ✔ a read-only hint is evidence for the Decisions API, never a rule that skips it (0.361884ms)
+2026-11-10T02:59:16.1602982Z ✔ an approved-write result routes to the originating Bot with the actual provider object receipt (8.367321ms)
+2026-11-10T02:59:16.1638468Z ✔ an early uncertain notice cannot deduplicate away a later verified result (0.93391ms)
+2026-11-10T02:59:21.5405324Z (node:3724) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:21.5406859Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:21.5408324Z (node:3724) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:21.5426659Z ✔ authenticated HTTP submission reaches actual planner prompt through stored event projection (3905.283695ms)
+2026-11-10T02:59:21.5430557Z ✔ anonymous or client-provided authority is rejected before storing images (2.255182ms)
+2026-11-10T02:59:21.5433875Z ✔ text-only HTTP submission stays text in actual planner prompt (15.798567ms)
+2026-11-10T02:59:21.5440106Z ✔ host-signed compaction retains original pixels after a text followup (3.062156ms)
+2026-11-10T02:59:21.5442528Z ✔ actual preparePrompt compacts original HTTP image using the frozen planner model (51.351953ms)
+2026-11-10T02:59:21.6615266Z ✔ write planning uses only the documented image and tool capable Gateway route (1.225503ms)
+2026-11-10T02:59:21.6642221Z ✔ a synthetic prebuilt image message retains its image part in prompt projection (481.261011ms)
+2026-11-10T02:59:21.6650289Z ✔ new write-enabled gateway runs select the documented planner without replacing subscriptions or unrelated runs (0.219198ms)
+2026-11-10T02:59:21.6652312Z ✔ real text event reaches the prompt without requiring an image (3.619033ms)
+2026-11-10T02:59:21.6653840Z ✔ settings are scoped, versioned, and acquire membership before commit (6.141343ms)
+2026-11-10T02:59:21.6655215Z ✔ browser actions have no ask: the settings schema rejects it, allow and deny stay valid (0.857066ms)
+2026-11-10T02:59:21.6656453Z ✔ policy is scoped to the host run and locks its head and execution (10.074711ms)
+2026-11-10T02:59:21.6657175Z ✔ foreign scope, inactive run, revoked tool and corrupt policy fail closed (2.761235ms)
+2026-11-10T02:59:21.6658140Z ✔ without the tool's metadata an unnamed action asks, denies take precedence, and allow requires every layer (7.110409ms)
+2026-11-10T02:59:21.6659405Z ✔ workspace choice narrows the agent decision; absent workspace choice inherits (0.523856ms)
+2026-11-10T02:59:21.6661232Z ✔ an unnamed action follows the tool's own default; explicit ask and deny still narrow (decision 2026-10-31) (0.304788ms)
+2026-11-10T02:59:21.6662164Z (node:3818) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:21.6663349Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:21.6664278Z (node:3818) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:21.6665239Z ✔ browser metadata has no open APP transaction and same-intent replay reads original proposal (58.918071ms)
+2026-11-10T02:59:21.6666413Z ✔ lost insert COMMIT reply is unknown; explicit same-intent recovery performs no new metadata or insert (3.659499ms)
+2026-11-10T02:59:21.6667484Z ✔ session revocation or request abort during metadata never commits the proposal (4.662858ms)
+2026-11-10T02:59:21.6668368Z ✔ concurrent identical intents share one inserted proposal; changed payload cannot replace it (8.684943ms)
+2026-11-10T02:59:21.6669252Z ✔ append_notion_paragraph pins owner/account/target/version and rechecks before write (6.064169ms)
+2026-11-10T02:59:21.6670359Z ✔ send_slack_message pins owner/account/target/version and rechecks before write (20.208204ms)
+2026-11-10T02:59:21.6671197Z ✔ cancel_calendar_event pins owner/account/target/version and rechecks before write (5.696284ms)
+2026-11-10T02:59:21.6672034Z ✔ Slack snapshots preserve supported conversation facts without deciding their meaning (0.919404ms)
+2026-11-10T02:59:21.6672786Z ✔ Calendar snapshots pin ID and ETag while retaining event facts (3.309096ms)
+2026-11-10T02:59:21.6673604Z ✔ native cancellation and Slack metadata read default closed without verified transports/contracts (6.810266ms)
+2026-11-10T02:59:21.6674463Z ✔ Notion rechecks the approved target and owner connection at the SDK send boundary (2.115906ms)
+2026-11-10T02:59:21.6675866Z ✔ public availability reports only the server gate as 200 no-store without runtime services (28.915844ms)
+2026-11-10T02:59:21.6677350Z ✔ the explicit incident switch closes product POST without initializing runtime (2.989003ms)
+2026-11-10T02:59:21.6678877Z ✔ production rollout delegates browser authority and durable IDs to the existing HTTP service (8.767286ms)
+2026-11-10T02:59:21.6680558Z ✔ runtime load failure returns an unavailable response without diagnostics (0.524708ms)
+2026-11-10T02:59:21.6682527Z ✔ owned approval view returns exact stored snapshot without approving, invoking or exposing ledger tokens (41.216277ms)
+2026-11-10T02:59:21.6684235Z ✔ view rejects owner/session/action mismatch, ambiguous intents, tampering and mid-read expiry (9.649891ms)
+2026-11-10T02:59:21.6685764Z ✔ HTTP view uses authenticated actor only and preserves strict browser envelope (42.2694ms)
+2026-11-10T02:59:31.0984182Z (node:3907) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:31.0985743Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:31.0987280Z (node:3907) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+2026-11-10T02:59:31.0989129Z (node:3907) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:31.0991384Z ✔ a healthy mounted approval UI makes no ten-second availability, list or result poll (11429.20534ms)
+2026-11-10T02:59:31.5931127Z ✔ the real infinite cache invalidates all loaded pages, and proposal events refresh capability hints (497.954611ms)
+2026-11-10T02:59:32.2446886Z ✔ only a changed PostHog hint invalidates server capability; repeated callbacks make no reads (648.325186ms)
+2026-11-10T02:59:32.9001837Z ✔ an exact result push reconciles an uncertain card without resending its decision (656.979076ms)
+2026-11-10T02:59:34.5156916Z ✔ a server-derived expiry performs one authoritative read and disables approval even when the client clock is behind (1617.089407ms)
+2026-11-10T02:59:37.2884198Z ✔ a slow initial approval read followed by a fast same-expiry read still observes the real server expiry (2774.111766ms)
+2026-11-10T02:59:37.6371460Z (node:3922) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:37.6373315Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:37.6375026Z (node:3922) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+2026-11-10T02:59:37.6376966Z (node:3922) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:37.6379133Z ✔ all new ask proposals display their frozen content/account; new and legacy buttons retain separate deciders (697.30584ms)
+2026-11-10T02:59:37.6380785Z ✔ disabled new service preserves legacy approvals without an error or new action (23.863865ms)
+2026-11-10T02:59:37.6382271Z ✔ failed availability leaves legacy approvals usable and never starts new service POSTs (20.84999ms)
+2026-11-10T02:59:37.6383335Z ✔ closing availability removes retained uncertain cards and stops their list/view POSTs (90.164756ms)
+2026-11-10T02:59:37.6384473Z ✔ a lost decision response keeps the same card unconfirmed and reads only view instead of resending (72.766454ms)
+2026-11-10T02:59:37.6385812Z ✔ an authenticated pending view permits explicit recovery without sending a decision, then requires a separate approval click (83.800399ms)
+2026-11-10T02:59:37.6387644Z ✔ an expired pending view cannot restore approval controls after a lost response (42.853327ms)
+2026-11-10T02:59:37.6389214Z ✔ a stale recovery control cannot restore or mutate another account proposal (96.670968ms)
+2026-11-10T02:59:37.6391149Z ✔ a response from a switched cookie cannot expose another owner under the old session key (21.621657ms)
+2026-11-10T02:59:37.6392747Z ✔ older unresolved pages are reachable and expired approvals can only be declined (58.248362ms)
+2026-11-10T02:59:37.6394400Z ✔ redacted attention proposals expose decline without an approval control or invented target (41.854122ms)
+2026-11-10T02:59:37.6396060Z ✔ an in-flight decision from an old session cannot disable or settle the next account cards (99.467166ms)
+2026-11-10T02:59:37.6396602Z ℹ tests 97
+2026-11-10T02:59:37.6396831Z ℹ suites 0
+2026-11-10T02:59:37.6397338Z ℹ pass 97
+2026-11-10T02:59:37.6397571Z ℹ fail 0
+2026-11-10T02:59:37.6397805Z ℹ cancelled 0
+2026-11-10T02:59:37.6398022Z ℹ skipped 0
+2026-11-10T02:59:37.6398220Z ℹ todo 0
+2026-11-10T02:59:37.6398480Z ℹ duration_ms 24772.134456
+2026-11-10T02:59:38.0046875Z 
+2026-11-10T02:59:38.0047863Z > next-app@0.0.1 test:write-transactions /home/runner/work/Mikka/Mikka
+2026-11-10T02:59:38.0049295Z > node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-transaction.test.ts
+2026-11-10T02:59:38.0050366Z 
+2026-11-10T02:59:38.2651936Z ✔ pre-abort opens no connection; a late pool checkout is discarded exactly once (2.927754ms)
+2026-11-10T02:59:38.2654432Z ✔ pending query abort uses supplied control cancellation once and discards; late work cannot issue SQL (1.169398ms)
+2026-11-10T02:59:38.2657024Z ✔ COMMIT response loss is unconfirmed, never rollback/retry; acknowledged commit cleanup loss is committed (1.062359ms)
+2026-11-10T02:59:38.2660200Z ✔ APP parents precede member lease, then final same-client fence immediately precedes COMMIT (0.672723ms)
+2026-11-10T02:59:38.2661724Z ✔ member authorization failure or lease revocation rolls back with no COMMIT (1.426006ms)
+2026-11-10T02:59:38.2663369Z ✔ real cancellation helper uses only checked-out endpoint/PID/key and reports EOF, never ACK (0.81057ms)
+2026-11-10T02:59:38.2664906Z ✔ checkout resolved then same-turn abort cannot fall between ownership and waiter resolution (0.485624ms)
+2026-11-10T02:59:38.2667318Z ✔ late guard cleanup is awaited once, including a delayed close rejection (0.586773ms)
+2026-11-10T02:59:38.2673070Z ✔ guarded effect runs with membership lease held through commit (0.97223ms)
+2026-11-10T02:59:38.3050698Z ℹ tests 9
+2026-11-10T02:59:38.3051952Z ℹ suites 0
+2026-11-10T02:59:38.3052737Z ℹ pass 9
+2026-11-10T02:59:38.3053426Z ℹ fail 0
+2026-11-10T02:59:38.3054111Z ℹ cancelled 0
+2026-11-10T02:59:38.3055016Z ℹ skipped 0
+2026-11-10T02:59:38.3055741Z ℹ todo 0
+2026-11-10T02:59:38.3056961Z ℹ duration_ms 265.372082
+2026-11-10T02:59:38.9842613Z ✔ a read-only tool goes to the Decisions judge too; allowed, it runs with the pinned version and no record (7.418957ms)
+2026-11-10T02:59:38.9871391Z ✔ a write the shared judge allows runs directly and leaves a record (0.960232ms)
+2026-11-10T02:59:38.9901451Z ✔ a call the judge asks for (destructive, unjudged or refused) becomes a card (0.324574ms)
+2026-11-10T02:59:38.9930921Z ✔ explicit settings win over the judgment (1.057129ms)
+2026-11-10T02:59:38.9943463Z ✔ settings: the person may allow, a workspace only narrows, deny beats ask (1.222477ms)
+2026-11-10T02:59:39.0001360Z ✔ an uncertain write stays running and is not resent (0.443475ms)
+2026-11-10T02:59:39.0008757Z ✔ the call stays inside the person's own connected app (1.640866ms)
+2026-11-10T02:59:39.0010600Z ✔ listing shows only the app's own tools and which ones only read (1.485096ms)
+2026-11-10T02:59:39.0012124Z ✔ an app that needs no connection runs on the person alone; any other app still needs its account (0.770485ms)
+2026-11-10T02:59:39.0702290Z ✔ Google uses the stable cloud callback hub under the Mikka base path (1.408343ms)
+2026-11-10T02:59:39.0761646Z ✔ uses the production base path and requires a configured base URL (0.259754ms)
+2026-11-10T02:59:39.0769609Z ✔ shows only real accounts on our apps, without credentials (3.070478ms)
+2026-11-10T02:59:39.0806914Z ✔ the on/off switch follows Composio isDisabled, not the status (0.238334ms)
+2026-11-10T02:59:39.0825036Z ✔ only Composio hosted connect pages over HTTPS are followed (0.302002ms)
+2026-11-10T02:59:39.0832521Z ✔ an update either switches an account or renames it, never both (6.727739ms)
+2026-11-10T02:59:39.0834434Z ✔ failed explicit disconnect never falls back or forgets the stored account, including 400 and 409 (1.080493ms)
+2026-11-10T02:59:39.0836219Z ✔ choose only an explicit usable default or a sole usable account (0.293056ms)
+2026-11-10T02:59:39.0837739Z ✔ stored emails and the chosen default are joined per toolkit (0.790271ms)
+2026-11-10T02:59:39.0839450Z ✔ an account the provider refused shows as expired, so the list offers a reconnect (0.403341ms)
+2026-11-10T02:59:39.0844111Z ✔ only a plain email address is kept (0.839904ms)
+2026-11-10T02:59:39.0845705Z ✔ reads each provider's identity from where it puts it (0.943668ms)
+2026-11-10T02:59:39.0847255Z ✔ return paths stay inside the app and off the API (0.522934ms)
+2026-11-10T02:59:39.0848831Z ✔ the connect flow cookie round-trips and drops a bad return path (2.261051ms)
+2026-11-10T02:59:39.0850642Z ✔ recognises Composio refusing a duplicate alias (0.309015ms)
+2026-11-10T02:59:39.2872508Z ✔ executes only for the signed-in user’s active, enabled account and pins its tool version (6.848815ms)
+2026-11-10T02:59:39.2882690Z ✔ does not execute without an active, enabled connection or with invalid input (0.778059ms)
+2026-11-10T02:59:39.2884429Z ✔ ambiguous or unavailable account never silently falls back to the oldest (0.934651ms)
+2026-11-10T02:59:39.2894636Z ✔ rejects tool slugs outside Mikka’s fixed allowlist (0.29491ms)
+2026-11-10T02:59:39.2909637Z ✔ sends an email as plain text to the first recipient plus the rest (1.964359ms)
+2026-11-10T02:59:39.3226952Z Composio action failed { action: 'GMAIL_SEND_EMAIL', error: 'TypeError' }
+2026-11-10T02:59:39.3357511Z Composio action failed { action: 'GOOGLECALENDAR_CREATE_EVENT', error: 'TypeError' }
+2026-11-10T02:59:39.3427039Z Composio action failed { action: 'GOOGLECALENDAR_PATCH_EVENT', error: 'TypeError' }
+2026-11-10T02:59:39.3441014Z Composio action failed { action: 'GMAIL_SEND_EMAIL', error: 'Error' }
+2026-11-10T02:59:39.3545886Z ✔ a lost response after an external write stays uncertain; preflight failures never dispatch (83.532702ms)
+2026-11-10T02:59:39.3564339Z ✔ an unsuccessful dispatched write is unknown while an unsuccessful read remains a read error (1.120256ms)
+2026-11-10T02:59:39.3573694Z ✔ creates an event on the primary calendar without a Meet link, emailing guests unless told not to (0.526921ms)
+2026-11-10T02:59:39.3609241Z ✔ an event change must change something and cannot cancel the event (0.919232ms)
+2026-11-10T02:59:39.3652304Z ✔ only sending mail and writing the calendar are account writes (0.552499ms)
+2026-11-10T02:59:39.3681376Z ✔ bound actions never follow a changed default or use a disabled, missing, or wrong-toolkit account (0.690926ms)
+2026-11-10T02:59:39.3686546Z ✔ model tools pass explicit account choices separately from provider input (1.97587ms)
+2026-11-10T02:59:39.3714136Z ✔ the dispatch gate sees the account and tool tags before anything is sent, and can stop it (0.434279ms)
+2026-11-10T02:59:39.4050038Z ✔ reconnecting the expired account the person chose as default keeps it the default (3.683039ms)
+2026-11-10T02:59:39.4052360Z ✔ an expired account that was never chosen does not take the default from a working one (0.312583ms)
+2026-11-10T02:59:39.4072776Z ✔ a reconnect does not carry an alias that was only the old email, nor a default it did not have (0.615275ms)
+2026-11-10T02:59:39.4075001Z ✔ the only account being reconnected stays the default (0.177821ms)
+2026-11-10T02:59:39.4076423Z ✔ a failed retire still reads the email; another toolkit is never retired (0.51014ms)
+2026-11-10T02:59:39.4078871Z ✔ a non-working replacement never retires the old connection or takes its default (0.584488ms)
+2026-11-10T02:59:39.4083375Z ✔ a new connection is successful only when its owned account is usable (0.328382ms)
+2026-11-10T02:59:39.4084993Z ✔ old accounts get their email on load: at most five, in parallel, each asked once (11.035693ms)
+2026-11-10T02:59:39.4086660Z ✔ a disabled or missing explicit default does not label another account as the default (1.31545ms)
+2026-11-10T02:59:39.4088333Z ✔ HTTP failures including Google quota 403 never become a final "no email" (0.84806ms)
+2026-11-10T02:59:39.4090339Z ✔ Slack errors inside HTTP 200 are retried instead of cached as missing email (0.321158ms)
+2026-11-10T02:59:39.4092364Z ✔ reconnect reports completion only after the expected old account is retired (0.285221ms)
+2026-11-10T02:59:39.4094021Z ✔ failed alias or default handover is not reported as a complete reconnect (0.42432ms)
+2026-11-10T02:59:39.4261706Z ✔ loads every Composio page in cursor order (2.777222ms)
+2026-11-10T02:59:40.6772852Z ✔ bounded and explicit source/workspace/query contract (2.879984ms)
+2026-11-10T02:59:40.6777744Z ✔ cursor preserves microseconds and is bound to owner/source/workspace/query (4.621978ms)
+2026-11-10T02:59:40.7273359Z ✔ reads an event’s title and times, also when nested under response_data (2.330781ms)
+2026-11-10T02:59:40.7275267Z ✔ keeps only ids and the link from a result (0.24167ms)
+2026-11-10T02:59:40.7276983Z ✔ the token names owner, Bot and run; the request names only the toolkit (2.756283ms)
+2026-11-10T02:59:40.7278668Z ✔ another person's app is refused: the owner always comes from the token (0.421194ms)
+2026-11-10T02:59:40.7280455Z ✔ a toolkit outside the run's list or a malformed one is refused (0.251548ms)
+2026-11-10T02:59:40.7281875Z ✔ an expired, missing or non-run token is refused (0.315558ms)
+2026-11-10T02:59:40.7283298Z ✔ only a toolkit's own tools with object schemas are listed (0.521281ms)
+2026-11-10T02:59:40.7298006Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"rate_limited","ms":0}
+2026-11-10T02:59:40.7299783Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":0}
+2026-11-10T02:59:40.7306019Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"cache_hit","ms":0}
+2026-11-10T02:59:40.7307565Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":0}
+2026-11-10T02:59:40.7310309Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":1}
+2026-11-10T02:59:40.7311591Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":1}
+2026-11-10T02:59:40.7313718Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":1}
+2026-11-10T02:59:40.7315224Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":0}
+2026-11-10T02:59:40.7317016Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":1}
+2026-11-10T02:59:40.7318449Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":0}
+2026-11-10T02:59:40.7320071Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":0}
+2026-11-10T02:59:40.7321588Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":0}
+2026-11-10T02:59:40.7322883Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"ok","ms":0}
+2026-11-10T02:59:40.7324295Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"throttled","ms":0}
+2026-11-10T02:59:40.7325561Z {"event":"web_search","provider":"fake","caller":"coordinator","outcome":"denied","ms":0}
+2026-11-10T02:59:40.7326886Z ✔ Firecrawl 结果映射成通用格式，并丢掉非 http 链接 (35.904038ms)
+2026-11-10T02:59:40.7327741Z ✔ 429 和 5xx 分别归类 (2.442439ms)
+2026-11-10T02:59:40.7328552Z ✔ 失败时降级成 searchUnavailable，不抛错 (1.980217ms)
+2026-11-10T02:59:40.7330038Z ✔ 同一查询命中缓存，只请求一次 (1.916659ms)
+2026-11-10T02:59:40.7330782Z ✔ 每个用户每分钟最多 10 次 (6.009131ms)
+2026-11-10T02:59:40.7331455Z ✔ 权限钩子拒绝时不调用提供方 (0.422367ms)
+2026-11-10T02:59:40.7332241Z ✔ accepts skills.sh search results (4.964165ms)
+2026-11-10T02:59:40.7333213Z ✔ rejects result links outside skills.sh (0.432947ms)
+2026-11-10T02:59:40.7334242Z ✔ with no query, pages through the all-time leaderboard (3.573375ms)
+2026-11-10T02:59:40.7335536Z ✔ a search asks for results up to the end of the page and returns that page (1.489124ms)
+2026-11-10T02:59:40.7336725Z ✔ rejects more results than skills.sh search can return (0.360612ms)
+2026-11-10T02:59:40.7337469Z ℹ tests 71
+2026-11-10T02:59:40.7337854Z ℹ suites 0
+2026-11-10T02:59:40.7338238Z ℹ pass 71
+2026-11-10T02:59:40.7338574Z ℹ fail 0
+2026-11-10T02:59:40.7338938Z ℹ cancelled 0
+2026-11-10T02:59:40.7339301Z ℹ skipped 0
+2026-11-10T02:59:40.7339646Z ℹ todo 0
+2026-11-10T02:59:40.7343205Z ℹ duration_ms 2367.405528
+2026-11-10T02:59:41.7312094Z Composio connect follow-up failed { step: 'list', error: 'Error' }
+2026-11-10T02:59:41.7411578Z Composio connect follow-up failed { step: 'list', error: 'Error' }
+2026-11-10T02:59:41.7433498Z (node:4422) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:41.7462437Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:41.7516695Z (node:4422) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:41.7524230Z ✔ reconnect redirects to failure if follow-up fails or the account list cannot be read (105.783546ms)
+2026-11-10T02:59:41.7594005Z ✔ a first connection cannot report success when the owned account list is unavailable (1.292127ms)
+2026-11-10T02:59:41.7871738Z (node:4428) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:41.7873310Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:41.7896895Z (node:4428) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:41.7900678Z ✔ any store toolkit starts a per-person Composio connect link (23.906323ms)
+2026-11-10T02:59:41.7901959Z ✔ a toolkit outside the store, a malformed slug or a cross-origin request never reaches Composio (5.765197ms)
+2026-11-10T02:59:42.0905813Z (node:4429) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:42.0907379Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:42.0937382Z (node:4429) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:42.1031449Z ✔ real SDK disconnect uses only the exact account delete endpoint and requests revocation (57.573254ms)
+2026-11-10T02:59:43.0025005Z (node:4483) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:43.0026907Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:43.0028331Z (node:4483) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:43.0056997Z ✔ proposal freezes the account used to read the event, and approval uses it after default changes (68.723091ms)
+2026-11-10T02:59:43.0061742Z ✔ an old unbound proposal fails closed without a provider call (2.04591ms)
+2026-11-10T02:59:43.0066212Z ✔ an unknown dispatched outcome keeps the consumed proposal running instead of reporting a failed effect (1.499132ms)
+2026-11-10T02:59:43.0070546Z ✔ a model-selected account is frozen in the proposal (1.929734ms)
+2026-11-10T02:59:43.0073624Z ✔ computer and credential reviews retain their own approval authority without a Composio account (28.43845ms)
+2026-11-10T02:59:43.0076896Z ✔ a mail send or calendar write runs at once in the connected account and stays as a record, not a card (0.66536ms)
+2026-11-10T02:59:43.0080836Z ✔ a direct write with an unknown outcome stays running and is reported uncertain (1.190326ms)
+2026-11-10T02:59:43.0084161Z ✔ a call judged destructive, or not judged at all, becomes an approval card instead of running (1.300121ms)
+2026-11-10T02:59:43.0087718Z ✔ an approved store-app call without an account runs only for an app that needs none (15.298512ms)
+2026-11-10T02:59:43.0653043Z ℹ tests 14
+2026-11-10T02:59:43.0653353Z ℹ suites 0
+2026-11-10T02:59:43.0653928Z ℹ pass 14
+2026-11-10T02:59:43.0654518Z ℹ fail 0
+2026-11-10T02:59:43.0655017Z ℹ cancelled 0
+2026-11-10T02:59:43.0655453Z ℹ skipped 0
+2026-11-10T02:59:43.0655830Z ℹ todo 0
+2026-11-10T02:59:43.0656275Z ℹ duration_ms 2284.873623
+2026-11-10T02:59:43.4327215Z 
+2026-11-10T02:59:43.4328077Z > next-app@0.0.1 test:plugins /home/runner/work/Mikka/Mikka
+2026-11-10T02:59:43.4330632Z > node --import tsx --test lib/plugins/plugins.test.ts lib/plugins/store-state.test.ts lib/plugins/app-detail.test.ts lib/plugins/connect-kind.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/plugins/routes.test.ts
+2026-11-10T02:59:43.4332263Z 
+2026-11-10T02:59:43.9342346Z ✔ an app page comes from Composio alone, read or not connected, with tools split by readOnlyHint (2.715457ms)
+2026-11-10T02:59:43.9391919Z ✔ nothing is made up: a missing field stays missing; ours and malformed slugs are refused (1.247915ms)
+2026-11-10T02:59:43.9413267Z ✔ an app's page says how it connects, with Composio's form when it takes the person's key (0.845104ms)
+2026-11-10T02:59:43.9945640Z ✔ how an app connects follows its Composio auth schemes (1.419193ms)
+2026-11-10T02:59:43.9947838Z ✔ the form is Composio's own fields for each credential scheme, in its order (1.615919ms)
+2026-11-10T02:59:43.9982003Z ✔ what a person submits must fit the form (0.661071ms)
+2026-11-10T02:59:44.3060420Z ✔ MCP input rejects credential URLs, private targets, forwarded headers and credential moves (6.530963ms)
+2026-11-10T02:59:44.3067097Z ✔ connection-owned credentials are masked from pre-call diagnostics as well as tool results (2.10461ms)
+2026-11-10T02:59:44.3068317Z ✔ transport rejects private DNS and origin changes before sending, pins DNS on the wire (10.410017ms)
+2026-11-10T02:59:44.3069221Z ✔ skill installation fetches one pinned Markdown body, rejects ambiguous and truncated trees (9.562178ms)
+2026-11-10T02:59:44.3071044Z ✔ skills.sh names resolve frontmatter rather than assuming the repository directory has that name (1.512216ms)
+2026-11-10T02:59:44.3776385Z {"event":"mcp_unavailable","stage":"target","reason":"unknown","chain":[{"name":"Error"}]}
+2026-11-10T02:59:44.3778811Z {"event":"mcp_unavailable","stage":"target","reason":"unknown","chain":[{"name":"Error"}]}
+2026-11-10T02:59:44.3891078Z {"event":"mcp_unavailable","stage":"target","reason":"unknown","chain":[{"name":"Error"}]}
+2026-11-10T02:59:44.3923335Z ✔ real MCP http handshake, discovery, call, masking, live revocation and no retry after uncertain side effects (100.770586ms)
+2026-11-10T02:59:44.4097630Z {"event":"mcp_unavailable","stage":"target","reason":"unknown","chain":[{"name":"Error"}]}
+2026-11-10T02:59:44.4099413Z {"event":"mcp_unavailable","stage":"target","reason":"unknown","chain":[{"name":"Error"}]}
+2026-11-10T02:59:44.4163583Z {"event":"mcp_unavailable","stage":"target","reason":"unknown","chain":[{"name":"Error"}]}
+2026-11-10T02:59:44.4363533Z ✔ real MCP sse handshake, discovery, call, masking, live revocation and no retry after uncertain side effects (27.749331ms)
+2026-11-10T02:59:44.4365988Z ✔ store lists every Composio toolkit but local ones and own integrations, in Composio order, with how each connects (10.803781ms)
+2026-11-10T02:59:44.4546571Z ✔ the pinned lookup connects to the checked address while Host keeps the site name (17.782312ms)
+2026-11-10T02:59:44.4552122Z ✔ the MCP SDK connects through the pinned transport on 200 text/event-stream (4.158295ms)
+2026-11-10T02:59:44.4553945Z ✔ the MCP SDK connects through the pinned transport on 200 application/json; charset=utf-8 (2.436377ms)
+2026-11-10T02:59:44.4555838Z ✔ a Vercel deployment never sends MCP requests through a proxy; development may (1.819148ms)
+2026-11-10T02:59:44.4760974Z ✔ a connected Composio app shows …, an unconnected one + (0.975768ms)
+2026-11-10T02:59:44.4762153Z ✔ GitHub, Linear and Telegram follow their own state (0.190234ms)
+2026-11-10T02:59:44.4763154Z ✔ search matches the name or the slug (0.232804ms)
+2026-11-10T02:59:44.4765399Z ℹ tests 21
+2026-11-10T02:59:44.4765847Z ℹ suites 0
+2026-11-10T02:59:44.4766282Z ℹ pass 21
+2026-11-10T02:59:44.4766710Z ℹ fail 0
+2026-11-10T02:59:44.4767111Z ℹ cancelled 0
+2026-11-10T02:59:44.4767567Z ℹ skipped 0
+2026-11-10T02:59:44.4768552Z ℹ todo 0
+2026-11-10T02:59:44.4769420Z ℹ duration_ms 1009.022503
+2026-11-10T02:59:45.0019211Z (node:4610) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:45.0020844Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:45.0022849Z (node:4610) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:45.0044207Z ✔ actual routes require authentication and same-origin mutations before storage/source access (43.236404ms)
+2026-11-10T02:59:45.0046935Z ✔ actual routes use the authenticated owner, reject injected owners and expose counts without credentials (7.138114ms)
+2026-11-10T02:59:45.0049192Z ✔ an app page needs a signed-in person, not a connected account (0.647286ms)
+2026-11-10T02:59:45.0051946Z ✔ custom MCP sharing is a fresh owner HTTP action; workspace reads and mutations reject injected authority (3.804205ms)
+2026-11-10T02:59:45.0054946Z ✔ MCP sharing rejects missing and delegated credentials before storage even when the session stub has an owner (1.714232ms)
+2026-11-10T02:59:45.0058623Z ✔ a key goes from the signed-in person to Composio and never back out, in a response or a log (5.745881ms)
+2026-11-10T02:59:45.0452575Z ℹ tests 6
+2026-11-10T02:59:45.0453070Z ℹ suites 0
+2026-11-10T02:59:45.0453498Z ℹ pass 6
+2026-11-10T02:59:45.0454177Z ℹ fail 0
+2026-11-10T02:59:45.0455332Z ℹ cancelled 0
+2026-11-10T02:59:45.0455799Z ℹ skipped 0
+2026-11-10T02:59:45.0456200Z ℹ todo 0
+2026-11-10T02:59:45.0456669Z ℹ duration_ms 531.588193
+2026-11-10T02:59:45.4396987Z 
+2026-11-10T02:59:45.4398233Z > next-app@0.0.1 test:pending-actions-live /home/runner/work/Mikka/Mikka
+2026-11-10T02:59:45.4400714Z > node --import tsx --test lib/live/pending-action-cache.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/pending-actions.live.test.tsx app/api/pending-actions/route.test.ts
+2026-11-10T02:59:45.4401805Z 
+2026-11-10T02:59:45.6939637Z ✔ a pending list has an owner and session key; unresolved identity subscribes to nothing (2.032194ms)
+2026-11-10T02:59:45.6946530Z ✔ browser and credential cards retain five minutes; account/app cards retain seven days (0.428137ms)
+2026-11-10T02:59:45.6948830Z ✔ the compatible array read retains its server observation and pre-request monotonic time (21.022122ms)
+2026-11-10T02:59:45.6950615Z ✔ a changed cookie cannot cache another owner under the old session key (1.065624ms)
+2026-11-10T02:59:45.7313471Z ℹ tests 4
+2026-11-10T02:59:45.7314176Z ℹ suites 0
+2026-11-10T02:59:45.7314611Z ℹ pass 4
+2026-11-10T02:59:45.7336237Z ℹ fail 0
+2026-11-10T02:59:45.7337304Z ℹ cancelled 0
+2026-11-10T02:59:45.7338182Z ℹ skipped 0
+2026-11-10T02:59:45.7338596Z ℹ todo 0
+2026-11-10T02:59:45.7339184Z ℹ duration_ms 256.586158
+2026-11-10T02:59:46.0861191Z (node:4723) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:46.0873202Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:46.0901409Z (node:4723) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:46.0961707Z ✔ unauthenticated list still fails before its database read (97.975153ms)
+2026-11-10T02:59:46.1003614Z ✔ normal and token callers retain the filtered array contract with private owner/read-time headers (2.660636ms)
+2026-11-10T02:59:46.7533261Z (node:4724) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-10T02:59:46.7534648Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-10T02:59:46.7536196Z (node:4724) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+2026-11-10T02:59:46.7537982Z (node:4724) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-10T02:59:57.4418429Z ✔ the healthy actual pending list remains idle beyond its previous ten-second poll (10944.864864ms)
+2026-11-10T02:59:57.9304502Z ✔ a committed same-owner list event removes the card without resending a decision; another key does not read (490.083949ms)
+2026-11-10T02:59:59.5482286Z ✔ a server five-minute deadline rechecks once despite a slow client clock, and does not extend approval (1617.83458ms)
+2026-11-10T02:59:59.7120436Z ✔ a response belonging to another signed-in user is never rendered under the old key (166.003248ms)
+2026-11-10T03:00:02.4891703Z ✔ a slow initial pending read does not swallow the final same-expiry authoritative read (2778.602315ms)
+2026-11-10T03:00:02.8323446Z ℹ tests 7
+2026-11-10T03:00:02.8323964Z ℹ suites 0
+2026-11-10T03:00:02.8324399Z ℹ pass 7
+2026-11-10T03:00:02.8324837Z ℹ fail 0
+2026-11-10T03:00:02.8325261Z ℹ cancelled 0
+2026-11-10T03:00:02.8325724Z ℹ skipped 0
+2026-11-10T03:00:02.8326144Z ℹ todo 0
+2026-11-10T03:00:02.8326638Z ℹ duration_ms 17059.285564
+2026-11-10T03:00:02.8673021Z ##[group]Run node apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint
+2026-11-10T03:00:02.8673752Z [36;1mnode apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint[0m
+2026-11-10T03:00:02.8694150Z shell: /usr/bin/bash -e {0}
+2026-11-10T03:00:02.8694401Z env:
+2026-11-10T03:00:02.8694599Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-10T03:00:02.8694865Z   CI: true
+2026-11-10T03:00:02.8695288Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T03:00:02.8695772Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T03:00:02.8696299Z   DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T03:00:02.8696916Z   SITE_SEARCH_WORKSPACE_DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T03:00:02.8697309Z   SITE_SEARCH_REQUIRE_DUAL_PG: 1
+2026-11-10T03:00:02.8697663Z   MIKKA_TEST_DEPLOYMENT_SHA: 383daa9386b7fa0db96ee9109fa5e5a428aec141
+2026-11-10T03:00:02.8698054Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-10T03:00:02.8698480Z   BETTER_AUTH_SECRET: synthetic-site-search-secret-not-a-real-credential
+2026-11-10T03:00:02.8698867Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-10T03:00:02.8699096Z   MIGRATE: 0
+2026-11-10T03:00:02.8699337Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-10T03:00:02.8699635Z ##[endgroup]
+2026-11-10T03:00:03.4550813Z {"routes":257,"methods":345}
+2026-11-10T03:00:03.8066528Z 
+2026-11-10T03:00:03.8067293Z > next-app@0.0.1 typecheck /home/runner/work/Mikka/Mikka
+2026-11-10T03:00:03.8068242Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck
+2026-11-10T03:00:03.8068775Z 
+2026-11-10T03:00:11.3918706Z 
+2026-11-10T03:00:11.3920133Z > @mikka/frontend@0.0.1 typecheck /home/runner/work/Mikka/Mikka/apps/frontend
+2026-11-10T03:00:11.3921092Z > tsc --noEmit -p tsconfig.json
+2026-11-10T03:00:11.3921429Z 
+2026-11-10T03:00:52.1074165Z 
+2026-11-10T03:00:52.1077054Z > next-app@0.0.1 lint /home/runner/work/Mikka/Mikka
+2026-11-10T03:00:52.1077899Z > pnpm lint:code && pnpm lint:ui
+2026-11-10T03:00:52.1078154Z 
+2026-11-10T03:00:52.4584485Z 
+2026-11-10T03:00:52.4585393Z > next-app@0.0.1 lint:code /home/runner/work/Mikka/Mikka
+2026-11-10T03:00:52.4586608Z > oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory
+2026-11-10T03:00:52.4587280Z 
+2026-11-10T03:00:52.9225485Z ##[warning]lib/desktop-rpc/read-batch-context.test.ts:462:9: Do not add `then` to an object.
+2026-11-10T03:00:52.9235048Z 
+2026-11-10T03:00:52.9235269Z Found 1 warning and 0 errors.
+2026-11-10T03:00:52.9235747Z Finished in 419ms on 4131 files with 97 rules using 4 threads.
+2026-11-10T03:00:52.9405151Z  ELIFECYCLE  Command failed with exit code 1.
+2026-11-10T03:00:52.9785525Z  ELIFECYCLE  Command failed with exit code 1.
+2026-11-10T03:00:53.0026916Z ##[error]Process completed with exit code 1.
+2026-11-10T03:00:53.0110476Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+2026-11-10T03:00:53.0110936Z with:
+2026-11-10T03:00:53.0111151Z   name: site-search-evidence
+2026-11-10T03:00:53.0111437Z   path: playwright-report/
+test-results/
+
+2026-11-10T03:00:53.0111734Z   if-no-files-found: error
+2026-11-10T03:00:53.0111978Z   retention-days: 7
+2026-11-10T03:00:53.0112189Z   compression-level: 6
+2026-11-10T03:00:53.0112403Z   overwrite: false
+2026-11-10T03:00:53.0112616Z   include-hidden-files: false
+2026-11-10T03:00:53.0112846Z env:
+2026-11-10T03:00:53.0113048Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-10T03:00:53.0113304Z   CI: true
+2026-11-10T03:00:53.0113726Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T03:00:53.0114190Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-10T03:00:53.0114722Z   DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T03:00:53.0115323Z   SITE_SEARCH_WORKSPACE_DATABASE_URL: ***127.0.0.1:5433/mikka_workspace_e2e
+2026-11-10T03:00:53.0115731Z   SITE_SEARCH_REQUIRE_DUAL_PG: 1
+2026-11-10T03:00:53.0116077Z   MIKKA_TEST_DEPLOYMENT_SHA: 383daa9386b7fa0db96ee9109fa5e5a428aec141
+2026-11-10T03:00:53.0116463Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-10T03:00:53.0116874Z   BETTER_AUTH_SECRET: synthetic-site-search-secret-not-a-real-credential
+2026-11-10T03:00:53.0117270Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-10T03:00:53.0117500Z   MIGRATE: 0
+2026-11-10T03:00:53.0117745Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-10T03:00:53.0118054Z ##[endgroup]
+2026-11-10T03:00:53.1889539Z (node:5509) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-10T03:00:53.1891380Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-10T03:00:53.1909008Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-11-10T03:00:53.1911962Z The least common ancestor is /home/runner/work/Mikka/Mikka. This will be the root directory of the artifact
+2026-11-10T03:00:53.1915917Z ##[error]No files were found with the provided path: playwright-report/
+test-results/. No artifacts will be uploaded.
+2026-11-10T03:00:53.2115543Z Post job cleanup.
+2026-11-10T03:00:53.3730933Z Pruning is unnecessary.
+2026-11-10T03:00:53.3906698Z Post job cleanup.
+2026-11-10T03:00:53.4842570Z [command]/usr/bin/git version
+2026-11-10T03:00:53.4889093Z git version 2.56.0
+2026-11-10T03:00:53.4940818Z Temporarily overriding HOME='/home/runner/work/_temp/aec5bbf9-5662-47cd-9786-cd09acb5d845' before making global git config changes
+2026-11-10T03:00:53.4942790Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-10T03:00:53.4944252Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-10T03:00:53.4979409Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-10T03:00:53.5020411Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-10T03:00:53.5306017Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-10T03:00:53.5352152Z http.https://github.com/.extraheader
+2026-11-10T03:00:53.5376042Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-10T03:00:53.5412316Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-10T03:00:53.5704507Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-10T03:00:53.5752549Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-10T03:00:53.6177403Z Print service container logs: 0d56813859334e758de99d20cfb1c023_postgres17_413e5e
+2026-11-10T03:00:53.6182798Z ##[command]/usr/bin/docker logs --details da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23
+2026-11-10T03:00:53.6331765Z  The files belonging to this database system will be owned by user "postgres".
+2026-11-10T03:00:53.6332585Z  This user must also own the server process.
+2026-11-10T03:00:53.6333072Z  
+2026-11-10T03:00:53.6333556Z  The database cluster will be initialized with locale "en_US.utf8".
+2026-11-10T03:00:53.6334352Z  The default database encoding has accordingly been set to "UTF8".
+2026-11-10T03:00:53.6335104Z  The default text search configuration will be set to "english".
+2026-11-10T03:00:53.6335527Z  
+2026-11-10T03:00:53.6335731Z  Data page checksums are disabled.
+2026-11-10T03:00:53.6335991Z  
+2026-11-10T03:00:53.6336295Z  fixing permissions on existing directory /var/lib/postgresql/data ... ok
+2026-11-10T03:00:53.6336732Z  creating subdirectories ... ok
+2026-11-10T03:00:53.6337058Z  selecting dynamic shared memory implementation ... posix
+2026-11-10T03:00:53.6337409Z  selecting default "max_connections" ... 100
+2026-11-10T03:00:53.6337714Z  selecting default "shared_buffers" ... 128MB
+2026-11-10T03:00:53.6338012Z  selecting default time zone ... Etc/UTC
+2026-11-10T03:00:53.6341895Z  initdb: warning: enabling "trust" authentication for local connections
+2026-11-10T03:00:53.6343210Z  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-11-10T03:00:53.6344278Z  creating configuration files ... ok
+2026-11-10T03:00:53.6344765Z  running bootstrap script ... ok
+2026-11-10T03:00:53.6345293Z  performing post-bootstrap initialization ... ok
+2026-11-10T03:00:53.6345841Z  syncing data to disk ... ok
+2026-11-10T03:00:53.6346189Z  
+2026-11-10T03:00:53.6346379Z  
+2026-11-10T03:00:53.6346636Z  Success. You can now start the database server using:
+2026-11-10T03:00:53.6346958Z  
+2026-11-10T03:00:53.6347205Z      pg_ctl -D /var/lib/postgresql/data -l logfile start
+2026-11-10T03:00:53.6347516Z  
+2026-11-10T03:00:53.6348166Z  waiting for server to start....2026-11-10 02:58:29.170 UTC [48] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-10T03:00:53.6349068Z  2026-11-10 02:58:29.171 UTC [48] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-10T03:00:53.6349652Z  2026-11-10 02:58:29.174 UTC [51] LOG:  database system was shut down at 2026-11-10 02:58:29 UTC
+2026-11-10T03:00:53.6350937Z  2026-11-10 02:58:29.179 UTC [48] LOG:  database system is ready to accept connections
+2026-11-10T03:00:53.6351569Z   done
+2026-11-10T03:00:53.6351775Z  server started
+2026-11-10T03:00:53.6352378Z  2026-11-10 02:58:29.491 UTC [1] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-10T03:00:53.6353103Z  2026-11-10 02:58:29.491 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-10T03:00:53.6353584Z  2026-11-10 02:58:29.491 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-10T03:00:53.6354103Z  2026-11-10 02:58:29.493 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-10T03:00:53.6354662Z  2026-11-10 02:58:29.496 UTC [64] LOG:  database system was shut down at 2026-11-10 02:58:29 UTC
+2026-11-10T03:00:53.6355175Z  2026-11-10 02:58:29.501 UTC [1] LOG:  database system is ready to accept connections
+2026-11-10T03:00:53.6355544Z  CREATE DATABASE
+2026-11-10T03:00:53.6355740Z  
+2026-11-10T03:00:53.6355917Z  
+2026-11-10T03:00:53.6356235Z  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+2026-11-10T03:00:53.6361023Z  
+2026-11-10T03:00:53.6361650Z  waiting for server to shut down...2026-11-10 02:58:29.358 UTC [48] LOG:  received fast shutdown request
+2026-11-10T03:00:53.6362819Z  .2026-11-10 02:58:29.358 UTC [48] LOG:  aborting any active transactions
+2026-11-10T03:00:53.6363846Z  2026-11-10 02:58:29.362 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
+2026-11-10T03:00:53.6364786Z  2026-11-10 02:58:29.362 UTC [49] LOG:  shutting down
+2026-11-10T03:00:53.6365474Z  2026-11-10 02:58:29.364 UTC [49] LOG:  checkpoint starting: shutdown immediate
+2026-11-10T03:00:53.6367412Z  2026-11-10 02:58:29.380 UTC [49] LOG:  checkpoint complete: wrote 925 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.012 s, sync=0.003 s, total=0.018 s; sync files=301, longest=0.002 s, average=0.001 s; distance=4256 kB, estimate=4256 kB; lsn=0/19179A8, redo lsn=0/19179A8
+2026-11-10T03:00:53.6369307Z  2026-11-10 02:58:29.390 UTC [48] LOG:  database system is shut down
+2026-11-10T03:00:53.6370108Z   done
+2026-11-10T03:00:53.6370425Z  server stopped
+2026-11-10T03:00:53.6370754Z  
+2026-11-10T03:00:53.6371162Z  PostgreSQL init process complete; ready for start up.
+2026-11-10T03:00:53.6371689Z  
+2026-11-10T03:00:53.6379735Z Stop and remove container: 0d56813859334e758de99d20cfb1c023_postgres17_413e5e
+2026-11-10T03:00:53.6384858Z ##[command]/usr/bin/docker rm --force da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23
+2026-11-10T03:00:53.7642245Z da94e4c6f08839732167efae2f02fe2c843fdeac0cba4d0d2273c292785d2d23
+2026-11-10T03:00:53.7669191Z Print service container logs: c4ea30e808e64c698e75f27b086ba2c4_postgres17_68dbf0
+2026-11-10T03:00:53.7670863Z ##[command]/usr/bin/docker logs --details dbda028f9e10134937684344aa3fb15b05ce4f7c31fad38e7aba974f2187c010
+2026-11-10T03:00:53.7818813Z  The files belonging to this database system will be owned by user "postgres".
+2026-11-10T03:00:53.7820973Z  initdb: warning: enabling "trust" authentication for local connections
+2026-11-10T03:00:53.7822082Z  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-11-10T03:00:53.7822749Z  This user must also own the server process.
+2026-11-10T03:00:53.7823045Z  
+2026-11-10T03:00:53.7823338Z  The database cluster will be initialized with locale "en_US.utf8".
+2026-11-10T03:00:53.7823796Z  The default database encoding has accordingly been set to "UTF8".
+2026-11-10T03:00:53.7824233Z  The default text search configuration will be set to "english".
+2026-11-10T03:00:53.7824568Z  
+2026-11-10T03:00:53.7824774Z  Data page checksums are disabled.
+2026-11-10T03:00:53.7825019Z  
+2026-11-10T03:00:53.7825323Z  fixing permissions on existing directory /var/lib/postgresql/data ... ok
+2026-11-10T03:00:53.7825717Z  creating subdirectories ... ok
+2026-11-10T03:00:53.7826033Z  selecting dynamic shared memory implementation ... posix
+2026-11-10T03:00:53.7826397Z  selecting default "max_connections" ... 100
+2026-11-10T03:00:53.7826709Z  selecting default "shared_buffers" ... 128MB
+2026-11-10T03:00:53.7827003Z  selecting default time zone ... Etc/UTC
+2026-11-10T03:00:53.7827283Z  creating configuration files ... ok
+2026-11-10T03:00:53.7827563Z  running bootstrap script ... ok
+2026-11-10T03:00:53.7827857Z  performing post-bootstrap initialization ... ok
+2026-11-10T03:00:53.7828163Z  syncing data to disk ... ok
+2026-11-10T03:00:53.7828391Z  
+2026-11-10T03:00:53.7828556Z  
+2026-11-10T03:00:53.7828783Z  Success. You can now start the database server using:
+2026-11-10T03:00:53.7829085Z  
+2026-11-10T03:00:53.7829315Z      pg_ctl -D /var/lib/postgresql/data -l logfile start
+2026-11-10T03:00:53.7829620Z  
+2026-11-10T03:00:53.7844202Z  waiting for server to start....2026-11-10 02:58:29.534 UTC [49] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-10T03:00:53.7845661Z  2026-11-10 02:58:29.534 UTC [49] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-10T03:00:53.7846259Z  2026-11-10 02:58:29.538 UTC [52] LOG:  database system was shut down at 2026-11-10 02:58:29 UTC
+2026-11-10T03:00:53.7846952Z  2026-11-10 02:58:29.542 UTC [49] LOG:  database system is ready to accept connections
+2026-11-10T03:00:53.7847339Z   done
+2026-11-10T03:00:53.7847523Z  server started
+2026-11-10T03:00:53.7847717Z  CREATE DATABASE
+2026-11-10T03:00:53.7847913Z  
+2026-11-10T03:00:53.7848080Z  
+2026-11-10T03:00:53.7848393Z  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+2026-11-10T03:00:53.7848784Z  
+2026-11-10T03:00:53.7849148Z  waiting for server to shut down...2026-11-10 02:58:29.717 UTC [49] LOG:  received fast shutdown request
+2026-11-10T03:00:53.7849668Z  .2026-11-10 02:58:29.717 UTC [49] LOG:  aborting any active transactions
+2026-11-10T03:00:53.7850856Z  2026-11-10 02:58:29.719 UTC [49] LOG:  background worker "logical replication launcher" (PID 55) exited with exit code 1
+2026-11-10T03:00:53.7851750Z  2026-11-10 02:58:29.720 UTC [50] LOG:  shutting down
+2026-11-10T03:00:53.7852397Z  2026-11-10 02:58:29.721 UTC [50] LOG:  checkpoint starting: shutdown immediate
+2026-11-10T03:00:53.7853494Z  2026-11-10 02:58:29.736 UTC [50] LOG:  checkpoint complete: wrote 925 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.012 s, sync=0.003 s, total=0.016 s; sync files=301, longest=0.002 s, average=0.001 s; distance=4256 kB, estimate=4256 kB; lsn=0/19179B8, redo lsn=0/19179B8
+2026-11-10T03:00:53.7854535Z  2026-11-10 02:58:29.743 UTC [49] LOG:  database system is shut down
+2026-11-10T03:00:53.7854860Z   done
+2026-11-10T03:00:53.7855036Z  server stopped
+2026-11-10T03:00:53.7855231Z  
+2026-11-10T03:00:53.7855465Z  PostgreSQL init process complete; ready for start up.
+2026-11-10T03:00:53.7855758Z  
+2026-11-10T03:00:53.7856306Z  2026-11-10 02:58:29.838 UTC [1] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-10T03:00:53.7857016Z  2026-11-10 02:58:29.838 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-10T03:00:53.7857480Z  2026-11-10 02:58:29.838 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-10T03:00:53.7857999Z  2026-11-10 02:58:29.839 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-10T03:00:53.7858554Z  2026-11-10 02:58:29.842 UTC [65] LOG:  database system was shut down at 2026-11-10 02:58:29 UTC
+2026-11-10T03:00:53.7859052Z  2026-11-10 02:58:29.847 UTC [1] LOG:  database system is ready to accept connections
+2026-11-10T03:00:53.7860607Z Stop and remove container: c4ea30e808e64c698e75f27b086ba2c4_postgres17_68dbf0
+2026-11-10T03:00:53.7861364Z ##[command]/usr/bin/docker rm --force dbda028f9e10134937684344aa3fb15b05ce4f7c31fad38e7aba974f2187c010
+2026-11-10T03:00:53.9126184Z dbda028f9e10134937684344aa3fb15b05ce4f7c31fad38e7aba974f2187c010
+2026-11-10T03:00:53.9160583Z Remove container network: github_network_65e105b8c43d4a028bd5740d7ee33e51
+2026-11-10T03:00:53.9165265Z ##[command]/usr/bin/docker network rm github_network_65e105b8c43d4a028bd5740d7ee33e51
+2026-11-10T03:00:54.0078515Z github_network_65e105b8c43d4a028bd5740d7ee33e51
+2026-11-10T03:00:54.0157203Z Cleaning up orphan processes
+2026-11-10T03:00:54.0654990Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

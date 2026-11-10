@@ -1,0 +1,252 @@
+{
+  "schema": "issue1512.macos-restart-timing-comparison.v1",
+  "historicalFormal": {
+    "runId": 42731843507,
+    "attempt": 1,
+    "jobId": 129551876738,
+    "source": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "originalLogGitBlob": "989174f5612eaffa364b517728571cefb88d9763",
+    "thisReaderOriginalActionsReads": 0,
+    "sourceKind": "previously frozen original log",
+    "result": "failed",
+    "states": [
+      {
+        "step": "check",
+        "status": "running"
+      },
+      {
+        "step": "check",
+        "status": "running"
+      },
+      {
+        "step": "install",
+        "status": "running"
+      },
+      {
+        "step": "service",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "online"
+      },
+      {
+        "step": "service",
+        "status": "running"
+      },
+      {
+        "step": "service",
+        "status": "failed",
+        "cause": "service_failed"
+      }
+    ],
+    "installer": {
+      "exitCode": 1,
+      "truncated": false,
+      "bootstrapReportedExitCode": 5
+    },
+    "daemonLifecycle": [
+      {
+        "event": "started",
+        "at": "2026-11-10T00:59:45.087Z",
+        "generation": 1
+      },
+      {
+        "event": "registered",
+        "at": "2026-11-10T00:59:45.122Z",
+        "generation": 1
+      },
+      {
+        "event": "stopped",
+        "at": "2026-11-10T00:59:46.745Z",
+        "generation": 1
+      }
+    ],
+    "launchctlCommandTimestamps": null,
+    "bootoutExitCode": null,
+    "outputWitnesses": {
+      "resultJsonFirstLine": 558,
+      "resultJsonLastLine": 614,
+      "resultJsonStartedAt": "2026-11-10T00:59:46.7892090Z",
+      "bootstrapErrorTextLine": 611,
+      "bootstrapErrorTextOutputAt": "2026-11-10T00:59:46.8114560Z",
+      "stoppedToDiagnosticOutputApproxMs": 44.209,
+      "note": "GitHub job-log timestamps are result emission timestamps, not launchctl invocation/return times."
+    }
+  },
+  "firstDiagnostic": {
+    "runId": 42739939984,
+    "attempt": 1,
+    "source": "fd3862c99d2c23d25edecabdeb76e85b097571b8",
+    "resultGitBlob": "9236028bad545490051d680deafe1ef631896f8f",
+    "archive": "6c71125de288846e0a86948de4af671ed3fcce72",
+    "conclusion": "success",
+    "instrumentation": "A Node launchctl wrapper around the original commands",
+    "launchctl": [
+      {
+        "stage": "bootout",
+        "phase": "install",
+        "startedAt": "2026-11-10T02:06:46.479Z",
+        "finishedAt": "2026-11-10T02:06:46.489Z",
+        "elapsedMs": 8.866,
+        "exitCode": 3,
+        "signal": null,
+        "signalOther": false,
+        "errorCode": null,
+        "timedOut": false
+      },
+      {
+        "stage": "bootstrap",
+        "phase": "install",
+        "startedAt": "2026-11-10T02:06:46.545Z",
+        "finishedAt": "2026-11-10T02:06:46.594Z",
+        "elapsedMs": 46.067,
+        "exitCode": 0,
+        "signal": null,
+        "signalOther": false,
+        "errorCode": null,
+        "timedOut": false
+      },
+      {
+        "stage": "bootout",
+        "phase": "reconnect",
+        "startedAt": "2026-11-10T02:06:48.532Z",
+        "finishedAt": "2026-11-10T02:06:48.541Z",
+        "elapsedMs": 7.208,
+        "exitCode": 0,
+        "signal": null,
+        "signalOther": false,
+        "errorCode": null,
+        "timedOut": false
+      },
+      {
+        "stage": "bootstrap",
+        "phase": "reconnect",
+        "startedAt": "2026-11-10T02:06:48.611Z",
+        "finishedAt": "2026-11-10T02:06:48.624Z",
+        "elapsedMs": 10.397,
+        "exitCode": 0,
+        "signal": null,
+        "signalOther": false,
+        "errorCode": null,
+        "timedOut": false
+      }
+    ],
+    "commandGapsMs": {
+      "install": 56,
+      "reconnect": 70
+    },
+    "limitation": "Intervening wrapper/process work changes the command gap; successful run does not establish product correctness."
+  },
+  "inprocessDiagnostic": {
+    "runId": 42745131850,
+    "attempt": 1,
+    "source": "299fbddd8c8f252959088a8cafabde962636b945",
+    "resultGitBlob": "06bbf51080d45959aa992ebe60c5fb1b27ac2060",
+    "conclusion": "success",
+    "instrumentation": "Synchronous timestamp/error-reference recording in the original service process; a single record emitted after sequence completion/failure",
+    "launchctl": {
+      "status": "captured",
+      "attempts": 2,
+      "records": [
+        {
+          "phase": "install",
+          "schema": "issue1512.launchctl-inprocess.v1",
+          "bootout": {
+            "startedAt": "2026-11-10T02:52:38.654Z",
+            "finishedAt": "2026-11-10T02:52:38.684Z",
+            "elapsedMs": 29.765,
+            "complete": true,
+            "failed": true,
+            "exitCode": 3,
+            "errorCode": null,
+            "signal": null
+          },
+          "bootstrap": {
+            "startedAt": "2026-11-10T02:52:38.684Z",
+            "finishedAt": "2026-11-10T02:52:38.703Z",
+            "elapsedMs": 19.078,
+            "complete": true,
+            "failed": false,
+            "exitCode": 0,
+            "errorCode": null,
+            "signal": null
+          },
+          "betweenCommandsMs": 0.003
+        },
+        {
+          "phase": "reconnect",
+          "schema": "issue1512.launchctl-inprocess.v1",
+          "bootout": {
+            "startedAt": "2026-11-10T02:52:41.434Z",
+            "finishedAt": "2026-11-10T02:52:41.455Z",
+            "elapsedMs": 20.907,
+            "complete": true,
+            "failed": false,
+            "exitCode": 0,
+            "errorCode": null,
+            "signal": null
+          },
+          "bootstrap": {
+            "startedAt": "2026-11-10T02:52:41.455Z",
+            "finishedAt": "2026-11-10T02:52:41.475Z",
+            "elapsedMs": 19.531,
+            "complete": true,
+            "failed": false,
+            "exitCode": 0,
+            "errorCode": null,
+            "signal": null
+          },
+          "betweenCommandsMs": 0.002
+        }
+      ],
+      "missing": 0,
+      "invalid": 0,
+      "oversized": 0,
+      "maxRecords": 2,
+      "maxCommandOutputBytes": 16384,
+      "boundary": "Only completed command output. Synchronous timestamp recording still changes timing; non-reproduction is not a product fix."
+    },
+    "daemonLifecycle": {
+      "status": "captured",
+      "events": [
+        {
+          "event": "started",
+          "at": "2026-11-10T02:52:39.755Z",
+          "generation": 1
+        },
+        {
+          "event": "registered",
+          "at": "2026-11-10T02:52:39.798Z",
+          "generation": 1
+        },
+        {
+          "event": "stopped",
+          "at": "2026-11-10T02:52:41.454Z",
+          "generation": 1
+        },
+        {
+          "event": "started",
+          "at": "2026-11-10T02:52:42.399Z",
+          "generation": 2
+        }
+      ],
+      "malformedLines": 0,
+      "boundary": "Point-in-time log read only; a missing line is not proof that an event did not happen."
+    }
+  },
+  "findings": [
+    "The original formal Node22 restart remains a failure: initial install reached online, reconnect service step failed, and captured stderr reports launchctl bootstrap5. The containing installer command exited1.",
+    "The original daemon logged stopped at00:59:46.745Z; the result JSON began emitting around44.209ms later. These timestamps do not identify when bootout returned or bootstrap ran.",
+    "The two instrumented runs each passed original install/reconnect/no-re-enrollment assertions. They do not replace formal acceptance of the unmodified product source.",
+    "In the in-process diagnostic, reconnect bootout0 completed and bootstrap0 started at the same wall-clock millisecond41.455Z, with measured synchronous gap0.002ms. The stopped event at41.454Z precedes those recorded boundaries by1ms.",
+    "The second success with no inter-command wrapper/process or file I/O prevents treating the first run's70ms gap as an established explanation of the original failure.",
+    "The daemon stopped log is a point-in-time application event; it does not independently prove process exit or completion of all launchd state changes.",
+    "No comparison supplies a confirmed product root cause. No retry, polling, sleep, kickstart replacement, or product fix is justified by these observations.",
+    "Future CI for a materially changed formal head is independent evidence; it cannot rewrite the historical5852 failure."
+  ]
+}

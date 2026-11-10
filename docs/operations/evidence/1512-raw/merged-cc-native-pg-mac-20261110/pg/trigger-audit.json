@@ -1,0 +1,462 @@
+{
+  "schema": "issue1512-native-pending-workflow-trigger-audit.v1",
+  "candidateOpsCommit": "e29dec5a9cae90fa8f48b5b612ac2cf8c08ad4cc",
+  "sourceTree": "c4540c9d0954eb341a359fe72c74c0421b17fd73",
+  "greenTree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0",
+  "opsTree": "f65ed56a00878a9d9f76bec230bc420e4e858fb7",
+  "originalWorkflowCount": 43,
+  "originalWorkflowReadbackBlobHashesVerified": true,
+  "oldTaskRunsOpsWorkflowPresent": false,
+  "newWorkflow": {
+    "path": ".github/workflows/issue1512-native-pending-pg.yml",
+    "blob": "e3bbb1e5a2ca415553f4f0319258da45b681eb55",
+    "onlyBranch": "ops/1512-task-runs-pg-20261110",
+    "message": "issue1512 Native pending workspace PG admit 20261110",
+    "onlyAttempt": "1"
+  },
+  "conclusions": [
+    "The GREEN tree contains none of the old issue1512-task-runs-pg workflow/controller/manifest; only three new ops entry files are added.",
+    "The normal ui-policy and web-deploy push triggers only accept main.",
+    "Every other push trigger either only accepts main, a listed unrelated branch, integration/** or integrate/**, or v* tags; none accept this ops branch.",
+    "All workflow_run consumers listen only for Web deploy or E2B additive runtime release, not this new workflow name.",
+    "Other workflows require PR/merge-group/manual/reusable/schedule/deployment events; this exact ops push does not itself cause those events.",
+    "This is static trigger analysis, not evidence that any runner has started or completed."
+  ],
+  "workflows": [
+    {
+      "path": ".github/workflows/analytics-ssr.yml",
+      "sha": "2a263858b477569d92f1694ed6bfddcd03469c56",
+      "events": [
+        "workflow_call:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/app-icon.yml",
+      "sha": "2ad5b5fa99d72c4440c435bdd8f5bad44411bd36",
+      "events": [
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/browser-gate.yml",
+      "sha": "0717180c70f54f9af06ebe39d0f5b5ec207235c4",
+      "events": [
+        "pull_request:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/ci-selection.yml",
+      "sha": "334b063f287defd1d93ef11f1235954768c9ed1e",
+      "events": [
+        "workflow_call:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/cloud-computer.yml",
+      "sha": "1d91a07140966e8220e24153be6fdaff2b0aaf6c",
+      "events": [
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/credential-vault.yml",
+      "sha": "440712e2ca9e474e64970e8e03392b91e12acdca",
+      "events": [
+        "push:",
+        "pull_request:"
+      ],
+      "push": "push:\n    branches: ['codex/180-account-credential-vault']",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/desktop-release.yml",
+      "sha": "d254ed3ac47c943d57fc3dc79448b1752753078f",
+      "events": [
+        "push:",
+        "workflow_dispatch:"
+      ],
+      "push": "push:\n    branches: [main]\n    paths:\n      - 'apps/desktop/**'\n      # Shared renderer source and build inputs are part of the shipped app.\n      - 'apps/frontend/**'\n      - 'app/\\[locale\\]/**'\n      - 'app/actions/**'\n      - 'app/fonts/**'\n      - 'app/globals.css'\n      - 'components/**'\n      - 'hooks/**'\n      - 'lib/**'\n      - 'messages/**'\n      - 'i18n/**'\n      - 'public/**'\n      - 'packages/config/**'\n      - 'instrumentation-client.ts'\n      - 'next.config.mjs'\n      - 'postcss.config.mjs'\n      - 'tsconfig.json'\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'lib/daemon-commands.ts'\n      - 'lib/local-device-setup.ts'\n      - 'package.json'\n      - 'pnpm-lock.yaml'\n      - 'pnpm-workspace.yaml'\n      - 'patches/**'\n      - 'scripts/release/**'\n      - 'config/release-security.json'\n      - '.github/workflows/desktop-release.yml'",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/desktop.yml",
+      "sha": "1cfd9d8be85015b639809faedc8a68fb83609399",
+      "events": [
+        "workflow_call:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/device-gateway.yml",
+      "sha": "a0c0db030a9343caeffd371889bf40c13d06d2cc",
+      "events": [
+        "push:",
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": "push:\n    branches: [main]\n    paths: &gateway_paths\n      - 'cloudflare/device-gateway/**'\n      - 'lib/device-gateway*.ts'\n      - 'lib/device-presence*.ts'\n      - 'lib/live/**'\n      - 'lib/db/commit-effects*.ts'\n      - 'hooks/use-live-key.tsx'\n      - 'app/api/live/**'\n      - 'scripts/device-gateway/**'\n      - '.github/workflows/device-gateway.yml'",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/e2b-byos.yml",
+      "sha": "333e0674355baa72ce7bd00e7e57964fff8c7d6a",
+      "events": [
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "sha": "2aa85fdd0cb12727621b774ab5886804be486605",
+      "events": [
+        "push:",
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": "push:\n    branches: [main]\n    # An unrelated merge can obsolete an in-flight publication. Recheck the\n    # live worker on every main push; failed input fingerprints skip retries.",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/e2b-runtime-release.yml",
+      "sha": "7a592d975ac7594e723822f597b512defa4526b2",
+      "events": [
+        "workflow_call:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/e2b-template.yml",
+      "sha": "bb948480beac3370335dd4b8ce59a01e6becf1f0",
+      "events": [
+        "workflow_call:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/issue1415-deployed-production.yml",
+      "sha": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be",
+      "events": [
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/issue1415-managed-inspection.yml",
+      "sha": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+      "events": [
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/issues-1515-1517-cleanup.yml",
+      "sha": "402b01de60f16f041ab9d0bd3b2036ad820e760e",
+      "events": [
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/issues-1515-1517-diagnostics.yml",
+      "sha": "bb67205200d6777a626cecc3494762e49d491a5c",
+      "events": [
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+      "sha": "4757d62065017957f6e1e4300ab4695507ce40d8",
+      "events": [
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/local-device-node22.yml",
+      "sha": "d195f389292e1a84967fd9864063ac536b91bbaf",
+      "events": [
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/mobile-native.yml",
+      "sha": "a14280622e2e0cd44d79b809ef36bb6b1895cd38",
+      "events": [
+        "push:",
+        "workflow_dispatch:"
+      ],
+      "push": "push:\n    branches: [main]\n    paths:\n      - 'apps/mobile/app.json'\n      - 'apps/mobile/app.config.ts'\n      - 'apps/mobile/eas.json'\n      - '.easignore'",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/mobile-screenshots.yml",
+      "sha": "17cedf93280ec9955608c34c7b605f9df6704f4d",
+      "events": [
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/mobile-update.yml",
+      "sha": "0708d8d90ac94c96bd35f2cec0407d8b25d362f3",
+      "events": [
+        "push:",
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": "push:\n    branches: [main]\n    paths: ['apps/mobile/**', 'packages/protocol/**']",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/model-provider-fallback-acceptance.yml",
+      "sha": "316476e5015a5bc04c27a62d198f847784233201",
+      "events": [
+        "workflow_run:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": "workflow_run:\n    workflows: [Web deploy]\n    types: [completed]"
+    },
+    {
+      "path": ".github/workflows/production-readiness.yml",
+      "sha": "0cd039a6c28eeccf2a417ff4f3e09255b371be29",
+      "events": [
+        "pull_request:",
+        "push:",
+        "workflow_dispatch:"
+      ],
+      "push": "push:\n    branches: [acceptance/proactive-1157-1163]\n    paths:\n      - '.github/workflows/production-readiness.yml'\n      - 'scripts/acceptance/production-readiness*'",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/production-smoke.yml",
+      "sha": "67751d4d3a38989a635e5ee07ac0c8f0775a333e",
+      "events": [
+        "schedule:",
+        "deployment_status:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/project-decisions-acceptance.yml",
+      "sha": "7be1af6692ab21d971bd091994c56a7a3ac159fe",
+      "events": [
+        "workflow_run:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": "workflow_run:\n    workflows: [Web deploy]\n    types: [completed]"
+    },
+    {
+      "path": ".github/workflows/publish-daemon.yml",
+      "sha": "c6f861a5ec36468ee9a65bc226613fbbabc797c2",
+      "events": [
+        "push:",
+        "workflow_dispatch:"
+      ],
+      "push": "push:\n    branches: [main]\n    # Publish only when something that goes into the npm package changed.\n    # Every published version makes installed daemons upgrade and restart.\n    paths:\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'packages/config/**'\n      - 'package.json'\n      - 'pnpm-lock.yaml'\n      - 'pnpm-workspace.yaml'\n      - 'patches/**'\n      - 'LICENSE'\n      - 'scripts/release/**'\n      - 'config/release-security.json'\n      - '.github/workflows/publish-daemon.yml'",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/read-cache-production.yml",
+      "sha": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22",
+      "events": [
+        "pull_request:",
+        "workflow_dispatch:",
+        "workflow_run:"
+      ],
+      "push": null,
+      "downstream": "workflow_run:\n    workflows: ['Web deploy']\n    types: [completed]\n    branches: [main]"
+    },
+    {
+      "path": ".github/workflows/read-cache.yml",
+      "sha": "86ee0112413eae241189bb2d748a6d6901201c4f",
+      "events": [
+        "pull_request:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "events": [
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/self-hosted-image.yml",
+      "sha": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077",
+      "events": [
+        "workflow_call:",
+        "push:",
+        "workflow_dispatch:"
+      ],
+      "push": "push:\n    branches: [main]\n    tags: ['v*']",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/self-hosted-production.yml",
+      "sha": "2f42f98f72a1f58022c10ea70514dbd9b2c43f84",
+      "events": [
+        "pull_request:",
+        "workflow_run:"
+      ],
+      "push": null,
+      "downstream": "workflow_run:\n    workflows: ['Web deploy']\n    types: [completed]\n    branches: [main]"
+    },
+    {
+      "path": ".github/workflows/self-hosting-ui.yml",
+      "sha": "5aa39770c0a4d6166e0088d5e1d84af746b57d58",
+      "events": [
+        "pull_request:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/site-search.yml",
+      "sha": "299e09591558bced0eafcc05c7d5a6d295078438",
+      "events": [
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/ssh-device-backend.yml",
+      "sha": "e980cb3cdf2bc1206972ca66c87f9bc990e2ac48",
+      "events": [
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/subagents.yml",
+      "sha": "116080d9d31bf85774dedac96f79a92235575706",
+      "events": [
+        "push:",
+        "workflow_dispatch:"
+      ],
+      "push": "push:\n    branches: ['codex/342-runtime', 'codex/180-account-credential-vault', 'integration/**', 'integrate/**']",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/suggestions-cron.yml",
+      "sha": "587693cbff72150a1212d0997aabee0aff1269ce",
+      "events": [
+        "push:",
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": "push:\n    branches: [main]\n    paths: &minute_paths\n      - 'cloudflare/suggestions-cron/**'\n      - 'scripts/suggestions-cron/**'\n      - 'scripts/device-gateway/deploy.mjs'\n      - 'scripts/release/ci-gate.mjs'\n      - '.github/workflows/suggestions-cron.yml'",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/task-secret-acceptance.yml",
+      "sha": "938ffc405cee597005d4503ab022ab1c3b0f934e",
+      "events": [
+        "workflow_run:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": "workflow_run:\n    workflows: [E2B additive runtime release]\n    types: [completed]"
+    },
+    {
+      "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+      "sha": "42ae23945f798020ec068635e7621869fb427af2",
+      "events": [
+        "workflow_run:"
+      ],
+      "push": null,
+      "downstream": "workflow_run:\n    workflows: [E2B additive runtime release]\n    types: [completed]"
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "sha": "1e3e2b5edc6dbd6796fd5f2fd464b7c2a6b12b35",
+      "events": [
+        "push:",
+        "pull_request:",
+        "merge_group:",
+        "workflow_dispatch:",
+        "schedule:"
+      ],
+      "push": "push:\n    branches: [main]",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/unattended-sandbox.yml",
+      "sha": "91ebe7a22509c3e900eedf2d6f160c454da91b4e",
+      "events": [
+        "pull_request:",
+        "workflow_dispatch:"
+      ],
+      "push": null,
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "sha": "710f70c3528e1b8eb5c37f1be52c6442445bf9be",
+      "events": [
+        "push:",
+        "workflow_dispatch:",
+        "workflow_call:"
+      ],
+      "push": "push:\n    branches: [main]",
+      "downstream": null
+    },
+    {
+      "path": ".github/workflows/workspace-governance-acceptance.yml",
+      "sha": "c107a7699cc0bb91ac8d9eaf258361d2f04e51a4",
+      "events": [
+        "pull_request:",
+        "merge_group:",
+        "push:"
+      ],
+      "push": "push:\n    branches: [main]",
+      "downstream": null
+    }
+  ],
+  "controllerStaticEcmaParse": {
+    "blob": "fe3e2611b0babfe8b8e750058bbeba92127fe9a7",
+    "status": "PASS",
+    "method": "Compile without executing using V8 async function after removing only static import declarations and replacing import.meta.url; no Node/runtime/Actions pass claim."
+  },
+  "resourcesStartedByThisAudit": 0
+}

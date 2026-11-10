@@ -1,0 +1,373 @@
+{
+  "schema": "issue1512.historical-probe-applicability-main-native-pending.v1",
+  "observedAt": "2026-11-10 02:53:58 UTC",
+  "status": "RETAIN_PRIOR_SCOPED_BASELINE_NO_NEW_MEASUREMENT",
+  "sources": {
+    "baseline": {
+      "commit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+      "tree": "42d33eb7faf77d7049607523599de9374e065660",
+      "recursiveTreeEntries": 7816,
+      "truncated": false
+    },
+    "merge": {
+      "commit": "c0fab83818b75c487089f554f2d350abd33b146b",
+      "tree": "c4540c9d0954eb341a359fe72c74c0421b17fd73",
+      "recursiveTreeEntries": 7843,
+      "truncated": false
+    },
+    "green": {
+      "commit": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "tree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0",
+      "recursiveTreeEntries": 7844,
+      "truncated": false
+    }
+  },
+  "checkedFiles": [
+    {
+      "role": "baselineAudit",
+      "gitBlob": "b0b28e9af02598fd1c14c098fefecbee43fa1038",
+      "bytes": 21038,
+      "sha256": "7648a4d28eb88559d9e46478c97b6c04fc76f70821b8030d13a82bca195eb73b"
+    },
+    {
+      "role": "baselineProof",
+      "gitBlob": "7e7856cbe3bac470133110f81c92e9873fc1d8f6",
+      "bytes": 1348,
+      "sha256": "aac5169ba36d1ce5be053911eb6a5fa6d2e64a452f0b34911fadfe442c9216b5"
+    },
+    {
+      "role": "source:probe",
+      "gitBlob": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "bytes": 19846,
+      "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4"
+    },
+    {
+      "role": "source:node",
+      "gitBlob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "bytes": 7287,
+      "sha256": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0"
+    },
+    {
+      "role": "source:flush",
+      "gitBlob": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "bytes": 657,
+      "sha256": "22e4cda2056cca851351d40ac3389ad7242b034aec5371b01537f611d3f60c95"
+    },
+    {
+      "role": "source:request",
+      "gitBlob": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+      "bytes": 2883,
+      "sha256": "a7c9c6bcb0b5e68dfebb96d7841171f4dc07c09061d0889404482d2594124ca9"
+    },
+    {
+      "role": "source:packageBefore",
+      "gitBlob": "15694f93bdaa65ce04d1f2dfa5325e44b7f59511",
+      "bytes": 81494,
+      "sha256": "35f8af8ff86bdf5a376563d74df3aeaa1cac3bcf947da88c1ea10b4ea5829c41"
+    },
+    {
+      "role": "source:packageAfter",
+      "gitBlob": "4b0b4d88bfa19cc2fe9a792a415d89a247a27e56",
+      "bytes": 81761,
+      "sha256": "d5a1833dee7a538f31a895b23af0cdb0988109f555e25af92f929c42176ca16a"
+    }
+  ],
+  "priorApplicabilityGitBlob": "b0b28e9af02598fd1c14c098fefecbee43fa1038",
+  "historicalMeasurementGitBlob": "7e7856cbe3bac470133110f81c92e9873fc1d8f6",
+  "actualHistoricalExecution": {
+    "source": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+    "runId": 42552094175
+  },
+  "probeDependencies": [
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "baseline5852": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "merge": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "green": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "prior5852": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "unchanged": true
+    },
+    {
+      "path": "apps/api/runtime/request-trace.ts",
+      "baseline5852": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+      "merge": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+      "green": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+      "prior5852": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+      "unchanged": true
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "baseline5852": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "merge": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "green": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "prior5852": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "unchanged": true
+    },
+    {
+      "path": "lib/tracing/config.ts",
+      "baseline5852": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "merge": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "green": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "prior5852": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "unchanged": true
+    },
+    {
+      "path": "lib/tracing/context.ts",
+      "baseline5852": "fe005d26c2ea903250683d9351334b95ef328383",
+      "merge": "fe005d26c2ea903250683d9351334b95ef328383",
+      "green": "fe005d26c2ea903250683d9351334b95ef328383",
+      "prior5852": "fe005d26c2ea903250683d9351334b95ef328383",
+      "unchanged": true
+    },
+    {
+      "path": "lib/tracing/spans.ts",
+      "baseline5852": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "merge": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "green": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "prior5852": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "unchanged": true
+    },
+    {
+      "path": "lib/tracing/sampling.ts",
+      "baseline5852": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "merge": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "green": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "prior5852": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "unchanged": true
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "baseline5852": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "merge": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "green": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "prior5852": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "unchanged": true
+    },
+    {
+      "path": "lib/tracing/logs.ts",
+      "baseline5852": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "merge": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "green": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "prior5852": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "unchanged": true
+    },
+    {
+      "path": "lib/tracing/flush.ts",
+      "baseline5852": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "merge": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "green": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "prior5852": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "unchanged": true
+    },
+    {
+      "path": "lib/tracing/labels.ts",
+      "baseline5852": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "merge": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "green": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "prior5852": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "unchanged": true
+    },
+    {
+      "path": "packages/protocol/src/tracing.ts",
+      "baseline5852": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "merge": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "green": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "prior5852": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "unchanged": true
+    },
+    {
+      "path": "packages/protocol/src/coded-error.ts",
+      "baseline5852": "53c619750e667cba008192495928112da5de16f1",
+      "merge": "53c619750e667cba008192495928112da5de16f1",
+      "green": "53c619750e667cba008192495928112da5de16f1",
+      "prior5852": "53c619750e667cba008192495928112da5de16f1",
+      "unchanged": true
+    },
+    {
+      "path": "packages/protocol/src/trace-context.ts",
+      "baseline5852": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "merge": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "green": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "prior5852": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "unchanged": true
+    },
+    {
+      "path": "lib/base-path-config.mjs",
+      "baseline5852": "a5338d3516d88e4f911031a316ae5187a379ba33",
+      "merge": "a5338d3516d88e4f911031a316ae5187a379ba33",
+      "green": "a5338d3516d88e4f911031a316ae5187a379ba33",
+      "prior5852": "a5338d3516d88e4f911031a316ae5187a379ba33",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/test-accounts/database-target.mjs",
+      "baseline5852": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+      "merge": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+      "green": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+      "prior5852": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+      "unchanged": true
+    },
+    {
+      "path": "packages/protocol/src/local-test-mode.ts",
+      "baseline5852": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+      "merge": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+      "green": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+      "prior5852": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/server-test.mjs",
+      "baseline5852": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+      "merge": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+      "green": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+      "prior5852": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+      "unchanged": true
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "baseline5852": "52a7ed583d756b1575697556e29a6f65438d2410",
+      "merge": "52a7ed583d756b1575697556e29a6f65438d2410",
+      "green": "52a7ed583d756b1575697556e29a6f65438d2410",
+      "prior5852": "52a7ed583d756b1575697556e29a6f65438d2410",
+      "unchanged": true
+    },
+    {
+      "path": "lib/posthog-config.ts",
+      "baseline5852": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "merge": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "green": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "prior5852": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "unchanged": true
+    }
+  ],
+  "dependencyEvidence": {
+    "entireLockUnchanged": {
+      "path": "pnpm-lock.yaml",
+      "gitBlob": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+      "mergeSame": true,
+      "greenSame": true
+    },
+    "workspaceAndTypeScriptConfigUnchanged": [
+      {
+        "path": "pnpm-workspace.yaml",
+        "baseline": "a9aff193192f224a7b457af8b82a52cfa86c9a48",
+        "merge": "a9aff193192f224a7b457af8b82a52cfa86c9a48",
+        "green": "a9aff193192f224a7b457af8b82a52cfa86c9a48"
+      },
+      {
+        "path": "tsconfig.json",
+        "baseline": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+        "merge": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+        "green": "48293d8237e1804840ec535a18bd5d1c7630eea6"
+      }
+    ],
+    "packageBefore": "15694f93bdaa65ce04d1f2dfa5325e44b7f59511",
+    "packageAfter": "4b0b4d88bfa19cc2fe9a792a415d89a247a27e56",
+    "packageChecks": [
+      {
+        "section": "dependencies",
+        "equal": true
+      },
+      {
+        "section": "devDependencies",
+        "equal": true
+      },
+      {
+        "section": "optionalDependencies",
+        "equal": true
+      },
+      {
+        "section": "peerDependencies",
+        "equal": true
+      },
+      {
+        "section": "overrides",
+        "equal": true
+      },
+      {
+        "section": "pnpm",
+        "equal": true
+      },
+      {
+        "section": "packageManager",
+        "equal": true
+      },
+      {
+        "section": "engines",
+        "equal": true
+      }
+    ],
+    "packageChangedKeys": [
+      {
+        "section": "scripts",
+        "key": "test:byos"
+      },
+      {
+        "section": "scripts",
+        "key": "test:run-publication"
+      },
+      {
+        "section": "scripts",
+        "key": "test:github"
+      },
+      {
+        "section": "scripts",
+        "key": "test:factory"
+      },
+      {
+        "section": "scripts",
+        "key": "test:inbox-db"
+      }
+    ],
+    "method": "Read complete untruncated Git trees and compare exact blob identities. Parse both full package.json blobs; the only changes are five test script entries. Entire pnpm lock identity, not only selected version strings, is unchanged."
+  },
+  "sourceImpact": {
+    "mainMerge": "New Inbox/business query/workflow/development-startup diagnostic code is outside this standalone probe's source/import path. Generated routes and actual application business paths changed, so this conclusion does not claim unchanged application-wide latency.",
+    "nativePending": "The new helper/ALS queue, read-batch wrapper and workspace reader do not enter the benchmark. It directly uses pg.Pool with three fixed SELECT calls, beginRequestTrace and withRunSpan. No Native batch handler or workspace authorization reader is called.",
+    "asyncExport": "Probe request-trace and product tracing node/config/context/spans/sampling/sanitize/logs/flush/labels blobs are identical across5852/M/G. BatchSpanProcessor/SafeExporter, error pause, queue settings and FlushOnRootEnd source are unchanged. The Native patch adds no OTLP/export flush await to the business path.",
+    "developmentRuntime": "apps/api/scripts/dev.mjs changes worker-init refusal diagnostics only in the reviewed diff; its developmentTracing function is untouched. The benchmark uses its own node:http server and does not launch this dev runtime."
+  },
+  "retainedHistoricalMeasurements": {
+    "environment": {
+      "node": "v24.22.2",
+      "platform": "linux",
+      "postgres": "real loopback",
+      "requests_per_condition": 600,
+      "queries_per_request": 3
+    },
+    "boundary": "Real HTTP and pg driver; async batched in-memory collectors. Excludes external collector network, model and cloud provisioning latency.",
+    "handlerMeanDeltaMs": 0.34458290666665925,
+    "handlerP95DeltaMs": 0.43658000000004904,
+    "criticalRetained": "600/600",
+    "controlledFailuresRetained": "20/20",
+    "linkedErrorLogs": 20,
+    "rawSqlErrorExported": false,
+    "measurementAttribution": "Historical execution only; these numbers are not rerun or relabeled as measured on5852/M/G."
+  },
+  "applicability": {
+    "retained": "Existing finite warmed Web HTTP/real loopback PG overhead and controlled-failure retention baseline remains applicable within its prior boundaries; no new concrete invalidation was found in5852→M/G.",
+    "rerun": "Do not rerun this unchanged probe solely because the App SHA advanced. This review itself executed no benchmark.",
+    "oldUnmeasuredDifferencesRemain": [
+      "serverless exporter drain; benchmark uses serverless:false",
+      "additional closed transport enum branch in sanitizer"
+    ],
+    "excluded": [
+      "New Native pending-only queue/ALS execution cost or Native startup-login query totals",
+      "Production collector network and PostHog backend ingestion",
+      "Whole daemon/CLI cost, model/provider or cloud provisioning latency",
+      "Cold startup, current-source production concurrency and current business-route performance",
+      "Serverless response-lifecycle/exporter-drain performance: probe explicitly uses serverless:false",
+      "Current PG gate's Node24.22.1 runtime cost: historical benchmark used Node24.22.2"
+    ]
+  },
+  "requiredNext": "Preserve existing benchmark attribution and proceed with independent actual Native/source-bound production acceptance. No request for new benchmark resources follows from this audit.",
+  "reviewerOperations": {
+    "benchmarkExecutions": 0,
+    "nodeExecutions": 0,
+    "sqlExecutions": 0,
+    "actionsOriginalReads": 0,
+    "artifactDownloads": 0,
+    "resourceCreates": 0,
+    "sourceOrBranchMutations": 0
+  }
+}

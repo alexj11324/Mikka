@@ -1,0 +1,220 @@
+{
+  "schema": "issue1512.maincc389d.conflict-union-independent-review/v1",
+  "reviewedAt": "2026-11-10T02:09:50Z",
+  "reviewer": "/root/cp53_archive",
+  "verdict": "PASS_STATIC_REVIEW_RUNTIME_VALIDATION_PENDING",
+  "source": {
+    "base": "60401d31fb33b7f272cb0262df58d3d2008280b4",
+    "ours": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "main": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+    "mainTree": "3d7f2633b54853ca9eb2d730c60d2b11ae947b59"
+  },
+  "identities": [
+    {
+      "path": "app/actions/coordinator.ts",
+      "side": "base",
+      "gitBlob": "bd24ef4c103b670d92d381d396d5c3e1b6aba083",
+      "bytes": 25249,
+      "sha256": "f73da84cbff308cf16c80dea1017161ca8ad8b44e9281d235eb8a2e622f680bd"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "side": "ours",
+      "gitBlob": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+      "bytes": 25408,
+      "sha256": "e417302a0cbf5810e061e60aa33ba8e13f29636be29bd822fa139eaa9def9d63"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "side": "main",
+      "gitBlob": "56966e5121841386542cf4100e1ff2d1a4f4b9a7",
+      "bytes": 25381,
+      "sha256": "ad98666ad109d5275872a8fd26a40ab95c848c1a5dd8b710e9c9e4d5ec13d2d4"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "side": "candidate",
+      "gitBlob": "23179358e0af9db78d084973ecc197f0fb749e91",
+      "bytes": 25540,
+      "sha256": "155c29248a97c680ae4eba22459425e675ec0f15b8424d0f7583dda17b4ddf39"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "side": "base",
+      "gitBlob": "7ee7564fe213ce3fba762fee8685eb9a4bb31329",
+      "bytes": 31628,
+      "sha256": "2dc30e00bdcf7e226ae7de623efaaf55f417fa2c145c91629d373a19cba9396b"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "side": "ours",
+      "gitBlob": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+      "bytes": 34092,
+      "sha256": "9cce7fe66cb9a836f0807288c2570d6ec135c505b1c101b09fbd6cd31a8f76b0"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "side": "main",
+      "gitBlob": "9e07d31f062945418a7350f786a0608e0e512e3d",
+      "bytes": 33398,
+      "sha256": "85a438cb45968f6cd53bf90abcf511c251a9b8b1afabc76f22522ca90dd859f1"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "side": "candidate",
+      "gitBlob": "281c7dc61a7522a66291cf9496d80a41274e1319",
+      "bytes": 35884,
+      "sha256": "8bdeacf60c4b8847837e232c63985ef02afb7e89d72a69aa2f2504baeeae4d41"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "side": "base",
+      "gitBlob": "45b15793b7a24e0f99ddad7fd6eee8b0ec12b5aa",
+      "bytes": 57523,
+      "sha256": "61ab316edb729cc9d1d4cc5a3c76697290654367980e57334effa71c65fb0687"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "side": "ours",
+      "gitBlob": "5139cd606467f11e366ad2592fe8e0bdacf84b52",
+      "bytes": 65888,
+      "sha256": "0db219c6a21dc4f20d7e99128141b2faa33554fc5fac0504521f1dd6f799a772"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "side": "main",
+      "gitBlob": "49b761efeb996e34d28f2e2b3ac98d77b17b15e3",
+      "bytes": 62691,
+      "sha256": "756d59b01d74b963ce2b48de4f97930a354f56428f977f66b310b66a6c9986fe"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "side": "candidate",
+      "gitBlob": "ccc3d2ab527e9051f8261e3ad0909434d4be38ab",
+      "bytes": 71173,
+      "sha256": "1ef2cd8700e2e42415314671f72a4449283e7abf58763bf87c333582be29fdeb"
+    }
+  ],
+  "mechanical": {
+    "all12SourceBytesSha256AndGitBlobsIndependentlyRecomputed": true,
+    "forward": {
+      "app/actions/coordinator.ts": {
+        "exactAddedDeltaAgainstCurrentMain": true,
+        "oursChangedLines": 5,
+        "candidateChangedLines": 5
+      },
+      "scripts/e2b/validate-template-subscriptions.mjs": {
+        "exactAddedDeltaAgainstCurrentMain": true,
+        "oursChangedLines": 31,
+        "candidateChangedLines": 31
+      },
+      "scripts/e2b/validate-template-subscriptions.test.mjs": {
+        "exactAddedDeltaAgainstCurrentMain": true,
+        "oursChangedLines": 137,
+        "candidateChangedLines": 137
+      }
+    },
+    "reverse": {
+      "app/actions/coordinator.ts": {
+        "exactMainDeltaOnAdaptedOurs": true,
+        "mainChangedLines": 2,
+        "candidateChangedLines": 2
+      },
+      "scripts/e2b/validate-template-subscriptions.mjs": {
+        "exactMainDeltaOnAdaptedOurs": true,
+        "mainChangedLines": 27,
+        "candidateChangedLines": 27
+      },
+      "scripts/e2b/validate-template-subscriptions.test.mjs": {
+        "exactMainDeltaOnAdaptedOurs": true,
+        "mainChangedLines": 114,
+        "candidateChangedLines": 114
+      }
+    },
+    "interpretation": "Ordered insertion/deletion deltas close in both directions after only the explicitly listed adaptations. Each affected function and control-flow location was also read manually. No source mutation or ref publication was performed by this reviewer."
+  },
+  "adaptations": [
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "kind": "private identifier collision only",
+      "old": "DISPATCH_REFUSAL_CODES",
+      "new": "STARTUP_CORRELATION_REFUSAL_CODES",
+      "occurrences": 2,
+      "scope": "Rename only the existing ours startupCorrelation allowlist declaration and its one use. Main's distinct DISPATCH_REFUSAL_CODES declaration and its one use remain byte-identical."
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "function": "preRunFailureArtifact",
+      "old": "assert.equal(failed.code, 'template_gate_bootstrap_proof_invalid')",
+      "new": [
+        "assert.equal(failed.code, 'template_gate_execution_failed')",
+        "assert.equal(failed.stage, 'acceptance')",
+        "assert.deepEqual(fixture.observations, { publications: 1, proofReads: 1 })"
+      ],
+      "reason": "Main now rejects failed candidate execution before entering the receipt stage or reading bootstrap-proof.json. The other candidate still passes and accounts for the one publication and proof read."
+    }
+  ],
+  "checks": {
+    "coordinator": {
+      "oursReadOnlyPolicyObservationImportAndTwoWrappersPreserved": true,
+      "mainSuggestionInboxChangedImportAndClaimedOnlyCallPreserved": true,
+      "claimAndSubmissionTransactionOrderingUnchanged": true,
+      "ownershipChecksUnchanged": true
+    },
+    "diagnosticFields": {
+      "mainClosedDispatchAllowlistByteIdentical": true,
+      "mainAllowlistDefinitions": 1,
+      "mainAllowlistUses": 1,
+      "oursRenamedDefinitions": 1,
+      "oursRenamedUses": 1,
+      "oursStartupCorrelationFunctionExactExceptPrivateIdentifier": true,
+      "topLevelDispatchRefusalUsesOnlyMainClosedList": true,
+      "nestedStartupCorrelationUsesOnlyOwnList": true,
+      "topLevelUnknownValue": "unavailable",
+      "nestedUnknownValue": "unknown",
+      "noRefusalTextOrPrivateDetailCopied": true,
+      "oursExactSourceCommitAndHarnessBindingPreserved": true,
+      "requestTraceScopeRemainsSubmissionHttpOnly": true,
+      "validityChecksForBoundedTraceAndWorkflowIdentifiersPreserved": true,
+      "successDiagnosticsDoNotGainFailureFields": true
+    },
+    "executionGate": {
+      "mainAssertCandidateExecutionFunctionByteIdentical": true,
+      "assertCalledAfterRunAcceptanceAndBeforeReceiptStage": true,
+      "assertCalledBeforeSandboxBootstrapProofRead": true,
+      "candidateReceiptAlsoCallsAssert": true,
+      "failedModeStatusSampleCleanupOfficialTimingStillRejected": true,
+      "mainPublishedVmProofAndPublicationEqualityCheckPreserved": true,
+      "noProofFabricationOrFallbackSuccessAdded": true,
+      "sharedScopeModelCredentialSourceAndCleanupChecksPreserved": true,
+      "maxStartupMs": 5000,
+      "timeoutMs": 240000,
+      "minToolCalls": 1
+    },
+    "tests": {
+      "allMainTestDeltasRetained": true,
+      "allOursTestDeltasRetainedAfterSpecifiedAdaptation": true,
+      "refusedBothCandidatesAssertZeroPublicationsAndProofReads": true,
+      "mixedFailureAndPassAssertOnePublicationAndProofRead": true,
+      "missingOrInvalidProofOnSuccessfulExecutionStillRejected": true,
+      "noAcceptedFileOnFailureAssertionsRetained": true,
+      "deviceVmCleanupWorkspaceRestoreSignoutAssertionsRetained": true,
+      "privacyCanariesAndDiagnosticsMode0600AssertionsRetained": true
+    }
+  },
+  "blockingFindings": [],
+  "limitations": [
+    "Static source and test review only; no Node test command or production gate was executed by this reviewer.",
+    "Prepared source blobs are not a published business ref or a complete merged tree.",
+    "Generated route artifacts and their canonical execution were outside this three-file review.",
+    "The earlier 5852 failures, Native full-query-budget failure and production0/2 remain unchanged until separately verified."
+  ],
+  "reviewerOperations": {
+    "actionsOriginalLogReads": 0,
+    "artifactZipDownloads": 0,
+    "resourcesCreated": 0,
+    "appOrDatabaseExecutions": 0,
+    "modelCalls": 0,
+    "refWrites": 0
+  }
+}

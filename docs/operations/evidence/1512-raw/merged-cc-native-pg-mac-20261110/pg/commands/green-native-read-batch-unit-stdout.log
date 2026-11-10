@@ -1,0 +1,190 @@
+TAP version 13
+# Subtest: concurrent owner-wide readers reuse their actual personal home only within the batch
+ok 1 - concurrent owner-wide readers reuse their actual personal home only within the batch
+  ---
+  duration_ms: 1.884773
+  type: 'test'
+  ...
+# Subtest: different Live kinds share one revision query before either consumer reads its data
+ok 2 - different Live kinds share one revision query before either consumer reads its data
+  ---
+  duration_ms: 6.189341
+  type: 'test'
+  ...
+# Subtest: owner observations are separate for parallel batches, owners and database authorities
+ok 3 - owner observations are separate for parallel batches, owners and database authorities
+  ---
+  duration_ms: 0.63796
+  type: 'test'
+  ...
+# Subtest: later reads in one batch keep the earlier revision, while the next batch reads the new revision
+ok 4 - later reads in one batch keep the earlier revision, while the next batch reads the new revision
+  ---
+  duration_ms: 0.822493
+  type: 'test'
+  ...
+# Subtest: a missing or failed revision never becomes fabricated proof and does not poison the next request
+ok 5 - a missing or failed revision never becomes fabricated proof and does not poison the next request
+  ---
+  duration_ms: 1.5527
+  type: 'test'
+  ...
+# Subtest: ordinary revision readers and different database scopes remain independent
+ok 6 - ordinary revision readers and different database scopes remain independent
+  ---
+  duration_ms: 0.324281
+  type: 'test'
+  ...
+# Subtest: bound after-work cannot reuse an already completed batch authority observation
+ok 7 - bound after-work cannot reuse an already completed batch authority observation
+  ---
+  duration_ms: 0.19688
+  type: 'test'
+  ...
+# Subtest: notification target resolution never inherits an earlier list-read home, even inside the batch
+ok 8 - notification target resolution never inherits an earlier list-read home, even inside the batch
+  ---
+  duration_ms: 0.155253
+  type: 'test'
+  ...
+# Subtest: planned owner readers share one earlier observation without exposing each other's keys
+ok 9 - planned owner readers share one earlier observation without exposing each other's keys
+  ---
+  duration_ms: 0.525804
+  type: 'test'
+  ...
+# Subtest: an undeclared batch keeps ordinary per-reader observations
+ok 10 - an undeclared batch keeps ordinary per-reader observations
+  ---
+  duration_ms: 0.421328
+  type: 'test'
+  ...
+# Subtest: a selected team key stays late and total requested and returned keys stay unchanged
+ok 11 - a selected team key stays late and total requested and returned keys stay unchanged
+  ---
+  duration_ms: 0.581392
+  type: 'test'
+  ...
+# Subtest: owner homes and database authorities do not borrow another planned observation
+ok 12 - owner homes and database authorities do not borrow another planned observation
+  ---
+  duration_ms: 0.56642
+  type: 'test'
+  ...
+# Subtest: absent homes and invalid or nonrevision refs never trigger an owner prefetch
+ok 13 - absent homes and invalid or nonrevision refs never trigger an owner prefetch
+  ---
+  duration_ms: 0.460476
+  type: 'test'
+  ...
+# Subtest: an entity or another owner key does not start the resolved home's list prefetch
+ok 14 - an entity or another owner key does not start the resolved home's list prefetch
+  ---
+  duration_ms: 0.267126
+  type: 'test'
+  ...
+# Subtest: missing and failed prefetched revisions remain unknown until another request reads
+ok 15 - missing and failed prefetched revisions remain unknown until another request reads
+  ---
+  duration_ms: 0.752671
+  type: 'test'
+  ...
+# Subtest: throw and cancellation release the plan as well as its earlier observations
+ok 16 - throw and cancellation release the plan as well as its earlier observations
+  ---
+  duration_ms: 0.493099
+  type: 'test'
+  ...
+# Subtest: authorized workspace readers share their earlier Team revisions despite different readiness
+ok 17 - authorized workspace readers share their earlier Team revisions despite different readiness
+  ---
+  duration_ms: 0.743138
+  type: 'test'
+  ...
+# Subtest: authorized Team plans do not resolve a Personal home or borrow a different workspace
+ok 18 - authorized Team plans do not resolve a Personal home or borrow a different workspace
+  ---
+  duration_ms: 0.333203
+  type: 'test'
+  ...
+# Subtest: entities, unresolved scopes and mismatched workspace refs never start a Team plan
+ok 19 - entities, unresolved scopes and mismatched workspace refs never start a Team plan
+  ---
+  duration_ms: 0.377317
+  type: 'test'
+  ...
+# Subtest: workspace revision observations use the actual executor behind one request proxy
+ok 20 - workspace revision observations use the actual executor behind one request proxy
+  ---
+  duration_ms: 0.375517
+  type: 'test'
+  ...
+# Subtest: workspace plans never supply foreground revisions to after, cron or workflow reads
+ok 21 - workspace plans never supply foreground revisions to after, cron or workflow reads
+  ---
+  duration_ms: 0.281196
+  type: 'test'
+  ...
+# Subtest: workspace plan failure and completed lifetimes never fabricate or retain revision proof
+ok 22 - workspace plan failure and completed lifetimes never fabricate or retain revision proof
+  ---
+  duration_ms: 0.368747
+  type: 'test'
+  ...
+# Subtest: authorized Team list prefetch reduces three separately ready fixed-revision reads to one SQL
+ok 23 - authorized Team list prefetch reduces three separately ready fixed-revision reads to one SQL
+  ---
+  duration_ms: 0.260423
+  type: 'test'
+  ...
+# Subtest: pending workspace choices share one fresh SELECT and independent scalar rows before dispatch
+ok 24 - pending workspace choices share one fresh SELECT and independent scalar rows before dispatch
+  ---
+  duration_ms: 0.443124
+  type: 'test'
+  ...
+# Subtest: a workspace SELECT is removed before callback construction and Drizzle thenable assimilation
+ok 25 - a workspace SELECT is removed before callback construction and Drizzle thenable assimilation
+  ---
+  duration_ms: 0.322096
+  type: 'test'
+  ...
+# Subtest: a later workspace read cannot join an in-flight or completed pre-revocation SELECT
+ok 26 - a later workspace read cannot join an in-flight or completed pre-revocation SELECT
+  ---
+  duration_ms: 0.328078
+  type: 'test'
+  ...
+# Subtest: workspace queue failures reject only their joined readers and never poison a later read
+ok 27 - workspace queue failures reject only their joined readers and never poison a later read
+  ---
+  duration_ms: 0.320611
+  type: 'test'
+  ...
+# Subtest: workspace choices are partitioned by request, SQL family, executor, session, reader, pin and principal
+ok 28 - workspace choices are partitioned by request, SQL family, executor, session, reader, pin and principal
+  ---
+  duration_ms: 0.786788
+  type: 'test'
+  ...
+# Subtest: transactions, absent Native identity, unknown principal and detached work bypass the workspace queue
+ok 29 - transactions, absent Native identity, unknown principal and detached work bypass the workspace queue
+  ---
+  duration_ms: 0.49814
+  type: 'test'
+  ...
+# Subtest: parallel and successive Native batches never share a workspace observation
+ok 30 - parallel and successive Native batches never share a workspace observation
+  ---
+  duration_ms: 0.187265
+  type: 'test'
+  ...
+1..30
+# tests 30
+# suites 0
+# pass 30
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 255.61473

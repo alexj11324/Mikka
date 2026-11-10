@@ -1,0 +1,107 @@
+{
+  "schema": "issue1512.native-pending-pg-entry-independent-review.v1",
+  "observedAt": "2026-11-10 02:51:25 UTC",
+  "status": "PASS_STATIC_REVIEW_EXECUTION_PENDING",
+  "candidateOpsCommitReportedByRoot": "e29dec5a9cae90fa8f48b5b612ac2cf8c08ad4cc",
+  "candidateOpsTreeReportedByRoot": "f65ed56a00878a9d9f76bec230bc420e4e858fb7",
+  "sources": [
+    {
+      "role": "controller",
+      "gitBlob": "fe3e2611b0babfe8b8e750058bbeba92127fe9a7",
+      "bytes": 29498,
+      "sha256": "e403969e1f2573bfa15a8bfd42c781a1a90a8d6600f21c3d43080c9e20c80874"
+    },
+    {
+      "role": "manifest",
+      "gitBlob": "7afb65f36ffb84b9e97820910aa93492d5f0b7c0",
+      "bytes": 8088,
+      "sha256": "b4088c164649f2aa39c49f4375dd5947b553c75deb2ae9c4fbfe2dab2b348c25"
+    },
+    {
+      "role": "workflow",
+      "gitBlob": "e3bbb1e5a2ca415553f4f0319258da45b681eb55",
+      "bytes": 3649,
+      "sha256": "ba0d45d6e436d79f1ed8faa75a433110e6a4009db0f4abef9fbf35fb82b56448"
+    },
+    {
+      "role": "reusedController",
+      "gitBlob": "627e8d1173ea078b920f045ac123edf1c6e622e8",
+      "bytes": 24259,
+      "sha256": "36ffce799cffe19b49ed695cacd3068983e0f4ea09d00a7eb7123eb7b12b3e1b"
+    },
+    {
+      "role": "reusedWorkflow",
+      "gitBlob": "e5c0c2537598720eb732225f9726cf97f2177a72",
+      "bytes": 3351,
+      "sha256": "55f87d3e21970d51bd7affa43444c71e164468217991d236442a61987a5d23e3"
+    },
+    {
+      "role": "summaryHelper",
+      "gitBlob": "ea9a1c2092019ad82e3e796df7a4cf9816ded4cc",
+      "bytes": 38875,
+      "sha256": "ee256781af51f978d23862f5b0f9c6d23a697f8932230b56152acb7ba9b3691f"
+    }
+  ],
+  "independentlyReadGitGraph": {
+    "merge": {
+      "sha": "c0fab83818b75c487089f554f2d350abd33b146b",
+      "tree": "c4540c9d0954eb341a359fe72c74c0421b17fd73",
+      "parents": [
+        "907d281478d587fce6895ec6f48bec25f75dc085",
+        "cc389d61e8a85206d17616e4326a660283a1b2bd"
+      ]
+    },
+    "red": {
+      "sha": "f5d208e1b34f893a0caf70d821d767380ab8fe0a",
+      "tree": "669d51d72d9920053656855b2bf75cc3c44f63d7",
+      "parents": [
+        "c0fab83818b75c487089f554f2d350abd33b146b"
+      ]
+    },
+    "green": {
+      "sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "tree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0",
+      "parents": [
+        "f5d208e1b34f893a0caf70d821d767380ab8fe0a"
+      ]
+    }
+  },
+  "requiredOpsParents": [
+    "3a467634faafacb639316f7f6af0c3ba698ec06d",
+    "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+  ],
+  "blockingFindings": [],
+  "review": {
+    "admission": "Exact repository/branch/push/head message, attempt 1, GitHub-hosted Linux, Node24.22.1/pnpm10.34.3, expiration, disabled caches, and driver hash; no retry command. Read-only contents token; checkout credentials not persisted.",
+    "reachability": "Ops second parent G, G parent R, R parent M: checkout depth4 includes the required M/R/G commit objects and trees. M's encoded parents are checked; execution does not require checking them out.",
+    "sourceBoundaries": "Independent Git metadata matches manifest SHA/tree/parents. Commit file lists show M→R only the unchanged-baseline-plus-appended PG test; R→G exactly four already-reviewed product/unit files. Runtime sourceProof checks HEAD/tree, clean index/diff, fixed file/common blob hashes, original test prefix, and reconstructed actual tracked worktree tree before and after every unit/PG phase.",
+    "dependencies": "Exactly one frozen pnpm install into this run's temporary store. Package/lock/workspace/tsconfig/helper hashes are common across phases; no source patch or compilation-cache reuse.",
+    "unitEvidence": "M's complete template-subscriptions file expects33 tests, G's read-batch-context file expects30. Each command runs in a separate process, records real status and complete stdout/stderr bytes/hash. Each unit catches failure independently and performs an after-source proof; failure does not skip the other unit or PG but prevents final exit0.",
+    "databaseIsolation": "Fresh owned PostgreSQL17 container with random masked password, only 127.0.0.1:5432 published, exact run/attempt/commit labels and private network. All three DB URLs must match the generated disposable mikka_e2e endpoint, with no external legacy fallback.",
+    "freshPhases": "RED begins with no schema_migrations. GREEN drops/recreates mikka_e2e via a separate control database, requires a different database OID and empty schema, and reruns migration/bootstrap/setup. Only job-created bootstrap_<32hex> databases outside the initial catalog may be removed.",
+    "redPredicate": "Requires code1, exactly25 tests/22pass/3fail/zero skipped-todo-cancelled. Exactly two named leaf ERR_ASSERTION/testCodeFailure records with specified message and actual/expected5/1 and4/2, plus exactly the named subtestsFailed parent. Timeout/signal/spawn errors never qualify.",
+    "greenPredicate": "Requires code0, exactly25 tests, no TAP failures/skips/todo/cancellation, pass==tests via the independently read fixed checkSummary implementation; both target names must occur.",
+    "failureContinuation": "Each PG phase has its own catch/finally; unknown RED failure invalidates proof but GREEN is still attempted against a fresh DB. All-source/summary failures persist independently. Overall exit0 requires both complete units and exact RED plus full GREEN.",
+    "originals": "Every settled command's original stdout/stderr is credential-screened, written as bytes with SHA256/length and status, and also encoded in bounded log chunks. No transcript truncation is applied by the controller. Receipt persists after each command/unit/phase. Output containing temporary credentials blocks export rather than silently altering originals.",
+    "cleanup": "Always-run cleanup after successful prepare does not depend on manifest admission still being open. It validates exact owned labels, stops/removes only this container with --volumes, verifies original anonymous volumes and container absent, removes the exact empty owned network, deletes local temporary DB/auth environment files, persists cleanup.json, and fails if cleanup fails. Artifact upload also uses always().",
+    "closure": "Reused old workflow is statically closed with if:false. New entry remains guarded for the one admitted push; final normal closing commit must set enabled:false and disable its job after the terminal run. Closure is operationally pending, not claimed complete."
+  },
+  "knownBoundaries": [
+    "This review performs no Node/TypeScript/Docker/SQL execution and reads no Actions originals. Expected test counts are gate predicates, not observed passes.",
+    "Root independently reported candidate ops parents/tree and the G→ops three-entry-only diff. This review independently verifies the three entry blobs and M/R/G Git metadata, not the new ops tree a second time.",
+    "A killed/interrupted command may leave an incomplete execution and cannot satisfy the gate; full-output claims apply to completed commands captured by the controller.",
+    "The alternate-index proof covers actual tracked files, with fixed absence checks for the new helper on M/R. It is not a general filesystem sandbox.",
+    "Successful local PostgreSQL/unit checks do not establish the actual Native/Web query gate, production tracing, daemon cold-start/network behavior, or overall issue acceptance."
+  ],
+  "reviewerOperations": {
+    "actionsOriginalReads": 0,
+    "artifactDownloads": 0,
+    "ciRuns": 0,
+    "resourceCreates": 0,
+    "sourceOrBranchMutations": 0
+  },
+  "relatedReviews": {
+    "nativeProductAndPgTest": "858cf1f0d39421cf22dd786c741ea7bcea5b2c1a",
+    "mainMerge": "c62bb998e6c2b5ff04c82a8472a519d81bc2ccea"
+  }
+}

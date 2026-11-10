@@ -1,0 +1,50 @@
+{
+  "schema": "issue1512.thenable-lint-single-comment-independent-review.v1",
+  "observedAt": "2026-11-10 03:05:54 UTC",
+  "status": "PASS_STATIC_REVIEW_ACTUAL_LINT_PENDING",
+  "path": "lib/desktop-rpc/read-batch-context.test.ts",
+  "before": "dc6af1b78e66695688b0bef35d493a8f5b727f7d",
+  "after": {
+    "gitBlob": "69b2d9707493b5aa3c6f841099421ba8fe8f2a1d",
+    "bytes": 36549,
+    "sha256": "668cd5eb34ea157bd31a97c0e168246f68e8eb4c185f63eca11d0415d8b4a5b1"
+  },
+  "proposedCommitReportedByRoot": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "proposedTreeReportedByRoot": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+  "parent": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+  "actualFailureEvidence": "5fbdf47e24b08340f860ab35e4018aae55787d80",
+  "diff": {
+    "singleComment": "// oxlint-disable-next-line unicorn/no-thenable -- Match Drizzle query builders to test dispatch cleanup before assimilation.",
+    "occurrences": 1,
+    "commentBytes": 134,
+    "removingExactLineRestoresOriginalBytes": true
+  },
+  "reason": "The fixture intentionally implements PromiseLike.then to reproduce Drizzle assimilation timing. The narrow next-line exception matches two existing repository uses of the identical unicorn/no-thenable rule, including an awaited Drizzle fixture. It documents this required protocol surface instead of removing coverage.",
+  "existingPatterns": [
+    {
+      "path": "tests/support/fake-workflow.ts",
+      "blob": "db82c89c25afeedaac3afe16d6f1fe2702d4f340"
+    },
+    {
+      "path": "tests/fixtures/scope-store-runtime.mjs",
+      "blob": "f90ff4e183490ec2662cc0a48fd1e5710ae58c77"
+    }
+  ],
+  "unchanged": {
+    "productCode": true,
+    "allThirtyTestExecutableStatements": true,
+    "allAssertions": true,
+    "thenableStructure": true,
+    "dispatchBeforeConstructionAndAssimilationCoverage": true,
+    "globalLintRules": true,
+    "otherWarningsRemainFatal": true
+  },
+  "reuseBoundary": "The prior fixed-source33/30 unit and RED/GREEN PG evidence retains its original source attribution. This comment-only change adds no concrete product/runtime reason to rerun isolated PG. Actual new-head lint still must pass.",
+  "blockingFindings": [],
+  "reviewerOperations": {
+    "newRuntimeExecutions": 0,
+    "newActionsOriginalReads": 0,
+    "resourceCreates": 0,
+    "branchWrites": 0
+  }
+}

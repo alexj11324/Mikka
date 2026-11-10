@@ -1,0 +1,42 @@
+{
+  "schema": "issue1512.formal-source-publication.v1",
+  "observedAt": "2026-11-10 03:09:06 UTC",
+  "repository": "alexj11324/Mikka",
+  "pr": 1799,
+  "branch": "fix/1512-daemon-fixture-executable-20261109",
+  "publications": [
+    {
+      "from": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+      "to": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "tree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0",
+      "force": false,
+      "casSucceeded": true,
+      "refReadback": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "validation": "Fixed M template 33/33, G Native units30/30, exact RED25/22/3 and GREEN25/25 real PG; no formal Native-budget or production acceptance claim."
+    },
+    {
+      "from": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "to": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+      "force": false,
+      "casSucceeded": true,
+      "refReadback": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "changes": {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "additions": 1,
+        "deletions": 0,
+        "commentOnly": true,
+        "productBytesUnchanged": true
+      },
+      "reason": "G formal Source/site-search observed no-thenable warning in an intentionally thenable Drizzle fixture; precise one-line documented lint exception keeps all executable text and assertions.",
+      "independentReview": "14fcb337b91e96f257dde80b27fca25ded4410b5"
+    }
+  ],
+  "mainLastRead": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+  "issueState": "open",
+  "productionAccepted": 0,
+  "productionRequired": 2,
+  "formalCI": "5f359 running; G old jobs terminal, original failures preserved",
+  "macFormal": "5f359 Node22 existing workflow dispatch being prepared because paths did not automatically select it",
+  "rootActionsOriginalReads": 0
+}

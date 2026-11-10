@@ -1,0 +1,30 @@
+{
+  "schema": "issue1512.macos-inprocess-root-review-and-publication.v1",
+  "observedAt": "2026-11-10 02:48:48 UTC",
+  "candidate": "299fbddd8c8f252959088a8cafabde962636b945",
+  "parent": "6c71125de288846e0a86948de4af671ed3fcce72",
+  "tree": "ddf13157a753a7b91e85f0278ee03e11b84e012f",
+  "independentReview": "99285a1907a72b53849c64f88d357bee3c3ee4d6",
+  "files": [
+    "a650a67ab4fc24d4014d0513b11b2e5f8bc6c639",
+    "af24a8b53480a9a394658d87e6da6a47480dc5ec",
+    "df7774974e60776ec196b3c76aa558f1a5aff493",
+    "adb484a5e5606149570afccca5c3bba55eaea600",
+    "1d42e9f078262cb2eb8297dce30e2671a78e9edd",
+    "f1dc34377e0aa051bb2b3644abbc84a5ce7412d8"
+  ],
+  "readAllSixFiles": true,
+  "actualParentAndTreeRead": true,
+  "githubComparePaths": 6,
+  "compareAheadBy": 1,
+  "compareBehindBy": 0,
+  "casForce": false,
+  "casSucceeded": true,
+  "refAfter": "299fbddd8c8f252959088a8cafabde962636b945",
+  "rootConclusion": "No static blocker found. Original command count/args and error semantics preserved, timing instrumentation only between original commands, exact source/package/run binding and fixture-scoped cleanup reviewed. Temporary diagnostics not product source.",
+  "limitations": [
+    "No runtime result is asserted in this record.",
+    "Synchronous timestamps still change timing; non-reproduction does not prove the EIO5 is fixed.",
+    "Actual Actions originals are delegated exclusively to mac_inprocess_diag."
+  ]
+}

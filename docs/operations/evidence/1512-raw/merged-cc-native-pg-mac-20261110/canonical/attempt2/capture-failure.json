@@ -1,0 +1,10 @@
+{
+  "schema": "issue1512.maincc-capture-error.v1",
+  "sessionId": "sbx_OyXZLPFtfWcvQCPrAq6n7dDBZNHM",
+  "rawCommandSha": "279cb6e14b8554d37ba4f99aab02a3b616d6dc4e",
+  "failure": {
+    "name": "SyntaxError",
+    "message": "Unterminated string in JSON at position 2014 (line 1 column 2015)"
+  },
+  "outputs": []
+}

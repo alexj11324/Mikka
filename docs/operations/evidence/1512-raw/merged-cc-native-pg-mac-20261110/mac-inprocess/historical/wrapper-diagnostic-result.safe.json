@@ -1,0 +1,258 @@
+{
+  "schema": "issue1512.macos-restart-diagnostic-result.v1",
+  "run": {
+    "id": 42739939984,
+    "attempt": 1,
+    "head": "fd3862c99d2c23d25edecabdeb76e85b097571b8",
+    "conclusion": "success",
+    "packageJob": 129578210529,
+    "macosJob": 129578598937,
+    "packageStartedAt": "2026-11-10T02:02:22Z",
+    "packageCompletedAt": "2026-11-10T02:03:20Z",
+    "macosStartedAt": "2026-11-10T02:03:24Z",
+    "macosCompletedAt": "2026-11-10T02:07:00Z"
+  },
+  "source": {
+    "productCommit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "productTree": "42d33eb7faf77d7049607523599de9374e065660",
+    "controlCommit": "fd3862c99d2c23d25edecabdeb76e85b097571b8",
+    "controlTree": "e31707ffe113dc0371636479fff6aab3a2b36468",
+    "actualCheckoutWitnessLines": [
+      162,
+      283
+    ],
+    "logGitBlob": "5fa27277f48e51ad3cfa2931fce83a3666c1d3d2",
+    "temporaryOverlayManifestGitBlob": "4533323df5ec6cc175592b4902cf8dffdc0c33f1",
+    "actualNode": "22.22.1",
+    "dependencyInstallNode": "24.22.1",
+    "bindingStepExecutedSuccessfully": true,
+    "packageBindingPredicate": "Same run/attempt, source commit/tree, one tarball, exact bytes/hash and overlay preimages verified by actual controller execution.",
+    "limitation": "Artifact source-binding.json and individual package SHA256 were not downloaded independently; raw log checkout/version witnesses and actual successful fixed controller binding step are preserved."
+  },
+  "fixture": {
+    "result": "installed/launchagent/online/reconnect",
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "22.22.1",
+    "npmStarted": true,
+    "registrations": 2,
+    "heartbeats": 2,
+    "enrollments": 1,
+    "socketPathBytes": 73,
+    "states": [
+      {
+        "step": "check",
+        "status": "running"
+      },
+      {
+        "step": "check",
+        "status": "running"
+      },
+      {
+        "step": "install",
+        "status": "running"
+      },
+      {
+        "step": "service",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "online"
+      },
+      {
+        "step": "service",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "running"
+      },
+      {
+        "step": "connect",
+        "status": "online"
+      }
+    ]
+  },
+  "launchctl": {
+    "status": "captured",
+    "limits": {
+      "records": 16,
+      "bytes": 8192,
+      "probeTimeoutMs": 1000
+    },
+    "truncated": false,
+    "writeFailure": false,
+    "events": [
+      {
+        "stage": "bootout",
+        "phase": "install",
+        "startedAt": "2026-11-10T02:06:46.479Z",
+        "finishedAt": "2026-11-10T02:06:46.489Z",
+        "elapsedMs": 8.866,
+        "exitCode": 3,
+        "signal": null,
+        "signalOther": false,
+        "errorCode": null,
+        "timedOut": false
+      },
+      {
+        "stage": "bootstrap",
+        "phase": "install",
+        "startedAt": "2026-11-10T02:06:46.545Z",
+        "finishedAt": "2026-11-10T02:06:46.594Z",
+        "elapsedMs": 46.067,
+        "exitCode": 0,
+        "signal": null,
+        "signalOther": false,
+        "errorCode": null,
+        "timedOut": false
+      },
+      {
+        "stage": "bootout",
+        "phase": "reconnect",
+        "startedAt": "2026-11-10T02:06:48.532Z",
+        "finishedAt": "2026-11-10T02:06:48.541Z",
+        "elapsedMs": 7.208,
+        "exitCode": 0,
+        "signal": null,
+        "signalOther": false,
+        "errorCode": null,
+        "timedOut": false
+      },
+      {
+        "stage": "bootstrap",
+        "phase": "reconnect",
+        "startedAt": "2026-11-10T02:06:48.611Z",
+        "finishedAt": "2026-11-10T02:06:48.624Z",
+        "elapsedMs": 10.397,
+        "exitCode": 0,
+        "signal": null,
+        "signalOther": false,
+        "errorCode": null,
+        "timedOut": false
+      }
+    ],
+    "boundary": "Completed commands only; a killed wrapper or an unwritable journal may leave missing entries. Probe failures are not proof of absence."
+  },
+  "commandGapsMs": {
+    "install": 56,
+    "reconnect": 70
+  },
+  "findings": [
+    "The diagnostic's first bootout returned3; first bootstrap returned0. This does not independently classify the first service registration state.",
+    "The diagnostic's reconnect bootout and bootstrap both returned0. No post-failure probes were invoked.",
+    "Reconnect bootout completion48.541Z preceded bootstrap start48.611Z by70ms; this includes intervening wrapper/process work and is not an isolated overhead measurement.",
+    "The original formal5852 EIO5 was not reproduced in this instrumented run. No product fix has been implemented or established.",
+    "The original fixture assertions, including new online observation and no re-enrollment, passed in the instrumented environment."
+  ],
+  "cleanup": {
+    "schema": "issue1512.macos-restart-diagnostic-cleanup.v1",
+    "startedAt": "2026-11-10T02:06:52.249Z",
+    "ownerRecord": "validated",
+    "fixtureStepOutcome": "success",
+    "fixtureFinally": {
+      "bootout": {
+        "attempted": true,
+        "exitCode": 0,
+        "error": false
+      },
+      "fixtureServerClosed": true,
+      "environmentRestored": true,
+      "fixtureHomeRemoved": true
+    },
+    "bootout": {
+      "attempted": true,
+      "startedAt": "2026-11-10T02:06:52.261Z",
+      "finishedAt": "2026-11-10T02:06:52.269Z",
+      "exitCode": 3,
+      "signal": null,
+      "errorCode": null,
+      "timedOut": false
+    },
+    "serviceProbe": {
+      "attempted": true,
+      "startedAt": "2026-11-10T02:06:52.269Z",
+      "finishedAt": "2026-11-10T02:06:52.276Z",
+      "exitCode": 113,
+      "signal": null,
+      "errorCode": null,
+      "timedOut": false
+    },
+    "fixtureHomeRemoved": true,
+    "privateControlRemoved": true,
+    "status": "bootout_succeeded_home_removed",
+    "processAbsence": "not_independently_probed",
+    "limitation": "Nonzero launchctl print or bootout does not prove absence; no output text is parsed. Runner teardown is separate.",
+    "finishedAt": "2026-11-10T02:06:52.278Z"
+  },
+  "closure": {
+    "commit": "a7ba52b13336654471a486571f8655cc42c7734e",
+    "parent": "fd3862c99d2c23d25edecabdeb76e85b097571b8",
+    "tree": "4c1d3e27a5febcf215f0cd6b52afd4d426cb7174",
+    "manifestGitBlob": "e3622f9b210678a7815022527d4bfb28c139a04d",
+    "workflowGitBlob": "36dda19d9de5d9a5bef2a4e95fe36581b17dfb3c",
+    "enabled": false,
+    "bothJobGuards": false,
+    "runId": 42740630331,
+    "attempt": 1,
+    "conclusion": "skipped",
+    "jobs": [
+      {
+        "id": 129580549023,
+        "name": "macos-diagnostic",
+        "conclusion": "skipped",
+        "runnerId": null,
+        "runnerName": null,
+        "steps": []
+      },
+      {
+        "id": 129580549184,
+        "name": "package",
+        "conclusion": "skipped",
+        "runnerId": null,
+        "runnerName": null,
+        "steps": []
+      }
+    ]
+  },
+  "downloads": {
+    "reader": "/root/mac_restart_diagnostic",
+    "macosJobLog": 1,
+    "packageJobLog": 0,
+    "diagnosticZip": 0,
+    "packageZip": 0,
+    "originalFormal5852Logs": 0,
+    "invalidWorkflowLogs": 0,
+    "reason": "The complete diagnostic record and cleanup record were emitted in the original Mac job log. No extraction VM or duplicate ZIP download was needed."
+  },
+  "artifactsMetadataOnly": [
+    {
+      "id": 13728443013,
+      "name": "issue1512-mac-restart-diagnostic",
+      "bytes": 2648,
+      "sha256": "56a5b6cde097c675c180d0ba1677426a7b055fdb41dfa61ecd218abbd9aad9e9"
+    },
+    {
+      "id": 13727889319,
+      "name": "issue1512-mac-restart-daemon",
+      "bytes": 965080,
+      "sha256": "3c134ebd2cffac776728c0621ccf23a92790aa8f98a78f28433897fe6aa0ec39"
+    }
+  ],
+  "activity": {
+    "actualMacFixtureExecutions": 1,
+    "workflowReruns": 0,
+    "originalSourceChangesForYamlRepair": 0,
+    "temporaryExtractionMachinesCreated": 0,
+    "ownedActiveExtractionMachines": 0,
+    "formalBranchChanges": 0,
+    "productionAcceptance": false,
+    "formalNode22AcceptanceReplacement": false
+  },
+  "nextStep": "Prepare a separate, lower-perturbation diagnostic inside the original service process, emitting only after the entire sequence. Do not treat this successful diagnostic as a fix."
+}

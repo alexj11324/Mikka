@@ -1,0 +1,458 @@
+{
+  "schema": "issue1512.formal-G-ci-superseded-inventory.v1",
+  "observedAt": "2026-11-10 03:07:44 UTC",
+  "head": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+  "supersededBy": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "runs": [
+    {
+      "id": 42746314753,
+      "name": "Workspace governance acceptance",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+    },
+    {
+      "id": 42746314763,
+      "name": "Unattended sandbox acceptance",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+    },
+    {
+      "id": 42746314854,
+      "name": "Site search read contract",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+    },
+    {
+      "id": 42746314750,
+      "name": "Device gateway",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+    },
+    {
+      "id": 42746314768,
+      "name": "Cloud computer backend",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+    },
+    {
+      "id": 42746314949,
+      "name": "Read cache API acceptance",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+    },
+    {
+      "id": 42746314946,
+      "name": "SSH device backend",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+    },
+    {
+      "id": 42746314877,
+      "name": "E2B additive runtime release",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+    },
+    {
+      "id": 42746314853,
+      "name": "Browser gate",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+    },
+    {
+      "id": 42746314876,
+      "name": "CI",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "cancelled",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364"
+    }
+  ],
+  "jobs": [
+    {
+      "id": 129599168104,
+      "runId": 42746314753,
+      "name": "Workspace governance HTTP (Item 11)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T02:59:58Z"
+    },
+    {
+      "id": 129599168080,
+      "runId": 42746314763,
+      "name": "runtime",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:00:00Z"
+    },
+    {
+      "id": 129599168167,
+      "runId": 42746314854,
+      "name": "site-search",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "failure",
+      "completed_at": "2026-11-10T03:00:55Z"
+    },
+    {
+      "id": 129599167732,
+      "runId": 42746314750,
+      "name": "test",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:00:52Z"
+    },
+    {
+      "id": 129600073193,
+      "runId": 42746314750,
+      "name": "deploy",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "skipped",
+      "completed_at": "2026-11-10T03:00:52Z"
+    },
+    {
+      "id": 129599167386,
+      "runId": 42746314768,
+      "name": "backend",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:01:11Z"
+    },
+    {
+      "id": 129599167887,
+      "runId": 42746314768,
+      "name": "Local driver (macOS permissions, nonblocking)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T02:58:53Z"
+    },
+    {
+      "id": 129599167996,
+      "runId": 42746314768,
+      "name": "Local driver (Linux Xvfb)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T02:58:54Z"
+    },
+    {
+      "id": 129599171546,
+      "runId": 42746314949,
+      "name": "Read cache API and CLI",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:01:58Z"
+    },
+    {
+      "id": 129599170899,
+      "runId": 42746314946,
+      "name": "ssh",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:03:56Z"
+    },
+    {
+      "id": 129599167948,
+      "runId": 42746314877,
+      "name": "test",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T02:58:34Z"
+    },
+    {
+      "id": 129599269373,
+      "runId": 42746314877,
+      "name": "check",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "skipped",
+      "completed_at": "2026-11-10T02:58:34Z"
+    },
+    {
+      "id": 129599269869,
+      "runId": 42746314877,
+      "name": "release",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "skipped",
+      "completed_at": "2026-11-10T02:58:34Z"
+    },
+    {
+      "id": 129599168177,
+      "runId": 42746314853,
+      "name": "Browser tests (before merge)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T02:58:22Z"
+    },
+    {
+      "id": 129599168815,
+      "runId": 42746314876,
+      "name": "changes / Changed files",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T02:59:20Z"
+    },
+    {
+      "id": 129599526580,
+      "runId": 42746314876,
+      "name": "Core unit checks",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "completed_at": "2026-11-10T03:06:33Z"
+    },
+    {
+      "id": 129599526599,
+      "runId": 42746314876,
+      "name": "Integration unit checks",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:04:37Z"
+    },
+    {
+      "id": 129599526704,
+      "runId": 42746314876,
+      "name": "Database checks (1/4)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:03:31Z"
+    },
+    {
+      "id": 129599526709,
+      "runId": 42746314876,
+      "name": "Source checks",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "failure",
+      "completed_at": "2026-11-10T03:01:38Z"
+    },
+    {
+      "id": 129599526750,
+      "runId": 42746314876,
+      "name": "Database checks (4/4)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:03:59Z"
+    },
+    {
+      "id": 129599526759,
+      "runId": 42746314876,
+      "name": "Daemon checks",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:02:33Z"
+    },
+    {
+      "id": 129599526816,
+      "runId": 42746314876,
+      "name": "Database checks (3/4)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:02:33Z"
+    },
+    {
+      "id": 129599526973,
+      "runId": 42746314876,
+      "name": "Database checks (2/4)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:04:48Z"
+    },
+    {
+      "id": 129599527639,
+      "runId": 42746314876,
+      "name": "desktop-checks / changes / Changed files",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:00:23Z"
+    },
+    {
+      "id": 129599527794,
+      "runId": 42746314876,
+      "name": "analytics-checks / changes / Changed files",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:00:29Z"
+    },
+    {
+      "id": 129599527876,
+      "runId": 42746314876,
+      "name": "image-checks / changes / Changed files",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:00:16Z"
+    },
+    {
+      "id": 129599528817,
+      "runId": 42746314876,
+      "name": "Cloud credential access (OIDC)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "skipped",
+      "completed_at": "2026-11-10T02:59:20Z"
+    },
+    {
+      "id": 129599849192,
+      "runId": 42746314876,
+      "name": "image-checks / image",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "completed_at": "2026-11-10T03:06:34Z"
+    },
+    {
+      "id": 129599889128,
+      "runId": 42746314876,
+      "name": "desktop-checks / icon",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:00:51Z"
+    },
+    {
+      "id": 129599889195,
+      "runId": 42746314876,
+      "name": "desktop-checks / checks",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:02:59Z"
+    },
+    {
+      "id": 129599889205,
+      "runId": 42746314876,
+      "name": "desktop-checks / smoke",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:05:01Z"
+    },
+    {
+      "id": 129599929506,
+      "runId": 42746314876,
+      "name": "analytics-checks / Analytics SSR (full)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:05:00Z"
+    },
+    {
+      "id": 129601511923,
+      "runId": 42746314876,
+      "name": "Production build and browser interactions",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:05:01Z"
+    },
+    {
+      "id": 129601583832,
+      "runId": 42746314876,
+      "name": "analytics-checks / analytics-ssr",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at": "2026-11-10T03:05:04Z"
+    },
+    {
+      "id": 129601592338,
+      "runId": 42746314876,
+      "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "completed_at": "2026-11-10T03:06:24Z"
+    },
+    {
+      "id": 129602173453,
+      "runId": 42746314876,
+      "name": "UI policy (strict)",
+      "head_sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "completed_at": "2026-11-10T03:06:35Z"
+    }
+  ],
+  "counts": {
+    "actionsRuns": 10,
+    "actionsJobs": 36,
+    "externalChecks": 1,
+    "expectedTotalChecksFromCurrentKnownRecords": 37,
+    "jobConclusions": {
+      "success": 26,
+      "failure": 2,
+      "skipped": 4,
+      "cancelled": 4
+    }
+  },
+  "originals": {
+    "129599526709": {
+      "run": 42746314876,
+      "attempt": 1,
+      "status": "frozen-decoded",
+      "reader": "/root/independent_final",
+      "responseBlob": "ba8c0141a2aadbb41db50676445004eca729a994",
+      "decodedBlob": "f2d492684d79e0eab45ec53bbf1e65dcc52244e4",
+      "bytes": 125341,
+      "sha256": "8ae01fd9e4b30aa0550d00357e3f4021fd60d4251d13b90b53207d08804f83ed"
+    },
+    "129599168167": {
+      "run": 42746314854,
+      "attempt": 1,
+      "status": "frozen-decoded",
+      "reader": "/root/independent_final",
+      "responseBlob": "81e97a86b367031d012bf3321cf6fb004b145c76",
+      "decodedBlob": "b5291eddd1b41d7103f6e6c4dccb1da6662e7b26",
+      "bytes": 102274,
+      "sha256": "02cb7244154431405e232b5c08e8af387f52050f102400046836e389334adc56"
+    }
+  },
+  "rootCauseProof": "49219023505b26cee1f28963c6b476057adcfdb6",
+  "commentOnlyFixReview": "14fcb337b91e96f257dde80b27fca25ded4410b5",
+  "cancellation": {
+    "method": "GitHub automatic concurrency cancellation after superseding head push",
+    "oldMainRun": 42746314876,
+    "completedAt": "2026-11-10T03:06:35Z",
+    "reviewerCancelCalls": 0,
+    "allOldWorkflowsTerminal": true
+  },
+  "claims": "Superseded run is not passing CI. No cancelled job is claimed as accepted; new head must satisfy actual mandatory gates."
+}

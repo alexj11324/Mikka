@@ -1,0 +1,49 @@
+{
+  "schema": "issue1512.pending-native-source-pair.v1",
+  "mergedBase": {
+    "sha": "c0fab83818b75c487089f554f2d350abd33b146b",
+    "tree": "c4540c9d0954eb341a359fe72c74c0421b17fd73"
+  },
+  "red": {
+    "sha": "f5d208e1b34f893a0caf70d821d767380ab8fe0a",
+    "tree": "669d51d72d9920053656855b2bf75cc3c44f63d7",
+    "delta": [
+      "tests/action-read-egress.db.test.ts"
+    ]
+  },
+  "green": {
+    "sha": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+    "tree": "6e045fec3a07c05c9d21dfb2b9edb9f8c4fb5fb0",
+    "parent": "f5d208e1b34f893a0caf70d821d767380ab8fe0a",
+    "delta": [
+      {
+        "path": "lib/desktop-rpc/workspace-choices.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f3480c04c9f81b0f963a9fd8ecc6e29a668cf0c0"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ed6d0490005919a412decd65271e879fc9c58c60"
+      },
+      {
+        "path": "lib/workspace-access.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "55e1ae30e46ee6f1a861c507e25efeffb26552f8"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dc6af1b78e66695688b0bef35d493a8f5b727f7d"
+      }
+    ]
+  },
+  "manifest": "8c3cfd8f1f14618cf96fc895f186716737fe8d03",
+  "independentReview": "858cf1f0d39421cf22dd786c741ea7bcea5b2c1a",
+  "runtimeStatus": "not run",
+  "formalBranch": "unchanged 5852aa8832c07fdeef43665dd5e156ce5516e3ea"
+}

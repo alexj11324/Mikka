@@ -1,0 +1,77 @@
+{
+  "schema": "issue1512.formal-G-ci-first-failure-inventory.v1",
+  "observedAt": "2026-11-10 03:03:51 UTC",
+  "head": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+  "branch": "fix/1512-daemon-fixture-executable-20261109",
+  "readOwnership": {
+    "reader": "/root/independent_final",
+    "exclusive": [
+      "Source/Core/Integration/formal-PG and other non-Native/non-Mac failures"
+    ],
+    "excluded": {
+      "Native": "/root/native_pending_final",
+      "MacNode22": "/root/mac_inprocess_diag"
+    }
+  },
+  "logs": {
+    "129599526709": {
+      "run": 42746314876,
+      "attempt": 1,
+      "status": "frozen-decoded",
+      "reader": "/root/independent_final",
+      "responseBlob": "ba8c0141a2aadbb41db50676445004eca729a994",
+      "decodedBlob": "f2d492684d79e0eab45ec53bbf1e65dcc52244e4",
+      "bytes": 125341,
+      "sha256": "8ae01fd9e4b30aa0550d00357e3f4021fd60d4251d13b90b53207d08804f83ed"
+    },
+    "129599168167": {
+      "run": 42746314854,
+      "attempt": 1,
+      "status": "frozen-decoded",
+      "reader": "/root/independent_final",
+      "responseBlob": "81e97a86b367031d012bf3321cf6fb004b145c76",
+      "decodedBlob": "b5291eddd1b41d7103f6e6c4dccb1da6662e7b26",
+      "bytes": 102274,
+      "sha256": "02cb7244154431405e232b5c08e8af387f52050f102400046836e389334adc56"
+    }
+  },
+  "findings": [
+    {
+      "job": 129599526709,
+      "run": 42746314876,
+      "attempt": 1,
+      "name": "Source checks",
+      "headAssociation": "a5027a36fdd73229db1a22bde6ab3ec68ce63364",
+      "failedStep": "Run pnpm lint:code",
+      "source": "lib/desktop-rpc/read-batch-context.test.ts",
+      "line": 462,
+      "column": 9,
+      "diagnostic": "Do not add `then` to an object.",
+      "summary": "oxlint --deny-warnings: 1 warning, 0 errors, exit1",
+      "interpretation": "The new regression intentionally constructs a Drizzle-like thenable. Keep its dispatch-before-thenable-assimilation coverage while fixing the lint violation.",
+      "productOrTestEditPerformed": false
+    },
+    {
+      "job": 129599168167,
+      "run": 42746314854,
+      "attempt": 1,
+      "name": "site-search",
+      "failedStep": "Run node apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint",
+      "diagnostic": "Same lint warning at read-batch-context.test.ts:462:9. Later artifact upload reports no playwright-report/test-results because earlier compound gate failed.",
+      "separateProductFailureInferred": false
+    }
+  ],
+  "inventory": {
+    "runCount": 10,
+    "jobsAtSnapshot": 33,
+    "dynamicExpansionIncomplete": true,
+    "failedJobs": [
+      129599526709,
+      129599168167
+    ],
+    "readCalls": 2,
+    "actionsOriginalLogReadsEach": 1,
+    "otherRawLogsRead": 0
+  },
+  "next": "Implementer prepares smallest fixture correction preserving thenable semantics; continue metadata inventory and retain required gates."
+}

@@ -1,0 +1,34 @@
+{
+  "schema": "issue1512.maincc-execution-loss.v1",
+  "observedAt": "2026-11-10 02:23:31 UTC",
+  "sourceInputGitBlob": "b7c286836a1c89e9ea5cc9d9d68f80b5627fdd3f",
+  "runnerGitBlob": "c3db56a1278460f893cda6c9427359b04a5b7847",
+  "sessionId": "sbx_P7UEfT3DZ8yG2YpfWXF73HqqdSux",
+  "name": "issue1512-maincc-canonical-20261110",
+  "commandId": "cmd_e2f4d14dfee442108f9b3bba4cff",
+  "commandObservedExit": null,
+  "canonicalResult": "unknown_result_not_recovered",
+  "testResult": "unknown_result_not_recovered",
+  "reason": "Orchestration state and child agents disappeared before report retrieval; nonpersistent sandbox reached its configured 300000ms timeout. Stopped filesystem has no saved snapshot. No passing result can be inferred from launch metadata.",
+  "metadata": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"sandbox\": {\n      \"name\": \"issue1512-maincc-canonical-20261110\",\n      \"currentSessionId\": \"sbx_P7UEfT3DZ8yG2YpfWXF73HqqdSux\",\n      \"status\": \"stopped\",\n      \"statusUpdatedAt\": 1794277026763,\n      \"persistent\": false,\n      \"workloadType\": \"sandbox\",\n      \"region\": \"iad1\",\n      \"failoverRegions\": [],\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"runtime\": \"node22\",\n      \"architecture\": \"amd64\",\n      \"image\": \"vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219\",\n      \"timeout\": 300000,\n      \"snapshotExpiration\": 604800000,\n      \"totalEgressBytes\": 29405,\n      \"totalIngressBytes\": 7864103,\n      \"totalActiveCpuDurationMs\": 6683,\n      \"totalDurationMs\": 300166,\n      \"cwd\": \"/vercel\",\n      \"tags\": {\n        \"issue\": \"1512\",\n        \"purpose\": \"maincc-canonical-and-merge-tests\"\n      },\n      \"createdAt\": 1794276726373,\n      \"updatedAt\": 1794276726373\n    },\n    \"session\": {\n      \"id\": \"sbx_P7UEfT3DZ8yG2YpfWXF73HqqdSux\",\n      \"runtime\": \"node22\",\n      \"architecture\": \"amd64\",\n      \"requestedAt\": 1794276726304,\n      \"startedAt\": 1794276726344,\n      \"stoppedAt\": 1794277026510,\n      \"status\": \"stopped\",\n      \"duration\": 300166,\n      \"vcpus\": 1,\n      \"memory\": 2048,\n      \"timeout\": 300000,\n      \"region\": \"iad1\",\n      \"cwd\": \"/vercel\",\n      \"workloadType\": \"sandbox\",\n      \"createdAt\": 1794276726304,\n      \"updatedAt\": 1794276726351,\n      \"interactivePort\": 26661,\n      \"activeCpuDurationMs\": 6683,\n      \"networkTransfer\": {\n        \"ingress\": 7864103,\n        \"egress\": 29405\n      },\n      \"sourceSandboxName\": \"issue1512-maincc-canonical-20261110\",\n      \"projectId\": \"prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH\"\n    },\n    \"routes\": [],\n    \"resumed\": false\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  },
+  "snapshots": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"result\": {\n    \"snapshots\": [],\n    \"pagination\": {\n      \"count\": 0,\n      \"next\": null\n    }\n  }\n}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  },
+  "recovery": "Repeat only this necessary bounded source-generation/test execution with synchronous capture and immediately freeze the complete output before stopping resources; preserve this loss rather than overwrite it."
+}
