@@ -312,7 +312,9 @@ test('Task review reads preserve exact source, tenancy and accepted comments on 
       await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [f.where.id, member.id])
       await assert.rejects(() => selectedTaskReview(deps, f.viewer, f.taskId, reference(snapshot)), code('workspace_not_found'))
       await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [f.taskId])
-      await assert.rejects(() => selectedTaskReview(deps, f.who, f.taskId, reference(snapshot)), code('workspace_not_found'))
+      // A bound workspace Task does not require a Team link; the owner keeps
+      // the retained source, while the suspended member was denied above.
+      assert.equal((await selectedTaskReview(deps, f.who, f.taskId, reference(snapshot)))?.taskId, f.taskId)
     })
 
     await t.test('moving the Task to another workspace does not move the retained source authority', async () => {

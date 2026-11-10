@@ -594,8 +594,11 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [f.taskId, { type: 'doc', attrs: { mikka: { deletedAt: new Date().toISOString() } }, content: [] }])
       await assert.rejects(() => read(f, snapshot.id, reviewer), code('workspace_not_found'))
       await pool.query('UPDATE issues SET content=\'{"type":"doc","content":[]}\' WHERE id=$1', [f.taskId])
-      await pool.query('UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",\'{executionIdentity,workspaceId}\',to_jsonb($2::text)) WHERE id=$1', [f.runId, otherWorkspace.id])
-      await assert.rejects(() => read(f, snapshot.id, reviewer), code('workspace_not_found'))
+      // The tenant trigger freezes a Run's workspace at INSERT. Moving its
+      // frozen execution identity to another tenant is now rejected by the
+      // database before a domain read can observe it.
+      await assert.rejects(() => pool.query('UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",\'{executionIdentity,workspaceId}\',to_jsonb($2::text)) WHERE id=$1', [f.runId, otherWorkspace.id]),
+        (error: unknown) => (error as { code?: string }).code === '23514')
     })
 
     await t.test('a stopped Run first freezes its original review scope without a checkpoint or usable daemon token', async () => {
@@ -669,13 +672,20 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       }
       const original = { executionIdentity: { workspaceId: f.where.id },
         repositoryAdmission: { workspaceId: f.where.id, remoteKey: remoteKey(remote) } }
-      for (const definition of [
+      const definitions = [
         { ...original, repositoryAdmission: { ...original.repositoryAdmission, remoteKey: remoteKey('https://github.com/mikka-fixtures/another.git') } },
         { ...original, repositoryAdmission: { ...original.repositoryAdmission, workspaceId: otherWorkspace.id } },
         { ...original, executionIdentity: { workspaceId: otherWorkspace.id } },
         { repositoryAdmission: { remoteKey: remoteKey(remote) } },
         { executionIdentity: original.executionIdentity },
-      ]) {
+      ]
+      for (const [index, definition] of definitions.entries()) {
+        if (index === 2) {
+          // A non-null frozen tenant cannot be rewritten to another tenant.
+          await assert.rejects(() => pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.runId, definition]),
+            (error: unknown) => (error as { code?: string }).code === '23514')
+          continue
+        }
         await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.runId, definition])
         await assert.rejects(() => ensureScope(f), code('workspace_not_found'))
         await assertUnbound(f)
@@ -978,7 +988,7 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       const keptSnapshot = (await capture(kept, true)).snapshot, discardedSnapshot = (await capture(discarded, true)).snapshot
       const { scope } = await reviewRows(kept, keptSnapshot, departing.id)
       const memberRows = await reviewRows(kept, keptSnapshot, member.id)
-      const { deleteMainAccountData, deleteWorkspaceData: deleteAccountWorkspaceData, planWorkspaces } = await import('../../account/delete')
+      const { deleteMainAccountData, deleteWorkspaceData: deleteAccountWorkspaceData, planWorkspaces, freezeTaskRetention } = await import('../../account/delete')
       const { workspaceDb } = await import('../../workspace-db')
       const plan = await workspaceDb.transaction(tx => planWorkspaces(tx, departing.id))
       assert.ok('shared' in plan)
@@ -986,7 +996,10 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       const client = await pool.connect()
       try {
         await client.query('BEGIN')
-        await deleteMainAccountData(client, departing.id, plan)
+        // Retention must freeze the APP task set under the same transaction;
+        // deleteMainAccountData deliberately trusts a frozen plan.
+        const frozen = await freezeTaskRetention(client, departing.id, plan)
+        await deleteMainAccountData(client, departing.id, frozen)
         await client.query('COMMIT')
       } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
       await workspaceDb.transaction(tx => deleteAccountWorkspaceData(tx, departing.id, hash(`${departing.id}@example.invalid`), plan))

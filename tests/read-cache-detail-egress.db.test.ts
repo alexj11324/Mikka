@@ -266,14 +266,16 @@ test('detail and activity revalidate current access while returning only changed
       const unlinkedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
 
       // Frozen same-fixture measurements on main 3c32675c: a changed linked
-      // control cannot make an upstream SQL/payload regression pass.
+      // control cannot make an upstream SQL/payload regression pass. The Task
+      // review hint adds a bounded boolean column (and its correlated SQL) to
+      // the citation reads; statement counts are unchanged.
       const originalIdentifierReadMetrics = {
         linkedConnections: { statements: 14, read: 3490, written: 5497 },
         unlinkedConnections: { statements: 14, read: 3192, written: 5346 },
-        linkedCitation: { statements: 4, read: 955, written: 1875 },
-        unlinkedCitation: { statements: 5, read: 1083, written: 2140 },
+        linkedCitation: { statements: 4, read: 1188, written: 1934 },
+        unlinkedCitation: { statements: 5, read: 1403, written: 2257 },
         linkedRunCitation: { statements: 9, read: 3157, written: 6581 },
-        unlinkedRunCitation: { statements: 10, read: 2762, written: 6564 },
+        unlinkedRunCitation: { statements: 10, read: 2724, written: 6798 },
       } as const
       for (const [label, result, statementLimit] of [
         ['linkedConnections', linkedConnections, 14],

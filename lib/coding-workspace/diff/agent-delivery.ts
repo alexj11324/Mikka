@@ -209,6 +209,11 @@ export async function deliverAgentReview(deps: DiffDependencies, actor: ReviewAc
       } })
   } catch (error) {
     const reason = refusal(error)
+    if (reason === 'target_unavailable' && process.env.MIKKA_REVIEW_DEBUG === '1') {
+      const detail = error as { code?: string; message?: string; cause?: { code?: string; message?: string } }
+      console.error(JSON.stringify({ event: 'review_target_unavailable_debug', name: error instanceof Error ? error.name : typeof error,
+        code: detail.code, message: detail.message, causeCode: detail.cause?.code, causeMessage: detail.cause?.message }))
+    }
     if (reason && !requestSignal.aborted) return reject(deps, actor, row, reason, requestSignal)
     throw new WorkspaceReviewError('workspace_review_delivery_uncertain', { cause: error })
   }
