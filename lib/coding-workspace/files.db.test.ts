@@ -322,10 +322,10 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
         await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [personalId, owner, `${owner}@example.invalid`])
       }
       await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,'No-team task fixture','{"type":"doc"}','doing','normal','personal')`, [issueId, owner, personalId])
-      await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, issueId])
-      await assert.rejects(() => resolve(f), errorCode('workspace_not_found'))
       await pool.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set(jsonb_set("agentDefinition",'{executionIdentity,workspaceId}',to_jsonb($2::text)),'{repositoryAdmission,workspaceId}',to_jsonb($2::text)) WHERE id=$1`, [f.runId, personalId])
       await pool.query('UPDATE device_tokens SET "boundWorkspaceId"=$2 WHERE id=$1', [f.tokenId, personalId])
+      await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, issueId])
+      await assert.rejects(() => resolve(f), errorCode('workspace_not_found'))
       const personalActor = { userId: owner, workspaceId: personalId }
       assert.equal((await resolve(f, personalActor)).identity.workspaceId, personalId)
       // The existing domain rejects promotion without an authorized Team.
