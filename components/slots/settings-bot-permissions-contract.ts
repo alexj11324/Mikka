@@ -1,6 +1,6 @@
 // What 设置 › 应用与运行权限 receives (docs/ui-overlay.md): permissions for the
 // current workspace, from the routes that store them. One choice applies to
-// every Bot in the workspace; a Bot's own stricter layer still narrows it.
+// every Bot in the workspace; there is no per-Bot permission layer.
 // - App access: the workspace's allow / ask / deny per app
 //   (`/api/bots/:botId/definition`, view workspace_write_policy, action
 //   set_workspace_write_policy). Only admins save; any member reads. The app's

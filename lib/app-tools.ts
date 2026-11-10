@@ -78,12 +78,11 @@ const decision = z.enum(['allow', 'ask', 'deny'])
 const layer = z.record(z.string(), decision).nullable().optional()
 /**
  * An explicit setting for any of `keys` (the tool, then its app key and legacy
- * action), from the Bot's own layer and the workspace's. Restrictive wins: a
- * deny in either layer, then an ask; only when neither restricts does an allow
- * run the call without the judge. So a workspace Allow is a real grant a Bot
- * inherits, while a Bot's ask/deny still narrows it (and a workspace ask/deny
- * still narrows a Bot allow). Null when nothing names the call; settings that
- * cannot be read throw, and the caller decides how to fail.
+ * action), from the workspace's layer only. A deny in the workspace, then an
+ * ask; only when the workspace does not restrict does an allow run the call
+ * without the judge. There is no Bot layer to narrow it. Null when nothing
+ * names the call; settings that cannot be read throw, and the caller decides
+ * how to fail.
  */
 export function explicitSetting(row: { agent: unknown; workspace: unknown } | null, keys: readonly string[]): AppToolDecision | null {
   if (!row) return null

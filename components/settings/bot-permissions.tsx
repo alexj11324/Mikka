@@ -41,8 +41,8 @@ async function agentPolicy<T>(body: unknown): Promise<T> {
 
 /**
  * The current workspace's permissions: one access level per connected app, the provider's real tool catalogue, and the
- * workspace's run policy. This is not per Bot: every Bot in the workspace inherits these choices, and a Bot's own
- * stricter layer still narrows them. Admins save; any member reads. Saves go through the same routes.
+ * workspace's run policy. This is not per Bot: every Bot in the workspace inherits these choices; no Bot layer
+ * narrows them. Admins save; any member reads. Saves go through the same routes.
  */
 export function useBotPermissions({ admin = false, workspaceId }: { admin?: boolean; workspaceId?: string } = {}): SettingsBotPermissionsProps {
   const t = useTranslations('Settings.botPermissions')
@@ -67,7 +67,7 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
   // The worker the run policy is read through: the person's first agent (the workspace layer is the same for each).
   const agentId = agents?.[0]?.id ?? null
 
-  // The workspace's own policy is the page's source of truth. The Bot layer is not read: it can only narrow.
+  // The workspace's policy is the page's only source of truth; no Bot layer is read or applied.
   const workspace = useSWR(botId && workspaceId ? ['workspace-write-policy', workspaceId, botId] : null, () => botId ? definition<WritePolicy>(botId, { view: 'workspace_write_policy' }) : null, { revalidateOnFocus: false })
   const run = useSWR(agentId && botId && workspaceId ? ['workspace-run-policy', workspaceId, botId, agentId] : null, () => agentId && botId ? agentPolicy<AgentPolicy>({ operation: 'readAgent', agentId, botId }) : null, { revalidateOnFocus: false })
 

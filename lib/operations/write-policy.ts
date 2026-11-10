@@ -26,8 +26,8 @@ export function resolveWritePermission(action: string, layers: readonly unknown[
   return permissionDecision(choices) ?? fallback
 }
 
-/** The Bot's layer and the workspace's; a workspace Allow is a grant a Bot with
- * no entry inherits, while a Bot ask/deny or a workspace ask/deny narrows it. */
+/** The workspace's layer. A workspace deny or ask applies to every Bot; there is
+ * no Bot layer to narrow it. */
 export function resolveScopedWritePermission(action: string, agent: unknown, workspace: unknown, fallback: WriteFallback = 'ask'): 'allow' | 'ask' | 'deny' {
   const parsed = settings.safeParse(workspace)
   if (!parsed.success) throw new OperationError('writePolicyUnavailable')
