@@ -668,7 +668,7 @@ test('a task title makes the message a task submission with the normal gates and
   const send = (title = 'Fix login redirect') => sendCoordinatorMessage('do the task', null, null, submissionId, undefined, undefined, undefined, undefined, undefined, undefined, title)
   try {
     assert.deepEqual(await send(), { queued: true })
-    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', taskTitle: 'Fix login redirect' })
+    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', source: 'person', taskTitle: 'Fix login redirect' })
     assert.deepEqual(await send(), { queued: true })
     assert.equal(current.rows.size, 1)
     for (const invalid of ['', '   ', 'x'.repeat(61), 'two\nlines']) assert.deepEqual(await send(invalid), { error: 'validationGeneric', params: undefined })
