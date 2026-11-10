@@ -1331,6 +1331,16 @@
     "viewProjects": "View projects"
   },
   "IssueDetail": {
+    "frame": {
+      "delegate": "Handed to",
+      "open": "Open",
+      "openThread": "Open {name}'s conversation",
+      "subtaskPlaceholder": "Name the sub-task and press Enter",
+      "subtaskMenu": "Actions for {title}",
+      "subscribe": "Subscribe",
+      "unsubscribe": "Unsubscribe",
+      "created": "created {when}"
+    },
     "breadcrumbBoard": "Board",
     "breadcrumbMore": "More locations",
     "connecting": "Connecting…",

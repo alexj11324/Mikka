@@ -1331,6 +1331,16 @@
     "viewProjects": "查看项目"
   },
   "IssueDetail": {
+    "frame": {
+      "delegate": "交给",
+      "open": "打开",
+      "openThread": "打开 {name} 的对话",
+      "subtaskPlaceholder": "输入子任务名称，按回车创建",
+      "subtaskMenu": "{title} 的操作",
+      "subscribe": "关注",
+      "unsubscribe": "取消关注",
+      "created": "创建于{when}"
+    },
     "breadcrumbBoard": "看板",
     "breadcrumbMore": "更多位置",
     "connecting": "正在连接…",
