@@ -2404,6 +2404,7 @@
       "useMine": "Use mine"
     },
     "permissionsPage": {
+      "accessHint": "Click an access to change it",
       "heading": "What bots and members may do",
       "detail": "Locked items are blocked for everyone in this workspace.",
       "allowed": "Allowed",
@@ -2418,6 +2419,17 @@
       "summary": "{allowed} allowed, {blocked} blocked"
     },
     "audit": {
+      "unknownAction": "recorded “{action}”",
+      "filterMenu": {
+        "clearAll": "Clear all",
+        "remove": "Remove {label}",
+        "more": "{count} more: {labels}"
+      },
+      "tableWords": {
+        "undo": "Undo",
+        "redo": "Redo",
+        "values": "{count, plural, one {# value} other {# values}}"
+      },
       "adminOnly": "Only admins can see the audit log.",
       "categoryFilter": "Category",
       "columns": {
@@ -2505,7 +2517,8 @@
         },
         "agent": {
           "approval_decided": "{decision, select, approved {approved a tool request} denied {denied a tool request} other {decided a tool request}}",
-          "approval_consumed": "used a tool approval"
+          "approval_consumed": "used a tool approval",
+          "policy_changed": "changed the Agent approval rules"
         },
         "workspace": {
           "slug_changed": "changed the address from {from} to {to}",
@@ -2516,7 +2529,9 @@
           "checkout_started": "opened checkout",
           "credits_purchased": "bought points",
           "auto_recharge_changed": "changed auto recharge",
-          "limits_changed": "changed usage limits"
+          "limits_changed": "changed usage limits",
+          "card_verified": "verified a card",
+          "payment_method_changed": "changed the payment method"
         },
         "audit": {
           "exported": "exported audit log",

@@ -75,9 +75,16 @@ export function useAuditLog(workspaceId: string) {
   const exportHref = withBasePath(`/api/workspaces/${encodeURIComponent(workspaceId)}/audit-log?${search}`)
 
   const word = (path: string) => t.has(path as never) ? t(path as never) : null
+  /** The event as a sentence. An argument the event did not record reads as nothing; an action without words is still a readable line, never a code or a key path. */
   function sentence(event: AuditEventView) {
     const key = `actions.${event.action}`
-    return t.has(key as never) ? t(key as never, params(event, word) as never) : event.action
+    const unknown = () => t('unknownAction', { action: event.action.replace(/[._]+/g, ' ').trim() })
+    const raw = t.has(key as never) ? t.raw(key as never) : null
+    if (typeof raw !== 'string') return unknown()
+    const values = params(event, word)
+    for (const [, name] of raw.matchAll(/\{\s*(\w+)/g)) values[name] ??= ''
+    const text = t(key as never, values as never)
+    return text.includes(`audit.${key}`) ? unknown() : text
   }
 
   // A refused read says why: an admin-only page for a member, a sign-in, or the code to quote.

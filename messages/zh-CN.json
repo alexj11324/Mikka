@@ -2404,6 +2404,7 @@
       "useMine": "用我的"
     },
     "permissionsPage": {
+      "accessHint": "点按权限即可更改",
       "heading": "Bot 和成员可以做什么",
       "detail": "锁定的项目对这个工作区的所有人禁止。",
       "allowed": "允许",
@@ -2418,6 +2419,17 @@
       "summary": "{allowed} 项允许，{blocked} 项禁止"
     },
     "audit": {
+      "unknownAction": "记录了「{action}」",
+      "filterMenu": {
+        "clearAll": "全部清除",
+        "remove": "移除{label}",
+        "more": "还有 {count} 项：{labels}"
+      },
+      "tableWords": {
+        "undo": "撤销",
+        "redo": "重做",
+        "values": "{count} 个值"
+      },
       "adminOnly": "只有管理员可以查看审计日志。",
       "categoryFilter": "类别",
       "columns": {
@@ -2505,7 +2517,8 @@
         },
         "agent": {
           "approval_decided": "{decision, select, approved {批准工具请求} denied {拒绝工具请求} other {处理工具请求}}",
-          "approval_consumed": "使用工具批准"
+          "approval_consumed": "使用工具批准",
+          "policy_changed": "更改了 Agent 审批规则"
         },
         "workspace": {
           "slug_changed": "把地址从 {from} 改为 {to}",
@@ -2516,7 +2529,9 @@
           "checkout_started": "打开了结账",
           "credits_purchased": "购买了点数",
           "auto_recharge_changed": "修改了自动充值",
-          "limits_changed": "修改了用量上限"
+          "limits_changed": "修改了用量上限",
+          "card_verified": "验证了付款卡",
+          "payment_method_changed": "更改了付款方式"
         },
         "audit": {
           "exported": "导出审计日志",
