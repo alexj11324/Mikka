@@ -99,7 +99,7 @@ export function useGitHubAppSetup(userId: string) {
     setOwner: (value: string) => { if (value === 'personal' || value === 'organization') { setOwner(value); setProblem(null) } },
     setOrganization: (value: string) => { setOrganization(value); setProblem(null) },
     /** The hidden form that hands the manifest to GitHub; render it wherever the setup is shown. */
-    manifest: submission && <form ref={manifestForm} method="POST" action={submission.action} hidden><input type="hidden" name="manifest" value={submission.manifest} readOnly /></form>,
+    manifest: submission && <form ref={manifestForm} method="POST" action={submission.action} hidden><FieldGroup><Field><Input type="hidden" name="manifest" value={submission.manifest} readOnly /></Field></FieldGroup></form>,
   }
 }
 
