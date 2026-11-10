@@ -74,15 +74,18 @@ function fixture() {
 
 function readFixture() {
   const cache = new Map<string, { data: { items: number[] } }>()
-  let reads = 0
+  let reads = 0, refreshes = 0
   const commit = async (wait?: Promise<void>) => {
     const pending = observeSWRRead(cache, 'chat', async () => { reads++; if (wait) await wait; return { items: [reads] } })
     const data = await pending
     acceptSWRRead(cache, 'chat', data); cache.set('chat', { data }); await settle()
     return data
   }
-  return { cache, commit, count: () => reads,
-    refresh: (_key: string, _required?: unknown, _reuse?: boolean, after?: number) => readFresh(cache, 'chat', after!, () => commit(), () => true, () => true) }
+  return { cache, commit, count: () => reads, refreshCount: () => refreshes,
+    refresh: (_key: string, _required?: unknown, _reuse?: boolean, after?: number) => {
+      refreshes++
+      return readFresh(cache, 'chat', after!, () => commit(), () => true, () => true)
+    } }
 }
 
 test('equal selected and home hints prepare one connection without a business read', async () => {
@@ -91,7 +94,7 @@ test('equal selected and home hints prepare one connection without a business re
   assert.equal(f.calls.length, 1)
   assert.equal(f.watchers.size, 1)
   const socket = await f.open()
-  assert.deepEqual(reads, [])
+  assert.equal(reads.length, 0)
   const owner = new LiveChannelOwner(f.runtime, new Map(), preparation), unmount = owner.mount()
   owner.confirmWorkspace(selected)
   const stop = owner.subscribe(selected, 'thread_list', selected, ['threads'], key => { reads.push(key) })
@@ -181,7 +184,8 @@ test('a read begun after readiness is reused by the real late subscriber', async
   const owner = new LiveChannelOwner(f.runtime, data.cache, preparation), unmount = owner.mount()
   owner.confirmWorkspace(selected)
   owner.subscribe(selected, 'bot_chat', changed, ['chat'], data.refresh)
-  await f.advance(0)
+  await f.advance(100)
+  assert.equal(data.refreshCount(), 1, 'the original debounce must invoke the real refresh')
   assert.equal(data.count(), 1)
   assert.equal(f.calls.length, 1)
   unmount()
@@ -197,7 +201,8 @@ test('a read begun before readiness still catches up even when it finishes after
   const owner = new LiveChannelOwner(f.runtime, data.cache, preparation), unmount = owner.mount()
   owner.confirmWorkspace(selected)
   owner.subscribe(selected, 'bot_chat', changed, ['chat'], data.refresh)
-  await f.advance(0)
+  await f.advance(100)
+  assert.equal(data.refreshCount(), 1, 'the original debounce must invoke the real refresh')
   assert.equal(data.count(), 2, 'late completion is not a fresh dispatch/read-begin proof')
   unmount()
 })
@@ -210,7 +215,8 @@ test('an incoming push with no keys remains an obligation for a later matching s
   const owner = new LiveChannelOwner(f.runtime, data.cache, preparation), unmount = owner.mount()
   owner.confirmWorkspace(selected)
   owner.subscribe(selected, 'bot_chat', changed, ['chat'], data.refresh)
-  await f.advance(0)
+  await f.advance(100)
+  assert.equal(data.refreshCount(), 1, 'the original debounce must invoke the real refresh')
   assert.equal(data.count(), 2)
   assert.equal(f.calls.length, 1)
   unmount()
@@ -224,7 +230,8 @@ test('a different event kind does not discard continuous coverage for the late k
   const owner = new LiveChannelOwner(f.runtime, data.cache, preparation), unmount = owner.mount()
   owner.confirmWorkspace(selected)
   owner.subscribe(selected, 'bot_chat', changed, ['chat'], data.refresh)
-  await f.advance(0)
+  await f.advance(100)
+  assert.equal(data.refreshCount(), 1, 'the original debounce must invoke the real refresh')
   assert.equal(data.count(), 1)
   unmount()
 })
