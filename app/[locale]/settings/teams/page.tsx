@@ -6,6 +6,7 @@ import { loadTeamDirectory } from '@/app/actions/teams'
 import { WorkspaceApp } from '@/components/workspace-app'
 import { getTranslations } from 'next-intl/server'
 import { authorizedCacheWorkspace } from '@/lib/swr/cache-scope'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('Metadata')
@@ -16,6 +17,6 @@ export default async function TeamsPage({ searchParams }: { searchParams: Promis
   const session = await getSession()
   if (!session?.user) redirect('/sign-in?next=%2Fsettings%2Fteams')
   const initial = await loadTeamDirectory(query.workspace).catch(() => null)
-  const cacheWorkspace = await authorizedCacheWorkspace(session.user.id, query.workspace)
+  const cacheWorkspace = await authorizedCacheWorkspace({ id: session.user.id, [enterprisePrincipal]: { kind: 'session', sessionId: session.session.id } }, query.workspace)
   return <WorkspaceApp user={session.user} cacheWorkspace={cacheWorkspace} initialTeams={initial ?? undefined} googleEnabled={googleEnabled} />
 }

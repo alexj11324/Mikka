@@ -15,7 +15,10 @@ test('edition defaults to community and rejects misspelled deployment configurat
 
 test('community own-provider usage never touches hosted billing, including beyond the free trial', async () => {
   const pool = new Proxy({}, { get() { throw new Error('community must not read or write the hosted billing database') } }) as Pool
-  const usage = new HostedUsageStore(pool, { metered: false })
+  const usage = new HostedUsageStore(pool, {
+    metered: false,
+    quota: async () => { throw new Error('community must not acquire a hosted plan quota') },
+  })
   assert.equal(await usage.verify('workspace', null, null), false)
   for (let index = 0; index < 40; index++) {
     assert.equal((await usage.canUseMikkaPaid('workspace')).verified, true)
