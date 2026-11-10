@@ -72,7 +72,9 @@ export async function hostedPointsHere(workspaceId: string): Promise<{ points: n
   ])
   let points = 0
   let trialLeft = 0
-  for (const [index, payer] of [workspaceId, ...await sharedCreditWorkspaces(workspaceId)].entries()) {
+  const account = await (await import('./billing/organization-account')).resolvePlatformBillingAccount(workspaceId)
+  const payers = [account.accountWorkspaceId, ...account.organizationId ? [] : await sharedCreditWorkspaces(workspaceId)]
+  for (const [index, payer] of payers.entries()) {
     try {
       const balance = await canUseMikkaPaid(payer)
       points += balancePoints(balance)

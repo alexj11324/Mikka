@@ -31,7 +31,8 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     await admin.end()
   })
   await pool.query(`CREATE TABLE "user" (id text primary key,email text not null);
-    CREATE TABLE workspace_credit_grants (id uuid primary key,"workspaceId" uuid not null,points integer not null,bucket text not null);
+    CREATE TABLE workspace_credit_grants (id uuid primary key,"workspaceId" uuid not null,points integer not null,bucket text not null,"periodStart" timestamptz,"expiresAt" timestamptz);
+    CREATE TABLE workspace_settings ("workspaceId" uuid primary key,"monthlyCreditLimit" integer);
     CREATE TABLE workspace_audit_events (id uuid primary key,"workspaceId" uuid,"actorType" text,"actorName" text,action text,category text,metadata jsonb);
     CREATE TABLE mikka_workspaces(id uuid primary key,"userId" text);
     CREATE TABLE bots (id uuid primary key,"workspaceId" uuid);
@@ -46,6 +47,8 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     readFileSync('drizzle/20261030230001_legacy_hosted_workspaces.sql', 'utf8'),
   )
   await pool.query(readFileSync('drizzle/20261101130000_hosted_usage_concurrent.sql', 'utf8'))
+  await pool.query(readFileSync('drizzle/20261110020032_plan_credit_usage.sql', 'utf8'))
+  await pool.query(readFileSync('drizzle/20261110020033_resource_budgets.sql', 'utf8'))
   const store = new HostedUsageStore(pool)
   /** `n` messages sent in this workspace's chats (created by `creator`), plus a 重试 and a welcome request that never count. */
   const sent = async (workspaceId: string, n: number, creator = `creator-${workspaceId}`) => {
@@ -60,6 +63,42 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     await store.verify(id, 'cus_fixture', `card_${id}`)
     return id
   }
+  await t.test('plan points are usable, settle once across an expiry boundary, and leave purchased balances intact', async () => {
+    const id = await verified(), grant = randomUUID(), call = randomUUID()
+    await pool.query('update hosted_allowances set remaining=0 where "workspaceId"=$1', [id])
+    await pool.query(`insert into workspace_credit_grants (id,"workspaceId",points,bucket,"periodStart","expiresAt") values($1,$2,100,'plan',now()-interval '1 day',now()+interval '1 day')`, [grant, id])
+    await store.reserve(id, 'synthetic/plan', call)
+    const { rows: [usage] } = await pool.query('select "createdAt" from hosted_usage where id=$1', [call])
+    const expiry = new Date(usage.createdAt.getTime() + 1)
+    await pool.query('update workspace_credit_grants set "expiresAt"=$2 where id=$1', [grant, expiry])
+    assert.equal((await store.balance(id, pool, new Date(expiry.getTime() + 1))).plan, 0)
+    await store.settle(call, 25_000)
+    await store.settle(call, 25_000)
+    const receipt = (await pool.query('select "costMicroUsd"::int cost,"planMicroUsd"::int plan,"purchasedMicroUsd"::int purchased,"planAllocations" from hosted_usage where id=$1', [call])).rows[0]
+    assert.deepEqual(receipt, { cost: 25_000, plan: 25_000, purchased: 0, planAllocations: { [grant]: 25_000 } })
+    assert.equal((await pool.query('select points from workspace_credit_grants where id=$1', [grant])).rows[0].points, 100)
+  })
+  await t.test('workspace, member, project, thread and run budgets serialize concurrent holds and retain unknown cost', async () => {
+    const { hostedBillingScope } = await import('./context'), { readResourceBudgets } = await import('../billing/resource-budgets')
+    for (const scope of ['workspace', 'member', 'project', 'thread', 'run'] as const) {
+      const workspaceId = await verified(), actorId = `member-${randomUUID()}`, projectId = randomUUID(), threadId = randomUUID(), runId = randomUUID()
+      const scopeId = { workspace: workspaceId, member: actorId, project: projectId, thread: threadId, run: runId }[scope]
+      await pool.query(`insert into billing_resource_budgets (id,"workspaceId",scope,"scopeId",period,"limitPoints","warningPercent","updatedBy") values($1,$2,$3,$4,'month',20,50,$5)`, [randomUUID(), workspaceId, scope, scopeId, actorId])
+      const attribution = { workspaceId, billingAccountWorkspaceId: workspaceId, actorId, projectId, threadId, runId, attributionComplete: true }
+      const calls = [randomUUID(), randomUUID(), randomUUID()]
+      const outcomes = await hostedBillingScope.run(attribution, () => Promise.allSettled(calls.map(call => store.reserve(workspaceId, 'synthetic/budget', call))))
+      assert.equal(outcomes.filter(value => value.status === 'fulfilled').length, 2, scope)
+      for (const result of outcomes) if (result.status === 'rejected') assert.match(String(result.reason), /usage_budget_exhausted/)
+      const accepted = calls.filter((_, n) => outcomes[n].status === 'fulfilled')
+      await store.settle(accepted[0], 100_000)
+      await store.settle(accepted[1], null)
+      const [budget] = await readResourceBudgets(pool, [workspaceId])
+      assert.equal(budget.exhausted, true); assert.equal(budget.thresholdReached, true)
+      if (scope !== 'workspace') await assert.rejects(store.reserve(workspaceId, 'synthetic/missing-attribution', randomUUID()), /usage_budget_exhausted/)
+      await store.settle(accepted[1], 0)
+      await hostedBillingScope.run(attribution, () => store.reserve(workspaceId, 'synthetic/resumed', randomUUID()))
+    }
+  })
   await t.test('a paid-only store requires verification and positive balance without consuming a chat trial', async () => {
     const paidOnly = new HostedUsageStore(pool, { metered: true, allowTrial: false }), fresh = randomUUID()
     await assert.rejects(paidOnly.canUseMikkaPaid(fresh), /verification_required/)
@@ -85,7 +124,7 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     // The platform pays: unpaid spend under its daily cap, never a debt the allowance repays after a card.
     const row = (await pool.query('SELECT "unpaidMicroUsd","purchasedMicroUsd","freeMicroUsd" FROM hosted_usage WHERE id=$1', [first])).rows[0]
     assert.deepEqual([Number(row.unpaidMicroUsd), Number(row.purchasedMicroUsd), Number(row.freeMicroUsd)], [30_000, 0, 0])
-    assert.deepEqual(await store.balance(fresh), { verified: false, free: 0, purchased: 0 })
+    assert.deepEqual(await store.balance(fresh), { verified: false, free: 0, plan: 0, purchased: 0 })
     assert.equal((await store.canUseMikkaPaid(fresh) as { trialLeft?: number }).trialLeft, 19)
     // The 20th message's turn still runs; the 21st needs a card. 重试 and the welcome request never count.
     await sent(fresh, 19)
@@ -162,13 +201,14 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     },
   )
   await t.test(
-    'free then purchased; plan ignored; replay and parallel settlement idempotent; zero refused',
+    'free then purchased; expired plan retained without spending; replay and parallel settlement idempotent; zero refused',
     async () => {
       const id = await verified()
       await pool.query(
         "INSERT INTO workspace_credit_grants VALUES ($1,$2,100,'purchased'),($3,$2,99999,'plan')",
         [randomUUID(), id, randomUUID()],
       )
+      await pool.query(`update workspace_credit_grants set "expiresAt"=now()-interval '1 day' where "workspaceId"=$1 and bucket='plan'`, [id])
       const call = randomUUID()
       await store.reserve(id, 'fixture', call)
       await Promise.all([
@@ -178,6 +218,7 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
       assert.deepEqual(await store.balance(id), {
         verified: true,
         free: 0,
+        plan: 0,
         purchased: 800_000,
       })
       const call2 = randomUUID()
@@ -348,7 +389,7 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     const id = await verified(), call = randomUUID()
     await pool.query('UPDATE hosted_allowances SET remaining=1 WHERE "workspaceId"=$1', [id])
     await store.reserve(id, 'fixture', call, {}, 100_000)
-    assert.deepEqual(await store.balance(id), { verified: true, free: 1, purchased: 0 })
+    assert.deepEqual(await store.balance(id), { verified: true, free: 1, plan: 0, purchased: 0 })
     const pending = (await pool.query('SELECT "reservedFree","reservedPurchased","reservedUnpaid","costMicroUsd" FROM hosted_usage WHERE id=$1', [call])).rows[0]
     assert.deepEqual(Object.values(pending).map(value => value === null ? null : Number(value)), [0, 0, 0, null])
     await Promise.all([store.settle(call, 20_001), store.settle(call, 20_001)])
@@ -366,15 +407,15 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     await pool.query('UPDATE hosted_allowances SET remaining=900000 WHERE "workspaceId"=$1', [id])
     await pool.query('INSERT INTO hosted_usage (id,"workspaceId",model,state,"reservedFree","reservedUnpaid") VALUES ($1,$2,\'legacy\',\'pending\',100000,100000)', [freeCall, id])
     await Promise.all([store.settle(freeCall, 120_000), store.settle(freeCall, 120_000)])
-    assert.deepEqual(await store.balance(id), { verified: true, free: 880_000, purchased: 1_000_000 })
+    assert.deepEqual(await store.balance(id), { verified: true, free: 880_000, plan: 0, purchased: 1_000_000 })
     await pool.query('INSERT INTO hosted_usage (id,"workspaceId",model,state,"reservedPurchased") VALUES ($1,$2,\'legacy\',\'pending\',100000)', [paidCall, id])
     assert.equal((await store.balance(id)).purchased, 900_000)
     await Promise.all([store.settle(paidCall, 120_000), store.settle(paidCall, 120_000)])
-    assert.deepEqual(await store.balance(id), { verified: true, free: 880_000, purchased: 880_000 })
+    assert.deepEqual(await store.balance(id), { verified: true, free: 880_000, plan: 0, purchased: 880_000 })
     const overrun = randomUUID()
     await pool.query('INSERT INTO hosted_usage (id,"workspaceId",model,state,"reservedPurchased") VALUES ($1,$2,\'legacy\',\'pending\',100000)', [overrun, id])
     await store.settle(overrun, 1_800_000)
-    assert.deepEqual(await store.balance(id), { verified: true, free: 0, purchased: 0 }, 'unused allowance cannot hide a larger already-incurred debt')
+    assert.deepEqual(await store.balance(id), { verified: true, free: 0, plan: 0, purchased: 0 }, 'unused allowance cannot hide a larger already-incurred debt')
     await assert.rejects(store.reserve(id, 'fixture', randomUUID()), /free_allowance_used/)
   })
   await t.test(

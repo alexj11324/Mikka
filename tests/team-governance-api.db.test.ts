@@ -53,7 +53,7 @@ test('Team governance HTTP handlers enforce actual entitlements and workspace bo
     const summary = await response.json()
     assert.equal(summary.edition, 'team_free')
     assert.equal(summary.activeHumans, 2)
-    assert.equal(summary.activeHumanLimit, 5)
+    assert.equal(summary.activeHumanLimit, null)
     assert.equal((await post({ action: 'grant', plan: 'pro' })).status, 400)
     assert.equal((await post({ action: 'save', template: { name: 'Read only', rules: { approvalMode: 'read_only' } } })).status, 409)
     assert.equal((await report()).status, 409)

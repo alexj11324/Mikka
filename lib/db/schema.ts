@@ -1266,10 +1266,17 @@ export const workspaceBilling = pgTable('workspace_billing', {
   plan: text('plan'),
   status: text('status'),
   seats: integer('seats').notNull().default(0),
+  // Historical seat quantities are retained; new checkouts use resource_v1.
+  billingModel: text('billingModel').$type<'legacy_seat' | 'resource_v1'>().notNull().default('legacy_seat'),
+  stripePriceId: text('stripePriceId'),
+  billingPlan: text('billingPlan').$type<'free' | 'pro' | 'enterprise'>().notNull().default('free'),
+  billingExpiresAt: timestamp('billingExpiresAt', { withTimezone: true }),
+  billingRevision: bigint('billingRevision', { mode: 'number' }).notNull().default(0),
   currentPeriodEnd: timestamp('currentPeriodEnd', { withTimezone: true }),
   autoRechargeEnabled: boolean('autoRechargeEnabled').notNull().default(false),
   autoRechargeThreshold: integer('autoRechargeThreshold'),
   autoRechargePacks: integer('autoRechargePacks'),
+  autoRechargeMonthlyCap: integer('autoRechargeMonthlyCap'),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -1286,6 +1293,8 @@ export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
   currency: text('currency'),
   receiptUrl: text('receiptUrl'),
   stripeFeeCents: integer('stripeFeeCents'),
+  periodStart: timestamp('periodStart', { withTimezone: true }),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('workspace_credit_grants_workspace_idx').on(table.workspaceId, table.createdAt), index('workspace_credit_grants_payment_intent_idx').on(table.stripePaymentIntentId)])
 
@@ -1294,6 +1303,19 @@ export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   type: text('type').notNull(),
   processedAt: timestamp('processedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** APP -> Workspace entitlement delivery. No credentials or payment payloads. */
+export const billingEntitlementOutbox = pgTable('billing_entitlement_outbox', {
+  eventId: text('eventId').primaryKey().references(() => stripeWebhookEvents.id),
+  workspaceId: uuid('workspaceId').notNull(),
+  subscriptionId: text('subscriptionId').notNull(),
+  plan: text('plan').$type<'free' | 'pro' | 'enterprise'>().notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  revision: bigint('revision', { mode: 'number' }).notNull(),
+  billingModel: text('billingModel').$type<'legacy_seat' | 'resource_v1'>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
+}, table => [index('billing_entitlement_pending_idx').on(table.workspaceId, table.deliveredAt, table.revision)])
 
 /** A live key's post-commit revision (lib/live/revisions.ts). No content: kind, ID and a counter. */
 export const liveRevisions = pgTable('live_revisions', {

@@ -8,7 +8,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 export interface CreditTransaction {
   id: string
   date: string
-  type: 'topup' | 'verification' | 'refund'
+  type: 'topup' | 'verification' | 'refund' | 'subscription'
   points: number
   amountCents: number | null
   currency: string | null
@@ -28,9 +28,9 @@ export async function workspaceCreditBillingView(actorId: string, workspaceId: s
   await ensureLegacyVerification(workspaceId)
   const balance = await hostedUsage.balance(workspaceId)
   const { rows } = await pool.query<Omit<CreditTransaction, 'date'> & { date: Date }>(
-    `SELECT id::text AS id,"createdAt" AS date,CASE WHEN reason='refund' THEN 'refund' ELSE 'topup' END AS type,
+    `SELECT id::text AS id,"createdAt" AS date,CASE WHEN reason='refund' THEN 'refund' WHEN reason='subscription' THEN 'subscription' ELSE 'topup' END AS type,
       points,"amountCents",currency,"stripeFeeCents",'succeeded' AS status,"receiptUrl"
-    FROM workspace_credit_grants WHERE "workspaceId"=$1 AND bucket='purchased' AND reason IN ('purchase','refund')
+    FROM workspace_credit_grants WHERE "workspaceId"=$1 AND ((bucket='purchased' AND reason IN ('purchase','refund')) OR (bucket='plan' AND reason='subscription'))
     UNION ALL
     SELECT 'verification:' || v."workspaceId",v."verifiedAt",'verification',$2::int,0,'usd',NULL,'succeeded',NULL
     FROM hosted_verifications v JOIN hosted_allowances a ON a."workspaceId"=v."workspaceId"
@@ -39,7 +39,7 @@ export async function workspaceCreditBillingView(actorId: string, workspaceId: s
     [workspaceId, FREE_ALLOWANCE_MICRO_USD / MICRO_USD_PER_POINT],
   )
   return {
-    balancePoints: (balance.free + balance.purchased) / MICRO_USD_PER_POINT,
+    balancePoints: (balance.free + balance.plan + balance.purchased) / MICRO_USD_PER_POINT,
     transactions: rows.map(row => ({ ...row, date: row.date.toISOString() })),
   }
 }

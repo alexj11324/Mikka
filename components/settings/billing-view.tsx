@@ -46,9 +46,11 @@ export function BillingPageView({ plan: planState, balance, allowance, computerB
       <SettingRow title={data.live ? data.plan ?? t('team') : t('free')} description={planLine}>
         {data.live || data.hasCustomer
           ? <Button type="button" variant="secondary" size="sm" disabled={pending !== null} onClick={planState.openPortal}>{t('changePlan')}</Button>
-          : <Button type="button" size="sm" disabled={pending !== null} onClick={planState.startCheckout}>{t('subscribe')}</Button>}
+          : <Button type="button" size="sm" disabled={pending !== null || !data.resourceCheckoutAvailable} onClick={planState.startCheckout}>{t('subscribe')}</Button>}
       </SettingRow>
-      {data.live && <SettingRow title={t('seats')}><span>{t('seatsUsed', { used: data.members, total: data.seats })}</span></SettingRow>}
+      <SettingRow title={t('members')} description={t('membersNotBilled')}><span>{number.format(data.members)}</span></SettingRow>
+      {data.billingModel === 'legacy_seat' && data.live && <p className="px-5 pb-4 text-sm text-muted-foreground">{t('legacySubscription')}</p>}
+      {!data.live && !data.resourceCheckoutAvailable && <p role="status" className="px-5 pb-4 text-sm text-muted-foreground">{actionError('billingResourcePlanUnavailable')}</p>}
     </SettingsSection>
 
     {computerBilling && (data.planPoints !== null || data.purchasedPoints > 0) && <SettingsSection id="billing-points" title={t('points')}>

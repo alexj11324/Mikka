@@ -1,21 +1,33 @@
 import 'server-only'
 // 计费 (V15). No embedded card or tax forms: plans and payment methods go
 // through Stripe Checkout and the Customer Portal; a webhook records state.
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@/lib/db'
-import { stripeWebhookEvents, workspaceBilling, workspaceCreditGrants } from '@/lib/db/schema'
+import { db, pool } from '@/lib/db'
+import { stripeWebhookEvents, workspaceBilling } from '@/lib/db/schema'
+import { HostedUsageStore } from '@/lib/abuse/store'
+import { MICRO_USD_PER_POINT } from '@/lib/abuse/policy'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { BILLING_LIVE_STATUSES } from '@/lib/workspace-admin/general'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
-import { stripeConfig, stripePost, StripeRequestError, type StripeConfig } from './stripe'
+import { stripeConfig, stripeGet, stripePost, StripeRequestError, type StripeConfig } from './stripe'
 import { applyPointsEvent, type PointsWebhookOptions } from './points-webhook'
+import { resourcePrice } from './resource-plan'
+import { applySubscriptionEvent } from './subscription-webhook'
+import { drainBillingEntitlements } from './entitlement-outbox'
+import { organizationBillingAccounts, organizationMembers } from '@/lib/db/governance-schema'
+import { requireOrganizationAdmin } from '@/lib/governance/organizations'
 
 type Env = Readonly<Record<string, string | undefined>>
 
 export interface BillingView {
   configured: boolean
+  /** A resource price must be configured separately from the historical seat price. */
+  resourceCheckoutAvailable: boolean
+  billingModel: 'legacy_seat' | 'resource_v1' | null
+  entitlementPlan: 'free' | 'pro' | 'enterprise'
+  entitlementExpiresAt: string | null
   plan: string | null
   status: string | null
   /** True while the subscription still bills (active, trialing, past_due…). */
@@ -40,20 +52,39 @@ async function activeMembers(workspaceId: string) {
 /** Admins only. */
 export async function workspaceBillingView(actorId: string, workspaceId: string, env: Env = process.env): Promise<BillingView> {
   await requireAdmin(actorId, workspaceId)
+  return readBillingAccount(workspaceId, env)
+}
+
+/** Organization admins receive billing metadata without acquiring private workspace content access. */
+export async function organizationBillingView(actorId: string, organizationId: string, env: Env = process.env) {
+  const account = await workspaceDb.transaction(async tx => {
+    await requireOrganizationAdmin(tx, organizationId, actorId)
+    const [row] = await tx.select().from(organizationBillingAccounts).where(eq(organizationBillingAccounts.organizationId, organizationId)).limit(1)
+    const [members] = await tx.select({ count: sql<number>`count(*)::int` }).from(organizationMembers)
+      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.status, 'active')))
+    return { workspaceId: row?.workspaceId ?? null, members: members?.count ?? 0 }
+  })
+  return { organizationId, accountWorkspaceId: account.workspaceId,
+    billing: account.workspaceId ? { ...await readBillingAccount(account.workspaceId, env), members: account.members } : null }
+}
+
+async function readBillingAccount(workspaceId: string, env: Env): Promise<BillingView> {
   const [billing] = await db.select().from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)
-  const [plan] = await db.select({ points: workspaceCreditGrants.points }).from(workspaceCreditGrants)
-    .where(and(eq(workspaceCreditGrants.workspaceId, workspaceId), eq(workspaceCreditGrants.bucket, 'plan'))).orderBy(desc(workspaceCreditGrants.createdAt)).limit(1)
-  const [purchased] = await db.select({ n: sql<number>`coalesce(sum(${workspaceCreditGrants.points}), 0)::int` }).from(workspaceCreditGrants)
-    .where(and(eq(workspaceCreditGrants.workspaceId, workspaceId), eq(workspaceCreditGrants.bucket, 'purchased')))
+  const balance = await new HostedUsageStore(pool).balance(workspaceId)
   const status = billing?.status ?? null
   return {
     configured: Boolean(stripeConfig(env)),
+    resourceCheckoutAvailable: Boolean(stripeConfig(env)?.resourcePriceId),
+    billingModel: billing?.billingModel ?? null,
+    entitlementPlan: billing?.billingExpiresAt && billing.billingExpiresAt > new Date() ? billing.billingPlan : 'free',
+    entitlementExpiresAt: billing?.billingExpiresAt?.toISOString() ?? null,
     plan: billing?.plan ?? null, status,
     live: Boolean(status && (BILLING_LIVE_STATUSES as readonly string[]).includes(status)),
     seats: billing?.seats ?? 0, members: await activeMembers(workspaceId),
     currentPeriodEnd: billing?.currentPeriodEnd?.toISOString() ?? null,
     hasCustomer: Boolean(billing?.stripeCustomerId),
-    planPoints: plan?.points ?? null, purchasedPoints: purchased?.n ?? 0,
+    planPoints: billing?.billingModel === 'resource_v1' || balance.plan > 0 ? balance.plan / MICRO_USD_PER_POINT : null,
+    purchasedPoints: balance.purchased / MICRO_USD_PER_POINT,
   }
 }
 
@@ -85,22 +116,25 @@ export async function billingPortalUrl(actorId: string, workspaceId: string, bac
   return { url: z.url().parse(session.url) }
 }
 
-/** 订阅 Team: a Checkout session for one seat per active member. Admins only. */
+/** A capacity plan is one verified resource price, regardless of human membership. */
 export async function planCheckoutUrl(actorId: string, workspaceId: string, back: string, fetchImpl: typeof fetch = fetch, env: Env = process.env): Promise<{ url: string }> {
   const config = requireConfig(env)
-  if (!config.teamPriceId) throw new WorkspaceError('billingNotConfigured')
   await requireAdmin(actorId, workspaceId)
+  if (!config.resourcePriceId) throw new WorkspaceError('billingResourcePlanUnavailable')
   const [billing] = await db.select({ status: workspaceBilling.status, customer: workspaceBilling.stripeCustomerId }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)
   if (billing?.status && (BILLING_LIVE_STATUSES as readonly string[]).includes(billing.status)) throw new WorkspaceError('billingPlanInvalid')
   const back_ = returnUrl.parse(back)
-  const seats = Math.max(1, await activeMembers(workspaceId))
+  let price: ReturnType<typeof resourcePrice>
+  const configuredPrice = await provider(() => stripeGet<unknown>(config, `prices/${config.resourcePriceId}`, fetchImpl))
+  try { price = resourcePrice(configuredPrice, config.resourcePriceId) }
+  catch { throw new WorkspaceError('billingResourcePlanUnavailable') }
   const session = await provider(() => stripePost<{ url: string }>(config, 'checkout/sessions', {
     mode: 'subscription',
-    line_items: [{ price: config.teamPriceId, quantity: seats }],
+    line_items: [{ price: price.id, quantity: 1 }],
     client_reference_id: workspaceId,
     ...(billing?.customer ? { customer: billing.customer } : {}),
-    subscription_data: { metadata: { workspaceId } },
-    metadata: { workspaceId },
+    subscription_data: { metadata: { workspaceId, billingModel: price.version, plan: price.plan } },
+    metadata: { workspaceId, billingModel: price.version },
     success_url: back_, cancel_url: back_,
   }, fetchImpl))
   return { url: z.url().parse(session.url) }
@@ -112,13 +146,6 @@ const subscriptionEvent = z.object({
   data: z.object({ object: z.record(z.string(), z.unknown()) }),
 })
 
-const subscription = z.object({
-  id: z.string(), customer: z.string(), status: z.string(),
-  metadata: z.object({ workspaceId: z.uuid() }).loose(),
-  current_period_end: z.number().optional(),
-  items: z.object({ data: z.array(z.object({ quantity: z.number().int().optional(), current_period_end: z.number().optional(), price: z.object({ nickname: z.string().nullish(), lookup_key: z.string().nullish() }).loose() }).loose()) }).loose(),
-}).loose()
-
 /**
  * Applies one verified webhook event. Idempotent by event id. Only
  * subscription and points events change state; the workspace comes from the metadata
@@ -126,24 +153,15 @@ const subscription = z.object({
  */
 export async function applyStripeEvent(raw: unknown, options: PointsWebhookOptions = {}): Promise<boolean> {
   const event = subscriptionEvent.parse(raw)
-  return db.transaction(async tx => {
+  const inserted = await db.transaction(async tx => {
     const inserted = await tx.insert(stripeWebhookEvents).values({ id: event.id, type: event.type }).onConflictDoNothing().returning({ id: stripeWebhookEvents.id })
     if (!inserted.length) return false
     await applyPointsEvent(tx, event.type, event.data.object, options)
-    if (!['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'].includes(event.type)) return true
-    const sub = subscription.parse(event.data.object)
-    const item = sub.items.data[0]
-    const periodEnd = sub.current_period_end ?? item?.current_period_end
-    const values = {
-      stripeCustomerId: sub.customer, stripeSubscriptionId: sub.id,
-      status: event.type === 'customer.subscription.deleted' ? 'canceled' : sub.status,
-      plan: item?.price.nickname ?? item?.price.lookup_key ?? 'Team',
-      seats: item?.quantity ?? 0,
-      currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
-      updatedAt: new Date(),
-    }
-    await tx.insert(workspaceBilling).values({ workspaceId: sub.metadata.workspaceId, ...values })
-      .onConflictDoUpdate({ target: workspaceBilling.workspaceId, set: values })
+    await applySubscriptionEvent(tx, event, options)
     return true
   })
+  // Replays also drain: APP may have committed just before a Workspace outage.
+  // A non-2xx response asks Stripe to retry; success means both stores agree.
+  await drainBillingEntitlements(event.id)
+  return inserted
 }

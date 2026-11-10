@@ -12,7 +12,7 @@ import type { CreditBalanceState } from '@/hooks/settings/use-billing'
 
 export { creditBillingKey } from '@/hooks/settings/use-billing'
 
-const STATUS: Record<CreditTransaction['type'], 'paid' | 'credited' | 'refunded'> = { topup: 'paid', verification: 'credited', refund: 'refunded' }
+const STATUS: Record<CreditTransaction['type'], 'paid' | 'credited' | 'refunded'> = { topup: 'paid', verification: 'credited', refund: 'refunded', subscription: 'paid' }
 
 /**
  * 计费 › 余额 and 账单记录 (Figma BIL-1 `708:26856`, BIL-3 `708:27372`). One balance
