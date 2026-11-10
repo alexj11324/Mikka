@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { lstat, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { PRODUCT, PRODUCT_TREE, OVERLAY, PUBLIC_TARGETS, REQUIRED_SLOTS, validateWorkspaceNameCleanup } from './ui-proof-1782.mjs'
+import { PRODUCT, PRODUCT_TREE, OVERLAY, PUBLIC_TARGETS, REQUIRED_SLOTS, validateSemanticChecks, validateWorkspaceNameCleanup } from './ui-proof-1782.mjs'
 
 try {
   const app = resolve(process.env.MIKKA_TEST_APP_DIR)
@@ -15,6 +15,7 @@ try {
   const source = JSON.parse(await readFile(join(output, 'source-pair.json'), 'utf8'))
   assert.equal(manifest.product, PRODUCT); assert.equal(manifest.productTree, PRODUCT_TREE); assert.equal(manifest.overlay, OVERLAY)
   assert.equal(source.product, PRODUCT); assert.equal(source.productTree, PRODUCT_TREE); assert.equal(source.overlay, OVERLAY)
+  assert.equal(source.inventorySemantics, 'transformed_source_modules_not_render_coverage')
   assert.deepEqual(source.targets.map(target => target.path), PUBLIC_TARGETS)
   assert.ok(source.targets.every(target => target.includedInProductionBuild === true && /^[a-f0-9]{64}$/.test(target.sha256)))
   assert.deepEqual(source.slots.map(slot => slot.name), REQUIRED_SLOTS)
@@ -25,6 +26,7 @@ try {
   assert.equal(manifest.edition, 'cloud'); assert.equal(manifest.externalCloudServiceConfigured, false)
   if (process.env.CAPTURE_OUTCOME === 'success') {
     assert.equal(manifest.result, 'passed'); assert.equal(manifest.screens.length, 20); assert.equal(manifest.checks.length, 12)
+    validateSemanticChecks(manifest.checks)
     assert.equal(manifest.compiled.revision, PRODUCT); assert.equal(manifest.compiled.rendererBuild, source.build.rendererBuild)
     assert.equal(manifest.compiled.servedBuildMatches, true); assert.equal(manifest.compiled.servedOverlayMatches, true)
     assert.ok(Object.values(manifest.cleanup).every(value => value === true))

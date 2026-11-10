@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { CASES, extendFixtures } from './ui-proof-1782-fixtures.mjs'
-import { DATABASE, PRODUCT, PRODUCT_TREE, OVERLAY, closedFailure, gallery, selectOfficialWorkspace, sourceEvidence, taskActivityLocators } from './ui-proof-1782.mjs'
+import { DATABASE, PRODUCT, PRODUCT_TREE, OVERLAY, closedFailure, gallery, officialInboxLocators, officialTaskLocators, openOfficialOverview, selectOfficialWorkspace, sourceEvidence } from './ui-proof-1782.mjs'
 
 const app = resolve(process.env.MIKKA_TEST_APP_DIR ?? '')
 const output = resolve(process.env.MIKKA_UI_PROOF_OUTPUT ?? '')
@@ -91,19 +91,15 @@ async function capture(page, name, title, theme, viewport) {
 
 async function taskList(page, theme, viewport) {
   phase = 'task_list'
-  await page.goto(`${environment.origin}/mikka/en/?threads=all`, { waitUntil: 'domcontentloaded' })
-  const panel = page.locator('[data-slot="all-threads"]')
-  await expect(panel).toBeVisible()
-  const toggles = page.locator('[data-slot="all-tasks"]')
-  await expect(toggles.first()).toBeAttached()
-  assert.ok(await toggles.count() >= 1 && await toggles.count() <= 2)
-  // The product renders a window-bar copy and a responsive phone copy. Check
-  // every rendered copy instead of accidentally taking the hidden first one.
-  for (let index = 0; index < await toggles.count(); index++) {
-    await expect(toggles.nth(index)).toHaveAttribute('aria-label', messages.Shell.panel.allTasksPending.replace('{count}', '1'))
-    await expect(toggles.nth(index).locator('[data-slot="tasks-pending"]')).toHaveText('1')
-  }
-  if (viewport.width === 1440) await expect(page.locator('[data-slot="all-tasks"]:visible').first()).toBeVisible()
+  await page.goto(`${environment.origin}/mikka/en/?bot=${base.fixture.bot}`, { waitUntil: 'domcontentloaded' })
+  const overviewLabels = { overviewLabel: messages.Shell.panel.overview, panelLabel: messages.Shell.panel.label, tasksLabel: messages.Shell.panel.tasks }
+  const panel = await openOfficialOverview(page, overviewLabels)
+  const inbox = officialInboxLocators(page, messages.Nav.inbox)
+  await expect(inbox.item).toHaveCount(1)
+  await expect(inbox.count).toHaveCount(1)
+  await expect(inbox.count).toHaveText('1')
+  await expect(inbox.count).toHaveAttribute('title', '1')
+  if (viewport.width === 1440) await expect(inbox.count).toBeVisible()
   assert.deepEqual(await panel.locator('[data-task-group]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-task-group'))), ['pending', 'todo', 'done'])
   for (const [group, count] of [['pending', 3], ['todo', 1], ['done', 1]]) {
     const section = panel.locator(`[data-task-group="${group}"]`)
@@ -127,16 +123,21 @@ async function taskList(page, theme, viewport) {
   }
   assert.equal(new Set(iconEvidence.slice(0, 3).map(item => item.shapeSha256)).size, 3)
   assert.equal(new Set(iconEvidence.slice(0, 3).map(item => item.color)).size, 3)
-  await capture(page, 'task-groups-expanded', 'Waiting, blocked, failed, still-open task and completed task', theme, viewport)
-  await page.goto(`${environment.origin}/mikka/en/?bot=${base.fixture.coordinator}&threads=${base.fixture.coordinator}`, { waitUntil: 'domcontentloaded' })
-  const empty = page.locator('[data-slot="all-threads"]')
+  await capture(page, 'task-groups-expanded', 'Dispatcher Overview: waiting, blocked, failed, still-open and completed tasks', theme, viewport)
+  await page.goto(`${environment.origin}/mikka/en/?bot=${base.fixture.coordinator}`, { waitUntil: 'domcontentloaded' })
+  const empty = await openOfficialOverview(page, overviewLabels)
   await expect(empty.getByText(messages.Shell.panel.noTasks, { exact: true })).toBeVisible()
   await expect(empty.locator('[data-task-row]')).toHaveCount(0)
-  const emptyToggles = page.locator('[data-slot="all-tasks"]')
-  await expect(emptyToggles.first()).toBeAttached()
-  for (let index = 0; index < await emptyToggles.count(); index++) await expect(emptyToggles.nth(index).locator('[data-slot="tasks-pending"]')).toHaveText('1')
-  await capture(page, 'empty-dispatcher', 'Coordinator has no tasks; the global hand still counts one', theme, viewport)
-  report.checks.push({ case: 'task_groups', theme, width: viewport.width, taskCount: 5, handCount: 1,
+  const emptyInbox = officialInboxLocators(page, messages.Nav.inbox)
+  await expect(emptyInbox.item).toHaveCount(1)
+  await expect(emptyInbox.count).toHaveCount(1)
+  await expect(emptyInbox.count).toHaveText('1')
+  await expect(emptyInbox.count).toHaveAttribute('title', '1')
+  if (viewport.width === 1440) await expect(emptyInbox.count).toBeVisible()
+  await capture(page, 'empty-dispatcher', 'Coordinator Overview has no tasks; the global Inbox still counts one', theme, viewport)
+  report.checks.push({ case: 'task_groups', theme, width: viewport.width, taskCount: 5,
+    surface: 'dispatcher_overview', pendingIndicator: 'inbox', globalWaitingCount: 1,
+    renderedSlots: ['app-frame', 'thread', 'bot-tasks'],
     groups: { pending: 3, running: 0, todo: 1, done: 1 }, completedInitiallyFolded: true,
     openTaskWithSuccessfulAttempt: 'todo', emptyDispatcher: true, icons: iconEvidence })
 }
@@ -145,30 +146,41 @@ async function taskDetail(page, theme, viewport) {
   phase = 'task_detail'
   const row = extension.rows.find(item => item.key === 'open')
   await page.goto(`${environment.origin}/mikka/en/?issue=${row.id}`, { waitUntil: 'domcontentloaded' })
-  const task = page.getByRole('region', { name: row.title, exact: true }).filter({ has: page.locator('#task-title') })
+  const delegated = messages.Workspace.activity.delegated.replace('{name}', base.fixture.botName)
+  const frame = officialTaskLocators(page, { title: row.title, titleLabel: messages.Workspace.detail.titleLabel,
+    propertiesLabel: messages.IssueDetail.propertiesHeading,
+    assigneeLabel: messages.Metadata.assignee.aria.replace('{name}', humanAssigneeName),
+    delegateLabel: messages.Metadata.assignee.delegatedTo.replace('{name}', base.fixture.botName),
+    activityLabel: messages.Workspace.activity.title, delegated,
+    threadLabel: messages.IssueDetail.frame.openThread.replace('{name}', base.fixture.agentLabel) })
+  const { task, properties } = frame
+  await expect(task).toHaveCount(1)
   await expect(task).toHaveAttribute('aria-busy', 'false')
-  await expect(task.locator('#task-title')).toHaveValue(row.title)
-  const properties = task.locator('#issue-properties')
-  const expand = properties.getByRole('button', { name: messages.IssueDetail.propertiesRelations, exact: true })
-  if (await expand.isVisible() && await expand.getAttribute('aria-expanded') === 'false') await expand.click()
-  await expect(properties.locator('[data-assignee-trigger]')).toHaveAttribute('aria-label', messages.Metadata.assignee.aria.replace('{name}', humanAssigneeName))
-  await expect(properties.getByText(messages.Metadata.assignee.delegatedTo.replace('{name}', base.fixture.botName), { exact: true })).toBeAttached()
-  await expect(properties.getByText(base.fixture.botName, { exact: true })).toBeVisible()
+  await expect(frame.title).toHaveValue(row.title)
+  await expect(properties).toHaveCount(1)
+  await expect(frame.assignee).toHaveCount(1)
+  await expect(frame.assignee).toBeVisible()
+  await expect(frame.assignee).toHaveText(humanAssigneeName)
+  await expect(frame.delegate).toHaveCount(1)
+  await expect(frame.delegate).toBeVisible()
+  await expect(frame.delegate).toHaveText(base.fixture.botName)
+  await expect(properties.getByRole('button', { name: messages.Issue.status.doing, exact: true })).toBeVisible()
   await properties.scrollIntoViewIfNeeded()
   await capture(page, 'human-and-delegate', 'Human assignee and separate Agent Delegate', theme, viewport)
   phase = 'task_detail_activity'
-  const delegated = messages.Workspace.activity.delegated.replace('{name}', base.fixture.botName)
-  const activity = taskActivityLocators(task, { label: messages.Workspace.activity.label, delegated })
-  await expect(activity.region).toHaveCount(1)
-  await expect(activity.delegation).toHaveCount(1)
-  await expect(activity.delegation).toBeVisible()
+  await expect(frame.activity).toHaveCount(1)
+  await expect(frame.delegation).toHaveCount(1)
+  await expect(frame.delegation).toBeVisible()
   phase = 'task_detail_history'
-  const result = activity.result
+  const result = frame.result
   await expect(result).toHaveCount(1)
   await expect(result).toBeVisible()
+  const resultPrefix = `${base.fixture.agentLabel} ${messages.Shell.panel.task.result.done} ·`
+  assert.ok((await result.innerText()).replace(/\s+/g, ' ').trim().startsWith(`${resultPrefix} `))
   await result.scrollIntoViewIfNeeded()
   await capture(page, 'delegation-and-history', 'Delegation event and successful historical attempt; task remains open', theme, viewport)
   report.checks.push({ case: 'human_delegate_history', theme, width: viewport.width, humanAssignee: true, separateDelegate: true, delegationActivity: true,
+    surface: 'hosted_task_detail_frame', renderedSlots: ['task-detail'],
     historicalAttemptResult: 'done', taskStatus: 'doing' })
 }
 

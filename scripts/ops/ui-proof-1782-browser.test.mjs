@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
-import { selectOfficialWorkspace, taskActivityLocators } from './ui-proof-1782.mjs'
+import { officialInboxLocators, officialTaskLocators, openOfficialOverview, selectOfficialWorkspace, taskActivityLocators } from './ui-proof-1782.mjs'
 
 const app = resolve(process.env.MIKKA_TEST_APP_DIR)
 const require = createRequire(join(app, 'package.json'))
@@ -106,5 +106,99 @@ test('duplicate delegation copy reproduces the unscoped failure and the activity
     await page.locator('section').evaluate(node => node.remove())
     await expect(activity.region).toHaveCount(0)
     await expect(activity.result).toHaveCount(0)
+  } finally { await browser.close() }
+})
+
+// These fixtures exercise selectors against the newly published accessible
+// contract. They contain no hosted implementation and do not prove application
+// rendering or replace any normal-RPC capture assertion.
+for (const width of [1440, 390]) test(`official Overview opens through work-area controls at ${width}px and keeps the Inbox global`, { timeout: 20_000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage({ viewport: { width, height: 900 } })
+    page.setDefaultTimeout(5_000)
+    await page.setContent(`<style>@media(max-width:900px){nav{display:none}}</style>
+      <nav class="ui-as-side__nav" aria-label="Main menu"><button class="ui-as-side__item"><span>Inbox</span><span class="ui-as-side__count" title="1">1</span></button></nav>
+      <button aria-label="Open artifacts" onclick="document.querySelector('#area').hidden=false">Open artifacts</button>
+      <aside id="area" aria-label="Artifacts" hidden>
+        <section aria-label="Tools"><button onclick="this.closest('section').hidden=true;document.querySelector('#panel').hidden=false">Overview</button></section>
+        <aside id="panel" aria-label="Right panel" hidden><h2>Ada</h2><div role="tablist" aria-label="Right panel content">
+          <button role="tab" aria-selected="false" onclick="this.setAttribute('aria-selected','true');document.querySelector('#rows').hidden=false">Tasks</button>
+        </div><div id="rows" hidden>${['waiting', 'blocked', 'failed', 'todo', 'done'].map(state => `<button data-task-row data-task-state="${state}">${state}</button>`).join('')}</div></aside>
+      </aside>`)
+    assert.equal(await page.locator('[data-slot="all-threads"]').count(), 0)
+    assert.equal(await page.locator('[data-slot="all-tasks"]').count(), 0)
+    const panel = await openOfficialOverview(page, { overviewLabel: 'Overview', panelLabel: 'Right panel', tasksLabel: 'Tasks' })
+    await expect(panel).toBeVisible()
+    await expect(panel.locator('[data-task-row]')).toHaveCount(5)
+    const inbox = officialInboxLocators(page, 'Inbox')
+    await expect(inbox.item).toHaveCount(1)
+    await expect(inbox.count).toHaveText('1')
+    await expect(inbox.count).toHaveAttribute('title', '1')
+    assert.equal(await inbox.count.isVisible(), width === 1440)
+    // The counter is not sourced from this dispatcher's rendered list.
+    await panel.locator('#rows').evaluate(node => { node.textContent = 'No tasks yet' })
+    await expect(panel.locator('[data-task-row]')).toHaveCount(0)
+    await expect(inbox.count).toHaveText('1')
+  } finally { await browser.close() }
+})
+
+test('the hosted frame independently locates the human, explicit Delegate and exact historical result', { timeout: 20_000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage()
+    page.setDefaultTimeout(5_000)
+    await page.setContent(`<main role="region" aria-label="Proof task" aria-busy="false">
+      <textarea class="ui-kb-issue__title" aria-label="Task title">Proof task</textarea>
+      <aside aria-label="Properties"><button aria-label="Assignee: Test owner">Test owner</button>
+        <span aria-label="Delegated to Ada">Ada</span><button>In Progress</button></aside>
+      <section aria-label="Activity"><h2>Activity</h2><ol>
+        <li data-event><span><b>Test owner</b> Delegated to Ada · now</span></li>
+      </ol></section></main>`)
+    const values = { title: 'Proof task', titleLabel: 'Task title', propertiesLabel: 'Properties',
+      assigneeLabel: 'Assignee: Test owner', delegateLabel: 'Delegated to Ada',
+      activityLabel: 'Activity', delegated: 'Delegated to Ada', threadLabel: "Open Codex's conversation" }
+    const frame = officialTaskLocators(page, values)
+    await expect(frame.task).toHaveCount(1)
+    await expect(frame.title).toHaveValue('Proof task')
+    await expect(frame.assignee).toHaveText('Test owner')
+    await expect(frame.delegate).toHaveText('Ada')
+    await expect(frame.delegate).toBeVisible()
+    await expect(frame.delegation).toHaveCount(1)
+    await expect(frame.result).toHaveCount(0)
+    await frame.properties.evaluate(node => {
+      const summary = document.createElement('span')
+      summary.textContent = 'Delegated to Ada'; node.append(summary)
+    })
+    await expect(frame.task.getByText('Delegated to Ada', { exact: false })).toHaveCount(2)
+    await expect(frame.delegation).toHaveCount(1)
+    await frame.activity.evaluate(node => { const duplicate = node.cloneNode(true); duplicate.setAttribute('data-duplicate', ''); node.after(duplicate) })
+    await expect(frame.activity).toHaveCount(2)
+    await expect(frame.delegation).toHaveCount(2)
+    await page.locator('[data-duplicate]').evaluate(node => node.remove())
+    await expect(frame.activity).toHaveCount(1)
+    assert.equal(await frame.task.locator('#task-title').count(), 0)
+    assert.equal(await taskActivityLocators(frame.task, { label: 'Task activity', delegated: values.delegated }).region.count(), 0)
+    // No historical row is needed to locate an explicit delegate. Once present,
+    // the result must belong to the named conversation, not the Task status.
+    await frame.activity.locator('ol').evaluate(node => {
+      const item = document.createElement('li')
+      const button = document.createElement('button')
+      button.setAttribute('aria-label', "Open Codex's conversation")
+      button.textContent = 'Codex Done · now'
+      item.append(button); node.append(item)
+    })
+    await expect(frame.result).toHaveCount(1)
+    await expect(frame.result).toHaveText('Codex Done · now')
+    await expect(frame.properties.getByRole('button', { name: 'In Progress', exact: true })).toBeVisible()
+    await frame.activity.locator('[data-event]').evaluate(node => node.remove())
+    await expect(frame.delegation).toHaveCount(0)
+    await expect(frame.delegate).toHaveCount(1)
+    await expect(frame.task.getByText('Delegated to Ada', { exact: false })).toHaveCount(1)
+    await frame.activity.evaluate(node => node.remove())
+    await expect(frame.result).toHaveCount(0)
+    // The old public frame cannot silently stand in for this hosted frame.
+    await frame.title.evaluate(node => { node.className = ''; node.id = 'task-title' })
+    await expect(frame.task).toHaveCount(0)
   } finally { await browser.close() }
 })

@@ -5,16 +5,18 @@ import { readFile, realpath, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-export const PRODUCT = 'd2ab0ccc6e9c90f0113cfba5134b24c760758c56'
-export const PRODUCT_TREE = 'cc0b11ebd2d285c93bb9655302cfd3e3d1872d36'
-export const CONTROL_PARENT = '4bbf9ccacb66b1167da068076ee7fb4155a128f7'
-export const OVERLAY = 'b92b0e1d48f75c92d059ee071162b72455e6af90'
+export const PRODUCT = 'e3c0b0e050515986a8e42cc15ce0a3de15b8e88c'
+export const PRODUCT_TREE = '1e9b0ebbc340aa68096356bd75a9d00a61d88a82'
+export const CONTROL_PARENT = '2d92f93c6e38a64efef170c71c887f8fbb9b6065'
+export const OVERLAY = 'fe20f19bcf82e6541430b62c450920ba42c95fb0'
 export const BRANCH = 'ops/1782-official-ui-proof-20261109'
 export const DATABASE = 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e'
 export const PUBLIC_TARGETS = Object.freeze([
   'components/nav/all-threads-data.ts', 'hooks/use-bot-tasks.ts',
   'components/workspace/issue-detail-properties.tsx', 'components/workspace/issue-activity-feed.tsx',
   'components/workspace/project-form.tsx',
+  'components/workspace/issue-workspace.tsx', 'components/nav/context-panel.tsx',
+  'components/workspace/task-detail.tsx', 'components/workspace/task-detail-frame.tsx',
 ])
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 const git = (directory, args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
@@ -79,7 +81,7 @@ export function closedFailure(phase, error) {
 
 /** The pinned official shell exposes its real Workspace menu as a radio menu.
  * Use ordinary clicks and observe its actual document navigation. The public
- * shell's fixed button label and aria-current contract do not apply to b92. */
+ * shell's fixed button label and aria-current contract do not apply here. */
 export async function selectOfficialWorkspace(page, { workspaceName, basePath, onPhase = () => {} }) {
   assert.equal(basePath, '/mikka')
   assert.ok(typeof workspaceName === 'string' && workspaceName.length > 0 && workspaceName.length <= 120)
@@ -120,6 +122,98 @@ export function taskActivityLocators(task, { label, delegated }) {
     result: region.locator('[data-run-result="done"]') }
 }
 
+/** The official frame moves Overview into the conversation work area. Follow
+ * its visible controls; an old ?threads= address now redirects to Tasks. */
+export async function openOfficialOverview(page, { overviewLabel, panelLabel, tasksLabel }) {
+  for (const value of [overviewLabel, panelLabel, tasksLabel]) assert.ok(typeof value === 'string' && value.length > 0 && value.length <= 120)
+  const opener = page.getByRole('button', { name: 'Open artifacts', exact: true })
+  await opener.waitFor({ state: 'visible' })
+  assert.equal(await opener.count(), 1)
+  await opener.click()
+  const area = page.getByRole('complementary', { name: 'Artifacts', exact: true })
+  await area.waitFor({ state: 'visible' })
+  assert.equal(await area.count(), 1)
+  const overview = area.getByRole('region', { name: 'Tools', exact: true }).getByRole('button', { name: overviewLabel, exact: true })
+  await overview.waitFor({ state: 'visible' })
+  assert.equal(await overview.count(), 1)
+  await overview.click()
+  const panel = area.getByRole('complementary', { name: panelLabel, exact: true })
+  await panel.waitFor({ state: 'visible' })
+  assert.equal(await panel.count(), 1)
+  const tasks = panel.getByRole('tab', { name: tasksLabel, exact: true })
+  await tasks.waitFor({ state: 'visible' })
+  assert.equal(await tasks.count(), 1)
+  await tasks.click()
+  assert.equal(await tasks.getAttribute('aria-selected'), 'true')
+  return panel
+}
+
+/** The same global pending count now belongs to the official Inbox navigation
+ * item. It is independent of the dispatcher whose Overview is open. */
+export function officialInboxLocators(page, label) {
+  assert.ok(typeof label === 'string' && label.length > 0 && label.length <= 120)
+  const item = page.locator('nav.ui-as-side__nav button.ui-as-side__item').filter({ has: page.getByText(label, { exact: true }) })
+  return { item, count: item.locator('.ui-as-side__count') }
+}
+
+/** Match the pinned hosted frame itself, never silently accept the old public
+ * fallback. Human responsibility, explicit delegation and historical activity
+ * each have their own named element. */
+export function officialTaskLocators(page, { title, titleLabel, propertiesLabel, assigneeLabel, delegateLabel, activityLabel, delegated, threadLabel }) {
+  for (const value of [title, titleLabel, propertiesLabel, assigneeLabel, delegateLabel, activityLabel, delegated, threadLabel]) assert.ok(typeof value === 'string' && value.length > 0 && value.length <= 250)
+  const task = page.getByRole('region', { name: title, exact: true }).filter({ has: page.locator('textarea.ui-kb-issue__title') })
+  const properties = task.getByRole('complementary', { name: propertiesLabel, exact: true })
+  const activity = task.getByRole('region', { name: activityLabel, exact: true })
+  return { task, title: task.getByRole('textbox', { name: titleLabel, exact: true }), properties,
+    assignee: properties.getByRole('button', { name: assigneeLabel, exact: true }),
+    delegate: properties.getByLabel(delegateLabel, { exact: true }),
+    activity, delegation: activity.getByText(delegated, { exact: false }),
+    result: activity.getByRole('button', { name: threadLabel, exact: true }) }
+}
+
+/** Compile inventory and visible UI are different evidence. The gallery must
+ * name exactly the surfaces actually traversed in each theme and viewport. */
+export function validateSemanticChecks(checks) {
+  assert.ok(Array.isArray(checks))
+  assert.equal(checks.length, 12)
+  const seen = new Set()
+  for (const row of checks) {
+    assert.ok(['light', 'dark'].includes(row.theme))
+    assert.ok([1440, 390].includes(row.width))
+    assert.ok(['task_groups', 'human_delegate_history', 'project_stale_form'].includes(row.case))
+    const identity = `${row.case}:${row.theme}:${row.width}`
+    assert.ok(!seen.has(identity)); seen.add(identity)
+    if (row.case === 'task_groups') {
+      assert.equal(row.surface, 'dispatcher_overview')
+      assert.equal(row.pendingIndicator, 'inbox')
+      assert.equal(row.globalWaitingCount, 1)
+      assert.equal(Object.hasOwn(row, 'handCount'), false)
+      assert.deepEqual(row.renderedSlots, ['app-frame', 'thread', 'bot-tasks'])
+      assert.equal(row.taskCount, 5)
+      assert.deepEqual(row.groups, { pending: 3, running: 0, todo: 1, done: 1 })
+      assert.equal(row.completedInitiallyFolded, true)
+      assert.equal(row.openTaskWithSuccessfulAttempt, 'todo')
+      assert.equal(row.emptyDispatcher, true)
+      assert.deepEqual(row.icons.map(icon => icon.key), ['waiting', 'blocked', 'failed', 'open', 'done'])
+      for (const icon of row.icons) {
+        assert.match(icon.shapeSha256, /^[a-f0-9]{64}$/)
+        assert.ok(typeof icon.color === 'string' && icon.color.length > 0 && icon.color.length <= 100)
+      }
+      assert.equal(new Set(row.icons.slice(0, 3).map(icon => icon.shapeSha256)).size, 3)
+      assert.equal(new Set(row.icons.slice(0, 3).map(icon => icon.color)).size, 3)
+    } else if (row.case === 'human_delegate_history') {
+      assert.equal(row.surface, 'hosted_task_detail_frame')
+      assert.deepEqual(row.renderedSlots, ['task-detail'])
+      for (const key of ['humanAssignee', 'separateDelegate', 'delegationActivity']) assert.equal(row[key], true)
+      assert.equal(row.historicalAttemptResult, 'done')
+      assert.equal(row.taskStatus, 'doing')
+    } else {
+      for (const key of ['normalRpcBusinessError', 'serverProjectUnchanged', 'draftPreserved', 'editableAfterError', 'saveEnabledAfterError']) assert.equal(row[key], true)
+    }
+  }
+  return true
+}
+
 export function validateWorkspaceNameCleanup(value) {
   assert.equal(value?.captured, true)
   assert.ok(value.phase === 'unchanged' || value.phase === 'restored')
@@ -141,7 +235,7 @@ export async function preflight(control, app, env = process.env) {
   })
 }
 
-export const REQUIRED_SLOTS = Object.freeze(['all-threads', 'bot-tasks', 'task-column', 'task-conversation'])
+export const REQUIRED_SLOTS = Object.freeze(['all-threads', 'bot-tasks', 'task-column', 'task-conversation', 'app-frame', 'thread', 'task-detail'])
 
 export function validateInventory(inventory, privateInputs) {
   assert.equal(inventory.version, 1)
@@ -184,7 +278,8 @@ export async function sourceEvidence(app, { compiled = false } = {}) {
   for (const path of PUBLIC_TARGETS) targets.push({ path, sha256: sha256(await readFile(join(app, path))), includedInProductionBuild: compiled })
   const slots = REQUIRED_SLOTS.map(name => ({ name, privateOverlaySelected: true, includedInProductionBuild: compiled }))
   return { version: 1, product: PRODUCT, productTree: PRODUCT_TREE, overlay: OVERLAY,
-    productionEntry: 'apps/frontend/src/index.tsx', build, targets, slots }
+    productionEntry: 'apps/frontend/src/index.tsx',
+    inventorySemantics: 'transformed_source_modules_not_render_coverage', build, targets, slots }
 }
 
 export function gallery(manifest) {

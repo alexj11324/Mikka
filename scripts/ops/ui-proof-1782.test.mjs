@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { BRANCH, CONTROL_PARENT, DATABASE, OVERLAY, PRODUCT, PRODUCT_TREE, PUBLIC_TARGETS, REQUIRED_SLOTS, closedFailure, gallery, validateInventory, validateInvocation, validateWorkspaceNameCleanup } from './ui-proof-1782.mjs'
+import { BRANCH, CONTROL_PARENT, DATABASE, OVERLAY, PRODUCT, PRODUCT_TREE, PUBLIC_TARGETS, REQUIRED_SLOTS, closedFailure, gallery, validateInventory, validateInvocation, validateSemanticChecks, validateWorkspaceNameCleanup } from './ui-proof-1782.mjs'
 import { CASES, freshTaskContent } from './ui-proof-1782-fixtures.mjs'
 
 const control = '1234567890abcdef1234567890abcdef12345678'
@@ -158,8 +158,8 @@ const selectedInputs = REQUIRED_SLOTS.map(slot => `.hosted-ui/slots/${slot}.tsx`
 function inventory() { return { version: 1, target: 'web', rendererBuild: 'a'.repeat(64), serverModules: [],
   inputs: [...PUBLIC_TARGETS, ...selectedInputs], usedActions: ['issues.getIssue', 'agents.pollIssueThreads', 'projects.saveProject'] } }
 
-test('requires the real production inventory to include all five public files and four private slots', () => {
-  assert.deepEqual(validateInventory(inventory(), selectedInputs), { rendererBuild: 'a'.repeat(64), transformedModuleCount: 9 })
+test('requires the real production inventory to include all nine public files and seven private slots', () => {
+  assert.deepEqual(validateInventory(inventory(), selectedInputs), { rendererBuild: 'a'.repeat(64), transformedModuleCount: 16 })
 })
 for (const path of [...PUBLIC_TARGETS, ...selectedInputs]) test(`refuses a build without ${path}`, () => {
   const value = inventory(); value.inputs = value.inputs.filter(input => input !== path)
@@ -176,5 +176,37 @@ test('a desktop inventory, duplicate sources, server code and omitted save RPC a
 test('activity and historical-attempt failures remain separate closed phases', () => {
   for (const phase of ['task_detail_activity', 'task_detail_history']) {
     assert.deepEqual(closedFailure(phase, { name: 'Error', message: 'private DOM or locator' }), { phase, kind: 'Error' })
+  }
+})
+
+function semanticChecks() {
+  return [1440, 390].flatMap(width => ['light', 'dark'].flatMap(theme => [
+    { case: 'task_groups', theme, width, taskCount: 5, surface: 'dispatcher_overview', pendingIndicator: 'inbox', globalWaitingCount: 1,
+      renderedSlots: ['app-frame', 'thread', 'bot-tasks'], groups: { pending: 3, running: 0, todo: 1, done: 1 },
+      completedInitiallyFolded: true, openTaskWithSuccessfulAttempt: 'todo', emptyDispatcher: true,
+      icons: ['waiting', 'blocked', 'failed', 'open', 'done'].map((key, index) => ({ key, shapeSha256: String(index).repeat(64), color: `rgb(${index}, 0, 0)` })) },
+    { case: 'human_delegate_history', theme, width, humanAssignee: true, separateDelegate: true, delegationActivity: true,
+      surface: 'hosted_task_detail_frame', renderedSlots: ['task-detail'], historicalAttemptResult: 'done', taskStatus: 'doing' },
+    { case: 'project_stale_form', theme, width, normalRpcBusinessError: true, serverProjectUnchanged: true,
+      draftPreserved: true, editableAfterError: true, saveEnabledAfterError: true },
+  ]))
+}
+
+test('the audit requires all twelve actual surfaces and preserves the existing business checks', () => {
+  assert.equal(validateSemanticChecks(semanticChecks()), true)
+})
+
+test('a legacy hand, compile-only slot, duplicate viewport or weakened business outcome cannot pass the audit', () => {
+  for (const change of [rows => { rows[0].surface = 'all_threads' }, rows => { rows[0].pendingIndicator = 'hand' },
+    rows => { rows[0].handCount = 1 }, rows => { rows[0].globalWaitingCount = 0 },
+    rows => { rows[0].renderedSlots.push('all-threads') }, rows => { rows[1].renderedSlots = ['task-conversation'] },
+    rows => { rows[1].surface = 'public_task_detail' }, rows => { rows[0].groups.pending = 2 },
+    rows => { rows[0].icons[1].shapeSha256 = rows[0].icons[0].shapeSha256 },
+    rows => { rows[0].icons[1].color = rows[0].icons[0].color },
+    rows => { rows[0].emptyDispatcher = false }, rows => { rows[1].historicalAttemptResult = 'running' },
+    rows => { rows[1].taskStatus = 'done' }, rows => { rows[2].draftPreserved = false },
+    rows => { rows[3] = structuredClone(rows[0]) }, rows => { rows.pop() }]) {
+    const rows = semanticChecks(); change(rows)
+    assert.throws(() => validateSemanticChecks(rows), { name: 'AssertionError' })
   }
 })
