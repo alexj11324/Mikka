@@ -354,3 +354,98 @@ test('a failed terminal result after acknowledged shutdown keeps the original te
   assert.equal(report.stage, 'terminal'); assert.equal(report.previewStopped, true); assert.equal(report.passed, false)
   assert.deepEqual(calls, ['write', 'shutdown', 'remove', 'terminal'])
 })
+
+import { prepareFrameworkPreview } from './workspace-ingress-acceptance.mjs'
+
+function previewSandbox(reply, { commandError, output } = {}) {
+  const calls = []
+  const sandbox = { files: { async write(path, body, options) {
+    calls.push({ operation: 'write', path, body: JSON.parse(body), options })
+  } }, commands: { async run(command, options) {
+    const cleanup = command.startsWith('rm -f -- ')
+    calls.push({ operation: cleanup ? 'remove' : 'prepare', command, options })
+    if (cleanup) return { exitCode: 0, stdout: '' }
+    if (commandError) throw commandError
+    return { exitCode: 0, stdout: output ?? JSON.stringify(reply) }
+  } } }
+  return { sandbox, calls }
+}
+
+test('unavailable preview retains only closed probe observations and keeps the original failed condition', async () => {
+  for (const outcome of [null, 'timeout', 'connection_failed', 'pin_changed', 'http_error', 'invalid_status']) {
+    const diagnostic = { candidateCount: outcome ? 1 : 0, vanishedFds: 2, processReadErrors: 1,
+      budgetExpired: false, probes: outcome ? [{ outcome, elapsedMs: 8001 }] : [] }
+    const { sandbox, calls } = previewSandbox({ running: false, state: 'unavailable', code: 'no_loopback_server', diagnostic })
+    const report = { stage: 'next', passed: false, frameworks: [] }, binding = { runId: 'synthetic-run' }
+    await assert.rejects(prepareFrameworkPreview(sandbox, binding, 3101, report), cause => cause.receiptCode === 'preview')
+    assert.deepEqual(report.previewDiagnostic, { reply: 'unavailable', error: null, status: null, ...diagnostic, truncated: false })
+    assert.equal(report.stage, 'next'); assert.equal(report.passed, false); assert.deepEqual(report.frameworks, [])
+    assert.deepEqual(calls.map(row => row.operation), ['write', 'prepare', 'remove'])
+    assert.deepEqual(calls[0].body, { operation: 'prepare', binding, port: 3101 })
+    assert.deepEqual(calls[0].options, { user: 'root' })
+    assert.deepEqual(calls[1].options, { user: 'root', timeoutMs: 25_000 })
+    assert.deepEqual(calls[2].options, { user: 'root', timeoutMs: 5000 })
+  }
+})
+
+test('untrusted prepare reply cannot preserve private strings or unbounded diagnostic values', async () => {
+  const privateText = 'synthetic-private-path-url-pid-header-and-capability'
+  const reply = { running: false, state: 'unavailable', code: 'no_loopback_server', pid: privateText, host: privateText,
+    diagnostic: { candidateCount: true, vanishedFds: 4096 * 1024 + 1, processReadErrors: -1, budgetExpired: privateText,
+      path: privateText, probes: Array.from({ length: 17 }, () => ({ outcome: privateText, elapsedMs: 25_001, error: privateText })) } }
+  const { sandbox } = previewSandbox(reply), report = { passed: false }
+  await assert.rejects(prepareFrameworkPreview(sandbox, {}, 3101, report), cause => cause.receiptCode === 'preview')
+  const value = report.previewDiagnostic
+  assert.deepEqual([value.candidateCount, value.vanishedFds, value.processReadErrors, value.budgetExpired], [null, null, null, null])
+  assert.equal(value.probes.length, 16); assert.equal(value.truncated, true)
+  assert.ok(value.probes.every(row => row.outcome === 'other' && row.elapsedMs === null))
+  assert.equal(JSON.stringify(report).includes(privateText), false)
+  for (const [field, maximum] of [['candidateCount', 16], ['vanishedFds', 4096 * 1024], ['processReadErrors', 4096], ['elapsedMs', 25_000]]) {
+    for (const number of [0, maximum, maximum + 1, -1, true, '1', 1.5]) {
+      const diagnostic = field === 'elapsedMs' ? { probes: [{ outcome: 'timeout', elapsedMs: number }] } : { [field]: number }
+      const fixture = previewSandbox({ running: false, state: 'unavailable', code: 'no_loopback_server', diagnostic }), observed = {}
+      await assert.rejects(prepareFrameworkPreview(fixture.sandbox, {}, 3101, observed), cause => cause.receiptCode === 'preview')
+      const retained = field === 'elapsedMs' ? observed.previewDiagnostic.probes[0].elapsedMs : observed.previewDiagnostic[field]
+      assert.equal(retained, number === 0 || number === maximum ? number : null)
+    }
+  }
+})
+
+test('prepare success, wrong port and control errors keep the same authority gate', async () => {
+  const successful = { running: true, port: 3101, gatewayPort: 3102 }
+  const report = { passed: false }, { sandbox } = previewSandbox(successful)
+  assert.deepEqual(await prepareFrameworkPreview(sandbox, {}, 3101, report), successful)
+  assert.equal(report.previewDiagnostic, undefined); assert.equal(report.passed, false)
+  const privateText = 'synthetic-private-gateway-error'
+  for (const [reply, classification, code, status] of [
+    [{ running: true, port: 3102 }, 'port_mismatch', null, null],
+    [{ running: 'true', port: 3101 }, 'invalid_reply', null, null],
+    [{ error: 'server_stopped', status: 409 }, 'control_error', 'server_stopped', 409],
+    [{ error: 'control_unavailable', status: 503 }, 'control_error', 'control_unavailable', 503],
+    [{ error: privateText, status: true }, 'control_error', 'other', null],
+  ]) {
+    const state = previewSandbox(reply), observed = { passed: false }
+    await assert.rejects(prepareFrameworkPreview(state.sandbox, {}, 3101, observed), cause => cause.receiptCode === 'preview')
+    assert.deepEqual([observed.previewDiagnostic.reply, observed.previewDiagnostic.error, observed.previewDiagnostic.status], [classification, code, status])
+    assert.equal(observed.passed, false); assert.equal(JSON.stringify(observed).includes(privateText), false)
+  }
+  const source = readFileSync(new URL('./workspace-ingress-acceptance.mjs', import.meta.url), 'utf8')
+  assert.match(source, /const prepared = await prepareFrameworkPreview\(sandbox, binding, port, runtimeReport\)/)
+  assert.match(source, /framework\(sandbox, kind, appRoot, identity, fetchImpl, Socket, report\)/)
+})
+
+test('prepare command and JSON failures keep their cause and cleanup without fabricating a reply diagnostic', async () => {
+  const privateText = 'synthetic-private-sdk-message-and-output'
+  const commandError = new CommandExitError({ exitCode: 1, stdout: privateText, stderr: privateText, error: privateText })
+  for (const options of [{ commandError }, { output: privateText }, { output: 'x'.repeat(32_769) }]) {
+    const { sandbox, calls } = previewSandbox(null, options), report = { passed: false }
+    await assert.rejects(prepareFrameworkPreview(sandbox, {}, 3101, report), cause => {
+      assert.equal(cause.receiptCode, 'process'); assert.ok(cause.cause)
+      if (options.commandError) assert.equal(cause.cause, commandError)
+      return true
+    })
+    assert.equal(report.previewDiagnostic, undefined); assert.equal(report.passed, false)
+    assert.deepEqual(calls.map(row => row.operation), ['write', 'prepare', 'remove'])
+    assert.equal(JSON.stringify(report).includes(privateText), false)
+  }
+})

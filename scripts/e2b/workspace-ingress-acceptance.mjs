@@ -36,6 +36,10 @@ const IDENTITY_ERROR_TYPES = new Set(['Error', 'TypeError', 'SyntaxError', 'Comm
   'NotEnoughSpaceError', 'TimeoutError', 'AbortError'])
 const diagnosticInteger = (value, minimum, maximum) => Number.isSafeInteger(value)
   && value >= minimum && value <= maximum ? value : null
+const PREVIEW_ERRORS = new Set(['invalid_scope', 'invalid_port', 'worktree_unavailable', 'port_limit',
+  'authorization_revoked', 'authorization_expired', 'server_stopped', 'control_unavailable',
+  'firewall_unsupported', 'firewall_unavailable', 'infrastructure_only', 'origin_limit'])
+const PREVIEW_PROBE_OUTCOMES = new Set(['timeout', 'connection_failed', 'http_error', 'pin_changed', 'invalid_status'])
 
 // SDK messages, command output, request URLs and headers must never enter a
 // receipt. Inspect only bounded command stderr for these fixed classifications.
@@ -223,6 +227,33 @@ async function control(sandbox, message) {
   }
 }
 
+export async function prepareFrameworkPreview(sandbox, binding, port, report) {
+  const prepared = await control(sandbox, { operation: 'prepare', binding, port })
+  if (!(prepared.running === true && prepared.port === port)) {
+    // The Unix reply is not a receipt. Preserve only fixed classifications,
+    // bounded counts and timings; never copy its addresses or process data.
+    const diagnostic = prepared.diagnostic
+    const probes = Array.isArray(diagnostic?.probes) ? diagnostic.probes : []
+    const controlError = typeof prepared.error === 'string'
+    report.previewDiagnostic = {
+      reply: controlError ? 'control_error' : prepared.running === true ? 'port_mismatch'
+        : prepared.running === false && prepared.state === 'unavailable' && prepared.code === 'no_loopback_server' ? 'unavailable' : 'invalid_reply',
+      error: controlError ? PREVIEW_ERRORS.has(prepared.error) ? prepared.error : 'other' : null,
+      status: controlError && [400, 403, 404, 409, 429, 503].includes(prepared.status) ? prepared.status : null,
+      candidateCount: diagnosticInteger(diagnostic?.candidateCount, 0, 16),
+      vanishedFds: diagnosticInteger(diagnostic?.vanishedFds, 0, 4096 * 1024),
+      processReadErrors: diagnosticInteger(diagnostic?.processReadErrors, 0, 4096),
+      budgetExpired: typeof diagnostic?.budgetExpired === 'boolean' ? diagnostic.budgetExpired : null,
+      probes: probes.slice(0, 16).map(row => ({
+        outcome: PREVIEW_PROBE_OUTCOMES.has(row?.outcome) ? row.outcome : 'other',
+        elapsedMs: diagnosticInteger(row?.elapsedMs, 0, 25_000),
+      })), truncated: probes.length > 16,
+    }
+  }
+  check(prepared.running === true && prepared.port === port, 'preview')
+  return prepared
+}
+
 async function background(sandbox, command, options, ready, timeoutMs = 30_000) {
   const pending = Promise.withResolvers()
   let buffer = '', settled = false
@@ -283,7 +314,7 @@ export function observeHmr(url, protocols, headers, Socket) {
   }
 }
 
-async function framework(sandbox, kind, root, identity, fetchImpl, Socket) {
+async function framework(sandbox, kind, root, identity, fetchImpl, Socket, runtimeReport) {
   const directory = `${root}/${kind}`
   const files = kind === 'next' ? {
     'app/layout.jsx': 'export default function Layout({children}){return <html><body>{children}</body></html>}',
@@ -310,8 +341,7 @@ async function framework(sandbox, kind, root, identity, fetchImpl, Socket) {
   try {
     const raw = await markerSample(publicOrigin(sandbox, port), fetchImpl)
     check(denied(raw), 'raw_exposed'); report.rawDenied = true
-    const prepared = await control(sandbox, { operation: 'prepare', binding, port })
-    check(prepared.running === true && prepared.port === port, 'preview')
+    const prepared = await prepareFrameworkPreview(sandbox, binding, port, runtimeReport)
     gatewayPort = prepared.gatewayPort
     const origin = publicOrigin(sandbox, gatewayPort)
     const unauthenticated = await request(origin + '/', fetchImpl)
@@ -462,7 +492,7 @@ export async function probeWorkspaceIngress(initialSandbox, identity, {
     report.frameworkVersions = versions
     report.frameworkLockSha256 = hash(await readFile(new URL('./fixtures/preview-frameworks/package-lock.json', import.meta.url)))
     await jsonCommand(sandbox, `python3 '${GATEWAY}' ensure`)
-    for (const kind of ['next', 'vite']) { report.stage = kind; report.frameworks.push(await framework(sandbox, kind, appRoot, identity, fetchImpl, Socket)) }
+    for (const kind of ['next', 'vite']) { report.stage = kind; report.frameworks.push(await framework(sandbox, kind, appRoot, identity, fetchImpl, Socket, report)) }
     await probeTerminalAfterPreview(sandbox, report, identity, terminalProbe, fetchImpl)
     report.stage = 'pause_resume'
     check(await sandbox.pause({ mode: 'full' }) === true, 'resume')

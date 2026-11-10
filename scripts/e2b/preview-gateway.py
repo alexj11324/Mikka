@@ -25,7 +25,7 @@ DEPENDENCIES = Path('/opt/mikka/runtime/preview-python-3.14.0')
 if DEPENDENCIES.is_dir():
     sys.path.insert(0, str(DEPENDENCIES))
 
-from aiohttp import ClientError, ClientSession, ClientTimeout, DummyCookieJar, WSMsgType, web
+from aiohttp import ClientConnectionError, ClientError, ClientSession, ClientTimeout, DummyCookieJar, WSMsgType, web
 from multidict import CIMultiDict
 from yarl import URL
 from preview_firewall import FirewallError, protect_port
@@ -101,7 +101,9 @@ def listeners():
     return result
 
 
-def discover(worktree, user_id, requested_port=None):
+def discover(worktree, user_id, requested_port=None, *, diagnostic=None):
+    if diagnostic is not None:
+        diagnostic.update({'vanishedFds': 0, 'processReadErrors': 0})
     if requested_port is not None and not valid_port(requested_port):
         raise PreviewFailure('invalid_port', 400)
     try:
@@ -122,7 +124,12 @@ def discover(worktree, user_id, requested_port=None):
                 continue
             start = proc_start(process.name)
             for descriptor in list((process / 'fd').iterdir())[:1024]:
-                link = os.readlink(descriptor)
+                try:
+                    link = os.readlink(descriptor)
+                except FileNotFoundError:
+                    if diagnostic is not None:
+                        diagnostic['vanishedFds'] += 1
+                    continue  # An unrelated FD can close after enumeration.
                 inode = link[8:-1] if link.startswith('socket:[') else ''
                 if inode not in available:
                     continue
@@ -132,6 +139,8 @@ def discover(worktree, user_id, requested_port=None):
                 found.append({'port': port, 'host': host, 'pid': int(process.name), 'start': start, 'inode': inode,
                               'worktree': worktree, 'rootDevice': root_info.st_dev, 'rootInode': root_info.st_ino, 'userId': user_id})
         except (OSError, ValueError, IndexError):
+            if diagnostic is not None:
+                diagnostic['processReadErrors'] += 1
             continue  # A process may exit between procfs reads; it grants nothing.
     unique = {(item['port'], item['host']): item for item in found}
     if len(unique) > MAX_CANDIDATES:
@@ -150,7 +159,14 @@ def pinned(target):
             return False
         if proc_start(target['pid']) != target['start'] or listeners().get(target['inode']) != (target['port'], target['host']):
             return False
-        return any(os.readlink(fd) == f"socket:[{target['inode']}]" for fd in Path(f"/proc/{target['pid']}/fd").iterdir())
+        for descriptor in Path(f"/proc/{target['pid']}/fd").iterdir():
+            try:
+                link = os.readlink(descriptor)
+            except FileNotFoundError:
+                continue
+            if link == f"socket:[{target['inode']}]":
+                return True
+        return False
     except (OSError, ValueError, IndexError):
         return False
 
@@ -267,7 +283,9 @@ class Gateway:
         if binding['runId'] in self.revoked:
             raise PreviewFailure('authorization_revoked', 403)
         # Only a trusted control-plane request can switch a run's target.
-        candidates = discover(binding['worktreePath'], self.user_id, message.get('port'))
+        diagnostic = {}
+        candidates = discover(binding['worktreePath'], self.user_id, message.get('port'), diagnostic=diagnostic)
+        diagnostic.update({'candidateCount': len(candidates), 'probes': [], 'budgetExpired': False})
         target = None
         discovery_deadline = time.monotonic() + DISCOVERY_SECONDS
         for candidate in candidates:
@@ -279,20 +297,40 @@ class Gateway:
                 raise PreviewFailure(cause.code, 404 if cause.code == 'firewall_unsupported' else 503) from cause
             remaining = discovery_deadline - time.monotonic()
             if remaining <= 0:
+                diagnostic['budgetExpired'] = True
                 break
+            started = time.monotonic()
+            outcome = 'http_error'
             try:
                 # Next compiles the first document lazily. A one-second probe
                 # misclassifies its real listening server as absent. Keep a
                 # bounded overall discovery budget without retry/polling.
                 async with self.http.get(f"http://{candidate['host']}:{candidate['port']}/", allow_redirects=False,
                                          timeout=ClientTimeout(total=min(8, remaining)), headers={'Host': f"localhost:{candidate['port']}"}) as reply:
-                    if 100 <= reply.status <= 599 and pinned(candidate):
-                        target = candidate
-                        break
-            except (ClientError, OSError, asyncio.TimeoutError):
+                    if 100 <= reply.status <= 599:
+                        if pinned(candidate):
+                            target = candidate
+                            outcome = 'selected'
+                            break
+                        outcome = 'pin_changed'
+                    else:
+                        outcome = 'invalid_status'
+            except asyncio.TimeoutError:
+                outcome = 'timeout'
                 continue
+            except ClientConnectionError:
+                outcome = 'connection_failed'
+                continue
+            except (ClientError, OSError):
+                continue
+            finally:
+                diagnostic['probes'].append({'outcome': outcome, 'elapsedMs': int((time.monotonic() - started) * 1000)})
         if target is None:
-            return {'running': False, 'state': 'unavailable', 'code': 'no_loopback_server', 'observedAt': int(time.time() * 1000)}
+            # Root control diagnostics contain no socket/process identity,
+            # paths, URLs or exception text. The application rebuilds its
+            # ordinary four-field unavailable DTO instead of forwarding this.
+            return {'running': False, 'state': 'unavailable', 'code': 'no_loopback_server',
+                    'observedAt': int(time.time() * 1000), 'diagnostic': diagnostic}
         # Discovery may wait for a cold framework compile. It must never hold
         # the control lock that a stop/revocation needs to close live sockets.
         async with self.lock:

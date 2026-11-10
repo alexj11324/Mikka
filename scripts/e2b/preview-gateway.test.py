@@ -4,7 +4,7 @@ No browser, model, external service or production credential is used. Run with
 python3 scripts/e2b/preview-gateway.test.py in an isolated Linux environment.
 """
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 import errno
 import http.server
 import importlib.util
@@ -566,6 +566,232 @@ class PreviewAcceptance(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(error.exception.status, 404)
         self.assertIsNone(self.gateway.port)
         self.assertEqual(len(self.gateway.tickets), 0)
+
+
+def fixture_loopback_listener():
+    # Ephemeral allocation can select a reserved provider port. Select only a
+    # valid fixture port; this does not retry discovery or an HTTP request.
+    for _ in range(16):
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.bind(('127.0.0.1', 0))
+        if gateway_module.valid_port(listener.getsockname()[1]):
+            listener.listen()
+            return listener
+        listener.close()
+    raise AssertionError('No valid fixture port was allocated')
+
+
+class ProcfsDiscoveryAcceptance(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='mikka-preview-procfs-')
+        self.root = Path(self.temporary.name)
+        self.previous = Path.cwd()
+        os.chdir(self.root)
+        self.listener = fixture_loopback_listener()
+        self.port = self.listener.getsockname()[1]
+        # /proc can belong to an outer PID namespace. Use the process that
+        # actually owns this socket in procfs, not a guessed numeric PID.
+        self.process = Path('/proc/self').resolve(strict=True)
+        self.descriptors = self.process / 'fd'
+        self.assertEqual((self.process / 'cwd').resolve(strict=True), self.root)
+        targets = gateway_module.discover(str(self.root), os.getuid(), self.port)
+        self.assertEqual(len(targets), 1)
+        self.target = targets[0]
+        self.assertEqual(self.target['pid'], int(self.process.name))
+        self.assertTrue(gateway_module.pinned(self.target))
+
+    def tearDown(self):
+        self.listener.close()
+        os.chdir(self.previous)
+        self.temporary.cleanup()
+
+    @contextmanager
+    def unrelated_descriptor(self, *, disappear=False):
+        descriptor = os.open('/dev/null', os.O_RDONLY)
+        path = self.descriptors / str(descriptor)
+        original = Path.iterdir
+        enumerations = []
+
+        def snapshot(directory):
+            entries = list(original(directory))
+            if directory == self.descriptors:
+                self.assertIn(path, entries)
+                self.assertIn(self.descriptors / str(self.listener.fileno()), entries)
+                enumerations.append(True)
+                if disappear:
+                    os.close(descriptor)
+                    # This is a real vanished procfs entry, not a fabricated
+                    # exception or a synthetic listener returned by discover.
+                    with self.assertRaises(FileNotFoundError):
+                        os.readlink(path)
+                return iter([path, *(entry for entry in entries if entry != path)])
+            return iter(entries)
+
+        try:
+            with mock.patch.object(Path, 'iterdir', snapshot):
+                yield path
+            self.assertEqual(enumerations, [True])
+        finally:
+            if not disappear or not enumerations:
+                os.close(descriptor)
+
+    def test_discovery_keeps_the_real_listener_after_an_unrelated_fd_disappears(self):
+        with self.unrelated_descriptor(disappear=True):
+            targets = gateway_module.discover(str(self.root), os.getuid(), self.port)
+        self.assertEqual(targets, [self.target])
+        self.assertTrue(gateway_module.pinned(self.target))
+        diagnostic = {}
+        with self.unrelated_descriptor(disappear=True):
+            targets = gateway_module.discover(str(self.root), os.getuid(), self.port, diagnostic=diagnostic)
+        self.assertEqual(targets, [self.target])
+        self.assertGreaterEqual(diagnostic['vanishedFds'], 1)
+        self.assertGreaterEqual(diagnostic['processReadErrors'], 0)
+
+    def test_pinning_keeps_the_real_listener_after_an_unrelated_fd_disappears(self):
+        with self.unrelated_descriptor(disappear=True):
+            pinned = gateway_module.pinned(self.target)
+        self.assertTrue(pinned)
+        self.assertEqual(gateway_module.listeners().get(self.target['inode']), (self.port, '127.0.0.1'))
+
+    def test_non_enoent_fd_errors_still_refuse_the_process(self):
+        original = os.readlink
+        for code in (errno.EACCES, errno.EIO):
+            for operation in ('discover', 'pinned'):
+                with self.subTest(errno=code, operation=operation), self.unrelated_descriptor() as path:
+                    def denied(descriptor, *args, **kwargs):
+                        if Path(descriptor) == path:
+                            raise OSError(code, 'synthetic fd read refused')
+                        return original(descriptor, *args, **kwargs)
+                    with mock.patch.object(os, 'readlink', denied):
+                        if operation == 'discover':
+                            self.assertEqual(gateway_module.discover(str(self.root), os.getuid(), self.port), [])
+                        else:
+                            self.assertFalse(gateway_module.pinned(self.target))
+        self.assertTrue(gateway_module.pinned(self.target))
+
+    def test_closed_replaced_socket_and_reused_pid_identity_remain_denied(self):
+        self.listener.close()
+        self.assertFalse(gateway_module.pinned(self.target))
+        self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.listener.bind(('127.0.0.1', self.port))
+        self.listener.listen()
+        targets = gateway_module.discover(str(self.root), os.getuid(), self.port)
+        self.assertEqual(len(targets), 1)
+        replacement = targets[0]
+        self.assertNotEqual(replacement['inode'], self.target['inode'])
+        self.assertFalse(gateway_module.pinned(self.target))
+        self.assertTrue(gateway_module.pinned(replacement))
+        # A stale start time for the same PID cannot inherit the new socket.
+        self.assertFalse(gateway_module.pinned({**replacement, 'start': str(int(replacement['start']) + 1)}))
+        for field in ('rootInode', 'rootDevice', 'userId'):
+            self.assertFalse(gateway_module.pinned({**replacement, field: replacement[field] + 1}))
+
+
+class PrepareDiagnosticAcceptance(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='mikka-preview-diagnostic-')
+        self.root = Path(self.temporary.name)
+        self.previous = Path.cwd()
+        os.chdir(self.root)
+        self.listener = fixture_loopback_listener()
+        self.port = self.listener.getsockname()[1]
+        self.gateway = gateway_module.Gateway(self.root, user_id=os.getuid(), protect=lambda _port: None)
+        await self.gateway.start()
+        self.binding = {'taskId': 'task-a', 'runId': 'run-a', 'ownerId': 'owner-a', 'workspaceId': 'workspace-a',
+                        'deviceId': 'device-a', 'repoId': 'repo-a', 'sandboxId': 'sandbox-a', 'epoch': 1,
+                        'worktreePath': str(self.root), 'expiresAt': time.time() + 120}
+        self.server = None
+        self.release = asyncio.Event()
+        self.tasks = set()
+        self.requests = 0
+
+    async def asyncTearDown(self):
+        self.release.set()
+        if self.server:
+            self.server.close()
+        await asyncio.gather(*self.tasks)
+        if self.server:
+            await self.server.wait_closed()
+        await self.gateway.close()
+        self.listener.close()
+        os.chdir(self.previous)
+        self.temporary.cleanup()
+
+    async def unavailable(self, binding=None):
+        result = await self.gateway.control({'operation': 'prepare', 'binding': binding or self.binding, 'port': self.port})
+        self.assertFalse(result['running'])
+        self.assertEqual(result['state'], 'unavailable')
+        self.assertEqual(result['code'], 'no_loopback_server')
+        self.assertIsNone(self.gateway.port)
+        self.assertEqual(self.gateway.tickets, {})
+        self.assertIn('diagnostic', result)
+        diagnostic = result['diagnostic']
+        self.assertEqual(set(diagnostic), {'candidateCount', 'vanishedFds', 'processReadErrors', 'probes', 'budgetExpired'})
+        for count in ('candidateCount', 'vanishedFds', 'processReadErrors'):
+            self.assertIs(type(diagnostic[count]), int)
+            self.assertGreaterEqual(diagnostic[count], 0)
+        for probe in diagnostic['probes']:
+            self.assertEqual(set(probe), {'outcome', 'elapsedMs'})
+            self.assertIs(type(probe['elapsedMs']), int)
+            self.assertGreaterEqual(probe['elapsedMs'], 0)
+        self.assertNotIn(str(self.root), json.dumps(diagnostic))
+        return diagnostic
+
+    async def start_http(self, *, stop_listener=False):
+        async def handle(reader, writer):
+            task = asyncio.current_task()
+            self.tasks.add(task)
+            try:
+                await reader.readuntil(b'\r\n\r\n')
+                self.requests += 1
+                if stop_listener:
+                    # A real response followed by a lost listening socket
+                    # must be distinguished from a failed HTTP connection.
+                    self.server.close()
+                    writer.write(b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n')
+                    await writer.drain()
+                else:
+                    await self.release.wait()
+            finally:
+                writer.close()
+                await writer.wait_closed()
+                self.tasks.discard(task)
+        self.server = await asyncio.start_server(handle, sock=self.listener)
+
+    async def test_no_candidate_is_distinct_from_a_probe_failure(self):
+        empty = self.root / 'no-process-worktree'
+        empty.mkdir()
+        diagnostic = await self.unavailable({**self.binding, 'worktreePath': str(empty)})
+        self.assertEqual(diagnostic['candidateCount'], 0)
+        self.assertEqual(diagnostic['probes'], [])
+        self.assertFalse(diagnostic['budgetExpired'])
+
+    async def test_closed_listener_records_a_real_connection_failure(self):
+        self.gateway.protect = lambda _port: self.listener.close()
+        diagnostic = await self.unavailable()
+        self.assertEqual(diagnostic['candidateCount'], 1)
+        self.assertEqual([row['outcome'] for row in diagnostic['probes']], ['connection_failed'])
+        self.assertEqual(self.listener.fileno(), -1)
+        self.assertFalse(diagnostic['budgetExpired'])
+
+    async def test_unresponsive_http_records_the_original_eight_second_timeout(self):
+        await self.start_http()
+        self.assertEqual(gateway_module.DISCOVERY_SECONDS, 12)
+        diagnostic = await self.unavailable()
+        self.assertEqual(self.requests, 1)
+        self.assertEqual(diagnostic['candidateCount'], 1)
+        self.assertEqual([row['outcome'] for row in diagnostic['probes']], ['timeout'])
+        self.assertGreaterEqual(diagnostic['probes'][0]['elapsedMs'], 7500)
+        self.assertLess(diagnostic['probes'][0]['elapsedMs'], 12000)
+        self.assertFalse(diagnostic['budgetExpired'])
+
+    async def test_successful_http_with_a_disappeared_socket_records_pin_failure(self):
+        await self.start_http(stop_listener=True)
+        diagnostic = await self.unavailable()
+        self.assertEqual(self.requests, 1)
+        self.assertEqual(diagnostic['candidateCount'], 1)
+        self.assertEqual([row['outcome'] for row in diagnostic['probes']], ['pin_changed'])
+        self.assertFalse(diagnostic['budgetExpired'])
 
 
 if __name__ == '__main__':
