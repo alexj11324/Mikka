@@ -49,31 +49,42 @@ function useSuggestionsKey() {
 
 /**
  * The 建议 list and 交给 Coordinator (R-21), shared with a UI layer's inbox (docs/ui-overlay.md).
- * `send` resolves to the error to show, or null once the Coordinator has it. `enabled` false reads nothing.
+ * `send` resolves to the error to show, or null once the Coordinator has it.
  */
-export function useSuggestions(enabled = true) {
+export function useSuggestions() {
   const actionError = useActionError()
   const { mutate: mutateAll } = useSWRConfig()
-  const key = useSuggestionsKey()
-  const { data, error, mutate } = useSWR(enabled ? key : null, fetchJson<SuggestionsView>)
+  const { data, error, mutate } = useSWR(useSuggestionsKey(), fetchJson<SuggestionsView>)
   // One list, newest first (R-21); the API still groups by app.
   const items = data?.groups.flatMap(group => group.items) ?? []
   async function send(id: string): Promise<string | null> {
     try {
       const result = await sendSuggestion(id)
       if (result.error && result.error !== 'suggestionNotFound') return actionError(result.error)
-      await Promise.all([mutate(), mutateAll(coordinatorChatKey()), mutateAll(key => key === 'threads' || Array.isArray(key) && key[0] === 'threads')])
+      await Promise.all([mutate(), mutateAll(SUGGESTION_COUNT_KEY), mutateAll(coordinatorChatKey()), mutateAll(key => key === 'threads' || Array.isArray(key) && key[0] === 'threads')])
       return null
     } catch { return actionError() }
   }
   return { data, items, error, mutate, send }
 }
 
+const SUGGESTION_COUNT_KEY = withBasePath('/api/suggestions?count=1')
+
+/**
+ * How many cards the suggestions list shows, for the count on 收件箱. A read-only count (`count=1`): unlike the list's
+ * read, it writes no briefing and wakes nothing, so a count on every page changes nothing. `enabled` false reads nothing.
+ */
+export function useSuggestionCount(enabled: boolean) {
+  const { data } = useSWR(enabled ? SUGGESTION_COUNT_KEY : null, fetchJson<{ count: number }>)
+  return data?.count ?? 0
+}
+
 /** Re-reads the suggestions: beside the title on wide screens, among the phone header's actions otherwise. */
 export function SuggestionsRefresh({ phoneHidden = false }: { phoneHidden?: boolean }) {
   const t = useTranslations('SuggestionsPage')
   const { isValidating, mutate } = useSWR(useSuggestionsKey(), fetchJson<SuggestionsView>)
-  return <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn(phoneHidden && 'max-md:hidden')} aria-label={t('refresh')} disabled={isValidating} onClick={() => { void mutate().then(() => toast.success(t('refreshed')), () => toast.error(t('refreshFailed'))) }} />}><RotateCw data-icon="inline-start" className={cn(isValidating && 'animate-spin')} /></TooltipTrigger><TooltipContent>{t('refresh')}</TooltipContent></Tooltip>
+  const { mutate: mutateAll } = useSWRConfig()
+  return <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn(phoneHidden && 'max-md:hidden')} aria-label={t('refresh')} disabled={isValidating} onClick={() => { void mutateAll(SUGGESTION_COUNT_KEY); void mutate().then(() => toast.success(t('refreshed')), () => toast.error(t('refreshFailed'))) }} />}><RotateCw data-icon="inline-start" className={cn(isValidating && 'animate-spin')} /></TooltipTrigger><TooltipContent>{t('refresh')}</TooltipContent></Tooltip>
 }
 
 /**
