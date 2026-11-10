@@ -55,7 +55,6 @@ test('detail and activity revalidate current access while returning only changed
   const owner = `detail-cache-${randomUUID()}`, stranger = `detail-stranger-${randomUUID()}`
   const workspaceId = randomUUID(), personalWorkspaceId = randomUUID(), teamId = randomUUID(), botId = randomUUID()
   const read = <T>(work: () => Promise<T>) => withActivitySession(owner, () => actAs(owner, work), personalWorkspaceId) as Promise<T>
-  const readWorkspace = <T>(work: () => Promise<T>) => withActivitySession(owner, () => actAs(owner, work), workspaceId) as Promise<T>
   const readShared = <T>(work: () => Promise<T>) => withActivitySession(stranger, () => actAs(stranger, work), workspaceId) as Promise<T>
   const readChat = (...args: Parameters<typeof syncCoordinatorChat>): ReturnType<typeof syncCoordinatorChat> => withActivitySession(stranger, () => syncCoordinatorChat(...args), workspaceId)
   const content = { type: 'doc', content: Array.from({ length: 70 }, (_, index) => ({ type: 'paragraph', content: [{ type: 'text', text: `Paragraph ${index}: ${'private history body '.repeat(20)}` }] })) }
@@ -175,13 +174,11 @@ test('detail and activity revalidate current access while returning only changed
       const id = sharedId
       const identifier = createdShared.issue.identifier
       assert.ok(identifier)
-      const { ActionFailureError } = await import('../lib/action-error')
       const { listIssueConnections } = await import('../app/actions/issue-operations')
       const { citationSources } = await import('../lib/coordinator/store')
       const { runAction } = await import('../lib/action-error')
       // Team links only name this already-bound shared task. The Personal task
       // above remains a separate control; unlinking never transfers ownership.
-      const id = sharedId
       const readWorkspace = <T>(work: () => Promise<T>) => withActivitySession(owner, () => actAs(owner, work), workspaceId) as Promise<T>
       const sharedNumber = successful(await readWorkspace(() => getIssue(id))).issue.metadata.number
       assert.equal(sharedNumber, 2, 'the shared task keeps its owner-allocated number')

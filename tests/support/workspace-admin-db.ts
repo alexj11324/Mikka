@@ -86,8 +86,6 @@ export async function seedProject(pool: Pool, userId: string, links: Array<{ tea
   if (links.some(link => link.workspaceId !== workspaceId)) throw new Error('Project fixture cannot cross workspaces')
   await pool.query(`insert into workspace_projects (id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) values ($1,$2,$3,'P','','','planned','none','','','','','[]',1)`, [id, userId, workspaceId])
   for (const link of links) await pool.query('insert into mikka_team_projects ("projectId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id, link.teamId, link.workspaceId, userId])
-  const workspaceIds = [...new Set(links.map(link => link.workspaceId))]
-  const workspaceId = !links.length ? await seedPersonalWorkspace(pool, userId) : workspaceIds.length === 1 ? workspaceIds[0] : null
   await pool.query(`insert into resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance)
     values('project',$1,$2,$3,$4,'created')`, [id, workspaceId, userId, !workspaceId ? 'quarantined' : links.length ? 'shared' : 'private'])
   return id

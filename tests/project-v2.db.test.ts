@@ -167,7 +167,7 @@ test('Project v2: split database migration, canonical relationships and live ten
 
     const draft = { name: 'Same display name', summary: '', description: '', status: 'planned' as const, priority: 'none' as const, lead: '', team: 'Any display text', startDate: '', targetDate: '', properties: { ...properties, members: [] }, workspaceId: alpha }
     const created = await actAs(member, () => actions.saveProject({ ...draft, leadUserId: owner, memberIds: [owner, member] }))
-    assert.ok(created.project, JSON.stringify(created))
+    assert.ok('project' in created, JSON.stringify(created))
     const createdId = created.project.id
 
     await t.test('upgraded database rejects old inserts and canonical legacy-only writes without altering evidence', async () => {
@@ -194,12 +194,12 @@ test('Project v2: split database migration, canonical relationships and live ten
 
     await t.test('legacy client fields through the current API update canonical people and never leak a writer marker', async () => {
       const saved = await actAs(member, () => actions.saveProject({ ...draft, name: 'Alias-compatible API', lead: 'me', properties: { ...draft.properties, members: ['me'] } }))
-      assert.ok(saved.project, JSON.stringify(saved))
+      assert.ok('project' in saved, JSON.stringify(saved))
       assert.equal(saved.project.leadUserId, member)
       assert.deepEqual(saved.project.memberIds, [member])
       const edited = await actAs(member, () => actions.updateProjectProperties({ id: saved.project!.id, revision: saved.project!.revision, workspaceId: alpha,
         changes: { lead: owner, properties: { ...draft.properties, members: [owner] } } }))
-      assert.ok(edited.project, JSON.stringify(edited))
+      assert.ok('project' in edited, JSON.stringify(edited))
       assert.equal(edited.project.leadUserId, owner)
       assert.deepEqual(edited.project.memberIds, [owner])
       const clients = await Promise.all(Array.from({ length: 5 }, () => workspaceModule!.connect()))
@@ -215,12 +215,14 @@ test('Project v2: split database migration, canonical relationships and live ten
     })
 
     await t.test('create and edit stable people IDs; invalid/departed identities never become assignees', async () => {
-      assert.equal(created.project!.workspaceId, alpha)
-      assert.equal(created.project!.createdBy, member)
-      assert.equal(created.project!.leadUserId, owner)
-      assert.deepEqual(created.project!.memberIds.sort(), [member, owner].sort())
+      assert.ok('project' in created, JSON.stringify(created))
+      assert.equal(created.project.workspaceId, alpha)
+      assert.equal(created.project.createdBy, member)
+      assert.equal(created.project.leadUserId, owner)
+      assert.deepEqual(created.project.memberIds.sort(), [member, owner].sort())
       const invalid = await actAs(member, () => actions.updateProjectProperties({ id: createdId, revision: 1, changes: { leadUserId: outsider }, workspaceId: alpha }))
-      assert.match(invalid.error ?? '', /memberNotJoined/)
+      assert.ok('error' in invalid, JSON.stringify(invalid))
+      assert.match(invalid.error, /memberNotJoined/)
       const unchanged = (await accessibleProjects(member, projectDb, alpha)).find(row => row.id === createdId)!
       assert.equal(unchanged.revision, 1)
       assert.equal(unchanged.leadUserId, owner)
@@ -247,7 +249,7 @@ test('Project v2: split database migration, canonical relationships and live ten
     await t.test('same names and stale JSON never establish membership; renames follow stable IDs', async () => {
       let row = (await accessibleProjects(member, projectDb, alpha)).find(item => item.id === createdId)!
       const renamed = await actAs(member, () => actions.updateProjectProperties({ id: createdId, revision: row.revision, changes: { name: 'Renamed through ID' }, workspaceId: alpha }))
-      assert.ok(renamed.project, JSON.stringify(renamed))
+      assert.ok('project' in renamed, JSON.stringify(renamed))
       const views = await projectViewsForTasks([{ id: initialTasks[1], workspaceId: alpha }, { id: initialTasks[0], workspaceId: alpha }, { id: foreignTask, workspaceId: beta }])
       assert.deepEqual(views.get(initialTasks[1]), { projectId: createdId, project: 'Renamed through ID' })
       assert.equal(views.has(initialTasks[0]), false)
@@ -255,8 +257,8 @@ test('Project v2: split database migration, canonical relationships and live ten
       assert.equal((await projectViewsForTasks([{ id: initialTasks[1], workspaceId: beta }])).size, 0)
       row = renamed.project
       const concurrent = await Promise.all(['First update', 'Second update'].map(name => actAs(member, () => actions.updateProjectProperties({ id: createdId, revision: row.revision, changes: { name }, workspaceId: alpha }))))
-      assert.equal(concurrent.filter(result => result.project).length, 1)
-      assert.equal(concurrent.filter(result => result.error).length, 1)
+      assert.equal(concurrent.filter(result => 'project' in result).length, 1)
+      assert.equal(concurrent.filter(result => 'error' in result).length, 1)
     })
 
     await t.test('fresh membership and pinned Workspace gate writes, including the creator', async () => {
