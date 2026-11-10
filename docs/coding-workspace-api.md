@@ -132,9 +132,11 @@ Its lifetime is ten minutes and its machine binding must still match.
 Rename, deletion, changed bytes, changed HEAD, or a new machine generation
 requires a new selection; none is silently rebound to a newer Run.
 A folder selection is rejected with `workspace_limit_exceeded` (429) when it
-contains more than 20 text files or more than 64 KiB of selected content;
-`omitted` counts non-text (binary or too-large) files, never the 21st file. A
-`resolve` or `submit` with several mentions is limited to 20 files in total.
+contains more than 20 candidate text files (text extension or name) or more
+than 64 KiB of selected content; `omitted` counts those candidates that read as
+binary or too large, and a non-text name is skipped before the cap. The 21st
+candidate is the 429, never an omitted file. A `resolve` or `submit` with
+several mentions is limited to 20 files in total.
 
 Submission requires a real human session and same-origin `Origin`. PATs can
 create and resolve references but cannot impersonate a human submission.
