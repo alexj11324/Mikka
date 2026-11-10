@@ -1,0 +1,216 @@
+TAP version 13
+# Subtest: task run rows keep the newest owner run and the 200-row limit without unused fields
+ok 1 - task run rows keep the newest owner run and the 200-row limit without unused fields
+  ---
+  duration_ms: 1135.68136
+  type: 'test'
+  ...
+# {"read":"task-runs","rowCount":200,"beforeResultBytes":1246853,"resultBytes":36949,"actionBytes":47283,"fields":["issueId","id","issueTitle","agentName","status","outcome","failureDetails","expiresAt","harnesses","id","name","color","shape"]}
+# Subtest: one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows
+ok 2 - one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows
+  ---
+  duration_ms: 4.821359
+  type: 'test'
+  ...
+# Subtest: task thread lists retain exact titles, summaries and privacy while details retain full errors
+ok 3 - task thread lists retain exact titles, summaries and privacy while details retain full errors
+  ---
+  duration_ms: 1630.000157
+  type: 'test'
+  ...
+# {"read":"issue-thread-list","rowCount":20,"beforeResultBytes":3405216,"resultBytes":7938,"actionBytes":15710,"fields":["id","issueId","userId","status","case","createdAt","finishedAt","coalesce","harness","name","stopRequestedAt","outcome","kind","color","shape","case","case"]}
+# Subtest: team link reads page through all authorized pairs and retain explicit-id scope checks
+ok 4 - team link reads page through all authorized pairs and retain explicit-id scope checks
+  ---
+  duration_ms: 32.708071
+  type: 'test'
+  ...
+# {"read":"team-links-110","beforeResultBytes":13091,"afterResultBytes":8801}
+# {"read":"team-links-paged","pages":[{"rows":128,"bytes":10241,"fields":["issueId","teamId"]},{"rows":128,"bytes":10241,"fields":["issueId","teamId"]},{"rows":4,"bytes":321,"fields":["issueId","teamId"]}]}
+# Subtest: thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields
+    # Subtest: identity projections are bounded and every read has a fixed action source
+    ok 1 - identity projections are bounded and every read has a fixed action source
+      ---
+      duration_ms: 29.901913
+      type: 'test'
+      ...
+    # {"read":"thread-find-issue-linked","beforeResultBytes":29175,"resultBytes":97,"selectQueries":6,"allResultBytes":1011,"rowCount":1,"fields":["id","userId"]}
+    # {"read":"thread-changes-linked","beforeResultBytes":29175,"resultBytes":97,"selectQueries":6,"allResultBytes":949,"rowCount":1,"fields":["id","userId"]}
+    # {"read":"thread-find-issue-no-bot","beforeResultBytes":29152,"resultBytes":141,"selectQueries":2,"allResultBytes":302,"rowCount":1,"fields":["id","userId","issueId","workspaceId"]}
+    # {"read":"thread-changes-no-bot","beforeResultBytes":29152,"resultBytes":97,"selectQueries":3,"allResultBytes":371,"rowCount":1,"fields":["id","userId"]}
+    # {"read":"thread-find-issue-bot","beforeResultBytes":29195,"resultBytes":141,"selectQueries":2,"allResultBytes":302,"rowCount":1,"fields":["id","userId","issueId","workspaceId"]}
+    # {"read":"thread-changes-bot","beforeResultBytes":29195,"resultBytes":97,"selectQueries":3,"allResultBytes":371,"rowCount":1,"fields":["id","userId"]}
+    # Subtest: both actions preserve owner, peer, missing and null-issue boundaries
+    ok 2 - both actions preserve owner, peer, missing and null-issue boundaries
+      ---
+      duration_ms: 59.605771
+      type: 'test'
+      ...
+    # Subtest: the changes result still returns valid checkpoints and rejects unreadable gzip
+    ok 3 - the changes result still returns valid checkpoints and rejects unreadable gzip
+      ---
+      duration_ms: 28.479191
+      type: 'test'
+      ...
+    # Subtest: the newest checkpoint follows only the same owner and workspace chain
+    ok 4 - the newest checkpoint follows only the same owner and workspace chain
+      ---
+      duration_ms: 17.672239
+      type: 'test'
+      ...
+    # Subtest: a cyclic chain fails before returning checkpoint content
+    ok 5 - a cyclic chain fails before returning checkpoint content
+      ---
+      duration_ms: 7.455866
+      type: 'test'
+      ...
+    # Subtest: suspension and removal are read afresh, including Bot threads without an issue
+    ok 6 - suspension and removal are read afresh, including Bot threads without an issue
+      ---
+      duration_ms: 38.214106
+      type: 'test'
+      ...
+    1..6
+ok 5 - thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields
+  ---
+  duration_ms: 215.210105
+  type: 'test'
+  ...
+# Subtest: task-run visibility skips unused team metadata without weakening fresh workspace authority
+    # Subtest: the existing no-links option keeps the exact real predicate and avoids two pages of unused links
+    ok 1 - the existing no-links option keeps the exact real predicate and avoids two pages of unused links
+      ---
+      duration_ms: 8.790001
+      type: 'test'
+      ...
+    # Subtest: the real task-run action reads no team metadata and still reads current tenant membership
+    ok 2 - the real task-run action reads no team metadata and still reads current tenant membership
+      ---
+      duration_ms: 12.10104
+      type: 'test'
+      ...
+    # {"read":"task-run-visibility","selectedRows":1,"teamMetadataQueries":0,"freshWorkspaceMembershipReads":1}
+    # Subtest: token pinning and foreign-workspace denial remain on the original action path
+    ok 3 - token pinning and foreign-workspace denial remain on the original action path
+      ---
+      duration_ms: 7.940337
+      type: 'test'
+      ...
+    # Subtest: suspension and removal are fresh on every call even with trusted principal provenance
+    ok 4 - suspension and removal are fresh on every call even with trusted principal provenance
+      ---
+      duration_ms: 23.357251
+      type: 'test'
+      ...
+    1..4
+ok 6 - task-run visibility skips unused team metadata without weakening fresh workspace authority
+  ---
+  duration_ms: 81.80674
+  type: 'test'
+  ...
+# Subtest: Native workspace choices share only undispatched real SELECTs and retain fresh authority
+    # Subtest: five concurrent authenticated readers issue one unchanged membership-and-link SELECT
+    not ok 1 - five concurrent authenticated readers issue one unchanged membership-and-link SELECT
+      ---
+      duration_ms: 13.166056
+      type: 'test'
+      location: '/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:9:18732'
+      failureType: 'testCodeFailure'
+      error: |-
+        the old product issues five equivalent fresh SELECTs
+        
+        5 !== 1
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1
+      actual: 5
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:642:14)
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:637:5)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+      ...
+    # Subtest: completed reads never hide same-batch suspension, removal or restoration
+    ok 2 - completed reads never hide same-batch suspension, removal or restoration
+      ---
+      duration_ms: 13.710047
+      type: 'test'
+      ...
+    # Subtest: a membership change is visible while the earlier real SELECT is still unresolved
+    ok 3 - a membership change is visible while the earlier real SELECT is still unresolved
+      ---
+      duration_ms: 5.033805
+      type: 'test'
+      ...
+    # Subtest: a newly attached archived Organization is visible before the old SELECT resolves
+    ok 4 - a newly attached archived Organization is visible before the old SELECT resolves
+      ---
+      duration_ms: 8.021468
+      type: 'test'
+      ...
+    # Subtest: joined readers still execute independent current Organization policy checks
+    not ok 5 - joined readers still execute independent current Organization policy checks
+      ---
+      duration_ms: 17.100629
+      type: 'test'
+      location: '/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:9:22116'
+      failureType: 'testCodeFailure'
+      error: |-
+        each parallel pair has one fresh membership/link observation
+        
+        4 !== 2
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 2
+      actual: 4
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:701:16)
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:690:5)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+      ...
+    # Subtest: different authenticated readers, pins, principals, requests and Native sessions cannot join
+    ok 6 - different authenticated readers, pins, principals, requests and Native sessions cannot join
+      ---
+      duration_ms: 11.590135
+      type: 'test'
+      ...
+    # Subtest: top-level Workspace transactions and nested savepoints bypass the pending queue
+    ok 7 - top-level Workspace transactions and nested savepoints bypass the pending queue
+      ---
+      duration_ms: 4.372012
+      type: 'test'
+      ...
+    # Subtest: foreground-only scope cannot survive as deferred, expired or non-Native work
+    ok 8 - foreground-only scope cannot survive as deferred, expired or non-Native work
+      ---
+      duration_ms: 7.101306
+      type: 'test'
+      ...
+    1..8
+not ok 7 - Native workspace choices share only undispatched real SELECTs and retain fresh authority
+  ---
+  duration_ms: 100.68824
+  type: 'test'
+  location: '/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:9:12086'
+  failureType: 'subtestsFailed'
+  error: '2 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..7
+# tests 25
+# suites 0
+# pass 22
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 23502.564927

@@ -1,0 +1,208 @@
+TAP version 13
+# Subtest: the production gate logs in as SMOKE without pinning an owner workspace or bot
+ok 1 - the production gate logs in as SMOKE without pinning an owner workspace or bot
+  ---
+  duration_ms: 6.755169
+  type: 'test'
+  ...
+# Subtest: a different application commit is refused before login, enrollment or candidate creation
+ok 2 - a different application commit is refused before login, enrollment or candidate creation
+  ---
+  duration_ms: 21.319202
+  type: 'test'
+  ...
+# Subtest: a release receipt names the actual candidate, revision, model and registered device
+ok 3 - a release receipt names the actual candidate, revision, model and registered device
+  ---
+  duration_ms: 4.813268
+  type: 'test'
+  ...
+# Subtest: startup correlation survives claude_code failure before a run exists
+ok 4 - startup correlation survives claude_code failure before a run exists
+  ---
+  duration_ms: 19.316579
+  type: 'test'
+  ...
+# Subtest: startup correlation survives codex failure before a run exists
+ok 5 - startup correlation survives codex failure before a run exists
+  ---
+  duration_ms: 6.926435
+  type: 'test'
+  ...
+# Subtest: startup correlation requires exact candidate binding and existing metadata
+ok 6 - startup correlation requires exact candidate binding and existing metadata
+  ---
+  duration_ms: 36.683708
+  type: 'test'
+  ...
+# Subtest: startup correlation rejects malformed identifiers and preserves independently valid fields
+ok 7 - startup correlation rejects malformed identifiers and preserves independently valid fields
+  ---
+  duration_ms: 77.388118
+  type: 'test'
+  ...
+# Subtest: startup correlation keeps only closed refusal codes and never emits prompts or other identities
+ok 8 - startup correlation keeps only closed refusal codes and never emits prompts or other identities
+  ---
+  duration_ms: 32.689463
+  type: 'test'
+  ...
+# Subtest: successful candidate diagnostics do not gain startup correlation metadata
+ok 9 - successful candidate diagnostics do not gain startup correlation metadata
+  ---
+  duration_ms: 2.138674
+  type: 'test'
+  ...
+# Subtest: a pre-dispatch refusal keeps its phase without reading an unpublished proof and cleans both candidates
+ok 10 - a pre-dispatch refusal keeps its phase without reading an unpublished proof and cleans both candidates
+  ---
+  duration_ms: 3.363276
+  type: 'test'
+  ...
+# Subtest: dispatch refusal diagnostics admit only fixed business codes and never untrusted details
+ok 11 - dispatch refusal diagnostics admit only fixed business codes and never untrusted details
+  ---
+  duration_ms: 13.594092
+  type: 'test'
+  ...
+# Subtest: a failed subscription still tests the other candidate and closes every created instance and device
+ok 12 - a failed subscription still tests the other candidate and closes every created instance and device
+  ---
+  duration_ms: 2.676008
+  type: 'test'
+  ...
+# Subtest: candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session
+ok 13 - candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session
+  ---
+  duration_ms: 3.101867
+  type: 'test'
+  ...
+# Subtest: a real receipt rejection persists its run hash and reason without provider text or credentials
+ok 14 - a real receipt rejection persists its run hash and reason without provider text or credentials
+  ---
+  duration_ms: 5.569534
+  type: 'test'
+  ...
+# Subtest: preflight failures preserve their phase and closed error details without producing an accepted file
+ok 15 - preflight failures preserve their phase and closed error details without producing an accepted file
+  ---
+  duration_ms: 24.601113
+  type: 'test'
+  ...
+# Subtest: a failure before a sample exists preserves the startup phase without inventing sample evidence
+ok 16 - a failure before a sample exists preserves the startup phase without inventing sample evidence
+  ---
+  duration_ms: 2.105717
+  type: 'test'
+  ...
+# Subtest: startup failure projection drops unknown content and only admits numeric HTTP error statuses
+ok 17 - startup failure projection drops unknown content and only admits numeric HTTP error statuses
+  ---
+  duration_ms: 11.413782
+  type: 'test'
+  ...
+# Subtest: failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code
+ok 18 - failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code
+  ---
+  duration_ms: 2.278953
+  type: 'test'
+  ...
+# Subtest: retained cleanup identities must belong to this case and contain at most four distinct UUIDs
+ok 19 - retained cleanup identities must belong to this case and contain at most four distinct UUIDs
+  ---
+  duration_ms: 5.669777
+  type: 'test'
+  ...
+# Subtest: a terminal-before-proof failure identifies only its owned case and the missing evidence
+ok 20 - a terminal-before-proof failure identifies only its owned case and the missing evidence
+  ---
+  duration_ms: 1.60585
+  type: 'test'
+  ...
+# Subtest: cleanup failures retain bounded step families and HTTP status without arbitrary causes
+ok 21 - cleanup failures retain bounded step families and HTTP status without arbitrary causes
+  ---
+  duration_ms: 2.302419
+  type: 'test'
+  ...
+# Subtest: a failed pair preserves the genuine passing receipt without creating publishable evidence
+ok 22 - a failed pair preserves the genuine passing receipt without creating publishable evidence
+  ---
+  duration_ms: 5.340711
+  type: 'test'
+  ...
+# Subtest: failure projection bounds cleanup rows and refuses foreign or malformed fixture identities
+ok 23 - failure projection bounds cleanup rows and refuses foreign or malformed fixture identities
+  ---
+  duration_ms: 9.375636
+  type: 'test'
+  ...
+# Subtest: the observed Codex adapter-start failure retains false agent_start and error cli_init
+ok 24 - the observed Codex adapter-start failure retains false agent_start and error cli_init
+  ---
+  duration_ms: 2.898245
+  type: 'test'
+  ...
+# Subtest: failed execution retains only bound registration binary metadata without a passing receipt
+ok 25 - failed execution retains only bound registration binary metadata without a passing receipt
+  ---
+  duration_ms: 1.881825
+  type: 'test'
+  ...
+# Subtest: registration diagnostics reject unbounded or non-original binary metadata without leaking it
+ok 26 - registration diagnostics reject unbounded or non-original binary metadata without leaking it
+  ---
+  duration_ms: 10.135368
+  type: 'test'
+  ...
+# Subtest: bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish
+ok 27 - bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish
+  ---
+  duration_ms: 1.621758
+  type: 'test'
+  ...
+# Subtest: bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs
+ok 28 - bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs
+  ---
+  duration_ms: 5.520618
+  type: 'test'
+  ...
+# Subtest: bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair
+ok 29 - bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair
+  ---
+  duration_ms: 7.543365
+  type: 'test'
+  ...
+# Subtest: bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption
+ok 30 - bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption
+  ---
+  duration_ms: 1.174875
+  type: 'test'
+  ...
+# Subtest: bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values
+ok 31 - bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values
+  ---
+  duration_ms: 7.828256
+  type: 'test'
+  ...
+# Subtest: successful candidate gate adds no failure diagnostics and keeps the original accepted receipt
+ok 32 - successful candidate gate adds no failure diagnostics and keeps the original accepted receipt
+  ---
+  duration_ms: 2.793335
+  type: 'test'
+  ...
+# Subtest: failure projection distinguishes the closed 3c production shapes using synthetic identities
+ok 33 - failure projection distinguishes the closed 3c production shapes using synthetic identities
+  ---
+  duration_ms: 1.886225
+  type: 'test'
+  ...
+1..33
+# tests 33
+# suites 0
+# pass 33
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 448.28086
