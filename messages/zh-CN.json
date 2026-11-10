@@ -1796,7 +1796,7 @@
         "title": "连接"
       },
       "bot-permissions": {
-        "title": "Bot 权限"
+        "title": "应用与运行权限"
       },
       "models": {
         "title": "模型与订阅",
@@ -2274,7 +2274,16 @@
     },
     "botPermissions": {
       "loading": "正在读取权限…",
-      "rule": "由 Decision API 判断，只有删除、覆盖这类破坏性操作才会先问你。",
+      "rule": "每个应用对整个工作区只有一个档位；单个 Bot 更严格的设置仍会生效。工具列表来自应用的真实目录。",
+      "workspaceScope": "这些设置作用于本工作区的所有 Bot。",
+      "allTools": "所有工具",
+      "allToolsCount": "所有工具 · {count} 项",
+      "tools": "查看工具",
+      "toolsCount": "{count} 个工具 · {readOnly} 个只读",
+      "toolsLoading": "正在读取工具…",
+      "toolsFailed": "工具列表读取失败",
+      "readOnly": "只读",
+      "write": "可写",
       "bot": "Bot",
       "mode": "审批方式",
       "modes": {

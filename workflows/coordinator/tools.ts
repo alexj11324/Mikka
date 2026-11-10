@@ -144,7 +144,11 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
     github_call: tool({
       description: 'Call one GitHub tool from github_tools as the person: read issues, pull requests and CI; comment; open or merge pull requests. Use its name and schema, only for the person’s task. An mcpOutcomeUnknown result must not be retried automatically.',
       inputSchema: z.object({ name: z.string().min(1).max(128), arguments: z.record(z.string(), z.unknown()) }).strict(),
-      execute: input => steps.githubMcp(userId, input, scope),
+      execute: async input => {
+        const { githubCallAllowed } = await import('@/lib/operations/github-call-policy')
+        if (!(await githubCallAllowed(userId, botId))) return { error: 'githubActionDenied' }
+        return steps.githubMcp(userId, input, scope)
+      },
     }),
     ...(computerEnabled ? {
       start_web_subagent: tool({

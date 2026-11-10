@@ -1796,7 +1796,7 @@
         "title": "Connections"
       },
       "bot-permissions": {
-        "title": "Bot permissions"
+        "title": "App & run permissions"
       },
       "models": {
         "title": "Models and subscriptions",
@@ -2274,7 +2274,16 @@
     },
     "botPermissions": {
       "loading": "Reading permissions…",
-      "rule": "The Decision API judges each call; only destructive ones, like deleting or overwriting, ask you first.",
+      "rule": "Each app has one access level for the whole workspace; a Bot's own stricter setting still applies. Tools come from the provider's real catalogue.",
+      "workspaceScope": "These settings apply to every Bot in this workspace.",
+      "allTools": "All tools",
+      "allToolsCount": "All tools · {count}",
+      "tools": "View tools",
+      "toolsCount": "{count} tools · {readOnly} read-only",
+      "toolsLoading": "Reading tools…",
+      "toolsFailed": "Couldn't read the tool list",
+      "readOnly": "read-only",
+      "write": "can write",
       "bot": "Bot",
       "mode": "Approval",
       "modes": {
@@ -6148,8 +6157,8 @@
   "HostedPermissions": {
     "apps": "Apps",
     "redLines": "Red lines",
-    "redLinesText": "Writes set to Not allowed: never done, whatever the Decision API judges",
-    "redLinesEmpty": "No writes are set to Not allowed",
+    "redLinesText": "Apps set to Not allowed: never used, even if a Bot's own layer would allow them",
+    "redLinesEmpty": "No app is set to Not allowed",
     "allowText": "Does it without asking – recorded in the activity",
     "askText": "Waits for your OK in the Inbox",
     "neverText": "Won't do it, and tells you it can't",
@@ -6159,12 +6168,12 @@
     "changes": "Writes",
     "care": "Needs care",
     "nothingToDecide": "Connect an app first",
-    "noActions": "No write of this app has its own setting; the Decision API judges each call",
+    "noActions": "This app has one access level; Default lets the Decision API judge each call",
     "noApp": "Nothing open",
-    "noAppText": "Pick an app to see how the Bot's writes in it are handled.",
+    "noAppText": "Pick an app to see its tools and access level.",
     "empty": "No apps connected",
-    "emptyText": "Connect an app and the Bot's writes in it show up here.",
-    "means": "{allow} on its own · asks before {ask} · {never} not allowed; the Decision API judges the rest",
+    "emptyText": "Connect an app and its tools show up here.",
+    "means": "{allow} on its own · asks before {ask} · {never} not allowed; Default lets the Decision API judge",
     "summaryAllow": "{count} on its own",
     "summaryAsk": "asks before {count}",
     "summaryNever": "{count} not allowed",

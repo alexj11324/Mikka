@@ -33,7 +33,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
   // One Bot's permissions: app writes, run permissions and approval mode (affectUI Agent / Permissions).
-  { id: 'bot-permissions', group: 'personal', title: 'Bot permissions' },
+  { id: 'bot-permissions', group: 'personal', title: 'App & run permissions' },
   // 模型与订阅 (decision 2026-11-02-1400): subscriptions, API keys, 运行位置 and 优先使用的模型 (was API 与订阅 and Bot 与 Agents).
   { id: 'models', group: 'personal', title: 'Models and subscriptions' },
   { id: 'logins', group: 'personal', title: 'Secrets and logins' },
