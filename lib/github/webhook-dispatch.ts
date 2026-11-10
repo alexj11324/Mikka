@@ -2,6 +2,7 @@ import { afterJob } from '@/lib/background'
 import { githubCandidateIds } from '@/lib/suggestions/notification'
 import { PULL_REQUEST_REFRESH_ACTIONS } from './publication-webhook-actions'
 import { noteLogOutcome } from '@/lib/request-log'
+import { reviewCheckEvent } from './review-checks'
 
 export const GITHUB_WEBHOOK_MAX_BYTES = 1_000_000
 const noStore = { 'Cache-Control': 'no-store' }
@@ -32,7 +33,7 @@ export async function dispatchVerifiedGitHubWebhook(event: string | null, rawBod
   try { payload = JSON.parse(rawBody) } catch { return new Response('Invalid webhook JSON.', { status: 400, headers: noStore }) }
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return new Response('Invalid webhook JSON.', { status: 400, headers: noStore })
   const hasNotifications = githubCandidateIds(event, payload).length > 0
-  const refresh = event === 'pull_request' && typeof payload.action === 'string' && PULL_REQUEST_REFRESH_ACTIONS.has(payload.action)
+  const refresh = (event === 'pull_request' && typeof payload.action === 'string' && PULL_REQUEST_REFRESH_ACTIONS.has(payload.action)) || Boolean(reviewCheckEvent(event, payload))
   const pr = payload.pull_request as { html_url?: unknown; merged?: unknown; merge_commit_sha?: unknown; head?: { sha?: unknown } } | undefined
   const merged = event === 'pull_request' && payload.action === 'closed' && pr?.merged === true && typeof pr.html_url === 'string'
     ? { url: pr.html_url, headSha: typeof pr.head?.sha === 'string' ? pr.head.sha : null, mergeCommitSha: typeof pr.merge_commit_sha === 'string' ? pr.merge_commit_sha : null } : null

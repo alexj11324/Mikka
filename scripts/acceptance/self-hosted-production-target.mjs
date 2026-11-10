@@ -3,7 +3,7 @@ import { successfulRelease } from './project-decisions.mjs'
 
 export const CORE_MODE = 'self-hosted-core'
 export const CORE_WORKFLOW = '.github/workflows/self-hosted-production.yml'
-export const CORE_ISSUES = Object.freeze([1560, 1561, 1562, 1556])
+export const CORE_ISSUES = Object.freeze([1560, 1561, 1562, 1556, 1826, 1820])
 export const CORE_ORIGIN = 'https://app.aspectlylabs.com'
 const REPOSITORY = 'alexj11324/Mikka'
 const API = 'https://api.github.com/repos/' + REPOSITORY

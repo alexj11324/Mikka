@@ -35,7 +35,7 @@ mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshe
 mock.module('@/lib/use-presence', { namedExports: { usePresence: (open: boolean) => ({ value: open, open, onOpenChangeComplete: nothing }) } })
 mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspace() }) } })
 mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () => ({ data: { sessions: [] } }) } })
-mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing } })
+mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing, useOpenerFocus: () => () => true } })
 mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
   useLiveIssueList: () => emptyList, useLiveThreadList: () => emptyList,
@@ -56,7 +56,7 @@ mock.module('next/dynamic', { defaultExport: delayedDynamic })
 for (const [file, names] of [
   // The real app-frame slot also exports an unused rail; its account menu is outside this shell-state fixture.
   ['../workspace-menu.tsx', ['WorkspaceMenu']],
-  ['../nav/bot-list.tsx', ['BotList']], ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
+  ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
   ['../onboarding/onboarding.tsx', ['Onboarding']], ['../teams/team-home.tsx', ['TeamHome']],
   ['./issue-list.tsx', ['IssueList']], ['./board-page.tsx', ['BoardPage']],
   ['../nav/context-panel.tsx', ['ContextPanel']],
@@ -67,6 +67,7 @@ for (const [file, names] of [
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
   ['./create-issue-dialog.tsx', ['CreateIssueDialog']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, empty])) })
+mock.module('@/components/nav/bot-list', { namedExports: { BotList: empty, useChatNav: () => ({ entries: [], reloadGroups: async () => {} }) } })
 mock.module('@/components/nav/thread-list', { namedExports: { threadName: () => '' } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty, COORDINATOR_AVATAR: {} } })
 mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: empty, AllThreadsToggle: empty, waitingCount: () => 0 } })

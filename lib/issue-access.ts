@@ -15,6 +15,11 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 import { taskReaderScope } from '@/lib/task-workspace'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 
+type Issue = typeof issues.$inferSelect
+type LockIssue = Pick<Issue, 'id' | 'userId' | 'workspaceId' | 'ownershipState' | 'scopeVersion' | 'content'>
+type IssueAccess<T = Issue> = { issue: T; teamId: string | null }
+type RequestIssueAccess<T = Issue> = IssueAccess<T> & { user: Awaited<ReturnType<typeof requireUser>> }
+
 export async function requireUser() {
   const user = await currentUser()
   if (!user) throw new ActionFailureError('authRequired')
@@ -29,12 +34,17 @@ export async function requireIssueAccess(id: string, includeDeleted = false) {
  * Like requireIssueAccess, without reading the task body: `content` holds only
  * its attrs (where the metadata lives). For callers that re-read the body under
  * a lock, or never need it; a full body is up to 250 KB of database egress.
+ * The internal lock projection keeps only scope fields and attrs; default callers retain the full row shape.
  */
-export async function requireIssueAccessWithoutBody(id: string) {
-  return requireRequestIssue(id, false, true)
+export function requireIssueAccessWithoutBody(id: string, options: { projection: 'lock' }): Promise<RequestIssueAccess<LockIssue>>
+export function requireIssueAccessWithoutBody(id: string): Promise<RequestIssueAccess>
+export async function requireIssueAccessWithoutBody(id: string, options?: { projection: 'lock' }) {
+  return options?.projection === 'lock' ? requireRequestIssue(id, false, 'lock') : requireRequestIssue(id, false, true)
 }
 
-async function requireRequestIssue(id: string, includeDeleted: boolean, withoutBody: boolean) {
+function requireRequestIssue(id: string, includeDeleted: boolean, withoutBody: 'lock'): Promise<RequestIssueAccess<LockIssue>>
+function requireRequestIssue(id: string, includeDeleted: boolean, withoutBody: boolean): Promise<RequestIssueAccess>
+async function requireRequestIssue(id: string, includeDeleted: boolean, withoutBody: boolean | 'lock') {
   const user = await requireUser()
   const pinned = taskReaderScope(user).workspaceId
   // Only this server-side context may supply the entry membership proof. Token
@@ -43,14 +53,23 @@ async function requireRequestIssue(id: string, includeDeleted: boolean, withoutB
   // through their write; this proof never survives the current request.
   const verifiedWorkspaceId = pinned ? undefined : (await (await import('@/lib/workspace-access')).loadWorkspaceContext(undefined, user)).workspace.id
   const workspaceId = pinned ?? verifiedWorkspaceId!
-  const issue = await findIssueForUser({ ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal] }, id, includeDeleted, db, withoutBody, true, verifiedWorkspaceId)
+  const reader = { ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal] }
+  const issue = withoutBody === 'lock'
+    ? await findIssueForUser(reader, id, includeDeleted, db, 'lock', true, verifiedWorkspaceId)
+    : await findIssueForUser(reader, id, includeDeleted, db, withoutBody, true, verifiedWorkspaceId)
   if (!issue) throw new ActionFailureError('issueNotFound')
   return { ...issue, user }
 }
 
 const { content: _content, ...issueColumnsWithoutBody } = getTableColumns(issues)
+// Only lock-bound internal readers use this projection. They re-read all task
+// data after acquiring the row lock; attrs retain the same deletion check here.
+const issueLockColumns = { id: issues.id, userId: issues.userId, workspaceId: issues.workspaceId,
+  ownershipState: issues.ownershipState, scopeVersion: issues.scopeVersion, content: issueAttrsContent }
 
-async function findIssueForUser(reader: IssueReader, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db, withoutBody = false, withTeam = true, verifiedWorkspaceId?: string) {
+function findIssueForUser(reader: IssueReader, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'>, withoutBody: 'lock', withTeam?: boolean, verifiedWorkspaceId?: string): Promise<IssueAccess<LockIssue> | null>
+function findIssueForUser(reader: IssueReader, id: string, includeDeleted: boolean, executor?: Pick<typeof db, 'select'>, withoutBody?: boolean, withTeam?: boolean, verifiedWorkspaceId?: string): Promise<IssueAccess | null>
+async function findIssueForUser(reader: IssueReader, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db, withoutBody: boolean | 'lock' = false, withTeam = true, verifiedWorkspaceId?: string) {
   if (!z.uuid().safeParse(id).success) return null
   const userId = typeof reader === 'string' ? reader : reader.id
   // A bare id inside `actAs` for a token's owner keeps the token's scope (an API route running existing actions).
@@ -61,9 +80,11 @@ async function findIssueForUser(reader: IssueReader, id: string, includeDeleted:
   const predicate = verifiedWorkspaceId && verifiedWorkspaceId === workspaceId
     ? issueVisibilityPredicate(userId, { allowedIds: [], workspaceIds: [verifiedWorkspaceId] }, includeDeleted)
     : (await issueVisibility(reader, includeDeleted, workspaceId, executor, { onlyIssueIds: [id], withTeamLinks: false })).predicate
-  const [row] = withoutBody
-    ? await executor.select({ issue: { ...issueColumnsWithoutBody, content: issueAttrsContent } }).from(issues).where(and(eq(issues.id, id), predicate)).limit(1)
-    : await executor.select({ issue: issues }).from(issues).where(and(eq(issues.id, id), predicate)).limit(1)
+  const [row] = withoutBody === 'lock'
+    ? await executor.select({ issue: issueLockColumns }).from(issues).where(and(eq(issues.id, id), predicate)).limit(1)
+    : withoutBody
+      ? await executor.select({ issue: { ...issueColumnsWithoutBody, content: issueAttrsContent } }).from(issues).where(and(eq(issues.id, id), predicate)).limit(1)
+      : await executor.select({ issue: issues }).from(issues).where(and(eq(issues.id, id), predicate)).limit(1)
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null
   // A workspace token reads its owner's workspace tasks only in that workspace, as its task list does.
   if (workspaceId && row.issue.workspaceId !== workspaceId) return null
