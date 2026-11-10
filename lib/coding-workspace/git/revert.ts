@@ -6,7 +6,6 @@ import {
   type GitRevertApplied, type GitRevertFile, type GitRevertPreviewInternal, type GitRevertTarget, type GitUndone,
 } from '@mikka/protocol/coding-workspace-git'
 import type { DiffFileMetadata, DiffRevision } from '@mikka/protocol/coding-workspace-review'
-import { maskCheckpoint } from '../../secrets/checkpoint'
 import { secretMaskerFor } from '../../secrets/runtime'
 import { runChanged } from '../../live/panels'
 import { requestWorkspaceRead } from '../requests'
@@ -17,6 +16,7 @@ import {
   claimOperation, claimUndo, finishOperation, finishUndo, insertPreview, latestUndoable, releaseOperation,
   releaseUndoClaim, type GitOperationRow,
 } from './ops'
+import { undoCaptureFile } from './undo'
 
 export type GitDependencies = { database: Pool; membership: Pool }
 const retryable = (error: unknown) => error instanceof CodingWorkspaceError
@@ -133,12 +133,7 @@ export async function undoLastOperation(dependencies: GitDependencies, actor: Re
     const receipt = row.receipt as { headSha?: unknown } | null
     if (!row.undoFiles?.length || typeof receipt?.headSha !== 'string') throw new WorkspaceGitError('workspace_git_undo_unavailable')
     const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
-    const files = row.undoFiles.map(file => {
-      const bytes = Buffer.from(file.base64, 'base64')
-      const masked = maskCheckpoint({ patch: bytes, files: [] }, mask).patch
-      if (!masked.equals(bytes)) throw new WorkspaceGitError('workspace_git_undo_unavailable')
-      return { ...file, base64: masked.toString('base64'), sha256: gitDigest(masked) }
-    })
+    const files = row.undoFiles.map(file => undoCaptureFile(file, mask))
     const request: WorkspaceReadRequest = { mode: 'files', kind: 'git_undo', operationId: input.operationId,
       undoOf: input.undoOf, expected: { headSha: receipt.headSha }, files: { files } }
     const result = await requestWorkspaceRead(dependencies.database, dependencies.membership, actor, runId, repoId, request, signal,

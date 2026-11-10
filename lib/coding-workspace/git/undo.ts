@@ -1,12 +1,35 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
-import { WORKSPACE_GIT_MAX_UNDO_BYTES, WORKSPACE_GIT_MAX_UNDO_FILES } from '@mikka/protocol/coding-workspace-git'
+import { WORKSPACE_GIT_MAX_UNDO_BYTES, WORKSPACE_GIT_MAX_UNDO_FILES, WorkspaceGitError, type GitUndoFile } from '@mikka/protocol/coding-workspace-git'
 import type { WorkspaceReadReceipt, WorkspaceReadRequest } from '@mikka/protocol/coding-workspace'
 import { maskCheckpoint } from '../../secrets/checkpoint'
 import type { Masker } from '../../secrets/mask'
 import type { WorkspaceQuery } from '../identity'
 
 const digest = (value: Buffer) => createHash('sha256').update(value).digest('hex')
+
+type UndoCapture = { path: string; existed: boolean; mode: string | null; base64: string; sha256: string
+  after: { exists: boolean; contentSha256: string | null } }
+
+/** A stored capture is jsonb, so its mode is a plain string. The request
+ * contract accepts only the four Git modes; an unknown one is a refusal, never
+ * a cast that would hand the device a mode it cannot honour. */
+function undoMode(mode: string | null): GitUndoFile['mode'] {
+  if (mode === null || mode === '100644' || mode === '100755' || mode === '120000' || mode === '160000') return mode
+  throw new WorkspaceGitError('workspace_git_undo_unavailable')
+}
+
+/** Re-mask one stored capture and re-prove it against the current secret
+ * policy before it may become an Undo request. Content the mask would alter is
+ * refused: restoring masked text would silently rewrite the file. */
+export function undoCaptureFile(file: UndoCapture, mask: Masker): GitUndoFile {
+  const bytes = Buffer.from(file.base64, 'base64')
+  if (bytes.toString('base64') !== file.base64) throw new WorkspaceGitError('workspace_git_undo_unavailable')
+  const masked = maskCheckpoint({ patch: bytes, files: [] }, mask).patch
+  if (!masked.equals(bytes)) throw new WorkspaceGitError('workspace_git_undo_unavailable')
+  return { path: file.path, existed: file.existed, mode: undoMode(file.mode), base64: masked.toString('base64'),
+    sha256: digest(masked), after: file.after }
+}
 
 async function mark(database: WorkspaceQuery, operationId: string, ownerId: string, reason: 'secret' | 'too_large' | 'none') {
   await database.query(`UPDATE coding_workspace_git_operations SET "undoFiles"=NULL,"undoMaskPolicy"=NULL,"undoAvailable"=false,
