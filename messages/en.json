@@ -3014,7 +3014,27 @@
         "independent-review": "Review the frozen candidate and record reproducible findings.",
         "systematic-debugging": "Reproduce the failure, identify its cause and verify the fix."
       },
-      "numberedSource": "{source} {number}"
+      "numberedSource": "{source} {number}",
+      "mark": {
+        "icon": "Icon",
+        "color": "Colour",
+        "icons": {
+          "square": "Square",
+          "chevrons": "Brackets",
+          "lens": "Lens",
+          "lines": "Lines",
+          "check": "Check",
+          "stairs": "Steps",
+          "diamond": "Diamond",
+          "arrow": "Arrow"
+        },
+        "colors": {
+          "ink": "Ink",
+          "graphite": "Graphite",
+          "teal": "Teal",
+          "pink": "Pink"
+        }
+      }
     },
     "cloud": {
       "title": "Mikka Cloud",
@@ -3562,6 +3582,7 @@
       "runWaitingDevice": "starts when its computer is back online",
       "runDeviceBack": "starts now: its computer is back online",
       "issueMoved": "moved to {status}",
+      "issueSnapshot": "is {status}",
       "issueChanged": "changed status",
       "runReport": "reported progress",
       "runQuestion": "is waiting for your answer",
@@ -4543,6 +4564,8 @@
       "title": "New task",
       "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",
+      "titleLabel": "Title",
+      "titlePlaceholder": "Title (optional, the Bot writes one if empty)",
       "placeholder": "What should it do?",
       "promptWithContext": "Create a task for me ({context}): {text}",
       "contextDevice": "run it on {device}",

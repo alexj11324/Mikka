@@ -1215,3 +1215,42 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.equal(pinned.agentProfile!.targetEntry.harness, 'claude_code')
   })
 })
+
+test('Agent Profile marks: derived on create, kept or cleared on update, closed by the column checks', { skip: !dbUrl, timeout: 60_000 }, async t => {
+  const pool = new Pool({ connectionString: dbUrl, max: 4 })
+  const [profiles, { deriveProfileMark }] = await Promise.all([import('./agent-profile'), import('./agent-profile-mark')])
+  for (const file of ['20261104231000_agent_profiles.sql', '20261110070000_agent_profile_marks.sql']) {
+    const sql = await readFile(new URL(`../../drizzle/${file}`, import.meta.url), 'utf8')
+    await pool.query(sql); await pool.query(sql)
+  }
+  const ownerId = await seedUser(pool, 'profile-marks')
+  const workspace = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }])
+  t.after(async () => {
+    await pool.query('DELETE FROM factory_agent_profiles WHERE "ownerId"=$1', [ownerId])
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspace.id])
+    await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspace.id])
+    await pool.query('DELETE FROM "user" WHERE id=$1', [ownerId])
+    await pool.end()
+  })
+  const scope = { ownerId, workspaceId: workspace.id }
+  // Membership and model checks have their own suites above; this one is about the mark columns.
+  const store = new profiles.AgentProfileStore(pool, { validateModel: async () => {}, membership: async () => ({ check: async () => {}, close: async () => {} }) })
+  const reviewer = { name: 'Reviewer', roles: ['review'], harness: 'auto', model: { mode: 'inherit' } }
+  const created = await store.create(scope, reviewer)
+  assert.deepEqual({ icon: created.icon, color: created.color }, deriveProfileMark({ name: 'Reviewer', roles: ['review'] }))
+  assert.equal(created.icon, 'lens')
+  const stored = (await pool.query('SELECT icon,color FROM factory_agent_profiles WHERE id=$1', [created.id])).rows[0]
+  assert.deepEqual(stored, { icon: created.icon, color: created.color }, 'a new Profile stores its derived mark')
+  const chosen = await store.create(scope, { ...reviewer, name: 'Chosen' }, undefined, { icon: 'diamond' })
+  assert.equal(chosen.icon, 'diamond'); assert.equal(chosen.color, deriveProfileMark({ name: 'Chosen', roles: ['review'] }).color)
+  const recolored = await store.update(scope, chosen.id, chosen.version, { ...reviewer, name: 'Chosen' }, { color: 'pink' })
+  assert.deepEqual([recolored.icon, recolored.color, recolored.digest], ['diamond', 'pink', chosen.digest], 'the mark is outside the digest')
+  const toggled = await store.update(scope, chosen.id, recolored.version, { ...reviewer, name: 'Chosen', enabled: false })
+  assert.deepEqual([toggled.icon, toggled.color], ['diamond', 'pink'], 'a save without a mark keeps it')
+  const cleared = await store.update(scope, chosen.id, toggled.version, { ...reviewer, name: 'Chosen', roles: ['deploy'] }, { icon: null, color: null })
+  assert.deepEqual((await pool.query('SELECT icon,color FROM factory_agent_profiles WHERE id=$1', [chosen.id])).rows[0], { icon: null, color: null })
+  assert.deepEqual({ icon: cleared.icon, color: cleared.color }, deriveProfileMark({ name: 'Chosen', roles: ['deploy'] }), 'null reads as the derived default')
+  await assert.rejects(store.create(scope, reviewer, undefined, { icon: 'skull' } as never))
+  await assert.rejects(pool.query("UPDATE factory_agent_profiles SET icon='skull' WHERE id=$1", [created.id]), { code: '23514' })
+  await assert.rejects(pool.query("UPDATE factory_agent_profiles SET color='red' WHERE id=$1", [created.id]), { code: '23514' })
+})

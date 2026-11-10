@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { createContext, type ReactNode } from 'react'
 import type { RunSource } from '@/lib/coordinator/citations'
 import type { ChatComposerProps } from './chat-composer-contract'
 
@@ -61,6 +61,8 @@ export type ThreadEntry =
     stopped?: boolean
     /** Who wrote it, where the conversation has more than one Agent (a task's attempts): shown where it changes. */
     author?: { id: string; name: string; mark: ReactNode }
+    /** A line about the chat (an event, a quota switch), not the Bot's words: it has no author line, and the reply after it shows its own. */
+    event?: true
     /** Copy, the pages it cites, reactions. */
     actions?: ReactNode
   }
@@ -114,6 +116,16 @@ export type ThreadScreenProps = {
    * (`revealId`) to be shown; the work area stays folded until then.
    */
   panels?: { tabs: ThreadPanelTab[]; reveal: number; revealId: string | null }
+  /**
+   * Tabs the chat opens itself in the same work area (FRAME_OWNS_PANEL, decision 2026-11-10): a task's view
+   * (`task:<issueId>`) from a task card or chip, a thread's conversation (`thread:<runId>`) from a thread chip, an
+   * Agent's stretch or a subagent. `reveal` counts up each time one is asked for (`revealId`). With `work`, a task card
+   * opens through its part's `onOpen` only, never the template's own task tab.
+   */
+  work?: { tabs: ThreadPanelTab[]; reveal: number; revealId: string | null; beforeClose?: (tabId: string) => Promise<boolean> }
 }
 
-export type ThreadPanelTab = { id: 'overview' | 'browser'; title: string; content: ReactNode }
+/** The hosted shell waits for a task tab's existing save before removing it. */
+export const WorkTabCloseContext = createContext<((tabId: string) => Promise<boolean>) | null>(null)
+
+export type ThreadPanelTab = { id: 'overview' | 'browser' | `task:${string}` | `thread:${string}`; title: string; content: ReactNode }

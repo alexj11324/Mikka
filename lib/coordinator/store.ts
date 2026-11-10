@@ -25,7 +25,7 @@ import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
 import { attentionQuestionsFromEvents, type AttentionQuestion } from './question-attention'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
-import { issueAttrsContent } from '@/lib/issue-summary-columns'
+import { issueAttrsContent, issueLatestRun } from '@/lib/issue-summary-columns'
 import { threadGroup, type ThreadOutcome } from '@/lib/thread-groups'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
@@ -33,6 +33,7 @@ import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorChatState } from './chat-state'
 import { compactChatMessage, compactChatToolMetadata, summaryChatMessage } from './chat-projection'
+import { projectMessageDisplays } from './display-projection'
 import type { ChatToolMetadata, ChatToolMetadataRow } from './chat-tool-metadata'
 import { coordinatorLeaseActive } from './lease'
 import { readCoordinatorPromptPreferences, readPreferences } from '@/lib/preferences'
@@ -42,6 +43,7 @@ import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
 import type { ScheduledRead } from '@/lib/schedules/contract'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
+import { scheduleChatResultSchema } from '@/lib/schedules/chat-result'
 import { botChatChanged } from '../live/chats'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { activeTaskWorkspaces, requireTaskWorkspace } from '@/lib/task-workspace'
@@ -451,6 +453,15 @@ export async function lastEventKind(userId: string, botId: string): Promise<stri
 }
 
 export async function appendMessages(userId: string, holder: string, unmasked: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false): Promise<number> {
+  return appendStoredMessages(userId, holder, unmasked, warning, botId, streamId, stopped, false)
+}
+
+/** Only a trusted host producer may persist display/source envelopes. */
+export async function appendHostMessages(userId: string, holder: string, messages: import('./message-safety').SourcedMessage[], botId: string): Promise<number> {
+  return appendStoredMessages(userId, holder, messages, null, botId, undefined, false, true)
+}
+
+async function appendStoredMessages(userId: string, holder: string, unmasked: ModelMessage[], warning: string | null, botId: string, streamId: string | undefined, stopped: boolean, hostPresentation: boolean): Promise<number> {
   // Safety floor (decision 2026-11-02-1600): a GitHub token or other credential
   // never persists in chat, a tool result included.
   const messages = maskDeep(unmasked, credentialMasker)
@@ -460,11 +471,11 @@ export async function appendMessages(userId: string, holder: string, unmasked: M
     const first = await nextPosition(tx, userId, botId)
     if (messages.length) {
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, mikkaScheduleResult: _unscheduled, mikkaDisplay, mikkaEvent, mikkaUserEvent, ...plain } = message as unknown as Record<string, unknown>
         // 停止: the turn's last message carries the mark; the chat shows 已停止 under the reply.
         const stop = stopped && index === messages.length - 1 && message.role === 'assistant'
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
-          message: { ...plain, ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}), ...(stop ? { mikkaStopped: true } : {}) } }
+          message: { ...plain, ...(hostPresentation ? { mikkaDisplay, mikkaEvent, mikkaUserEvent } : {}), ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}), ...(stop ? { mikkaStopped: true } : {}) } }
       }))
       await botChatChanged(tx, userId, botId)
     }
@@ -536,7 +547,7 @@ export async function failTurn(userId: string, holder: string, error: string, bo
     if (messages.length) {
       const first = await nextPosition(tx, userId, botId)
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, mikkaScheduleResult: _unscheduled, mikkaDisplay: _display, mikkaEvent: _event, mikkaUserEvent: _user, ...plain } = message as unknown as Record<string, unknown>
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
           message: { ...plain, ...(message.role === 'assistant' && completed?.streamId ? { mikkaStreamId: completed.streamId } : {}) } }
       }))
@@ -582,7 +593,13 @@ function conversationWithMemory({ session, rows }: Awaited<ReturnType<typeof rea
   const memory = memoryEnabled ? session?.memory ?? '' : ''
   // A failed message retried with 重新发送 is not said twice: the new attempt stands for it.
   return { summary: session?.summary ?? null, memory, messages: rows.filter(row => (row.message as { mikkaRetried?: unknown }).mikkaRetried !== true).map(row => {
-    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, mikkaFailureDetails: _details, mikkaRetried: _retried, ...message } = row.message
+    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, mikkaFailureDetails: _details, mikkaRetried: _retried, mikkaScheduleResult: _schedule, mikkaDisplay: _display, ...message } = row.message
+    const schedule = scheduleChatResultSchema.safeParse(_schedule)
+    // Status-only receipts have a localized display line, not an empty model reply.
+    if (message.role === 'assistant' && !message.content && schedule.success) {
+      const task = schedule.data.task
+      message.content = `Schedule ${JSON.stringify(schedule.data.title)} ${schedule.data.status}.${task ? ` Task ${JSON.stringify(task.title)} has status ${task.status}.` : ''}`
+    }
     return { position: row.position, message: message as unknown as ModelMessage }
   }) }
 }
@@ -679,7 +696,7 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   // Numbering is a separate bounded read after the visible tasks are known.
   const visibility = issueIds.length
     ? await issueVisibility(reader, false, undefined, db, { onlyIssueIds: issueIds, withTeamLinks: false }) : null
-  const issueRows = issueIds.length ? await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
+  const issueRows = issueIds.length ? await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, run: issueLatestRun })
     .from(issues)
     .where(and(inArray(issues.id, issueIds), visibility!.predicate)) : []
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
@@ -705,13 +722,14 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   ], db)
   for (const { content, ownerId: _owner, scope: _scope, ...row } of issueRows) {
     const metadata = readIssueMetadata(content)
-    if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null }
+    if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null,
+      pullRequests: metadata.pullRequests }
   }
   for (const row of runs) {
     const task = row.issueId ? tasks.get(row.issueId) ?? null : null
     // The short title travels only when there is one, so a citation carries nothing new otherwise.
     const shortTitle = task && task.shortTitleFrom === task.title ? task.shortTitle : null
-    const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status } : null
+    const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status, run: task.latestRun } : null
     const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
     const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
     sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, group, issue,
@@ -746,12 +764,6 @@ export async function citationNames(reader: IssueReader, texts: readonly string[
   // A teammate's thread is named by its harness, as its bare projection (workspaceRunView) is.
   for (const run of runs) names[run.id] = { kind: 'run', name: run.own ? threadName(run.promptHead ?? '', run.agentName) : threadName('', run.harness) }
   return names
-}
-
-/** A waiting message as the chat shows it: its words, and a stand-in per photo so the chat can count them. */
-function withImages(text: string, images: unknown): ModelMessage['content'] {
-  if (!Array.isArray(images) || !images.length) return text
-  return [{ type: 'text', text }, ...images.map(() => ({ type: 'file' as const, data: '', mediaType: 'image/jpeg' }))]
 }
 
 type ChatReadObservation = { expiries: Date[]; observedAt: number }
@@ -794,7 +806,7 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
     waiting: sql<WaitingRow[]>`coalesce((select jsonb_agg(to_jsonb(${sql.identifier('chat_waiting')}) order by ${waitingRead.createdAt}) from ${waitingRead}), '[]'::jsonb)`,
   }).from(storedRead).leftJoin(sessionRead, sql`true`)
   const session = { leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt, lastFailure: snapshot.lastFailure }
-  const rows = snapshot.rows.map(row => ({ ...row, createdAt: new Date(row.createdAt) }))
+  const rows = await projectMessageDisplays(db, userId, snapshot.rows.map(row => ({ ...row, createdAt: new Date(row.createdAt) })))
   const hasMore = rows.length > limit
   rows.splice(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
@@ -802,8 +814,9 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
   const last = rows[0]?.position ?? window.after ?? 0
   const lastMessage = rows[0] && { role: String(rows[0].message.role), ...(typeof rows[0].message.mikkaStreamId === 'string' ? { streamId: rows[0].message.mikkaStreamId } : {}), createdAt: rows[0].createdAt }
   // A retry (重试, or an interrupted turn) re-answers a message already in the chat (postedToChat): no second bubble.
-  const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
-    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
+  const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && event.payload.source !== 'coordinator_welcome'
+    && (event.payload.source === 'person' || !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK))).map((event, index) => ({
+    position: last + index + 1, createdAt: event.createdAt, message: maskDeep(sourcedEventMessage(event, eventPrompt(event)),credentialMasker), pending: true as const,
   }))
   const read = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   // An older page (history): a welcome failure there was answered by what came after it, so it is not shown.
@@ -951,7 +964,7 @@ export async function botChatSnapshot(reader: IssueReader) {
   const readableBots = workspaces.length ? await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)))) : []
   if (!readableBots.length) return { items: {} as Record<string, BotChatSummary>, expiries: [] as Date[], observedAt: Date.now() }
   const botIds = readableBots.map(bot => bot.id)
-  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
+  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { id: coordinatorMessages.id, botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), inArray(coordinatorMessages.botId, botIds), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
   const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), inArray(coordinatorSessions.botId, botIds)))
@@ -970,7 +983,8 @@ export async function botChatSnapshot(reader: IssueReader) {
     if (!session.botId) continue
     result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId), now).working }
   }
-  const lines = latest.flatMap(row => {
+  const projected = await projectMessageDisplays(db, userId, latest)
+  const lines = projected.flatMap(row => {
     if (!row.botId) return []
     const [item] = chatItems([{ position: 0, message: row.message as unknown as ModelMessage, createdAt: row.createdAt }])
     // A failed welcome is no message from the Bot: no preview line and no time to count as unread.
@@ -989,8 +1003,8 @@ export async function botChatSnapshot(reader: IssueReader) {
 
 /** The whole conversation for display, newest last. */
 export async function conversationForDisplay(userId: string, limit = 200, botId: string) {
-  const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
-  return rows.reverse()
+  return (await projectMessageDisplays(db, userId, rows)).reverse().map(({ id: _id, ...row }) => row)
 }

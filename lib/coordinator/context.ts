@@ -14,6 +14,8 @@ import { eventLine, type EventLine } from './event-line'
 import { projectedToolResult, toolCallMetadata, toolResultMetadata, type ProjectedToolMetadata } from './tool-metadata'
 import { quotePreview, toolQuote } from './tool-quote'
 import { invalidToolParts } from './invalid-tool-call'
+import { scheduleChatResultSchema } from '@/lib/schedules/chat-result'
+import { messageDisplay } from './message-display'
 
 export { QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE, quoteText, quotePreview, toolQuoteText, toolQuote } from './tool-quote'
 
@@ -436,21 +438,41 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
     items.push({ position: waiting.position, from: 'coordinator', text: '', tools: [], threads: [], createdAt: waiting.createdAt.toISOString(), artifacts: [...new Set(waiting.ids)] })
     waiting.ids = []
   }
-  for (const { id, position, message, createdAt, pending } of rows) {
-    if (message.role === 'user') {
-      const source = message as SourcedMessage
-      // Completion instructions are model context. Trust the host event marker,
-      // not a text prefix a person can also write; its reply starts a new message.
-      if (!source.mikkaUserEvent && source.mikkaEvent?.eventKind === 'run_finished') {
-        briefingBoundary = true
+  for (const { id, position, message: storedMessage, createdAt, pending } of rows) {
+    const display = messageDisplay(storedMessage)
+    const message = display?.kind === 'reply' ? { ...storedMessage, role: 'assistant' as const, content: display.text }
+      : display?.kind === 'person' ? { ...storedMessage, role: 'user' as const, content: Array.isArray(storedMessage.content) ? [{ type: 'text' as const, text: display.text }, ...storedMessage.content.filter(part => part.type === 'file')] : display.text } : storedMessage
+    if (display?.kind === 'hidden') {
+      briefingBoundary = true
+      continue
+    }
+    if (display?.kind === 'reply') {
+      flush()
+      briefingBoundary = true
+    }
+    if (display?.kind === 'event') {
+      const content = typeof message.content === 'string' ? message.content : ''
+      const cited = display.artifacts ? { ids: display.artifacts } : display.line.kind === 'artifact' ? takeArtifacts(content.split('\n')[0]) : { ids: [] }
+      if (cited.ids.length) {
+        Object.assign(waiting, { ids: [...waiting.ids, ...cited.ids], position, createdAt })
         continue
       }
+      flush()
+      const source = message as SourcedMessage
+      items.push({ ...(id ? { id } : {}), position, from: 'event', text: '', tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [],
+        ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : { line: display.line }) })
+      continue
+    }
+    if (message.role === 'user') {
+      const source = message as SourcedMessage
       // 重新发送 retried this failed message in place (store.sendRetryOf): the new attempt stands for it.
       if ((message as { mikkaRetried?: unknown }).mikkaRetried === true) continue
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+      // Compatibility only for rows without an audience. New host formats must
+      // declare display metadata; a marked person's same words are never guessed at.
       // The request for its welcome is for the Coordinator only. When the turn answering it failed (store.failTurn),
       // the Bot's side says why, with 重试, until a reply follows (the welcome request had no other trace in the chat).
-      if (raw.startsWith(COORDINATOR_WELCOME_MARK)) {
+      if (display?.kind === 'welcome' || (!display && raw.startsWith(COORDINATOR_WELCOME_MARK))) {
         const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
         const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason, failureDetails: (message as { mikkaFailureDetails?: unknown }).mikkaFailureDetails }) : null
         if (failure) {
@@ -461,16 +483,16 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         continue
       }
       // Evidence the person has not seen (lib/attention): only what the Coordinator decides to tell them shows, as its own message.
-      if (raw.startsWith(HANDOFF_PREFIX)) {
+      if (!display && raw.startsWith(HANDOFF_PREFIX)) {
         briefingBoundary = true
         continue
       }
       // Briefing instructions belong only in model context; its reply starts a new chat message.
-      if (raw.startsWith('[Event] It is 08:00 for the person: their morning briefing') || raw.startsWith('[Event] The person just connected an app. Their first briefing:')) {
+      if (!display && (raw.startsWith('[Event] It is 08:00 for the person: their morning briefing') || raw.startsWith('[Event] The person just connected an app. Their first briefing:'))) {
         briefingBoundary = true
         continue
       }
-      const event = !source.mikkaUserEvent && raw.startsWith('[Event]')
+      const event = !display && !source.mikkaUserEvent && raw.startsWith('[Event]')
       if (event) {
         const cited = takeArtifacts(raw.split('\n')[0])
         if (cited.ids.length) {
@@ -481,7 +503,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       flush()
       const base = { ...(id ? { id } : {}), position, tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], ...(pending ? { pending } : {}) }
       // The triage line is for the Coordinator, not the person.
-      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n'),
+      if (event) items.push({ ...base, from: 'event', text: '',
         ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : { line: eventLine(source.mikkaEvent?.eventKind, raw, source.mikkaEvent?.observedState ?? null) }) })
       else {
         const { quote, text: unquoted } = splitQuote(raw)
@@ -494,6 +516,18 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
       }
     } else if (message.role === 'assistant') {
+      const schedule = scheduleChatResultSchema.safeParse((message as { mikkaScheduleResult?: unknown }).mikkaScheduleResult)
+      if (schedule.success) {
+        flush()
+        briefingBoundary = true
+        const task = schedule.data.task
+        if (task || !message.content || (Array.isArray(message.content) && !message.content.length)) {
+          items.push({ ...(id ? { id } : {}), position, from: 'event', text: task ? `[[issue:${task.id}]]` : '', tools: [], threads: [], artifacts: [], createdAt: createdAt.toISOString(),
+            line: task ? { kind: 'issueSnapshot', issueId: task.id, runId: null, title: task.title, status: task.status }
+              : { kind: 'scheduleRan', issueId: null, runId: null, title: schedule.data.title, status: schedule.data.status } })
+          continue
+        }
+      }
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
       const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) && !invalidParts.has(part) ? [part.toolName] : [])
@@ -531,6 +565,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         // Only a reply that shows ends the boundary; hidden tool-only steps do not.
         briefingBoundary = false
       }
+      if (schedule.success || display?.kind === 'reply') briefingBoundary = true
     } else if (message.role === 'tool') {
       const last = items.at(-1)
       if (last?.from !== 'coordinator') continue
