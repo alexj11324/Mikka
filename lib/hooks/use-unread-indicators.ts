@@ -94,26 +94,30 @@ export function useUnreadIndicators({ conversationId, items, rootRef, source = c
 
   useEffect(() => { const id = requestAnimationFrame(measure); return () => cancelAnimationFrame(id) }, [items, divider, measure])
 
-  // The scroller can finish anchor placement or reveal content-visibility items
-  // after its scroll event. Observe the resulting geometry as well: a scroll
-  // measurement is not evidence that the final visible messages were measured.
+  // Scroll and a new row already remeasure. Watching every row does not: on the
+  // translucent desktop window those resize and intersection callbacks (the old
+  // thresholds were 0, 0.5 and 1) arrive every frame, and each one laid out the
+  // whole transcript. One observer on the transcript is enough for a row that
+  // grows after it is mounted, and a subpixel change is not a new height.
   const messagePositions = items.map(item => item.position).join(',')
   useEffect(() => {
     const element = viewport()
-    if (!element) return
+    const content = element?.querySelector<HTMLElement>('[data-slot="message-scroller-content"]')
+    if (!content) return
     let frame: number | null = null
-    const scheduleMeasure = () => {
+    let lastHeight = content.scrollHeight
+    const size = new ResizeObserver(() => {
       if (frame !== null) return
-      frame = requestAnimationFrame(() => { frame = null; measure() })
-    }
-    const nodes = [...element.querySelectorAll<HTMLElement>(`[${MESSAGE_POSITION_ATTR}]`)]
-    const visibility = new IntersectionObserver(scheduleMeasure, { root: element, threshold: [0, 0.5, 1] })
-    const size = new ResizeObserver(scheduleMeasure)
-    size.observe(element)
-    for (const node of nodes) { visibility.observe(node); size.observe(node) }
-    scheduleMeasure()
+      frame = requestAnimationFrame(() => {
+        frame = null
+        const height = content.scrollHeight
+        if (Math.abs(height - lastHeight) < 1) return
+        lastHeight = height
+        measure()
+      })
+    })
+    size.observe(content)
     return () => {
-      visibility.disconnect()
       size.disconnect()
       if (frame !== null) cancelAnimationFrame(frame)
     }
