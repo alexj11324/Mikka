@@ -1,15 +1,15 @@
 import 'server-only'
-import { createHash } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 // Workspace and repository secrets are enabled whenever the deployment has its
 // encryption key. Choosing BYO or platform E2B billing does not disable secret protection.
 import { and, eq, inArray, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { userSecrets, workspaceSecrets } from '@/lib/db/secrets-schema'
-import { openSecret, secretAad, SecretsKeyMissingError, userSecretAad } from './crypto'
+import { openSecret, secretAad, secretsKey, SecretsKeyMissingError, userSecretAad } from './crypto'
 import { byoE2BKeyEnabled, workspaceSecretsConfigured, E2BKeyError } from './flag'
 import { isReservedEnvName, repositoryRef } from './format'
 import type { SecretAuditHook } from './store'
-import { createSecretMasker, identityMasker, maskDeep, withCredentialMasking, type Masker } from './mask'
+import { createSecretMasker, MASK_RULES_VERSION, maskDeep, withCredentialMasking, type MaskableSecret, type Masker } from './mask'
 import { effectiveSecretDelivery, type SecretDelivery } from './delivery'
 
 // The settings store (and its workspace-access chain) loads only when the encryption key is configured and a query runs.
@@ -175,14 +175,27 @@ async function workspaceE2BKeySecret(workspaceId: string, env: Env): Promise<{ n
   return (await (await import('./e2b')).maskableE2BKeys(workspaceId, env)).map(value => ({ name: 'E2B_API_KEY', value }))
 }
 
+function retainedSourceMasker(secrets: readonly MaskableSecret[], env: Env): Masker {
+  const mask = withCredentialMasking(createSecretMasker(secrets))
+  const material = JSON.stringify(['retained-source/v1', MASK_RULES_VERSION,
+    secrets.map(({ name, value }) => [name, value]).sort((a, b) => Buffer.compare(Buffer.from(JSON.stringify(a)), Buffer.from(JSON.stringify(b))))])
+  // Never persist an unkeyed hash of a potentially low-entropy secret. The
+  // fingerprint and masker use the same already-loaded values, without a
+  // second query that could certify a different set of secrets.
+  mask.sourcePolicy = workspaceSecretsConfigured(env)
+    ? createHmac('sha256', secretsKey(env)).update(material).digest('hex')
+    : createHash('sha256').update(material).digest('hex')
+  return mask
+}
+
 /** Masker for persisted output: saved secrets (none without an encryption key) plus credential patterns. Env vars (kind='env') are not masked: they are plain config shown in settings. */
 export async function workspaceSecretMasker(workspaceId: string | null | undefined, env: Env = process.env): Promise<Masker> {
   // Credential patterns (GitHub tokens, JWTs) are masked even with no saved secret or no key.
-  if (!workspaceId || !workspaceSecretsConfigured(env)) return withCredentialMasking(identityMasker)
+  if (!workspaceId || !workspaceSecretsConfigured(env)) return retainedSourceMasker([], env)
   // 4e3: every secret a task of this workspace can receive, including all repository-scoped ones.
   const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), eq(workspaceSecrets.kind, 'secret'))))
   const e2bKey = await workspaceE2BKeySecret(workspaceId, env)
-  return withCredentialMasking(createSecretMasker([...rows.map(row => openRuntime(row, env)), ...e2bKey]))
+  return retainedSourceMasker([...rows.map(row => openRuntime(row, env)), ...e2bKey], env)
 }
 
 /**
@@ -194,7 +207,7 @@ export async function secretMaskerFor(target: { workspaceId: string | null | und
   const rows = target.workspaceId ? await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, target.workspaceId!), eq(workspaceSecrets.kind, 'secret')))) : []
   const e2bKey = target.workspaceId ? await workspaceE2BKeySecret(target.workspaceId, env) : []
   const own = (await loadUserRuntimeSecrets(target.ownerId, env)).filter(secret => secret.kind === 'secret')
-  return withCredentialMasking(createSecretMasker([...rows.map(row => openRuntime(row, env)), ...e2bKey, ...own]))
+  return retainedSourceMasker([...rows.map(row => openRuntime(row, env)), ...e2bKey, ...own], env)
 }
 /** maskDeep(value) with secretMaskerFor(target). */
 export async function maskFor<T>(target: { workspaceId: string | null | undefined; ownerId?: string | null }, value: T, env: Env = process.env): Promise<T> {
@@ -211,7 +224,7 @@ export async function runWorkspaceId(runId: string): Promise<string | null> {
 
 /** Masker for output persisted on behalf of a run (MCP worker tools). Same secret set as the run's sandbox. */
 export async function runSecretMasker(runId: string, env: Env = process.env): Promise<Masker> {
-  if (!workspaceSecretsConfigured(env)) return withCredentialMasking(identityMasker)
+  if (!workspaceSecretsConfigured(env)) return retainedSourceMasker([], env)
   const { rows: [run] } = await guardSecretsDb(async () => (await import('@/lib/db')).pool.query<{ userId: string }>('SELECT "userId" FROM agent_runs WHERE id=$1', [runId]))
   return secretMaskerFor({ workspaceId: await runWorkspaceId(runId), ownerId: run?.userId ?? null }, env)
 }

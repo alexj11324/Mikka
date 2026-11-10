@@ -16,6 +16,8 @@ import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { mobileTaskActivity, mobileTaskGroup } from '@/lib/mobile-task-view'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskBlock } from '@/lib/task-blocked'
+import { taskReviewSummaries } from '@/lib/coding-workspace/task-review/summaries'
+import { taskReviewSourceHint } from '@/lib/coding-workspace/task-review/summary-selection'
 
 /** Locate the persisted tenant through the full reader, then hold fresh
  * membership and re-read every projection. Cookie/default choices are not pins. */
@@ -24,7 +26,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
   if (!candidate || candidate.ownershipState !== 'bound' || !candidate.workspaceId
     || (explicitWorkspaceId !== undefined && candidate.workspaceId !== explicitWorkspaceId)) return null
   const workspaceId = candidate.workspaceId
-  return withIssueWorkspace(user, workspaceId, () => readMobileTask({
+  return withIssueWorkspace(user, workspaceId, { issueId: id, action: 'canReadContent' }, () => readMobileTask({
     ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal],
   }, workspaceId, id))
 }
@@ -51,7 +53,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
       .leftJoin(devices, and(eq(devices.id, agentRuns.deviceId), eq(devices.ownerId, user.id)))
       .where(and(eq(agentRuns.issueId, id), eq(agentRuns.userId, user.id), eq(agentRuns.workspaceId, workspaceId)))
       .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)),
-    db.select({ schedule: taskSchedule(issues.id, user.id, workspaceId), owner: users.name }).from(issues)
+    db.select({ schedule: taskSchedule(issues.id, user.id, workspaceId), owner: users.name, codingReview: taskReviewSourceHint }).from(issues)
       .leftJoin(users, eq(users.id, issues.userId))
       .where(and(eq(issues.id, id), eq(issues.workspaceId, workspaceId), eq(issues.ownershipState, 'bound'))),
     db.select({ actorType: issueVersions.actorType, actorId: issueVersions.actorId }).from(issueVersions)
@@ -61,6 +63,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     visibleBlockers ? db.select({ id: issues.id, status: issues.status }).from(issues)
       .where(and(inArray(issues.id, blockerIds), visibleBlockers.predicate)) : [],
   ])
+  const reviews = await taskReviewSummaries(user, decoration?.codingReview ? [id] : [], workspaceId)
   const [creation] = await enrichActivityActors(versions, issue.userId)
   const task = { ...issue, metadata }
   const newest = runs[0]
@@ -74,6 +77,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
       id, identifier: identifiers.get(id) ?? null, title: displayTaskTitle({ ...issue, shortTitle: issue.shortTitleFrom === issue.title ? issue.shortTitle : null }), description: issueContentToMarkdown(issue.content).trim() || null,
       status: issue.status, priority: issue.priority, group: mobileTaskGroup(task, newest, blocked), bot: newest?.bot ?? null,
       agent: newest ? { harness: newest.harness, model: newest.model } : null, place, schedule: taskScheduleView(decoration?.schedule ?? null, labels),
+      review: reviews.get(id) ?? null,
     },
     activity: mobileTaskActivity(task, runs, { by: creation?.actor ? creation.actor.name : decoration?.owner ?? null, createdAt: issue.createdAt }),
     live: { workspaceId },

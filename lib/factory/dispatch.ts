@@ -102,6 +102,8 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
         await tx.query('UPDATE agent_runs SET prompt=left(prompt,$2) || $3,"promptTaskStart"=CASE WHEN "promptTaskStart" IS NOT NULL AND "promptTaskLength" IS NOT NULL THEN LEAST("promptTaskStart",$2) END,"promptTaskLength"=CASE WHEN "promptTaskStart" IS NOT NULL AND "promptTaskLength" IS NOT NULL THEN LEAST("promptTaskLength",GREATEST(0,$2-"promptTaskStart")) END WHERE id=$1', [queued.runId, 100000 - handoffText.length, handoffText]);
       }
       await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ handoff: { eventId: handoff.eventId, digest: handoff.digest, requestEpoch: task.sourceEventId } })]);
+      const { rows: [review] } = await tx.query('SELECT output->\'workspaceReview\' AS reference FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id]);
+      if (review?.reference != null) await (await import('../coding-workspace/diff/feedback-brief')).appendReviewBatchToRun(tx, task, queued.runId, review.reference);
       await adapters.freeze(tx,task,queued.runId);
       const { rows: [run] } = await tx.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[queued.runId]);
       if (!run || run.userId !== userId || run.issueId !== task.issueId || !(await factoryRunBotMatches(tx, task, run)) || run.agentId !== input.agentId || run.deviceRepoId !== input.deviceRepoId || run.status !== 'queued' || run.stopRequestedAt || !run.agentDefinition) fail('factoryRunMismatch');

@@ -79,7 +79,10 @@ export function automaticFactoryDispatch(pool: Pool) {
     // absent for local runs). Every later role and recovery selection keeps
     // the task/run tenant, including a botless shared task.
     if (!source || !workspaceId || source.workspaceId !== workspaceId || source.userId !== task.userId || source.issueId !== task.issueId ||
-      (source.deviceKind === 'cloud' && source.runtimeWorkspaceId !== workspaceId)) throw new FactoryError('factoryRunMismatch')
+      // A completed source may have released its live cloud binding. The
+      // persisted run/task tenant remains authoritative; only a binding that
+      // still exists can contradict it.
+      (source.deviceKind === 'cloud' && source.runtimeWorkspaceId != null && source.runtimeWorkspaceId !== workspaceId)) throw new FactoryError('factoryRunMismatch')
     const check = task.stage !== 'execute'
     const checkStage = task.stage === 'review' || task.stage === 'verify' ? task.stage : undefined
     const candidateId = task.candidateId
@@ -244,7 +247,10 @@ export function automaticFactoryDispatch(pool: Pool) {
       return async () => { notifyDeviceWork(deviceId) }
     }
     const selectedHarness = checkStart?.run.agentDefinition.harness ?? (profileChoice?.target.kind === 'cloud' ? profileChoice.target.harness : source.harness)
-    const runtime = await ensureRecordedBotHarnessRuntime(tx, { userId: task.userId, workspaceId: source.workspaceId }, source.runtimeBotId, selectedHarness, { freshTask: true })
+    // The live computer binding is released when a source run finishes. The
+    // run's own bot is the durable fallback, then the task's bot for legacy rows.
+    const runtimeBotId = source.runtimeBotId ?? source.botId ?? task.botId
+    const runtime = await ensureRecordedBotHarnessRuntime(tx, { userId: task.userId, workspaceId: source.workspaceId }, runtimeBotId, selectedHarness, { freshTask: true })
     if (!runtime || (checkStart && runtime.agentId !== checkStart.run.agentId)) throw new FactoryError('factoryCheckHarnessUnavailable')
     let model: Partial<RunModel> | { error: string } = selection
     if (profileChoice) {
@@ -262,7 +268,7 @@ export function automaticFactoryDispatch(pool: Pool) {
     const { rows: [issue] } = await tx.query('SELECT title,content FROM issues WHERE id=$1', [task.issueId])
     const actor = { userId: task.userId, workspaceId: source.workspaceId as string }
     const dispatch = createFactoryDispatch(pool, store, (client, _owner, _input, _bot, context) => queueCloudRun(pool, actor, {
-      botId: source.runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel, ...inheritedPolicy,
+      botId: runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel, ...inheritedPolicy,
       withoutBot: task.botId === null, ...(continueImplementation ? { threadRunId: source.id } : {}), readOnly: check || (continueImplementation && source.agentDefinition?.readOnly), idempotencyKey: `factory:${context.attemptId}`,
       allowLocalRecovery: source.agentDefinition?.allowLocalRecovery, sourceEventId: context.sourceEventId,
     }, client, context), { ...defaultFactoryDispatchAdapters, configure: {

@@ -141,5 +141,7 @@ test('usage attributes the frozen payer and leaves external amounts unknown', as
   assert.equal(rows.find(row => row.kind === 'local_device')?.ownerId, 'requester')
   assert.equal(rows[0].runs, 2); assert.equal(rows[0].seconds, 60)
   assert.equal(rows.find(row => row.kind === 'api_key')?.amount, 'provider_unknown')
+  assert.ok(rows.every(row => row.costMicroUsd === null && row.chargedByMikka === false))
+  assert.equal(rows.find(row => row.kind === 'api_key')?.lane, 'model')
   assert.deepEqual(executionAccountUsage([{ identity: null, seconds: 10 }]), [])
 })

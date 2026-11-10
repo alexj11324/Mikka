@@ -49,6 +49,8 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 import { activeTaskWorkspaces, requireTaskWorkspace } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
 import type { CoordinatorStartupReceipt, CoordinatorStartupSettingsCandidate, CoordinatorStartupSettings, CoordinatorStartupTake } from './startup-receipt'
+import type { TaskReviewSummary } from '../coding-workspace/task-review/projection'
+import { taskReviewSourceHint } from '../coding-workspace/task-review/summary-selection'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -696,7 +698,7 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   // Numbering is a separate bounded read after the visible tasks are known.
   const visibility = issueIds.length
     ? await issueVisibility(reader, false, undefined, db, { onlyIssueIds: issueIds, withTeamLinks: false }) : null
-  const issueRows = issueIds.length ? await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, run: issueLatestRun })
+  const issueRows = issueIds.length ? await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, run: issueLatestRun, codingReview: taskReviewSourceHint })
     .from(issues)
     .where(and(inArray(issues.id, issueIds), visibility!.predicate)) : []
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
@@ -720,16 +722,26 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
     ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })),
     ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number })),
   ], db)
-  for (const { content, ownerId: _owner, scope: _scope, ...row } of issueRows) {
+  // The hint keeps the Review loader off reads whose tasks have no source.
+  const reviewIds = [...new Set([
+    ...issueRows.filter(row => row.codingReview).map(row => row.id),
+    ...[...tasks.values()].filter(task => task.codingReview).map(task => task.id),
+  ])]
+  const reviews = reviewIds.length
+    ? await (await import('../coding-workspace/task-review/summaries')).taskReviewSummaries(reader, reviewIds)
+    : new Map<string, TaskReviewSummary>()
+  for (const { content, ownerId: _owner, scope: _scope, codingReview: _codingReview, ...row } of issueRows) {
     const metadata = readIssueMetadata(content)
+    const review = reviews.get(row.id)
     if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null,
-      pullRequests: metadata.pullRequests }
+      pullRequests: metadata.pullRequests, ...(review ? { review } : {}) }
   }
   for (const row of runs) {
     const task = row.issueId ? tasks.get(row.issueId) ?? null : null
     // The short title travels only when there is one, so a citation carries nothing new otherwise.
     const shortTitle = task && task.shortTitleFrom === task.title ? task.shortTitle : null
-    const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status, run: task.latestRun } : null
+    const review = task ? reviews.get(task.id) : undefined
+    const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status, run: task.latestRun, ...(review ? { review } : {}) } : null
     const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
     const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
     sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, group, issue,

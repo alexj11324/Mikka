@@ -34,8 +34,12 @@ not on the dispatching bot's machine (`cloud-computer-backend.md` § 2).
 | **Account** | 账号 | The person: 账户, security, 偏好, 通知, profile memory (个人资料类记忆), 密钥与登录, 设备 and 「模型与订阅」. The same in every workspace. |
 | **Personal workspace** | 个人工作区 | One per person. Only that person's bots, chats, tasks, threads and their memory; personal 计费 and 用量; no team settings. |
 | **Shared workspace** | 共享工作区 | Members, 团队权限, 密钥与环境, 审计日志, team 用量 and 计费. Nothing moves between it and a personal workspace. |
+| **Organization** | 组织 | Manages membership, organization connections, policies and billing across attached Workspaces. Each Workspace remains an independent tenant; an Organization role does not confer private content access. |
+| **Resource owner** | 所有者 | Manages a Project, Task, Thread, Bot or Artifact's access and controlled ownership transfer. Ownership does not bypass a private ancestor or a revoked Workspace membership. |
+| **Actor** | 操作者 | The authenticated person or service principal responsible for a message or operation. Kept separately from the Thread Owner, execution identity, credential owner and payer. |
 
 Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md).
+Collaboration and financial authority: [2026-11-10-0017](decisions/2026-11-10-0017-collaboration-governance.md).
 
 ## Rules for designs
 
@@ -221,10 +225,12 @@ Agents. The UI calls it daemon in both languages, with no 「Mikka」 in front:
 _Avoid_: Mikka 客户端, Mikka client, 客户端 (reads as the desktop app).
 
 **Connection (连接)**:
-The person's authorised link to an outside app (Gmail, GitHub, Linear,
-Telegram…), used only by their own bots unless a workspace policy says
-otherwise.
-_Owner_: the account (Connection aggregate).
+An authorized link to an outside provider. Personal app connections (Gmail,
+GitHub, Linear, Telegram…) and Claude Code/Codex subscriptions belong to the
+account. Organization model connections are API keys, gateways or custom
+endpoints owned by the organization. Sharing content never shares a connection.
+_Owner_: the account or organization (Connection aggregate); a Subscription
+connection is always account-owned and never a public member resource pool.
 _Avoid_: integration, plugin (a 插件 is the store item, the connection is
 what linking it creates), binding.
 
@@ -235,7 +241,9 @@ Sensitive third-party API values follow the scoped capability boundary in
 `lib/secrets/runtime.ts` separates ordinary env and explicit direct delivery
 from protected HTTP capabilities, which the claim route seals for the run.
 Deployed protection requires the decision's runtime canaries and evidence.
-_Owner_: the workspace (Secret aggregate).
+_Owner_: the account for Personal secrets, or the Workspace/Project for Shared
+secrets. Thread scope narrows delivery to authorized work; it does not change
+ownership or authorize delivery of someone else's Personal secret.
 _Avoid_: credential (a model credential is the account's), token, 环境变量 as
 a separate thing (an environment variable is a kind of secret).
 
@@ -245,6 +253,10 @@ allowance is the credits a new workspace starts with once its owner is
 verified. A model subscription's quota (订阅额度) is the subscription owner's,
 never the workspace's.
 _Owner_: the workspace (Billing aggregate); 订阅额度 belongs to the account.
+An Organization can explicitly designate an attached Workspace's existing
+billing account for its platform resources. Existing balances keep their
+owner and ledger history. External API keys, subscriptions and E2B bills remain
+external; an unavailable provider amount is **Unknown**, never zero.
 _Avoid_: bare 额度 (say 免费额度 or 订阅额度), balance, quota for credits.
 ## Known naming debt
 

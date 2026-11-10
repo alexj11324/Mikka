@@ -88,6 +88,18 @@ test('Factory flow accepts only a strict UUID and its two declared methods', () 
   assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
 })
 
+test('billing metadata and commands have exact scoped routes and methods', () => {
+  assert.equal(allowedApiPath('/api/organizations', 'GET'), true)
+  for (const method of ['HEAD', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS']) assert.equal(allowedApiPath('/api/organizations', method), false)
+  for (const scope of ['workspaces', 'organizations']) {
+    const path = `/api/${scope}/${identity.user.id}/billing`
+    for (const method of ['GET', 'POST']) assert.equal(allowedApiPath(path, method), true)
+    for (const method of ['HEAD', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath(path, method), false)
+    assert.equal(allowedApiPath(`${path}/credentials`, 'GET'), false)
+    assert.equal(allowedApiPath(`/api/${scope}/forged/billing`, 'POST'), false)
+  }
+})
+
 test('local entry/assets load without backend; missing assets and symlink escape fail closed', async t => {
   const root = await fixture(t)
   await mkdir(join(root, 'assets'))
