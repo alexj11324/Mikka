@@ -16,7 +16,7 @@ No skill restyles a paid block or component (BoardUI Pro, affectUI, beUI Pro):
 their token, icon-set, font and polish rules apply to Mikka's own UI only
 (`docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md`).
 
-Vendored on 2026-10-29, unmodified, from these pinned commits:
+Vendored from these pinned commits. Rows marked *unmodified* are byte-identical upstream; every deviation is named in its row.
 
 | Source | Commit | License | Skills |
 | --- | --- | --- | --- |
@@ -37,6 +37,7 @@ Vendored on 2026-10-29, unmodified, from these pinned commits:
 | [avdlee/swiftui-agent-skill](https://github.com/avdlee/swiftui-agent-skill) | `62bd760f005093d1e2e4de5db156e456a5f96400` | MIT, (c) 2026 Antoine van der Lee | `swiftui-expert-skill` (vendored 2026-11-08 at Alex's request, from `skills/swiftui-expert-skill/`). Changed: `scripts/` (the Instruments `record_trace.py` / `analyze_trace.py` helpers and `instruments_parser/`) left out under the no-scripts rule, so the trace recording and analysis steps in `SKILL.md` do not run here; every other file is unmodified |
 | [gannonh/skills](https://github.com/gannonh/skills) | `2ef000341d4e60af00e8934ba1d4cfef82b63b13` | MIT, (c) 2026 Gannon Hall | `update-docs` (`skills/update-docs/`, vendored 2026-11-08), unmodified. The optional `documentation-and-adrs` reference uses an available installed skill when relevant |
 | [wondelai/skills](https://github.com/wondelai/skills) | `6621b1f32cca2b9b17d7a18c076bf6e7da83f8a6` | MIT, (c) 2025 Wondel.ai sp. z o.o. Google guide attribution is retained in `SKILL.md` | `technical-documentation` (vendored 2026-11-08), unmodified, including all seven reference pages |
+| [backnotprop/pstack](https://github.com/backnotprop/pstack) | `08547969e1dffaa6457ea65141cc62c1d9a2eef1` | MIT | `poteto-mode` (the playbooks and the 24 `principle-*` skills), `how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `reflect`, `sharpen`, `correct`, `recall`, `bro`, `figure-it-out`, `show-me-your-work`, `automate-me`, `benchmark-checklist`, `blast-radius`, `create-verification-skill`, `maintain-verification-skill`, `create-formal-verification-skill`, `maintain-formal-verification-skill`, `statechart`, `typescript-best-practices`, `technical-writing`, `no-comments`, `make-bot-ui`, `in-your-own-words`, `setup-pstack`, `poteto-help`, `ketchup`, `ketchup-video` (vendored 2026-11-10 at Alex's request). Changed: every `scripts/` directory left out under the no-scripts rule, so the `check-plan.mjs` / `worktree-audit.sh` / `log.sh` steps in `poteto-mode` and `show-me-your-work`, and the TLA+ test corpus in `statechart`, do not run here; the `statechart` reference pages are kept. Kept our existing `tdd`, `teach` and `unslop` rather than pstack's same-named copies. Not vendored: `goal`, `loop` (harness built-ins already covered). |
 
 Full license texts are in [`../skill-licenses/`](../skill-licenses/). The
 `update-docs` license is retained in [`update-docs/LICENSE.md`](update-docs/LICENSE.md).
