@@ -4552,6 +4552,8 @@
       "title": "New task",
       "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",
+      "titleLabel": "Title",
+      "titlePlaceholder": "Title (optional, the Bot writes one if empty)",
       "placeholder": "What should it do?",
       "promptWithContext": "Create a task for me ({context}): {text}",
       "contextDevice": "run it on {device}",

@@ -25,6 +25,11 @@ export type NewTaskProps = {
   onClose: () => void
   /** The project page the request came from. */
   project?: string | null
+  /** 标题 the person wrote (optional; empty, the Bot writes one). */
+  title: string
+  onTitle: (title: string) => void
+  /** Longest title. */
+  titleMax: number
   /** The request, without the attached files' text (they show as cards). */
   text: string
   onText: (text: string) => void
@@ -58,7 +63,7 @@ export type NewTaskProps = {
   /** Profile checks, 未开启任务创建 and Coordinator unavailable, as Mikka draws them; null when there are none. */
   notices: ReactNode
   sending: boolean
-  /** Whether 创建任务 can send now (text, a usable profile, files done, creation available). */
+  /** Whether 创建任务 can send now (a title or text, a usable profile, files done, creation available). */
   canSubmit: boolean
   onSubmit: () => void
 }

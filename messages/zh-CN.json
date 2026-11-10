@@ -4552,6 +4552,8 @@
       "title": "新建任务",
       "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",
+      "titleLabel": "标题",
+      "titlePlaceholder": "标题（可选，不填由 Bot 起）",
       "placeholder": "要它做什么？",
       "promptWithContext": "帮我新建一个任务（{context}）：{text}",
       "contextDevice": "在 {device} 上做",
