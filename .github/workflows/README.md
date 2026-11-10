@@ -47,6 +47,23 @@ bindings. Current workflow files define the triggers and selected coverage.
   in addition to not cancelling a running main job. Superseded PR checks may
   still be cancelled.
 
+## Registered production API follow-ups
+
+`self-hosted-production.yml` uses the exact successful main Web `workflow_run`
+and the existing shared-account queue. Its Core, Inbox and registered #1856
+Organization owner/audit selectors keep independent issue and resource scopes.
+Each selector runs before the existing two smoke secrets can be read through
+Infisical. The Organization step uses its own session before Inbox; it does not
+add Organization writes to Inbox inventory or select Core device/PAT business.
+All original Inbox guards and recovery step bindings remain in place.
+
+See the [Inbox follow-up contract](../../docs/acceptance/backend-production-followup-1608-1820.md)
+and [Organization owner/audit contract](../../docs/acceptance/governance-production-followup-1608.md)
+for exact source/window admission, normal fixture operations and cleanup.
+Those contracts define execution requirements; only version-bound production
+receipts establish which checks passed. Limited Organization/audit coverage
+does not establish Pro entitlement, IdP interoperability or SCIM lifecycle.
+
 ## Cloud worker template release
 
 `e2b-official-runtime.yml` is the only production release coordinator. It checks
