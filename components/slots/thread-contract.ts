@@ -114,6 +114,13 @@ export type ThreadScreenProps = {
    * (`revealId`) to be shown; the work area stays folded until then.
    */
   panels?: { tabs: ThreadPanelTab[]; reveal: number; revealId: string | null }
+  /**
+   * Tabs the chat opens itself in the same work area (FRAME_OWNS_PANEL, decision 2026-11-10): a task's view
+   * (`task:<issueId>`) from a task card or chip, a thread's conversation (`thread:<runId>`) from a thread chip, an
+   * Agent's stretch or a subagent. `reveal` counts up each time one is asked for (`revealId`). With `work`, a task card
+   * opens through its part's `onOpen` only, never the template's own task tab.
+   */
+  work?: { tabs: ThreadPanelTab[]; reveal: number; revealId: string | null }
 }
 
-export type ThreadPanelTab = { id: 'overview' | 'browser'; title: string; content: ReactNode }
+export type ThreadPanelTab = { id: 'overview' | 'browser' | `task:${string}` | `thread:${string}`; title: string; content: ReactNode }

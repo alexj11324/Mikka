@@ -2,7 +2,7 @@
 // whole page (bar, title, description, sub-tasks, activity, details) with its own controls; every save, read and
 // rule stays in public code (components/workspace/task-detail.tsx and task-detail-frame.tsx). The description editor,
 // 验收, an open thread and the dialogs stay Mikka's and come in rendered.
-import type { CompositionEvent, KeyboardEvent, ReactNode, RefObject } from 'react'
+import { createContext, type CompositionEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { IssueDetailNavigation } from '@/components/workspace/issue-detail-header'
 import type { IssueDiscussions } from '@/components/workspace/issue-editor'
 
@@ -154,3 +154,11 @@ export type TaskDetailFrameProps = {
   /** Members, description history, the ⋯ menu's and the properties' dialogs. */
   dialogs: ReactNode
 }
+
+/**
+ * The task view in a chat's work area (decision 2026-11-10): a narrow tab, whose own × closes it, so the layer leaves
+ * out the way back, the pager and ✕, stacks the details card above the body, and offers expand: the task's full page.
+ * Absent (null) on the task page itself.
+ */
+export type TaskDetailPlacement = { onExpand: () => void; expandLabel: string }
+export const TaskDetailPlacementContext = createContext<TaskDetailPlacement | null>(null)
