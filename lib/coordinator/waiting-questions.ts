@@ -13,16 +13,28 @@ export interface WaitingQuestionItem {
   line?: EventLine | null
 }
 
+/** Statuses that mean the task has a newer run doing something: nothing waits on the person meanwhile. */
+const ACTIVE = new Set(['queued', 'preparing', 'running', 'finishing', 'paused'])
+const CLOSED_ISSUE = new Set(['done', 'canceled', 'duplicate'])
+
+/** A run that ended on a question asked the person: `asked_human` is recorded at completion, before the outcome judge answers. */
+function waitsOnPerson(run: { status: string; outcome: string | null; stopReason?: string | null }): boolean {
+  if (run.status === 'waiting_input') return true
+  if (ACTIVE.has(run.status)) return false
+  return run.outcome === 'needs_input' || run.stopReason === 'asked_human'
+}
+
 /**
  * The tasks a person still has to answer for. A question is a live state, not
  * a stored transcript line: the chat shows one sentence above the composer and
  * draws no `runQuestion` row (decision 2026-11-10).
  *
  * A `runQuestion` event only says a question was asked once. Whether it is
- * still waiting follows the same rule as the inbox and the thread's 等待你
- * badge: the task's newest run is `waiting_input`, or ended and judged
- * `needs_input`. Answering starts a continuation run on the same task, so the
- * newest run moves on and the sentence disappears.
+ * still waiting follows the inbox's order (lib/inbox/store.ts): a closed task
+ * or a merged pull request is not waiting; an active newest run is not waiting;
+ * a live `waiting_input`, a judged `needs_input`, or a `stopped/asked_human`
+ * run is. Answering starts a continuation run on the same task, so the newest
+ * run moves on and the sentence disappears.
  *
  * - Only the latest non-stale `runQuestion` event counts.
  * - One row per task (two threads of one task answer the same question), and
@@ -43,14 +55,18 @@ export function waitingQuestionRuns(
     const key = run?.issue?.id ?? line.runId ?? `position-${item.position}`
     if (seen.has(key)) continue
     seen.add(key)
-    // `issue.run` is the task's newest run (lib/issue-summary-columns). Waiting is
-    // the inbox's needsReply: a live `waiting_input`, or the judged `needs_input`
-    // (a run that asked ends `stopped`, and the judge may also call it after
-    // `succeeded` when it hands work back), so the sentence and the inbox agree.
-    const newest = run ? run.issue?.run ?? { status: run.status, outcome: run.outcome ?? null } : null
-    if (!run || !newest) continue
-    if (newest.status !== 'waiting_input' && newest.outcome !== 'needs_input') continue
+    if (!run) continue
+    // `runQuestion` prompts name the task (lib/coordinator/context.ts), so a real
+    // question reads the task's newest run (`issue.run`, lib/issue-summary-columns)
+    // — the same row the inbox reads. An issue exists but its newest run has not
+    // loaded: wait for the next chat read rather than trust the asking run.
+    const newest = run.issue ? run.issue.run : { status: run.status, outcome: run.outcome ?? null, stopReason: run.stopReason ?? null }
+    if (!newest) continue
+    if (run.issue?.status && CLOSED_ISSUE.has(run.issue.status)) continue
+    if ((run.pullRequests ?? []).some(pr => pr.state === 'merged')) continue
+    if (!waitsOnPerson(newest)) continue
     rows.push({ runId: line.runId, title: runTitle(run) })
   }
   return rows.reverse()
 }
+

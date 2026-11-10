@@ -17,7 +17,7 @@ Two chat-chrome problems were reported on 2026-11-10:
 
 **B. A question is a live state, not a message.** `runQuestion` is no longer drawn as a transcript event line. While a task still waits on the person, the composer column shows one sentence above the input: a warning icon, an ICU-plural count, and the task that has waited longest as an inline link inside the sentence. The thread is never a row of its own, and two threads of one task count once.
 
-Whether it still waits follows the inbox's rule: the task's **newest** run is `waiting_input`, or ended and judged `needs_input`. The stored event never carries a title and the asking run ends as `stopped`, so the sentence reads the run source: an answered question starts a continuation run on the same task, whose newer state removes the sentence. A source that has not loaded yet waits for the next chat read instead of showing model text.
+Whether it still waits follows the inbox's order: a closed task or a merged pull request is not waiting; a newer active run on the task is not waiting; a live `waiting_input`, a judged `needs_input`, or a run that ended `asked_human` is. The stored event never carries a title and the asking run ends as `stopped`, so the sentence reads the task's **newest** run (the same `issue.run` the inbox reads): an answered question starts a continuation run on the same task, whose newer state removes the sentence. A source that has not loaded yet waits for the next chat read instead of showing model text.
 
 This does not change [2026-11-10-0659](2026-11-10-0659-task-code-chips-and-work-area-tabs.md): a thread named in a sentence is its title in the link colour, with no icon, chip fill, accent or state badge.
 
