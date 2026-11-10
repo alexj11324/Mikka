@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { billingEntitlementOutbox } from '@/lib/db/schema'
 import { organizationBillingAccounts, organizationEntitlements, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
@@ -77,5 +77,14 @@ export async function drainBillingEntitlements(eventIds?: readonly string[]): Pr
     }
   }
   if (failure) throw failure
-  if (rows.length === 100) throw new Error('billing_entitlement_delivery_backlog')
+  // A bounded scan may omit the caller's row. Only its own backlog (or a
+  // caller-less sweep) asks Stripe to retry; foreign pending rows never do.
+  if (rows.length === 100) {
+    const ownPending = requested?.size
+      ? (await db.select({ eventId: billingEntitlementOutbox.eventId }).from(billingEntitlementOutbox)
+        .where(and(inArray(billingEntitlementOutbox.eventId, [...requested]), isNull(billingEntitlementOutbox.deliveredAt))).limit(1)).length > 0
+      : false
+    if (!requested || ownPending) throw new Error('billing_entitlement_delivery_backlog')
+    console.warn('[billing] entitlement delivery backlog', { pending: rows.length })
+  }
 }
