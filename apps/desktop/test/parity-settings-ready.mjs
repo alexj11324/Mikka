@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
 
-const SECTIONS = new Set(['members', 'preferences', 'memory', 'account', 'teams', 'notifications', 'security', 'connections', 'bot-permissions', 'models', 'logins', 'privacy', 'computers', 'general', 'permissions', 'secrets', 'audit', 'usage', 'billing'])
+const SECTIONS = new Set(['members', 'preferences', 'memory', 'account', 'teams', 'notifications', 'security', 'connections', 'bot-permissions', 'models', 'logins', 'privacy', 'computers', 'general', 'permissions', 'secrets', 'environments', 'audit', 'usage', 'billing'])
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/
 
 function sectionId(id) {
