@@ -36,11 +36,11 @@ test("a local Mac looks at the app bundle and ~/.local/bin before PATH; other pl
   assert.deepEqual(computerDriverCandidates({ platform: "linux", env: {}, home: "/home/person" }), ["cua-driver"]);
   assert.deepEqual(
     computerDriverCandidates({ platform: "darwin", env: { MIKKA_CUA_DRIVER: " /custom/driver " }, home: "/Users/person" }),
-    ["/custom/driver", "/Applications/CuaDriver.app/Contents/MacOS/cua-driver", "/Users/person/.local/bin/cua-driver", "cua-driver"],
+    ["/custom/driver"],
   );
   assert.deepEqual(
     computerDriverCandidates({ platform: "linux", env: { MIKKA_CUA_DRIVER: "/custom/driver" }, home: "/home/person" }),
-    ["/custom/driver", "cua-driver"],
+    ["/custom/driver"],
   );
 });
 
@@ -183,7 +183,7 @@ test("the doctor separates missing, wrong version, both denied grants and a fail
   const accessibility = await doctorComputerDriver({
     inspect: inspect({ driver: pinned, found: [] }),
     permissions: async () => ({ ...granted, accessibility: "denied" }),
-    probe: async () => ({ ok: false }),
+    probe: async () => { throw new Error("the probe must not run without Accessibility"); },
     platform: "darwin",
   });
   assert.equal(accessibility.probe.status, "accessibility_denied");
@@ -192,7 +192,7 @@ test("the doctor separates missing, wrong version, both denied grants and a fail
   const screen = await doctorComputerDriver({
     inspect: inspect({ driver: pinned, found: [] }),
     permissions: async () => ({ ...granted, screenRecording: "denied" }),
-    probe: async () => ({ ok: false }),
+    probe: async () => { throw new Error("the probe must not run without Screen Recording"); },
     platform: "darwin",
   });
   assert.equal(screen.probe.status, "screen_recording_denied");
@@ -205,22 +205,26 @@ test("the doctor separates missing, wrong version, both denied grants and a fail
   });
   assert.equal(capture.probe.status, "capture_failed");
 
-  // Unknown TCC plus a failed capture is classified by the first grant it
-  // needs; the report never claims a denial it did not observe.
+  // Unknown TCC plus a failed capture is not a confirmed denial; the probe
+  // is skipped (it must never raise the consent dialog), so the report says
+  // capture_failed while all three states stay unknown.
+  let probed = false;
   const unknown = await doctorComputerDriver({
     inspect: inspect({ driver: pinned, found: [] }),
     permissions: async () => ({ accessibility: "unknown", screenRecording: "unknown", captureConsent: "unknown" }),
-    probe: async () => ({ ok: false }),
+    probe: async () => { probed = true; return { ok: false }; },
     platform: "darwin",
   });
-  assert.equal(unknown.probe.status, "accessibility_denied");
+  assert.equal(unknown.probe.status, "capture_failed");
   assert.equal(unknown.accessibility, "unknown");
+  assert.equal(probed, false, "the capture probe is gated on read-only grants");
 });
 
 test("a working capture is ok even when read-only status cannot see TCC", () => {
   assert.equal(computerDoctorStatus({ accessibility: "unknown", screenRecording: "unknown", captureConsent: "unknown", probeOk: true }), "ok");
   assert.equal(computerDoctorStatus({ accessibility: "granted", screenRecording: "granted", captureConsent: "unknown", probeOk: false }), "capture_failed");
-  assert.equal(computerDoctorStatus({ accessibility: "granted", screenRecording: "unknown", captureConsent: "unknown", probeOk: false }), "screen_recording_denied");
+  assert.equal(computerDoctorStatus({ accessibility: "granted", screenRecording: "unknown", captureConsent: "unknown", probeOk: false }), "capture_failed");
+  assert.equal(computerDoctorStatus({ accessibility: "unknown", screenRecording: "unknown", captureConsent: "unknown", probeOk: false }), "capture_failed");
 });
 
 test("the person's grant runs once and the answer is the post-grant report", async () => {

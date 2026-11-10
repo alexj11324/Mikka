@@ -11,6 +11,8 @@ export interface DoctorOptions {
   platform?: string;
   env?: Record<string, string | undefined>;
   home?: string;
+  /** A look the caller already took; the report reuses it instead of re-detecting. */
+  inspection?: ComputerDriverInspection;
   inspect?: (
     binary: string | undefined,
     options: { platform: string; env: Record<string, string | undefined>; home?: string },

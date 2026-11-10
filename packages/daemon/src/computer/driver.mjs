@@ -35,16 +35,16 @@ function driverEnvironment() {
   );
 }
 /**
- * Stable places a local macOS install may put the driver, most specific
- * first. `MIKKA_CUA_DRIVER` pins one for acceptance and tests; other
- * platforms keep looking only at PATH.
+ * Where a local driver may live. `MIKKA_CUA_DRIVER` pins exactly one path for
+ * acceptance and tests, so a stale or fake override cannot silently fall
+ * through to another install. Otherwise macOS checks the app bundle,
+ * `~/.local/bin` and PATH in that order; other platforms keep PATH only.
  */
 export function computerDriverCandidates({ platform = process.platform, env = process.env, home = homedir() } = {}) {
   const override = typeof env.MIKKA_CUA_DRIVER === "string" ? env.MIKKA_CUA_DRIVER.trim() : "";
-  const candidates = override ? [override] : [];
-  if (platform === "darwin") candidates.push(CUA_DRIVER_APP_PATH, join(home, ".local/bin/cua-driver"));
-  candidates.push("cua-driver");
-  return candidates;
+  if (override) return [override];
+  if (platform === "darwin") return [CUA_DRIVER_APP_PATH, join(home, ".local/bin/cua-driver"), "cua-driver"];
+  return ["cua-driver"];
 }
 async function resolveDriverCandidate(candidate) {
   const located = candidate.includes("/")

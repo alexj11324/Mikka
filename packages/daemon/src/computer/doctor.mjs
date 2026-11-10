@@ -9,17 +9,16 @@ import {
 } from "./driver.mjs";
 
 /**
- * The five failure classes, plus ok. A failed capture with unknown TCC
- * status is classified by the first grant it needs, never as a confirmed
- * denial: the permission states stay "unknown" in the report.
+ * The five failure classes, plus ok. Only an explicit read-only denial
+ * becomes accessibility_denied or screen_recording_denied; unknown TCC with
+ * no working capture is capture_failed, never a denial the status did not
+ * report.
  */
 export function computerDoctorStatus({ accessibility, screenRecording, captureConsent, probeOk }) {
   if (probeOk) return "ok";
   if (accessibility === "denied") return "accessibility_denied";
   if (screenRecording === "denied") return "screen_recording_denied";
   if (captureConsent === "denied") return "screen_recording_denied";
-  if (accessibility === "unknown") return "accessibility_denied";
-  if (screenRecording === "unknown") return "screen_recording_denied";
   return "capture_failed";
 }
 
@@ -41,8 +40,11 @@ function report({ driver, version, binaryPath, permissions, probe }) {
 }
 
 /**
- * Looks, reads TCC and takes one real screenshot. `inspect`, `permissions`
- * and `probe` are seams for tests; production uses the driver functions.
+ * Looks, reads TCC and, only once the read-only status shows both grants,
+ * takes one real screenshot. The probe must never be the thing that raises a
+ * macOS consent dialog. `inspect`, `permissions` and `probe` are seams for
+ * tests; production uses the driver functions. `inspection` lets a caller
+ * that already looked share that look with the report.
  */
 export async function doctorComputerDriver(options = {}) {
   const {
@@ -50,11 +52,12 @@ export async function doctorComputerDriver(options = {}) {
     platform = process.platform,
     env = process.env,
     home,
+    inspection: supplied,
     inspect = inspectComputerDriver,
     permissions = readComputerPermissions,
     probe = probeComputerDriver,
   } = options;
-  const inspection = await inspect(binary, { platform, env, home });
+  const inspection = supplied ?? await inspect(binary, { platform, env, home });
   const driver = inspection.driver;
   const found = inspection.found?.[0] ?? null;
   if (!driver) {
@@ -67,7 +70,10 @@ export async function doctorComputerDriver(options = {}) {
     });
   }
   const states = await permissions(driver, { platform });
-  const result = await probe(driver);
+  const granted = states.accessibility === "granted" && states.screenRecording === "granted";
+  // Unknown status (no CuaDriver daemon) or an explicit denial must not run
+  // the capture probe: it could trigger the system consent prompt.
+  const result = granted ? await probe(driver) : { ok: false, width: null, height: null };
   return report({ driver, version: driver.version, binaryPath: driver.path, permissions: states, probe: result });
 }
 
@@ -83,10 +89,11 @@ export async function grantComputerAccess(options = {}) {
     platform = process.platform,
     env = process.env,
     home,
+    inspection: supplied,
     inspect = inspectComputerDriver,
     grant = grantComputerPermissions,
   } = options;
-  const inspection = await inspect(binary, { platform, env, home });
+  const inspection = supplied ?? await inspect(binary, { platform, env, home });
   if (inspection.driver) {
     try {
       await grant(inspection.driver, { platform });
