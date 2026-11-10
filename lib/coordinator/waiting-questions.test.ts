@@ -64,13 +64,13 @@ test('a run judged done, idle or blocked is not waiting', () => {
 
 test('the judge can hand a succeeded run back as needs_input; the inbox waits on that too', () => {
   assert.deepEqual(
-    waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'succeeded', outcome: 'needs_input' }) }), new Set()),
-    [{ runId: 'r1', title: 'what r1 was asked' }],
+    waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'succeeded', outcome: 'needs_input', issue: 'i1' }) }), new Set()),
+    [{ runId: 'r1', title: '登录页白屏' }],
   )
 })
 
 test('a stale event is not waiting', () => {
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1') }), new Set([1])), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'waiting_input' }) }), new Set([1])), [])
 })
 
 test('an unreadable run source is not invented from model text; the question waits for the next chat read', () => {
@@ -89,7 +89,7 @@ test('two threads of one task answer the same question: the newest event wins an
 test('the task that has waited longest comes first', () => {
   const result = waitingQuestionRuns(
     [{ position: 1, line: question('r1') }, { position: 9, line: question('r2') }],
-    sources({ r1: run('r1', { title: 'first' }), r2: run('r2', { title: 'second' }) }),
+    sources({ r1: run('r1', { status: 'waiting_input', title: 'first' }), r2: run('r2', { status: 'waiting_input', title: 'second' }) }),
     new Set(),
   )
   assert.deepEqual(result.map(row => row.title), ['first', 'second'])
@@ -98,7 +98,7 @@ test('the task that has waited longest comes first', () => {
 test('the latest question for one run replaces an earlier one', () => {
   const result = waitingQuestionRuns(
     [{ position: 1, line: question('r1', 'old') }, { position: 2, line: question('r1', 'new') }],
-    sources({ r1: run('r1', { title: 'new' }) }),
+    sources({ r1: run('r1', { status: 'waiting_input', title: 'new' }) }),
     new Set(),
   )
   assert.deepEqual(result, [{ runId: 'r1', title: 'new' }])
@@ -140,4 +140,14 @@ test('a live waiting_input still shows on a merged task, as the thread badge doe
     waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'waiting_input', issue: 'i1', merged: true }) }), new Set()),
     [{ runId: 'r1', title: '登录页白屏' }],
   )
+})
+
+test('a judged outcome wins over asked_human: the run moved on', () => {
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'done', stopReason: 'asked_human' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'blocked', stopReason: 'asked_human' }) }), new Set()), [])
+})
+
+test('a thread with no task shows only its live wait, which can end', () => {
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'waiting_input' }) }), new Set()), [{ runId: 'r1', title: 'what r1 was asked' }])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1') }), new Set()), [])
 })

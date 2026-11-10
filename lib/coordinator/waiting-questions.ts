@@ -33,7 +33,9 @@ function needsReply(issue: { status?: string } | undefined, run: { status: strin
   if (pullRequests.some(pr => pr.state === 'merged')) return false
   if (run.outcome === 'failed' || run.outcome === 'blocked') return false
   if (status === 'review' || pullRequests.some(pr => pr.state === 'open' || pr.state === 'draft')) return false
-  if (run.outcome === 'needs_input' || run.stopReason === 'asked_human') return true
+  if (run.outcome === 'needs_input') return true
+  // `asked_human` proves a question was asked, but a judged outcome still wins: done/idle/blocked means it moved on.
+  if (run.outcome == null && run.stopReason === 'asked_human') return true
   if (run.status === 'failed') return false
   return false
 }
@@ -76,7 +78,13 @@ export function waitingQuestionRuns(
     // loaded: wait for the next chat read rather than trust the asking run.
     const newest = run.issue ? run.issue.run : { status: run.status, outcome: run.outcome ?? null, stopReason: run.stopReason ?? null }
     if (!newest) continue
-    if (!needsReply(run.issue ?? undefined, newest, run.pullRequests ?? [])) continue
+    // A thread with no task has no continuation the person can start (thread-continue refuses it), so only its
+    // live wait can end on its own; an ended task-free question would otherwise stay forever.
+    if (!run.issue) {
+      if (newest.status === 'waiting_input') rows.push({ runId: line.runId, title: runTitle(run) })
+      continue
+    }
+    if (!needsReply(run.issue, newest, run.pullRequests ?? [])) continue
     rows.push({ runId: line.runId, title: runTitle(run) })
   }
   return rows.reverse()
