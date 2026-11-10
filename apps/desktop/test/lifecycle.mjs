@@ -24,7 +24,7 @@ import { readNativeDaemonMetadata } from './native-metadata.mjs'
 import { readNativeStartup } from './native-startup.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 import { waitForNativeDevice } from './native-device-ready.mjs'
-import { continueInSystemBrowser } from './browser-handoff.mjs'
+import { signInBundledAccount } from './bundled-sign-in.mjs'
 import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledDocument } from './native-document.mjs'
 import { createLifecycleQueryCounter, queryCountDelta } from './lifecycle-query-counts.mjs'
 import { selectWorkspaceMenuItem } from './parity-page-ready.mjs'
@@ -162,41 +162,7 @@ async function selectFixture(page) {
 }
 
 async function nativeSignIn(app, page, account = scope.owner) {
-  mark('auth-initial-document')
-  await waitForBundledDocument(page)
-  mark('auth-open-browser')
-  await app.evaluate(({ shell }) => {
-    globalThis.__mikkaLifecycleExternal = null
-    shell.openExternal = async url => { globalThis.__mikkaLifecycleExternal = url }
-  })
-  const handoff = page.evaluate(() => window.mikka.bundled.signIn({ provider: 'google', locale: 'zh-CN', next: '/' }))
-  let rejection
-  handoff.catch(error => { rejection = error })
-  let external
-  for (let attempt = 0; attempt < 150; attempt++) {
-    if (rejection) throw new Error('LIFECYCLE_HANDOFF_FAILED', { cause: rejection })
-    external = await app.evaluate(() => globalThis.__mikkaLifecycleExternal)
-    if (external) break
-    await new Promise(resolve => setTimeout(resolve, 100))
-  }
-  assert.ok(external, 'main opens the ordinary system-browser handoff')
-  assert.equal(new URL(external).origin, environment.origin)
-  const context = await browser.newContext({ storageState: account.storageStatePath })
-  try {
-    const browserPage = await context.newPage()
-    mark('auth-return-navigation')
-    const returned = page.waitForEvent('domcontentloaded', { timeout: 60_000 })
-    returned.catch(() => {})
-    await continueInSystemBrowser(browserPage, external)
-    await handoff
-    await returned
-    mark('auth-public-session')
-    const session = await waitForBundledSession(page, account.userId)
-    assert.equal(session.user.id, account.userId)
-    mark('auth-record-session')
-    await scope.recordResource({ type: 'session', id: session.session.id, ownerId: account.userId })
-    return session
-  } finally { await context.close() }
+  return signInBundledAccount({ application: app, page, browser, account, scope, origin: environment.origin, mark })
 }
 
 async function prepareNativeDevice(run, mode) {

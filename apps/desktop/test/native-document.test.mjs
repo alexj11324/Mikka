@@ -149,10 +149,10 @@ test('same-document History routes have a closed bundled classification without 
 
 test('failure evidence retains a closed error class and owned source locations only', () => {
   const failure = new Error('page.evaluate: Execution context was destroyed; https://private.example/?token=secret')
-  failure.stack = 'Error: secret\n at /private/owner/apps/desktop/test/lifecycle.mjs:148:11\n at /private/secret.ts:3:2\n at /private/apps/desktop/test/bundled-session.mjs:16:9'
+  failure.stack = 'Error: secret\n at /private/owner/apps/desktop/test/lifecycle.mjs:148:11\n at /private/secret.ts:3:2\n at /private/apps/desktop/test/bundled-sign-in.mjs:16:9\n at /private/apps/desktop/test/bundled-session.mjs:16:9'
   const result = nativeLifecycleFailure(failure)
   assert.deepEqual(result, { kind: 'Error', code: 'navigation-context-destroyed', locations: [
-    { file: 'lifecycle.mjs', line: 148, column: 11 }, { file: 'bundled-session.mjs', line: 16, column: 9 },
+    { file: 'lifecycle.mjs', line: 148, column: 11 }, { file: 'bundled-sign-in.mjs', line: 16, column: 9 }, { file: 'bundled-session.mjs', line: 16, column: 9 },
   ] })
   assert.equal(JSON.stringify(result).includes('private'), false)
   assert.equal(JSON.stringify(result).includes('secret'), false)
