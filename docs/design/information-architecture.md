@@ -162,7 +162,7 @@ terms) and tenancy rule.
 | 常规 (`general`) | Workspace; 转让 and delete team-only | Workspace | T1, T2 | Team-only; fixed by #895 | Name, icon, address are the tenant's; transfer is between people |
 | 成员 (`members`) | Team-only | Member | T2 | Team-only | Between people |
 | 团队 (`teams`) | Team-only | Team | T2 | Team-only (server gap M5) | Between people |
-| 应用与运行权限 (`bot-permissions`) | Workspace | Workspace (policies) | T1 | Workspace | Target contract: the workspace's app access and run policy; every Bot inherits it. Until Phase 4, 团队权限 still holds 允许使用的应用 |
+| 应用与运行权限 (`bot-permissions`) | Workspace | Workspace (policies) | T1 | Workspace | The workspace's app access and run policy; every Bot inherits it. Team permissions still holds 允许使用的应用; read-only and disabled app levels are target |
 | 团队权限 (`permissions`) | Team-only | Workspace (policies) | T2 | Team-only | Governs sharing with other members (2240); app access will move to 应用与运行权限 (Phase 4) |
 | 密钥与环境 (`secrets`) | Workspace | Secret | T5 | Team-only, admin-only; fixed by #895 (members gap M6) | Injected into the workspace's own runs |
 | 审计日志 (`audit`) | Team-only | Workspace (audit) | T2 | Team-only | Member audit is between people |
