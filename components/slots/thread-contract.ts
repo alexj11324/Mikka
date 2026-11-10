@@ -61,6 +61,8 @@ export type ThreadEntry =
     stopped?: boolean
     /** Who wrote it, where the conversation has more than one Agent (a task's attempts): shown where it changes. */
     author?: { id: string; name: string; mark: ReactNode }
+    /** A line about the chat (an event, a quota switch), not the Bot's words: it has no author line, and the reply after it shows its own. */
+    event?: true
     /** Copy, the pages it cites, reactions. */
     actions?: ReactNode
   }
