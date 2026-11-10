@@ -6,7 +6,7 @@ import { compactTaskTitle } from '@/lib/short-title'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type BotWorkRun = { id: string; name: string; harness: string | null }
-export type BotWorkTask = { id: string; issueId: string | null; name: string; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
+export type BotWorkTask = { id: string; issueId: string | null; name: string; fullName: string; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
 
 /** The workspace's already authorized task/run lists, grouped without another read. */
 export function botWorkTree(workspaceId: string | null, botIds: readonly string[], threads: readonly Thread[], issues: readonly Issue[]) {
@@ -35,7 +35,10 @@ export function botWorkTree(workspaceId: string | null, botIds: readonly string[
     let row = rows.get(id)
     if (!row) {
       const own = issue ? localTaskState(issue, newest.get(issue.id)) : null
-      row = { id, issueId: issue?.id ?? null, name: issue ? [issueIdentifier(issue), compactTaskTitle(issue)].filter(Boolean).join(' ') : compactTaskTitle({ title: run.prompt.split('\n').find(line => line.trim())?.trim() || run.agentName }),
+      const runTitle = run.prompt.split('\n').find(line => line.trim())?.trim() || run.agentName
+      row = { id, issueId: issue?.id ?? null,
+        name: issue ? [issueIdentifier(issue), compactTaskTitle(issue)].filter(Boolean).join(' ') : compactTaskTitle({ title: runTitle }),
+        fullName: issue ? [issueIdentifier(issue), issue.title].filter(Boolean).join(' ') : runTitle,
         state: own?.state ?? null, reason: own?.reason ?? null, runs: [] }
       rows.set(id, row)
     }

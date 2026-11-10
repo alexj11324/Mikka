@@ -54,6 +54,7 @@ test('sidebar task names use the existing short title and bound pending/manual t
   const standalone = { ...run('c', null) as Parameters<typeof botWorkTree>[2][number], prompt: 'one two three four five six seven eight' }
   const rows = botWorkTree('workspace', ['bot'], [run('a', 'a'), run('b', 'b'), standalone], [generated, pending]).get('bot')!
   assert.equal(rows[0].name, 'MIK-a 登录回调修复')
+  assert.equal(rows[0].fullName, 'MIK-a 完整的任务需求原文不应该出现在紧凑的导航里面')
   assert.equal(rows[1].name, 'MIK-b 这是一个超过十二字限制的')
   assert.equal(rows[2].name, 'one two three four five six')
   assert.equal(generated.title, '完整的任务需求原文不应该出现在紧凑的导航里面')

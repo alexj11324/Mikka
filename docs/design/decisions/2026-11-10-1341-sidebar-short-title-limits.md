@@ -19,9 +19,17 @@ may clear invalid derived title/cache-source pairs, preserving full titles
 and task content. Migration acceptance must use an isolated database;
 production changes follow normal deployment.
 
+During deployment an older writer can still send an overlong derived title.
+A database compatibility trigger drops only an invalid derived title and its
+source marker to `NULL` before the check runs. The full title and task creation
+remain valid. Direct invalid derived writes therefore clear the cache rather
+than aborting the whole task transaction; the check still forbids invalid
+stored values.
+
 Until a generated title exists, the sidebar bounds a deterministic fallback
 from the task title or standalone run's first line. This fallback is not
 claimed to be model-generated and starts no new model request. Existing
 task creation stays asynchronous and keeps its model-admission and failure
 behavior. A manually typed full title and the task editor's full title remain
 unchanged; only their compact navigation label is shortened.
+The child tooltip and task detail retain the full title.
