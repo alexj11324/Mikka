@@ -152,10 +152,10 @@ export async function applyStripeEvent(raw: unknown, options: PointsWebhookOptio
   })
   // Replays also drain: APP may have committed just before a Workspace outage.
   // A non-2xx response asks Stripe to retry; success means both stores agree.
-  const reconciled = await drainPlanRefundReceipts()
-  // A receipt reconciled now projects under its original refund event, which
-  // may differ from this delivery. Other tenants' pending rows are attempted
-  // by the drain but cannot fail this webhook.
-  await drainBillingEntitlements([event.id, ...reconciled])
+  await drainPlanRefundReceipts()
+  // Only this event owns its webhook outcome. A refund receipt reconciled by
+  // this delivery projects under its original event id: the drain still
+  // attempts that durable row, but a foreign tenant's outage cannot fail here.
+  await drainBillingEntitlements([event.id])
   return inserted
 }

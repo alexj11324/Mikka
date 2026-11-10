@@ -144,4 +144,27 @@ test('Stripe purchased points ledger', { skip: !dbUrl }, async t => {
     await applyStripeEvent(succeeded, options)
     assert.equal((await rows(purchase.payment_intent)).reduce((sum, row) => sum + row.points, 0), 900)
   })
+
+  await t.test('a foreign pending entitlement projection cannot fail this webhook', async () => {
+    const foreign = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    const trigger = `synthetic_billing_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`create function ${trigger}() returns trigger language plpgsql as $$ begin if NEW."workspaceId"='${foreign.id}'::uuid then raise exception 'synthetic_workspace_outage'; end if; return NEW; end $$;
+      create trigger ${trigger} before insert or update on mikka_workspace_entitlements for each row execute function ${trigger}()`)
+    const foreignEvent = id('evt')
+    try {
+      await pool.query(`insert into stripe_webhook_events (id,type) values ($1,'customer.subscription.updated')`, [foreignEvent])
+      await pool.query(`insert into billing_entitlement_outbox ("eventId","workspaceId","subscriptionId",plan,"expiresAt",revision,"billingModel")
+        values ($1,$2,$3,'pro',$4,1,'resource_v1')`, [foreignEvent, foreign.id, id('sub'), new Date(Date.now() + 86_400_000)])
+      // The drain attempts the foreign row, but only this event's own failure may fail this webhook.
+      const purchase = session()
+      assert.equal(await applyStripeEvent(event('checkout.session.completed', purchase), options), true)
+      assert.equal((await rows(purchase.payment_intent)).length, 1)
+      assert.equal((await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId"=$1 and "deliveredAt" is null', [foreignEvent])).rows[0].n, 1)
+    } finally {
+      await pool.query(`drop trigger if exists ${trigger} on mikka_workspace_entitlements; drop function if exists ${trigger}()`)
+    }
+    // Any later webhook drains the durable row once the foreign Workspace recovers.
+    await applyStripeEvent(event('checkout.session.completed', session()), options)
+    assert.equal((await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId"=$1 and "deliveredAt" is not null', [foreignEvent])).rows[0].n, 1)
+  })
 })
