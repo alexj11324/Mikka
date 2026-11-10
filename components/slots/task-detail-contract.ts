@@ -5,6 +5,7 @@
 import { createContext, type CompositionEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { IssueDetailNavigation } from '@/components/workspace/issue-detail-header'
 import type { IssueDiscussions } from '@/components/workspace/issue-editor'
+import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
 
 /** A glyph the layer draws from its own set. */
 export type TaskIcon =
@@ -69,6 +70,11 @@ export type TaskDetailRow = {
   /** A quiet word after the value (自动判断). */
   note?: string
   disabled?: boolean
+  /**
+   * The status row only: the task's own state (localTaskState on its newest thread, decision #1864 point 6), which the
+   * value shows instead of the board status, as every other surface names the task; `menu` still sets the board status.
+   */
+  state?: { state: TaskState; reason: TaskReason | null }
 }
 
 export type TaskSubtask = {

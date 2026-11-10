@@ -33,3 +33,17 @@ export function useTaskStateLabel() {
   const t = useTranslations('Shell.panel')
   return (state: TaskState, reason: TaskReason | null) => reason ? t(`task.reason.${reason}`) : state === 'waiting' ? t('taskGroup.pending') : t(`task.state.${state}`)
 }
+
+type ThreadRun = { id: string; status: string; outcome?: string | null; createdAt: Date | string; continuation?: { status: string; outcome?: string | null } | null }
+
+/**
+ * The run that decides a task's state: its newest thread's live run (the chain's newest attempt, else the thread's
+ * own run), as the task rows and the work area read it. Null for a task no thread has worked on.
+ */
+export function newestThreadRun(threads: readonly ThreadRun[] | undefined): { status: string; outcome: string | null } | null {
+  const time = (thread: ThreadRun) => new Date(thread.createdAt).getTime()
+  const newest = (threads ?? []).reduce<ThreadRun | null>((best, thread) => !best || time(thread) > time(best) || (time(thread) === time(best) && thread.id > best.id) ? thread : best, null)
+  if (!newest) return null
+  const live = newest.continuation ?? newest
+  return { status: live.status, outcome: live.outcome ?? null }
+}
