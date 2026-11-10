@@ -3,8 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import type { LiveInvalidation } from './events'
 import type { LiveScope } from './scope'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedProjectTasks, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 
 test('project map invalidations use current scope and only committed writes', { skip: !dbUrl }, async t => {
   const pending: (() => Promise<void>)[] = [], sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []

@@ -103,15 +103,18 @@ async function canonicalProject(reader: IssueReader, projectId: string, workspac
 export async function resolveProjectReadScope(reader: IssueReader, projectId: string, workspaceId: string): Promise<ProjectScope> {
   const userId = readerId(reader)
   const { project, workspace } = await canonicalProject(reader, projectId, workspaceId, projectDb, true)
-  const { resourceActionAllowed } = await import('@/lib/resource-access/store')
-  if (!await resourceActionAllowed(db, userId, { kind: 'project', id: projectId, workspaceId }, 'canReadContent'))
-    throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
-  const scopedReader: IssueReader = { id: userId, [tokenWorkspace]: workspaceId }
+  // One application read authorizes the Project and filters its Task rows; a
+  // split read would double the map GET egress budget.
   const predicate = issueVisibilityPredicate(userId, { allowedIds: [], workspaceIds: [workspaceId] })
-  const visible = project.issueIds.length ? await db.select({ id: issues.id }).from(issues)
-    .where(and(inArray(issues.id, project.issueIds), predicate)) : []
+  const { rows: [access] } = await db.execute<{ allowed: boolean; ids: string[] }>(sql`with permitted as (
+    select mikka_resource_acl_allowed('account',${userId},${workspaceId}::uuid,'project',${projectId}::uuid,'canReadContent') as allowed
+  ) select allowed,coalesce((select jsonb_agg(${issues.id}) from ${issues}
+    where permitted.allowed and ${issues.id}=any(${sql.param(project.issueIds)}::uuid[]) and ${predicate}),'[]'::jsonb) as ids from permitted`)
+  if (!access?.allowed) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
+  const visible = Array.isArray(access.ids) ? access.ids.filter(id => databaseUuid.test(id)) : []
+  const scopedReader: IssueReader = { id: userId, [tokenWorkspace]: workspaceId }
   return { reader: scopedReader, userId, workspaceId, projectId, project,
-    issueIds: visible.map(issue => issue.id), personalWorkspace: workspace.kind === 'personal' }
+    issueIds: visible, personalWorkspace: workspace.kind === 'personal' }
 }
 
 /** No project-name matching, creator fallback, cross-request cache or cross-DB join. */

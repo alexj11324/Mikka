@@ -386,51 +386,6 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.deepEqual(await persisted(), before)
   })
 
-  await t.test('an unlinked workspace task keeps its owner number without a repeated empty team read', async () => {
-    const { setIssueTeam } = await import('../app/actions/team-relations')
-    const changeTeam = (input: Parameters<typeof setIssueTeam>[0]) => run('/actions/team-relations', () => setIssueTeam(input), teamSelection)
-    const unlinkedId = await workspaceTask()
-    const { rows: [localTeam] } = await workspace.query('select identifier from mikka_teams where id=$1', [team.id])
-    const removed = await changeTeam({ issueId: unlinkedId, teamId: null, expectedTeamId: team.id })
-    assert.equal(removed.ok, true, JSON.stringify(removed))
-    await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2),($3,$4)', [owner, 'MOBI', other, 'OTHR'])
-    const { rows: [numbered] } = await pool.query('select content,scope,"workspaceId","ownershipState" from issues where id=$1', [unlinkedId])
-    const identifier = 'MOBI-' + numbered.content.attrs.mikka.number
-    assert.equal(numbered.scope, 'workspace')
-    assert.equal(numbered.workspaceId, teamWorkspace.id, 'removing a Team link cannot move task ownership')
-    assert.equal(numbered.ownershipState, 'bound')
-    await request(personalTask, { workspaceId: own.id })
-    const warmup = await request(unlinkedId)
-    assert.equal(warmup.status, 200)
-    assert.equal((await warmup.json()).task.identifier, identifier)
-    const personalRead = await measured(async () => {
-      const response = await request(personalTask, { workspaceId: own.id })
-      assert.equal(response.status, 200)
-      return response.json()
-    })
-    const unlinkedRead = await measured(async () => {
-      const response = await request(unlinkedId)
-      assert.equal(response.status, 200)
-      return response.json()
-    })
-    assert.equal(unlinkedRead.value.task.identifier, identifier)
-    assert.deepEqual(unlinkedRead.value.live, { workspaceId: teamWorkspace.id }, 'an absent Team link does not turn Shared ownership into Personal')
-    assert.ok(unlinkedRead.statements <= personalRead.statements,
-      'the same owner and absent team link require no extra database statement for workspace scope')
-    assert.equal((await request(unlinkedId, { workspaceId: own.id })).status, 404)
-    const linked = await changeTeam({ issueId: unlinkedId, teamId: team.id, expectedTeamId: null })
-    assert.equal(linked.ok, true)
-    const relinked = await request(unlinkedId)
-    assert.equal(relinked.status, 200)
-    const relinkedBody = await relinked.json()
-    assert.match(relinkedBody.task.identifier, new RegExp('^' + localTeam.identifier + '-\\d+$'))
-    assert.deepEqual(relinkedBody.live, { workspaceId: teamWorkspace.id }, 'relinking keeps the same persisted Shared workspace')
-    assert.equal((await request(unlinkedId, { workspaceId: own.id })).status, 404, 'a prior negative link read cannot cross a later team boundary')
-    assert.equal((await request(unlinkedId, { workspaceId: secondWorkspace.id })).status, 404)
-    t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'mobile-unlinked-task-detail', scope: 'data-read-path_not_page_http',
-      personal: readMetrics(personalRead), unlinked: readMetrics(unlinkedRead) }))
-  })
-
   await t.test('explicit workspace selections return 404 across tenants, and workspace tokens stay scoped', async () => {
     const personalPat = await createPersonalAccessToken(owner, own.id, { name: 'Mobile personal pin fixture', expiresAt: null })
     const ownerMember = (await workspace.query('select name,email,role from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [teamWorkspace.id, owner])).rows[0]

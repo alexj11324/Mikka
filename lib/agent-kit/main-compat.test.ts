@@ -10,7 +10,6 @@ import {runPrompt} from '../run-prompt'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
 import { overrideDeploymentSwitch } from '../deployment-switches'
-import { PgDialect } from 'drizzle-orm/pg-core'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
 const otherWorkspace=randomUUID()

@@ -50,7 +50,7 @@ test('Project v2: split database migration, canonical relationships and live ten
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     const names = orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))
-    const boundary = '20261108120300_project_v2.sql'
+    const boundary = '20261110151000_project_v2.sql'
     for (const pool of [application, workspace]) await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,"appliedAt" timestamptz NOT NULL DEFAULT now())')
     const migrate = async (files: string[]) => {
       for (const name of files) {

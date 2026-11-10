@@ -6,6 +6,7 @@ import { Pool } from 'pg'
 import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { workspaces, workspaceMembers } from '../db/workspace-schema'
+import { organizationWorkspaces } from '../db/governance-schema'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 
@@ -19,7 +20,10 @@ const workspaceModule = await import('../workspace-db')
 // Only the three source-only lock cases replace their persistence operations;
 // the PG case below uses the real Workspace module and real tenant/member rows.
 async function fixtureWorkspaceTransaction<T>(work: (tx: {
-  select(fields: Record<string, unknown>): { from(table: unknown): { where(condition: SQL): { for(mode: string): Promise<Record<string, unknown>[]> } } }
+  select(fields: Record<string, unknown>): { from(table: unknown): {
+    leftJoin(table: unknown, condition: SQL): { where(condition: SQL): { for(mode: string): Promise<Record<string, unknown>[]> } }
+    where(condition: SQL): { for(mode: string): Promise<Record<string, unknown>[]> }
+  } }
   execute(statement: SQL): Promise<ReturnType<typeof select>>
 }) => Promise<T>) {
   const scope = scopeFixture!
@@ -29,26 +33,38 @@ async function fixtureWorkspaceTransaction<T>(work: (tx: {
   let workspaceRead = false, memberRead = false, relationLocked = false, resourceLocked = false, committed = false
   try {
     const result = await work({
-      select: fields => ({ from: table => ({ where: condition => ({ for: async mode => {
-        assert.equal(mode, 'share')
-        const query = dialect.sqlToQuery(condition)
-        if (table === workspaces) {
-          assert.deepEqual(Object.keys(fields), ['id', 'kind', 'ownerId'])
-          assert.equal(fields.id, workspaces.id); assert.equal(fields.kind, workspaces.kind); assert.equal(fields.ownerId, workspaces.userId)
-          assert.equal(compact(query.sql), '"mikka_workspaces"."id" = $1')
-          assert.deepEqual(query.params, [scope.workspaceId])
-          assert.equal(workspaceRead, false); workspaceRead = true
-          scope.order.push(`WS${depth} workspace`)
-          return [{ id: scope.workspaceId, kind: 'team', ownerId: scope.owner }]
+      select: fields => ({ from: table => {
+        const read = {
+          leftJoin: (joined: unknown, on: SQL) => {
+            assert.equal(table, workspaceMembers); assert.equal(joined, organizationWorkspaces)
+            const link = dialect.sqlToQuery(on)
+            assert.equal(compact(link.sql), '"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+            return read
+          },
+          where: (condition: SQL) => ({ for: async (mode: string) => {
+            assert.equal(mode, 'share')
+            const query = dialect.sqlToQuery(condition)
+            if (table === workspaces) {
+              assert.deepEqual(Object.keys(fields), ['id', 'kind', 'ownerId'])
+              assert.equal(fields.id, workspaces.id); assert.equal(fields.kind, workspaces.kind); assert.equal(fields.ownerId, workspaces.userId)
+              assert.equal(compact(query.sql), '"mikka_workspaces"."id" = $1')
+              assert.deepEqual(query.params, [scope.workspaceId])
+              assert.equal(workspaceRead, false); workspaceRead = true
+              scope.order.push(`WS${depth} workspace`)
+              return [{ id: scope.workspaceId, kind: 'team', ownerId: scope.owner }]
+            }
+            assert.equal(table, workspaceMembers)
+            assert.deepEqual(Object.keys(fields), ['id', 'organizationId']); assert.equal(fields.id, workspaceMembers.userId)
+            assert.equal(fields.organizationId, organizationWorkspaces.organizationId)
+            assert.equal(compact(query.sql), '("mikka_workspace_members"."workspaceId" = $1 and "mikka_workspace_members"."userId" = $2 and "mikka_workspace_members"."status" = $3)')
+            assert.deepEqual(query.params, [scope.workspaceId, scope.owner, 'active'])
+            assert.equal(workspaceRead, true); assert.equal(memberRead, false); memberRead = true
+            scope.order.push(`WS${depth} member`)
+            return scope.memberActive ? [{ id: scope.owner, organizationId: null }] : []
+          } }),
         }
-        assert.equal(table, workspaceMembers)
-        assert.deepEqual(Object.keys(fields), ['id']); assert.equal(fields.id, workspaceMembers.userId)
-        assert.equal(compact(query.sql), '("mikka_workspace_members"."workspaceId" = $1 and "mikka_workspace_members"."userId" = $2 and "mikka_workspace_members"."status" = $3)')
-        assert.deepEqual(query.params, [scope.workspaceId, scope.owner, 'active'])
-        assert.equal(workspaceRead, true); assert.equal(memberRead, false); memberRead = true
-        scope.order.push(`WS${depth} member`)
-        return scope.memberActive ? [{ id: scope.owner }] : []
-      } }) }) }),
+        return read
+      } }),
       execute: async statement => {
         assert.equal(depth, 2); assert.equal(memberRead, true); assert.equal(scope.memberActive, true)
         const query = dialect.sqlToQuery(statement)

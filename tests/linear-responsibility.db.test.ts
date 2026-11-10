@@ -101,7 +101,14 @@ test('Linear responsibility respects current Workspace members, holds incoming l
 
   await t.test('a corrupt extra membership cannot assign a peer inside a personal Workspace', async () => {
     const personalId = await seedPersonalWorkspace(pool, owner)
-    await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [personalId, member, `${member}@example.invalid`])
+    // Recreate the pre-guard historical corrupt row that the current trigger
+    // would reject, then restore the guard before exercising app assignment.
+    await pool.query('ALTER TABLE mikka_workspace_members DISABLE TRIGGER mikka_personal_membership_guard')
+    try {
+      await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [personalId, member, `${member}@example.invalid`])
+    } finally {
+      await pool.query('ALTER TABLE mikka_workspace_members ENABLE TRIGGER mikka_personal_membership_guard')
+    }
     const [personalTeam] = await db.insert(linearTeamSyncs).values({ id: randomUUID(), ownerId: owner, workspaceId: personalId, linearTeamId: randomUUID(), linearTeamKey: 'LRP', linearTeamName: 'Personal fixture' }).returning()
     const peer = await createAppIssueFromLinear(personalTeam, remote(member, personalTeam))
     assert.ok(peer)

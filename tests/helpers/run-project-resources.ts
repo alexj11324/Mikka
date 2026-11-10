@@ -11,6 +11,10 @@ export async function seedRunProjectResources(pool: Pool, input: {
   const projectId = randomUUID()
   await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
     VALUES($1,$2,$3,'Run resource fixture','','','planned','none','','','','','[]',1)`, [projectId, input.ownerId, input.workspaceId])
+  // Project archive and other ACL-guarded project writers require the same
+  // policy row that the production creation transaction registers.
+  const { registerProjectAccess } = await import('../../lib/resource-access/projects')
+  await registerProjectAccess(input.ownerId, projectId, input.workspaceId)
   const linked = await pool.query(`INSERT INTO workspace_project_tasks("issueId","projectId","workspaceId")
     SELECT id,$1,"workspaceId" FROM issues WHERE id=$2 AND "workspaceId"=$3 AND "ownershipState"='bound'`,
   [projectId, input.issueId, input.workspaceId])

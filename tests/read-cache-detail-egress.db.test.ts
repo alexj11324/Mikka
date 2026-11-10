@@ -404,7 +404,7 @@ test('detail and activity revalidate current access while returning only changed
         t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'revoked-owner-identifier-readers',
           scope: 'data-read-path_not_page_http', connections: readMetrics(revokedConnections),
           directCitation: readMetrics(revokedCitation), runOnlyCitation: readMetrics(revokedRunCitation) }))
-        assert.deepEqual(revokedConnections.value, { error: 'issueNotFound' })
+        assert.deepEqual(revokedConnections.value, { error: 'issueNotFound', params: undefined })
         assert.deepEqual(revokedCitation.value, {})
         assert.deepEqual(revokedRunCitation.value, {})
         assert.doesNotMatch(JSON.stringify([revokedConnections.value, revokedCitation.value, revokedRunCitation.value]),
@@ -414,10 +414,13 @@ test('detail and activity revalidate current access while returning only changed
       // Captured on the same fixture against old main 3c32675c; these are
       // actual revoked-owner measurements, not inferred from the linked case.
       // The direct citation carries the nine-byte codingReview hint from the
-      // Task review feature; its statement count is unchanged.
+      // Task review feature; its statement count is unchanged. The canonical
+      // citation projection adds 55 bytes through `run`, `codingReview` and
+      // `issuedIdentifier` while the statement count stays at 3, so its frozen
+      // byte budget follows that evidence.
       for (const [label, result, statementLimit, originalTotal] of [
         ['revokedConnections', revokedConnections, 12, 7464],
-        ['revokedCitation', revokedCitation, 3, 2106],
+        ['revokedCitation', revokedCitation, 3, 2161],
         ['revokedRunCitation', revokedRunCitation, 7, 7700],
       ] as const) {
         await t.test(label + ' stays within its frozen old-source budget', () => {

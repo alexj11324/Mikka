@@ -119,8 +119,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
     await recordPushGrant(pool, id, normalizeRepository('octo/repo').key)
     const ws = { id: await seedPersonalWorkspace(pool, id) }
-    const issueId = await seedIssue(pool, id)
-    await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
+    const issueId = await numberedTask(id, ws.id, taskNumber)
     const botId = await seedBot(pool, ws.id, id)
     const connection = randomUUID()
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$5,$4,'synthetic-subject',$6)`, [connection, id, ws.id, 'a'.repeat(64), `synthetic-${connection}`, JSON.stringify({ revision: '1', models: ['gpt-5'] })])

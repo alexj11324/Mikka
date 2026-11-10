@@ -39,7 +39,7 @@ export async function verifyWorkDomain({ accounts, pool, rpc, switchTo, a, b, ta
   }
   const successful = async (account, action, ...args) => {
     const value = await rpc(account, action, ...args)
-    assert.ok(value && !value.error, `domain action failed: ${action}`)
+    assert.ok(value && !value.error, `domain action failed: ${action}: ${value?.error ?? 'no result'}`)
     return value
   }
   const mobilePresentationBody = async (account, body, expected = 200) => {

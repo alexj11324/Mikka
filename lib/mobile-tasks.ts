@@ -30,7 +30,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
   if (!candidate || candidate.ownershipState !== 'bound' || !candidate.workspaceId
     || (explicitWorkspaceId !== undefined && candidate.workspaceId !== explicitWorkspaceId)) return null
   const workspaceId = candidate.workspaceId
-  return withIssueWorkspace(user, workspaceId, () => readMobileTask({
+  return withIssueWorkspace(user, workspaceId, { issueId: id, action: 'canReadContent' }, () => readMobileTask({
     ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal],
   }, workspaceId, id))
 }

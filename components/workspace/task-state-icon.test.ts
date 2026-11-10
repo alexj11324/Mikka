@@ -18,5 +18,5 @@ test('a task\'s state comes from its newest thread\'s live run, not an older one
   const resumed = [{ ...threads[1], continuation: { status: 'running', outcome: null } }]
   assert.deepEqual(newestThreadRun(resumed), { status: 'running', outcome: null })
   // ALEX-45: In Review on the board and its newest thread asked a question: one state, 等你回复.
-  assert.deepEqual(localTaskState({ status: 'review', metadata: { pullRequests: [] } }, { status: 'waiting_input', outcome: null }), { state: 'waiting', reason: 'needsReply' })
+  assert.deepEqual(localTaskState({ status: 'review', metadata: { pullRequests: [] } }, { status: 'waiting_input', outcome: null }), { state: 'waiting', reason: 'needs_input' })
 })

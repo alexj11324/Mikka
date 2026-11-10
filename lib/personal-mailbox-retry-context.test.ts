@@ -4,6 +4,7 @@ import { type SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { agentRuns, agents, deviceRepos, devices } from './db/schema'
 import { workspaceMembers, workspaces } from './db/workspace-schema'
+import { organizationWorkspaces } from './db/governance-schema'
 import { remoteKey } from '@mikka/protocol/repository'
 
 // Exercise the actual infrastructure-retry writer with controlled persistence.
@@ -84,7 +85,7 @@ const database = {
     transactions++; return fn(tx)
   },
 }
-mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: database, pool: { query: async (statement: string, params: unknown[]) => {
+mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: database, withDatabaseClient: () => { throw Error('Held-client work is outside the legacy retry fixture') }, pool: { query: async (statement: string, params: unknown[]) => {
   assert.ok(resourceLocked, 'both source and replacement repository checks hold the lease')
   if (normalize(statement) === 'SELECT r."botId",r."workspaceId",r.harness,r."agentId",r."repoId",a."deviceId" FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId" WHERE r."ownerId"=$1 AND r."botId"=$2 AND a."deviceId" IS NOT NULL AND (EXISTS (SELECT 1 FROM user_e2b_keys uk WHERE uk."userId"=r."ownerId") OR EXISTS (SELECT 1 FROM workspace_e2b_keys wk WHERE wk."createdBy"=r."ownerId")) ORDER BY (r.harness=$3) DESC NULLS LAST LIMIT 1') {
     assert.deepEqual(params, [lost.userId, botId, null])
@@ -103,6 +104,7 @@ const workspaceTx = {
     let table: unknown, condition: SQL
     const selection = {
       from(value: unknown) { table = value; return selection },
+      leftJoin(value: unknown) { assert.equal(value, organizationWorkspaces); return selection },
       where(value: SQL) { condition = value; return selection },
       for: async (lock: string) => {
         assert.equal(lock, 'share')
@@ -114,7 +116,7 @@ const workspaceTx = {
         }
         assert.equal(table, workspaceMembers)
         assert.deepEqual(params, [workspaceId, lost.userId, 'active'])
-        return [{ id: lost.userId }]
+        return [{ id: lost.userId, organizationId: null }]
       },
     }
     return selection

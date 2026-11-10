@@ -62,8 +62,15 @@ async function lockedProject<T>(reader: ProjectReader, workspaceId: string, id: 
   // relation edit that is waiting on the same Project policy.
   return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
     await lockTeamRelations(tx)
-    return withResourceAccess(reader, { kind: 'project', id, workspaceId }, action,
-      async () => operation(tx, await requireProjectWrite(tx, reader, id, workspaceId, { allowArchived: true })))
+    try {
+      return await withResourceAccess(reader, { kind: 'project', id, workspaceId }, action,
+        async () => operation(tx, await requireProjectWrite(tx, reader, id, workspaceId, { allowArchived: true })))
+    } catch (error) {
+      // Project callers must not receive the generic Task refusal for a
+      // missing or inaccessible Project policy.
+      if (error instanceof ActionFailureError && error.code === 'issueNotFound') throw new ActionFailureError('projectNotFound')
+      throw error
+    }
   })
 }
 

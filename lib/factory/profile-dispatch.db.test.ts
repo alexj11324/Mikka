@@ -2071,18 +2071,25 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     }, tx, factoryContext)
     const dispatch = createFactoryDispatch(pool, f.store, (tx, _owner, input, _bot, context) =>
       queue(tx, context.sourceEventId, 'factory:' + context.attemptId, input.agentId, input.deviceRepoId, context))
+    // Queuing with an existing APP transaction borrows the Workspace/resource
+    // lease; acquire it before opening that transaction, as production callers do.
+    const { withProjectResourceLease } = await import('@/lib/project-resources/store')
+    const queued = <T>(work: () => Promise<T>) => withProjectResourceLease(f.ownerId, f.workspaceId, work)
     let runId: string
     if (mode === 'ordinary') {
-      const tx = await pool.connect()
-      try {
-        await tx.query('BEGIN')
-        const eventId = randomUUID()
-        await tx.query('INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1::uuid,$2,$3,$4,\'user_message\',$1::text,$5)',
-          [eventId, f.ownerId, f.botId, issueId, { text: 'Original legacy thread request.' }])
-        runId = (await queue(tx, eventId, 'legacy-review:' + issueId)).runId
-        await tx.query('COMMIT')
-      } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
-    } else runId = (await dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents[harness], deviceRepoId: f.repoId })).runId
+      runId = await queued(async () => {
+        const tx = await pool.connect()
+        try {
+          await tx.query('BEGIN')
+          const eventId = randomUUID()
+          await tx.query('INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1::uuid,$2,$3,$4,\'user_message\',$1::text,$5)',
+            [eventId, f.ownerId, f.botId, issueId, { text: 'Original legacy thread request.' }])
+          const created = (await queue(tx, eventId, 'legacy-review:' + issueId)).runId
+          await tx.query('COMMIT')
+          return created
+        } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+      })
+    } else runId = (await queued(() => dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents[harness], deviceRepoId: f.repoId }))).runId
     await pool.query('UPDATE agent_runs SET status=\'succeeded\',"startedAt"=now(),"finishedAt"=now(),"sessionId"=$2,"stopReason"=\'submitted\',report=$3 WHERE id=$1',
       [runId, 'native-review-' + runId, { sourceCommit: reviewBaseSha, publish: { commit: reviewHeadSha, pushed: true },
         verify: { status: 'passed' }, summary: 'Completed repository candidate.', runtime: { observedModel: model[harness] } }])

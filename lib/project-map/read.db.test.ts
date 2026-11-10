@@ -5,9 +5,8 @@ import { once } from 'node:events'
 import { gzipSync } from 'node:zlib'
 import { mock, test } from 'node:test'
 import type { PoolClient } from 'pg'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedProjectTasks, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { ownLiveRuntime } from '../../tests/support/live-runtime'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedPersonalWorkspace, seedWorkspace } from '../../tests/support/workspace-admin-db'
 
 test('project map uses real PostgreSQL and normal HTTP PAT authorization', { skip: !dbUrl, timeout: 180_000 }, async t => {
   const live = await ownLiveRuntime(t)

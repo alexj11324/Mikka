@@ -165,7 +165,7 @@ export interface Plan {
 /** Durable deletion receipts written before Project v2 do not carry this field. */
 type CompatiblePlan = Omit<Plan, 'keptProjectIds'> & { keptProjectIds?: string[] }
 
-type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'delete' | 'execute' | 'update'>
+type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'delete' | 'execute' | 'update' | 'insert'>
 
 async function retainedWorkspaceProjects(wtx: WorkspaceTx, userId: string, solo: string[], shared: string[]) {
   return (await wtx.select({ id: projects.id }).from(projects)
