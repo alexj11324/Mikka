@@ -66,7 +66,8 @@ const components = (title: string, media: readonly ArtifactMedia[]): Components 
     return typeof src === 'string' && SAFE_IMAGE.test(src) ? <img src={src} alt={alt ?? ''} referrerPolicy="no-referrer" loading="lazy" className="my-3 max-w-full rounded-xl" /> : null
   },
   code: ({ className, children }) => className ? <code>{children}</code> : <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs">{children}</code>,
-  pre: ({ children }) => <pre className="my-3 overflow-x-auto rounded-xl bg-muted p-4 font-mono text-xs leading-5 [&_code]:bg-transparent [&_code]:p-0">{children}</pre>,
+  // A long line (an acceptance report's evidence is a sentence in a block) wraps inside the box instead of running past it.
+  pre: ({ children }) => <pre className="my-3 overflow-x-auto rounded-xl bg-muted p-4 font-mono text-xs leading-5 whitespace-pre-wrap wrap-anywhere [&_code]:bg-transparent [&_code]:p-0">{children}</pre>,
   table: ({ children }) => <div className="my-3 overflow-hidden rounded-xl bg-muted/40"><Table className="text-sm">{children}</Table></div>,
   thead: ({ children }) => <TableHeader className="bg-muted [&_tr]:border-0">{children}</TableHeader>,
   tbody: ({ children }) => <TableBody>{children}</TableBody>,

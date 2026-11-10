@@ -13,7 +13,8 @@ import { MikkaMark } from '@/components/brand/mikka-mark'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { NewGroupDialog } from './new-group-dialog'
-import { GroupPillAvatar } from './group-avatar'
+import { CachedGroupAvatar, GroupPillAvatar } from './group-avatar'
+import { botWorkTree, type BotWorkTask } from './bot-work-tree'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
@@ -82,16 +83,18 @@ function useChatRows({ bots, workspaceId, active, userId }: { bots: BotView[]; w
 }
 
 /** One row of the chat list as data, for a frame that draws its own navigation (RailProps.chats). */
-export type ChatNavEntry = { id: string; kind: 'coordinator' | 'bot' | 'group'; name: string; unread: boolean; current: boolean; target: ChatTarget }
+export type ChatNavEntry = { id: string; kind: 'coordinator' | 'bot' | 'group'; name: string; unread: boolean; current: boolean; target: ChatTarget; avatar: ReactNode; work?: BotWorkTask[] }
 
 /** The bot list's rows as data: what the hosted App Shell lists under Bots and 群聊, with the same unread dots. */
-export function useChatNav({ bots, workspaceId, active, userId }: { bots: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string }): { entries: ChatNavEntry[]; reloadGroups: () => Promise<unknown> } {
+export function useChatNav({ bots, workspaceId, active, userId, threads = [], issues = [] }: { bots: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[] }): { entries: ChatNavEntry[]; reloadGroups: () => Promise<unknown> } {
   const i18nText = useTranslations()
   const { rows, unread, reloadGroups } = useChatRows({ bots, workspaceId, active, userId })
-  const coordinator: ChatNavEntry = { id: 'coordinator', kind: 'coordinator', name: i18nText('Nav.coordinator'), unread: unread('coordinator'), current: active?.kind === 'coordinator', target: { kind: 'coordinator' } }
+  const coordinatorId = bots.find(bot => bot.coordinator)?.id
+  const work = botWorkTree(workspaceId, bots.map(bot => bot.id), threads, issues)
+  const coordinator: ChatNavEntry = { id: 'coordinator', kind: 'coordinator', name: i18nText('Nav.coordinator'), unread: unread('coordinator'), current: active?.kind === 'coordinator', target: { kind: 'coordinator' }, avatar: <CoordinatorAvatar size="row" />, work: coordinatorId ? work.get(coordinatorId) ?? [] : [] }
   const entries = [coordinator, ...rows.map((row): ChatNavEntry => row.kind === 'group'
-    ? { id: row.group.id, kind: 'group', name: row.group.title || i18nText('Nav.untitledConversation'), unread: unread(row.group.id), current: active?.kind === 'group' && active.id === row.group.id, target: { kind: 'group', id: row.group.id, title: row.group.title, workspaceId: row.group.workspaceId } }
-    : { id: row.bot.id, kind: 'bot', name: row.bot.name, unread: unread(row.bot.id), current: active?.kind === 'bot' && active.botId === row.bot.id, target: { kind: 'bot', botId: row.bot.id } })]
+    ? { id: row.group.id, kind: 'group', name: row.group.title || i18nText('Nav.untitledConversation'), unread: unread(row.group.id), current: active?.kind === 'group' && active.id === row.group.id, target: { kind: 'group', id: row.group.id, title: row.group.title, workspaceId: row.group.workspaceId }, avatar: <CachedGroupAvatar id={row.group.id} title={row.group.title || i18nText('Nav.untitledConversation')} /> }
+    : { id: row.bot.id, kind: 'bot', name: row.bot.name, unread: unread(row.bot.id), current: active?.kind === 'bot' && active.botId === row.bot.id, target: { kind: 'bot', botId: row.bot.id }, avatar: <BotAvatar id={row.bot.id} color={row.bot.color} shape={row.bot.shape} size="row" still />, work: work.get(row.bot.id) ?? [] })]
   return { entries, reloadGroups }
 }
 

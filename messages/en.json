@@ -1335,6 +1335,16 @@
     "viewProjects": "View projects"
   },
   "IssueDetail": {
+    "frame": {
+      "delegate": "Handed to",
+      "open": "Open",
+      "openThread": "Open {name}'s conversation",
+      "subtaskPlaceholder": "Name the sub-task and press Enter",
+      "subtaskMenu": "Actions for {title}",
+      "subscribe": "Subscribe",
+      "unsubscribe": "Unsubscribe",
+      "created": "created {when}"
+    },
     "breadcrumbBoard": "Board",
     "breadcrumbMore": "More locations",
     "connecting": "Connecting…",
@@ -2407,7 +2417,55 @@
       "shadowConfirmMany": "{workspace} already has {names}. Use your own values in your runs?",
       "useMine": "Use mine"
     },
+    "permissionsPage": {
+      "accessHint": "Click an access to change it",
+      "heading": "What bots and members may do",
+      "detail": "Locked items are blocked for everyone in this workspace.",
+      "allowed": "Allowed",
+      "blocked": "Blocked",
+      "allowedEmpty": "Nothing is allowed",
+      "blockedEmpty": "Nothing is blocked",
+      "block": "Block {name}",
+      "unblock": "Allow {name}",
+      "readOnly": "Only admins can change these.",
+      "appColumn": "App",
+      "accessColumn": "Access",
+      "summary": "{allowed} allowed, {blocked} blocked"
+    },
     "audit": {
+      "unknownAction": "recorded “{action}”",
+      "filterMenu": {
+        "clearAll": "Clear all",
+        "remove": "Remove {label}",
+        "more": "{count} more: {labels}"
+      },
+      "tableWords": {
+        "undo": "Undo",
+        "redo": "Redo",
+        "values": "{count, plural, one {# value} other {# values}}"
+      },
+      "adminOnly": "Only admins can see the audit log.",
+      "categoryFilter": "Category",
+      "columns": {
+        "time": "Time",
+        "actor": "Who",
+        "action": "What",
+        "category": "Category",
+        "place": "Where"
+      },
+      "range": {
+        "label": "Period",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "last7": "Last 7 days",
+        "last30": "Last 30 days",
+        "last90": "Last 90 days",
+        "apply": "Apply",
+        "pickEnd": "{start} – pick an end",
+        "days": "{count, plural, one {# day} other {# days}}",
+        "choose": "Choose a period",
+        "presets": "Periods"
+      },
       "loading": "Loading audit log",
       "filter": "Filter",
       "filters": {
@@ -2473,7 +2531,8 @@
         },
         "agent": {
           "approval_decided": "{decision, select, approved {approved a tool request} denied {denied a tool request} other {decided a tool request}}",
-          "approval_consumed": "used a tool approval"
+          "approval_consumed": "used a tool approval",
+          "policy_changed": "changed the Agent approval rules"
         },
         "workspace": {
           "slug_changed": "changed the address from {from} to {to}",
@@ -2485,7 +2544,9 @@
           "checkout_started": "opened checkout",
           "credits_purchased": "bought points",
           "auto_recharge_changed": "changed auto recharge",
-          "limits_changed": "changed usage limits"
+          "limits_changed": "changed usage limits",
+          "card_verified": "verified a card",
+          "payment_method_changed": "changed the payment method"
         },
         "audit": {
           "exported": "exported audit log",
@@ -2953,7 +3014,27 @@
         "independent-review": "Review the frozen candidate and record reproducible findings.",
         "systematic-debugging": "Reproduce the failure, identify its cause and verify the fix."
       },
-      "numberedSource": "{source} {number}"
+      "numberedSource": "{source} {number}",
+      "mark": {
+        "icon": "Icon",
+        "color": "Colour",
+        "icons": {
+          "square": "Square",
+          "chevrons": "Brackets",
+          "lens": "Lens",
+          "lines": "Lines",
+          "check": "Check",
+          "stairs": "Steps",
+          "diamond": "Diamond",
+          "arrow": "Arrow"
+        },
+        "colors": {
+          "ink": "Ink",
+          "graphite": "Graphite",
+          "teal": "Teal",
+          "pink": "Pink"
+        }
+      }
     },
     "cloud": {
       "title": "Mikka Cloud",
@@ -3476,6 +3557,17 @@
     "events": {
       "aThread": "A thread",
       "aTask": "A task",
+      "anAgent": "An Agent",
+      "aSchedule": "A schedule",
+      "schedule": "Schedule “{title}”",
+      "scheduleEnded": {
+        "succeeded": "ran",
+        "failed": "failed",
+        "skipped": "was skipped",
+        "cancelled": "was cancelled",
+        "other": "ran"
+      },
+      "scheduleDue": "is due",
       "quoted": "“{title}”",
       "runEnded": {
         "succeeded": "finished",
@@ -4471,6 +4563,8 @@
       "title": "New task",
       "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",
+      "titleLabel": "Title",
+      "titlePlaceholder": "Title (optional, the Bot writes one if empty)",
       "placeholder": "What should it do?",
       "promptWithContext": "Create a task for me ({context}): {text}",
       "contextDevice": "run it on {device}",
@@ -4492,7 +4586,12 @@
       "modelUnavailable": "No default model can run",
       "loadingPlacement": "Checking run settings…",
       "quotaUnchecked": "Model allowance needs checking",
-      "workspaceDefault": "Use workspace defaults"
+      "workspaceDefault": "Use workspace defaults",
+      "machineRow": "Machine",
+      "botRow": "Hand to",
+      "details": "Details",
+      "expand": "Bigger window",
+      "collapse": "Smaller window"
     },
     "board": {
       "toolbar": "Board toolbar",
@@ -4606,7 +4705,9 @@
         "groups": "group chats",
         "tasks": "tasks"
       },
-      "sourceSeparator": ", "
+      "sourceSeparator": ", ",
+      "sectionsHint": "to jump between sections",
+      "openHint": "to open"
     }
   },
   "SuggestionsPage": {
@@ -4633,7 +4734,9 @@
       "all": "All",
       "documents": "Documents",
       "pages": "Web pages"
-    },
+    ,
+      "pullRequests": "Pull requests",
+      "media": "Screenshots and recordings"},
     "columns": {
       "name": "Name",
       "source": "Source",
@@ -4645,7 +4748,7 @@
     "empty": "No artifacts yet",
     "threadEntry": "Artifact · {count}",
     "folders": {
-      "sub": "Documents and pages the Bots and Agents handed over in tasks, by task.",
+      "sub": "Documents, pages, pull requests and screenshots the Bots and Agents handed over in tasks, by task.",
       "folders": "By task",
       "search": "Search tasks…",
       "noMatch": "No task matches “{query}”.",
@@ -5745,9 +5848,15 @@
       "pending": "Loading"
     }
   },
+  "HostedPlugins": {
+    "manageApp": "Manage {name}",
+    "moreTwo": "{first} and {second}",
+    "moreMany": "{first}, {second} and {count, number} more"
+  },
   "HostedTasks": {
     "open": "Open task",
     "status": "Status",
+    "factoryStage": "Factory stage",
     "tasks": "Tasks",
     "steps": "Steps",
     "happened": "Latest",
@@ -5975,6 +6084,48 @@
     "share": "of {month}",
     "open": "Open",
     "runsCount": "{count, plural, one {# run} other {{formatted} runs}}"
+  },
+  "HostedShell": {
+    "newTab": "New tab",
+    "searchOrUrl": "Search or enter URL",
+    "tools": "Tools",
+    "noTools": "No tools yet",
+    "moreFor": "More for {name}",
+    "suggested": "Suggested",
+    "noSuggestions": "Nothing suggested right now"
+  },
+  "HostedMembers": {
+    "title": "Members & teams",
+    "overview": "Overview",
+    "you": "(You)",
+    "changeRole": "Change role",
+    "clear": "Clear",
+    "selectAll": "Select all",
+    "select": "Select {name}",
+    "selected": "{count} selected",
+    "roleOf": "Role of {name}",
+    "noMatch": "No one matches “{query}”.",
+    "membersSub": "{suspended, plural, =0 {All active} one {# suspended} other {# suspended}}",
+    "adminsSub": "Can invite, change roles and suspend",
+    "invitesSub": "{expired, plural, =0 {None expired} one {# expired} other {# expired}}",
+    "yourRole": "Your role",
+    "yourRoleSub": "Only admins can invite and change access",
+    "status": "Status",
+    "sortAscending": "Name A–Z",
+    "sortDescending": "Name Z–A",
+    "confirmSuspendMany": "Suspend {count} members. They lose access to the workspace's member directory; access already granted on tasks stays.",
+    "confirmRoleMany": "Make {count} members {role} and keep them active.",
+    "renewInvite": "New invite link",
+    "copy": "Copy",
+    "importCsv": "Import from CSV",
+    "teamCount": "{count, plural, one {# team} other {# teams}}",
+    "deleteTeam": "Delete team",
+    "deleteConfirm": "Type {name} to confirm",
+    "deleteTitle": "Delete {name}?",
+    "deleteImpact": "{tasks, plural, one {# task} other {# tasks}} and {projects, plural, one {# project} other {# projects}} go with it. A project shared with another team only loses the link.",
+    "deleteCounting": "Counting what goes with it…",
+    "deleting": "Deleting…",
+    "teamDeleted": "{name} deleted."
   },
   "HostedSettings": {
     "back": "Back",

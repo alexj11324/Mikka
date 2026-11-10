@@ -794,7 +794,7 @@
         "POST"
       ],
       "maxDuration": 300,
-      "sourceHash": "9983459187c605d4344fa04981be50ee7adca650d17e22b3f92b4d0f7dad8a3f"
+      "sourceHash": "1e10e4d68acb421783e54f4cc8d7e0a8ee3455f444f59b27bd8cb36cc9fae2f8"
     },
     {
       "path": "/mikka/api/device-tokens",
@@ -1763,7 +1763,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "17806db00cdde5941c101a2d7b50fbf056fd14703166786fd04245818dc33d8e"
+      "sourceHash": "c117f9998933e20bbd9ac0c602f5fa1b5381c717994e438663da5f771f7e39f5"
     },
     {
       "path": "/mikka/api/skills",
@@ -1856,7 +1856,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "5564176cdb07576e4e60b4aa6a6deb0a9e86f226830cfb71765d7b16cda26fe1"
+      "sourceHash": "a73ac42d81c8f719c0d9ca6191e134003408aad921aad3dd24740399b9612076"
     },
     {
       "path": "/mikka/api/suggestions/[id]",
@@ -2077,7 +2077,7 @@
         "GET"
       ],
       "maxDuration": 60,
-      "sourceHash": "fba01c0d44c97d74ce0be6cb88391acbb46dae9b87689a10d0796487a94cf7ac"
+      "sourceHash": "a9f6dbf39b7663b85a3a32763b146bc04230450eec03a62d97afa670492fb2d1"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/audit-log/retention",

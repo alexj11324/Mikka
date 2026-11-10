@@ -43,13 +43,17 @@ Collaboration and financial authority: [2026-11-10-0017](decisions/2026-11-10-00
 
 ## Rules for designs
 
-- The left column is the **bot list**: bots and group chats only. The right
-  column is the **task list** (since 2026-11-07: no list shows threads; a
-  thread opens only from inside its task,
-  [decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)). There is no "conversation list".
-- The bot list holds bots and group chats only. A thread name ("#66 …",
-  "MIK-11 …") is never a left-column row. A bot row's preview line may quote
-  the latest message, which may mention a thread, but the row is the bot.
+- The left column is the **bot list**. In the hosted shell a Bot expands
+  its dispatched tasks and Agent work below its own row, like Capy's Captains
+  ([2026-11-10](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
+  Bot and group rows keep their own avatars. A child is named for its work;
+  a task carries its own state, and the Agent's mark identifies its executor.
+  This navigation does not change the distinction between dispatching Bot,
+  task and executing Agent.
+- Task lists continue to show one row per task, with its threads inside
+  ([2026-11-07](decisions/2026-11-07-2045-tasks-only-threads-inside.md)).
+  A standalone Agent run already visible to its dispatching Bot can be a
+  child of that Bot in the hosted sidebar; it is not a global thread list.
 - The right panel's 概览 header is the selected bot (the same avatar and
   name as its left row), followed by the tabs 详情 / 任务 / PR / 电脑. A
   task's title appears in its task row and detail, never as that
@@ -95,7 +99,7 @@ Decided by Alex, 2026-10-28.
 | --- | --- | --- |
 | **Artifact** | Artifact | Something a thread produces for the person to look at or accept, such as an acceptance (验收), a PR, a document or a web page. The word is never translated (not 产物, 工件 or 成果). Lives on the Artifact rail page (R-56). An open thread's header always has an Artifact button, and the message that finishes a thread carries its Artifact card (Alex, 2026-11-06). |
 | **Agent** | Agent | The coding agent that runs a thread: Claude Code, Codex, Cursor (`agents` table, a harness). It does the coding work; a bot never does. Shown by its own brand mark wherever a thread or run has an icon (R-78). Never called harness or 执行器 in the UI (R-43). |
-| **Agent Profile** | Agent 配置 | A reusable logical coding role owned by a person in a workspace: responsibilities, capabilities, Agent/model policy, effort, private instructions and controlled Skills. Several Profiles may use the same physical Agent/model. Managed in Settings › Models and subscriptions; frozen into each selected run. It never becomes a Bot or a left-column row. [Spec](factory-agent-profiles.md). |
+| **Agent Profile** | Agent 配置 | A reusable logical coding role owned by a person in a workspace: responsibilities, capabilities, Agent/model policy, effort, private instructions and controlled Skills. Several Profiles may use the same physical Agent/model. Managed in Settings › Models and subscriptions; frozen into each selected run. Has its own mark (a glyph and colour), the main mark of its Agent stretches (R-78). It never becomes a Bot or a left-column row. [Spec](factory-agent-profiles.md). |
 | **Library** | 资料库 | A bot's files, listed under 概览 › 详情; the person can delete their own (R-51). Files are added with the composer's 「+」. |
 | **Thread** | 线程 | As above. Since 2026-11-07 it is shown only inside its task (an Agent stretch in the task's 活动); no list or tab is named 线程. |
 | **Browser** | 浏览器 | The person's own local browser, one for the whole app, opened from the globe in the top bar (R-57). |

@@ -327,16 +327,40 @@ export const NAVIGATE_EVENT = 'mikka:navigate'
  * unsaved-changes check as back and forward.
  */
 export function navigate(change: Partial<WorkspaceLocation>, mode: 'push' | 'replace' = 'push') {
+  if (toWorkArea(change)) return
   goTo(change, mode)
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
+}
+
+/**
+ * A chat's work area (the hosted chat, FRAME_OWNS_PANEL; decision 2026-11-10), while that chat is on screen: a task or
+ * a thread opened from anywhere on the page opens as one of its tabs instead of a right column beside the chat.
+ */
+export type WorkAreaOpener = { task: (issueId: string) => void; thread: (runId: string) => void }
+let workArea: WorkAreaOpener | null = null
+
+/** The chat on screen hands over its work area; the returned function takes it back (on unmount). */
+export function setWorkAreaOpener(opener: WorkAreaOpener): () => void {
+  workArea = opener
+  return () => { if (workArea === opener) workArea = null }
+}
+
+/** A move that only opens a task or a thread beside the centre goes to the chat's work area when there is one. */
+function toWorkArea(change: Partial<WorkspaceLocation>): boolean {
+  if (!workArea || !Object.keys(change).every(key => key === 'task' || key === 'thread')) return false
+  if (change.thread) workArea.thread(change.thread)
+  else if (change.task) workArea.task(change.task)
+  else return false
+  return true
 }
 
 function here() {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`
 }
 
-/** Opens a thread in the right column beside what is in the centre (R-82). */
+/** Opens a thread in the right column beside what is in the centre (R-82), or in the chat's work area (setWorkAreaOpener). */
 export function openThread(runId: string) {
+  if (toWorkArea({ thread: runId })) return
   const from = here()
   goTo({ thread: runId })
   // Remembers where it came from, so ← steps back to that list as the browser's back does.
@@ -370,6 +394,7 @@ export function toggleAllThreads(open: boolean) {
  * task. ← in the task steps back to where it was opened, as a thread's does.
  */
 export function openTask(issueId: string) {
+  if (toWorkArea({ task: issueId })) return
   const from = here()
   goTo({ task: issueId, thread: null })
   window.history.replaceState({ ...window.history.state, [OPENED_TASK]: { issueId, from } satisfies OpenedTask }, '', here())

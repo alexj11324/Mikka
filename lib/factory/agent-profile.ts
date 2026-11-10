@@ -14,6 +14,7 @@ import { BUILTIN_AGENT_PROFILE_ID, BUILTIN_AGENT_PROFILE_VERSION, builtinAgentPr
 import { acquireProfileMembership, profileView, readProfileRow, readProfileRows, validateProfileScope, type ProfileMembership, type ProfileQuery, type ProfileRow } from './agent-profile-store'
 import { agentProfileSkillsCatalog, resolveAgentProfileSkills } from './agent-profile-skills'
 import { maskFactoryNote } from './note-mask'
+import { resolveProfileMark, type ProfileMarkValue } from './agent-profile-mark'
 import { profileDecisionDiagnostics, profileDecisionInput, profileDecisionQuestions, profileDecisionSelection, type ProfileCheckWork, type PublicAgentProfile } from './agent-profile-decision'
 import type { ModelRoutingContext } from '@/lib/model-routing-server'
 
@@ -102,10 +103,11 @@ async function eligibleProfiles(pool: Pool, scope: DispatchScope, rows: ProfileR
   return { eligible, availability, constraints }
 }
 
-/** Only the actor's authorized, currently runnable public summaries enter model context. */
-export async function listPublicAgentProfiles(pool: Pool, scope: DispatchScope, request: Partial<AgentProfileDispatchRequest> = {}): Promise<PublicAgentProfile[]> {
+/** Only the actor's authorized, currently runnable public summaries enter model context.
+ * The mark rides along here so a reply can name a Profile as the UI draws it; the Decision input stays without it. */
+export async function listPublicAgentProfiles(pool: Pool, scope: DispatchScope, request: Partial<AgentProfileDispatchRequest> = {}): Promise<(PublicAgentProfile & ProfileMarkValue)[]> {
   const member = await acquireProfileMembership(scope)
-  try { return (await eligibleProfiles(pool, scope, await readProfileRows(pool, scope), request, {}, true)).eligible.map(item => item.public) }
+  try { return (await eligibleProfiles(pool, scope, await readProfileRows(pool, scope), request, {}, true)).eligible.map(item => ({ ...item.public, ...resolveProfileMark(item.public, item.row) })) }
   finally { await member.close() }
 }
 

@@ -238,6 +238,7 @@ jobs:
           node scripts/release/web-deploy.mjs main
           message="$(git log -1 --format=%s "$GITHUB_SHA")"
           url="$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --archive=tgz --regions cle1 --token "$VERCEL_TOKEN" \
+            --env WORKFLOW_EVENTS_TRANSPORT=http \
             --meta githubDeployment=1 --meta githubOrg=alexj11324 --meta githubRepo=Mikka \
             --meta githubCommitRef=main --meta githubCommitSha="$GITHUB_SHA" \
             --meta mikkaUiOverlaySha="$MIKKA_UI_OVERLAY_SHA" \
