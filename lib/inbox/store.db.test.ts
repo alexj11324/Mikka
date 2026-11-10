@@ -68,7 +68,11 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     try {
       for (const user of [canonicalOwner, canonicalPeer]) await admin.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, `${user}@example.invalid`])
       await admin.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'fixture\',\'personal\')', [id, canonicalOwner])
-      for (const user of [canonicalOwner, canonicalPeer]) await admin.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$2,\'member\')', [id, user])
+      await admin.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$2,\'member\')', [id, canonicalOwner])
+      // Migrated public tables reject new corrupt memberships. The private
+      // schema below still exercises reads of historical corrupt rows.
+      await assert.rejects(admin.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$2,\'member\')', [id, canonicalPeer]), { code: '23514' })
+      assert.equal((await admin.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [id, canonicalPeer])).rowCount, 0)
       assert.equal(await guard({ id: canonicalOwner }, id, async scope => scope.personal), true)
       await assert.rejects(guard({ id: canonicalPeer }, id, async () => assert.fail('foreign personal admission')), { code: 'workspaceAccessDenied' })
       await admin.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [id, canonicalOwner])
