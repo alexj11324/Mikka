@@ -85,7 +85,8 @@ export const threadLifecycleProvider = {
     return rows
   },
   async deleteSnapshot(snapshotId: string, ownerId: string): Promise<boolean> {
-    return withE2BErrors(ownerId, false, () => Sandbox.deleteSnapshot(snapshotId, await options(ownerId)))
+    const prepared = await options(ownerId)
+    return withE2BErrors(ownerId, false, () => Sandbox.deleteSnapshot(snapshotId, prepared))
   },
   /** Restore from a snapshot on the same owner's key. The snapshot is written
    * only by this module for this task's machine; no template-origin check is
