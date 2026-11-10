@@ -2,9 +2,45 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
 import { chatItems, jsonbText, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
+import { scheduleChatMessage } from '../schedules/chat-result'
 import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 import { runCompletionObservations } from './run-completion-observation'
 import { restoreChatToolMetadata } from './chat-tool-metadata'
+
+test('scheduled results keep their useful body separate from adjacent replies, without protocol receipts', () => {
+  const at = new Date('2030-01-01T00:00:00Z')
+  const items = chatItems([
+    { position: 1, createdAt: at, message: { role: 'assistant', content: 'The reminder is set.' } },
+    { position: 2, createdAt: at, message: scheduleChatMessage('Daily check', 'succeeded', { text: 'Check the release notes.' }) },
+    { position: 3, createdAt: at, message: { role: 'assistant', content: 'Another reply.' } },
+  ])
+  assert.deepEqual(items.map(item => item.text), ['The reminder is set.', 'Check the release notes.', 'Another reply.'])
+  assert.doesNotMatch(JSON.stringify(items), /Schedule |occurrence|operation|succeeded/)
+})
+
+test('failed, skipped and cancelled schedules are friendly event data rather than raw error codes', () => {
+  const at = new Date('2030-01-01T00:00:00Z')
+  for (const status of ['failed', 'skipped', 'cancelled']) {
+    const [item] = chatItems([{ position: 1, createdAt: at, message: scheduleChatMessage('Daily check', status, null) }])
+    assert.equal(item.from, 'event')
+    assert.equal(item.text, '')
+    assert.deepEqual(item.line, { kind: 'scheduleRan', runId: null, issueId: null, title: 'Daily check', status })
+  }
+})
+
+test('a scheduled task snapshot retains its exact task and status as localizable event data', () => {
+  const task = { id: '00000000-0000-4000-8000-000000000179', title: 'Release', status: 'review' }
+  const [item] = chatItems([{ position: 1, createdAt: new Date(), message: scheduleChatMessage('Daily check', 'succeeded', task) }])
+  assert.equal(item.text, `[[issue:${task.id}]]`)
+  assert.deepEqual(item.line, { kind: 'issueSnapshot', runId: null, issueId: task.id, title: 'Release', status: 'review' })
+})
+
+test('words resembling a scheduler protocol do not turn an ordinary reply into a host result', () => {
+  const content = '[Schedule example; occurrence example; operation example] Example: succeeded\nKeep this quoted example.'
+  const [item] = chatItems([{ position: 1, createdAt: new Date(), message: { role: 'assistant', content } }])
+  assert.equal(item.from, 'coordinator')
+  assert.equal(item.text, content)
+})
 
 test('watchdog blocker exposes the actual host facts and never invents a successful handoff', () => {
   const prompt = eventPrompt({ kind: 'run_report', issueId: 'issue', runId: null, payload: {

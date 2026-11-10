@@ -33,6 +33,7 @@ import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorChatState } from './chat-state'
 import { compactChatMessage, compactChatToolMetadata, summaryChatMessage } from './chat-projection'
+import { projectScheduleResults } from './schedule-result-projection'
 import type { ChatToolMetadata, ChatToolMetadataRow } from './chat-tool-metadata'
 import { coordinatorLeaseActive } from './lease'
 import { readCoordinatorPromptPreferences, readPreferences } from '@/lib/preferences'
@@ -42,6 +43,7 @@ import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
 import type { ScheduledRead } from '@/lib/schedules/contract'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
+import { scheduleChatResultSchema } from '@/lib/schedules/chat-result'
 import { botChatChanged } from '../live/chats'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { activeTaskWorkspaces, requireTaskWorkspace } from '@/lib/task-workspace'
@@ -460,7 +462,7 @@ export async function appendMessages(userId: string, holder: string, unmasked: M
     const first = await nextPosition(tx, userId, botId)
     if (messages.length) {
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, mikkaScheduleResult: _unscheduled, ...plain } = message as unknown as Record<string, unknown>
         // 停止: the turn's last message carries the mark; the chat shows 已停止 under the reply.
         const stop = stopped && index === messages.length - 1 && message.role === 'assistant'
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
@@ -536,7 +538,7 @@ export async function failTurn(userId: string, holder: string, error: string, bo
     if (messages.length) {
       const first = await nextPosition(tx, userId, botId)
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, mikkaScheduleResult: _unscheduled, ...plain } = message as unknown as Record<string, unknown>
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
           message: { ...plain, ...(message.role === 'assistant' && completed?.streamId ? { mikkaStreamId: completed.streamId } : {}) } }
       }))
@@ -582,7 +584,13 @@ function conversationWithMemory({ session, rows }: Awaited<ReturnType<typeof rea
   const memory = memoryEnabled ? session?.memory ?? '' : ''
   // A failed message retried with 重新发送 is not said twice: the new attempt stands for it.
   return { summary: session?.summary ?? null, memory, messages: rows.filter(row => (row.message as { mikkaRetried?: unknown }).mikkaRetried !== true).map(row => {
-    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, mikkaFailureDetails: _details, mikkaRetried: _retried, ...message } = row.message
+    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, mikkaFailureDetails: _details, mikkaRetried: _retried, mikkaScheduleResult: _schedule, ...message } = row.message
+    const schedule = scheduleChatResultSchema.safeParse(_schedule)
+    // Status-only receipts have a localized display line, not an empty model reply.
+    if (message.role === 'assistant' && !message.content && schedule.success) {
+      const task = schedule.data.task
+      message.content = `Schedule ${JSON.stringify(schedule.data.title)} ${schedule.data.status}.${task ? ` Task ${JSON.stringify(task.title)} has status ${task.status}.` : ''}`
+    }
     return { position: row.position, message: message as unknown as ModelMessage }
   }) }
 }
@@ -794,7 +802,7 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
     waiting: sql<WaitingRow[]>`coalesce((select jsonb_agg(to_jsonb(${sql.identifier('chat_waiting')}) order by ${waitingRead.createdAt}) from ${waitingRead}), '[]'::jsonb)`,
   }).from(storedRead).leftJoin(sessionRead, sql`true`)
   const session = { leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt, lastFailure: snapshot.lastFailure }
-  const rows = snapshot.rows.map(row => ({ ...row, createdAt: new Date(row.createdAt) }))
+  const rows = await projectScheduleResults(db, userId, snapshot.rows.map(row => ({ ...row, createdAt: new Date(row.createdAt) })))
   const hasMore = rows.length > limit
   rows.splice(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
@@ -951,7 +959,7 @@ export async function botChatSnapshot(reader: IssueReader) {
   const readableBots = workspaces.length ? await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)))) : []
   if (!readableBots.length) return { items: {} as Record<string, BotChatSummary>, expiries: [] as Date[], observedAt: Date.now() }
   const botIds = readableBots.map(bot => bot.id)
-  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
+  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { id: coordinatorMessages.id, botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), inArray(coordinatorMessages.botId, botIds), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
   const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), inArray(coordinatorSessions.botId, botIds)))
@@ -970,7 +978,8 @@ export async function botChatSnapshot(reader: IssueReader) {
     if (!session.botId) continue
     result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId), now).working }
   }
-  const lines = latest.flatMap(row => {
+  const projected = await projectScheduleResults(db, userId, latest)
+  const lines = projected.flatMap(row => {
     if (!row.botId) return []
     const [item] = chatItems([{ position: 0, message: row.message as unknown as ModelMessage, createdAt: row.createdAt }])
     // A failed welcome is no message from the Bot: no preview line and no time to count as unread.
@@ -989,8 +998,8 @@ export async function botChatSnapshot(reader: IssueReader) {
 
 /** The whole conversation for display, newest last. */
 export async function conversationForDisplay(userId: string, limit = 200, botId: string) {
-  const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
-  return rows.reverse()
+  return (await projectScheduleResults(db, userId, rows)).reverse().map(({ id: _id, ...row }) => row)
 }

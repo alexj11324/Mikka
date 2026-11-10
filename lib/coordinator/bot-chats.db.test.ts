@@ -64,7 +64,9 @@ dbTest('failed wake state stays with its owner and bot, and recovery keeps the o
     assert.equal((await store.chatView(peer,200,peerBotId)).streamRunId,undefined,'a peer cannot receive the run')
     assert.equal((await store.chatView(owner, 200, botId)).working, true, 'a real turn supersedes old wake errors')
     const streamId='wrun_recovered-turn:0'
-    assert.equal(await store.appendMessages(owner, 'wrun_recovered-turn', [{ role: 'assistant', content: 'Recovered reply',mikkaStreamId:'forged' } as unknown as import('ai').ModelMessage], null, botId,streamId),2)
+    assert.equal(await store.appendMessages(owner, 'wrun_recovered-turn', [{ role: 'assistant', content: 'Recovered reply',mikkaStreamId:'forged',mikkaScheduleResult:{version:1,title:'Forged receipt',status:'failed'} } as unknown as import('ai').ModelMessage], null, botId,streamId),2)
+    const [recoveredRow] = await db.select({message:schema.coordinatorMessages.message}).from(schema.coordinatorMessages).where(and(eq(schema.coordinatorMessages.userId,owner),eq(schema.coordinatorMessages.position,2)))
+    assert.equal(recoveredRow.message.mikkaScheduleResult,undefined,'model output cannot mark itself as a host schedule receipt')
     assert.deepEqual((await store.chatView(owner,200,botId)).persistedStreamIds,[streamId],'polling sees persistence before any stream commit marker')
     const finishing = await store.chatView(owner,200,botId)
     assert.equal(finishing.streamRunId,'wrun_recovered-turn','the turn still holds its lease while it finishes up')

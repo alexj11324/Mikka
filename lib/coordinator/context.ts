@@ -14,6 +14,7 @@ import { eventLine, type EventLine } from './event-line'
 import { projectedToolResult, toolCallMetadata, toolResultMetadata, type ProjectedToolMetadata } from './tool-metadata'
 import { quotePreview, toolQuote } from './tool-quote'
 import { invalidToolParts } from './invalid-tool-call'
+import { scheduleChatResultSchema } from '@/lib/schedules/chat-result'
 
 export { QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE, quoteText, quotePreview, toolQuoteText, toolQuote } from './tool-quote'
 
@@ -494,6 +495,18 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
       }
     } else if (message.role === 'assistant') {
+      const schedule = scheduleChatResultSchema.safeParse((message as { mikkaScheduleResult?: unknown }).mikkaScheduleResult)
+      if (schedule.success) {
+        flush()
+        briefingBoundary = true
+        const task = schedule.data.task
+        if (task || !message.content || (Array.isArray(message.content) && !message.content.length)) {
+          items.push({ ...(id ? { id } : {}), position, from: 'event', text: task ? `[[issue:${task.id}]]` : '', tools: [], threads: [], artifacts: [], createdAt: createdAt.toISOString(),
+            line: task ? { kind: 'issueSnapshot', issueId: task.id, runId: null, title: task.title, status: task.status }
+              : { kind: 'scheduleRan', issueId: null, runId: null, title: schedule.data.title, status: schedule.data.status } })
+          continue
+        }
+      }
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
       const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) && !invalidParts.has(part) ? [part.toolName] : [])
@@ -531,6 +544,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         // Only a reply that shows ends the boundary; hidden tool-only steps do not.
         briefingBoundary = false
       }
+      if (schedule.success) briefingBoundary = true
     } else if (message.role === 'tool') {
       const last = items.at(-1)
       if (last?.from !== 'coordinator') continue
