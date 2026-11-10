@@ -152,7 +152,13 @@ LOW（可后续 PR）：`approvals.ts:129-132` 过期状态在事务内 throw �
 - **CI 不跑浏览器测试**：`.github/workflows/browser-gate.yml` 按 decision 2026-11-01-1520 已退化成 echo，只为保住 required check 名字。任何只靠 Playwright 的守卫永远不会让 CI 变红。
 - **`generate-routes.mjs` 的 `--check` 未实现**，UI policy 声称的「生成物未同步」检查是假绿。已有一个未完成分支 `zero/a-route-check`（本地 commit `1cf716fde`，+110/−7，未 push）。
 - **过期注释**：`lib/app-tools.ts:11-15`、`:66`、`lib/pending-action-store.ts:19-20`、`lib/app-tools.test.ts:56` 标题都与 `write-judgment.ts` 相反。已有本地分支 `zero/b-stale-comments`（commit `5b96763db`，未 push）。
-- 本地还留有 `zero/a-route-check`、`zero/b-stale-comments` 两个分支，均未 push、未开 PR。
+- **未完成工作已全部推到 GitHub**（2026-11-10 21:20 UTC，均为 WIP，未开 PR、未验证）：
+  - `wip/handoff-2026-11-10` — 本交接单
+  - `zero/a-route-check` — `generate-routes.mjs --check` 的未完成实现（+110/−7，`1cf716fde`）
+  - `zero/b-stale-comments` — 过期注释清理，已完成但未验证（`5b96763db`）
+  - `wip/chat-actions-20261110` — #1888 的测试加固（citation 预算算式注释、stopReason 计数断言、等待句可点击 e2e），基于 `79925cb56`
+  - `wip/thread-modes-20261110` — #1886 的 2 个 MEDIUM 修复进行到一半（`thread-mode/store.ts`、`run-provider-fallback.ts`、`run-admission-store.ts`、`queue-run.ts`、`run-quota.ts`、`run-leases.ts`、`agent-runs.ts`），基于 `a8f5b82f9`
+  - `wip/bot-permissions-20261110` — #1880 的 P0 修复进行到一半（`account-write-setting.ts` 新增、`steps.ts`/`pending-action-store.ts`/`app-tools.ts` 改动、迁移已改名 250000/250001），基于 `2c0cfacbc`
 - `~/.config/mikka/zero-cat.env`（chmod 600）保存了 zero.cat 的 base URL 与 key，已停用；是否删除待定。
 
 ---
