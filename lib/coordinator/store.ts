@@ -18,7 +18,7 @@ import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
 import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
 import { wakeCoordinatorSoon } from './wake-after-commit'
 import { COORDINATOR_LEASE_CHANNEL } from '@/lib/db/listen'
-import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, agents, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
@@ -682,6 +682,16 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   const issueRows = issueIds.length ? await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
     .from(issues)
     .where(and(inArray(issues.id, issueIds), visibility!.predicate)) : []
+  // Each visible cited task's newest thread, for its one state (localTaskState). Only its status and outcome, under
+  // the task branch of the run visibility rule (runVisibilityPredicate): the run in the task's own workspace, inside
+  // the reader's workspaces, on a task the same predicate shows.
+  const visibleIssueIds = issueRows.map(row => row.id)
+  const newestRuns = visibleIssueIds.length ? await db.selectDistinctOn([agentRuns.issueId], { issueId: agentRuns.issueId, status: agentRuns.status, outcome: agentRuns.outcome })
+    .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
+    .innerJoin(issues, and(eq(issues.id, agentRuns.issueId), eq(agentRuns.workspaceId, issues.workspaceId)))
+    .where(and(inArray(agentRuns.issueId, visibleIssueIds), visibility!.workspaceIds.length ? inArray(agentRuns.workspaceId, visibility!.workspaceIds) : sql`false`, visibility!.predicate))
+    .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)) : []
+  const newestRun = new Map(newestRuns.map(row => [row.issueId, { status: row.status, outcome: row.outcome ?? null }]))
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
   const runs = runIds.length ? await visibleRuns(reader, { runIds, limit: runIds.length, brief: true }) : []
   // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
@@ -705,7 +715,8 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   ], db)
   for (const { content, ownerId: _owner, scope: _scope, ...row } of issueRows) {
     const metadata = readIssueMetadata(content)
-    if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null }
+    if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null,
+      run: newestRun.get(row.id) ?? null, pullRequests: metadata.pullRequests }
   }
   for (const row of runs) {
     const task = row.issueId ? tasks.get(row.issueId) ?? null : null

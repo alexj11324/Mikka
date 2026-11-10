@@ -66,6 +66,12 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
     assert.equal((sources[runs[0]] as { name: string }).name, 'Fix the login bug that drops a session when the token refre…')
     assert.equal((sources[runs[0]] as { summary: string }).summary, 'Fixed the race.')
 
+    // A cited task carries its newest thread's status and outcome and its PRs, for its one state (localTaskState).
+    const cited = (await citationSources(owner, [`[[issue:${issueId}]]`]))[issueId]
+    assert.ok(cited?.kind === 'issue')
+    assert.deepEqual(cited.run, { status: 'succeeded', outcome: null }, 'the newest of its threads')
+    assert.deepEqual(cited.pullRequests, readIssueMetadata(task.content).pullRequests)
+
     // The list projection: only the report's summary, no provenance.
     const brief = await visibleRuns(owner, { runIds: runs, limit: runs.length, brief: true })
     assert.deepEqual(brief.find(run => run.id === runs[0])?.report, { summary: '  Fixed the race.  ' })
