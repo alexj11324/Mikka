@@ -20,7 +20,7 @@ export function PostHogAnalytics() {
     // hostname. It is independent of login and survives a site-to-App hop.
     if (window.mikka?.app?.runtime === 'electron') return
     rememberFirstTouch(window.location.href, document.referrer, document.cookie,
-      cookie => { document.cookie = cookie })
+      (cookie: string) => { document.cookie = cookie })
   }, [])
 
   useEffect(() => {
