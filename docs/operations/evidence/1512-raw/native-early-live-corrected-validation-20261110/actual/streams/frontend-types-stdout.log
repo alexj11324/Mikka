@@ -1,0 +1,4 @@
+
+> @mikka/frontend@0.0.1 typecheck /home/runner/work/Mikka/Mikka/apps/frontend
+> tsc --noEmit -p tsconfig.json
+

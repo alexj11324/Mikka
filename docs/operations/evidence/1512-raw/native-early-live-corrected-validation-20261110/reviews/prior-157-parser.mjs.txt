@@ -1,0 +1,12 @@
+export function parseTap(raw) {
+ const roots=[],all=[],stack=[];
+ const lines=raw.split("\n");
+ for(let i=0;i<lines.length;i++){
+  let m=lines[i].match(/^(\s*)# Subtest: (.*)$/);
+  if(m){const indent=m[1].length;while(stack.length&&stack.at(-1).indent>=indent)stack.pop();const n={name:m[2],indent,startLine:i+1,children:[],status:null};if(stack.length)stack.at(-1).children.push(n);else roots.push(n);stack.push(n);all.push(n);continue;}
+  m=lines[i].match(/^(\s*)(not ok|ok) (\d+) - (.*)$/);
+  if(m){const indent=m[1].length,name=m[4].replace(/ # (?:SKIP|TODO).*$/,"");const n=stack.at(-1);if(!n||n.indent!==indent||n.name!==name)throw Error(`TAP mismatch ${i+1}: ${name}`);n.status=m[2]==="ok"?"pass":"fail";n.number=Number(m[3]);n.endLine=i+1;n.directive=m[4]!==name?m[4].slice(name.length):null;stack.pop();}
+ }
+ if(stack.length||all.some(n=>n.status===null))throw Error("unclosed TAP");
+ return{roots,all};
+}

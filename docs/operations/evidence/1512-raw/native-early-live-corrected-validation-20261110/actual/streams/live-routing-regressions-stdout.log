@@ -1,0 +1,142 @@
+TAP version 13
+# Subtest: equal selected and home hints prepare one connection without a business read
+ok 1 - equal selected and home hints prepare one connection without a business read
+  ---
+  duration_ms: 4.341808
+  type: 'test'
+  ...
+# Subtest: different selected and home hints join their exact existing registry entries
+ok 2 - different selected and home hints join their exact existing registry entries
+  ---
+  duration_ms: 1.845066
+  type: 'test'
+  ...
+# Subtest: confirming the selected hint before its first real subscriber preserves ready coverage
+ok 3 - confirming the selected hint before its first real subscriber preserves ready coverage
+  ---
+  duration_ms: 0.664711
+  type: 'test'
+  ...
+# Subtest: a stopped historical subscription cannot consume the selected reservation
+ok 4 - a stopped historical subscription cannot consume the selected reservation
+  ---
+  duration_ms: 0.710377
+  type: 'test'
+  ...
+# Subtest: an invalid entity does not count as a consumer or consume preparation
+ok 5 - an invalid entity does not count as a consumer or consume preparation
+  ---
+  duration_ms: 0.598758
+  type: 'test'
+  ...
+# Subtest: fresh selected and home scopes retire unused hints without relabelling a subscription
+ok 6 - fresh selected and home scopes retire unused hints without relabelling a subscription
+  ---
+  duration_ms: 1.205231
+  type: 'test'
+  ...
+# Subtest: a read begun after readiness is reused by the real late subscriber
+ok 7 - a read begun after readiness is reused by the real late subscriber
+  ---
+  duration_ms: 1.750769
+  type: 'test'
+  ...
+# Subtest: a read begun before readiness still catches up even when it finishes afterwards
+ok 8 - a read begun before readiness still catches up even when it finishes afterwards
+  ---
+  duration_ms: 1.174402
+  type: 'test'
+  ...
+# Subtest: an incoming push with no keys remains an obligation for a later matching subscriber
+ok 9 - an incoming push with no keys remains an obligation for a later matching subscriber
+  ---
+  duration_ms: 1.109932
+  type: 'test'
+  ...
+# Subtest: a different event kind does not discard continuous coverage for the late key
+ok 10 - a different event kind does not discard continuous coverage for the late key
+  ---
+  duration_ms: 0.836342
+  type: 'test'
+  ...
+# Subtest: abandoned render owners do not claim a prepared cache lifetime
+ok 11 - abandoned render owners do not claim a prepared cache lifetime
+  ---
+  duration_ms: 0.413041
+  type: 'test'
+  ...
+# Subtest: a second cache cannot borrow the first cache live history
+ok 12 - a second cache cannot borrow the first cache live history
+  ---
+  duration_ms: 0.52493
+  type: 'test'
+  ...
+# Subtest: StrictMode cleanup and setup use a new lifetime and old cleanup cannot close it
+ok 13 - StrictMode cleanup and setup use a new lifetime and old cleanup cannot close it
+  ---
+  duration_ms: 0.754879
+  type: 'test'
+  ...
+# Subtest: retirement before the first effect blocks old owners but not a new ordinary owner
+ok 14 - retirement before the first effect blocks old owners but not a new ordinary owner
+  ---
+  duration_ms: 0.506846
+  type: 'test'
+  ...
+# Subtest: an authority retirement aborts an unfinished ticket and its result cannot revive a socket
+ok 15 - an authority retirement aborts an unfinished ticket and its result cannot revive a socket
+  ---
+  duration_ms: 1.206533
+  type: 'test'
+  ...
+# Subtest: a failed empty preparation does not retry on timers or repeated visible events: null
+ok 16 - a failed empty preparation does not retry on timers or repeated visible events: null
+  ---
+  duration_ms: 0.506125
+  type: 'test'
+  ...
+# Subtest: a failed empty preparation does not retry on timers or repeated visible events: reject
+ok 17 - a failed empty preparation does not retry on timers or repeated visible events: reject
+  ---
+  duration_ms: 0.410928
+  type: 'test'
+  ...
+# Subtest: an empty prepared connection expires without a renewal loop; a real subscriber can reconnect
+ok 18 - an empty prepared connection expires without a renewal loop; a real subscriber can reconnect
+  ---
+  duration_ms: 0.63211
+  type: 'test'
+  ...
+# Subtest: the last real subscriber cancels its scheduled retry while a preparation remains
+ok 19 - the last real subscriber cancels its scheduled retry while a preparation remains
+  ---
+  duration_ms: 0.382183
+  type: 'test'
+  ...
+# Subtest: a hidden preparation waits for a real subscriber instead of creating an idle visibility retry
+ok 20 - a hidden preparation waits for a real subscriber instead of creating an idle visibility retry
+  ---
+  duration_ms: 0.253885
+  type: 'test'
+  ...
+# Subtest: a release from a disposed registry entry cannot remove its same-scope replacement
+ok 21 - a release from a disposed registry entry cannot remove its same-scope replacement
+  ---
+  duration_ms: 0.412821
+  type: 'test'
+  ...
+# Subtest: malformed and nil routing hints never request a ticket or attach a visibility watcher
+ok 22 - malformed and nil routing hints never request a ticket or attach a visibility watcher
+  ---
+  duration_ms: 0.205834
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 258.533164

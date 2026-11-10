@@ -1,0 +1,1042 @@
+{
+  "schema": "issue1512-evidence-checkpoint59-corrected-native-live-validation.v1",
+  "createdAt": "2026-11-10 06:57:30 UTC",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "status": "Exact isolated G2 validation PASS. Formal packaged Native budget and production acceptance remain open.",
+  "evidence": {
+    "branch": "refs/heads/evidence/1512-observability",
+    "parentCommit": "dacb94026c1fab78f3fd6efb422264e1b554fd13",
+    "parentTree": "7a8496ec1f6687f696aad10c0c63d002199c69b8",
+    "parentLeafCount": 9393,
+    "prefix": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110",
+    "baseRefReadback": "dacb94026c1fab78f3fd6efb422264e1b554fd13",
+    "newLeafCountIncludingThisIndex": 56,
+    "indexHashConvention": "index.json excludes its own hash from entries; normal commit/tree handoff separately records it.",
+    "publication": "Unreferenced normal child candidate; Root exclusively owns any later CAS."
+  },
+  "source": {
+    "G2": {
+      "sha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+      "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+      "parents": [
+        "ff385bfd91edcd40c3b3ee398b4b93098e5becbb"
+      ]
+    },
+    "failedG": {
+      "sha": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+      "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+      "parents": [
+        "9238b7092a39fce7edde2e488aef516c0b544677"
+      ]
+    },
+    "merge": {
+      "sha": "9238b7092a39fce7edde2e488aef516c0b544677",
+      "tree": "03712f2c1ca03ee45e61e124bd430fc9d1a377c9",
+      "parents": [
+        "5f3598029033b83ee72c88ea6c49955205eecab2",
+        "ab2d00a43a79d35380b4d2db9014a3792fea63ca"
+      ]
+    },
+    "exactPathsChangedFromG": 4,
+    "sourceCopiesInheritedFromCP58": [
+      {
+        "sourcePath": "apps/desktop/scripts/workspace-live.test.mjs",
+        "base": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+        "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+        "evidencePath": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/pending-G2/source/apps/desktop/scripts/workspace-live.test.mjs.txt",
+        "evidenceCommit": "dacb94026c1fab78f3fd6efb422264e1b554fd13"
+      },
+      {
+        "sourcePath": "hooks/use-subagent-updates.ts",
+        "base": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+        "sha": "dd831e0e657d00de9210e39194a926b4e977ec56",
+        "evidencePath": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/pending-G2/source/hooks/use-subagent-updates.ts.txt",
+        "evidenceCommit": "dacb94026c1fab78f3fd6efb422264e1b554fd13"
+      },
+      {
+        "sourcePath": "lib/live/channels.test.ts",
+        "base": "91c96118f0040a4594eb57e76f58befa2150fe99",
+        "sha": "c9059d2c8be5122681f5c4657889b01633ed3736",
+        "evidencePath": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/pending-G2/source/lib/live/channels.test.ts.txt",
+        "evidenceCommit": "dacb94026c1fab78f3fd6efb422264e1b554fd13"
+      },
+      {
+        "sourcePath": "tests/read-cache-scope.db.test.ts",
+        "base": "bbdae2625952b475c3488384bbd48c876887a805",
+        "sha": "ee59feba1e29769805806ec6e166abbc65994233",
+        "evidencePath": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/pending-G2/source/tests/read-cache-scope.db.test.ts.txt",
+        "evidenceCommit": "dacb94026c1fab78f3fd6efb422264e1b554fd13"
+      }
+    ],
+    "integrationProof": "02c63e132315daccf91fb21529b83967cfd8e5c2",
+    "formalForward": {
+      "branch": "fix/1512-daemon-fixture-executable-20261109",
+      "at": "2026-11-10 06:40:52 UTC",
+      "oldHead": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "newHead": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e"
+    },
+    "synthetic": {
+      "sha": "767f4f612af2c3e794031fba46d1f302ee2efab3",
+      "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+      "parents": [
+        "ab2d00a43a79d35380b4d2db9014a3792fea63ca",
+        "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e"
+      ]
+    }
+  },
+  "control": {
+    "active": {
+      "sha": "4c7270ebfdf828f368cac066ffc8589d8b522d5e",
+      "tree": "406b95198812b9c5fd46e8e60e97614067c262a7",
+      "parents": [
+        "6d7f36ea3c6b918f613cf22e848ed52d413d2bd6",
+        "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e"
+      ]
+    },
+    "closed": {
+      "sha": "996693d35b80a37b2e418bdde645e13368e6ae90",
+      "tree": "329ad540cc3f737cbbe57046ef470fb234285879",
+      "parents": [
+        "4c7270ebfdf828f368cac066ffc8589d8b522d5e"
+      ],
+      "enabled": false
+    },
+    "admittedAt": "2026-11-10 06:36:25 UTC",
+    "closedAt": "2026-11-10 06:37:14 UTC",
+    "rootApproval": "68efba46e6b89f19e1db23dc2048ee095936d083",
+    "coreManifest": "0af9f01652440f66530b8232829d3d8bedbc1ade",
+    "activeManifest": "420684e4ed70b3df8050b07b24ae29e5a94201bf",
+    "closedManifest": "f3d72f7b9f31882a23d7b3af51073470d102c577",
+    "driver": "4dc0e9aa58f1572091c6e5cb4974bdac49037a35",
+    "activeWorkflow": "b8e94d589a54448b9eefff3ce090d8c010567699",
+    "closedWorkflow": "ad6d0157aac5305dde40ad518262aeb684b05913",
+    "priorPendingWordsPreserved": "Original static admission/count/control records were not edited after their observation time."
+  },
+  "actual": {
+    "runId": "42769641000",
+    "attempt": "1",
+    "jobId": 129674158815,
+    "head": "4c7270ebfdf828f368cac066ffc8589d8b522d5e",
+    "source": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+    "conclusion": "success",
+    "completedAt": "2026-11-10T06:39:48Z",
+    "node": "v24.22.1",
+    "pnpm": "10.34.3",
+    "commandCount": 12,
+    "allExitCodes": 0,
+    "streamCount": 24,
+    "streamBytes": 70828,
+    "allStderrEmpty": true,
+    "originalIndex": "1f41473be9839f0acacc60062bb8426842d7d7c7",
+    "originalLog": {
+      "sha": "5e1de17d94fecc135349f02b5939c59d4470dedf",
+      "bytes": 492531,
+      "sha256": "20ef76f39cc379957b2df048d7e15cf740651857faf334d3c1f4b22e44858f19"
+    },
+    "originalResponse": {
+      "sha": "7967410df4741ad9282ed8c99e66d15e4972a705",
+      "bytes": 518707,
+      "sha256": "f17934145cebed237f620c9202e51b9cfcbaadc657930bff08df6f31530c2be2"
+    },
+    "rawJsonPayloads": {
+      "CONTROL": {
+        "blob": "021d068880c81c77f13b6cb6741e4284d1e3fb9b",
+        "bytes": 9992,
+        "sha256": "02e9a02c9287ce9d2ca66fa05bc30885a94dccf0b92a695c04758ea0560410b1",
+        "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+      },
+      "DATABASE_STARTED": {
+        "blob": "e0513b7e0fbc344721c2cad2108e33aae64edc7d",
+        "bytes": 280,
+        "sha256": "26f4ffa1494a26ef6ab130f75b5ee64b7edbeadb256e8b1a71cd42d8d792f32a",
+        "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+      },
+      "VERDICT": {
+        "blob": "6174063e64d45dc30b22d039007acad977af408e",
+        "bytes": 174191,
+        "sha256": "ff8b7ad17cbe0b75c63220884cdf4c9f7ff6d76570e3adbdb5324b6e46b3debf",
+        "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+      },
+      "CLEANUP": {
+        "blob": "515d4f2274a69f17cc8129fa51430b8768e5772c",
+        "bytes": 576,
+        "sha256": "77906ba4721958417695aad0d64d5a9c666034242344f385c9c173e9e4fd892c",
+        "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+      }
+    },
+    "terminalMetadata": "ab677ea84952f234b8ae80781896dd75ffc60f50",
+    "artifact": {
+      "metadataOnly": true,
+      "zipDownloaded": false,
+      "metadataBlob": "228312dd15576502aa25565b3c23d1b9c1c6e5b8",
+      "id": 13741286841,
+      "name": "issue1512-native-live-routing-validation-42769641000-attempt-1",
+      "sizeInBytes": 33886,
+      "digest": "sha256:7bd95c4e2827a77f4e38c437ed8f61bff151b05325d5f367a5b9c43a39c9c557"
+    },
+    "currentUnitCases": 123,
+    "unitGroups": [
+      {
+        "label": "live-routing-regressions",
+        "tests": 22,
+        "pass": 22,
+        "topLevel": 22,
+        "children": 0,
+        "sha": "f394ddd413fca5e1fa6a9ca03bf52f7185ca397e"
+      },
+      {
+        "label": "workspace-app",
+        "tests": 13,
+        "pass": 13,
+        "topLevel": 9,
+        "children": 4,
+        "sha": "9648136f47f8e7c8a65dde977c8657f5acabb972"
+      },
+      {
+        "label": "cloud-startup",
+        "tests": 88,
+        "pass": 88,
+        "topLevel": 88,
+        "children": 0,
+        "sha": "58e28ed29ecb944b6b9037ff8739410cc9af755e"
+      }
+    ],
+    "postgresCases": 15,
+    "migrationCases": 2,
+    "typeChecks": 3,
+    "lintCommands": 2,
+    "e2eSetupExitCode": 0,
+    "environmentBindExitCode": 0,
+    "originalRecordsNotArtifactMembers": true
+  },
+  "reuse": {
+    "unitCases": 157,
+    "executedInG2": false,
+    "firstRunId": 42766089161,
+    "firstRunOverall": "FAIL_PRESERVED",
+    "proof": "0f7bcdcc54a5088eb328c65be86b1475d8125bff",
+    "caseIndex": "4d9ea698ca71ef85948ba9bcfafaa0c75c690fea",
+    "parser": "97a81d45dfd36acf165ede837c91fc2658b1eada",
+    "files": [
+      {
+        "path": "lib/live/channel.test.ts",
+        "blob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+        "group": "live-routing-ts",
+        "actualPassed": 59,
+        "topLevelPassed": 59,
+        "nestedPassed": 0,
+        "originalTapBlob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+        "sameBlobAtGAndG2": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+        "blob": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+        "group": "live-routing-ts",
+        "actualPassed": 14,
+        "topLevelPassed": 14,
+        "nestedPassed": 0,
+        "originalTapBlob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+        "sameBlobAtGAndG2": true
+      },
+      {
+        "path": "lib/desktop-rpc/wire.test.ts",
+        "blob": "2170c999f99b2cfa2f6bbf6667b9de56296a0ada",
+        "group": "live-routing-ts",
+        "actualPassed": 5,
+        "topLevelPassed": 5,
+        "nestedPassed": 0,
+        "originalTapBlob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+        "sameBlobAtGAndG2": true
+      },
+      {
+        "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+        "blob": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+        "group": "renderer-bootstraps",
+        "actualPassed": 17,
+        "topLevelPassed": 6,
+        "nestedPassed": 11,
+        "originalTapBlob": "5667f9518de8521a415a606aa9c00741f7754701",
+        "sameBlobAtGAndG2": true
+      },
+      {
+        "path": "apps/desktop/scripts/installed-workspace.test.mjs",
+        "blob": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa",
+        "group": "renderer-bootstraps",
+        "actualPassed": 3,
+        "topLevelPassed": 3,
+        "nestedPassed": 0,
+        "originalTapBlob": "5667f9518de8521a415a606aa9c00741f7754701",
+        "sameBlobAtGAndG2": true
+      },
+      {
+        "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+        "blob": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae",
+        "group": "renderer-bootstraps",
+        "actualPassed": 21,
+        "topLevelPassed": 13,
+        "nestedPassed": 8,
+        "originalTapBlob": "5667f9518de8521a415a606aa9c00741f7754701",
+        "sameBlobAtGAndG2": true
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "blob": "06dceefec477df850087b47002266e612dddb63a",
+        "group": "startup-and-template-validators",
+        "actualPassed": 38,
+        "topLevelPassed": 38,
+        "nestedPassed": 0,
+        "originalTapBlob": "4a51ba0fa4d3a6a35856f74490aff793e1f69e1f",
+        "sameBlobAtGAndG2": true
+      }
+    ],
+    "sourceBoundInputs": 40,
+    "claim": "123 actual G2 units plus 157 separately eligible historical passes; never 280 executed together.",
+    "uiPolicy": {
+      "g2Executed": false,
+      "priorLabel": "ui-and-runtime-policy",
+      "priorExitCode": 0,
+      "scope": "Exact prior result plus review of four G2 diffs; not entire policy input-byte identity."
+    }
+  },
+  "cleanup": {
+    "runId": "42769641000",
+    "attempt": "1",
+    "containerName": "issue1512-native-live-routing-validation-42769641000-1",
+    "networkName": "issue1512-native-live-routing-net-42769641000-1",
+    "startedAt": "2026-11-10T06:39:39.242Z",
+    "stopped": true,
+    "containerRemoved": true,
+    "networkRemoved": true,
+    "errors": [],
+    "containerId": "79c03f372fe0045074c7e35c07f2478a16350e0718ac3092ed72ff35590f213d",
+    "removedVolumeNames": [
+      "b55fa2f778bc934e4511f24d4bcaf524af50ca40696c04480761717d9df91a7d"
+    ],
+    "networkId": "d26152d19faff87a85a5e66e3ecbaf4eaaee5a267a5efb42f33f8a0589043eb0",
+    "finishedAt": "2026-11-10T06:39:40.252Z"
+  },
+  "closure": {
+    "runId": 42769731455,
+    "attempt": 1,
+    "jobId": 129674451777,
+    "head": "996693d35b80a37b2e418bdde645e13368e6ae90",
+    "status": "completed",
+    "conclusion": "skipped",
+    "runnerId": null,
+    "runnerName": null,
+    "steps": [],
+    "exactChangedControlPaths": 2,
+    "frozenOriginalEvidence": "925f5279bb55dff2bbab23528c0a7a48998b9dc0"
+  },
+  "archiveVerification": {
+    "archiveOriginalsFetchedFrom": "already frozen Git blobs only",
+    "actionsOriginalEndpointsRead": 0,
+    "artifactZipDownloads": 0,
+    "newCompute": 0,
+    "refsMoved": 0,
+    "sourceProofs": 26,
+    "sourceFilesEach": 33,
+    "sourceProofHeadTreeAndManifestMatches": true,
+    "sourceFileHashMetadataStableAcrossAllProofs": true,
+    "exactG2TreeBindings": true,
+    "actualCommands": 12,
+    "allCommandExitCodesZero": true,
+    "allStderrEmpty": true,
+    "originalStreams": 24,
+    "originalStreamBytes": 70828,
+    "originalBytesAndGitHashesAllMatch": true,
+    "tapIndependentlyReparsed": [
+      {
+        "label": "live-routing-regressions",
+        "tests": 22,
+        "pass": 22,
+        "topLevel": 22,
+        "children": 0,
+        "sha": "f394ddd413fca5e1fa6a9ca03bf52f7185ca397e"
+      },
+      {
+        "label": "workspace-app",
+        "tests": 13,
+        "pass": 13,
+        "topLevel": 9,
+        "children": 4,
+        "sha": "9648136f47f8e7c8a65dde977c8657f5acabb972"
+      },
+      {
+        "label": "cloud-startup",
+        "tests": 88,
+        "pass": 88,
+        "topLevel": 88,
+        "children": 0,
+        "sha": "58e28ed29ecb944b6b9037ff8739410cc9af755e"
+      },
+      {
+        "label": "migration-bootstrap",
+        "tests": 2,
+        "pass": 2,
+        "topLevel": 2,
+        "children": 0,
+        "sha": "8dbec5e923c162101a90781558d1e7b858716631"
+      },
+      {
+        "label": "cache-scope-pg",
+        "tests": 15,
+        "pass": 15,
+        "topLevel": 3,
+        "children": 12,
+        "sha": "36d60efff6cf5450e47d498b34d7620f015fbf72"
+      }
+    ],
+    "actualUnitCases": 123,
+    "priorUnitCasesReused": 157,
+    "priorCasesNotRerun": true,
+    "priorGFailureRetained": true,
+    "pgCases": 15,
+    "migrationCases": 2,
+    "typeChecks": 3,
+    "lints": 2,
+    "uiPolicyG2Executed": false,
+    "ownedCleanupVerified": true,
+    "closedAdmissionSkippedWithoutRunner": true
+  },
+  "inheritedEvidence": [
+    {
+      "sha": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+      "path": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/actual/streams/live-routing-ts-stdout.log"
+    },
+    {
+      "sha": "5667f9518de8521a415a606aa9c00741f7754701",
+      "path": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/actual/streams/renderer-bootstraps-stdout.log"
+    },
+    {
+      "sha": "4a51ba0fa4d3a6a35856f74490aff793e1f69e1f",
+      "path": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/actual/streams/startup-and-template-validators-stdout.log"
+    },
+    {
+      "sha": "b7f13ec9a735846480339ff081824d73f38b9288",
+      "path": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/actual/streams/ui-and-runtime-policy-stdout.log"
+    },
+    {
+      "sha": "3578f33781eccdcd13254d5daea9fee421be5e4d",
+      "path": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/pending-G2/frontend-fix-manifest.json"
+    },
+    {
+      "sha": "d68afe9f8632ecd3f0faf34f972541d4e2ce19c1",
+      "path": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/pending-G2/frontend-static-review.json"
+    },
+    {
+      "sha": "b9402b98f534ddcb10d9b0e1dde4dd2b89d36300",
+      "path": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/pending-G2/freshness-fixture-cause.json"
+    },
+    {
+      "sha": "ff3222c1bd1b3f553d5e9c85b2d490adc2afc3f2",
+      "path": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/pending-G2/pg-fixture-independent-review.json"
+    }
+  ],
+  "supportingProofs": {
+    "finalIndependent": "5439c00da315593c80e501924a7adfd81791bd56",
+    "rootActual": "dbe952c2e8fdb3859f1ab29218e64b9ab9285733",
+    "actualMechanical": "85d44d8f81117db4f282af68849cdbc93bc9bb3d",
+    "prDescriptionReview": "28f6c02d52800a5bc7f48f5f187697937575452d",
+    "prDescriptionInput": "ba9935a840c19d18f5fe54a2c652d26852a8d089",
+    "oldOverheadApplicability": "f494eb642abf05047c2e68a05f504d4aff342820",
+    "formalNativeContract": "9cc2552c69d33d0306b33df415c13d91d36e5ef0",
+    "posthogReadOnlySafeProjection": "62b169b26e8ac4c84206880cdfa9e6fdc4d3f5da"
+  },
+  "openGates": {
+    "formalNative": "Pending actual full-window result on G2; H441 Native vs331 Web FAIL remains historical.",
+    "requiredSqlComparisons": [
+      "nativeLogin.queryCalls <= webLogin.queryCalls",
+      "first-pair startup-bundled.queryCalls <= startup-hosted.queryCalls"
+    ],
+    "protocolBytes": "Full receive/send totals and stages conserved and reported; no new per-direction or sum numeric <= threshold.",
+    "productionPassed": 0,
+    "productionRequired": 2,
+    "issueClosed": false
+  },
+  "limits": [
+    "Archive operation uses frozen Git copies only, never re-fetches Actions originals or ZIPs.",
+    "No resources or refs changed by this assembler.",
+    "PG same-source two-statement comparison is not a claim of zero extra wire bytes versus old projection.",
+    "Historical benchmark source applicability is not a new benchmark or Native early-live measurement.",
+    "PostHog file is explicitly an allowlisted safe metadata projection, not a full original response, query execution, simulation, or production trace result."
+  ],
+  "entries": [
+    {
+      "path": "actual/artifact-metadata-only.original.json",
+      "kind": "metadata only; archive ZIP not downloaded",
+      "sha": "228312dd15576502aa25565b3c23d1b9c1c6e5b8",
+      "bytes": 1061,
+      "sha256": "bd7de4d7385508feb02d2ce0c1a1681bd611cd0e1ee959de71cbc5d0e07d3c2c",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/artifact-metadata-only.original.json",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/emitted/CLEANUP.json",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member",
+      "sha": "515d4f2274a69f17cc8129fa51430b8768e5772c",
+      "bytes": 576,
+      "sha256": "77906ba4721958417695aad0d64d5a9c666034242344f385c9c173e9e4fd892c",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/emitted/CLEANUP.json",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/emitted/CONTROL.json",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member",
+      "sha": "021d068880c81c77f13b6cb6741e4284d1e3fb9b",
+      "bytes": 9992,
+      "sha256": "02e9a02c9287ce9d2ca66fa05bc30885a94dccf0b92a695c04758ea0560410b1",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/emitted/CONTROL.json",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/emitted/DATABASE_STARTED.json",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member",
+      "sha": "e0513b7e0fbc344721c2cad2108e33aae64edc7d",
+      "bytes": 280,
+      "sha256": "26f4ffa1494a26ef6ab130f75b5ee64b7edbeadb256e8b1a71cd42d8d792f32a",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/emitted/DATABASE_STARTED.json",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/emitted/VERDICT.json",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member",
+      "sha": "6174063e64d45dc30b22d039007acad977af408e",
+      "bytes": 174191,
+      "sha256": "ff8b7ad17cbe0b75c63220884cdf4c9f7ff6d76570e3adbdb5324b6e46b3debf",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/emitted/VERDICT.json",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/job-log-response.original.json",
+      "kind": "original Actions tool response frozen by sole reader",
+      "sha": "7967410df4741ad9282ed8c99e66d15e4972a705",
+      "bytes": 518707,
+      "sha256": "f17934145cebed237f620c9202e51b9cfcbaadc657930bff08df6f31530c2be2",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/job-log-response.original.json",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/job-log.original.log",
+      "kind": "complete decoded original job log",
+      "sha": "5e1de17d94fecc135349f02b5939c59d4470dedf",
+      "bytes": 492531,
+      "sha256": "20ef76f39cc379957b2df048d7e15cf740651857faf334d3c1f4b22e44858f19",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/job-log.original.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/original-index.json",
+      "sha": "1f41473be9839f0acacc60062bb8426842d7d7c7",
+      "bytes": 10016,
+      "sha256": "6902cc421e72a68ed02b7e0824d6b112ff32b09b63540c8da2c9efa0a17a3b29",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/original-index.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen source/metadata proof"
+    },
+    {
+      "path": "actual/root-closure-and-formal-publication.json",
+      "sha": "925f5279bb55dff2bbab23528c0a7a48998b9dc0",
+      "bytes": 39727,
+      "sha256": "e9f1b19d8024c2802f59dd3f2bd975ca3175ae08231d9ed9cecd0f6412ba791c",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/root-closure-and-formal-publication.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen source/metadata proof"
+    },
+    {
+      "path": "actual/streams/cache-scope-pg-stderr.log",
+      "kind": "exact command stderr",
+      "label": "cache-scope-pg",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/cache-scope-pg-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/cache-scope-pg-stdout.log",
+      "kind": "exact command stdout",
+      "label": "cache-scope-pg",
+      "sha": "36d60efff6cf5450e47d498b34d7620f015fbf72",
+      "bytes": 16854,
+      "sha256": "2d066fb78b6965eb26ea08669e5d8f7ed44f9662f8c048f24f21cd5edc72a0e6",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/cache-scope-pg-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/changed-root-oxlint-stderr.log",
+      "kind": "exact command stderr",
+      "label": "changed-root-oxlint",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/changed-root-oxlint-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/changed-root-oxlint-stdout.log",
+      "kind": "exact command stdout",
+      "label": "changed-root-oxlint",
+      "sha": "194f12d743ed586e2bc3f3fac03a379063cb17d2",
+      "bytes": 89,
+      "sha256": "da8e281080f85b6a2c83e52a2a22c089465b1d9cf0ff0ac65d421726722931a4",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/changed-root-oxlint-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/cloud-startup-stderr.log",
+      "kind": "exact command stderr",
+      "label": "cloud-startup",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/cloud-startup-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/cloud-startup-stdout.log",
+      "kind": "exact command stdout",
+      "label": "cloud-startup",
+      "sha": "58e28ed29ecb944b6b9037ff8739410cc9af755e",
+      "bytes": 22333,
+      "sha256": "f148ee050380a5fd3c547eff6ab716bd187b36c79dd12acb8ff76fea998d1d52",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/cloud-startup-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/desktop-renderer-types-stderr.log",
+      "kind": "exact command stderr",
+      "label": "desktop-renderer-types",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/desktop-renderer-types-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/desktop-renderer-types-stdout.log",
+      "kind": "exact command stdout",
+      "label": "desktop-renderer-types",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/desktop-renderer-types-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/desktop-source-oxlint-stderr.log",
+      "kind": "exact command stderr",
+      "label": "desktop-source-oxlint",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/desktop-source-oxlint-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/desktop-source-oxlint-stdout.log",
+      "kind": "exact command stdout",
+      "label": "desktop-source-oxlint",
+      "sha": "9139ce340a04e13ced135b6a2876e6b8cc680607",
+      "bytes": 217,
+      "sha256": "67c8d2a51f0f7a96a27f2bfaab82a1223a58476544a335cc8866abbba4126e04",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/desktop-source-oxlint-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/e2e-setup-stderr.log",
+      "kind": "exact command stderr",
+      "label": "e2e-setup",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/e2e-setup-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/e2e-setup-stdout.log",
+      "kind": "exact command stdout",
+      "label": "e2e-setup",
+      "sha": "0345f9b3a0d9b951ce7a9b463daca28904d8e8f8",
+      "bytes": 21440,
+      "sha256": "7fcbab4a666c5b23e8c58ac438f527275cbe0c4096e2b0f9357f53c7e73334ae",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/e2e-setup-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/environment-bind-stderr.log",
+      "kind": "exact command stderr",
+      "label": "environment-bind",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/environment-bind-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/environment-bind-stdout.log",
+      "kind": "exact command stdout",
+      "label": "environment-bind",
+      "sha": "fc8174dd3a36b6b78e76080ea4d7e8f1e7feb814",
+      "bytes": 153,
+      "sha256": "be50836342484d48d013565f0fc574990305e50377a175f9aec2442d90daecaf",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/environment-bind-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/frontend-types-stderr.log",
+      "kind": "exact command stderr",
+      "label": "frontend-types",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/frontend-types-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/frontend-types-stdout.log",
+      "kind": "exact command stdout",
+      "label": "frontend-types",
+      "sha": "5ed65c7077b5fbbc2653cdd95d6bd6e931b55d0d",
+      "bytes": 112,
+      "sha256": "2ef0d6047466a0901c7028b30b5174908637334416c211e818564fc46799fd6d",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/frontend-types-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/live-routing-regressions-stderr.log",
+      "kind": "exact command stderr",
+      "label": "live-routing-regressions",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/live-routing-regressions-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/live-routing-regressions-stdout.log",
+      "kind": "exact command stdout",
+      "label": "live-routing-regressions",
+      "sha": "f394ddd413fca5e1fa6a9ca03bf52f7185ca397e",
+      "bytes": 5171,
+      "sha256": "58397a6827841c2a96b9814ac8d7c26f5283bfc710fbe91e10131e07ebbc0655",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/live-routing-regressions-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/migration-bootstrap-stderr.log",
+      "kind": "exact command stderr",
+      "label": "migration-bootstrap",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/migration-bootstrap-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/migration-bootstrap-stdout.log",
+      "kind": "exact command stdout",
+      "label": "migration-bootstrap",
+      "sha": "8dbec5e923c162101a90781558d1e7b858716631",
+      "bytes": 1404,
+      "sha256": "343da9edb9b58e263f3188e440ebdc26df825440e63198be88500d70edffd08c",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/migration-bootstrap-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/root-types-stderr.log",
+      "kind": "exact command stderr",
+      "label": "root-types",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/root-types-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/root-types-stdout.log",
+      "kind": "exact command stdout",
+      "label": "root-types",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/root-types-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/workspace-app-stderr.log",
+      "kind": "exact command stderr",
+      "label": "workspace-app",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/workspace-app-stderr.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/streams/workspace-app-stdout.log",
+      "kind": "exact command stdout",
+      "label": "workspace-app",
+      "sha": "9648136f47f8e7c8a65dde977c8657f5acabb972",
+      "bytes": 3055,
+      "sha256": "2e4149bd07b51a52b089a03d44f16f5e7939200c4dcc21ca15f3ded48caaaee3",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/streams/workspace-app-stdout.log",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "actual/terminal-jobs-metadata.original.json",
+      "kind": "frozen terminal job metadata",
+      "sha": "ab677ea84952f234b8ae80781896dd75ffc60f50",
+      "bytes": 8919,
+      "sha256": "39f04d45b6541dd512df472aa7745be5a3d5a0d9c97a6aaefe0cdde7524b9196",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/actual/terminal-jobs-metadata.original.json",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "controls/active-manifest.json",
+      "sha": "420684e4ed70b3df8050b07b24ae29e5a94201bf",
+      "bytes": 15653,
+      "sha256": "7a13877872371189e7b09389cb7a283a868cecff9758cd2a16c049ce28efc79d",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/controls/active-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "fixed admission control"
+    },
+    {
+      "path": "controls/active-workflow.yml.txt",
+      "sha": "b8e94d589a54448b9eefff3ce090d8c010567699",
+      "bytes": 3902,
+      "sha256": "e4a077e097d7226582e2aa3e22254d92b8a08033e3dd88393571bf59cf8438a1",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/controls/active-workflow.yml.txt",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "fixed admission control"
+    },
+    {
+      "path": "controls/closed-manifest.json",
+      "sha": "f3d72f7b9f31882a23d7b3af51073470d102c577",
+      "bytes": 15873,
+      "sha256": "e17dcd2df9df1164c360de86fca05eecff99c922e49e2f178e43ca4f9710f133",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/controls/closed-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "fixed admission control"
+    },
+    {
+      "path": "controls/closed-workflow.yml.txt",
+      "sha": "ad6d0157aac5305dde40ad518262aeb684b05913",
+      "bytes": 3633,
+      "sha256": "f1e3fc8f82151c32076ca0980f89dea81d6c59667f704a7a2ac778dd9162ed4d",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/controls/closed-workflow.yml.txt",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "fixed admission control"
+    },
+    {
+      "path": "controls/core-manifest.json",
+      "sha": "0af9f01652440f66530b8232829d3d8bedbc1ade",
+      "bytes": 15615,
+      "sha256": "97f755169e2978405f933b2e4fde6296d3638c28daa1fe80b2ceace9c082516f",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/controls/core-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "fixed admission control"
+    },
+    {
+      "path": "controls/driver.mjs.txt",
+      "sha": "4dc0e9aa58f1572091c6e5cb4974bdac49037a35",
+      "bytes": 32108,
+      "sha256": "9947e61d7b827afc13ee6fcdfa9d5cd30e3cd5e206b74e5257a3911a14b20bdc",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/controls/driver.mjs.txt",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "fixed admission control"
+    },
+    {
+      "path": "controls/root-approval.json",
+      "sha": "68efba46e6b89f19e1db23dc2048ee095936d083",
+      "bytes": 8462,
+      "sha256": "f718dc339fe175fbcc179fd99269f86b15153d6182cebd0320a276092d102338",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/controls/root-approval.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "fixed admission control"
+    },
+    {
+      "path": "preparation/formal-native-measurement-contract.json",
+      "sha": "9cc2552c69d33d0306b33df415c13d91d36e5ef0",
+      "bytes": 46523,
+      "sha256": "77725cadb1428e9e2c425c3ff87b1664719a6aa673e24f6699cc9c5f13ceae6f",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/preparation/formal-native-measurement-contract.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen source/metadata proof"
+    },
+    {
+      "path": "preparation/posthog-existing-alert-safe-projection.json",
+      "kind": "safe allowlisted projection of read-only metadata; NOT original response, NOT production acceptance",
+      "sha": "62b169b26e8ac4c84206880cdfa9e6fdc4d3f5da",
+      "bytes": 2664,
+      "sha256": "4b30c3a15382547e703ddb543bbbcff1214096b536ca49a85869fffc43832ed7",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/preparation/posthog-existing-alert-safe-projection.json",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "README.md",
+      "kind": "checkpoint narrative with actual/historical boundaries",
+      "sha": "c94a04d66249386fa30637d6dd47a433bbb75cae",
+      "bytes": 13083,
+      "sha256": "e1fdb11652a40e0cb7b0fba9b9bc71787434ff63a93f1e4a62399936ffab93af",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/README.md",
+      "mode": "100644",
+      "type": "blob"
+    },
+    {
+      "path": "reviews/actual-mechanical-verification.json",
+      "sha": "85d44d8f81117db4f282af68849cdbc93bc9bb3d",
+      "bytes": 23652,
+      "sha256": "3746685b4a017723820e808b351c3b184becd334c0e8b95dade86b55474cc5ae",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/actual-mechanical-verification.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    },
+    {
+      "path": "reviews/expected-counts.json",
+      "sha": "e3957af37b165a0a86b5715638b2b6911a158cb8",
+      "bytes": 5427,
+      "sha256": "1318d96fc86810dd46bed90097a3d3872ebffbb8d5fe76ca91f4aff99cfff6f1",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/expected-counts.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    },
+    {
+      "path": "reviews/independent-final-binding.json",
+      "sha": "5439c00da315593c80e501924a7adfd81791bd56",
+      "bytes": 35461,
+      "sha256": "762ccaf7f832af83c369fb1d5b2015cc1a99f7f8adebc91b9af09eb3096b0ae2",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/independent-final-binding.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    },
+    {
+      "path": "reviews/pr-body-risk-input-snapshot.json",
+      "sha": "ba9935a840c19d18f5fe54a2c652d26852a8d089",
+      "bytes": 49603,
+      "sha256": "650b67c245109935d8e6a443758846ff7750ad5c338c1d08e3f84edabb35f1c8",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/pr-body-risk-input-snapshot.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    },
+    {
+      "path": "reviews/pr-body-risk-review.json",
+      "sha": "28f6c02d52800a5bc7f48f5f187697937575452d",
+      "bytes": 6203,
+      "sha256": "f0469e430762f92a7830a4ad2a4d723904e052c4fc44bd983346347c53e896a4",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/pr-body-risk-review.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    },
+    {
+      "path": "reviews/prior-157-case-index.json",
+      "sha": "4d9ea698ca71ef85948ba9bcfafaa0c75c690fea",
+      "bytes": 62805,
+      "sha256": "0d7f44f9a277667b03b9472204d19c64006f81b9e9b02b936b9b84d0c3fbdd35",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/prior-157-case-index.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    },
+    {
+      "path": "reviews/prior-157-parser.mjs.txt",
+      "sha": "97a81d45dfd36acf165ede837c91fc2658b1eada",
+      "bytes": 915,
+      "sha256": "c886235a7faf292cbb38ece835548483fce23d207dfb0346891e1dd7cb5ec179",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/prior-157-parser.mjs.txt",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    },
+    {
+      "path": "reviews/prior-157-reuse-proof.json",
+      "sha": "0f7bcdcc54a5088eb328c65be86b1475d8125bff",
+      "bytes": 15794,
+      "sha256": "f27b8854be44c203898fc2ad96acb931f5348e7920dd2b505dcf4f4a1ae368a5",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/prior-157-reuse-proof.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    },
+    {
+      "path": "reviews/prior-overhead-source-applicability.json",
+      "sha": "f494eb642abf05047c2e68a05f504d4aff342820",
+      "bytes": 18479,
+      "sha256": "28b8e05143ec77597eaefc3c1dfc5e9e7d1cf9967fdcadf68ab8162321d02986",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/prior-overhead-source-applicability.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    },
+    {
+      "path": "reviews/root-actual-result-review.json",
+      "sha": "dbe952c2e8fdb3859f1ab29218e64b9ab9285733",
+      "bytes": 2433,
+      "sha256": "b644a92fe12e6663b37baabc58fc763c58948626c79f8e78bb9348539aac0598",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/root-actual-result-review.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    },
+    {
+      "path": "reviews/root-integration.json",
+      "sha": "02c63e132315daccf91fb21529b83967cfd8e5c2",
+      "bytes": 7078,
+      "sha256": "3bd143dfeaf79141b61d620f8e33b497fea5e37412fa715d8bef4025b491543b",
+      "fullPath": "docs/operations/evidence/1512-raw/native-early-live-corrected-validation-20261110/reviews/root-integration.json",
+      "mode": "100644",
+      "type": "blob",
+      "kind": "frozen review or derived verification"
+    }
+  ]
+}

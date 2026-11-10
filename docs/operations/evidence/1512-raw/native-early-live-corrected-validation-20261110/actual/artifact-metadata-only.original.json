@@ -1,0 +1,32 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "artifacts": [
+      {
+        "id": 13741286841,
+        "name": "issue1512-native-live-routing-validation-42769641000-attempt-1",
+        "size_in_bytes": 33886,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13741286841",
+        "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13741286841/zip",
+        "expired": false,
+        "created_at": "2026-11-10T06:39:40Z",
+        "expires_at": "2026-11-17T06:39:40Z",
+        "updated_at": "2026-11-10T06:39:40Z",
+        "digest": "sha256:7bd95c4e2827a77f4e38c437ed8f61bff151b05325d5f367a5b9c43a39c9c557",
+        "workflow_run": {
+          "id": 42769641000,
+          "repository_id": 1427517699,
+          "head_repository_id": 1427517699,
+          "head_branch": "ops/1512-task-runs-pg-20261110",
+          "head_sha": "4c7270ebfdf828f368cac066ffc8589d8b522d5e"
+        }
+      }
+    ]
+  },
+  "isError": false
+}

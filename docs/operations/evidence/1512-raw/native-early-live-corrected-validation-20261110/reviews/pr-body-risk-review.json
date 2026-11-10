@@ -1,0 +1,70 @@
+{
+  "schema": "issue1512-g2-pr-description-risk-review/v1",
+  "reviewer": "/root/independent_final",
+  "reviewedAt": "2026-11-10 06:49:13 UTC",
+  "scope": "Read-only check of PR1799 updated2026-11-10T06:43:26Z against fresh issue1512, exact main-ab2d to G2 changed-file inventory, and independently reviewed frozen G/G2 validation. This is not a new complete audit of all 71 file bodies or a refresh of older third-party pricing snapshots.",
+  "exactInputs": {
+    "blob": "ba9935a840c19d18f5fe54a2c652d26852a8d089",
+    "bytes": 49603,
+    "sha256": "650b67c245109935d8e6a443758846ff7750ad5c338c1d08e3f84edabb35f1c8"
+  },
+  "source": {
+    "head": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "base": "ab2d00a43a79d35380b4d2db9014a3792fea63ca",
+    "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1"
+  },
+  "independentG2Review": "5439c00da315593c80e501924a7adfd81791bd56",
+  "decision": "NO_MATERIAL_DESCRIPTION_OR_ACCEPTED_TEST_MISMATCH_IN_REVIEWED_G2_SCOPE; MERGE_GATES_STILL_PENDING",
+  "agreement": [
+    "PR states the ordinary H->M->G->G2 commit chain and unchanged main. Git compare is ahead41/behind0 with the current main ab2d as merge base; 71 changed files in the whole PR, distinct from the latest four G->G2 repairs or 21 M->G2 paths.",
+    "Actual new unit counts22+13+88=123, PG15 and migration2, 3types and2lints match the frozen raw TAP, verdict and independent binding review.",
+    "The157 historical passing tests are separately attributed. Old20 registryPASS and6 AppPASS are excluded, prior failures stay failed, and all changed groups were fully rerun.",
+    "The UI/runtime policy result is explicitly historical and supported by review of the four-path delta. The body correctly avoids claiming G2 reexecution or identical entire scanner input.",
+    "The two new TS files are registered in the existing test:device-gateway command. Current main->G2 package diff changes only that script line; the71-file inventory contains no lock/dependency or schema migration file.",
+    "Body distinguishes fresh routing hints from authority: home is unique active owned personal membership projection; selected/pin/cookie/Organization gates and fresh Live tickets remain, with no persistent authority cache.",
+    "Body accurately requires complete bootstrap body and generation validation, preserves readFresh and its old-read/push obligations, and does not replace the formal window with startup-only measurements.",
+    "Prior formal H441/Web331 and diagnostic441/Web365 remain FAIL, with the diagnostic missing Web document disclosed. G2 isolated PASS is not labelled Native full-budget or production acceptance.",
+    "Fixed-source cleanup and closure match the frozen owned-resource receipt and actual skipped closure job. No entry-reopening inference is made from retained active workflow metadata.",
+    "Issue1512's ACME/Personal, two official subscription cases, full trace/AI/Logs/Replay linkage, actual screenshots, deliberate failure retention, timeline/scouts and measured overhead remain explicit acceptance work. No issue-closing keyword bypasses production acceptance."
+  ],
+  "mergeRisk": {
+    "overall": "medium",
+    "readyToMerge": false,
+    "alignment": {
+      "verdict": "good",
+      "reason": "The new lifecycle work addresses source-bound actual dispatch/open/ready evidence while preserving the issue's sampling, privacy, no-extra-business-query/poll and full production acceptance contracts."
+    },
+    "impact": {
+      "verdict": "large",
+      "reason": "Native bootstrap, SWR identity and Live authority lifecycle are sensitive to stale owner/cache/session work. Same-instance handoff, current tickets, per-call Org checks and explicit retirement boundaries are covered by concrete source review and regression cases; routing-only hints do not grant authorization."
+    },
+    "verification": {
+      "verdict": "decent",
+      "reason": "New actualG2 checks and source-bounded reused tests are documented accurately, but the formal new-head CI and complete packaged Native budget are still pending. The historical limited Web exporter probe does not profile the new early-Live path or current production OTLP/daemon costs; real model/PostHog production acceptance remains0/2."
+    },
+    "rollbackCost": {
+      "verdict": "low",
+      "reason": "Own product changes have no schema migration or dependency upgrade and can be reverted through a normal revert PR. Production acceptance setting restoration separately retains owner-idle, version/value comparison and implicit CAS; unknown acknowledgement cannot be guessed."
+    },
+    "errorDetection": {
+      "verdict": "decent",
+      "reason": "Real100ms refresh callbacks, current-scope PG constraints, actual App lifecycle and before/after source proofs detect the reviewed failure classes. Formal SQL/bytes and production trace/AI/Logs/Replay evidence still need to be inspected; a functional green job is insufficient by itself."
+    }
+  },
+  "remainingGates": [
+    "Current G2 formal CI must reach required terminal success; metadata mergeable=true with mergeable_state=blocked is not readiness.",
+    "The complete same-window packaged Native measurement must meet the unchanged budget. Early connection design and isolated query counts are not a prediction of success.",
+    "Before merge, fresh main and the actual shared release window must be checked without disturbing another owner's active release.",
+    "After deployment, exact main/deployment/runtime/source binding, two independent one-submit official subscription cases, PostHog native image/Replay/timeline/AI/log semantics and cleanup remain separate production acceptance.",
+    "The previous limited overhead measurement remains attributed to its measured call graph; no current Native or production overhead PASS is inferred."
+  ],
+  "findings": [],
+  "reviewerLimits": {
+    "prOrIssueWrites": 0,
+    "refChanges": 0,
+    "resourceOrTestStarts": 0,
+    "originalActionsFetches": 0,
+    "credentialOrAccountAccess": 0
+  },
+  "note": "No additional code change, repeated test or PR-body correction is justified solely by this read-only review. Existing explicit pending gates should be completed on their real results."
+}

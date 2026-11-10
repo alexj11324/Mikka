@@ -1,0 +1,535 @@
+{
+  "schema": "issue1512-g2-pr-description-review-input/v1",
+  "observedAt": "2026-11-10 06:49:13 UTC",
+  "pr": {
+    "number": 1799,
+    "url": "https://github.com/alexj11324/Mikka/pull/1799",
+    "title": "fix(observability): complete release guards and acceptance recovery",
+    "updatedAt": "2026-11-10T06:43:26Z",
+    "state": "open",
+    "draft": false,
+    "head": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "base": "ab2d00a43a79d35380b4d2db9014a3792fea63ca",
+    "mergeable": true,
+    "mergeableState": "blocked",
+    "merged": false,
+    "changedFiles": 71,
+    "body": "## 当前：G2 隔离验证通过，正式 CI 与 Native 完整预算验收进行中\n\n正式 head **0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e**，tree **a9e6c067fbceb7c49143b9f5d1110971c2e535a1**。06:40:52 UTC 通过普通 CAS 从 H `5f3598029033b83ee72c88ea6c49955205eecab2` 前进；正常提交链为 **H → M9238b709 → Gff385bfd → G2 0b3b0f69**。M 的有序 parents 是 `[H5f359, main ab2d00]`，保留上游 #1860 的四个实际变更文件与本方 startup correlation。没有 rebase、force push 或直接修改 main。\n\n[新正式 CI 42770147727/A1](https://github.com/alexj11324/Mikka/actions/runs/42770147727) 等 11 个常规 workflow 已触发，尚未宣称全部通过。**最新完成的原始 Native 完整登录预算仍是 H 的 Native441 / Web331，FAIL +110；G2 的正式预算待实际结果。生产验收仍为0/2。** 本 PR 继续服务 #1512，生产完成后手动关闭 issue，不以 merge 自动关闭。\n\n## 为什么补这次 Live 生命周期修复\n\nH 的正式功能检查全部成功，但完整登录预算没有通过。随后固定源诊断确认：Native 已开始业务读取时，实际 Live 连接尚未建立；后来的 ready/push catch-up 有正确的新鲜度理由，不能靠删读、扩大 proof 白名单或改变窗口消除。\n\n[CP57 诊断与因果证据](https://github.com/alexj11324/Mikka/blob/044ec440137a1e1afe5070e51b37259b0950ce09/docs/operations/evidence/1512-raw/native-read-diagnostic-results-20261110/README.md)保留原始完整窗口 Native441/Web365 FAIL、两份实际 authenticated document 的 dispatch/open/ready 顺序，以及一份缺首文档的 Web 记录；缺失没有补造。HTTP bootstrap status 早于完整 body，不能把响应头时间冒充可用的预连接起点。\n\n本轮行为：\n\n- 在**实际 bootstrap body 完整解码、原 stale-generation 校验通过后**，为实际 InstalledWorkspace 路径准备 Live；真实 provider 继续使用同一个 registry/socket 与事件历史。\n- preparation 绑定真实 SWR cache 对象和 owner 生命周期；登出、session/owner/server/selection/role 变化或 update-required 会撤销旧 authority，旧异步完成不能复活它。合法路由返回使用新的普通生命周期。\n- selected cache workspace 和唯一自有 personal home 的路由 hint 分开。home hint 来自**原 membership SELECT 的 kind/owner 投影**，保持原 selected workspace、pin、cookie 与每次 Organization policy 检查；0个或多个候选返回 null。Live ticket 仍进行当前授权。\n- 没有新增业务 SQL 语句或轮询；新增投影字节不是零成本，最终仍按原完整窗口核 SQL/bytes。原 readFresh/dispatch proof、snapshot 白名单、Native fixture、五对样本、窗口和预算均未放宽。\n- root package 将两个新 TS 文件登记到原 CI 脚本；desktop 继续使用现有 test glob 和自己的 lint 配置。无依赖或 lock 变更。\n- 合入此前已实际验证的 hosted UI 验收 adapter：正常 Coordinator New Task 入口、Personal/Cloud/Profile/模型唯一匹配及回读，一次 paid click，未知提交结果不重试；这是验收适配，没有新增产品视觉设计。\n\n## G 的实际失败与 G2 修复验证\n\n[CP58 首轮失败完整归档](https://github.com/alexj11324/Mikka/blob/dacb94026c1fab78f3fd6efb422264e1b554fd13/docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110/README.md)保留 G run42766089161/A1 的真实 FAIL：TS100/98/2，renderer54/47/7，startup39/38/1（cloud88未注册），PG3/2/1（新增12子例未开始），三个类型检查失败。26条完整原始流、完整log/JSON、静审遗漏和cleanup均保留；没有重跑相同失败源求绿。\n\nG2 是 G 的正常子提交，只改四文件：SWR 测试采用真实 ESM入口；三处 registry 类型名修正；四个 freshness 场景驱动原有100ms定时器并断言 refresh确实发生，读取期望仍1/2/2/1；PG fixture 明确断言真实23514 guard拒绝非法个人成员/kind写入。产品权限、schema与timer均不变。控制器另补 cloud test 所需的 `--import tsx`，不修改产品源码。\n\n[实际 G2 隔离验证42769641000/A1](https://github.com/alexj11324/Mikka/actions/runs/42769641000)，job129674158815，固定 Node24.22.1 / pnpm10.34.3 / PostgreSQL17.11：\n\n| 必要组 | 实际结果 |\n| --- | --- |\n| Registry / freshness | **22/22 PASS** |\n| 真实 App / LiveProvider 生命周期 | **13/13 PASS** |\n| Cloud startup | **88/88 PASS**，此次完整注册并执行 |\n| 完整 cache-scope PG | **15/15 PASS**，包括原2项、父测试和12子例 |\n| Fresh migration bootstrap | **2/2 PASS**；setup/environment bind均exit0 |\n| Root / frontend / desktop renderer types | **三个全部exit0** |\n| Root changed-source / desktop lint | **两个全部exit0** |\n\n所有实际 TAP 为0 fail/skip/todo/cancel；12个命令均exit0，无timeout/signal/spawn error。Root已读取完整冻结VERDICT，核对 **26个源码证明**、33个文件、完整tracked tree及manifest/driver哈希均一致。VERDICT blob `6174063e64d45dc30b22d039007acad977af408e`；原始TAP与24条流由唯一reader先冻结再复算，独立审查只读冻结副本。\n\n首轮另外 **157项实际已通过用例**按精确G→G2四路径差异复用：channel59、controller14、wire5、parser17、Installed3、auth-only21、validator38。逐条原始TAP行/父子节点与source注册匹配，旧registry20个PASS和App6个PASS不纳入复用。本轮123项新执行与157项历史有效通过分开归属。原UI/runtime policy exit0按四diff静审维持适用，**不是G2重新执行，也不声称整个扫描输入字节未变**。\n\n实际cleanup `515d4f2274a69f17cc8129fa51430b8768e5772c` 证明精确owned container、volume、network均删除，errors=[]。入口已普通关闭到996693，关闭run42769731455/A1实际SKIP、runner=null、steps=[]。G2验证环境已清理；现有计算仅为正常PR检查。\n\n### 旧正式 H 与验收 adapter 的来源边界\n\nH 的11个正式workflow全部SUCCESS，主CI42747213108/A1；Native功能SUCCESS仍对应完整SQL **441/331 FAIL**。第一组启动208/228通过不能替代完整登录。24records、12checkpoints、8segments、2280cells、1208连续SQL ordinals守恒，未记录/overflow/drop为0，unknown照计。\n\n[CP55](https://github.com/alexj11324/Mikka/blob/bddacb14ba6c96f57438bffbf8d542caae63fce4/docs/operations/evidence/1512-raw/formal-5f-native-budget-hosted-adapter-20261110/README.md)保留H全部正式检查、Node22、Native原件与计数；另保留 hosted adapter 的真实 RED61/54/7（原43项全通过）、GREEN browser/core **135/135**、关闭态生产控制器 **37/37**及VM清理。旧Node22/版本不匹配失败均保留。它们不构成生产验收；尚未提交两个正式生产模型案例。\n\n## 此前修复：请求内并发选择与旧 main 合流\n\nNative 上轮完整登录查询 **448 > Web 438（+10）**，需要减少重复读取并保持授权新鲜度。这次仅合并同一可信 Native request/read batch 中、**SQL 尚未派发**的完全相同 workspace-choice SELECT：\n\n- 使用实际执行器身份，并按 request、Native session、user、pin、requested workspace、principal 分区。队列项在实际读取前删除；派发后到达的调用重新查库。\n- 每个调用者取得独立行副本，继续独立执行 Organization policy、pin 和 workspace 校验。事务、savepoint、deferred work、非 Native 或失效作用域均旁路。\n- 保留 Dock/通知/Live 功能及原始测量窗口，无新增业务 SQL 或轮询。\n- 修正 PG 中两处过时的投影 matcher，使其匹配现有 `id,kind,organizationId`；原断言继续执行。\n- 与 main **cc389** 正常合流：保留 Coordinator 的 Inbox 通知和本方只读 policy observation；保留上游先判断 candidate execution 再读 bootstrap proof 的门禁，同时保留本方闭集 startup correlation。两个不同用途的 refusal allowlist 分开命名。\n- 原 canonical generator 的实际输出为 **257 routes /345 methods**。两份产物的字节数、SHA256、Git SHA 均与实际 Node 执行回执一致，全部258输入与合并树相符。\n\n## 已完成的本轮验证\n\n[隔离验证42745526739/A1](https://github.com/alexj11324/Mikka/actions/runs/42745526739)，job129596578091，Node24.22.1 /pnpm10.34.3 /PostgreSQL17；依赖只安装一次，两个 PG 阶段使用新建数据库。\n\n| 固定源与检查 | 实际结果 |\n| --- | --- |\n| M 的完整订阅门禁单测 | **33/33 PASS**，0 fail/skip/todo/cancel |\n| GREEN 的完整 Native read-batch 单测 | **30/30 PASS**，0 fail/skip/todo/cancel |\n| RED：旧产品 + 新 PG 反例 | **25 tests /22 pass/3 fail**；仅五次读取应为一次、两组授权读取应为两次两个指定叶断言及其父级失败 |\n| GREEN：修复 + 相同 PG 文件 | **25/25 PASS**，0 fail/skip/todo/cancel |\n| 撤权、移除/恢复成员、Org 变更、pin/request/session/principal、事务/savepoint、过期/延后作用域 | 新旧全部安全反例均保留；GREEN 全通过 |\n| 清理 | 自有数据库容器、匿名 volumes 和 network 实际移除，errors=[]；入口已关闭 |\n\n五个并发等价选择实际 **5→1 SELECT**；两组 parallel pair 合计的当前 membership/link observation **4→2**，各调用者的 Organization policy 仍独立。Root 已独立读取四份冻结 TAP 核对完整计数和失败叶，原日志由唯一 reader 读取并先冻结。[完整PG证据索引](https://github.com/alexj11324/Mikka/blob/3e440c2ff6808dd7c18bdedbf274373801f8583c/.github/ops/issue1512-native-pending-pg/evidence/index.json)包含20条原始stdout/stderr、前后源码绑定、数据库重建、清理和入口关闭。\n\n此前最小 VM 的订阅单测真实 exit1 仍保留：其267文件输入清单缺少第一项测试实际读取的 `.github/workflows/e2b-runtime-release.yml`。这是已证实的夹具缺项；旧完整诊断未成功保全，不能推断唯一失败原因。本轮完整 checkout 对未改动的合并后测试文件33/33通过，没有放宽产品断言。\n\n### Mac 正式门禁与诊断\n\n| 来源 | 结果与范围 |\n| --- | --- |\n| 原5852正式 Node22 | restartLocal 的 launchctl bootstrap 返回 EIO5，FAIL保留 |\n| 包装器诊断42739939984/A1 | PASS；重连命令间隔70ms，存在明显时序扰动 |\n| 进程内诊断42745131850/A1 | PASS；重连bootout0/bootstrap0，间隔0.002ms；本次未复现 |\n| 新 5f359 正式 Node22 | **正式42748069074/A1 SUCCESS**：Node22.22.1 安装/launchagent/online/reconnect 通过；Node18.20.8 正确 node_required，npm 未启动、0 enroll/register；同一 Linux package 来源绑定通过。产品 service.ts 保持原代码，临时诊断未进入产品 |\n\n第二轮诊断的 fixture finally bootout0，精确 HOME/private control 已移除；独立进程不存在仍未探测。两个临时入口都已关闭。[第二轮完整归档](https://github.com/alexj11324/Mikka/blob/2064a57803381338c159fef82a447f47615d4286/docs/operations/evidence/1512-raw/macos-inprocess-diagnostic-20261110/index.safe.json)。现有证据不足以确认原 EIO5 根因，未加入猜测性 retry 或 kickstart。新正式运行的完整37文件证据已纳入CP55；正式fixture finally没有显式bootout回执，不据此声称做过独立进程不存在探测。\n\n### 上轮完整 Native 基线\n\n原5852同后端完整登录 **Native448 /Web438，FAIL +10**；原始FIRST启动 **bundled116 /hosted224**，bundled仍有3 physical/7 logical请求跨结束边界。24 records、12 checkpoints、8 segments、2280 cells、1226 SQL ordinals全部守恒。新候选仍须按原始窗口验证完整 Native≤Web，隔离 SELECT 减少不代替实际总量。\n\n[CP53汇总与原失败](https://github.com/alexj11324/Mikka/blob/63238d8e85150dd8136830591e55bcab105c3f9a/docs/operations/evidence/1512-raw/combined-5852-validation-20261110/README.md)保留5852全部正式CI、PG/Native原件、旧任务列表一行修复的PG红绿及清理。旧5852的Source/Core/Integration/Daemon成功、PG4/DB汇总/Mac失败均归属旧源。\n\n## 问题与修改后的行为\n\n实际发布和取证暴露了几个相互关联的问题：tracked daemon fixture权限不稳定、serverless返回时仍有在途遥测未收尾、返回式工具错误未正确保留ERROR，以及Native完整窗口SQL超预算。生产验收准备还发现原模型/绑定的恢复依据只存于进程内存，失败退出后无法继续核对。原始失败和未知都保留在证据中。\n\n- **调用链收尾和错误：** root-span的waitUntil覆盖batch队列与已开始的exporter transport，Logs并行flush；响应不等待遥测。工具拒绝保留子span、ERROR与闭集code，不改变业务返回或授权。\n- **Native与SQL：** snapshot读取使用可撤销的本地发送提示等待在途读取，仍要求实际response proof、SWR commit、scope和revision；无新增timer、产品SQL或轮询。保持后台fresh policy、原子enrollment、command snapshot、runs/repos的新鲜授权与撤权回归。\n- **模型和发布关联：** 保留daemon generation、W3C carrier和metadata-only合同，复用已授权最小Codex MCP reader/producer/writer回归。E2B诊断只输出闭集关联字段，HTTP trace仅表示提交请求。\n- **安装器凭据：** 默认空的显式输入覆盖环境继承，既有16个只读调用明确opt-in、两个写权限调用匿名；保留完整性和30秒/3重定向限制。\n- **生产验收driver：** Factory read/write/cleanup固定已核Personal selector，拒绝冲突selector；有界owner-idle检查保留。只有精确HTTP404加agentProfileNotFound能判缺失，权限/未知代码/坏JSON不能被写成清理成功。\n- **恢复记录：** CLI在任何新配置修改前先持久化最小recovery.json，收到实际implicit bindingId/revision后立即保存。配置已确认而checkpoint随后失败时，仍执行原有安全清理，并阻止下一case；不削弱ownRunsStopped、ownerIdle、版本/摘要、值比较或implicit CAS。独立文件0600、fsync和atomic rename；always artifact清单只增精确文件名。\n- **费用语义：** 文档明确区分Gateway返回的逐次金额、ZeroCat按配置token价计算的估算，以及未知费用。passthrough本身不证明实际订阅扣款；没有改计费代码、历史数据或冻结查询。\n\njournal只保存经过校验的模型id/kind/modelId/provider/chosen、实际绑定版本、profile id/version/digest/enabled和闭集状态。profile定义正文、消息、凭据、cookie、label、quota均不落盘。响应丢失/SIGKILL仍可能只留下未确认intent，不能猜恢复；固定文件不是跨执行历史数据库，现有非CAS picker/fallback边界仍保留。\n\n上游Workspace身份、fresh lease、PAT/跨tenant和迁移保护完整保留。移动端设计仅保留原UI owner的固定源码与原截图审阅；没有新增本方UI设计。\n\n\n## 已有受控失败与开销证据\n\n实际源1d126/run42552094175的故意失败已在隔离环境完成：**20完整traces/80spans/40ERROR**，两轮后端快照稳定，17条最初未被head采样选中，实际error_or_slow保留。原runner backendObserved=false保留，后端证明另列。\n\n历史Web HTTP/PG内存exporter测量：每条件600次、各100次预热、20请求一组交替，mean **+0.344583ms**、p95 **+0.436580ms**。它不是逐请求随机配对，也不是当前生产OTLP网络或全daemon成本。此前CP43依赖审查与serverless=false范围保留；已新增的serverless在途exporter drain不被该probe覆盖，现有waitUntil反例测试覆盖该分支。已独立核对5852→M→GREEN的20个probe源依赖、整份lock/workspace/tsconfig不变；package只改5个测试脚本，历史有限基准仍保留原归属。新Native队列不在该probe调用图，未把旧基准改标为当前Native或生产实测。\n\n## 剩余正式步骤\n\n1. 对正式G2完成适用CI与原始Native完整登录预算验收；旧H441/331 FAIL及已通过检查保留原来源。若新候选仍超预算，按实际原因继续修正。通过后fresh核main和实际共享发布窗口，正常merge本PR；已有部署在跑时等其完成，不force、不rebase。\n2. 确认实际Web READY/公开version及包含所需改动的有效runtime。App SHA、worker fingerprint与daemon来源分别记录；不要求它们SHA相同。skipped release不能当作新runtime发布成功。\n3. 用issue指定ACME账号的Personal真实UI完成 **Claude Haiku5.5** 和 **GPT6 Luna** 官方订阅两个案例。每例实际提交一次；先读取该例完整report/recovery/browser receipt并确认清理，再执行下一例。\n4. 用真实run/thread/task与session查询完整trace、每次generation、Logs、父子关系和阶段耗时。固定14查询保留全部分页并取得两轮稳定快照；集合对账不代替链路语义。\n5. 取得并实际查看PostHog原生PNG像素，核实际Replay播放或Replay-derived Vision画面与时间点，补全运行时间线。ID、HTTP200、摘要成功本身不算画面核验。\n6. 保存实际用量、费用边界、APM/AI scouts和所有清理回执；生产验收通过后**手动关闭#1512**。本PR不自动关闭issue。\n\n## 可观测性用量与费用\n\n2026-11-09 19:19–19:24 UTC原只读账期产品视图：Logs **492MB**、AI **1222events**、Web Replay **22recordings**；额度分别10000MB/100000events/5000recordings。另一usage_summary口径为373/857/16，不混加或强行相等；日级精确scope返回[]不当作0。金额/主单价字段为null，实际美元费用仍UNKNOWN。Vision原quota0/2500credits、signals0/4500；不是已执行本issue正式案例的证明。\n\nAPM/AI两个scout enabled/active/emit=true，1440分钟，Inbox开启，无Slack/Webhook，连续失败0；当时今日2/100次。last_run_at 06:30/07:30早于本次验收准备，不声称已检查尚未发生的正式案例。\n\n| 已核公开价格 | 免费月额度 | 第一付费档 | 边界 |\n| --- | ---: | ---: | --- |\n| Logs摄入 | 10GB | $0.25/GB（300GB以上$0.15） | 默认14天；自定义保留另计$0.05/GB-month |\n| AI Observability | 100000events | $0.000350/event | 所有$ai_事件按AI计费，不重复Product Analytics |\n| Web Replay | 5000recordings | $0.005/recording | 不假定一个run必等于一条录制 |\n| Replay Vision，Gemini 3 Flash | 以实际组织quota为准 | 成功observation5credits，每credit$0.01 | 两个成功且实际model匹配时，名义10credits/$0.10；未扣免费额度，不是实际账单 |\n\n来源：[Logs](https://posthog.com/docs/logs/pricing)、[AI](https://posthog.com/ai-observability/pricing)、[Replay](https://posthog.com/session-replay/pricing)、[当前MCP确认的Vision](https://posthog.com/docs/replay-vision/quota-and-limits)、[AI事件类别](https://posthog.com/docs/ai-observability/basics#the-ai_-prefix)。CP45保留只读价格准备及随后MCP对Vision单位价格的局部补充。\n\n**APM独立数值单价/计量映射、Scout每调用金额尚未证实，保持UNKNOWN；旧正文“Logs/Tracing共享同一档价”的断言不沿用。** OTLP压缩字节、JSON字节、span个数均不能替代billable MB；不把候选公开价当合同价格，也不把null当$0。\n\n容量场景明确采用假设：旧73MB traces/day在流量/每条大小不变时为2.19GB/月；若其中10%的既有流量由10%采样变全量，再假设100runs/day×每run25spans+10logs×每条1KB，则约4.27GB/月。若全部原流量全量为21.9GB/月、未含新增。这是体积场景，**不绑定未证实的APM价格**。100runs/day×5generations为15000generation events/月，额外$ai_事件另计；另设100新增Web recordings/day才为3000/月。\n\n取得实际本issue用量后按每产品分段价计算增量 **F(B+x)−F(B)**。已知公开摄入项的保守上界为 **0.25×Logs_MB/1000 +0.000350×AI_events +0.005×Web_recordings**，再单列实际Vision credits×0.01；APM、Scout、自定义保留、税/特殊合同价不在此式中。免费额度为组织共享，不为本issue预留。PostHog费与模型费分开；$ai_total_cost_usd或API单价估算不冒充Claude/Codex官方订阅逐次账单。\n\n## 合并风险\n\n**Merge risk: medium（中等）。目前不合并：G2必要隔离验证已通过，最新正式CI和Native完整预算仍在进行；生产0/2。**\n\n- **目标一致性：** 依据实际dispatch/open/ready诊断补齐可信bootstrap后的Live准备，减少生命周期造成的重复读取机会；不修改#1512的采样、隐私、完整预算和生产验收合同。\n- **影响：** Native初始化、SWR cache身份与权限生命周期敏感。精确cache/owner绑定、stale generation、当前Live ticket、每次Organization policy与撤权检查保留；home仅为路由hint，不成为持久授权缓存。\n- **验证：** G实际失败及静审遗漏完整保留，G2以4文件修复后实际123单测、15PG、2migration、3type与2lint通过；另157不变用例依原始证据复用。正式CI、原窗口Native总量及真实PostHog关联仍分别验收，不能互相代替。\n- **回滚：** 通过正常revert PR回退；本方无schema迁移。验收设置恢复仍要求owner-idle、版本/值比较、implicit CAS与真实回执；未知ACK不能猜恢复。\n- **发现错误：** 新鲜度测试明确驱动原100ms刷新、真实App生命周期和PG约束反例检测失效边界；全量source proof防止测源错位。正式Native报告核完整SQL/bytes，最后以真实trace/AI/Logs/Replay及截图确认生产行为。\n"
+  },
+  "issue": {
+    "number": 1512,
+    "url": "https://github.com/alexj11324/Mikka/issues/1512",
+    "updatedAt": "2026-11-10T06:38:44Z",
+    "state": "open",
+    "body": "## 为什么做\n\n2026-11-06 一天里排查了好几个问题：回复慢 75 秒、停止无效、云电脑启动 72 秒、短标题失败、模型路由「不确定」。每一个都只能靠写 SQL 查生产库、一段段翻 Vercel 日志（超过 3 小时的范围就超时）、读代码去猜，非常慢。原因是现有的可观测性（#1324）只为一个问题而建：查清数据库流量的去向。它覆盖不到链路、延迟和客户端。\n\nAlex 的判断：PostHog 本身够用，问题是我们没按它的最佳实践来做。目标是**排查任何问题，拿线程或运行的编号查一次就能看到完整时间线和原因**。\n\n## 现状\n\n- 网页（service `mikka-web`）有 OpenTelemetry span 进 PostHog（`posthog.trace_spans`），属性有 `mikka.route`、`mikka.db.response_bytes_approx`、`mikka.db.statement_id`。**head 采样 10%**，具体某一次运行经常没被采到。说明见 `docs/operations/tracing.md`。\n- 后台 workflow（Coordinator turn、派发）的耗时只在 Vercel 日志里，是 `turn_timing`、`model_call_timing`、`default_model_route` 这类 JSON 行，没有进调用链。\n- daemon 和云电脑只有很粗的 span，比如 `daemon.adapter.start` 只有一个总时长。云电脑上 bootstrap 各阶段只写进机器本地的 `/home/user/.mikka/thread-bootstrap.log`，机器回收后就没了。\n- 网页、workflow、daemon、E2B 之间**没有传 W3C `traceparent`**，每段各成一条 trace，串不起来。\n- 模型调用没接 PostHog AI Observability，token、缓存命中、首 token、成本都看不到。\n- 前端没开 posthog-js 的 `tracing_headers`，调用链没有关联到用户和 Session Replay。浏览器里 live 推送有没有收到、为什么跳过，完全没有记录。\n- 部分错误日志不带原因，比如曾经的「Short title failed Error」。\n\n## 要做的（按 PostHog 官方做法）\n\nPostHog 的 MCP 里有对应的 skill：`posthog:instrument-tracing`、`posthog:instrument-llm-analytics`、`posthog:exploring-apm-traces`、`posthog:exploring-llm-traces`。先读这几个，按它们的做法来。\n\n1. **一条运行一条 trace。** 在网页 → workflow（Coordinator turn、`dispatch_run`）→ `ensureThreadMachine` → E2B 建机 → bootstrap 各阶段 → daemon 注册 → 准备仓库 → 启动 agent → 首次模型调用 → 完成、交付、Factory 各阶段之间全程传 `traceparent`。daemon 和云电脑上的进程用 OTLP HTTP 直接导出到 PostHog（`/i/v1/traces`）。span 名字保持低基数，`run_id`、`thread_id`、`task_id`、`workflow_run_id` 放进属性。\n2. **关键路径全量保留。** 派发、运行、Coordinator turn、出错的和慢的请求一律 100% 保留，其余流量维持抽样。做法可以选 parent-based 采样加关键入口强制采样，或者 tail 策略，自己判断。在 PR 里估算 PostHog 用量和费用。\n3. **模型调用接入 AI Observability。** Coordinator、bot、Decision 和 Agent 运行的每次生成都上报模型、耗时、首 token、输入/输出/缓存读写 token 和成本，挂到对应的 trace 上。路由的 tier、effort 的 score 和 confidence，ZeroCat 和 Gateway 的路由与回退原因，都作为属性上报。\n4. **前端关联。** posthog-js 对 API host 开启 `tracing_headers`，让 span 带上 `posthogDistinctId` 和 `sessionId`，并和 Session Replay 关联。在浏览器端记录 live 推送的关键事件：socket 状态，收到、跳过、读取了哪些 key。不记内容。\n5. **日志进 PostHog Logs 并带上 trace_id。** 至少覆盖 workflow 和 daemon 的结构化日志。所有错误日志都带上原因链（name/code），遵守 `scripts/error-cause-policy.mjs`。\n6. **开启 PostHog 的 APM 和 AI Observability 自动巡检**（signals scout），延迟和错误率回退时提醒。\n7. **做一个「运行时间线」入口**：PostHog 里的 saved insight 或 notebook，输入 run、thread 或 task 编号，就能看到完整的阶段耗时和错误。把用法写进 `docs/operations/tracing.md`，替换旧文档里过时的部分。\n\n## 和其他进行中工作的关系\n\n#1505（云电脑启动，PR #1508 已经加了一部分子 span）、#1506（首字延迟，PR #1500 加了 prompt 前缀 hash）、#1503（Factory 交付）都会动到相关代码。本 issue 负责**统一的框架和规范**：tracer 初始化、上下文传递、采样、命名规范、AI Observability 接入。其他 issue 新加的 span 都按这里的规范来。如果合并时有冲突，用 merge commit 解决，不要互相覆盖。\n\n## 约束\n\n- **效率第一（Alex 原则）。** 观测不能拖慢产品：导出全部异步、批量，不阻塞请求和 Agent；serverless 函数结束前要 `forceFlush`，但不能增加用户可感知的延迟。用实测证明额外开销不超过几毫秒。\n- span 属性和日志里不放 token、密码、密钥，也不放用户消息内容（AI Observability 是否记录 prompt 和回复，默认关闭，只记数字）。\n- 不增加数据库流量，不加定时轮询。\n\n## 验收\n\n- [ ] 用 Alex 的账号（Infisical `prod:/` 的 `ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD`，不要打印）在生产上从 Coordinator 发一条消息并派一个任务。PostHog 里**同一条 trace** 能看到从发送到 agent 首次模型调用的每一段耗时，包括 daemon 和云电脑。截图附在 PR 里。\n- [ ] 这次的每次模型调用都出现在 AI Observability 里，带 token、缓存读写、首 token、成本，并且关联到这条 trace。\n- [ ] 能从这条 trace 跳到对应的 Session Replay 和日志。\n- [ ] 故意制造一次失败（比如测试环境里让某一步报错），错误 span 带原因，并且 100% 被保留。\n- [ ] 「运行时间线」入口可用，`docs/operations/tracing.md` 写清楚怎么用。\n- [ ] 自动巡检已经开启。\n- [ ] 实测观测带来的额外延迟，写进 PR。\n\n## 权限与规则（Alex，2026-11-05）\n\n- **你拥有完成本 issue 需要的全部权限**：机器、合并、生产部署、PostHog/Vercel/Neon/E2B/Infisical 的设置和数据、凭证和测试账号、付费资源，都由你自己决定。\n- **遇到任何阻碍都自己解决**，不要停下来等确认。**唯一的限制：目标没达成不许停。**\n- **节省：** 用多少开多少，用完就停，同一个测试不要无故反复跑。\n- 自己合并（合并前先 fetch main，main 上有部署在跑就等它跑完）。不 rebase，不 force push。凭证不进 GitHub、PR 或日志。\n- 前端界面如果需要改（不是指埋点本身），在 PR 里写明，由 Claude session 改。\n- 进度和结果写在本 issue 或 PR 里。生产验收通过后关闭本 issue。"
+  },
+  "compare": {
+    "base": "ab2d00a43a79d35380b4d2db9014a3792fea63ca",
+    "head": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "status": "ahead",
+    "aheadBy": 41,
+    "behindBy": 0,
+    "totalCommits": 41,
+    "mergeBase": "ab2d00a43a79d35380b4d2db9014a3792fea63ca",
+    "files": [
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 0
+      },
+      {
+        "path": "app/actions/coordinator.ts",
+        "sha": "23179358e0af9db78d084973ecc197f0fb749e91",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 2
+      },
+      {
+        "path": "app/actions/task-runs.ts",
+        "sha": "e2c0a834f2a4ef8cb10c836302f0929f02db6051",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "sha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+        "status": "modified",
+        "additions": 9,
+        "deletions": 6
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "sha": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+        "status": "modified",
+        "additions": 9,
+        "deletions": 12
+      },
+      {
+        "path": "apps/api/generated/routes.json",
+        "sha": "2e2fcf11f0e325c53ddc02c6c8dd0fce8a15e2f0",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 2
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "sha": "2bc6deb677517bbf947a6fc05200b4437c6c89b3",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 2
+      },
+      {
+        "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+        "sha": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+        "status": "modified",
+        "additions": 49,
+        "deletions": 0
+      },
+      {
+        "path": "apps/desktop/scripts/workspace-live.test.mjs",
+        "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+        "status": "added",
+        "additions": 308,
+        "deletions": 0
+      },
+      {
+        "path": "apps/desktop/src/renderer/app.tsx",
+        "sha": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+        "status": "modified",
+        "additions": 33,
+        "deletions": 11
+      },
+      {
+        "path": "apps/desktop/src/renderer/bootstrap.ts",
+        "sha": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 2
+      },
+      {
+        "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+        "sha": "ddeb2420392a0abb233bc3742cd539805424bc13",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "sha": "e7f6972a23519ae45e059038cd0c404789d44a98",
+        "status": "modified",
+        "additions": 11,
+        "deletions": 5
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "sha": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 2
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+        "sha": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+        "status": "added",
+        "additions": 129,
+        "deletions": 0
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.ts",
+        "sha": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+        "status": "added",
+        "additions": 45,
+        "deletions": 0
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace.tsx",
+        "sha": "25891b5f8d7dc7a5d6b3cd4688789898052855fd",
+        "status": "modified",
+        "additions": 5,
+        "deletions": 4
+      },
+      {
+        "path": "components/swr-defaults.tsx",
+        "sha": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+        "status": "modified",
+        "additions": 4,
+        "deletions": 3
+      },
+      {
+        "path": "components/workspace/issue-workspace.tsx",
+        "sha": "7f99022a11eae296502e353d58fe75a0d0d53137",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 2
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "sha": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+        "status": "modified",
+        "additions": 57,
+        "deletions": 8
+      },
+      {
+        "path": "hooks/use-live-key.tsx",
+        "sha": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 5
+      },
+      {
+        "path": "hooks/use-live-lists.ts",
+        "sha": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 6
+      },
+      {
+        "path": "hooks/use-subagent-updates.ts",
+        "sha": "dd831e0e657d00de9210e39194a926b4e977ec56",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 3
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "sha": "9109982d1c3245179b85a42d6969003aec2f5047",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1
+      },
+      {
+        "path": "lib/analytics-policy.ts",
+        "sha": "152b941ff7b05004a7c57a909f776c6268ede106",
+        "status": "modified",
+        "additions": 5,
+        "deletions": 4
+      },
+      {
+        "path": "lib/coordinator/coordinator-bot.ts",
+        "sha": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+        "status": "modified",
+        "additions": 38,
+        "deletions": 3
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.test.ts",
+        "sha": "a5157f09e8022bf9077053686d36aa02760a4e94",
+        "status": "modified",
+        "additions": 82,
+        "deletions": 0
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.ts",
+        "sha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 2
+      },
+      {
+        "path": "lib/desktop-rpc/bootstrap.ts",
+        "sha": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+        "status": "modified",
+        "additions": 4,
+        "deletions": 4
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "sha": "69b2d9707493b5aa3c6f841099421ba8fe8f2a1d",
+        "status": "modified",
+        "additions": 303,
+        "deletions": 0
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "sha": "ed6d0490005919a412decd65271e879fc9c58c60",
+        "status": "modified",
+        "additions": 55,
+        "deletions": 7
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "sha": "a40f946620ec874320586cb12ddb90c4b2fc438d",
+        "status": "modified",
+        "additions": 13,
+        "deletions": 0
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "sha": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0
+      },
+      {
+        "path": "lib/desktop-rpc/workspace-choices.ts",
+        "sha": "f3480c04c9f81b0f963a9fd8ecc6e29a668cf0c0",
+        "status": "added",
+        "additions": 97,
+        "deletions": 0
+      },
+      {
+        "path": "lib/device-enrollment.db.test.ts",
+        "sha": "e160aff553928010fcbd9decc0c46b5bed75f2b3",
+        "status": "modified",
+        "additions": 53,
+        "deletions": 0
+      },
+      {
+        "path": "lib/device-enrollment.ts",
+        "sha": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 11
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "sha": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+        "status": "modified",
+        "additions": 73,
+        "deletions": 0
+      },
+      {
+        "path": "lib/device-management.ts",
+        "sha": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+        "status": "modified",
+        "additions": 9,
+        "deletions": 0
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "sha": "7cef8e313ace1807a6fb266ce55d1e978420c221",
+        "status": "modified",
+        "additions": 13,
+        "deletions": 6
+      },
+      {
+        "path": "lib/dispatch-timing.ts",
+        "sha": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+        "status": "modified",
+        "additions": 25,
+        "deletions": 3
+      },
+      {
+        "path": "lib/live/channel.ts",
+        "sha": "61cdf48b28ab9260f5567300f2411cb555b13427",
+        "status": "modified",
+        "additions": 23,
+        "deletions": 6
+      },
+      {
+        "path": "lib/live/channels.test.ts",
+        "sha": "c9059d2c8be5122681f5c4657889b01633ed3736",
+        "status": "added",
+        "additions": 406,
+        "deletions": 0
+      },
+      {
+        "path": "lib/live/channels.ts",
+        "sha": "c40864fe9386855994d3a4ece9480639514d85aa",
+        "status": "modified",
+        "additions": 45,
+        "deletions": 11
+      },
+      {
+        "path": "lib/live/preparation.ts",
+        "sha": "7377678b777279de0ab21717749743fcce446d73",
+        "status": "added",
+        "additions": 135,
+        "deletions": 0
+      },
+      {
+        "path": "lib/live/revision-read.ts",
+        "sha": "266aa82ba4a683e88d207bc197fd97cee1f2b1ae",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 2
+      },
+      {
+        "path": "lib/personal-policy.test.ts",
+        "sha": "04c5ed8d4a2f724b6999609dbb9732c53c10ced1",
+        "status": "modified",
+        "additions": 356,
+        "deletions": 2
+      },
+      {
+        "path": "lib/personal-policy.ts",
+        "sha": "0c938df220721879bf2e41f5ac77909c36dd3feb",
+        "status": "modified",
+        "additions": 5,
+        "deletions": 2
+      },
+      {
+        "path": "lib/replay-readiness.ts",
+        "sha": "d60598b09201228e23c5ac7a9df00938192f0e67",
+        "status": "modified",
+        "additions": 12,
+        "deletions": 0
+      },
+      {
+        "path": "lib/swr/cache-scope.ts",
+        "sha": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+        "status": "modified",
+        "additions": 35,
+        "deletions": 11
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "sha": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "status": "modified",
+        "additions": 65,
+        "deletions": 6
+      },
+      {
+        "path": "lib/tracing/logs.test.ts",
+        "sha": "737fa373e4a8333a4a703bf6133f9a533d585460",
+        "status": "modified",
+        "additions": 135,
+        "deletions": 2
+      },
+      {
+        "path": "lib/tracing/node.ts",
+        "sha": "00775a5928228262a66b12b845ee0dc18f6c6047",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 1
+      },
+      {
+        "path": "lib/workspace-access.ts",
+        "sha": "55e1ae30e46ee6f1a861c507e25efeffb26552f8",
+        "status": "modified",
+        "additions": 23,
+        "deletions": 9
+      },
+      {
+        "path": "package.json",
+        "sha": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "sha": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+        "status": "modified",
+        "additions": 84,
+        "deletions": 17
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "sha": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+        "status": "modified",
+        "additions": 209,
+        "deletions": 5
+      },
+      {
+        "path": "scripts/acceptance/run-observability.md",
+        "sha": "4ca2cf35c1f499b338469556836ae0505649e82a",
+        "status": "modified",
+        "additions": 12,
+        "deletions": 2
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "sha": "104075571c73b97a985458f206dba310e4894490",
+        "status": "modified",
+        "additions": 180,
+        "deletions": 21
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+        "status": "modified",
+        "additions": 649,
+        "deletions": 4
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.mjs",
+        "sha": "f8561bbc3ce02dd53f4ac7ae487bbb8a70da0d3f",
+        "status": "modified",
+        "additions": 31,
+        "deletions": 0
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "sha": "06dceefec477df850087b47002266e612dddb63a",
+        "status": "modified",
+        "additions": 137,
+        "deletions": 0
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "sha": "30ef728a5a2d465d389916a63d40a816d13b1d4c",
+        "status": "modified",
+        "additions": 486,
+        "deletions": 0
+      },
+      {
+        "path": "tests/action-read-egress.db.test.ts",
+        "sha": "69e13d4fc18e00b49bbe1cef0cc97ec8c057eec0",
+        "status": "modified",
+        "additions": 366,
+        "deletions": 0
+      },
+      {
+        "path": "tests/analytics-policy.test.mjs",
+        "sha": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+        "status": "modified",
+        "additions": 23,
+        "deletions": 0
+      },
+      {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "sha": "609029dde521868c00ab7eb687394ad5cacd6183",
+        "status": "modified",
+        "additions": 55,
+        "deletions": 4
+      },
+      {
+        "path": "tests/coordinator-bot.db.test.ts",
+        "sha": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+        "status": "modified",
+        "additions": 316,
+        "deletions": 0
+      },
+      {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "sha": "d996a7428d1aba0ebc4dfc605b0a2d6fe3cde7f9",
+        "status": "modified",
+        "additions": 40,
+        "deletions": 0
+      },
+      {
+        "path": "tests/read-cache-scope.db.test.ts",
+        "sha": "ee59feba1e29769805806ec6e166abbc65994233",
+        "status": "modified",
+        "additions": 165,
+        "deletions": 0
+      },
+      {
+        "path": "tests/replay-readiness.test.mjs",
+        "sha": "58e4706039dafe6901082676f37a3c92da613d43",
+        "status": "modified",
+        "additions": 21,
+        "deletions": 3
+      },
+      {
+        "path": "workflows/coordinator/factory-steps.ts",
+        "sha": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "sha": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1
+      }
+    ],
+    "packagePatch": "@@ -208,7 +208,7 @@\n     \"test:subscription-usability\": \"node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/coordinator/bot-model-picker.test.tsx components/coordinator/task-profile-picker.test.tsx components/coordinator/task-profile-submit.test.tsx components/coordinator/retry-reply-button.test.tsx components/coordinator/subscription-recovery.test.tsx components/workspace/thread-quota.test.tsx components/settings/model-order-settings.test.tsx components/settings/subscription-settings.test.tsx components/settings/payment-privacy-read-states.test.tsx lib/cloud-dispatch-failure.test.ts lib/new-task-placement.test.ts lib/run-credential-source.test.ts lib/subscription-quota.test.ts components/plugins/plugins-view.test.tsx components/plugins/mcp-connections.test.tsx components/plugins/github-settings.test.tsx\",\n     \"test:factory-all-dispatch-db\": \"node --experimental-test-module-mocks --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/factory-all-dispatch.db.test.ts\",\n     \"test:view-state\": \"node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/hooks/view-state.test.tsx components/nav/thread-view-state.test.tsx components/workspace/issue-workspace-settings.test.tsx components/workspace/board-view-state.test.tsx hooks/use-resizable-width.test.tsx\",\n-    \"test:device-gateway\": \"node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/device-presence.test.ts lib/device-gateway-notify.test.ts lib/live/ticket.test.ts lib/mobile-threads-presence.test.ts && node --import tsx --test lib/device-gateway-ticket.test.ts lib/builtin-gateway/gateway.test.ts lib/builtin-gateway/session-revocation.test.ts lib/live/session-ticket.test.ts lib/builtin-gateway/presence.test.ts lib/builtin-gateway/postgres-lease.test.ts lib/builtin-gateway/postgres-cancel.test.ts lib/builtin-gateway/scheduler.test.ts lib/device-presence-grant.test.ts lib/live/presence-read.test.ts lib/live/scope.test.ts lib/live/home-scope-proof.test.ts lib/live/channel.test.ts lib/live/stream-batch.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/route.test.ts cloudflare/device-gateway/src/live-route.test.ts && node --test cloudflare/device-gateway/test/presence.test.mjs cloudflare/device-gateway/test/runtime.test.mjs\",\n+    \"test:device-gateway\": \"node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/device-presence.test.ts lib/device-gateway-notify.test.ts lib/live/ticket.test.ts lib/mobile-threads-presence.test.ts && node --import tsx --test lib/device-gateway-ticket.test.ts lib/builtin-gateway/gateway.test.ts lib/builtin-gateway/session-revocation.test.ts lib/live/session-ticket.test.ts lib/builtin-gateway/presence.test.ts lib/builtin-gateway/postgres-lease.test.ts lib/builtin-gateway/postgres-cancel.test.ts lib/builtin-gateway/scheduler.test.ts lib/device-presence-grant.test.ts lib/live/presence-read.test.ts lib/live/scope.test.ts lib/live/home-scope-proof.test.ts lib/live/channel.test.ts lib/live/channels.test.ts apps/desktop/src/renderer/workspace-live.test.ts lib/live/stream-batch.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/route.test.ts cloudflare/device-gateway/src/live-route.test.ts && node --test cloudflare/device-gateway/test/presence.test.mjs cloudflare/device-gateway/test/runtime.test.mjs\",\n     \"test:live-lists\": \"node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-lists.live.test.tsx scripts/desktop-notification-lifetime.live.test.tsx tests/desktop-notifications.test.ts\",\n     \"test:live-db\": \"node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/computer/event-session.db.test.ts lib/live/ticket-session.db.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/factory.db.test.ts lib/live/store.db.test.ts lib/live/panels.db.test.ts lib/db/request-scope-live.db.test.ts lib/short-title-schedule.db.test.ts lib/live/notification-context.db.test.ts lib/live/computer-state.db.test.ts lib/live/approved-writes.db.test.ts lib/live/pending-actions.db.test.ts lib/live/lists.db.test.ts lib/mcp/reply-live.db.test.ts lib/mcp/reply-notifications.db.test.ts lib/db/listen.db.test.ts lib/live/chats.db.test.ts lib/live/chat-preferences.db.test.ts lib/live/groups.db.test.ts lib/live/issue-threads.db.test.ts lib/live/issue-detail.db.test.ts lib/live/devices.db.test.ts lib/live/artifacts.db.test.ts lib/live/billing.db.test.ts lib/live/pull-requests.db.test.ts lib/computer/event-log.db.test.ts lib/computer/event-writers.db.test.ts lib/computer/event-broker.db.test.ts lib/live/project-map.db.test.ts lib/builtin-gateway/postgres.db.test.ts lib/builtin-gateway/session-revocation.db.test.ts\",\n     \"test:project-decisions-db\": \"node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/project-map/decisions.db.test.ts lib/project-map/http.db.test.ts lib/project-map/sources.db.test.ts lib/project-map/read.db.test.ts lib/secrets/project-map-mask.db.test.ts\","
+  }
+}

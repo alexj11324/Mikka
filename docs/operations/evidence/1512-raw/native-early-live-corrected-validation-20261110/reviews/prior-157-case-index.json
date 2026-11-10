@@ -1,0 +1,1857 @@
+{
+  "schema": "issue1512-g2-reused-actual-tests-case-index/v1",
+  "firstRun": 42766089161,
+  "firstAttempt": 1,
+  "firstG": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+  "candidateG2": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+  "totalReusedActualPass": 157,
+  "method": "Parse complete frozen TAP as an indentation-scoped parent/child tree. Match each exact source top-level test name, expanding only previously source-bound literal loops. Count actual parent and child ok results; reject duplicate names, missing/unclosed nodes, failures and directives. Match all seven identical G/G2 test blobs; reconcile selected and excluded original outcomes.",
+  "files": [
+    {
+      "path": "lib/live/channel.test.ts",
+      "blob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+      "group": "live-routing-ts",
+      "expectedFromSource": 59,
+      "actualPassed": 59,
+      "topLevelPassed": 59,
+      "nestedPassed": 0,
+      "originalTapBlob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+      "tests": [
+        {
+          "sourceRegistrationLine": 78,
+          "name": "presence support alone retains fallback; only the exact acknowledged watch makes idle reads stop",
+          "parent": null,
+          "status": "pass",
+          "number": 20,
+          "startLine": 116,
+          "resultLine": 117,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 97,
+          "name": "old Workers, missing and oversized proofs preserve the existing minute fallback",
+          "parent": null,
+          "status": "pass",
+          "number": 21,
+          "startLine": 122,
+          "resultLine": 123,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 112,
+          "name": "unknown, expired or overlong acknowledgements and explicit rejection cannot claim coverage",
+          "parent": null,
+          "status": "pass",
+          "number": 22,
+          "startLine": 128,
+          "resultLine": 129,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 134,
+          "name": "watch expiry does not fetch or renew a ticket; it resumes the existing slow fallback",
+          "parent": null,
+          "status": "pass",
+          "number": 23,
+          "startLine": 134,
+          "resultLine": 135,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 151,
+          "name": "duplicate subscriptions refcount one watch and the last exit unregisters while other live keys stay open",
+          "parent": null,
+          "status": "pass",
+          "number": 24,
+          "startLine": 140,
+          "resultLine": 141,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 168,
+          "name": "changing the proof replaces only its watch, ignores stale acknowledgements and makes no data read",
+          "parent": null,
+          "status": "pass",
+          "number": 25,
+          "startLine": 146,
+          "resultLine": 147,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 187,
+          "name": "hidden, disconnected and replaced sockets lose watch coverage and cannot accept a late old acknowledgement",
+          "parent": null,
+          "status": "pass",
+          "number": 26,
+          "startLine": 152,
+          "resultLine": 153,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 209,
+          "name": "watch bounds keep only uncovered keys on fallback and a freed slot admits the remaining subscription",
+          "parent": null,
+          "status": "pass",
+          "number": 27,
+          "startLine": 158,
+          "resultLine": 159,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 228,
+          "name": "duplicate badges share a connection and one revalidation per SWR key",
+          "parent": null,
+          "status": "pass",
+          "number": 28,
+          "startLine": 164,
+          "resultLine": 165,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 243,
+          "name": "a supported late subscription uses the continuous ready boundary instead of its registration time",
+          "parent": null,
+          "status": "pass",
+          "number": 29,
+          "startLine": 170,
+          "resultLine": 171,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 256,
+          "name": "a late read keeps exact coverage after other-kind",
+          "parent": null,
+          "status": "pass",
+          "number": 30,
+          "startLine": 176,
+          "resultLine": 177,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 256,
+          "name": "a late read keeps exact coverage after own-kind",
+          "parent": null,
+          "status": "pass",
+          "number": 31,
+          "startLine": 182,
+          "resultLine": 183,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 256,
+          "name": "a late read keeps exact coverage after reconnect",
+          "parent": null,
+          "status": "pass",
+          "number": 32,
+          "startLine": 188,
+          "resultLine": 189,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 256,
+          "name": "a late read keeps exact coverage after before-open",
+          "parent": null,
+          "status": "pass",
+          "number": 33,
+          "startLine": 194,
+          "resultLine": 195,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 291,
+          "name": "a late subscription without capabilities coverage retains its new read boundary",
+          "parent": null,
+          "status": "pass",
+          "number": 34,
+          "startLine": 200,
+          "resultLine": 201,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 291,
+          "name": "a late subscription without kind coverage retains its new read boundary",
+          "parent": null,
+          "status": "pass",
+          "number": 35,
+          "startLine": 206,
+          "resultLine": 207,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 291,
+          "name": "a late subscription without presence coverage retains its new read boundary",
+          "parent": null,
+          "status": "pass",
+          "number": 36,
+          "startLine": 212,
+          "resultLine": 213,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 305,
+          "name": "a unversioned event for an unsubscribed key advances continuous coverage",
+          "parent": null,
+          "status": "pass",
+          "number": 37,
+          "startLine": 218,
+          "resultLine": 219,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 305,
+          "name": "a versioned event for an unsubscribed key advances continuous coverage",
+          "parent": null,
+          "status": "pass",
+          "number": 38,
+          "startLine": 224,
+          "resultLine": 225,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 319,
+          "name": "a late subscription cannot replace a newer pending deadline boundary with older continuous coverage",
+          "parent": null,
+          "status": "pass",
+          "number": 39,
+          "startLine": 230,
+          "resultLine": 231,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 333,
+          "name": "live observations describe received, skipped and read keys without changing reads",
+          "parent": null,
+          "status": "pass",
+          "number": 40,
+          "startLine": 236,
+          "resultLine": 237,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 352,
+          "name": "online idle channels send pings and perform no polling reads",
+          "parent": null,
+          "status": "pass",
+          "number": 41,
+          "startLine": 242,
+          "resultLine": 243,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 362,
+          "name": "focus coverage follows this key, live capabilities and disconnects",
+          "parent": null,
+          "status": "pass",
+          "number": 42,
+          "startLine": 248,
+          "resultLine": 249,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 376,
+          "name": "duplicate visible events skip healthy live reads while a real hidden interval still catches up",
+          "parent": null,
+          "status": "pass",
+          "number": 43,
+          "startLine": 254,
+          "resultLine": 255,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 386,
+          "name": "unsupported live kinds keep visibility catch-up even while their socket is connected",
+          "parent": null,
+          "status": "pass",
+          "number": 44,
+          "startLine": 260,
+          "resultLine": 261,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 395,
+          "name": "offline fallback waits at least 60 seconds; hidden tabs make no requests",
+          "parent": null,
+          "status": "pass",
+          "number": 45,
+          "startLine": 266,
+          "resultLine": 267,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 411,
+          "name": "a reconnect reconciles missed changes immediately and resets the offline fallback",
+          "parent": null,
+          "status": "pass",
+          "number": 46,
+          "startLine": 272,
+          "resultLine": 273,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 423,
+          "name": "unknown ids, kinds and payload fields cannot trigger revalidation",
+          "parent": null,
+          "status": "pass",
+          "number": 47,
+          "startLine": 278,
+          "resultLine": 279,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 432,
+          "name": "workspace teardown aborts a pending ticket and discards late events",
+          "parent": null,
+          "status": "pass",
+          "number": 48,
+          "startLine": 284,
+          "resultLine": 285,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 443,
+          "name": "ticket renewal reauthenticates and catches up without keeping an expired subscription",
+          "parent": null,
+          "status": "pass",
+          "number": 49,
+          "startLine": 290,
+          "resultLine": 291,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 453,
+          "name": "a late ticket cannot open a socket after the tab becomes hidden",
+          "parent": null,
+          "status": "pass",
+          "number": 50,
+          "startLine": 296,
+          "resultLine": 297,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 466,
+          "name": "a half-open socket becomes offline when pongs stop",
+          "parent": null,
+          "status": "pass",
+          "number": 51,
+          "startLine": 302,
+          "resultLine": 303,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 476,
+          "name": "a healthy socket catches a lost invalidation at the full ticket lifetime",
+          "parent": null,
+          "status": "pass",
+          "number": 52,
+          "startLine": 308,
+          "resultLine": 309,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 498,
+          "name": "a hung renewal still reconciles a lost invalidation after one offline fallback interval",
+          "parent": null,
+          "status": "pass",
+          "number": 53,
+          "startLine": 314,
+          "resultLine": 315,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 524,
+          "name": "stream bursts retain the last change without reading more often than the old two-second cadence",
+          "parent": null,
+          "status": "pass",
+          "number": 54,
+          "startLine": 320,
+          "resultLine": 321,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 543,
+          "name": "semantic changes bypass a pending stream delay and deduplicate the same SWR key",
+          "parent": null,
+          "status": "pass",
+          "number": 55,
+          "startLine": 326,
+          "resultLine": 327,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 556,
+          "name": "a change during an in-flight read gets one trailing read after it settles",
+          "parent": null,
+          "status": "pass",
+          "number": 56,
+          "startLine": 332,
+          "resultLine": 333,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 571,
+          "name": "hidden documents discard delayed reads and reconcile the current document on visibility return",
+          "parent": null,
+          "status": "pass",
+          "number": 57,
+          "startLine": 338,
+          "resultLine": 339,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 583,
+          "name": "teardown during a read cannot schedule an old owner or workspace trailing read",
+          "parent": null,
+          "status": "pass",
+          "number": 58,
+          "startLine": 344,
+          "resultLine": 345,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 596,
+          "name": "a server question deadline performs one catch-up read and never becomes a poll",
+          "parent": null,
+          "status": "pass",
+          "number": 59,
+          "startLine": 350,
+          "resultLine": 351,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 611,
+          "name": "hidden question deadlines make no reads; visibility and teardown reconcile or discard them",
+          "parent": null,
+          "status": "pass",
+          "number": 60,
+          "startLine": 356,
+          "resultLine": 357,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 626,
+          "name": "a subscriber joining an already healthy channel reconciles a read that started before its subscription",
+          "parent": null,
+          "status": "pass",
+          "number": 61,
+          "startLine": 362,
+          "resultLine": 363,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 638,
+          "name": "a pending shared-key catch-up uses a remaining subscriber when the last reader unmounts",
+          "parent": null,
+          "status": "pass",
+          "number": 62,
+          "startLine": 368,
+          "resultLine": 369,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 652,
+          "name": "a new client on an old Worker keeps the sixty-second fallback despite healthy auto-pongs",
+          "parent": null,
+          "status": "pass",
+          "number": 63,
+          "startLine": 374,
+          "resultLine": 375,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 663,
+          "name": "capabilities are per-kind, including subscriptions added after the channel is ready",
+          "parent": null,
+          "status": "pass",
+          "number": 64,
+          "startLine": 380,
+          "resultLine": 381,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 675,
+          "name": "malformed readiness cannot suppress fallback, and a verified readiness stops only supported-key fallback",
+          "parent": null,
+          "status": "pass",
+          "number": 65,
+          "startLine": 386,
+          "resultLine": 387,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 692,
+          "name": "approval expiry still triggers one authoritative read when the old Worker has no capability announcement",
+          "parent": null,
+          "status": "pass",
+          "number": 66,
+          "startLine": 392,
+          "resultLine": 393,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 701,
+          "name": "moving the browser wall clock backwards cannot postpone a server-derived approval expiry",
+          "parent": null,
+          "status": "pass",
+          "number": 67,
+          "startLine": 398,
+          "resultLine": 399,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 711,
+          "name": "a backward wall-clock correction cannot postpone a pushed key beyond its existing pacing interval",
+          "parent": null,
+          "status": "pass",
+          "number": 68,
+          "startLine": 404,
+          "resultLine": 405,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 722,
+          "name": "updating or clearing a deadline retains the same subscription and cannot restart the same expiry",
+          "parent": null,
+          "status": "pass",
+          "number": 69,
+          "startLine": 410,
+          "resultLine": 411,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 741,
+          "name": "timing updates while hidden do not read, and updates after teardown cannot revive a subscription",
+          "parent": null,
+          "status": "pass",
+          "number": 70,
+          "startLine": 416,
+          "resultLine": 417,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 754,
+          "name": "updating read pacing retains the connection and applies the new spacing to subsequent pushes",
+          "parent": null,
+          "status": "pass",
+          "number": 71,
+          "startLine": 422,
+          "resultLine": 423,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 766,
+          "name": "only a newer real observation can rearm the same fired deadline, and an active deadline is never postponed",
+          "parent": null,
+          "status": "pass",
+          "number": 72,
+          "startLine": 428,
+          "resultLine": 429,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 788,
+          "name": "a fresh server-future observation whose conservative remaining time is zero gets only one immediate recheck",
+          "parent": null,
+          "status": "pass",
+          "number": 73,
+          "startLine": 434,
+          "resultLine": 435,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 816,
+          "name": "one coalesced read requires the highest pushed revision of every entity behind its key",
+          "parent": null,
+          "status": "pass",
+          "number": 74,
+          "startLine": 440,
+          "resultLine": 441,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 842,
+          "name": "an unversioned flush retains a higher revision from another active consumer of the same key",
+          "parent": null,
+          "status": "pass",
+          "number": 75,
+          "startLine": 446,
+          "resultLine": 447,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 855,
+          "name": "a version 2 channel asks for revisions and skips a push its data already holds, reading every newer or unknown one",
+          "parent": null,
+          "status": "pass",
+          "number": 76,
+          "startLine": 452,
+          "resultLine": 453,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 883,
+          "name": "a revision never skips a key it does not cover, a version 1 Worker, or a kind the Worker did not list",
+          "parent": null,
+          "status": "pass",
+          "number": 77,
+          "startLine": 458,
+          "resultLine": 459,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 909,
+          "name": "an unconditional push merged with a covered one still reads",
+          "parent": null,
+          "status": "pass",
+          "number": 78,
+          "startLine": 464,
+          "resultLine": 465,
+          "directive": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+      "blob": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "group": "live-routing-ts",
+      "expectedFromSource": 14,
+      "actualPassed": 14,
+      "topLevelPassed": 14,
+      "nestedPassed": 0,
+      "originalTapBlob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+      "tests": [
+        {
+          "sourceRegistrationLine": 30,
+          "name": "only the existing InstalledWorkspace render routes are eligible for preparation",
+          "parent": null,
+          "status": "pass",
+          "number": 1,
+          "startLine": 2,
+          "resultLine": 3,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 37,
+          "name": "a fully parsed authorized workspace prepares selected and home once without awaiting ready",
+          "parent": null,
+          "status": "pass",
+          "number": 2,
+          "startLine": 8,
+          "resultLine": 9,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 49,
+          "name": "disabled routes, missing identity and unverified selection do not prepare",
+          "parent": null,
+          "status": "pass",
+          "number": 3,
+          "startLine": 14,
+          "resultLine": 15,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 68,
+          "name": "a missing home hint never guesses that the selected workspace is personal home",
+          "parent": null,
+          "status": "pass",
+          "number": 4,
+          "startLine": 20,
+          "resultLine": 21,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 76,
+          "name": "an authorization or routing change retires the old preparation: owner",
+          "parent": null,
+          "status": "pass",
+          "number": 5,
+          "startLine": 26,
+          "resultLine": 27,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 76,
+          "name": "an authorization or routing change retires the old preparation: session",
+          "parent": null,
+          "status": "pass",
+          "number": 6,
+          "startLine": 32,
+          "resultLine": 33,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 76,
+          "name": "an authorization or routing change retires the old preparation: server",
+          "parent": null,
+          "status": "pass",
+          "number": 7,
+          "startLine": 38,
+          "resultLine": 39,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 76,
+          "name": "an authorization or routing change retires the old preparation: selector",
+          "parent": null,
+          "status": "pass",
+          "number": 8,
+          "startLine": 44,
+          "resultLine": 45,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 76,
+          "name": "an authorization or routing change retires the old preparation: role",
+          "parent": null,
+          "status": "pass",
+          "number": 9,
+          "startLine": 50,
+          "resultLine": 51,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 76,
+          "name": "an authorization or routing change retires the old preparation: workspace",
+          "parent": null,
+          "status": "pass",
+          "number": 10,
+          "startLine": 56,
+          "resultLine": 57,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 76,
+          "name": "an authorization or routing change retires the old preparation: home",
+          "parent": null,
+          "status": "pass",
+          "number": 11,
+          "startLine": 62,
+          "resultLine": 63,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 94,
+          "name": "an invalid later result revokes the previous preparation instead of retaining its history",
+          "parent": null,
+          "status": "pass",
+          "number": 12,
+          "startLine": 68,
+          "resultLine": 69,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 102,
+          "name": "returning to a legal workspace can create a fresh lifetime without reviving retired effects",
+          "parent": null,
+          "status": "pass",
+          "number": 13,
+          "startLine": 74,
+          "resultLine": 75,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 117,
+          "name": "a provider-retired preparation is replaced even when bootstrap identity is unchanged",
+          "parent": null,
+          "status": "pass",
+          "number": 14,
+          "startLine": 80,
+          "resultLine": 81,
+          "directive": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "path": "lib/desktop-rpc/wire.test.ts",
+      "blob": "2170c999f99b2cfa2f6bbf6667b9de56296a0ada",
+      "group": "live-routing-ts",
+      "expectedFromSource": 5,
+      "actualPassed": 5,
+      "topLevelPassed": 5,
+      "nestedPassed": 0,
+      "originalTapBlob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+      "tests": [
+        {
+          "sourceRegistrationLine": 5,
+          "name": "dates, undefined and literal tag-shaped application objects round-trip",
+          "parent": null,
+          "status": "pass",
+          "number": 15,
+          "startLine": 86,
+          "resultLine": 87,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 10,
+          "name": "ordinary chat JSON has no serialization overhead",
+          "parent": null,
+          "status": "pass",
+          "number": 16,
+          "startLine": 92,
+          "resultLine": 93,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 15,
+          "name": "tag decoding rejects malformed values, duplicates and excessive nesting",
+          "parent": null,
+          "status": "pass",
+          "number": 17,
+          "startLine": 98,
+          "resultLine": 99,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 23,
+          "name": "own __proto__ properties remain data without changing prototypes",
+          "parent": null,
+          "status": "pass",
+          "number": 18,
+          "startLine": 104,
+          "resultLine": 105,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 31,
+          "name": "the avatar FormData round-trips its bytes and rejects oversized files",
+          "parent": null,
+          "status": "pass",
+          "number": 19,
+          "startLine": 110,
+          "resultLine": 111,
+          "directive": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "blob": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "group": "renderer-bootstraps",
+      "expectedFromSource": 17,
+      "actualPassed": 17,
+      "topLevelPassed": 6,
+      "nestedPassed": 11,
+      "originalTapBlob": "5667f9518de8521a415a606aa9c00741f7754701",
+      "tests": [
+        {
+          "sourceRegistrationLine": 39,
+          "name": "retained-account local module loading overlaps the real bootstrap promise without mounting or an extra backend read",
+          "parent": null,
+          "status": "pass",
+          "number": 4,
+          "startLine": 20,
+          "resultLine": 21,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 61,
+          "name": "signed-out root and public/auth routes do not preload the workspace graph",
+          "parent": null,
+          "status": "pass",
+          "number": 5,
+          "startLine": 26,
+          "resultLine": 46,
+          "directive": null,
+          "children": [
+            {
+              "name": "/mikka",
+              "parent": "signed-out root and public/auth routes do not preload the workspace graph",
+              "status": "pass",
+              "number": 1,
+              "startLine": 27,
+              "resultLine": 28,
+              "directive": null
+            },
+            {
+              "name": "/mikka/en/sign-in",
+              "parent": "signed-out root and public/auth routes do not preload the workspace graph",
+              "status": "pass",
+              "number": 2,
+              "startLine": 33,
+              "resultLine": 34,
+              "directive": null
+            },
+            {
+              "name": "/mikka/en/a/public-share",
+              "parent": "signed-out root and public/auth routes do not preload the workspace graph",
+              "status": "pass",
+              "number": 3,
+              "startLine": 39,
+              "resultLine": 40,
+              "directive": null
+            }
+          ]
+        },
+        {
+          "sourceRegistrationLine": 76,
+          "name": "failure of the optional main identity hint leaves the normal bootstrap and lazy path available",
+          "parent": null,
+          "status": "pass",
+          "number": 6,
+          "startLine": 51,
+          "resultLine": 52,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 85,
+          "name": "bootstrap accepts an old server without the optional live routing hint and rejects malformed hints",
+          "parent": null,
+          "status": "pass",
+          "number": 7,
+          "startLine": 57,
+          "resultLine": 107,
+          "directive": null,
+          "children": [
+            {
+              "name": "undefined",
+              "parent": "bootstrap accepts an old server without the optional live routing hint and rejects malformed hints",
+              "status": "pass",
+              "number": 1,
+              "startLine": 58,
+              "resultLine": 59,
+              "directive": null
+            },
+            {
+              "name": "null",
+              "parent": "bootstrap accepts an old server without the optional live routing hint and rejects malformed hints",
+              "status": "pass",
+              "number": 2,
+              "startLine": 64,
+              "resultLine": 65,
+              "directive": null
+            },
+            {
+              "name": "<anonymous>",
+              "parent": "bootstrap accepts an old server without the optional live routing hint and rejects malformed hints",
+              "status": "pass",
+              "number": 3,
+              "startLine": 70,
+              "resultLine": 71,
+              "directive": null
+            },
+            {
+              "name": "not-a-workspace",
+              "parent": "bootstrap accepts an old server without the optional live routing hint and rejects malformed hints",
+              "status": "pass",
+              "number": 4,
+              "startLine": 76,
+              "resultLine": 77,
+              "directive": null
+            },
+            {
+              "name": "42",
+              "parent": "bootstrap accepts an old server without the optional live routing hint and rejects malformed hints",
+              "status": "pass",
+              "number": 5,
+              "startLine": 82,
+              "resultLine": 83,
+              "directive": null
+            },
+            {
+              "name": "[object Object]",
+              "parent": "bootstrap accepts an old server without the optional live routing hint and rejects malformed hints",
+              "status": "pass",
+              "number": 6,
+              "startLine": 88,
+              "resultLine": 89,
+              "directive": null
+            },
+            {
+              "name": "00000000-0000-0000-0000-000000000000",
+              "parent": "bootstrap accepts an old server without the optional live routing hint and rejects malformed hints",
+              "status": "pass",
+              "number": 7,
+              "startLine": 94,
+              "resultLine": 95,
+              "directive": null
+            },
+            {
+              "name": "a0c73a42-d768-467c-a00a-dc3a03e98273",
+              "parent": "bootstrap accepts an old server without the optional live routing hint and rejects malformed hints",
+              "status": "pass",
+              "number": 8,
+              "startLine": 100,
+              "resultLine": 101,
+              "directive": null
+            }
+          ]
+        },
+        {
+          "sourceRegistrationLine": 103,
+          "name": "an invalid explicit selector clears both routing hints after the normal bootstrap response",
+          "parent": null,
+          "status": "pass",
+          "number": 8,
+          "startLine": 112,
+          "resultLine": 113,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 116,
+          "name": "an expired bootstrap returns public sign-in configuration with no live routing hint",
+          "parent": null,
+          "status": "pass",
+          "number": 9,
+          "startLine": 118,
+          "resultLine": 119,
+          "directive": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "path": "apps/desktop/scripts/installed-workspace.test.mjs",
+      "blob": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa",
+      "group": "renderer-bootstraps",
+      "expectedFromSource": 3,
+      "actualPassed": 3,
+      "topLevelPassed": 3,
+      "nestedPassed": 0,
+      "originalTapBlob": "5667f9518de8521a415a606aa9c00741f7754701",
+      "tests": [
+        {
+          "sourceRegistrationLine": 114,
+          "name": "a completed preload waits for authentication, then renders synchronously without a fallback",
+          "parent": null,
+          "status": "pass",
+          "number": 1,
+          "startLine": 2,
+          "resultLine": 3,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 130,
+          "name": "an unfinished preload keeps normal Suspense and never changes component type after resolving",
+          "parent": null,
+          "status": "pass",
+          "number": 2,
+          "startLine": 8,
+          "resultLine": 9,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 150,
+          "name": "a rejected preload is never promoted to a resolved component and reaches the normal error boundary",
+          "parent": null,
+          "status": "pass",
+          "number": 3,
+          "startLine": 14,
+          "resultLine": 15,
+          "directive": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+      "blob": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae",
+      "group": "renderer-bootstraps",
+      "expectedFromSource": 21,
+      "actualPassed": 21,
+      "topLevelPassed": 13,
+      "nestedPassed": 8,
+      "originalTapBlob": "5667f9518de8521a415a606aa9c00741f7754701",
+      "tests": [
+        {
+          "sourceRegistrationLine": 124,
+          "name": "a valid system-browser PKCE page reads only the existing session and public login methods",
+          "parent": null,
+          "status": "pass",
+          "number": 19,
+          "startLine": 385,
+          "resultLine": 386,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 133,
+          "name": "a server authentication document preserves the PKCE identity-only boundary",
+          "parent": null,
+          "status": "pass",
+          "number": 20,
+          "startLine": 391,
+          "resultLine": 392,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 142,
+          "name": "a signed-in server GitHub document renders only its handoff before and after intent cleanup",
+          "parent": null,
+          "status": "pass",
+          "number": 21,
+          "startLine": 397,
+          "resultLine": 398,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 157,
+          "name": "a server GitHub document cannot bypass a rejected session",
+          "parent": null,
+          "status": "pass",
+          "number": 22,
+          "startLine": 403,
+          "resultLine": 404,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 166,
+          "name": "the official app without a server document marker keeps its normal workspace route",
+          "parent": null,
+          "status": "pass",
+          "number": 23,
+          "startLine": 409,
+          "resultLine": 410,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 173,
+          "name": "leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts",
+          "parent": null,
+          "status": "pass",
+          "number": 24,
+          "startLine": 415,
+          "resultLine": 416,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 188,
+          "name": "malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap",
+          "parent": null,
+          "status": "pass",
+          "number": 25,
+          "startLine": 421,
+          "resultLine": 435,
+          "directive": null,
+          "children": [
+            {
+              "name": "duplicate state",
+              "parent": "malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap",
+              "status": "pass",
+              "number": 1,
+              "startLine": 422,
+              "resultLine": 423,
+              "directive": null
+            },
+            {
+              "name": "Electron host",
+              "parent": "malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap",
+              "status": "pass",
+              "number": 2,
+              "startLine": 428,
+              "resultLine": 429,
+              "directive": null
+            }
+          ]
+        },
+        {
+          "sourceRegistrationLine": 198,
+          "name": "pending identity and workspace reads never join across phases or mount from a late identity result",
+          "parent": null,
+          "status": "pass",
+          "number": 26,
+          "startLine": 440,
+          "resultLine": 441,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 214,
+          "name": "a late full bootstrap cannot replace a newly opened PKCE identity page or its anonymous configuration",
+          "parent": null,
+          "status": "pass",
+          "number": 27,
+          "startLine": 446,
+          "resultLine": 447,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 226,
+          "name": "a retired workspace request cannot expire or disconnect the current PKCE identity page",
+          "parent": null,
+          "status": "pass",
+          "number": 28,
+          "startLine": 452,
+          "resultLine": 466,
+          "directive": null,
+          "children": [
+            {
+              "name": "401",
+              "parent": "a retired workspace request cannot expire or disconnect the current PKCE identity page",
+              "status": "pass",
+              "number": 1,
+              "startLine": 453,
+              "resultLine": 454,
+              "directive": null
+            },
+            {
+              "name": "503",
+              "parent": "a retired workspace request cannot expire or disconnect the current PKCE identity page",
+              "status": "pass",
+              "number": 2,
+              "startLine": 459,
+              "resultLine": 460,
+              "directive": null
+            }
+          ]
+        },
+        {
+          "sourceRegistrationLine": 239,
+          "name": "account and same-account session changes invalidate a pending identity response and clear prior caches",
+          "parent": null,
+          "status": "pass",
+          "number": 29,
+          "startLine": 471,
+          "resultLine": 485,
+          "directive": null,
+          "children": [
+            {
+              "name": "different owner",
+              "parent": "account and same-account session changes invalidate a pending identity response and clear prior caches",
+              "status": "pass",
+              "number": 1,
+              "startLine": 472,
+              "resultLine": 473,
+              "directive": null
+            },
+            {
+              "name": "same owner, new session",
+              "parent": "account and same-account session changes invalidate a pending identity response and clear prior caches",
+              "status": "pass",
+              "number": 2,
+              "startLine": 478,
+              "resultLine": 479,
+              "directive": null
+            }
+          ]
+        },
+        {
+          "sourceRegistrationLine": 259,
+          "name": "only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable",
+          "parent": null,
+          "status": "pass",
+          "number": 30,
+          "startLine": 490,
+          "resultLine": 504,
+          "directive": null,
+          "children": [
+            {
+              "name": "401",
+              "parent": "only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable",
+              "status": "pass",
+              "number": 1,
+              "startLine": 491,
+              "resultLine": 492,
+              "directive": null
+            },
+            {
+              "name": "503",
+              "parent": "only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable",
+              "status": "pass",
+              "number": 2,
+              "startLine": 497,
+              "resultLine": 498,
+              "directive": null
+            }
+          ]
+        },
+        {
+          "sourceRegistrationLine": 270,
+          "name": "a new session for the same owner retires the actual in-memory SWR cache",
+          "parent": null,
+          "status": "pass",
+          "number": 31,
+          "startLine": 509,
+          "resultLine": 510,
+          "directive": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "blob": "06dceefec477df850087b47002266e612dddb63a",
+      "group": "startup-and-template-validators",
+      "expectedFromSource": 38,
+      "actualPassed": 38,
+      "topLevelPassed": 38,
+      "nestedPassed": 0,
+      "originalTapBlob": "4a51ba0fa4d3a6a35856f74490aff793e1f69e1f",
+      "tests": [
+        {
+          "sourceRegistrationLine": 67,
+          "name": "the production gate logs in as SMOKE without pinning an owner workspace or bot",
+          "parent": null,
+          "status": "pass",
+          "number": 2,
+          "startLine": 32,
+          "resultLine": 33,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 74,
+          "name": "a different application commit is refused before login, enrollment or candidate creation",
+          "parent": null,
+          "status": "pass",
+          "number": 3,
+          "startLine": 38,
+          "resultLine": 39,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 84,
+          "name": "a release receipt names the actual candidate, revision, model and registered device",
+          "parent": null,
+          "status": "pass",
+          "number": 4,
+          "startLine": 44,
+          "resultLine": 45,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 276,
+          "name": "startup correlation survives claude_code failure before a run exists",
+          "parent": null,
+          "status": "pass",
+          "number": 5,
+          "startLine": 50,
+          "resultLine": 51,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 276,
+          "name": "startup correlation survives codex failure before a run exists",
+          "parent": null,
+          "status": "pass",
+          "number": 6,
+          "startLine": 56,
+          "resultLine": 57,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 285,
+          "name": "startup correlation requires exact candidate binding and existing metadata",
+          "parent": null,
+          "status": "pass",
+          "number": 7,
+          "startLine": 62,
+          "resultLine": 63,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 300,
+          "name": "startup correlation rejects malformed identifiers and preserves independently valid fields",
+          "parent": null,
+          "status": "pass",
+          "number": 8,
+          "startLine": 68,
+          "resultLine": 69,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 328,
+          "name": "startup correlation keeps only closed refusal codes and never emits prompts or other identities",
+          "parent": null,
+          "status": "pass",
+          "number": 9,
+          "startLine": 74,
+          "resultLine": 75,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 346,
+          "name": "successful candidate diagnostics do not gain startup correlation metadata",
+          "parent": null,
+          "status": "pass",
+          "number": 10,
+          "startLine": 80,
+          "resultLine": 81,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 358,
+          "name": "a pre-dispatch refusal keeps its phase without reading an unpublished proof and cleans both candidates",
+          "parent": null,
+          "status": "pass",
+          "number": 11,
+          "startLine": 86,
+          "resultLine": 87,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 387,
+          "name": "dispatch refusal diagnostics admit only fixed business codes and never untrusted details",
+          "parent": null,
+          "status": "pass",
+          "number": 12,
+          "startLine": 92,
+          "resultLine": 93,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 411,
+          "name": "a failed subscription still tests the other candidate and closes every created instance and device",
+          "parent": null,
+          "status": "pass",
+          "number": 13,
+          "startLine": 98,
+          "resultLine": 99,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 421,
+          "name": "candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session",
+          "parent": null,
+          "status": "pass",
+          "number": 14,
+          "startLine": 104,
+          "resultLine": 105,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 435,
+          "name": "a real receipt rejection persists its run hash and reason without provider text or credentials",
+          "parent": null,
+          "status": "pass",
+          "number": 15,
+          "startLine": 110,
+          "resultLine": 111,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 478,
+          "name": "preflight failures preserve their phase and closed error details without producing an accepted file",
+          "parent": null,
+          "status": "pass",
+          "number": 16,
+          "startLine": 116,
+          "resultLine": 117,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 525,
+          "name": "a failure before a sample exists preserves the startup phase without inventing sample evidence",
+          "parent": null,
+          "status": "pass",
+          "number": 17,
+          "startLine": 122,
+          "resultLine": 123,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 542,
+          "name": "startup failure projection drops unknown content and only admits numeric HTTP error statuses",
+          "parent": null,
+          "status": "pass",
+          "number": 18,
+          "startLine": 128,
+          "resultLine": 129,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 572,
+          "name": "failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code",
+          "parent": null,
+          "status": "pass",
+          "number": 19,
+          "startLine": 134,
+          "resultLine": 135,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 602,
+          "name": "retained cleanup identities must belong to this case and contain at most four distinct UUIDs",
+          "parent": null,
+          "status": "pass",
+          "number": 20,
+          "startLine": 140,
+          "resultLine": 141,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 622,
+          "name": "a terminal-before-proof failure identifies only its owned case and the missing evidence",
+          "parent": null,
+          "status": "pass",
+          "number": 21,
+          "startLine": 146,
+          "resultLine": 147,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 647,
+          "name": "cleanup failures retain bounded step families and HTTP status without arbitrary causes",
+          "parent": null,
+          "status": "pass",
+          "number": 22,
+          "startLine": 152,
+          "resultLine": 153,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 678,
+          "name": "a failed pair preserves the genuine passing receipt without creating publishable evidence",
+          "parent": null,
+          "status": "pass",
+          "number": 23,
+          "startLine": 158,
+          "resultLine": 159,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 716,
+          "name": "failure projection bounds cleanup rows and refuses foreign or malformed fixture identities",
+          "parent": null,
+          "status": "pass",
+          "number": 24,
+          "startLine": 164,
+          "resultLine": 165,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 753,
+          "name": "the observed Codex adapter-start failure retains false agent_start and error cli_init",
+          "parent": null,
+          "status": "pass",
+          "number": 25,
+          "startLine": 170,
+          "resultLine": 171,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 798,
+          "name": "failed execution retains only bound registration binary metadata without a passing receipt",
+          "parent": null,
+          "status": "pass",
+          "number": 26,
+          "startLine": 176,
+          "resultLine": 177,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 818,
+          "name": "registration diagnostics reject unbounded or non-original binary metadata without leaking it",
+          "parent": null,
+          "status": "pass",
+          "number": 27,
+          "startLine": 182,
+          "resultLine": 183,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 844,
+          "name": "bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish",
+          "parent": null,
+          "status": "pass",
+          "number": 28,
+          "startLine": 188,
+          "resultLine": 189,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 869,
+          "name": "bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs",
+          "parent": null,
+          "status": "pass",
+          "number": 29,
+          "startLine": 194,
+          "resultLine": 195,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 906,
+          "name": "bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair",
+          "parent": null,
+          "status": "pass",
+          "number": 30,
+          "startLine": 200,
+          "resultLine": 201,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 960,
+          "name": "bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption",
+          "parent": null,
+          "status": "pass",
+          "number": 31,
+          "startLine": 206,
+          "resultLine": 207,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 1007,
+          "name": "bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values",
+          "parent": null,
+          "status": "pass",
+          "number": 32,
+          "startLine": 212,
+          "resultLine": 213,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 1038,
+          "name": "successful candidate gate adds no failure diagnostics and keeps the original accepted receipt",
+          "parent": null,
+          "status": "pass",
+          "number": 33,
+          "startLine": 218,
+          "resultLine": 219,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 1057,
+          "name": "failure projection distinguishes the closed 3c production shapes using synthetic identities",
+          "parent": null,
+          "status": "pass",
+          "number": 34,
+          "startLine": 224,
+          "resultLine": 225,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 1144,
+          "name": "live observer close evidence survives the real failure projection without private fields",
+          "parent": null,
+          "status": "pass",
+          "number": 35,
+          "startLine": 230,
+          "resultLine": 231,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 1158,
+          "name": "live observer error evidence never invents close metadata",
+          "parent": null,
+          "status": "pass",
+          "number": 36,
+          "startLine": 236,
+          "resultLine": 237,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 1173,
+          "name": "live observer projection rejects malformed required evidence without leaking its values",
+          "parent": null,
+          "status": "pass",
+          "number": 37,
+          "startLine": 242,
+          "resultLine": 243,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 1212,
+          "name": "live observer close metadata is independently optional and bounded",
+          "parent": null,
+          "status": "pass",
+          "number": 38,
+          "startLine": 248,
+          "resultLine": 249,
+          "directive": null,
+          "children": []
+        },
+        {
+          "sourceRegistrationLine": 1231,
+          "name": "live observer evidence leaves legacy, unrelated failures and passing receipts unchanged",
+          "parent": null,
+          "status": "pass",
+          "number": 39,
+          "startLine": 254,
+          "resultLine": 255,
+          "directive": null,
+          "children": []
+        }
+      ]
+    }
+  ],
+  "groupConservation": [
+    {
+      "label": "live-routing-ts",
+      "originalTests": 100,
+      "originalPass": 98,
+      "originalFail": 2,
+      "reusableActualPass": 78,
+      "excludedPriorPass": 20,
+      "excludedPriorFail": 2,
+      "excludedRootNames": [
+        "equal selected and home hints prepare one connection without a business read",
+        "different selected and home hints join their exact existing registry entries",
+        "confirming the selected hint before its first real subscriber preserves ready coverage",
+        "a stopped historical subscription cannot consume the selected reservation",
+        "an invalid entity does not count as a consumer or consume preparation",
+        "fresh selected and home scopes retire unused hints without relabelling a subscription",
+        "a read begun after readiness is reused by the real late subscriber",
+        "a read begun before readiness still catches up even when it finishes afterwards",
+        "an incoming push with no keys remains an obligation for a later matching subscriber",
+        "a different event kind does not discard continuous coverage for the late key",
+        "abandoned render owners do not claim a prepared cache lifetime",
+        "a second cache cannot borrow the first cache live history",
+        "StrictMode cleanup and setup use a new lifetime and old cleanup cannot close it",
+        "retirement before the first effect blocks old owners but not a new ordinary owner",
+        "an authority retirement aborts an unfinished ticket and its result cannot revive a socket",
+        "a failed empty preparation does not retry on timers or repeated visible events: null",
+        "a failed empty preparation does not retry on timers or repeated visible events: reject",
+        "an empty prepared connection expires without a renewal loop; a real subscriber can reconnect",
+        "the last real subscriber cancels its scheduled retry while a preparation remains",
+        "a hidden preparation waits for a real subscriber instead of creating an idle visibility retry",
+        "a release from a disposed registry entry cannot remove its same-scope replacement",
+        "malformed and nil routing hints never request a ticket or attach a visibility watcher"
+      ]
+    },
+    {
+      "label": "renderer-bootstraps",
+      "originalTests": 54,
+      "originalPass": 47,
+      "originalFail": 7,
+      "reusableActualPass": 41,
+      "excludedPriorPass": 6,
+      "excludedPriorFail": 7,
+      "excludedRootNames": [
+        "the actual App prepares before the first workspace read and the real LiveProvider joins that connection",
+        "a response status is insufficient: preparation waits for the complete bootstrap body and validation",
+        "a history write before its queued route notification blocks the old bootstrap preparation",
+        "leaving and returning to a workspace starts an ordinary live lifetime without a new bootstrap",
+        "an update-required boundary retires preparation and a stale ready signal cannot revive it",
+        "a confirmed session expiry closes the owned connection and cannot leave a prepared route behind",
+        "a superseded bootstrap body cannot prepare after a new owner has been accepted",
+        "an owner change retires the first connection and prepares a distinct registry lifetime",
+        "authenticated non-workspace routes never prepare a live channel"
+      ]
+    },
+    {
+      "label": "startup-and-template-validators",
+      "originalTests": 39,
+      "originalPass": 38,
+      "originalFail": 1,
+      "reusableActualPass": 38,
+      "excludedPriorPass": 0,
+      "excludedPriorFail": 1,
+      "excludedRootNames": [
+        "scripts/acceptance/cloud-startup.test.mjs"
+      ]
+    }
+  ]
+}

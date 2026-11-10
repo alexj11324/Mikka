@@ -1,0 +1,407 @@
+{
+  "schema": "issue1512-g2-reused-first-G-results-proof/v1",
+  "status": "157 actual first-G passing tests eligible for scoped reuse at exact G2; first-G overall FAILURE retained; G2 runtime results pending",
+  "firstG": {
+    "sha": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "runId": 42766089161,
+    "attempt": 1,
+    "jobId": 129662811912,
+    "jobConclusion": "failure",
+    "fullActualProofBlob": "f0ab2b884b55dafa339f7d8559fc12f65667152f",
+    "originalStreamIndexBlob": "fa3ad0f12efec4794103f7311f3017825a59859a"
+  },
+  "G2": {
+    "sha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+    "parents": [
+      "ff385bfd91edcd40c3b3ee398b4b93098e5becbb"
+    ],
+    "commitAndFullRecursiveTreeIndependentlyRead": true,
+    "beforeLeafCount": 6983,
+    "afterLeafCount": 6983,
+    "addedPaths": [],
+    "deletedPaths": [],
+    "changedLeaves": [
+      {
+        "path": "apps/desktop/scripts/workspace-live.test.mjs",
+        "old": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+        "new": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+        "mode": "100644"
+      },
+      {
+        "path": "hooks/use-subagent-updates.ts",
+        "old": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+        "new": "dd831e0e657d00de9210e39194a926b4e977ec56",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/live/channels.test.ts",
+        "old": "91c96118f0040a4594eb57e76f58befa2150fe99",
+        "new": "c9059d2c8be5122681f5c4657889b01633ed3736",
+        "mode": "100644"
+      },
+      {
+        "path": "tests/read-cache-scope.db.test.ts",
+        "old": "bbdae2625952b475c3488384bbd48c876887a805",
+        "new": "ee59feba1e29769805806ec6e166abbc65994233",
+        "mode": "100644"
+      }
+    ]
+  },
+  "originalTapByteVerification": "All original stdout/stderr bytes, lengths, hashes and Git blobs were verified by f0ab2b before this derivation. Only those frozen bytes were used; no Actions log/artifact endpoint was reread.",
+  "parser": {
+    "sha": "97a81d45dfd36acf165ede837c91fc2658b1eada",
+    "bytes": 915,
+    "sha256": "c886235a7faf292cbb38ece835548483fce23d207dfb0346891e1dd7cb5ec179",
+    "method": "Strict indentation-scoped # Subtest / ok / not ok tree; exact node names and parent-child links, complete closure, no dangling nodes. All original nodes reconcile to first-G TAP totals. Source top-level names and fixed literal loop expansions uniquely assign test subtrees to files; parent and child ok nodes both count."
+  },
+  "exactCaseIndexBlob": "4d9ea698ca71ef85948ba9bcfafaa0c75c690fea",
+  "sourceRegistrationCountProofBlob": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e",
+  "reusedFiles": [
+    {
+      "path": "lib/live/channel.test.ts",
+      "blob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+      "group": "live-routing-ts",
+      "actualPassed": 59,
+      "topLevelPassed": 59,
+      "nestedPassed": 0,
+      "originalTapBlob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+      "sameBlobAtGAndG2": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+      "blob": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "group": "live-routing-ts",
+      "actualPassed": 14,
+      "topLevelPassed": 14,
+      "nestedPassed": 0,
+      "originalTapBlob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+      "sameBlobAtGAndG2": true
+    },
+    {
+      "path": "lib/desktop-rpc/wire.test.ts",
+      "blob": "2170c999f99b2cfa2f6bbf6667b9de56296a0ada",
+      "group": "live-routing-ts",
+      "actualPassed": 5,
+      "topLevelPassed": 5,
+      "nestedPassed": 0,
+      "originalTapBlob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+      "sameBlobAtGAndG2": true
+    },
+    {
+      "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "blob": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "group": "renderer-bootstraps",
+      "actualPassed": 17,
+      "topLevelPassed": 6,
+      "nestedPassed": 11,
+      "originalTapBlob": "5667f9518de8521a415a606aa9c00741f7754701",
+      "sameBlobAtGAndG2": true
+    },
+    {
+      "path": "apps/desktop/scripts/installed-workspace.test.mjs",
+      "blob": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa",
+      "group": "renderer-bootstraps",
+      "actualPassed": 3,
+      "topLevelPassed": 3,
+      "nestedPassed": 0,
+      "originalTapBlob": "5667f9518de8521a415a606aa9c00741f7754701",
+      "sameBlobAtGAndG2": true
+    },
+    {
+      "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+      "blob": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae",
+      "group": "renderer-bootstraps",
+      "actualPassed": 21,
+      "topLevelPassed": 13,
+      "nestedPassed": 8,
+      "originalTapBlob": "5667f9518de8521a415a606aa9c00741f7754701",
+      "sameBlobAtGAndG2": true
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "blob": "06dceefec477df850087b47002266e612dddb63a",
+      "group": "startup-and-template-validators",
+      "actualPassed": 38,
+      "topLevelPassed": 38,
+      "nestedPassed": 0,
+      "originalTapBlob": "4a51ba0fa4d3a6a35856f74490aff793e1f69e1f",
+      "sameBlobAtGAndG2": true
+    }
+  ],
+  "totalActualReusedPass": 157,
+  "groupConservation": [
+    {
+      "label": "live-routing-ts",
+      "originalTests": 100,
+      "originalPass": 98,
+      "originalFail": 2,
+      "reusableActualPass": 78,
+      "excludedPriorPass": 20,
+      "excludedPriorFail": 2
+    },
+    {
+      "label": "renderer-bootstraps",
+      "originalTests": 54,
+      "originalPass": 47,
+      "originalFail": 7,
+      "reusableActualPass": 41,
+      "excludedPriorPass": 6,
+      "excludedPriorFail": 7
+    },
+    {
+      "label": "startup-and-template-validators",
+      "originalTests": 39,
+      "originalPass": 38,
+      "originalFail": 1,
+      "reusableActualPass": 38,
+      "excludedPriorPass": 0,
+      "excludedPriorFail": 1
+    }
+  ],
+  "relatedUnchangedInputs": [
+    {
+      "path": "package.json",
+      "blob": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+      "mode": "100644"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "blob": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+      "mode": "100644"
+    },
+    {
+      "path": "tsconfig.json",
+      "blob": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/tsconfig.renderer.json",
+      "blob": "e2e9c270e1d3162a27ebb6121dda544aac787044",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/frontend/tsconfig.json",
+      "blob": "8edce1c70fa1174d8bebd2cf7aedb027073a4609",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "blob": "733aba8cb0bfd26f2c7c7302ad02bb9a92bb0e0f",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/frontend/package.json",
+      "blob": "f304311903743e2177d2aa4d1962cd10f56773c8",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "blob": "61cdf48b28ab9260f5567300f2411cb555b13427",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/live/channels.ts",
+      "blob": "c40864fe9386855994d3a4ece9480639514d85aa",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/live/preparation.ts",
+      "blob": "7377678b777279de0ab21717749743fcce446d73",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "blob": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/live/presence.ts",
+      "blob": "0b6ff3baba04a577b5d7f1c94a8519e77b013621",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "blob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/device-gateway-ticket.ts",
+      "blob": "5a84bce13112ea010708fcd4406c19c683c62a50",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "blob": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.ts",
+      "blob": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "blob": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-loader.ts",
+      "blob": "a966f949fce953ae8aa4eed051c17b4e5d3cb8f6",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+      "blob": "ddeb2420392a0abb233bc3742cd539805424bc13",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "blob": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/location.ts",
+      "blob": "ac2d1c163497cb165bab470c30661560ae78f053",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/client-configuration.ts",
+      "blob": "5bd1fde7c54de6032823e121dfa633c684fb4a4c",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/transport-state.ts",
+      "blob": "67f68cae303fef55b7196550fa81827ee4f700bc",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/frontend/src/web/platform.tsx",
+      "blob": "307a84b1a92213a2c9f941f2950285eb4c0484ae",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/frontend/src/web/rpc.ts",
+      "blob": "77b9950b7db762ae8f28e6cbfd3dac8e8fe6c0b7",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/base-path.ts",
+      "blob": "ffa8c4910a5d5d5ee3ff5f60065088c097fc4ed2",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "blob": "f8561bbc3ce02dd53f4ac7ae487bbb8a70da0d3f",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "blob": "ddc5e88da66a314d601e085d1afca916132aeab1",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/e2b-runtime-release.yml",
+      "blob": "7a592d975ac7594e723822f597b512defa4526b2",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/lint-ui.mjs",
+      "blob": "9c2f44bc94cf1fbfe4fa8097caba8afc20b93268",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/ui-policy.mjs",
+      "blob": "fbd927327c726f57c59e2b9ccaf070bed24c3659",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/interaction-policy.mjs",
+      "blob": "8c4e3a64f7f3a9c7ef7ee3cfca33b4d928e354e0",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/settings-policy.mjs",
+      "blob": "798472d4d49feb4a1a64a2885320d997d06fa766",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/icon-button-policy.mjs",
+      "blob": "ec3982a90ffb53dc83f78dd787bd13309028bc72",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/base-path-policy.mjs",
+      "blob": "052052380457b9156674418dd50a2c045441a340",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/split-pane-policy.mjs",
+      "blob": "d38d0812897970af08e60e54dbc37372e0596a8d",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/polling-policy.mjs",
+      "blob": "0911ac34c465529603a8c0135b0082aea4513939",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/error-cause-policy.mjs",
+      "blob": "822fbde9b131115a119eaa1fd9693dc65164dda2",
+      "mode": "100644"
+    },
+    {
+      "path": "ui-policy.json",
+      "blob": "f7aa7e6c6932e9cc82ec2af96a8a930eedd89173",
+      "mode": "100644"
+    },
+    {
+      "path": "components.json",
+      "blob": "f89fbf0207ba23999253bbe355f72a6c94ef9ed9",
+      "mode": "100644"
+    }
+  ],
+  "closureReasoning": [
+    "All 6,983 repository leaves were compared by path/type/mode/blob. Exactly four changed; none of the seven reused test files, their fixed dependency versions, aliases, build configuration, related tested product modules or policy engines changed.",
+    "Three changed paths are test files excluded from reuse: new registry tests, actual App fixture tests and the PG fixture. Their prior passing examples are deliberately excluded together with their prior failures.",
+    "The sole changed production path, hooks/use-subagent-updates.ts, is an exact three-occurrence LiveChannels→LiveChannelRegistry substitution in import type, WeakMap type argument and function parameter annotation. Executable expressions, side effects and module imports with runtime values are byte-identical. This is a source-level type-only check, not a claimed new transpiler execution.",
+    "Channel/controller/wire tests import the unchanged Live channel/preparation/read-observer/controller/wire modules; they do not import the three changed test files.",
+    "Renderer-startup and InstalledWorkspace fixtures load unchanged bootstrap/loader/InstalledWorkspace source and intercept the workspace module. Auth-only fixture loads the unchanged App/web adapters and replaces workspace/UI/runtime boundaries through its unchanged esbuild plugin. Its original source does not load the changed App test fixture.",
+    "Template validator imports unchanged validate-template-subscriptions and cloud-startup production modules and reads the unchanged release workflow. Its own 38 tests completed before; cloud-startup.test.mjs is a separate failed-to-load test file whose 88 tests receive no reuse credit.",
+    "No claim is made that unchanged test source alone proves arbitrary dependency closure. The exhaustive four-path repository delta, unchanged package/lock/config, inspected fixture import boundaries and exact type-only production substitution are the reuse boundary."
+  ],
+  "uiAndRuntimePolicy": {
+    "originalLabel": "ui-and-runtime-policy",
+    "executable": "/opt/hostedtoolcache/node/24.22.1/x64/bin/node",
+    "args": [
+      "scripts/lint-ui.mjs"
+    ],
+    "originalCode": 0,
+    "originalStdoutBlob": "b7f13ec9a735846480339ff081824d73f38b9288",
+    "originalStderrBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "originalOutput": "\nUI policy: 3348 business files, 0 errors; 287 component-library files excluded (no source verification).\nInteraction policy: 551 files, including downloaded business blocks; only UI/ReUI primitives excluded.\n{}\n",
+    "enginesAndConfigurationIdentical": true,
+    "applicability": "The policy enumerates repository sources and may read changed TS/test files; its entire input byte set is NOT unchanged. Reuse is review-backed: the four inspected diffs introduce no product UI markup, polling operation or user-facing error path; the only production change is type-only. This records the real first-G exit0 and its narrow applicability, not a G2 policy execution."
+  },
+  "deliberatelyNotReused": [
+    "20 previously passing new-registry cases plus its2 failures: all22 rerun at changed registry test source.",
+    "6 previously passing App examples plus its7 failures: all13 rerun at changed ESM fixture resolution.",
+    "Cloud-startup test file failed to load, so zero of its88 expected examples receive pass credit; all88 rerun with corrected --import tsx executor.",
+    "The original PG2 passing tests are not used to avoid fresh fixture setup: corrected complete15-test PG file reruns on a fresh database.",
+    "All3 failed typecheck commands rerun, including the actual changed type source.",
+    "Changed-file root lint and desktop lint rerun; original whole-G status remains FAILURE."
+  ],
+  "operationScope": {
+    "newRuntimeExecutionForThisProof": false,
+    "newCompute": false,
+    "refMutation": false,
+    "actionsOriginalReread": false,
+    "artifactZipDownloaded": false,
+    "manifestChanged": false
+  },
+  "limitations": [
+    "This is historical result reuse with exact source bounds, not a claim that G2 was executed by this derivation.",
+    "No packaged Native, SQL-budget or production acceptance claim follows from these unit-test results."
+  ]
+}

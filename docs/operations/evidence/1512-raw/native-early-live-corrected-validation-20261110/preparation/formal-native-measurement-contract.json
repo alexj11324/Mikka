@@ -1,0 +1,1240 @@
+{
+  "schema": "issue1512-formal-native-contract-source-review.v1",
+  "capturedAt": "2026-11-10 06:52:49 UTC",
+  "repository": "alexj11324/Mikka",
+  "purpose": "Read-only preparation for the ordinary PR Native job. This is source/metadata verification, not a Native budget result.",
+  "source": {
+    "baseline": {
+      "commit": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a"
+    },
+    "candidate": {
+      "commit": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+      "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1"
+    },
+    "syntheticPullRequestCommit": "767f4f612af2c3e794031fba46d1f302ee2efab3",
+    "syntheticTree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+    "syntheticCommitBindingProof": "925f5279bb55dff2bbab23528c0a7a48998b9dc0"
+  },
+  "verification": {
+    "method": "Compare complete nontruncated Git tree entries by exact path/blob SHA; this does not claim every equal body was newly fetched.",
+    "unchangedClosureFiles": 152,
+    "scope": [
+      "all apps/desktop/test files (75)",
+      "all non-test apps/desktop/scripts files",
+      "all apps/desktop/src/main and preload files",
+      "desktop package/builder config",
+      "idle budget",
+      "PR selection workflow and ci-selection",
+      "test-account CLI/evidence/environment"
+    ],
+    "allEqual": true,
+    "closure": [
+      {
+        "path": "apps/desktop/test/account-release-observer.mjs",
+        "sha": "f53b3643bf8084de20363e8e3e0aa48cde89154e",
+        "H": "f53b3643bf8084de20363e8e3e0aa48cde89154e",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/account-release-observer.test.mjs",
+        "sha": "444b63c46aad126a79cca20b490196f4ef963a83",
+        "H": "444b63c46aad126a79cca20b490196f4ef963a83",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/browser-handoff.mjs",
+        "sha": "fdabab7accddc1d31d6418b660bd9548fd452416",
+        "H": "fdabab7accddc1d31d6418b660bd9548fd452416",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/bundled-server-choice.mjs",
+        "sha": "b9e9b44746a735935fcbcd6590c62ee047f27cd8",
+        "H": "b9e9b44746a735935fcbcd6590c62ee047f27cd8",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/bundled-server-choice.test.mjs",
+        "sha": "4a5efa813d28f5cf90264f74e48f9187f600f60c",
+        "H": "4a5efa813d28f5cf90264f74e48f9187f600f60c",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/bundled-session.mjs",
+        "sha": "1864356a5f5359fcf0b96ce63b968da4637415f3",
+        "H": "1864356a5f5359fcf0b96ce63b968da4637415f3",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/bundled-session.test.mjs",
+        "sha": "244362124a3e67957d1519626a4d857d52c6aef4",
+        "H": "244362124a3e67957d1519626a4d857d52c6aef4",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/bundled-sign-in.mjs",
+        "sha": "1923572b7348f420b938418b70681ff9aeea4a39",
+        "H": "1923572b7348f420b938418b70681ff9aeea4a39",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/bundled-sign-in.test.mjs",
+        "sha": "cf7b3204ee49dc954b91f8a045e30a05342e08cf",
+        "H": "cf7b3204ee49dc954b91f8a045e30a05342e08cf",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/bundled-smoke.mjs",
+        "sha": "2df81511184d89d773b86f7d34ae0c069a49e295",
+        "H": "2df81511184d89d773b86f7d34ae0c069a49e295",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/compare-web-parity.mjs",
+        "sha": "5c35bc89cdedbd7593a7339995b857e7b9f802bb",
+        "H": "5c35bc89cdedbd7593a7339995b857e7b9f802bb",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.cjs",
+        "sha": "b36f8db3a1d34233a697a676ab9bb86aadd9cfa3",
+        "H": "b36f8db3a1d34233a697a676ab9bb86aadd9cfa3",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.test.mjs",
+        "sha": "902f0d99874738550e3545cfab0d75c1ad827c9f",
+        "H": "902f0d99874738550e3545cfab0d75c1ad827c9f",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/db-query-diagnostics.cjs",
+        "sha": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+        "H": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/db-query-diagnostics.test.mjs",
+        "sha": "671bc3cb87e263ffb4cae20da0c408aa91519431",
+        "H": "671bc3cb87e263ffb4cae20da0c408aa91519431",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/db-query-operations.cjs",
+        "sha": "9011b6edb7296c8872d3e311074529a49987b575",
+        "H": "9011b6edb7296c8872d3e311074529a49987b575",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+        "sha": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+        "H": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/docker-environment.mjs",
+        "sha": "cdb6497fc78a8f68748c0b6485478b59d3abcffc",
+        "H": "cdb6497fc78a8f68748c0b6485478b59d3abcffc",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/electron-keychain.cjs",
+        "sha": "af22c8ab77717cb8035b33df54c05e9dc3df4b76",
+        "H": "af22c8ab77717cb8035b33df54c05e9dc3df4b76",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/electron-launch.mjs",
+        "sha": "8c853e461279fc4afb7f9fed2ef08c199643eb66",
+        "H": "8c853e461279fc4afb7f9fed2ef08c199643eb66",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/electron-preflight.cjs",
+        "sha": "cce8c698103accd9ac6f2764cf3f1c2e4fe0dee9",
+        "H": "cce8c698103accd9ac6f2764cf3f1c2e4fe0dee9",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/environment.mjs",
+        "sha": "cf1dcee34ea2edeb9e0ed32110966726049246e5",
+        "H": "cf1dcee34ea2edeb9e0ed32110966726049246e5",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/fixtures/native-code-cache.cjs",
+        "sha": "c6612420f7f00b51f370759df39ef5e22100568f",
+        "H": "c6612420f7f00b51f370759df39ef5e22100568f",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/fixtures/native-daemon.mjs",
+        "sha": "253c675bd9169979978a5b6398826f5f98293166",
+        "H": "253c675bd9169979978a5b6398826f5f98293166",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/fixtures/native-viewport.cjs",
+        "sha": "343c99a8d353910918962515391d3ca83451eb59",
+        "H": "343c99a8d353910918962515391d3ca83451eb59",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/generated-workspace-name.mjs",
+        "sha": "1c5c05d753a284e4833b241218ad7de17d97771f",
+        "H": "1c5c05d753a284e4833b241218ad7de17d97771f",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/generated-workspace-name.test.mjs",
+        "sha": "f539145f7d8305b3e154b6c19abe78877133ac82",
+        "H": "f539145f7d8305b3e154b6c19abe78877133ac82",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/idle.mjs",
+        "sha": "2ceda2d307b2b43ef553833414cefe496d26f257",
+        "H": "2ceda2d307b2b43ef553833414cefe496d26f257",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+        "sha": "39e1facecdf28a661511f72e14580fdb4b1ae967",
+        "H": "39e1facecdf28a661511f72e14580fdb4b1ae967",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/lifecycle.mjs",
+        "sha": "8251fc9aa56103614d1ddff944668930d1da937c",
+        "H": "8251fc9aa56103614d1ddff944668930d1da937c",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/live-worker.mjs",
+        "sha": "e25a81358b49d8771d22c31949a42b763894fd1e",
+        "H": "e25a81358b49d8771d22c31949a42b763894fd1e",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/live-worker.test.mjs",
+        "sha": "6f2c022fe069d9fbe9ca0d11507aab368679a816",
+        "H": "6f2c022fe069d9fbe9ca0d11507aab368679a816",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-auth-diagnostics.mjs",
+        "sha": "4a37b4b6c250e550492c1b8ba49cde1e5443d200",
+        "H": "4a37b4b6c250e550492c1b8ba49cde1e5443d200",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-auth-diagnostics.test.mjs",
+        "sha": "585f5edea99d9c74894fd1556a1494a630bb41f3",
+        "H": "585f5edea99d9c74894fd1556a1494a630bb41f3",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-cleanup-close.test.mjs",
+        "sha": "abb40294adf2f97c25875fc1541f31afb9868c5b",
+        "H": "abb40294adf2f97c25875fc1541f31afb9868c5b",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-cleanup.mjs",
+        "sha": "49569102d4dccdbe64b00dd88699ad90e84f8985",
+        "H": "49569102d4dccdbe64b00dd88699ad90e84f8985",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-cleanup.test.mjs",
+        "sha": "b6fea228cc47dcdfd6b2e761e6455615df4be24d",
+        "H": "b6fea228cc47dcdfd6b2e761e6455615df4be24d",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-code-cache.mjs",
+        "sha": "4251fd1135ab01771c153bcc2591fda0e58eff4f",
+        "H": "4251fd1135ab01771c153bcc2591fda0e58eff4f",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-code-cache.test.mjs",
+        "sha": "917022259c7770ec8c865b121889491862dc9a94",
+        "H": "917022259c7770ec8c865b121889491862dc9a94",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-crypto.mjs",
+        "sha": "86926e6807f0b693680dfc1b363e7d104699a260",
+        "H": "86926e6807f0b693680dfc1b363e7d104699a260",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-crypto.test.mjs",
+        "sha": "858064f2e2d081cad80f61d1c22f780900b58755",
+        "H": "858064f2e2d081cad80f61d1c22f780900b58755",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-device-ready.mjs",
+        "sha": "aeacdb31da2c30da3e9afe5dbe7849af91da9a57",
+        "H": "aeacdb31da2c30da3e9afe5dbe7849af91da9a57",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-device-ready.test.mjs",
+        "sha": "9ed7176172b9f9301b25d625611bdf7839447411",
+        "H": "9ed7176172b9f9301b25d625611bdf7839447411",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-document-probe.md",
+        "sha": "164fc429c8bf29fa6d5edfa3437b964362c8e792",
+        "H": "164fc429c8bf29fa6d5edfa3437b964362c8e792",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-document-probe.mjs",
+        "sha": "3b8b5a5306473563c9919dd72ff3653f704f89a5",
+        "H": "3b8b5a5306473563c9919dd72ff3653f704f89a5",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-document.mjs",
+        "sha": "b0288adf3b81f8cde5c7516acf984419acf464be",
+        "H": "b0288adf3b81f8cde5c7516acf984419acf464be",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-document.test.mjs",
+        "sha": "a86fb1e9476a68ce2f75d85be4e908c140d0d8d9",
+        "H": "a86fb1e9476a68ce2f75d85be4e908c140d0d8d9",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-frame-probe.md",
+        "sha": "96d0ed2ed55382737c8a51954485a525ff0f783f",
+        "H": "96d0ed2ed55382737c8a51954485a525ff0f783f",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-frame-probe.mjs",
+        "sha": "5c125e71b1c77024ad7a9d9687de9a7fc609dc4d",
+        "H": "5c125e71b1c77024ad7a9d9687de9a7fc609dc4d",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-metadata.mjs",
+        "sha": "0c7db16eabe88a086ddb6e187d450ca53b430f50",
+        "H": "0c7db16eabe88a086ddb6e187d450ca53b430f50",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-node.mjs",
+        "sha": "c00de2c63acbaaa572cd996d477991369622a3b6",
+        "H": "c00de2c63acbaaa572cd996d477991369622a3b6",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-node.test.mjs",
+        "sha": "87c5e75620646d3a19bff66f3f7ef32fb7c45e2b",
+        "H": "87c5e75620646d3a19bff66f3f7ef32fb7c45e2b",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-resources.mjs",
+        "sha": "0e9b91a830547e79613ae6312ae677002dcfcf06",
+        "H": "0e9b91a830547e79613ae6312ae677002dcfcf06",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-startup.mjs",
+        "sha": "785a9fbd1adad8ba49d4ed79e1b3d009512594d6",
+        "H": "785a9fbd1adad8ba49d4ed79e1b3d009512594d6",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-viewport.mjs",
+        "sha": "d4e52fc817f463d7c7382ee8246ff5522463ede1",
+        "H": "d4e52fc817f463d7c7382ee8246ff5522463ede1",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/native-viewport.test.mjs",
+        "sha": "b3a5c25c84c5854784dda0d375a9dd03fedc8c3a",
+        "H": "b3a5c25c84c5854784dda0d375a9dd03fedc8c3a",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/offline-reconnect.mjs",
+        "sha": "a69e21b88c7e88186adba159d4cd53872f43d436",
+        "H": "a69e21b88c7e88186adba159d4cd53872f43d436",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-clock.mjs",
+        "sha": "0fa02f04de614d40c1d52d364c89a2a173b1fe29",
+        "H": "0fa02f04de614d40c1d52d364c89a2a173b1fe29",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-clock.test.mjs",
+        "sha": "8aafe896f2dbfd97a9f57477094153da905ce809",
+        "H": "8aafe896f2dbfd97a9f57477094153da905ce809",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-fixtures.mjs",
+        "sha": "b2700f11040452a42c8c2a8fac55d500fab8a617",
+        "H": "b2700f11040452a42c8c2a8fac55d500fab8a617",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-fixtures.test.mjs",
+        "sha": "51de22a2d5e9e8f4323bddb56a1d84872c443402",
+        "H": "51de22a2d5e9e8f4323bddb56a1d84872c443402",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-images.mjs",
+        "sha": "873befeef9c6246a2e640786e9a5f45b91381c15",
+        "H": "873befeef9c6246a2e640786e9a5f45b91381c15",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-page-ready.mjs",
+        "sha": "b1c5f927ca512097b6a65b366619e66d9a3ef124",
+        "H": "b1c5f927ca512097b6a65b366619e66d9a3ef124",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-reader-defaults.mjs",
+        "sha": "61892d691e38f3a35dae7de2a701da5bd8ac1b35",
+        "H": "61892d691e38f3a35dae7de2a701da5bd8ac1b35",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-reader-defaults.test.mjs",
+        "sha": "aeeba5ae1f38db70c2a5bf1a25a719a43a14428e",
+        "H": "aeeba5ae1f38db70c2a5bf1a25a719a43a14428e",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-reads.mjs",
+        "sha": "f8fcd9552d773f882e4e6fdb8409d5208c143935",
+        "H": "f8fcd9552d773f882e4e6fdb8409d5208c143935",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-reads.test.mjs",
+        "sha": "b734fdfc8b96f7995970b8a90e83ca8129aa9646",
+        "H": "b734fdfc8b96f7995970b8a90e83ca8129aa9646",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity-settings-ready.mjs",
+        "sha": "2697029e9975359d0f82441f59c05dc0279065e8",
+        "H": "2697029e9975359d0f82441f59c05dc0279065e8",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/parity.mjs",
+        "sha": "71157e93057ca19159a054fd4d41c9c0e0650fca",
+        "H": "71157e93057ca19159a054fd4d41c9c0e0650fca",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/production-application.mjs",
+        "sha": "1a7d3e374af646c3ccbbd568deb975acad04a3f2",
+        "H": "1a7d3e374af646c3ccbbd568deb975acad04a3f2",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/production-application.test.mjs",
+        "sha": "602262835600cee05739e2746c08e62900c50d0b",
+        "H": "602262835600cee05739e2746c08e62900c50d0b",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/run-acceptance.mjs",
+        "sha": "c28c6348d1efcd359ca1440267189d40341aae30",
+        "H": "c28c6348d1efcd359ca1440267189d40341aae30",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/self-hosted.mjs",
+        "sha": "f910f3117fb0a0993e3ee48192a90683148cbf6b",
+        "H": "f910f3117fb0a0993e3ee48192a90683148cbf6b",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/self-hosted.test.mjs",
+        "sha": "83c070a17901490c2ce42591b8b3782f02d6b036",
+        "H": "83c070a17901490c2ce42591b8b3782f02d6b036",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/test/smoke.mjs",
+        "sha": "b56fbf8cc9167adf2d9bce5f2a5fbf229fd69ae9",
+        "H": "b56fbf8cc9167adf2d9bce5f2a5fbf229fd69ae9",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/scripts/build-renderer.mjs",
+        "sha": "f558891553ad41105f497b3c5ae583530ba1a853",
+        "H": "f558891553ad41105f497b3c5ae583530ba1a853",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/scripts/build.mjs",
+        "sha": "876b47c9be337d3617cc3e39496825b2b27f9bd5",
+        "H": "876b47c9be337d3617cc3e39496825b2b27f9bd5",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/scripts/dev.mjs",
+        "sha": "c76a874b3db56239b0e224e5f60609186bb333b9",
+        "H": "c76a874b3db56239b0e224e5f60609186bb333b9",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/scripts/install-electron.mjs",
+        "sha": "7ed091af343429e0b8aba21edd3a217844ba1e0e",
+        "H": "7ed091af343429e0b8aba21edd3a217844ba1e0e",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/scripts/native-evidence.mjs",
+        "sha": "9eaf48c43ba5b3013b5ccb82d58c9dd968ed888e",
+        "H": "9eaf48c43ba5b3013b5ccb82d58c9dd968ed888e",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/scripts/notarize.mjs",
+        "sha": "20583f72c725fd18905fee8b978f7c5948e71dc8",
+        "H": "20583f72c725fd18905fee8b978f7c5948e71dc8",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/scripts/package-dev.mjs",
+        "sha": "9ddbffbad566e5416206baa827bf4a737c61b493",
+        "H": "9ddbffbad566e5416206baa827bf4a737c61b493",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/scripts/renderer-transforms.mjs",
+        "sha": "128776b00521daf50339265f7d9915b9dbff1cba",
+        "H": "128776b00521daf50339265f7d9915b9dbff1cba",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/scripts/verify-mac-package.mjs",
+        "sha": "e3436c4d6eb47356d8856b0c66b88f8c8da3f074",
+        "H": "e3436c4d6eb47356d8856b0c66b88f8c8da3f074",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/app-link.test.ts",
+        "sha": "030549ccb34970f2fb9d19e2ea196e3fefe9e6ba",
+        "H": "030549ccb34970f2fb9d19e2ea196e3fefe9e6ba",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/app-link.ts",
+        "sha": "9075db25231c94d97ba6253d96d16e4ba2422dbb",
+        "H": "9075db25231c94d97ba6253d96d16e4ba2422dbb",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bridge.ts",
+        "sha": "4bd9aa4867ebbcd1bfa3e20da21fd21f31a59a28",
+        "H": "4bd9aa4867ebbcd1bfa3e20da21fd21f31a59a28",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-accounts.ts",
+        "sha": "bb47c126cece96ababa9f9d2a4eed826ec3e4ac8",
+        "H": "bb47c126cece96ababa9f9d2a4eed826ec3e4ac8",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-approval-headers.test.ts",
+        "sha": "8bbfd992a75b523f9eb479ed8e300b2509926af6",
+        "H": "8bbfd992a75b523f9eb479ed8e300b2509926af6",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-auth.ts",
+        "sha": "d860b674f24e3159d7f196270c71c3a6f6e76839",
+        "H": "d860b674f24e3159d7f196270c71c3a6f6e76839",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-bootstrap-timing.test.ts",
+        "sha": "d42cbe103cb949b6e8bf0374152a952f90430089",
+        "H": "d42cbe103cb949b6e8bf0374152a952f90430089",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-bridge.ts",
+        "sha": "72a8e7ff2bf3f6dc38937962241a46b5c2abda69",
+        "H": "72a8e7ff2bf3f6dc38937962241a46b5c2abda69",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-live.test.ts",
+        "sha": "b79a1c1fb2a62da2e2ed6d35d464cfbe6cd6a3a0",
+        "H": "b79a1c1fb2a62da2e2ed6d35d464cfbe6cd6a3a0",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-live.ts",
+        "sha": "7d6056ed3b623cc3366895a3ce4484bec5e65b5d",
+        "H": "7d6056ed3b623cc3366895a3ce4484bec5e65b5d",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-loopback.ts",
+        "sha": "fb10d79785ae9676a89233265ab65fe14ea14417",
+        "H": "fb10d79785ae9676a89233265ab65fe14ea14417",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-policy.ts",
+        "sha": "2fa9d7dd4155a63ca1f15adf6f90855066decd2f",
+        "H": "2fa9d7dd4155a63ca1f15adf6f90855066decd2f",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-protocol.ts",
+        "sha": "653f8534f4f278a7c0e331d28ea3dbbebc49e3a6",
+        "H": "653f8534f4f278a7c0e331d28ea3dbbebc49e3a6",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-security.test.ts",
+        "sha": "905d0a302bf82ef41e502db1547020b6a1784830",
+        "H": "905d0a302bf82ef41e502db1547020b6a1784830",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-servers.test.ts",
+        "sha": "51527973640bd501af720c9245cdc40c8fffa6c7",
+        "H": "51527973640bd501af720c9245cdc40c8fffa6c7",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-servers.ts",
+        "sha": "a81a4c62880d5f65216cfb77f7e424f75bf73721",
+        "H": "a81a4c62880d5f65216cfb77f7e424f75bf73721",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-session-cache.test.ts",
+        "sha": "fd27e8f477bd2b96cc7bae688cb161d130b57822",
+        "H": "fd27e8f477bd2b96cc7bae688cb161d130b57822",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-session-change.ts",
+        "sha": "9134b505407e3b0eee47045592f642dcf84c082e",
+        "H": "9134b505407e3b0eee47045592f642dcf84c082e",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-startup.test.ts",
+        "sha": "3d23644c4b491516db577247476bd8c8c0911cfb",
+        "H": "3d23644c4b491516db577247476bd8c8c0911cfb",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-viewer.ts",
+        "sha": "be4fabce66c953d4d53dff82fa2c6df26cb71f46",
+        "H": "be4fabce66c953d4d53dff82fa2c6df26cb71f46",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-web.test.ts",
+        "sha": "371e199356f9b247c0886081aa76eab33cd00caa",
+        "H": "371e199356f9b247c0886081aa76eab33cd00caa",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/bundled-web.ts",
+        "sha": "9292256a5faa1a62a84c7d959308cd79800e5ba4",
+        "H": "9292256a5faa1a62a84c7d959308cd79800e5ba4",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/daemon-map.test.ts",
+        "sha": "62f891c5baf75fcb0f98ba045fc715d8e954ca1c",
+        "H": "62f891c5baf75fcb0f98ba045fc715d8e954ca1c",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/daemon-map.ts",
+        "sha": "256615e75a4898aac3115e5c61a6da22a6e4e3df",
+        "H": "256615e75a4898aac3115e5c61a6da22a6e4e3df",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/daemon-update.test.ts",
+        "sha": "a011c1fdb3573b45266f14f8153a9a5ebda34e50",
+        "H": "a011c1fdb3573b45266f14f8153a9a5ebda34e50",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/daemon-update.ts",
+        "sha": "f6666f498b6b8e080c1629c6b3be54806d6b3601",
+        "H": "f6666f498b6b8e080c1629c6b3be54806d6b3601",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/daemon.ts",
+        "sha": "f48a5730f110f9ebfb019ad88e92e9259471fab3",
+        "H": "f48a5730f110f9ebfb019ad88e92e9259471fab3",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/globals.d.ts",
+        "sha": "190274c58fde63fe61db700136ddcb590edb0e4e",
+        "H": "190274c58fde63fe61db700136ddcb590edb0e4e",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/index.ts",
+        "sha": "61da70923e2109761919f8b4968c0cb701917ff3",
+        "H": "61da70923e2109761919f8b4968c0cb701917ff3",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/launch-update.test.ts",
+        "sha": "8df43d35435ac65204c4e94a899773e7e7af4532",
+        "H": "8df43d35435ac65204c4e94a899773e7e7af4532",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/launch-update.ts",
+        "sha": "3cf7610d906630ffd460a9d87f90b5f53014ce5e",
+        "H": "3cf7610d906630ffd460a9d87f90b5f53014ce5e",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/local-install.test.ts",
+        "sha": "2b7b09bafe65b75541bb3f391fece9cec199f8eb",
+        "H": "2b7b09bafe65b75541bb3f391fece9cec199f8eb",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/local-install.ts",
+        "sha": "ce08ed88e72d13501142ea306175d5a003fa1e80",
+        "H": "ce08ed88e72d13501142ea306175d5a003fa1e80",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/local-setup.ts",
+        "sha": "0da85bb69edd8d4bd10c994d50069d7db80b72b9",
+        "H": "0da85bb69edd8d4bd10c994d50069d7db80b72b9",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/loopback.test.ts",
+        "sha": "7f1c9394c41a774ba4e228180c643ae3c3c75a4f",
+        "H": "7f1c9394c41a774ba4e228180c643ae3c3c75a4f",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/loopback.ts",
+        "sha": "fb5d185006e475d1abef773fd0570aae3ace845f",
+        "H": "fb5d185006e475d1abef773fd0570aae3ace845f",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/notification-center.test.ts",
+        "sha": "3dd883a27669bed040614450e0fc16ad9acc48b4",
+        "H": "3dd883a27669bed040614450e0fc16ad9acc48b4",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/notification-center.ts",
+        "sha": "512e1b7b1b24afa5b78138cda64f5514fe17c401",
+        "H": "512e1b7b1b24afa5b78138cda64f5514fe17c401",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/offline.test.ts",
+        "sha": "d6cf8e300ccc85e0ba9d39d1e3ca7b3c88e104f5",
+        "H": "d6cf8e300ccc85e0ba9d39d1e3ca7b3c88e104f5",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/offline.ts",
+        "sha": "e7cb653bec8c640a6b6275c630078e330d2e337b",
+        "H": "e7cb653bec8c640a6b6275c630078e330d2e337b",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/repo-picker.ts",
+        "sha": "e67a951d98c6a6d257b0b6dc5d85840c5e17a349",
+        "H": "e67a951d98c6a6d257b0b6dc5d85840c5e17a349",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/return-listener.test.ts",
+        "sha": "6a2123087c39dbfb19ecf92b343c7bb080f94bf4",
+        "H": "6a2123087c39dbfb19ecf92b343c7bb080f94bf4",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/return-listener.ts",
+        "sha": "d1b05330a67173703ba4c0f68ce6bffb137b8ab4",
+        "H": "d1b05330a67173703ba4c0f68ce6bffb137b8ab4",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/security.test.ts",
+        "sha": "0bac3043dca9940992943a725bbe08aabec0172e",
+        "H": "0bac3043dca9940992943a725bbe08aabec0172e",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/security.ts",
+        "sha": "e249dd82613011e62f3bc4d45f2b69ea42008a85",
+        "H": "e249dd82613011e62f3bc4d45f2b69ea42008a85",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/server-directory.ts",
+        "sha": "5216f6205b98880851094f7118cc99ae6d1d7896",
+        "H": "5216f6205b98880851094f7118cc99ae6d1d7896",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/server-discovery.test.ts",
+        "sha": "60fc1270c605d7e6ea5eb50d8563979730670512",
+        "H": "60fc1270c605d7e6ea5eb50d8563979730670512",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/server-discovery.ts",
+        "sha": "1bf27cbaa79bf95e448a38381d86f547eb803c52",
+        "H": "1bf27cbaa79bf95e448a38381d86f547eb803c52",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/session-vault-accounts.test.ts",
+        "sha": "7ab50842671be37f373b13e50c3d9ddff2122473",
+        "H": "7ab50842671be37f373b13e50c3d9ddff2122473",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/session-vault.ts",
+        "sha": "aa5549e66c8e87362c0405802202f53957ece2c6",
+        "H": "aa5549e66c8e87362c0405802202f53957ece2c6",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/ssh-install.test.ts",
+        "sha": "52810ede706bb0acdc0a2bb3317f5e67bf61bbb1",
+        "H": "52810ede706bb0acdc0a2bb3317f5e67bf61bbb1",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/ssh-install.ts",
+        "sha": "678df02e8bbf82ad49e894de20edc750b36cafcc",
+        "H": "678df02e8bbf82ad49e894de20edc750b36cafcc",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/ssh-repair-unregistered.test.ts",
+        "sha": "335808e29d938516aa033277c569c54883e517f1",
+        "H": "335808e29d938516aa033277c569c54883e517f1",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/subscription-callback.test.ts",
+        "sha": "a239fd08a25adcc36b1305ed7dd64a812ef07768",
+        "H": "a239fd08a25adcc36b1305ed7dd64a812ef07768",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/subscription-callback.ts",
+        "sha": "b1d4399a054c0d59de0a294ba4e33529d89c3bdc",
+        "H": "b1d4399a054c0d59de0a294ba4e33529d89c3bdc",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/updates.test.ts",
+        "sha": "376500da547be3fd2a58728b94faf44fbdb65ea8",
+        "H": "376500da547be3fd2a58728b94faf44fbdb65ea8",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/updates.ts",
+        "sha": "9a30ecacad1cf43799462f005e674250cc3b2793",
+        "H": "9a30ecacad1cf43799462f005e674250cc3b2793",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/window-appearance.test.ts",
+        "sha": "fba34da46f1d75614afbaf44e67dae2fb806dc44",
+        "H": "fba34da46f1d75614afbaf44e67dae2fb806dc44",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/main/window-appearance.ts",
+        "sha": "dd1f1646f76d5ae918b75556f578fd6cad5df1e3",
+        "H": "dd1f1646f76d5ae918b75556f578fd6cad5df1e3",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/src/preload/index.ts",
+        "sha": "1e62cd5e98e17554733e75915d2d9f03e99f7826",
+        "H": "1e62cd5e98e17554733e75915d2d9f03e99f7826",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/package.json",
+        "sha": "733aba8cb0bfd26f2c7c7302ad02bb9a92bb0e0f",
+        "H": "733aba8cb0bfd26f2c7c7302ad02bb9a92bb0e0f",
+        "unchanged": true
+      },
+      {
+        "path": "apps/desktop/electron-builder.yml",
+        "sha": "5ec7115ff45bfe4f68ff2e68848c730ebe5b91fb",
+        "H": "5ec7115ff45bfe4f68ff2e68848c730ebe5b91fb",
+        "unchanged": true
+      },
+      {
+        "path": "tests/idle-request-budget.json",
+        "sha": "2ed3ae6beb978cb5cc33d3f6e2eb71962c16f3b4",
+        "H": "2ed3ae6beb978cb5cc33d3f6e2eb71962c16f3b4",
+        "unchanged": true
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "sha": "1e3e2b5edc6dbd6796fd5f2fd464b7c2a6b12b35",
+        "H": "1e3e2b5edc6dbd6796fd5f2fd464b7c2a6b12b35",
+        "unchanged": true
+      },
+      {
+        "path": ".github/workflows/ci-selection.yml",
+        "sha": "334b063f287defd1d93ef11f1235954768c9ed1e",
+        "H": "334b063f287defd1d93ef11f1235954768c9ed1e",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/test-accounts/cli.mjs",
+        "sha": "8bfb15d5a6411ddf73a5ba039070b30662bc7d2f",
+        "H": "8bfb15d5a6411ddf73a5ba039070b30662bc7d2f",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/test-accounts/evidence.mjs",
+        "sha": "8f85f6124eb32afda5d0ce966adbff0aaca7a1bb",
+        "H": "8f85f6124eb32afda5d0ce966adbff0aaca7a1bb",
+        "unchanged": true
+      },
+      {
+        "path": "scripts/test-accounts/environment.mjs",
+        "sha": "ca7f18242173d25bf5e4afb8ade4d0387db656c7",
+        "H": "ca7f18242173d25bf5e4afb8ade4d0387db656c7",
+        "unchanged": true
+      }
+    ],
+    "additionalUnchanged": [
+      {
+        "path": "lib/swr/read-observer.ts",
+        "H": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "G2": "69a827369bd71838ba8ac9ffbee928ca70219e76"
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "H": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "G2": "dae8798653457afad334c2d909b10b63e9b3956f"
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "H": "e7f6972a23519ae45e059038cd0c404789d44a98",
+        "G2": "e7f6972a23519ae45e059038cd0c404789d44a98"
+      },
+      {
+        "path": "apps/desktop/src/startup.ts",
+        "H": "44914b58471b9712622974ce31f77829a6897fff",
+        "G2": "44914b58471b9712622974ce31f77829a6897fff"
+      }
+    ],
+    "temporaryRendererCausalDiagnosticOverlayPresent": false,
+    "diagnosticBoundary": "The existing db-query counter/diagnostics instrumentation is unchanged and remains part of the formal measurement. No temporary R/Q/D/C recorder, dump collector, or diagnostic flag was merged."
+  },
+  "workflow": {
+    "entry": {
+      "id": 391052823,
+      "path": ".github/workflows/ui-policy.yml",
+      "blob": "1e3e2b5edc6dbd6796fd5f2fd464b7c2a6b12b35",
+      "event": "pull_request",
+      "job": "desktop-checks",
+      "uses": "./.github/workflows/desktop.yml",
+      "condition": "github.event_name != 'push' && needs.changes.outputs.desktop == 'true'"
+    },
+    "called": {
+      "name": "Desktop shell",
+      "path": ".github/workflows/desktop.yml",
+      "blob": "1cfd9d8be85015b639809faedc8a68fb83609399",
+      "events": [
+        "workflow_call",
+        "workflow_dispatch"
+      ],
+      "job": "native-arm64",
+      "displayName": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "compositeDisplayName": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "needs": [
+        "changes",
+        "smoke",
+        "icon"
+      ],
+      "runner": "macos-26",
+      "architecture": "arm64",
+      "timeoutMinutes": 150,
+      "nodeSetupVersion": "24",
+      "pnpmVersion": "10.34.3",
+      "postgresMajor": 17
+    },
+    "packageCommand": "node apps/desktop/scripts/package-dev.mjs --acceptance",
+    "cryptoCommand": "node apps/desktop/test/native-crypto.mjs",
+    "acceptanceCommand": "node apps/desktop/test/environment.mjs -- node apps/desktop/test/run-acceptance.mjs bundled-smoke parity lifecycle",
+    "idleRun": false,
+    "idleReason": "Existing Alex 2026-11-06 workflow decision; no extra one-hour idle run.",
+    "artifacts": [
+      {
+        "nameTemplate": "desktop-package-evidence-${{ github.sha }}",
+        "directory": ".cache/desktop-native-evidence",
+        "jsonFiles": [
+          "mac-acceptance-package.json",
+          "native-crypto.json"
+        ],
+        "retentionDays": 7
+      },
+      {
+        "nameTemplate": "desktop-native-evidence-${{ github.sha }}",
+        "directory": ".cache/desktop-evidence",
+        "jsonFiles": [
+          "smoke.json",
+          "parity/parity.json",
+          "lifecycle.json"
+        ],
+        "retentionDays": 7
+      }
+    ],
+    "artifactSuffixBoundary": "The PR referenced_workflows are pinned to refs/pull/1799/merge at 767f4f... . github.sha is the synthetic merge SHA for this PR, while API head_sha is G2. Final actual artifact names must be read from metadata by the original reader; expected suffix is not an artifact receipt.",
+    "audits": [
+      "node apps/desktop/scripts/native-evidence.mjs .cache/desktop-native-evidence",
+      "node scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/desktop-evidence"
+    ]
+  },
+  "measurement": {
+    "fixture": "apps/desktop/test/lifecycle.mjs",
+    "fixtureBlob": "8251fc9aa56103614d1ddff944668930d1da937c",
+    "processCounter": "all actual pg.Client.query calls and PostgreSQL protocol receive/send bytes in primary API, without sampling",
+    "windows": {
+      "webLogin": {
+        "begin": "before ordinary owner.reauthenticate()",
+        "middle": [
+          "common-email-authentication",
+          "web-navigation-to-dom-content-loaded"
+        ],
+        "end": "after same fixture workspace is selected, seed chat visible and composer accepts draft",
+        "client": "fresh Chromium context with ordinary freshly saved private storageState"
+      },
+      "nativeLogin": {
+        "preWindow": "launch bundled Electron and waitForBundledDocument",
+        "begin": "before same ordinary owner.reauthenticate()",
+        "middle": [
+          "common-email-authentication",
+          "native-pkce-and-automatic-renderer-to-public-session"
+        ],
+        "end": "after same fixture workspace is selected and usable; before prepareNativeDevice/recordNativeState",
+        "pkceIncluded": true
+      },
+      "startupBundled": {
+        "window": "startup-bundled",
+        "begin": "pair 1 before fresh Electron launch",
+        "end": "after same usable seeded chat plus composer accepts draft"
+      },
+      "startupHosted": {
+        "window": "startup-hosted",
+        "begin": "pair 1 before fresh Electron launch",
+        "end": "after same usable seeded chat plus composer accepts draft",
+        "client": "preserved hosted Web renderer in the same packaged Electron shell"
+      }
+    },
+    "common": {
+      "pairs": 5,
+      "samples": 10,
+      "order": "odd pair bundled then hosted; even pair hosted then bundled",
+      "profile": "same retained ordinary authenticated profile/workspace and normal profile/OS caches",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "coldStartLatencyThreshold": null,
+      "includesAllPrimaryApiBackground": true,
+      "noGuessedSqlSubtraction": true,
+      "noCachePurgeOrArtificialDelay": true,
+      "devicePreparationOutsideLoginWindow": true,
+      "fixtureAndLeaseSqlExclusion": "only separate harness process; no primary API SQL is subtracted",
+      "protocolByteExclusion": "PostgreSQL connection handshake and TCP/TLS overhead only"
+    },
+    "integrity": [
+      "all four windows complete",
+      "source deployment SHA matches actual checkout",
+      "same API process/runtime/counter instance and monotonically increasing counters",
+      "unknownReadings equals 0",
+      "stage totals/operation totals/ordinal aggregates conserve full counts and both byte directions",
+      "unattributed SQL retained, not guessed into logical actions",
+      "physical RPC started-in-window separate from logical batch items and non-additive completion/crossing facts"
+    ],
+    "hardSqlComparisons": [
+      {
+        "left": "nativeLogin.total.queryCalls",
+        "operator": "<=",
+        "right": "webLogin.total.queryCalls"
+      },
+      {
+        "left": "startup-bundled.total.queryCalls",
+        "operator": "<=",
+        "right": "startup-hosted.total.queryCalls"
+      }
+    ],
+    "budgetAuthority": {
+      "issue": "https://github.com/alexj11324/Mikka/issues/1512",
+      "comment": "https://github.com/alexj11324/Mikka/issues/1512#issuecomment-6697400007",
+      "confirmedBy": "Root independently read exact API comment; native_pending_final reviewed full 133-comment history and prior verifyNativeOriginals, both on 2026-11-10.",
+      "interpretation": "Ordinary login and one startup must each use no more queries than the corresponding Web window."
+    },
+    "protocolBytes": {
+      "metrics": [
+        "pgProtocolReceiveBytes",
+        "pgProtocolSendBytes"
+      ],
+      "required": "report actual complete window totals, each stage and Native-Web differences with conservation checks",
+      "numericLeThreshold": null,
+      "projectionCostBoundary": "The new membership projection has nonzero response-byte cost even though it adds no SQL call. Do not imply bytes are unchanged or omit either direction."
+    },
+    "executionVsDecision": "The unchanged lifecycle fixture records the counters. It does not itself assert the two Native<=Web SQL comparisons. A green Actions job is insufficient to declare the issue Native budget passed."
+  },
+  "otherAcceptance": {
+    "smoke": "real compiled bundled Electron isolated authentication/runtime checks must pass",
+    "parity": {
+      "bothThemes": true,
+      "requiredScreensComplete": true,
+      "maximumChangedRatio": 0.001,
+      "identicalDynamicMaskGeometry": true
+    },
+    "crypto": {
+      "actualPackagedArm64": true,
+      "strictDeepSignatureIntegrity": true,
+      "sameImmutablePackage": true,
+      "independentProcesses": 3,
+      "modes": [
+        "bundled",
+        "hosted",
+        "bundled"
+      ],
+      "canaries": "real encrypted/decrypted independent canaries; each process exits"
+    },
+    "cleanup": "Exact owned apps/browsers/daemons/resources/fixture/lease cleaned; cleanup failure overrides success."
+  },
+  "observedMetadata": {
+    "runId": 42770147727,
+    "event": "pull_request",
+    "workflowId": 391052823,
+    "headSha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "runAttempt": 1,
+    "referencedWorkflows": [
+      {
+        "path": "alexj11324/Mikka/.github/workflows/ci-selection.yml@767f4f612af2c3e794031fba46d1f302ee2efab3",
+        "sha": "767f4f612af2c3e794031fba46d1f302ee2efab3",
+        "ref": "refs/pull/1799/merge"
+      },
+      {
+        "path": "alexj11324/Mikka/.github/workflows/analytics-ssr.yml@767f4f612af2c3e794031fba46d1f302ee2efab3",
+        "sha": "767f4f612af2c3e794031fba46d1f302ee2efab3",
+        "ref": "refs/pull/1799/merge"
+      },
+      {
+        "path": "alexj11324/Mikka/.github/workflows/desktop.yml@767f4f612af2c3e794031fba46d1f302ee2efab3",
+        "sha": "767f4f612af2c3e794031fba46d1f302ee2efab3",
+        "ref": "refs/pull/1799/merge"
+      },
+      {
+        "path": "alexj11324/Mikka/.github/workflows/self-hosted-image.yml@767f4f612af2c3e794031fba46d1f302ee2efab3",
+        "sha": "767f4f612af2c3e794031fba46d1f302ee2efab3",
+        "ref": "refs/pull/1799/merge"
+      }
+    ],
+    "checkedAt": "2026-11-10 06:52:49 UTC",
+    "jobs": [
+      {
+        "id": 129676137315,
+        "name": "desktop-checks / changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-10T06:42:03Z",
+        "headSha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+        "currentStep": null
+      },
+      {
+        "id": 129676443596,
+        "name": "desktop-checks / smoke",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-10T06:42:53Z",
+        "headSha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+        "currentStep": null
+      },
+      {
+        "id": 129676443651,
+        "name": "desktop-checks / checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-10T06:42:54Z",
+        "headSha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+        "currentStep": null
+      },
+      {
+        "id": 129676443698,
+        "name": "desktop-checks / icon",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-10T06:42:54Z",
+        "headSha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+        "currentStep": null
+      },
+      {
+        "id": 129678250257,
+        "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-10T06:47:56Z",
+        "headSha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+        "currentStep": "Run pnpm install --frozen-lockfile"
+      }
+    ]
+  },
+  "limits": {
+    "actionsOriginalsRead": false,
+    "artifactZipDownloaded": false,
+    "computeStarted": false,
+    "refsMoved": false,
+    "formalNativeResult": "pending",
+    "historicalFormalH": {
+      "nativeLoginQueries": 441,
+      "webLoginQueries": 331,
+      "status": "FAIL; not superseded until new actual formal Native passes"
+    },
+    "productionScenariosPassed": 0,
+    "productionScenariosRequired": 2
+  }
+}

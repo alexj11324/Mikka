@@ -1,0 +1,67 @@
+{
+  "schema": "issue1512-posthog-source-alert-current-config-readback/v1",
+  "readAt": "2026-11-10T06:53:06Z",
+  "projectId": 670821,
+  "issueComment": 6697400007,
+  "mode": "read-only existing metadata; no query execution, simulation, scout trigger, alert or insight mutation",
+  "insight": {
+    "id": 13703263,
+    "shortId": "k3M88Rs8",
+    "name": "[1324] Mikka 来源数据库小时异常",
+    "url": "https://us.posthog.com/project/670821/insights/k3M88Rs8",
+    "queryKind": "DataVisualizationNode",
+    "sourceKind": "HogQLQuery",
+    "display": "ActionsTable",
+    "sourceSqlBlob": "f3f8e98d1f54c0c4ad8236669b486249e981f989",
+    "sourceCommit": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "liveSqlBytes": 11298,
+    "exactByteMatch": true,
+    "liveSqlSha256": "0380c78c1ba9ef7ed04ec70d4f5155da166c75ca71313ab44fc83e626488bbd4"
+  },
+  "alert": {
+    "id": "01a1a9eb-1a3a-0000-6f0b-151446674319",
+    "name": "[1324] Mikka 来源数据库小时异常",
+    "enabled": true,
+    "calculationInterval": "hourly",
+    "condition": "absolute_value",
+    "thresholdUpper": 0.5,
+    "queryColumn": "value",
+    "queryEvaluation": "first_row",
+    "labelColumn": "source",
+    "state": "Not firing",
+    "lastCheckedAt": "2026-11-10T06:46:12.181440Z",
+    "subscribedUserCount": 1
+  },
+  "sourceRules": {
+    "weightedQueries": "1/sample_rate; legacy missing0.1",
+    "queryFloor": 2000,
+    "jsonByteFloor": 10000000,
+    "relativeFactor": 3,
+    "historicalWindowHours": 168,
+    "coveredFullHoursAfterRouteFirstPartialHour": 24,
+    "bytesWeightedCoverageMinimum": 0.95,
+    "authenticatedUserHashGroups": 3,
+    "registeredRpcActionGroups": 5,
+    "sameRequestUniqueAttribution": true,
+    "unattributedCountsRetained": true,
+    "noCurrentTelemetry": "NULL; heartbeat covers collection"
+  },
+  "knowledge": {
+    "skill": "posthog:authoring-insight-alerts",
+    "businessKnowledgeSearch": "connection capability unavailable; one schema check and enabled-tool discovery completed",
+    "docsSearch": "current official alerts documentation read",
+    "docsUrl": "https://posthog.com/docs/alerts",
+    "metadataToolSchemasRead": true
+  },
+  "privacy": {
+    "recordType": "allowlisted metadata projection, not an unmodified original response",
+    "personalUserFieldsExcluded": true,
+    "queryResultsExcluded": true,
+    "rawToolResponsesNotPublished": true
+  },
+  "limits": [
+    "Configuration parity is not a new remote SQL-engine execution or a simulated alert test.",
+    "Not firing is the existing alert state at the recorded read, not a future guarantee.",
+    "This does not prove the G2 Native budget or the two production trace cases."
+  ]
+}

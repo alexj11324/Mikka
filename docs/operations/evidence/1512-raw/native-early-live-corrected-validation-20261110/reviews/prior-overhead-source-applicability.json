@@ -1,0 +1,447 @@
+{
+  "schema": "issue1512-independent-historical-probe-applicability-g2/v1",
+  "reviewedAt": "2026-11-10 06:52:22 UTC",
+  "reviewer": "/root/independent_final",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "decision": "PRIOR_FINITE_PROBE_SCOPE_REMAINS_APPLICABLE_AS_HISTORICAL_EVIDENCE; NO_NEW_PERFORMANCE_MEASUREMENT_OR_EXPANDED_SCOPE",
+  "candidate": {
+    "commit": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1"
+  },
+  "prior": {
+    "applicability5852": "b0b28e9af02598fd1c14c098fefecbee43fa1038",
+    "priorReview": "4cb08d969c98591fd36ab504072afbcddea274d2",
+    "historicalExecutionSource": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+    "historicalControlledFailureRun": 42552094175,
+    "historicalFiniteOverheadReport": "7e7856cbe3bac470133110f81c92e9873fc1d8f6"
+  },
+  "method": [
+    "Recover the exact20-file list from the frozen5852 applicability proof, then compare every expected blob with the independently verified finalG2 complete leaf map.",
+    "Read exact5852/H/M root Git trees to compare complete pnpm-lock.yaml, pnpm-workspace.yaml and root tsconfig.json blob IDs with G2.",
+    "Read and structurally compare root package.json at5852/H/M/G2; check all top-level keys and list every changed script, not just selected dependency names.",
+    "Read unchanged probe and request-trace source and compare both known historical differences in tracing/node.ts and tracing/sanitize.ts. No benchmark, controlled failure or product execution was started."
+  ],
+  "sourceDependencies": [
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "historical": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "prior5852": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "currentG2": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "apps/api/runtime/request-trace.ts",
+      "historical": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+      "prior5852": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+      "currentG2": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "historical": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+      "prior5852": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "currentG2": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "equalTo5852": true,
+      "equalToHistorical": false
+    },
+    {
+      "path": "lib/tracing/config.ts",
+      "historical": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "prior5852": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "currentG2": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "lib/tracing/context.ts",
+      "historical": "fe005d26c2ea903250683d9351334b95ef328383",
+      "prior5852": "fe005d26c2ea903250683d9351334b95ef328383",
+      "currentG2": "fe005d26c2ea903250683d9351334b95ef328383",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "lib/tracing/spans.ts",
+      "historical": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "prior5852": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "currentG2": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "lib/tracing/sampling.ts",
+      "historical": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "prior5852": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "currentG2": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "historical": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+      "prior5852": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "currentG2": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "equalTo5852": true,
+      "equalToHistorical": false
+    },
+    {
+      "path": "lib/tracing/logs.ts",
+      "historical": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "prior5852": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "currentG2": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "lib/tracing/flush.ts",
+      "historical": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "prior5852": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "currentG2": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "lib/tracing/labels.ts",
+      "historical": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "prior5852": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "currentG2": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "packages/protocol/src/tracing.ts",
+      "historical": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "prior5852": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "currentG2": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "packages/protocol/src/coded-error.ts",
+      "historical": "53c619750e667cba008192495928112da5de16f1",
+      "prior5852": "53c619750e667cba008192495928112da5de16f1",
+      "currentG2": "53c619750e667cba008192495928112da5de16f1",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "packages/protocol/src/trace-context.ts",
+      "historical": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "prior5852": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "currentG2": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "lib/base-path-config.mjs",
+      "historical": "a5338d3516d88e4f911031a316ae5187a379ba33",
+      "prior5852": "a5338d3516d88e4f911031a316ae5187a379ba33",
+      "currentG2": "a5338d3516d88e4f911031a316ae5187a379ba33",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "scripts/test-accounts/database-target.mjs",
+      "historical": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+      "prior5852": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+      "currentG2": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "packages/protocol/src/local-test-mode.ts",
+      "historical": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+      "prior5852": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+      "currentG2": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "scripts/server-test.mjs",
+      "historical": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+      "prior5852": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+      "currentG2": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "historical": "52a7ed583d756b1575697556e29a6f65438d2410",
+      "prior5852": "52a7ed583d756b1575697556e29a6f65438d2410",
+      "currentG2": "52a7ed583d756b1575697556e29a6f65438d2410",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    },
+    {
+      "path": "lib/posthog-config.ts",
+      "historical": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "prior5852": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "currentG2": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "equalTo5852": true,
+      "equalToHistorical": true
+    }
+  ],
+  "sourceSummary": {
+    "exactListLength": 20,
+    "identicalTo5852": 20,
+    "identicalToOriginalHistoricalSource": 18,
+    "knownEarlierDifferences": 2
+  },
+  "rootFileBindings": [
+    {
+      "key": "root5852",
+      "sha": "42d33eb7faf77d7049607523599de9374e065660",
+      "truncated": false,
+      "roots": [
+        {
+          "path": "package.json",
+          "sha": "15694f93bdaa65ce04d1f2dfa5325e44b7f59511",
+          "currentG2": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+          "equal": false
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "sha": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+          "currentG2": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+          "equal": true
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "sha": "a9aff193192f224a7b457af8b82a52cfa86c9a48",
+          "currentG2": "a9aff193192f224a7b457af8b82a52cfa86c9a48",
+          "equal": true
+        },
+        {
+          "path": "tsconfig.json",
+          "sha": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+          "currentG2": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+          "equal": true
+        }
+      ]
+    },
+    {
+      "key": "rootH",
+      "sha": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+      "truncated": false,
+      "roots": [
+        {
+          "path": "package.json",
+          "sha": "4b0b4d88bfa19cc2fe9a792a415d89a247a27e56",
+          "currentG2": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+          "equal": false
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "sha": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+          "currentG2": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+          "equal": true
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "sha": "a9aff193192f224a7b457af8b82a52cfa86c9a48",
+          "currentG2": "a9aff193192f224a7b457af8b82a52cfa86c9a48",
+          "equal": true
+        },
+        {
+          "path": "tsconfig.json",
+          "sha": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+          "currentG2": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+          "equal": true
+        }
+      ]
+    },
+    {
+      "key": "rootM",
+      "sha": "03712f2c1ca03ee45e61e124bd430fc9d1a377c9",
+      "truncated": false,
+      "roots": [
+        {
+          "path": "package.json",
+          "sha": "677ab7d4849cbefe1b7dd33ebbc998b17e69ce09",
+          "currentG2": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+          "equal": false
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "sha": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+          "currentG2": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+          "equal": true
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "sha": "a9aff193192f224a7b457af8b82a52cfa86c9a48",
+          "currentG2": "a9aff193192f224a7b457af8b82a52cfa86c9a48",
+          "equal": true
+        },
+        {
+          "path": "tsconfig.json",
+          "sha": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+          "currentG2": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+          "equal": true
+        }
+      ]
+    }
+  ],
+  "packageDeltas": [
+    {
+      "from": "package5852",
+      "fromBlob": "15694f93bdaa65ce04d1f2dfa5325e44b7f59511",
+      "toBlob": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+      "changedKeys": [
+        "scripts"
+      ],
+      "changedScripts": [
+        "test:settings-backend",
+        "test:byos",
+        "test:run-publication",
+        "test:github",
+        "test:factory",
+        "test:device-gateway",
+        "test:inbox-db"
+      ],
+      "runtimeDependenciesEqual": true,
+      "devDependenciesEqual": true,
+      "packageManagerEqual": true,
+      "enginesEqual": true
+    },
+    {
+      "from": "packageH",
+      "fromBlob": "4b0b4d88bfa19cc2fe9a792a415d89a247a27e56",
+      "toBlob": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+      "changedKeys": [
+        "scripts"
+      ],
+      "changedScripts": [
+        "test:settings-backend",
+        "test:device-gateway"
+      ],
+      "runtimeDependenciesEqual": true,
+      "devDependenciesEqual": true,
+      "packageManagerEqual": true,
+      "enginesEqual": true
+    },
+    {
+      "from": "packageM",
+      "fromBlob": "677ab7d4849cbefe1b7dd33ebbc998b17e69ce09",
+      "toBlob": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+      "changedKeys": [
+        "scripts"
+      ],
+      "changedScripts": [
+        "test:device-gateway"
+      ],
+      "runtimeDependenciesEqual": true,
+      "devDependenciesEqual": true,
+      "packageManagerEqual": true,
+      "enginesEqual": true
+    }
+  ],
+  "packageScopeCorrection": {
+    "from": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "to": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "changedTopLevelSections": [
+      "scripts"
+    ],
+    "changedScriptsCount": 7,
+    "changedScripts": [
+      "test:settings-backend",
+      "test:byos",
+      "test:run-publication",
+      "test:github",
+      "test:factory",
+      "test:device-gateway",
+      "test:inbox-db"
+    ],
+    "fromHChangedScripts": [
+      "test:settings-backend",
+      "test:device-gateway"
+    ],
+    "fromMChangedScripts": [
+      "test:device-gateway"
+    ],
+    "instruction": "The prior PR phrase 'only five test scripts' must not be relabelled as the final5852->G2 comparison. The exact final comparison is seven test scripts, with dependencies/devDependencies/engines/packageManager unchanged. Update the scope/count if extending the old paragraph to G2.",
+    "noRuntimeDependencyChange": true
+  },
+  "measuredCallGraph": {
+    "probe": {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "blob": "09280f0dfb945157aa8c692699fecbc2989f15dc"
+    },
+    "requestWrapper": {
+      "path": "apps/api/runtime/request-trace.ts",
+      "blob": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b"
+    },
+    "setup": "The probe creates a local Node HTTP server, real pg Pool(max1) and instrumentation, product createTracerProvider and createLogProvider, and RunContext/W3C propagation.",
+    "nonFailurePath": "Each request uses /off or /on. The instrumented /on branch calls beginRequestTrace plus withTraceMetadata/withRunSpan around three SELECT1 requests. The comparator executes the same three queries without the request/run spans.",
+    "exporters": "Default benchmark uses InMemorySpanExporter and InMemoryLogRecordExporter, batches telemetry and force-flushes between blocks. Remote OTLP exists only in the distinct --export-controlled-failures mode, which skips latency sampling.",
+    "timing": "100 warmup requests per condition;600 measured requests per condition in the archived report;20-request blocks alternating condition order. It is not per-request randomized pairing or current production concurrency.",
+    "exactSourceAnchors": {
+      "inMemorySpans": 88,
+      "inMemoryLogs": 89,
+      "explicitServerlessFalse": 95,
+      "localPgPool": 99,
+      "requestWrapper": 116,
+      "blockSize": 173,
+      "baselineModeGuard": 168,
+      "providerNoopGuard": 63,
+      "unmeasuredExporterDrain": 88
+    },
+    "noNativePath": "The direct probe/HTTP handler call graph contains no Native renderer, desktop read batch, workspace bootstrap, live channel registry/preparation/cache handoff, authorizedBootstrapScopes or browser acceptance adapter calls. The latest client/live/cache-scope changes are outside this probe's exercised work.",
+    "externalFailureMode": "The20 synthetic failure mode checks product sampling/retention and exports sanitized telemetry. Its transport callback receipts remain distinct from the archived backend ingestion verification; neither is a production coding/model run."
+  },
+  "knownEarlierUnmeasuredDifferences": [
+    {
+      "path": "lib/tracing/node.ts",
+      "historicalBlob": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+      "currentBlob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "exactChange": "Root-end waitUntil flush now follows batcher.forceFlush with exporter.forceFlush, retaining already-started transport.",
+      "applicability": "Probe explicitly passes serverless:false and FlushOnRootEnd.onEnd immediately returns; that new drain branch is not exercised by either local measured handler or the controlled-failure probe.",
+      "notClaimed": "No serverless drain overhead, external exporter network latency or current deployment performance PASS."
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "historicalBlob": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+      "currentBlob": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "exactChange": "Adds the closed workflow.events.transport enum for http/ws and rejects other values.",
+      "applicability": "The existing finite probe does not supply this workflow transport field. The added comparison is not retroactively measured, even when its value-specific branch is not selected.",
+      "notClaimed": "No exact current-source latency equality or zero sanitizer overhead."
+    }
+  ],
+  "historicalResultsRetained": {
+    "reportEnvironment": {
+      "node": "v24.22.2",
+      "platform": "linux",
+      "postgres": "real loopback",
+      "requests_per_condition": 600,
+      "queries_per_request": 3
+    },
+    "handlerDeltaMeanMs": 0.34458290666665925,
+    "handlerDeltaP95Ms": 0.43658000000004904,
+    "originalAttribution": "The original finite Web HTTP/PG in-memory baseline and separately verified controlled-failure retention keep their original source/run/environment attribution.",
+    "noMeasurementRelabel": true,
+    "noNeedForRepeatSolelyForNewAppSha": true
+  },
+  "exclusions": [
+    "Production PostHog collector network and serverless post-response exporter drain.",
+    "Whole daemon, CLI, E2B provisioning, model/provider or live subscription costs.",
+    "New Native login startup/steady-state lifecycle, early live connection/ticket timing, home membership projection bytes and full SQL/bytes budget.",
+    "Current production traffic/concurrency and a claim that every request adds less than a fixed millisecond threshold.",
+    "Global zero overhead or exact current-source equality to the historical numeric result."
+  ],
+  "finalDisposition": "No new concrete invalidation was found in the specified20 core dependencies or pinned5852->G2 runtime inputs. Preserve the limited historical evidence and its two earlier unmeasured code differences. Complete the actual new-head Native and production acceptance separately.",
+  "independentRelatedReviews": {
+    "g2BindingAndResults": "5439c00da315593c80e501924a7adfd81791bd56",
+    "currentPrDescription": "28f6c02d52800a5bc7f48f5f187697937575452d"
+  },
+  "operations": {
+    "newRuns": 0,
+    "newResources": 0,
+    "originalActionsLogOrArtifactFetches": 0,
+    "productionReads": 0,
+    "refChanges": 0
+  },
+  "blockers": []
+}

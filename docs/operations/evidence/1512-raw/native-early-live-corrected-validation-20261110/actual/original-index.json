@@ -1,0 +1,265 @@
+{
+  "schema": "issue1512-live-routing-validation-original-stream-index/v1",
+  "repository": "alexj11324/Mikka",
+  "runId": "42769641000",
+  "attempt": "1",
+  "jobId": 129674158815,
+  "head": "4c7270ebfdf828f368cac066ffc8589d8b522d5e",
+  "source": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+  "sourceTree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+  "originalResponse": {
+    "sha": "7967410df4741ad9282ed8c99e66d15e4972a705",
+    "bytes": 518707,
+    "sha256": "f17934145cebed237f620c9202e51b9cfcbaadc657930bff08df6f31530c2be2"
+  },
+  "originalLog": {
+    "sha": "5e1de17d94fecc135349f02b5939c59d4470dedf",
+    "bytes": 492531,
+    "sha256": "20ef76f39cc379957b2df048d7e15cf740651857faf334d3c1f4b22e44858f19"
+  },
+  "preservation": "One original job-log fetch. Full response and complete decoded log frozen before parsing; each raw stdout/stderr decoded from strict BEGIN/CHUNK/END base64 frames, verified by emitted byte length/SHA256, then Git-frozen before TAP or receipt semantic interpretation. No original artifact ZIP download.",
+  "streamCount": 24,
+  "streams": [
+    {
+      "label": "live-routing-regressions",
+      "stream": "stdout",
+      "file": "live-routing-regressions-stdout.log",
+      "bytes": 5171,
+      "sha256": "58397a6827841c2a96b9814ac8d7c26f5283bfc710fbe91e10131e07ebbc0655",
+      "blob": "f394ddd413fca5e1fa6a9ca03bf52f7185ca397e"
+    },
+    {
+      "label": "live-routing-regressions",
+      "stream": "stderr",
+      "file": "live-routing-regressions-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "workspace-app",
+      "stream": "stdout",
+      "file": "workspace-app-stdout.log",
+      "bytes": 3055,
+      "sha256": "2e4149bd07b51a52b089a03d44f16f5e7939200c4dcc21ca15f3ded48caaaee3",
+      "blob": "9648136f47f8e7c8a65dde977c8657f5acabb972"
+    },
+    {
+      "label": "workspace-app",
+      "stream": "stderr",
+      "file": "workspace-app-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "cloud-startup",
+      "stream": "stdout",
+      "file": "cloud-startup-stdout.log",
+      "bytes": 22333,
+      "sha256": "f148ee050380a5fd3c547eff6ab716bd187b36c79dd12acb8ff76fea998d1d52",
+      "blob": "58e28ed29ecb944b6b9037ff8739410cc9af755e"
+    },
+    {
+      "label": "cloud-startup",
+      "stream": "stderr",
+      "file": "cloud-startup-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "changed-root-oxlint",
+      "stream": "stdout",
+      "file": "changed-root-oxlint-stdout.log",
+      "bytes": 89,
+      "sha256": "da8e281080f85b6a2c83e52a2a22c089465b1d9cf0ff0ac65d421726722931a4",
+      "blob": "194f12d743ed586e2bc3f3fac03a379063cb17d2"
+    },
+    {
+      "label": "changed-root-oxlint",
+      "stream": "stderr",
+      "file": "changed-root-oxlint-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "desktop-source-oxlint",
+      "stream": "stdout",
+      "file": "desktop-source-oxlint-stdout.log",
+      "bytes": 217,
+      "sha256": "67c8d2a51f0f7a96a27f2bfaab82a1223a58476544a335cc8866abbba4126e04",
+      "blob": "9139ce340a04e13ced135b6a2876e6b8cc680607"
+    },
+    {
+      "label": "desktop-source-oxlint",
+      "stream": "stderr",
+      "file": "desktop-source-oxlint-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "migration-bootstrap",
+      "stream": "stdout",
+      "file": "migration-bootstrap-stdout.log",
+      "bytes": 1404,
+      "sha256": "343da9edb9b58e263f3188e440ebdc26df825440e63198be88500d70edffd08c",
+      "blob": "8dbec5e923c162101a90781558d1e7b858716631"
+    },
+    {
+      "label": "migration-bootstrap",
+      "stream": "stderr",
+      "file": "migration-bootstrap-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "e2e-setup",
+      "stream": "stdout",
+      "file": "e2e-setup-stdout.log",
+      "bytes": 21440,
+      "sha256": "7fcbab4a666c5b23e8c58ac438f527275cbe0c4096e2b0f9357f53c7e73334ae",
+      "blob": "0345f9b3a0d9b951ce7a9b463daca28904d8e8f8"
+    },
+    {
+      "label": "e2e-setup",
+      "stream": "stderr",
+      "file": "e2e-setup-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "environment-bind",
+      "stream": "stdout",
+      "file": "environment-bind-stdout.log",
+      "bytes": 153,
+      "sha256": "be50836342484d48d013565f0fc574990305e50377a175f9aec2442d90daecaf",
+      "blob": "fc8174dd3a36b6b78e76080ea4d7e8f1e7feb814"
+    },
+    {
+      "label": "environment-bind",
+      "stream": "stderr",
+      "file": "environment-bind-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "cache-scope-pg",
+      "stream": "stdout",
+      "file": "cache-scope-pg-stdout.log",
+      "bytes": 16854,
+      "sha256": "2d066fb78b6965eb26ea08669e5d8f7ed44f9662f8c048f24f21cd5edc72a0e6",
+      "blob": "36d60efff6cf5450e47d498b34d7620f015fbf72"
+    },
+    {
+      "label": "cache-scope-pg",
+      "stream": "stderr",
+      "file": "cache-scope-pg-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "root-types",
+      "stream": "stdout",
+      "file": "root-types-stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "root-types",
+      "stream": "stderr",
+      "file": "root-types-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "frontend-types",
+      "stream": "stdout",
+      "file": "frontend-types-stdout.log",
+      "bytes": 112,
+      "sha256": "2ef0d6047466a0901c7028b30b5174908637334416c211e818564fc46799fd6d",
+      "blob": "5ed65c7077b5fbbc2653cdd95d6bd6e931b55d0d"
+    },
+    {
+      "label": "frontend-types",
+      "stream": "stderr",
+      "file": "frontend-types-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "desktop-renderer-types",
+      "stream": "stdout",
+      "file": "desktop-renderer-types-stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "desktop-renderer-types",
+      "stream": "stderr",
+      "file": "desktop-renderer-types-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    }
+  ],
+  "emittedRawJsonRecords": {
+    "CONTROL": {
+      "blob": "021d068880c81c77f13b6cb6741e4284d1e3fb9b",
+      "bytes": 9992,
+      "sha256": "02e9a02c9287ce9d2ca66fa05bc30885a94dccf0b92a695c04758ea0560410b1",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+    },
+    "DATABASE_STARTED": {
+      "blob": "e0513b7e0fbc344721c2cad2108e33aae64edc7d",
+      "bytes": 280,
+      "sha256": "26f4ffa1494a26ef6ab130f75b5ee64b7edbeadb256e8b1a71cd42d8d792f32a",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+    },
+    "VERDICT": {
+      "blob": "6174063e64d45dc30b22d039007acad977af408e",
+      "bytes": 174191,
+      "sha256": "ff8b7ad17cbe0b75c63220884cdf4c9f7ff6d76570e3adbdb5324b6e46b3debf",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+    },
+    "CLEANUP": {
+      "blob": "515d4f2274a69f17cc8129fa51430b8768e5772c",
+      "bytes": 576,
+      "sha256": "77906ba4721958417695aad0d64d5a9c666034242344f385c9c173e9e4fd892c",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+    }
+  },
+  "artifact": {
+    "metadataOnly": true,
+    "originalZipDownloaded": false,
+    "metadataResponseBlob": "228312dd15576502aa25565b3c23d1b9c1c6e5b8",
+    "id": 13741286841,
+    "name": "issue1512-native-live-routing-validation-42769641000-attempt-1",
+    "size_in_bytes": 33886,
+    "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13741286841",
+    "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13741286841/zip",
+    "expired": false,
+    "created_at": "2026-11-10T06:39:40Z",
+    "expires_at": "2026-11-17T06:39:40Z",
+    "updated_at": "2026-11-10T06:39:40Z",
+    "digest": "sha256:7bd95c4e2827a77f4e38c437ed8f61bff151b05325d5f367a5b9c43a39c9c557",
+    "workflow_run": {
+      "id": 42769641000,
+      "repository_id": 1427517699,
+      "head_repository_id": 1427517699,
+      "head_branch": "ops/1512-task-runs-pg-20261110",
+      "head_sha": "4c7270ebfdf828f368cac066ffc8589d8b522d5e"
+    }
+  },
+  "terminalJobsMetadataBlob": "ab677ea84952f234b8ae80781896dd75ffc60f50"
+}

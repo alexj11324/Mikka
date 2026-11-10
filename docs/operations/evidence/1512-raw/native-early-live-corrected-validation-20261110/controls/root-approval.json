@@ -1,0 +1,202 @@
+{
+  "schema": "issue1512-live-routing-validation-root-approval/v1",
+  "decision": "AUTHORIZE_ONE_CORRECTED_ISOLATED_FIXED_SOURCE_VALIDATION",
+  "reviewedAt": "2026-11-10T06:35:00Z",
+  "source": {
+    "sha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+    "parents": [
+      "ff385bfd91edcd40c3b3ee398b4b93098e5becbb"
+    ],
+    "completeLeafCount": 6983,
+    "wholeTreeHashIndependentlyReconstructed": true,
+    "allLeafModeTypeShaReadback": true
+  },
+  "merge": {
+    "sha": "9238b7092a39fce7edde2e488aef516c0b544677",
+    "tree": "03712f2c1ca03ee45e61e124bd430fc9d1a377c9",
+    "parents": [
+      "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "ab2d00a43a79d35380b4d2db9014a3792fea63ca"
+    ]
+  },
+  "previousSource": {
+    "sha": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "parents": [
+      "9238b7092a39fce7edde2e488aef516c0b544677"
+    ]
+  },
+  "previousRun": {
+    "id": 42766089161,
+    "attempt": 1,
+    "jobId": 129662811912,
+    "conclusion": "failure",
+    "verdictBlob": "98e57b4910569fc3fbc7f82d52fd37840b8850b9",
+    "rawStreamIndex": "fa3ad0f12efec4794103f7311f3017825a59859a",
+    "mechanicalProof": "f0ab2b884b55dafa339f7d8559fc12f65667152f",
+    "cleanup": "b5c2fc35e53cbcf7c16292d50cbafc8d2838a3c0"
+  },
+  "previousOps": {
+    "sha": "6d7f36ea3c6b918f613cf22e848ed52d413d2bd6",
+    "tree": "87c70fe8b81cc099cb5a4a5ef6e59cef83129ba4"
+  },
+  "controls": {
+    "driver": "4dc0e9aa58f1572091c6e5cb4974bdac49037a35",
+    "driverSha256": "9947e61d7b827afc13ee6fcdfa9d5cd30e3cd5e206b74e5257a3911a14b20bdc",
+    "workflow": "b8e94d589a54448b9eefff3ce090d8c010567699",
+    "closedWorkflow": "ad6d0157aac5305dde40ad518262aeb684b05913",
+    "coreManifestSha256": "97f755169e2978405f933b2e4fde6296d3638c28daa1fe80b2ceace9c082516f",
+    "coreManifestDefinition": "Exact final manifest serialization with candidateEvidence.finalRootApproval=null; all other fields fixed"
+  },
+  "correctionDiff": [
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "base": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531"
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "base": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+      "sha": "dd831e0e657d00de9210e39194a926b4e977ec56"
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "base": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "sha": "c9059d2c8be5122681f5c4657889b01633ed3736"
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "base": "bbdae2625952b475c3488384bbd48c876887a805",
+      "sha": "ee59feba1e29769805806ec6e166abbc65994233"
+    }
+  ],
+  "sourceBinding": {
+    "sourceFiles": 33,
+    "commonFiles": 10,
+    "all43MatchG2Tree": true,
+    "trackedWorktreeWholeTreeCheckedBeforeAndAfterEveryCommand": true
+  },
+  "evidence": {
+    "rootIntegration": "02c63e132315daccf91fb21529b83967cfd8e5c2",
+    "frontendFixManifest": "3578f33781eccdcd13254d5daea9fee421be5e4d",
+    "frontendFixIndependent": "d68afe9f8632ecd3f0faf34f972541d4e2ce19c1",
+    "pgFixReview": "b0c991217f60d84853febb7352ad3f210b4a0be6",
+    "pgFixIndependent": "ff3222c1bd1b3f553d5e9c85b2d490adc2afc3f2",
+    "freshnessCause": "b9402b98f534ddcb10d9b0e1dde4dd2b89d36300",
+    "exactSourceCountProof": "e3957af37b165a0a86b5715638b2b6911a158cb8",
+    "firstValidationReview": "50b01c430f36bc3703669496375086da3ffdb479",
+    "firstFailureMechanicalProof": "f0ab2b884b55dafa339f7d8559fc12f65667152f"
+  },
+  "reviewedBehavior": [
+    "Root read all four corrected sources, exact frontend and PG deltas, actual PG guard migration and independent narrow reviews.",
+    "The hook differs only by three TypeScript type identifier replacements; reversing them exactly reproduces the prior G source. Product runtime behavior is unchanged.",
+    "Four freshness fixtures now drive the unchanged 100ms debounce, require one actual refresh, and preserve business-read expectations1/2/2/1. No readFresh or proof predicate changes.",
+    "SWR ESM test external resolves the import export-condition. Actual App and hook behavior assertions remain unchanged.",
+    "PG test now proves existing personal-membership and immutable-kind SQLSTATE23514 rejection. Exact original5971-byte prefix, all15 registrations and original query-count assertions remain.",
+    "The entire corrected32KB controller and active/closed workflows were read. The previous actual failed G is a required parent and its failure is preserved. Admission validates source/trees/parents/4changed/21product paths and expiry.",
+    "Cloud startup uses its required tsx loader for the real extensionless TypeScript import; no product source or cloud88 assertions changed.",
+    "Full raw stdout/stderr are screened for temporary credentials and exported with exact length/SHA256 before parsing; no truncation or failure relabeling. Independent unit/type/lint/PG outcomes and owned cleanup are retained."
+  ],
+  "execution": {
+    "expiresAt": "2026-11-10T07:45:00.000Z",
+    "attempt": 1,
+    "runner": "ubuntu-22.04",
+    "node": "24.22.1",
+    "pnpm": "10.34.3",
+    "dependencyInstalls": 1,
+    "postgres": "postgres:17; fresh run-owned loopback container and network",
+    "unitExpected": {
+      "live-routing-regressions": 22,
+      "workspace-app": 13,
+      "cloud-startup": 88
+    },
+    "pgExpected": 15,
+    "typeChecks": 3,
+    "lints": 2,
+    "commandsExpected": 12,
+    "actualResults": "PENDING",
+    "countsArePredictions": true
+  },
+  "reusedResults": {
+    "totalUnitCases": 157,
+    "tests": [
+      {
+        "path": "lib/live/channel.test.ts",
+        "passed": 59,
+        "tap": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+        "blob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc"
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+        "passed": 14,
+        "tap": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+        "blob": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38"
+      },
+      {
+        "path": "lib/desktop-rpc/wire.test.ts",
+        "passed": 5,
+        "tap": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+        "blob": "2170c999f99b2cfa2f6bbf6667b9de56296a0ada"
+      },
+      {
+        "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+        "passed": 17,
+        "tap": "5667f9518de8521a415a606aa9c00741f7754701",
+        "blob": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a"
+      },
+      {
+        "path": "apps/desktop/scripts/installed-workspace.test.mjs",
+        "passed": 3,
+        "tap": "5667f9518de8521a415a606aa9c00741f7754701",
+        "blob": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa"
+      },
+      {
+        "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+        "passed": 21,
+        "tap": "5667f9518de8521a415a606aa9c00741f7754701",
+        "blob": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae"
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "passed": 38,
+        "tap": "4a51ba0fa4d3a6a35856f74490aff793e1f69e1f",
+        "blob": "06dceefec477df850087b47002266e612dddb63a"
+      }
+    ],
+    "uiPolicy": {
+      "label": "ui-and-runtime-policy",
+      "exitCode": 0,
+      "source": "9c2f44bc94cf1fbfe4fa8097caba8afc20b93268",
+      "proof": "98e57b4910569fc3fbc7f82d52fd37840b8850b9"
+    },
+    "boundary": "Actual unaffected pass cases in the failed prior G; no claim that G as a whole passed, no prior App/registry pass reuse, no Native/production pass inferred. Complete G2 tree differs only in the four audited corrections."
+  },
+  "constraints": {
+    "productionCredentials": false,
+    "productionAccount": false,
+    "externalModelCalls": false,
+    "nativeAcceptanceRun": false,
+    "mainOrFormalRefMutation": false,
+    "unchangedFailedSourceRetry": false,
+    "temporaryDiagnosticsInProduct": false
+  },
+  "cleanup": {
+    "always": true,
+    "exactOwnedRunAttemptShaLabels": true,
+    "stopAndRemoveContainerAndAnonymousVolumes": true,
+    "removeOwnedEmptyNetwork": true,
+    "verifyAbsence": true,
+    "closedEntryAfterAdmission": true
+  },
+  "originalReader": "/root/native_pending_final only; other readers use frozen Git copies",
+  "formalStatus": {
+    "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "fullLoginNative": 441,
+    "fullLoginWeb": 331,
+    "verdict": "FAIL",
+    "productionPassed": 0,
+    "productionRequired": 2,
+    "issueOpen": true
+  }
+}

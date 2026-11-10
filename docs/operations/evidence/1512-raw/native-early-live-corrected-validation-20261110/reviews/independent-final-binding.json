@@ -1,0 +1,986 @@
+{
+  "schema": "issue1512-independent-g2-controller-binding-and-results-review/v1",
+  "reviewedAt": "2026-11-10 06:46:59 UTC",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "reviewer": "/root/independent_final",
+  "decision": "NO_STATIC_BLOCKER; EXACT_G2_SOURCE_ADMISSION_CLOSURE_BINDING_AND_FROZEN_NECESSARY_RESULTS_VERIFIED",
+  "scope": [
+    "Review of the exact controller delta from 39f80294ee396b8b0ceb369bf41e8da25d1efffc to 4dc0e9aa58f1572091c6e5cb4974bdac49037a35, final approval/manifest/workflows and immutable source graph.",
+    "Independent recomputation of M, G2, active and closed tree identities, complete path-change boundaries, source/common bindings and previously passed test applicability.",
+    "Independent reading of already-frozen G2 result, cleanup and five raw TAP blobs. Original Actions log/artifact endpoints were not read by this reviewer.",
+    "No product/ref changes, new runner/VM/database, tests, account/credential access or production actions by this reviewer."
+  ],
+  "controls": {
+    "previousController": "39f80294ee396b8b0ceb369bf41e8da25d1efffc",
+    "controller": {
+      "blob": "4dc0e9aa58f1572091c6e5cb4974bdac49037a35",
+      "bytes": 32108,
+      "sha256": "9947e61d7b827afc13ee6fcdfa9d5cd30e3cd5e206b74e5257a3911a14b20bdc"
+    },
+    "finalManifest": {
+      "blob": "420684e4ed70b3df8050b07b24ae29e5a94201bf",
+      "bytes": 15653,
+      "sha256": "7a13877872371189e7b09389cb7a283a868cecff9758cd2a16c049ce28efc79d"
+    },
+    "rootApproval": {
+      "blob": "68efba46e6b89f19e1db23dc2048ee095936d083",
+      "bytes": 8462,
+      "sha256": "f718dc339fe175fbcc179fd99269f86b15153d6182cebd0320a276092d102338"
+    },
+    "activeWorkflow": {
+      "blob": "b8e94d589a54448b9eefff3ce090d8c010567699",
+      "bytes": 3902,
+      "sha256": "e4a077e097d7226582e2aa3e22254d92b8a08033e3dd88393571bf59cf8438a1"
+    },
+    "closedWorkflow": {
+      "blob": "ad6d0157aac5305dde40ad518262aeb684b05913",
+      "bytes": 3633,
+      "sha256": "f1e3fc8f82151c32076ca0980f89dea81d6c59667f704a7a2ac778dd9162ed4d"
+    },
+    "closedManifest": {
+      "blob": "f3d72f7b9f31882a23d7b3af51073470d102c577",
+      "bytes": 15873,
+      "sha256": "e17dcd2df9df1164c360de86fca05eecff99c922e49e2f178e43ca4f9710f133"
+    },
+    "rootApprovalCoreSha256": "97f755169e2978405f933b2e4fde6296d3638c28daa1fe80b2ceace9c082516f",
+    "expiresAt": "2026-11-10T07:45:00.000Z",
+    "admissionMessage": "ops: issue1512 live routing corrected validation ca60e1f3-5d08-45e9-b8ef-8ea2a8e7ff38",
+    "active": {
+      "sha": "4c7270ebfdf828f368cac066ffc8589d8b522d5e",
+      "tree": "406b95198812b9c5fd46e8e60e97614067c262a7",
+      "parents": [
+        "6d7f36ea3c6b918f613cf22e848ed52d413d2bd6",
+        "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e"
+      ]
+    },
+    "closed": {
+      "sha": "996693d35b80a37b2e418bdde645e13368e6ae90",
+      "tree": "329ad540cc3f737cbbe57046ef470fb234285879",
+      "parents": [
+        "4c7270ebfdf828f368cac066ffc8589d8b522d5e"
+      ],
+      "enabled": false
+    },
+    "closureWorkflowMetadata": "workflowBlob retains active admission identity; actual closed tree uses closedWorkflowBlob.",
+    "closureManifestChangedFields": [
+      "closedAdmission",
+      "enabled",
+      "status"
+    ],
+    "closureExplanation": "The closed manifest keeps workflowBlob as the original active admission identity. The actual closed tree uses closedWorkflowBlob ad6d0157aac5305dde40ad518262aeb684b05913, enabled=false, and an always-false job. The retained active metadata is not an executable reopened entry."
+  },
+  "sourceGraph": {
+    "merge": {
+      "sha": "9238b7092a39fce7edde2e488aef516c0b544677",
+      "tree": "03712f2c1ca03ee45e61e124bd430fc9d1a377c9",
+      "parents": [
+        "5f3598029033b83ee72c88ea6c49955205eecab2",
+        "ab2d00a43a79d35380b4d2db9014a3792fea63ca"
+      ]
+    },
+    "previousFailedSource": {
+      "sha": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+      "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+      "parents": [
+        "9238b7092a39fce7edde2e488aef516c0b544677"
+      ]
+    },
+    "correctedSource": {
+      "sha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+      "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+      "parents": [
+        "ff385bfd91edcd40c3b3ee398b4b93098e5becbb"
+      ]
+    },
+    "independentlyRecomputedTrees": {
+      "merge": {
+        "sha": "03712f2c1ca03ee45e61e124bd430fc9d1a377c9",
+        "leaves": 6978,
+        "directories": 894
+      },
+      "source": {
+        "sha": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+        "leaves": 6983,
+        "directories": 894
+      },
+      "active": {
+        "sha": "406b95198812b9c5fd46e8e60e97614067c262a7",
+        "leaves": 6986,
+        "directories": 896
+      },
+      "closed": {
+        "sha": "329ad540cc3f737cbbe57046ef470fb234285879",
+        "leaves": 6986,
+        "directories": 896
+      }
+    },
+    "exactPathChanges": {
+      "failedSourceToG2": 4,
+      "mergeToG2": 21,
+      "G2ToActive": 3,
+      "activeToClosed": 2
+    },
+    "correctedFiles": [
+      {
+        "path": "lib/live/channels.test.ts",
+        "blob": "c9059d2c8be5122681f5c4657889b01633ed3736",
+        "change": "Drive the existing 100 ms debounce in all four readFresh fixtures and require refreshCount=1; preserve business-read counts 1/2/2/1. The other assertion uses length=0 to avoid never[] narrowing."
+      },
+      {
+        "path": "apps/desktop/scripts/workspace-live.test.mjs",
+        "blob": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+        "change": "Resolve external SWR using the import condition for the real ESM App test. Original product and behavioral assertions unchanged."
+      },
+      {
+        "path": "hooks/use-subagent-updates.ts",
+        "blob": "dd831e0e657d00de9210e39194a926b4e977ec56",
+        "change": "Three erased type-name replacements from concrete LiveChannels to structural LiveChannelRegistry. Reversing these names reproduces the entire previous file; runtime statements unchanged."
+      },
+      {
+        "path": "tests/read-cache-scope.db.test.ts",
+        "blob": "ee59feba1e29769805806ec6e166abbc65994233",
+        "change": "Assert the existing SQLSTATE23514 owner-only personal membership and immutable-kind guards instead of attempting invalid fixture setup. Keep the original 5971-byte prefix, 15 total tests, synthetic projection cases and two-statement current-API assertions."
+      }
+    ],
+    "sourceCommonBindings": [
+      {
+        "path": "lib/swr/cache-scope.ts",
+        "sha": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+        "match": true
+      },
+      {
+        "path": "lib/desktop-rpc/bootstrap.ts",
+        "sha": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+        "match": true
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "sha": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+        "match": true
+      },
+      {
+        "path": "tests/read-cache-scope.db.test.ts",
+        "sha": "ee59feba1e29769805806ec6e166abbc65994233",
+        "match": true
+      },
+      {
+        "path": "lib/live/channel.test.ts",
+        "sha": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+        "match": true
+      },
+      {
+        "path": "lib/live/channels.test.ts",
+        "sha": "c9059d2c8be5122681f5c4657889b01633ed3736",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+        "sha": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+        "match": true
+      },
+      {
+        "path": "lib/desktop-rpc/wire.test.ts",
+        "sha": "2170c999f99b2cfa2f6bbf6667b9de56296a0ada",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/scripts/workspace-live.test.mjs",
+        "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/scripts/installed-workspace.test.mjs",
+        "sha": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+        "sha": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+        "match": true
+      },
+      {
+        "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+        "sha": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae",
+        "match": true
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup.test.mjs",
+        "sha": "ded31e330bef5e83f00659b4383e41b53afd1b81",
+        "match": true
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "sha": "06dceefec477df850087b47002266e612dddb63a",
+        "match": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "sha": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+        "match": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "sha": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+        "match": true
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.mjs",
+        "sha": "f8561bbc3ce02dd53f4ac7ae487bbb8a70da0d3f",
+        "match": true
+      },
+      {
+        "path": "package.json",
+        "sha": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+        "match": true
+      },
+      {
+        "path": "apps/frontend/package.json",
+        "sha": "f304311903743e2177d2aa4d1962cd10f56773c8",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/package.json",
+        "sha": "733aba8cb0bfd26f2c7c7302ad02bb9a92bb0e0f",
+        "match": true
+      },
+      {
+        "path": "scripts/lint-ui.mjs",
+        "sha": "9c2f44bc94cf1fbfe4fa8097caba8afc20b93268",
+        "match": true
+      },
+      {
+        "path": ".oxlintrc.json",
+        "sha": "42edbae82af95c335d45f316c494091950b1b82e",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/oxlint.json",
+        "sha": "7706be89045f6bea033656d0ba16303164ff3ca0",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/app.tsx",
+        "sha": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/bootstrap.ts",
+        "sha": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+        "sha": "ddeb2420392a0abb233bc3742cd539805424bc13",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.ts",
+        "sha": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace.tsx",
+        "sha": "25891b5f8d7dc7a5d6b3cd4688789898052855fd",
+        "match": true
+      },
+      {
+        "path": "hooks/use-live-key.tsx",
+        "sha": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+        "match": true
+      },
+      {
+        "path": "lib/live/channel.ts",
+        "sha": "61cdf48b28ab9260f5567300f2411cb555b13427",
+        "match": true
+      },
+      {
+        "path": "lib/live/channels.ts",
+        "sha": "c40864fe9386855994d3a4ece9480639514d85aa",
+        "match": true
+      },
+      {
+        "path": "lib/live/preparation.ts",
+        "sha": "7377678b777279de0ab21717749743fcce446d73",
+        "match": true
+      },
+      {
+        "path": "hooks/use-subagent-updates.ts",
+        "sha": "dd831e0e657d00de9210e39194a926b4e977ec56",
+        "match": true
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "sha": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+        "match": true
+      },
+      {
+        "path": "scripts/run-db-tests.mjs",
+        "sha": "ea9a1c2092019ad82e3e796df7a4cf9816ded4cc",
+        "match": true
+      },
+      {
+        "path": "scripts/setup-e2e-db.mjs",
+        "sha": "aaf8571eae3dcdb2f88b0dba5feb5a0878e8af41",
+        "match": true
+      },
+      {
+        "path": "scripts/test-accounts/bootstrap.mjs",
+        "sha": "3e29dba60095fb14a3efab57cd1571c6d3a8d8cb",
+        "match": true
+      },
+      {
+        "path": "tests/migrate-empty-db.test.mjs",
+        "sha": "8b77ac4fb0757735c70af1fe0bc0e2a6a2744678",
+        "match": true
+      },
+      {
+        "path": "tests/fixtures/activity-runtime.mjs",
+        "sha": "1f510854af9306cfb6b73b274d73a398f2bdfa05",
+        "match": true
+      },
+      {
+        "path": "tests/helpers/read-metrics.ts",
+        "sha": "5c836b5b3663ba8152319f92bc603a7fcc545b90",
+        "match": true
+      },
+      {
+        "path": "tests/helpers/e2e-target.mjs",
+        "sha": "2627923cc99fe2e9c14d88e6949b59d49d5d1640",
+        "match": true
+      },
+      {
+        "path": "drizzle/20261101020200_personal_workspace_kind.sql",
+        "sha": "3425bcdd9bce7dafd038d61b708795b36be71ffd",
+        "match": true
+      },
+      {
+        "path": "drizzle/20261109035010_team_entitlements.sql",
+        "sha": "f4bde1c93a54c5694ae9e0c5aaa96c6a142a8f17",
+        "match": true
+      }
+    ],
+    "unchangedReuseInputs": [
+      {
+        "path": "package.json",
+        "sha": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "sha": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "tsconfig.json",
+        "sha": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/tsconfig.renderer.json",
+        "sha": "e2e9c270e1d3162a27ebb6121dda544aac787044",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/frontend/tsconfig.json",
+        "sha": "8edce1c70fa1174d8bebd2cf7aedb027073a4609",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/package.json",
+        "sha": "733aba8cb0bfd26f2c7c7302ad02bb9a92bb0e0f",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/frontend/package.json",
+        "sha": "f304311903743e2177d2aa4d1962cd10f56773c8",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "lib/live/channel.ts",
+        "sha": "61cdf48b28ab9260f5567300f2411cb555b13427",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "lib/live/channels.ts",
+        "sha": "c40864fe9386855994d3a4ece9480639514d85aa",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "lib/live/preparation.ts",
+        "sha": "7377678b777279de0ab21717749743fcce446d73",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "lib/live/events.ts",
+        "sha": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "lib/live/presence.ts",
+        "sha": "0b6ff3baba04a577b5d7f1c94a8519e77b013621",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "sha": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "lib/device-gateway-ticket.ts",
+        "sha": "5a84bce13112ea010708fcd4406c19c683c62a50",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "sha": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.ts",
+        "sha": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/bootstrap.ts",
+        "sha": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-loader.ts",
+        "sha": "a966f949fce953ae8aa4eed051c17b4e5d3cb8f6",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+        "sha": "ddeb2420392a0abb233bc3742cd539805424bc13",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/app.tsx",
+        "sha": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/location.ts",
+        "sha": "ac2d1c163497cb165bab470c30661560ae78f053",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/client-configuration.ts",
+        "sha": "5bd1fde7c54de6032823e121dfa633c684fb4a4c",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/transport-state.ts",
+        "sha": "67f68cae303fef55b7196550fa81827ee4f700bc",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/frontend/src/web/platform.tsx",
+        "sha": "307a84b1a92213a2c9f941f2950285eb4c0484ae",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "apps/frontend/src/web/rpc.ts",
+        "sha": "77b9950b7db762ae8f28e6cbfd3dac8e8fe6c0b7",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "lib/base-path.ts",
+        "sha": "ffa8c4910a5d5d5ee3ff5f60065088c097fc4ed2",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.mjs",
+        "sha": "f8561bbc3ce02dd53f4ac7ae487bbb8a70da0d3f",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup.mjs",
+        "sha": "ddc5e88da66a314d601e085d1afca916132aeab1",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": ".github/workflows/e2b-runtime-release.yml",
+        "sha": "7a592d975ac7594e723822f597b512defa4526b2",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/lint-ui.mjs",
+        "sha": "9c2f44bc94cf1fbfe4fa8097caba8afc20b93268",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/ui-policy.mjs",
+        "sha": "fbd927327c726f57c59e2b9ccaf070bed24c3659",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/interaction-policy.mjs",
+        "sha": "8c4e3a64f7f3a9c7ef7ee3cfca33b4d928e354e0",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/settings-policy.mjs",
+        "sha": "798472d4d49feb4a1a64a2885320d997d06fa766",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/icon-button-policy.mjs",
+        "sha": "ec3982a90ffb53dc83f78dd787bd13309028bc72",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/base-path-policy.mjs",
+        "sha": "052052380457b9156674418dd50a2c045441a340",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/split-pane-policy.mjs",
+        "sha": "d38d0812897970af08e60e54dbc37372e0596a8d",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/polling-policy.mjs",
+        "sha": "0911ac34c465529603a8c0135b0082aea4513939",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "scripts/error-cause-policy.mjs",
+        "sha": "822fbde9b131115a119eaa1fd9693dc65164dda2",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "ui-policy.json",
+        "sha": "f7aa7e6c6932e9cc82ec2af96a8a930eedd89173",
+        "mode": "100644",
+        "match": true
+      },
+      {
+        "path": "components.json",
+        "sha": "f89fbf0207ba23999253bbe355f72a6c94ef9ed9",
+        "mode": "100644",
+        "match": true
+      }
+    ],
+    "integrationProof": "02c63e132315daccf91fb21529b83967cfd8e5c2",
+    "staticCountProof": "e3957af37b165a0a86b5715638b2b6911a158cb8"
+  },
+  "controllerReview": {
+    "reviewedEntireDelta": true,
+    "commandPlan": [
+      {
+        "group": "live-routing-regressions",
+        "commands": 1,
+        "expectedTests": 22,
+        "completeFile": "lib/live/channels.test.ts",
+        "executor": "node --test-reporter=tap --import tsx --test"
+      },
+      {
+        "group": "workspace-app",
+        "commands": 1,
+        "expectedTests": 13,
+        "completeFile": "apps/desktop/scripts/workspace-live.test.mjs",
+        "executor": "node --test-reporter=tap --test"
+      },
+      {
+        "group": "cloud-startup",
+        "commands": 1,
+        "expectedTests": 88,
+        "completeFile": "scripts/acceptance/cloud-startup.test.mjs",
+        "executor": "node --test-reporter=tap --import tsx --test"
+      },
+      {
+        "group": "lint",
+        "commands": 2,
+        "scope": "Root oxlint checks the three changed root paths; existing complete desktop lint covers the changed desktop App test."
+      },
+      {
+        "group": "isolated-postgres",
+        "commands": 4,
+        "labels": [
+          "migration-bootstrap",
+          "e2e-setup",
+          "environment-bind",
+          "cache-scope-pg"
+        ],
+        "expectedPgTests": 15
+      },
+      {
+        "group": "types",
+        "commands": 3,
+        "labels": [
+          "root-types",
+          "frontend-types",
+          "desktop-renderer-types"
+        ]
+      }
+    ],
+    "totalCommands": 12,
+    "necessaryChanges": [
+      "Fix the previous cloud-startup executor by loading tsx; the old file load failure registered none of its 88 tests.",
+      "Run all 22 changed registry tests and all 13 App tests, including their previously passing cases.",
+      "Retain explicit previous failed G source/run and exact G->G2 four-path whitelist; fixed parents/trees, 33 source plus 10 common blobs.",
+      "Keep one frozen dependency install and complete before/after tracked-tree/source checks for every command.",
+      "Keep original output framing, bytes/hash checks and preservation before semantic parsing; no truncated output is accepted as complete.",
+      "Each unit/check failure is recorded, later necessary groups continue, and any failure makes the actual job fail.",
+      "Keep complete PG15 gating, no skips/todos/cancellations, and the existing owned container/anonymous-volume/network cleanup verification.",
+      "Remove only the historical UI-policy rerun with explicit applicability review, while keeping the real previous policy result separate.",
+      "Depth4 checkout includes entry, G2, G and M objects needed for the fixed graph checks."
+    ],
+    "retainedGuards": [
+      "Exact repository, branch, push message, attempt1 and expiry admission.",
+      "Fixed Node24.22.1 and pnpm10.34.3; no production credentials or persistent Actions/compile/tsx cache.",
+      "Fresh run-owned PG17 with loopback mapping, owned labels and fixed isolated database targets.",
+      "Full source/tree proofs surrounding installation and commands; no mutable source substitution.",
+      "Full stdout/stderr, exit/signal/timeout/spawn-error truth; no retries or summary relabelling.",
+      "always cleanup only exact owned resources and verify their absence; no broad prune or unrelated-resource adoption.",
+      "Admission closed after one start, without modifying the admitted source run."
+    ],
+    "blockers": []
+  },
+  "historicalReuse": {
+    "previousRun": {
+      "id": 42766089161,
+      "attempt": 1,
+      "jobId": 129662811912,
+      "conclusion": "failure",
+      "verdictBlob": "98e57b4910569fc3fbc7f82d52fd37840b8850b9"
+    },
+    "proofBlob": "0f7bcdcc54a5088eb328c65be86b1475d8125bff",
+    "caseIndexBlob": "4d9ea698ca71ef85948ba9bcfafaa0c75c690fea",
+    "method": "Independently checked all 157 indexed raw TAP start/result lines, names, status and directives from already-frozen Git TAPs. All distinct result lines are ok; no missing/duplicate/conflicting record. Seven test blobs and 40 related inputs match the complete G2 leaf map.",
+    "independentChecks": {
+      "rows": [
+        {
+          "path": "lib/live/channel.test.ts",
+          "blob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+          "actualPassed": 59,
+          "tap": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+          "sameG2Blob": true
+        },
+        {
+          "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+          "blob": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+          "actualPassed": 14,
+          "tap": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+          "sameG2Blob": true
+        },
+        {
+          "path": "lib/desktop-rpc/wire.test.ts",
+          "blob": "2170c999f99b2cfa2f6bbf6667b9de56296a0ada",
+          "actualPassed": 5,
+          "tap": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+          "sameG2Blob": true
+        },
+        {
+          "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+          "blob": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+          "actualPassed": 17,
+          "tap": "5667f9518de8521a415a606aa9c00741f7754701",
+          "sameG2Blob": true
+        },
+        {
+          "path": "apps/desktop/scripts/installed-workspace.test.mjs",
+          "blob": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa",
+          "actualPassed": 3,
+          "tap": "5667f9518de8521a415a606aa9c00741f7754701",
+          "sameG2Blob": true
+        },
+        {
+          "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+          "blob": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae",
+          "actualPassed": 21,
+          "tap": "5667f9518de8521a415a606aa9c00741f7754701",
+          "sameG2Blob": true
+        },
+        {
+          "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+          "blob": "06dceefec477df850087b47002266e612dddb63a",
+          "actualPassed": 38,
+          "tap": "4a51ba0fa4d3a6a35856f74490aff793e1f69e1f",
+          "sameG2Blob": true
+        }
+      ],
+      "uniqueActualOkLines": 157,
+      "groups": [
+        {
+          "label": "live-routing-ts",
+          "total": 100,
+          "passed": 98,
+          "failed": 2,
+          "reused": 78,
+          "excludedPassed": 20,
+          "excludedFailed": 2,
+          "conserved": true
+        },
+        {
+          "label": "renderer-bootstraps",
+          "total": 54,
+          "passed": 47,
+          "failed": 7,
+          "reused": 41,
+          "excludedPassed": 6,
+          "excludedFailed": 7,
+          "conserved": true
+        },
+        {
+          "label": "startup-and-template-validators",
+          "total": 39,
+          "passed": 38,
+          "failed": 1,
+          "reused": 38,
+          "excludedPassed": 0,
+          "excludedFailed": 1,
+          "conserved": true
+        }
+      ],
+      "problems": [],
+      "total": 157
+    },
+    "explicitlyExcluded": "All 20 old passing registry cases and 6 old passing App cases, all old failures, and the unregistered cloud-startup cases are excluded from historical PASS credit. The previous G run remains failed.",
+    "unitArithmetic": "Historical 183 passing cases = 157 reused + 26 excluded. G2 executes 22+13+88=123 new unit results separately; it does not claim the 157 historical cases ran again.",
+    "uiPolicy": {
+      "label": "ui-and-runtime-policy",
+      "previousExitCode": 0,
+      "previousStdoutBlob": "b7f13ec9a735846480339ff081824d73f38b9288",
+      "policyScriptBlob": "9c2f44bc94cf1fbfe4fa8097caba8afc20b93268",
+      "actuallyRerunInG2": false,
+      "boundary": "The policy script/config are unchanged, but its scanner can see changed TS and test files. This review does not claim all policy input bytes are unchanged. Reuse is the original exit0 plus review of the exact four-path delta: no UI markup, polling operation or user-facing error path was introduced, and the only production-file difference is erased types."
+    }
+  },
+  "finalBindingChecks": {
+    "sourceTree": true,
+    "mergeTree": true,
+    "activeTree": true,
+    "closedTree": true,
+    "all43Files": true,
+    "all40RelatedInputs": true,
+    "fourPaths": true,
+    "twentyOnePaths": true,
+    "coreApprovalHash": true,
+    "driverHash": true,
+    "sourceParents": true,
+    "activeParents": true,
+    "closedParent": true,
+    "expiry": true,
+    "runBinding": true,
+    "closedRef": true,
+    "closedManifestDisabled": true,
+    "closedOnlyExpectedFields": true
+  },
+  "actualG2Verification": {
+    "metadata": {
+      "runId": 42769641000,
+      "attempt": 1,
+      "jobId": 129674158815,
+      "head": "4c7270ebfdf828f368cac066ffc8589d8b522d5e",
+      "branch": "ops/1512-task-runs-pg-20261110",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-10T06:36:27Z",
+      "updatedAt": "2026-11-10T06:39:48Z"
+    },
+    "frozenProof": {
+      "blob": "85d44d8f81117db4f282af68849cdbc93bc9bb3d",
+      "bytes": 23652,
+      "sha256": "3746685b4a017723820e808b351c3b184becd334c0e8b95dade86b55474cc5ae"
+    },
+    "originalStreamIndex": {
+      "blob": "1f41473be9839f0acacc60062bb8426842d7d7c7",
+      "bytes": 10016,
+      "sha256": "6902cc421e72a68ed02b7e0824d6b112ff32b09b63540c8da2c9efa0a17a3b29"
+    },
+    "rawVerdict": {
+      "blob": "6174063e64d45dc30b22d039007acad977af408e",
+      "bytes": 174191,
+      "sha256": "ff8b7ad17cbe0b75c63220884cdf4c9f7ff6d76570e3adbdb5324b6e46b3debf"
+    },
+    "rawCleanup": {
+      "blob": "515d4f2274a69f17cc8129fa51430b8768e5772c",
+      "bytes": 576,
+      "sha256": "77906ba4721958417695aad0d64d5a9c666034242344f385c9c173e9e4fd892c"
+    },
+    "independentChecks": {
+      "sourceProofs": 26,
+      "exactHeadAndTrackedTreeAnd33FileBlobs": true,
+      "allRepeatedFileByteLengthsAndSha256sIdentical": true,
+      "sourceControlIdentityMatchesFinalManifest": true,
+      "commandCount": 12,
+      "allCommandCodesZero": true,
+      "allCommandSignalsNull": true,
+      "allTimeoutAndSpawnFailuresAbsent": true,
+      "all24StreamRecordsMatchFrozenIndex": true,
+      "all12StderrRecordsEmpty": true,
+      "rawTaps": [
+        {
+          "label": "live-routing-regressions",
+          "blob": "f394ddd413fca5e1fa6a9ca03bf52f7185ca397e",
+          "bytes": 5171,
+          "summary": {
+            "tests": 22,
+            "pass": 22,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "actualOkRecords": 22,
+          "badRecords": 0
+        },
+        {
+          "label": "workspace-app",
+          "blob": "9648136f47f8e7c8a65dde977c8657f5acabb972",
+          "bytes": 3055,
+          "summary": {
+            "tests": 13,
+            "pass": 13,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "actualOkRecords": 13,
+          "badRecords": 0
+        },
+        {
+          "label": "cloud-startup",
+          "blob": "58e28ed29ecb944b6b9037ff8739410cc9af755e",
+          "bytes": 22333,
+          "summary": {
+            "tests": 88,
+            "pass": 88,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "actualOkRecords": 88,
+          "badRecords": 0
+        },
+        {
+          "label": "migration-bootstrap",
+          "blob": "8dbec5e923c162101a90781558d1e7b858716631",
+          "bytes": 1404,
+          "summary": {
+            "tests": 2,
+            "pass": 2,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "actualOkRecords": 2,
+          "badRecords": 0
+        },
+        {
+          "label": "cache-scope-pg",
+          "blob": "36d60efff6cf5450e47d498b34d7620f015fbf72",
+          "bytes": 16854,
+          "summary": {
+            "tests": 15,
+            "pass": 15,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "actualOkRecords": 15,
+          "badRecords": 0
+        }
+      ],
+      "exactOwnedCleanupMatchesReceipt": true,
+      "issues": []
+    },
+    "newUnitResults": "22/22 registry + 13/13 actual App + 88/88 cloud startup; 123 executed unit cases.",
+    "additionalActualResults": "Fresh PG15/15 and migration2/2; all 12 commands exit0, no signal/timeout/spawn failure and all 12 stderr streams empty.",
+    "pgMetricBoundary": "The current same-source cache and bootstrap APIs each execute two statements in the measured fixture. This does not prove unchanged wire bytes against the older narrower projection, or the full packaged Native login budget.",
+    "rawEvidenceBoundary": "Reviewer read the already-frozen verdict, cleanup and five original TAP blobs, checking their Git SHA/length/SHA256. The Native owner preserved all 24 original command streams; this reviewer cross-checked all 24 receipt/index records without fetching original Actions endpoints or asserting identity to undownloaded artifact members.",
+    "cleanup": {
+      "stopped": true,
+      "containerRemoved": true,
+      "networkRemoved": true,
+      "removedAnonymousVolumes": 1,
+      "errors": [],
+      "containerId": "79c03f372fe0045074c7e35c07f2478a16350e0718ac3092ed72ff35590f213d",
+      "networkId": "d26152d19faff87a85a5e66e3ecbaf4eaaee5a267a5efb42f33f8a0589043eb0",
+      "finishedAt": "2026-11-10T06:39:40.252Z"
+    },
+    "closureMetadata": [
+      {
+        "runId": 42769731455,
+        "jobId": 129674451777,
+        "head": "996693d35b80a37b2e418bdde645e13368e6ae90",
+        "status": "completed",
+        "conclusion": "skipped",
+        "runnerName": null,
+        "stepCount": 0
+      }
+    ],
+    "closureEvidence": "Independent GitHub metadata reads show closure run42769731455/job129674451777 skipped with runner_name=null and steps=[] at the closed commit. Fresh ops ref points to 996693d35b80a37b2e418bdde645e13368e6ae90."
+  },
+  "priorIndependentReviews": {
+    "productFrontend": "19c1ec3b2c4ea4d3a5da3740eb4799aadeb560f9",
+    "productBackend": "9265500119ea12b3e50ee9a8f3e3b3455e8eafe0",
+    "priorController": "83452fbf9b15149368b1e4a089db5d48bfadaee7",
+    "priorBinding": "50b01c430f36bc3703669496375086da3ffdb479",
+    "fixtureTimerFailureAnalysis": "b9402b98f534ddcb10d9b0e1dde4dd2b89d36300",
+    "frontendAndTypeRepairs": "d68afe9f8632ecd3f0faf34f972541d4e2ce19c1",
+    "pgFixtureRepairs": "ff3222c1bd1b3f553d5e9c85b2d490adc2afc3f2"
+  },
+  "limitations": [
+    "This approval covers the exact isolated G2 validation and source/control binding. It does not certify new-head formal CI, packaged Native acceptance, full-login SQL budget or production trace acceptance.",
+    "Formal earlier H Native441/Web331 remains a failed budget measurement; no candidate runtime benefit is inferred from earlier-connection design or these unit tests.",
+    "Production acceptance remains 0/2 in this review scope. No production session was created and no issue closure is authorized by this record alone.",
+    "The predecessor failed run and the fixture/type/executor causes remain archived; successful corrected execution does not erase those failures.",
+    "Static product reviews and the concrete regression tests cover their stated cases, not all scheduling and lifecycle interleavings."
+  ],
+  "reviewerOperations": {
+    "originalActionsLogOrArtifactFetches": 0,
+    "newResources": 0,
+    "productEdits": 0,
+    "refMutations": 0,
+    "productionActions": 0,
+    "permittedMutation": "One immutable Git review blob."
+  }
+}

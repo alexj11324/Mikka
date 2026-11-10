@@ -1,0 +1,123 @@
+TAP version 13
+# Read metrics trace: {"measurement":1,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:32:24)","databaseStatements":2,"databaseJsonResultBytes":216,"databaseSocketBytes":1037,"databaseSocketBytesWritten":1079,"actionJsonBytes":69,"socketTrace":{"beforeCount":1,"afterCount":2,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":true,"beforeRead":0,"afterRead":1037,"readDelta":1037,"beforeWritten":0,"afterWritten":1079,"writtenDelta":1079,"statements":2}]}}
+# Subtest: disk hydration authority follows actual membership, role, selected workspace and account deletion
+ok 1 - disk hydration authority follows actual membership, role, selected workspace and account deletion
+  ---
+  duration_ms: 851.989567
+  type: 'test'
+  ...
+# {"scenario":"authenticated_cache_scope_gate","databaseStatements":2,"databaseJsonResultBytes":216,"databaseSocketBytes":1037,"databaseSocketBytesWritten":1079,"actionJsonBytes":69}
+# Read metrics trace: {"measurement":2,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:64:24)","databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":1226,"databaseSocketBytesWritten":1398,"actionJsonBytes":292,"socketTrace":{"beforeCount":2,"afterCount":3,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":1,"newInMeasurement":false,"beforeRead":1181,"afterRead":1740,"readDelta":559,"beforeWritten":4448,"afterWritten":5430,"writtenDelta":982,"statements":2},{"socket":3,"newInMeasurement":true,"beforeRead":0,"afterRead":667,"readDelta":667,"beforeWritten":0,"afterWritten":416,"writtenDelta":416,"statements":1}]}}
+# Read metrics trace: {"measurement":3,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:65:24)","databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":621,"databaseSocketBytesWritten":1175,"actionJsonBytes":292,"socketTrace":{"beforeCount":3,"afterCount":3,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":1,"newInMeasurement":false,"beforeRead":1740,"afterRead":1802,"readDelta":62,"beforeWritten":5430,"afterWritten":5623,"writtenDelta":193,"statements":1},{"socket":3,"newInMeasurement":false,"beforeRead":667,"afterRead":1226,"readDelta":559,"beforeWritten":416,"afterWritten":1398,"writtenDelta":982,"statements":2}]}}
+# Read metrics trace: {"measurement":4,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:66:26)","databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":621,"databaseSocketBytesWritten":1175,"actionJsonBytes":292,"socketTrace":{"beforeCount":3,"afterCount":3,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":1,"newInMeasurement":false,"beforeRead":1802,"afterRead":1864,"readDelta":62,"beforeWritten":5623,"afterWritten":5816,"writtenDelta":193,"statements":1},{"socket":3,"newInMeasurement":false,"beforeRead":1226,"afterRead":1785,"readDelta":559,"beforeWritten":1398,"afterWritten":2380,"writtenDelta":982,"statements":2}]}}
+# Read metrics trace: {"measurement":5,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:71:27)","databaseStatements":3,"databaseJsonResultBytes":147,"databaseSocketBytes":720,"databaseSocketBytesWritten":1175,"actionJsonBytes":295,"socketTrace":{"beforeCount":3,"afterCount":3,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":1,"newInMeasurement":false,"beforeRead":2980,"afterRead":3638,"readDelta":658,"beforeWritten":8280,"afterWritten":9262,"writtenDelta":982,"statements":2},{"socket":3,"newInMeasurement":false,"beforeRead":1785,"afterRead":1847,"readDelta":62,"beforeWritten":2380,"afterWritten":2573,"writtenDelta":193,"statements":1}]}}
+# Subtest: settings cache restores presentation immediately but revalidates the real current preferences
+ok 2 - settings cache restores presentation immediately but revalidates the real current preferences
+  ---
+  duration_ms: 858.318744
+  type: 'test'
+  ...
+# {"scenario":"settings_notifications_and_prefix_reads","cold":{"databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":1226,"databaseSocketBytesWritten":1398,"actionJsonBytes":292},"warm":{"databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":621,"databaseSocketBytesWritten":1175,"actionJsonBytes":292},"reload":{"databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":621,"databaseSocketBytesWritten":1175,"actionJsonBytes":292},"changed":{"databaseStatements":3,"databaseJsonResultBytes":147,"databaseSocketBytes":720,"databaseSocketBytesWritten":1175,"actionJsonBytes":295},"measurement":"real_read_paths_without_hidden_prefetch_or_browser_assets; settings_without_live_coverage_always_revalidate"}
+# Read metrics trace: {"measurement":6,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:122:25)","databaseStatements":2,"databaseJsonResultBytes":229,"databaseSocketBytes":445,"databaseSocketBytesWritten":864,"actionJsonBytes":70,"socketTrace":{"beforeCount":3,"afterCount":3,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":3026,"afterRead":3471,"readDelta":445,"beforeWritten":6613,"afterWritten":7477,"writtenDelta":864,"statements":2}]}}
+# Read metrics trace: {"measurement":7,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:123:29)","databaseStatements":2,"databaseJsonResultBytes":229,"databaseSocketBytes":445,"databaseSocketBytesWritten":864,"actionJsonBytes":116,"socketTrace":{"beforeCount":3,"afterCount":3,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":3471,"afterRead":3916,"readDelta":445,"beforeWritten":7477,"afterWritten":8341,"writtenDelta":864,"statements":2}]}}
+# Subtest: bootstrap derives only a unique owner Live route from the current cache membership read
+    # Subtest: real PG: owned teams, foreign personal rows and suspended home membership produce no owner route
+    ok 1 - real PG: owned teams, foreign personal rows and suspended home membership produce no owner route
+      ---
+      duration_ms: 11.755053
+      type: 'test'
+      ...
+    # Subtest: synthetic projection: zero or multiple owned personal rows fail closed without changing the PG uniqueness constraint
+    ok 2 - synthetic projection: zero or multiple owned personal rows fail closed without changing the PG uniqueness constraint
+      ---
+      duration_ms: 0.406007
+      type: 'test'
+      ...
+    # Subtest: real PG: the personal-owner unique index remains enforced
+    ok 3 - real PG: the personal-owner unique index remains enforced
+      ---
+      duration_ms: 2.641521
+      type: 'test'
+      ...
+# Read metrics trace: {"measurement":8,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:150:29)","databaseStatements":2,"databaseJsonResultBytes":344,"databaseSocketBytes":569,"databaseSocketBytesWritten":864,"actionJsonBytes":150,"socketTrace":{"beforeCount":4,"afterCount":4,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":4291,"afterRead":4860,"readDelta":569,"beforeWritten":8984,"afterWritten":9848,"writtenDelta":864,"statements":2}]}}
+# Read metrics trace: {"measurement":9,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:151:25)","databaseStatements":2,"databaseJsonResultBytes":344,"databaseSocketBytes":569,"databaseSocketBytesWritten":864,"actionJsonBytes":70,"socketTrace":{"beforeCount":4,"afterCount":4,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":4860,"afterRead":5429,"readDelta":569,"beforeWritten":9848,"afterWritten":10712,"writtenDelta":864,"statements":2}]}}
+    # Subtest: real PG: a restored unique home remains separate from the selected team and cache response shape
+    ok 4 - real PG: a restored unique home remains separate from the selected team and cache response shape
+      ---
+      duration_ms: 10.168077
+      type: 'test'
+      ...
+# Read metrics trace: {"measurement":10,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:168:28)","databaseStatements":0,"databaseJsonResultBytes":0,"databaseSocketBytes":0,"databaseSocketBytesWritten":0,"actionJsonBytes":50,"socketTrace":{"beforeCount":4,"afterCount":4,"unrepresentedStatements":0,"truncated":false,"intervals":[]}}
+# Read metrics trace: {"measurement":11,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:168:28)","databaseStatements":0,"databaseJsonResultBytes":0,"databaseSocketBytes":0,"databaseSocketBytesWritten":0,"actionJsonBytes":50,"socketTrace":{"beforeCount":4,"afterCount":4,"unrepresentedStatements":0,"truncated":false,"intervals":[]}}
+# Read metrics trace: {"measurement":12,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:172:28)","databaseStatements":0,"databaseJsonResultBytes":0,"databaseSocketBytes":0,"databaseSocketBytesWritten":0,"actionJsonBytes":50,"socketTrace":{"beforeCount":4,"afterCount":4,"unrepresentedStatements":0,"truncated":false,"intervals":[]}}
+    # Subtest: real PG: cookie fallback and an explicit valid selection keep their original precedence
+    ok 5 - real PG: cookie fallback and an explicit valid selection keep their original precedence
+      ---
+      duration_ms: 9.579215
+      type: 'test'
+      ...
+    # Subtest: real PG: malformed and conflicting request pins still reject before any SELECT
+    ok 6 - real PG: malformed and conflicting request pins still reject before any SELECT
+      ---
+      duration_ms: 2.605735
+      type: 'test'
+      ...
+# Read metrics trace: {"measurement":13,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:178:28)","databaseStatements":1,"databaseJsonResultBytes":344,"databaseSocketBytes":499,"databaseSocketBytesWritten":643,"actionJsonBytes":50,"socketTrace":{"beforeCount":4,"afterCount":4,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":8274,"afterRead":8773,"readDelta":499,"beforeWritten":15032,"afterWritten":15675,"writtenDelta":643,"statements":1}]}}
+# Read metrics trace: {"measurement":14,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:179:23)","databaseStatements":1,"databaseJsonResultBytes":344,"databaseSocketBytes":499,"databaseSocketBytesWritten":643,"actionJsonBytes":50,"socketTrace":{"beforeCount":4,"afterCount":4,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":8773,"afterRead":9272,"readDelta":499,"beforeWritten":15675,"afterWritten":16318,"writtenDelta":643,"statements":1}]}}
+# Read metrics trace: {"measurement":15,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:180:31)","databaseStatements":1,"databaseJsonResultBytes":121,"databaseSocketBytes":258,"databaseSocketBytesWritten":653,"actionJsonBytes":50,"socketTrace":{"beforeCount":4,"afterCount":4,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":9272,"afterRead":9530,"readDelta":258,"beforeWritten":16318,"afterWritten":16971,"writtenDelta":653,"statements":1}]}}
+    # Subtest: real PG: unauthorized explicit targets, pinned targets and other readers cannot borrow the home hint
+    ok 7 - real PG: unauthorized explicit targets, pinned targets and other readers cannot borrow the home hint
+      ---
+      duration_ms: 6.001484
+      type: 'test'
+      ...
+    # Subtest: real PG: a later call observes home membership suspension and restoration
+    ok 8 - real PG: a later call observes home membership suspension and restoration
+      ---
+      duration_ms: 5.736267
+      type: 'test'
+      ...
+# Read metrics trace: {"measurement":16,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:201:29)","databaseStatements":2,"databaseJsonResultBytes":344,"databaseSocketBytes":575,"databaseSocketBytesWritten":864,"actionJsonBytes":150,"socketTrace":{"beforeCount":4,"afterCount":4,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":11043,"afterRead":11612,"readDelta":569,"beforeWritten":19342,"afterWritten":20206,"writtenDelta":864,"statements":2},{"socket":4,"newInMeasurement":false,"beforeRead":903,"afterRead":909,"readDelta":6,"beforeWritten":1075,"afterWritten":1075,"writtenDelta":0,"statements":0}]}}
+    # Subtest: real PG: the immutable personal kind remains enforced without creating a replacement home
+    ok 9 - real PG: the immutable personal kind remains enforced without creating a replacement home
+      ---
+      duration_ms: 13.113052
+      type: 'test'
+      ...
+    # Subtest: real PG: deleted home membership cannot supply a route while the selected team stays authorized
+    ok 10 - real PG: deleted home membership cannot supply a route while the selected team stays authorized
+      ---
+      duration_ms: 6.273121
+      type: 'test'
+      ...
+    # Subtest: real PG: revoking the selected membership removes both fields even when the owner home is active
+    ok 11 - real PG: revoking the selected membership removes both fields even when the owner home is active
+      ---
+      duration_ms: 3.050485
+      type: 'test'
+      ...
+# Read metrics trace: {"measurement":17,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:231:27)","databaseStatements":3,"databaseJsonResultBytes":463,"databaseSocketBytes":779,"databaseSocketBytesWritten":1707,"actionJsonBytes":150,"socketTrace":{"beforeCount":5,"afterCount":5,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":12430,"afterRead":13046,"readDelta":616,"beforeWritten":21713,"afterWritten":22577,"writtenDelta":864,"statements":2},{"socket":5,"newInMeasurement":false,"beforeRead":931,"afterRead":1094,"readDelta":163,"beforeWritten":2094,"afterWritten":2937,"writtenDelta":843,"statements":1}]}}
+# Read metrics trace: {"measurement":18,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:235:26)","databaseStatements":3,"databaseJsonResultBytes":462,"databaseSocketBytes":779,"databaseSocketBytesWritten":1707,"actionJsonBytes":50,"socketTrace":{"beforeCount":5,"afterCount":5,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":13046,"afterRead":13662,"readDelta":616,"beforeWritten":22577,"afterWritten":23441,"writtenDelta":864,"statements":2},{"socket":5,"newInMeasurement":false,"beforeRead":1129,"afterRead":1292,"readDelta":163,"beforeWritten":3102,"afterWritten":3945,"writtenDelta":843,"statements":1}]}}
+# Read metrics trace: {"measurement":19,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:240:28)","databaseStatements":3,"databaseJsonResultBytes":463,"databaseSocketBytes":779,"databaseSocketBytesWritten":1707,"actionJsonBytes":150,"socketTrace":{"beforeCount":5,"afterCount":5,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":false,"beforeRead":14278,"afterRead":14894,"readDelta":616,"beforeWritten":24305,"afterWritten":25169,"writtenDelta":864,"statements":2},{"socket":5,"newInMeasurement":false,"beforeRead":1490,"afterRead":1653,"readDelta":163,"beforeWritten":4952,"afterWritten":5795,"writtenDelta":843,"statements":1}]}}
+    # Subtest: real PG: every call rechecks the selected Organization policy before returning either field
+    ok 12 - real PG: every call rechecks the selected Organization policy before returning either field
+      ---
+      duration_ms: 17.208314
+      type: 'test'
+      ...
+    1..12
+ok 3 - bootstrap derives only a unique owner Live route from the current cache membership read
+  ---
+  duration_ms: 144.579455
+  type: 'test'
+  ...
+# {"scenario":"bootstrap_live_hint_no_extra_query","cache":{"databaseStatements":2,"databaseJsonResultBytes":229,"databaseSocketBytes":445,"databaseSocketBytesWritten":864,"actionJsonBytes":70},"bootstrap":{"databaseStatements":2,"databaseJsonResultBytes":229,"databaseSocketBytes":445,"databaseSocketBytesWritten":864,"actionJsonBytes":116}}
+1..3
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2147.982179

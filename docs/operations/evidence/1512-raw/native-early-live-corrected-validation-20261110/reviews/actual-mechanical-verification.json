@@ -1,0 +1,745 @@
+{
+  "schema": "issue1512-live-routing-g2-actual-verification/v1",
+  "status": "ALL NECESSARY FIXED-SOURCE G2 CHECKS ACTUALLY PASSED; not Native or production acceptance",
+  "run": {
+    "id": "42769641000",
+    "attempt": "1",
+    "jobId": 129674158815,
+    "head": "4c7270ebfdf828f368cac066ffc8589d8b522d5e",
+    "conclusion": "success",
+    "completedAt": "2026-11-10T06:39:48Z",
+    "source": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "sourceTree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+    "sourceParents": [
+      "ff385bfd91edcd40c3b3ee398b4b93098e5becbb"
+    ]
+  },
+  "originalStreamIndexBlob": "1f41473be9839f0acacc60062bb8426842d7d7c7",
+  "rawVerdictPayloadBlob": "6174063e64d45dc30b22d039007acad977af408e",
+  "rawCleanupPayloadBlob": "515d4f2274a69f17cc8129fa51430b8768e5772c",
+  "control": {
+    "manifest": {
+      "bytes": 15653,
+      "sha256": "7a13877872371189e7b09389cb7a283a868cecff9758cd2a16c049ce28efc79d",
+      "blob": "420684e4ed70b3df8050b07b24ae29e5a94201bf"
+    },
+    "driver": {
+      "bytes": 32108,
+      "sha256": "9947e61d7b827afc13ee6fcdfa9d5cd30e3cd5e206b74e5257a3911a14b20bdc",
+      "blob": "4dc0e9aa58f1572091c6e5cb4974bdac49037a35"
+    },
+    "node": "v24.22.1",
+    "pnpm": "10.34.3",
+    "nodeOptions": "--max-old-space-size=4096",
+    "opsTree": "406b95198812b9c5fd46e8e60e97614067c262a7",
+    "sourceFiles": 33,
+    "commonSourceBlobs": 10
+  },
+  "sourceVerification": {
+    "proofCount": 26,
+    "eachHasExactHeadAndTrackedTree": true,
+    "eachHasExact33BoundFileBlobsLengthsAndHashes": true,
+    "points": [
+      "before-install",
+      "before-live-routing-regressions",
+      "after-live-routing-regressions",
+      "before-workspace-app",
+      "after-workspace-app",
+      "before-cloud-startup",
+      "after-cloud-startup",
+      "before-changed-root-oxlint",
+      "after-changed-root-oxlint",
+      "before-desktop-source-oxlint",
+      "after-desktop-source-oxlint",
+      "before-migration-bootstrap",
+      "after-migration-bootstrap",
+      "before-e2e-setup",
+      "after-e2e-setup",
+      "before-environment-bind",
+      "after-environment-bind",
+      "before-cache-scope-pg",
+      "after-cache-scope-pg",
+      "before-root-types",
+      "after-root-types",
+      "before-frontend-types",
+      "after-frontend-types",
+      "before-desktop-renderer-types",
+      "after-desktop-renderer-types",
+      "final"
+    ],
+    "manifestFilesAndCommonBlobsMatchFullGitTree": true,
+    "sourceFailures": []
+  },
+  "originalByteVerification": {
+    "streams": 24,
+    "totalBytes": 70828,
+    "allFrameAndReceiptLengthsAndHashesMatch": true,
+    "allStreamGitSha1sMatch": true,
+    "allFrozenBeforeSemanticInterpretation": true,
+    "allStderrEmpty": true
+  },
+  "commands": [
+    {
+      "label": "live-routing-regressions",
+      "executable": "/opt/hostedtoolcache/node/24.22.1/x64/bin/node",
+      "args": [
+        "--test-reporter=tap",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/live/channels.test.ts"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:37:37.431Z",
+      "finishedAt": "2026-11-10T06:37:38.674Z",
+      "stdout": {
+        "label": "live-routing-regressions",
+        "stream": "stdout",
+        "file": "live-routing-regressions-stdout.log",
+        "bytes": 5171,
+        "sha256": "58397a6827841c2a96b9814ac8d7c26f5283bfc710fbe91e10131e07ebbc0655",
+        "blob": "f394ddd413fca5e1fa6a9ca03bf52f7185ca397e"
+      },
+      "stderr": {
+        "label": "live-routing-regressions",
+        "stream": "stderr",
+        "file": "live-routing-regressions-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "workspace-app",
+      "executable": "/opt/hostedtoolcache/node/24.22.1/x64/bin/node",
+      "args": [
+        "--test-reporter=tap",
+        "--test",
+        "apps/desktop/scripts/workspace-live.test.mjs"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:37:38.678Z",
+      "finishedAt": "2026-11-10T06:37:43.311Z",
+      "stdout": {
+        "label": "workspace-app",
+        "stream": "stdout",
+        "file": "workspace-app-stdout.log",
+        "bytes": 3055,
+        "sha256": "2e4149bd07b51a52b089a03d44f16f5e7939200c4dcc21ca15f3ded48caaaee3",
+        "blob": "9648136f47f8e7c8a65dde977c8657f5acabb972"
+      },
+      "stderr": {
+        "label": "workspace-app",
+        "stream": "stderr",
+        "file": "workspace-app-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "cloud-startup",
+      "executable": "/opt/hostedtoolcache/node/24.22.1/x64/bin/node",
+      "args": [
+        "--test-reporter=tap",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/cloud-startup.test.mjs"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:37:43.313Z",
+      "finishedAt": "2026-11-10T06:37:46.391Z",
+      "stdout": {
+        "label": "cloud-startup",
+        "stream": "stdout",
+        "file": "cloud-startup-stdout.log",
+        "bytes": 22333,
+        "sha256": "f148ee050380a5fd3c547eff6ab716bd187b36c79dd12acb8ff76fea998d1d52",
+        "blob": "58e28ed29ecb944b6b9037ff8739410cc9af755e"
+      },
+      "stderr": {
+        "label": "cloud-startup",
+        "stream": "stderr",
+        "file": "cloud-startup-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "changed-root-oxlint",
+      "executable": "pnpm",
+      "args": [
+        "exec",
+        "oxlint",
+        "--deny-warnings",
+        "hooks/use-subagent-updates.ts",
+        "lib/live/channels.test.ts",
+        "tests/read-cache-scope.db.test.ts"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:37:46.394Z",
+      "finishedAt": "2026-11-10T06:37:47.860Z",
+      "stdout": {
+        "label": "changed-root-oxlint",
+        "stream": "stdout",
+        "file": "changed-root-oxlint-stdout.log",
+        "bytes": 89,
+        "sha256": "da8e281080f85b6a2c83e52a2a22c089465b1d9cf0ff0ac65d421726722931a4",
+        "blob": "194f12d743ed586e2bc3f3fac03a379063cb17d2"
+      },
+      "stderr": {
+        "label": "changed-root-oxlint",
+        "stream": "stderr",
+        "file": "changed-root-oxlint-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "desktop-source-oxlint",
+      "executable": "pnpm",
+      "args": [
+        "--filter",
+        "@mikka/desktop",
+        "lint"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:37:47.863Z",
+      "finishedAt": "2026-11-10T06:37:49.361Z",
+      "stdout": {
+        "label": "desktop-source-oxlint",
+        "stream": "stdout",
+        "file": "desktop-source-oxlint-stdout.log",
+        "bytes": 217,
+        "sha256": "67c8d2a51f0f7a96a27f2bfaab82a1223a58476544a335cc8866abbba4126e04",
+        "blob": "9139ce340a04e13ced135b6a2876e6b8cc680607"
+      },
+      "stderr": {
+        "label": "desktop-source-oxlint",
+        "stream": "stderr",
+        "file": "desktop-source-oxlint-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "migration-bootstrap",
+      "executable": "/opt/hostedtoolcache/node/24.22.1/x64/bin/node",
+      "args": [
+        "--test-reporter=tap",
+        "--experimental-strip-types",
+        "--test",
+        "tests/migrate-empty-db.test.mjs"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:37:49.397Z",
+      "finishedAt": "2026-11-10T06:37:56.491Z",
+      "stdout": {
+        "label": "migration-bootstrap",
+        "stream": "stdout",
+        "file": "migration-bootstrap-stdout.log",
+        "bytes": 1404,
+        "sha256": "343da9edb9b58e263f3188e440ebdc26df825440e63198be88500d70edffd08c",
+        "blob": "8dbec5e923c162101a90781558d1e7b858716631"
+      },
+      "stderr": {
+        "label": "migration-bootstrap",
+        "stream": "stderr",
+        "file": "migration-bootstrap-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "e2e-setup",
+      "executable": "pnpm",
+      "args": [
+        "test:e2e:setup"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:37:56.493Z",
+      "finishedAt": "2026-11-10T06:38:00.283Z",
+      "stdout": {
+        "label": "e2e-setup",
+        "stream": "stdout",
+        "file": "e2e-setup-stdout.log",
+        "bytes": 21440,
+        "sha256": "7fcbab4a666c5b23e8c58ac438f527275cbe0c4096e2b0f9357f53c7e73334ae",
+        "blob": "0345f9b3a0d9b951ce7a9b463daca28904d8e8f8"
+      },
+      "stderr": {
+        "label": "e2e-setup",
+        "stream": "stderr",
+        "file": "e2e-setup-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "environment-bind",
+      "executable": "/opt/hostedtoolcache/node/24.22.1/x64/bin/node",
+      "args": [
+        "scripts/test-accounts/bootstrap.mjs",
+        "--output",
+        "/home/runner/work/_temp/issue1512-native-live-routing-validation/green-environment.json"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:38:00.285Z",
+      "finishedAt": "2026-11-10T06:38:01.396Z",
+      "stdout": {
+        "label": "environment-bind",
+        "stream": "stdout",
+        "file": "environment-bind-stdout.log",
+        "bytes": 153,
+        "sha256": "be50836342484d48d013565f0fc574990305e50377a175f9aec2442d90daecaf",
+        "blob": "fc8174dd3a36b6b78e76080ea4d7e8f1e7feb814"
+      },
+      "stderr": {
+        "label": "environment-bind",
+        "stream": "stderr",
+        "file": "environment-bind-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "cache-scope-pg",
+      "executable": "/opt/hostedtoolcache/node/24.22.1/x64/bin/node",
+      "args": [
+        "--test-reporter=tap",
+        "--import",
+        "tsx",
+        "--import",
+        "./tests/fixtures/activity-runtime.mjs",
+        "--test",
+        "tests/read-cache-scope.db.test.ts"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:38:01.397Z",
+      "finishedAt": "2026-11-10T06:38:04.569Z",
+      "stdout": {
+        "label": "cache-scope-pg",
+        "stream": "stdout",
+        "file": "cache-scope-pg-stdout.log",
+        "bytes": 16854,
+        "sha256": "2d066fb78b6965eb26ea08669e5d8f7ed44f9662f8c048f24f21cd5edc72a0e6",
+        "blob": "36d60efff6cf5450e47d498b34d7620f015fbf72"
+      },
+      "stderr": {
+        "label": "cache-scope-pg",
+        "stream": "stderr",
+        "file": "cache-scope-pg-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "root-types",
+      "executable": "pnpm",
+      "args": [
+        "exec",
+        "tsrs",
+        "--noEmit"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:38:04.584Z",
+      "finishedAt": "2026-11-10T06:38:10.983Z",
+      "stdout": {
+        "label": "root-types",
+        "stream": "stdout",
+        "file": "root-types-stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      "stderr": {
+        "label": "root-types",
+        "stream": "stderr",
+        "file": "root-types-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "frontend-types",
+      "executable": "pnpm",
+      "args": [
+        "--filter",
+        "@mikka/frontend",
+        "typecheck"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:38:10.989Z",
+      "finishedAt": "2026-11-10T06:38:55.310Z",
+      "stdout": {
+        "label": "frontend-types",
+        "stream": "stdout",
+        "file": "frontend-types-stdout.log",
+        "bytes": 112,
+        "sha256": "2ef0d6047466a0901c7028b30b5174908637334416c211e818564fc46799fd6d",
+        "blob": "5ed65c7077b5fbbc2653cdd95d6bd6e931b55d0d"
+      },
+      "stderr": {
+        "label": "frontend-types",
+        "stream": "stderr",
+        "file": "frontend-types-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "label": "desktop-renderer-types",
+      "executable": "pnpm",
+      "args": [
+        "--filter",
+        "@mikka/desktop",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.renderer.json"
+      ],
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "status": "EXITED",
+      "startedAt": "2026-11-10T06:38:55.317Z",
+      "finishedAt": "2026-11-10T06:39:38.576Z",
+      "stdout": {
+        "label": "desktop-renderer-types",
+        "stream": "stdout",
+        "file": "desktop-renderer-types-stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      "stderr": {
+        "label": "desktop-renderer-types",
+        "stream": "stderr",
+        "file": "desktop-renderer-types-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    }
+  ],
+  "independentlyRecomputedTap": [
+    {
+      "label": "live-routing-regressions",
+      "tests": 22,
+      "pass": 22,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "topLevel": 22,
+      "children": 0,
+      "stdoutBlob": "f394ddd413fca5e1fa6a9ca03bf52f7185ca397e"
+    },
+    {
+      "label": "workspace-app",
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "topLevel": 9,
+      "children": 4,
+      "stdoutBlob": "9648136f47f8e7c8a65dde977c8657f5acabb972"
+    },
+    {
+      "label": "cloud-startup",
+      "tests": 88,
+      "pass": 88,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "topLevel": 88,
+      "children": 0,
+      "stdoutBlob": "58e28ed29ecb944b6b9037ff8739410cc9af755e"
+    },
+    {
+      "label": "migration-bootstrap",
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "topLevel": 2,
+      "children": 0,
+      "stdoutBlob": "8dbec5e923c162101a90781558d1e7b858716631"
+    },
+    {
+      "label": "cache-scope-pg",
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "topLevel": 3,
+      "children": 12,
+      "stdoutBlob": "36d60efff6cf5450e47d498b34d7620f015fbf72"
+    }
+  ],
+  "strictTapTreeParserBlob": "97a81d45dfd36acf165ede837c91fc2658b1eada",
+  "checkOutcomes": [
+    {
+      "label": "changed-root-oxlint",
+      "code": 0,
+      "verdict": "CHECK_PASS"
+    },
+    {
+      "label": "desktop-source-oxlint",
+      "code": 0,
+      "verdict": "CHECK_PASS"
+    },
+    {
+      "label": "root-types",
+      "code": 0,
+      "verdict": "CHECK_PASS"
+    },
+    {
+      "label": "frontend-types",
+      "code": 0,
+      "verdict": "CHECK_PASS"
+    },
+    {
+      "label": "desktop-renderer-types",
+      "code": 0,
+      "verdict": "CHECK_PASS"
+    }
+  ],
+  "database": {
+    "containerId": "79c03f372fe0045074c7e35c07f2478a16350e0718ac3092ed72ff35590f213d",
+    "networkId": "d26152d19faff87a85a5e66e3ecbaf4eaaee5a267a5efb42f33f8a0589043eb0",
+    "imageId": "sha256:eb0fb2377534e65aad04f37838956b3dfb888e1a3dd3c1acf957bc6557eb6c7d",
+    "healthy": true,
+    "loopbackOnly": true,
+    "actualPostgres": {
+      "database": "mikka_e2e",
+      "role": "e2e",
+      "version": "170011",
+      "port": 5432,
+      "oid": "16384"
+    },
+    "catalogBefore": [
+      {
+        "datname": "mikka_e2e",
+        "oid": "16384"
+      },
+      {
+        "datname": "postgres",
+        "oid": "5"
+      },
+      {
+        "datname": "template0",
+        "oid": "4"
+      },
+      {
+        "datname": "template1",
+        "oid": "1"
+      }
+    ],
+    "catalogAfter": [
+      {
+        "datname": "bootstrap_bae6182fc7d54b43be5b1f0df3f9c994",
+        "oid": "16385"
+      },
+      {
+        "datname": "bootstrap_fbabb38436744763aaef9da647c54075",
+        "oid": "21789"
+      },
+      {
+        "datname": "mikka_e2e",
+        "oid": "16384"
+      },
+      {
+        "datname": "postgres",
+        "oid": "5"
+      },
+      {
+        "datname": "template0",
+        "oid": "4"
+      },
+      {
+        "datname": "template1",
+        "oid": "1"
+      }
+    ],
+    "originalPgDiagnostics": [
+      {
+        "scenario": "authenticated_cache_scope_gate",
+        "databaseStatements": 2,
+        "databaseJsonResultBytes": 216,
+        "databaseSocketBytes": 1037,
+        "databaseSocketBytesWritten": 1079,
+        "actionJsonBytes": 69
+      },
+      {
+        "scenario": "settings_notifications_and_prefix_reads",
+        "cold": {
+          "databaseStatements": 3,
+          "databaseJsonResultBytes": 68,
+          "databaseSocketBytes": 1226,
+          "databaseSocketBytesWritten": 1398,
+          "actionJsonBytes": 292
+        },
+        "warm": {
+          "databaseStatements": 3,
+          "databaseJsonResultBytes": 68,
+          "databaseSocketBytes": 621,
+          "databaseSocketBytesWritten": 1175,
+          "actionJsonBytes": 292
+        },
+        "reload": {
+          "databaseStatements": 3,
+          "databaseJsonResultBytes": 68,
+          "databaseSocketBytes": 621,
+          "databaseSocketBytesWritten": 1175,
+          "actionJsonBytes": 292
+        },
+        "changed": {
+          "databaseStatements": 3,
+          "databaseJsonResultBytes": 147,
+          "databaseSocketBytes": 720,
+          "databaseSocketBytesWritten": 1175,
+          "actionJsonBytes": 295
+        },
+        "measurement": "real_read_paths_without_hidden_prefetch_or_browser_assets; settings_without_live_coverage_always_revalidate"
+      },
+      {
+        "scenario": "bootstrap_live_hint_no_extra_query",
+        "cache": {
+          "databaseStatements": 2,
+          "databaseJsonResultBytes": 229,
+          "databaseSocketBytes": 445,
+          "databaseSocketBytesWritten": 864,
+          "actionJsonBytes": 70
+        },
+        "bootstrap": {
+          "databaseStatements": 2,
+          "databaseJsonResultBytes": 229,
+          "databaseSocketBytes": 445,
+          "databaseSocketBytesWritten": 864,
+          "actionJsonBytes": 116
+        }
+      }
+    ]
+  },
+  "cleanup": {
+    "runId": "42769641000",
+    "attempt": "1",
+    "containerName": "issue1512-native-live-routing-validation-42769641000-1",
+    "networkName": "issue1512-native-live-routing-net-42769641000-1",
+    "startedAt": "2026-11-10T06:39:39.242Z",
+    "stopped": true,
+    "containerRemoved": true,
+    "networkRemoved": true,
+    "errors": [],
+    "containerId": "79c03f372fe0045074c7e35c07f2478a16350e0718ac3092ed72ff35590f213d",
+    "removedVolumeNames": [
+      "b55fa2f778bc934e4511f24d4bcaf524af50ca40696c04480761717d9df91a7d"
+    ],
+    "networkId": "d26152d19faff87a85a5e66e3ecbaf4eaaee5a267a5efb42f33f8a0589043eb0",
+    "finishedAt": "2026-11-10T06:39:40.252Z"
+  },
+  "artifact": {
+    "downloaded": false,
+    "membersParsed": false,
+    "metadataOnly": true,
+    "metadataResponseBlob": "228312dd15576502aa25565b3c23d1b9c1c6e5b8",
+    "id": 13741286841,
+    "name": "issue1512-native-live-routing-validation-42769641000-attempt-1",
+    "size_in_bytes": 33886,
+    "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13741286841",
+    "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13741286841/zip",
+    "expired": false,
+    "created_at": "2026-11-10T06:39:40Z",
+    "expires_at": "2026-11-17T06:39:40Z",
+    "updated_at": "2026-11-10T06:39:40Z",
+    "digest": "sha256:7bd95c4e2827a77f4e38c437ed8f61bff151b05325d5f367a5b9c43a39c9c557",
+    "workflow_run": {
+      "id": 42769641000,
+      "repository_id": 1427517699,
+      "head_repository_id": 1427517699,
+      "head_branch": "ops/1512-task-runs-pg-20261110",
+      "head_sha": "4c7270ebfdf828f368cac066ffc8589d8b522d5e"
+    }
+  },
+  "priorResultReuse": {
+    "proofBlob": "0f7bcdcc54a5088eb328c65be86b1475d8125bff",
+    "caseIndexBlob": "4d9ea698ca71ef85948ba9bcfafaa0c75c690fea",
+    "actualFirstGPassReused": 157,
+    "notRerunByG2": true,
+    "firstGOverallFailurePreserved": true,
+    "reusedUiPolicyLabel": "ui-and-runtime-policy",
+    "uiPolicyNotRerunByG2": true
+  },
+  "limits": [
+    "This proof confirms only the exact isolated G2 commands and complete original streams. It does not claim packaged Native full-login SQL budget, native lifecycle or production acceptance.",
+    "Historical first-G failing run and its unstarted cases remain recorded independently; no failure was relabelled.",
+    "The 157 source-bounded prior passing tests and prior UI policy exit0 are separately justified historical reuse, not tests executed in this G2 run.",
+    "PG metrics compare the two current same-source APIs on the fixture and show2 statements each; they do not claim zero added wire bytes relative to older pre-projection source or predict whole Native-login SQL/bytes.",
+    "Emitted raw JSON payloads are not claimed byte-identical to undownloaded artifact members. No ZIP was downloaded because the full job log preserved all original command stream bytes.",
+    "Root owns entry closure and SKIP proof; this proof independently verifies the actual job's owned database cleanup."
+  ]
+}

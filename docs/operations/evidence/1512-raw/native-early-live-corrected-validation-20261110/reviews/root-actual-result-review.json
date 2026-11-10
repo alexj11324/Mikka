@@ -1,0 +1,70 @@
+{
+  "schema": "issue1512-g2-root-actual-review/v1",
+  "reviewedAt": "2026-11-10T06:46:00Z",
+  "result": "ISOLATED_REQUIRED_GROUPS_PASS",
+  "runId": 42769641000,
+  "attempt": 1,
+  "jobId": 129674158815,
+  "source": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+  "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+  "rawVerdict": "6174063e64d45dc30b22d039007acad977af408e",
+  "rawCleanup": "515d4f2274a69f17cc8129fa51430b8768e5772c",
+  "originalStreamIndex": "1f41473be9839f0acacc60062bb8426842d7d7c7",
+  "originalReaderMechanicalProof": "85d44d8f81117db4f282af68849cdbc93bc9bb3d",
+  "directlyReadRawTap": [
+    {
+      "blob": "f394ddd413fca5e1fa6a9ca03bf52f7185ca397e",
+      "actualPassed": 22
+    },
+    {
+      "blob": "9648136f47f8e7c8a65dde977c8657f5acabb972",
+      "actualPassed": 13
+    },
+    {
+      "blob": "58e28ed29ecb944b6b9037ff8739410cc9af755e",
+      "actualPassed": 88
+    },
+    {
+      "blob": "36d60efff6cf5450e47d498b34d7620f015fbf72",
+      "actualPassed": 15
+    }
+  ],
+  "verified": {
+    "all12CommandsExit0": true,
+    "noTimeoutSignalSpawnError": true,
+    "allActualTapNoFailSkipTodoCancelled": true,
+    "exact26SourceProofs33FilesAndWholeTrackedTree": true,
+    "manifestHashAndDriverHashMatchAdmission": true,
+    "threeTypechecksAndTwoLintsPassed": true,
+    "pgFreshLoopback17": true,
+    "cleanupExactActualContainerIdentity": true,
+    "ownedVolumeAndNetworkDeleted": true,
+    "cleanupErrors": [],
+    "prior157CasesSeparateSourceBoundReuse": true,
+    "firstGOverallFailPreserved": true
+  },
+  "pgObservedScope": {
+    "currentCacheAndBootstrapStatements": [
+      2,
+      2
+    ],
+    "newProjectionVsOldSourceBytesNotMeasuredByThisPair": true,
+    "fullNativeSqlAndBytesStillRequired": true
+  },
+  "closureProof": "925f5279bb55dff2bbab23528c0a7a48998b9dc0",
+  "formalForward": {
+    "at": "2026-11-10T06:40:52Z",
+    "prior": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "head": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "main": "ab2d00a43a79d35380b4d2db9014a3792fea63ca",
+    "synthetic": "767f4f612af2c3e794031fba46d1f302ee2efab3",
+    "syntheticTreeSameAsG2": true,
+    "reason": "Successful fixed controller/command/cleanup steps permitted normal CI entry; raw TAP/VERDICT subsequently independently checked. No merge."
+  },
+  "acceptance": {
+    "formalNative": "PENDING_AT_G2; previousH441/Web331FAIL",
+    "productionPassed": 0,
+    "required": 2,
+    "issueOpen": true
+  }
+}

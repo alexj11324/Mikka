@@ -1,0 +1,263 @@
+{
+  "schema": "issue1512-g2-source-count-proof/v1",
+  "status": "STATIC_EXPECTATION_ONLY_NOT_EXECUTED",
+  "source": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+  "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+  "priorProofBlob": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e",
+  "files": [
+    {
+      "path": "lib/live/channels.test.ts",
+      "regular": 20,
+      "topLoops": [
+        {
+          "values": [
+            "null",
+            "reject"
+          ],
+          "count": 2
+        }
+      ],
+      "subtests": [],
+      "expected": 22,
+      "blob": "c9059d2c8be5122681f5c4657889b01633ed3736",
+      "bytes": 20020,
+      "topLevelDeclarationLines": [
+        88,
+        107,
+        123,
+        136,
+        149,
+        162,
+        176,
+        190,
+        205,
+        219,
+        232,
+        245,
+        263,
+        285,
+        301,
+        333,
+        348,
+        363,
+        375,
+        391
+      ],
+      "bareCallSites": 21,
+      "nestedCallSites": 0,
+      "unexpectedSkipTodoOnly": false,
+      "priorBlob": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "actualDeclarationLines": [
+        91,
+        110,
+        126,
+        139,
+        152,
+        165,
+        179,
+        194,
+        210,
+        225,
+        239,
+        252,
+        270,
+        292,
+        308,
+        340,
+        355,
+        370,
+        382,
+        398
+      ],
+      "preservedRegistration": "No test registration or loop bound change in the exact reviewed test-only delta"
+    },
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "regular": 9,
+      "topLoops": [],
+      "subtests": [
+        {
+          "values": [
+            "/mikka/en/device",
+            "/mikka/en/sign-in?addAccount=1",
+            "/mikka/en/invite/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "/mikka/en/a/public-share"
+          ],
+          "count": 4
+        }
+      ],
+      "expected": 13,
+      "blob": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+      "bytes": 18598,
+      "topLevelDeclarationLines": [
+        171,
+        183,
+        196,
+        220,
+        238,
+        253,
+        266,
+        282,
+        295
+      ],
+      "bareCallSites": 9,
+      "nestedCallSites": 1,
+      "unexpectedSkipTodoOnly": false,
+      "priorBlob": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "actualDeclarationLines": [
+        175,
+        187,
+        200,
+        224,
+        242,
+        257,
+        270,
+        286,
+        299
+      ],
+      "preservedRegistration": "No test registration or loop bound change in the exact reviewed test-only delta"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "regular": 82,
+      "topLoops": [
+        {
+          "values": [
+            "prepared_agent_start",
+            "bootstrap_claude_start",
+            "bootstrap_codex_initialize"
+          ],
+          "count": 3
+        },
+        {
+          "values": [
+            "prepared_agent_start",
+            "bootstrap_claude_start",
+            "bootstrap_codex_initialize"
+          ],
+          "count": 3
+        }
+      ],
+      "subtests": [],
+      "expected": 88,
+      "blob": "ded31e330bef5e83f00659b4383e41b53afd1b81",
+      "bytes": 127436,
+      "sha256": "5a5066f771e153d112454456b80efc9ad57a8367d2756fffff0d6140e5e61c34",
+      "topLevelDeclarationLines": [
+        49,
+        252,
+        264,
+        283,
+        309,
+        327,
+        343,
+        373,
+        392,
+        410,
+        421,
+        439,
+        451,
+        470,
+        484,
+        494,
+        521,
+        531,
+        547,
+        576,
+        595,
+        621,
+        646,
+        655,
+        667,
+        680,
+        688,
+        762,
+        777,
+        798,
+        810,
+        835,
+        860,
+        891,
+        905,
+        920,
+        935,
+        952,
+        976,
+        992,
+        1003,
+        1015,
+        1024,
+        1054,
+        1066,
+        1076,
+        1087,
+        1110,
+        1132,
+        1192,
+        1214,
+        1225,
+        1269,
+        1297,
+        1314,
+        1342,
+        1354,
+        1361,
+        1380,
+        1393,
+        1409,
+        1419,
+        1438,
+        1453,
+        1485,
+        1511,
+        1536,
+        1553,
+        1606,
+        1626,
+        1638,
+        1656,
+        1668,
+        1685,
+        1700,
+        1719,
+        1789,
+        1809,
+        1826,
+        1836,
+        1855,
+        1867
+      ],
+      "bareCallSites": 84,
+      "nestedCallSites": 0,
+      "unexpectedSkipTodoOnly": false,
+      "preservedRegistration": "Exact unchanged source; executor now uses --import tsx"
+    }
+  ],
+  "groups": [
+    {
+      "label": "live-routing-regressions",
+      "expected": 22
+    },
+    {
+      "label": "workspace-app",
+      "expected": 13
+    },
+    {
+      "label": "cloud-startup",
+      "expected": 88
+    }
+  ],
+  "pg": {
+    "path": "tests/read-cache-scope.db.test.ts",
+    "blob": "ee59feba1e29769805806ec6e166abbc65994233",
+    "expected": 15,
+    "originalPrefixBytes": 5971,
+    "topLevel": 3,
+    "children": 12,
+    "independentReview": "ff3222c1bd1b3f553d5e9c85b2d490adc2afc3f2"
+  },
+  "limits": [
+    "Actual full TAP, all-pass, no skip/todo/cancel, exit0 and exact source proofs remain mandatory.",
+    "First failed run cannot be relabelled; only source-bound unaffected actual PASS cases may be reused."
+  ]
+}

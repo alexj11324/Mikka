@@ -1,0 +1,216 @@
+{
+  "schema": "issue1512-g2-root-integration-proof/v1",
+  "status": "SOURCE_BOUND; ACTUAL_VALIDATION_PENDING",
+  "source": {
+    "sha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+    "parents": [
+      "ff385bfd91edcd40c3b3ee398b4b93098e5becbb"
+    ],
+    "leaves": 6983,
+    "directories": 894,
+    "wholeGitTreeIndependentlyReconstructed": true,
+    "completeApiLeafReadback": true
+  },
+  "previousSource": {
+    "sha": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "actualRun": 42766089161,
+    "verdict": "FAIL_PRESERVED"
+  },
+  "deltaFromFailed": [
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "base": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531"
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "base": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+      "sha": "dd831e0e657d00de9210e39194a926b4e977ec56"
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "base": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "sha": "c9059d2c8be5122681f5c4657889b01633ed3736"
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "base": "bbdae2625952b475c3488384bbd48c876887a805",
+      "sha": "ee59feba1e29769805806ec6e166abbc65994233"
+    }
+  ],
+  "deltaFromMergedBase": [
+    {
+      "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "base": "a9a93381269a4078d046464b252851e72d84656c",
+      "sha": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "base": null,
+      "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "base": "c780d381fce0daa9c1646d63c7c099d48d197223",
+      "sha": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "base": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5",
+      "sha": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+      "base": "2463df1257aec4817e0fe625931d1897bb3ccbb7",
+      "sha": "ddeb2420392a0abb233bc3742cd539805424bc13",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+      "base": null,
+      "sha": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.ts",
+      "base": null,
+      "sha": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace.tsx",
+      "base": "e45052573bb4424f61da35eeaedb5f0a8d80844f",
+      "sha": "25891b5f8d7dc7a5d6b3cd4688789898052855fd",
+      "kind": "product"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "base": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "sha": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+      "kind": "product"
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "base": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+      "sha": "dd831e0e657d00de9210e39194a926b4e977ec56",
+      "kind": "type-only-consumer"
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "base": "3be4faece94b30d4a7f66ef2d3c8b2ef60134372",
+      "sha": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+      "kind": "product"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "base": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "sha": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "base": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "sha": "61cdf48b28ab9260f5567300f2411cb555b13427",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "base": null,
+      "sha": "c9059d2c8be5122681f5c4657889b01633ed3736",
+      "kind": "test"
+    },
+    {
+      "path": "lib/live/channels.ts",
+      "base": "d459548cbd8785bf2764d23543109b99ae146d18",
+      "sha": "c40864fe9386855994d3a4ece9480639514d85aa",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/preparation.ts",
+      "base": null,
+      "sha": "7377678b777279de0ab21717749743fcce446d73",
+      "kind": "product"
+    },
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "base": "f43f62b4798c971ebae3b52ab2a1db413925bf51",
+      "sha": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+      "kind": "product"
+    },
+    {
+      "path": "package.json",
+      "base": "677ab7d4849cbefe1b7dd33ebbc998b17e69ce09",
+      "sha": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+      "kind": "test-registration"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "base": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "sha": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+      "kind": "acceptance-adapter"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "base": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+      "sha": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+      "kind": "acceptance-adapter"
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "base": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+      "sha": "ee59feba1e29769805806ec6e166abbc65994233",
+      "kind": "test"
+    }
+  ],
+  "readback": {
+    "failedToCorrectedActualComparePaths": 4,
+    "mergedBaseToCorrectedActualComparePaths": 21,
+    "allOtherModeTypeShaUnchanged": true
+  },
+  "review": {
+    "frontendFixManifest": "3578f33781eccdcd13254d5daea9fee421be5e4d",
+    "frontendIndependent": "d68afe9f8632ecd3f0faf34f972541d4e2ce19c1",
+    "freshnessCause": "b9402b98f534ddcb10d9b0e1dde4dd2b89d36300",
+    "pgFixReview": "b0c991217f60d84853febb7352ad3f210b4a0be6",
+    "pgIndependent": "ff3222c1bd1b3f553d5e9c85b2d490adc2afc3f2",
+    "hookTypeOnlyReverseSubstitutionExact": true,
+    "originalPg5971PrefixExact": true,
+    "originalProductRuntimeTimerProofAndAuthorizationUnchanged": true,
+    "rootReadAllFourCorrectedSourcesAndPreciseDiffs": true,
+    "actualGuard": "f4bde1c93a54c5694ae9e0c5aaa96c6a142a8f17"
+  },
+  "controls": {
+    "driver": "4dc0e9aa58f1572091c6e5cb4974bdac49037a35",
+    "driverSha256": "9947e61d7b827afc13ee6fcdfa9d5cd30e3cd5e206b74e5257a3911a14b20bdc",
+    "workflow": "b8e94d589a54448b9eefff3ce090d8c010567699",
+    "closedWorkflow": "ad6d0157aac5305dde40ad518262aeb684b05913"
+  },
+  "runtimeExpectation": {
+    "proof": "e3957af37b165a0a86b5715638b2b6911a158cb8",
+    "units": [
+      22,
+      13,
+      88
+    ],
+    "pg": 15,
+    "typeChecks": 3,
+    "lints": 2,
+    "commands": 12,
+    "claimedActualPassed": 0
+  },
+  "constraints": {
+    "mainRefMoved": false,
+    "formalRefMoved": false,
+    "opsRefMoved": false,
+    "newResources": 0,
+    "priorFailuresRetained": true,
+    "formalNativeStatus": "441/331 FAIL",
+    "production": "0/2"
+  }
+}

@@ -1,0 +1,92 @@
+name: Issue1512 fixed Native Live routing validation
+
+on:
+  push:
+    branches: [ops/1512-task-runs-pg-20261110]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue1512-native-live-routing-validation-${{ github.run_id }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  REQUIRE_DB: '1'
+  MIKKA_EDITION: cloud
+  MIKKA_READ_METRICS_TRACE: '1'
+  MIKKA_TEST_DB_PORT: '5432'
+  MIKKA_SIGNUP_IP_HOURLY: '1000'
+  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+  MIKKA_VERIFICATION_IP_HOURLY: '1000'
+  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+  BETTER_AUTH_URL: http://localhost:3100
+  NEXT_TELEMETRY_DISABLED: '1'
+  NODE_OPTIONS: --max-old-space-size=4096
+  NODE_DISABLE_COMPILE_CACHE: '1'
+  TSX_DISABLE_CACHE: '1'
+
+jobs:
+  fixed-green:
+    name: One fixed candidate - Live routing units, PG17, types and changed-source lint
+    # One reviewed admission only; the immutable controller also verifies source, tree, parents, expiry and attempt.
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/ops/1512-task-runs-pg-20261110' &&
+      github.run_attempt == 1 &&
+      github.event.head_commit.message == 'ops: issue1512 live routing corrected validation ca60e1f3-5d08-45e9-b8ef-8ea2a8e7ff38'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 55
+    steps:
+      - name: Checkout fixed candidate source graph and preserved evidence ancestry
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 4
+          persist-credentials: false
+      - name: Set up fixed pnpm without a persistent cache
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - name: Set up fixed Node without an Actions cache
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+      - name: Bind immutable candidate and preserve controller outside checkout
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/issue1512-native-live-routing-validation"
+          test ! -e "$state"
+          mkdir -m 700 "$state"
+          cp .github/ops/issue1512-native-live-routing-validation/driver.mjs "$state/driver.mjs"
+          cp .github/ops/issue1512-native-live-routing-validation/manifest.json "$state/manifest.json"
+          node "$state/driver.mjs" prepare
+      - name: Install frozen dependencies once in a fresh store
+        timeout-minutes: 10
+        shell: bash
+        env:
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm install --frozen-lockfile --store-dir "$RUNNER_TEMP/issue1512-native-live-routing-validation/pnpm-store"
+      - name: Start owned loopback PostgreSQL with masked temporary credentials
+        timeout-minutes: 5
+        shell: bash
+        run: node "$RUNNER_TEMP/issue1512-native-live-routing-validation/driver.mjs" start
+      - name: Run affected corrected groups and preserve independent real outcomes
+        timeout-minutes: 36
+        shell: bash
+        run: node "$RUNNER_TEMP/issue1512-native-live-routing-validation/driver.mjs" run
+      - name: Remove only this job's database container, volumes and network
+        if: always() && steps.prepare.outcome == 'success'
+        timeout-minutes: 2
+        shell: bash
+        run: node "$RUNNER_TEMP/issue1512-native-live-routing-validation/driver.mjs" cleanup
+      - name: Preserve receipts and complete credential-screened command originals
+        if: always() && steps.prepare.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1512-native-live-routing-validation-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue1512-native-live-routing-validation/originals/
+          if-no-files-found: error
+          retention-days: 7
