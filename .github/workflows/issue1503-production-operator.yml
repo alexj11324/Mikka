@@ -14,7 +14,7 @@ concurrency:
   queue: max
 jobs:
   setup:
-    if: true
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
