@@ -53,7 +53,12 @@ export function observeReads(page, requirements, actionIds, basePath) {
       if (requirement.path) return request.method() === 'GET' && pathname === `${basePath}${requirement.path}`
       return observedAction(request, pathname, basePath, actionIds)?.action === requirement.action
     }, { timeout: 45_000 }).then(async response => {
-      assert.equal(response.ok(), true, `Read must succeed: ${requirement.path ?? requirement.action}`)
+      if (!response.ok()) {
+        // Keep the exact failure, with the status and a bounded body so the
+        // packaged runtime names the refused read instead of only its path.
+        const body = await response.text().catch(() => '')
+        assert.fail(`Read must succeed: ${requirement.path ?? requirement.action} (${response.status()}) ${body.slice(0, 300)}`)
+      }
       const headers = response.headers()
       const action = observedAction(response.request(), new URL(response.url()).pathname, basePath, actionIds)
       if (requirement.action && action?.kind === 'flight') {
