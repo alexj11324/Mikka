@@ -1,123 +1,42 @@
-name: Issue 1512 branch transport
+name: Issue 1512 one-shot production dispatch
 on:
   push:
     branches: [ops/1512-git-transport]
-    paths: ['.github/workflows/issue1512-git-transport.yml', '.github/issue1512-source.json', '.github/issue1512-dispatch.json']
+    paths:
+      - '.github/workflows/issue1512-git-transport.yml'
+      - '.github/issue1512-dispatch.json'
+      - 'scripts/ops/issue1512-production-dispatch.mjs'
+      - 'scripts/ops/issue1512-production-dispatch.test.mjs'
 permissions:
   contents: read
 jobs:
-  import:
-    if: github.repository == 'alexj11324/Mikka' && !startsWith(github.event.head_commit.message, 'issue1512:dispatch ') && !startsWith(github.event.head_commit.message, 'issue1512:cleanup ')
-    permissions:
-      contents: write
+  dispatch:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
-      group: issue-1512-git-transport
+      group: issue1512-one-shot-production-transport
       cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          fetch-depth: 0
-      - name: Verify and import the issue owner's exact Git objects
-        run: |
-          node --input-type=module <<'JS'
-          import fs from 'node:fs'
-          import crypto from 'node:crypto'
-          import { execFileSync } from 'node:child_process'
-          const manifest = JSON.parse(fs.readFileSync('.github/issue1512-source.json', 'utf8'))
-          if (!/^[a-f0-9]{40}$/.test(manifest.revision)) throw new Error('Invalid revision')
-          const bundle = Buffer.from(manifest.bundle, 'base64')
-          if (crypto.createHash('sha256').update(bundle).digest('hex') !== manifest.sha256) throw new Error('Bundle checksum mismatch')
-          const file = process.env.RUNNER_TEMP + '/issue1512.bundle'
-          fs.writeFileSync(file, bundle, { mode: 0o600 })
-          const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-          git('bundle', 'verify', file)
-          git('fetch', file, 'refs/heads/feat/1512-run-observability:refs/remotes/issue1512/import')
-          if (git('rev-parse', 'refs/remotes/issue1512/import') !== manifest.revision) throw new Error('Imported revision mismatch')
-          // Workflow files are published by the authorized owner connector.
-          // This narrow Actions token only transports a fast-forward whose
-          // resulting workflow tree is already identical to the remote head.
-          git('fetch', 'origin', 'refs/heads/ops/1512-source-objects:refs/remotes/origin/ops/1512-source-objects')
-          const previous = git('rev-parse', 'refs/remotes/origin/ops/1512-source-objects')
-          git('merge-base', '--is-ancestor', previous, manifest.revision)
-          if (git('diff', '--name-only', previous, manifest.revision, '--', '.github/workflows')) throw new Error('Workflow changes require the authorized owner connector')
-          git('push', 'origin', manifest.revision + ':refs/heads/ops/1512-source-objects')
-          console.log('Staged issue #1512 revision ' + manifest.revision + ' without force-push; owner connector must update the PR ref')
-          fs.rmSync(file)
-          JS
-
-  dispatch:
-    if: github.repository == 'alexj11324/Mikka' && startsWith(github.event.head_commit.message, 'issue1512:dispatch ')
+      queue: max
     permissions:
       contents: read
-      actions: write
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Dispatch the explicitly requested production verification
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          node --input-type=module <<'JS'
-          import fs from 'node:fs'
-          import assert from 'node:assert/strict'
-          const operation = JSON.parse(fs.readFileSync('.github/issue1512-dispatch.json', 'utf8'))
-          assert.match(operation.requestId, /^[0-9a-f-]{36}$/)
-          const input = operation.inputs
-          assert.ok(input && Object.keys(input).every(key => ['mode','expected-deployment-sha','model-case','prepare','browser-submit','export-target','export-id','session-id','trace-id'].includes(key)))
-          assert.ok(['preflight','execute','export','controlled-failure'].includes(input.mode))
-          assert.ok(['all','claude','codex'].includes(input['model-case']))
-          assert.match(input['expected-deployment-sha'], /^[0-9a-f]{40}$/)
-          for (const key of ['prepare','browser-submit']) assert.ok(['true','false'].includes(input[key]))
-          assert.ok(input.mode === 'execute' || input.prepare === 'false' && input['browser-submit'] === 'false')
-          assert.ok(input['browser-submit'] === 'false' || input['model-case'] !== 'all')
-          if (input.mode === 'export') {
-            assert.ok(['dashboard','insight'].includes(input['export-target']))
-            assert.match(input['export-id'], /^[1-9][0-9]{0,14}$/)
-          }
-          const sessionId = input['session-id'] ?? ''
-          const traceId = input['trace-id'] ?? ''
-          assert.equal(typeof sessionId, 'string')
-          assert.equal(typeof traceId, 'string')
-          if (sessionId || traceId) {
-            assert.equal(input.mode, 'export')
-            assert.match(sessionId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
-            assert.match(traceId, /^[0-9a-f]{32}$/)
-            assert.notEqual(traceId, '0'.repeat(32))
-          }
-          const api = 'https://api.github.com/repos/alexj11324/Mikka'
-          const headers = { authorization: 'Bearer ' + process.env.GH_TOKEN, accept: 'application/vnd.github+json', 'content-type': 'application/json', 'x-github-api-version': '2022-11-28' }
-          const head = await fetch(api + '/git/ref/heads/main', { headers, redirect: 'error', signal: AbortSignal.timeout(15000) })
-          assert.equal(head.status, 200)
-          assert.equal((await head.json()).object.sha, input['expected-deployment-sha'])
-          const served = await fetch('https://app.aspectlylabs.com/mikka/api/version', { headers: { 'cache-control': 'no-store' }, redirect: 'error', signal: AbortSignal.timeout(15000) })
-          assert.equal(served.status, 200)
-          assert.equal((await served.json()).build, input['expected-deployment-sha'])
-          const response = await fetch(api + '/actions/workflows/run-trace-acceptance.yml/dispatches', { method: 'POST', headers, redirect: 'error', signal: AbortSignal.timeout(15000), body: JSON.stringify({ ref: 'main', inputs: input }) })
-          await response.body?.cancel()
-          assert.equal(response.status, 204)
-          console.log(JSON.stringify({ dispatched: true, requestId: operation.requestId, mode: input.mode, modelCase: input['model-case'], revision: input['expected-deployment-sha'] }))
-          JS
-  cleanup:
-    if: github.repository == 'alexj11324/Mikka' && startsWith(github.event.head_commit.message, 'issue1512:cleanup ')
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    steps:
-      - name: Remove only this task's temporary transport branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          node --input-type=module <<'JS'
-          for (const branch of ['ops/1512-source-objects', 'ops/1512-git-transport']) {
-            const response = await fetch('https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/' + branch, { method: 'DELETE', headers: { authorization: 'Bearer ' + process.env.GH_TOKEN, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' }, redirect: 'error', signal: AbortSignal.timeout(15000) })
-            await response.body?.cancel()
-            if (![204,404].includes(response.status)) throw new Error('TASK_BRANCH_CLEANUP_FAILED')
-          }
-          console.log('Removed the two issue 1512 temporary transport branches')
-          JS
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify bounded dispatcher protocol without credentials or network
+        run: node --test scripts/ops/issue1512-production-dispatch.test.mjs
+      - name: Submit the exact admitted request once
+        run: node scripts/ops/issue1512-production-dispatch.mjs
+      - name: Preserve only the safe dispatch receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1512-production-dispatch-${{ github.run_id }}
+          path: artifacts/issue1512-production-dispatch/receipt.safe.json
+          retention-days: 7
+          if-no-files-found: warn
