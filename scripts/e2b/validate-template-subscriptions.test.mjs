@@ -972,3 +972,148 @@ test('failure projection distinguishes the closed 3c production shapes using syn
   assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
   assert.deepEqual(fixture.events.slice(-2), ['restored-workspace', 'signed-out'])
 })
+
+const liveObserverFixture = (event = 'close') => ({
+  version: 1,
+  firstFailure: { event, at: '2026-01-01T00:00:04.000Z', scopeHash: hash(TEAM).slice(0, 16), readyState: 3,
+    ...(event === 'close' ? { code: 1006, wasClean: false } : {}) },
+  openedAt: '2026-01-01T00:00:01.000Z', readyAt: '2026-01-01T00:00:02.000Z',
+  lastNotificationAt: '2026-01-01T00:00:03.000Z',
+  detailReads: { started: 3, completed: 2, lastCompletedAt: '2026-01-01T00:00:03.500Z', inFlightAtFailure: true },
+  shutdownAt: '2026-01-01T00:00:04.001Z',
+})
+
+async function failedLiveObserver(liveObserver, sampleOverrides = {}) {
+  const diagnostics = [], fixture = candidateFixture(async options => {
+    const value = accepted(options.harness)
+    if (options.harness === 'codex') {
+      value.status = 'failed'
+      Object.assign(value.samples[0], { status: 'failed', error: 'startup_live_disconnected',
+        failure: { phase: 'execution_watch', code: 'startup_live_disconnected' },
+        ...(liveObserver === undefined ? {} : { liveObserver }), ...sampleOverrides })
+    }
+    return value
+  })
+  await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }),
+    /template_gate_subscription_or_cleanup_failed/)
+  const failed = diagnostics.find(row => row.kind === 'codex')
+  assert.equal(failed.code, 'template_gate_execution_failed')
+  assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
+  assert.equal(diagnostics.find(row => row.kind === 'claude').passedReceipt.status, 'passed')
+  assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
+  return { failed, diagnostics }
+}
+
+test('live observer close evidence survives the real failure projection without private fields', async () => {
+  const expected = liveObserverFixture(), secret = 'PRIVATE_LIVE_REASON_TICKET_AND_NATIVE_SESSION'
+  const input = { ...expected, reason: secret, url: secret, ticket: secret, scope: TEAM, nativeSID: secret,
+    firstFailure: { ...expected.firstFailure, reason: secret, message: secret, stack: secret, scope: TEAM, url: secret, nativeSID: secret },
+    detailReads: { ...expected.detailReads, response: secret, chunks: [secret] } }
+  const { failed, diagnostics } = await failedLiveObserver(input)
+  assert.deepEqual(failed.liveObserver, expected)
+  assert.deepEqual(failed.failure, { phase: 'execution_watch', code: 'startup_live_disconnected' })
+  assert.equal(failed.sampleError, 'startup_live_disconnected')
+  const raw = JSON.stringify(diagnostics)
+  for (const forbidden of [secret, 'nativeSID', '"ticket"', '"stack"', '"chunks"']) assert.ok(!raw.includes(forbidden))
+  assert.ok(!JSON.stringify(failed.liveObserver).includes(TEAM))
+})
+
+test('live observer error evidence never invents close metadata', async () => {
+  const expected = liveObserverFixture('error'), secret = 'PRIVATE_ERROR_OR_LATER_CLOSE_REASON'
+  expected.openedAt = expected.readyAt = expected.lastNotificationAt = null
+  expected.firstFailure.readyState = 0
+  expected.detailReads = { started: 1, completed: 0, lastCompletedAt: null, inFlightAtFailure: true }
+  const input = { ...expected,
+    firstFailure: { ...expected.firstFailure, code: 1006, wasClean: false, reason: secret, message: secret },
+    laterClose: { code: 1000, wasClean: true, reason: secret }, error: { message: secret, stack: secret } }
+  const { failed } = await failedLiveObserver(input)
+  assert.deepEqual(failed.liveObserver, expected)
+  assert.ok(!Object.hasOwn(failed.liveObserver.firstFailure, 'code'))
+  assert.ok(!Object.hasOwn(failed.liveObserver.firstFailure, 'wasClean'))
+  assert.ok(!JSON.stringify(failed).includes(secret))
+})
+
+test('live observer projection rejects malformed required evidence without leaking its values', async () => {
+  const secret = 'PRIVATE_MALFORMED_LIVE_OBSERVER_VALUE'
+  const mutations = [
+    value => { value.version = 2 },
+    value => { value.firstFailure.event = secret },
+    value => { value.firstFailure.at = secret },
+    value => { value.firstFailure.at = '2026-02-31T00:00:00.000Z' },
+    value => { value.firstFailure.scopeHash = TEAM },
+    value => { value.firstFailure.scopeHash = [hash(TEAM).slice(0, 16)] },
+    value => { value.firstFailure.scopeHash = { toString: () => hash(TEAM).slice(0, 16), privateValue: secret } },
+    value => { value.firstFailure.scopeHash = secret.repeat(1000) },
+    value => { value.firstFailure.readyState = '3' },
+    value => { value.firstFailure.readyState = 4 },
+    value => { value.openedAt = secret },
+    value => { value.readyAt = { at: secret } },
+    value => { value.lastNotificationAt = '2026-01-01' },
+    value => { value.shutdownAt = secret },
+    value => { value.detailReads.started = Number.MAX_SAFE_INTEGER + 1 },
+    value => { value.detailReads.completed = -1 },
+    value => { value.detailReads.completed = 4 },
+    value => { value.detailReads.inFlightAtFailure = 'true' },
+    value => { value.detailReads.lastCompletedAt = secret },
+    value => { delete value.detailReads },
+  ]
+  for (const mutate of mutations) {
+    const input = liveObserverFixture()
+    mutate(input)
+    const { failed } = await failedLiveObserver(input)
+    assert.ok(!Object.hasOwn(failed, 'liveObserver'))
+    assert.ok(!JSON.stringify(failed).includes(secret))
+    assert.equal(failed.failure.code, 'startup_live_disconnected')
+  }
+  for (const input of [null, [], secret, { version: 1, firstFailure: null }]) {
+    const { failed } = await failedLiveObserver(input)
+    assert.ok(!Object.hasOwn(failed, 'liveObserver'))
+    assert.ok(!JSON.stringify(failed).includes(secret))
+  }
+})
+
+test('live observer close metadata is independently optional and bounded', async () => {
+  for (const [code, wasClean, expectedFields] of [
+    [1000, true, { code: 1000, wasClean: true }],
+    [0, false, { code: 0, wasClean: false }],
+    [65535, false, { code: 65535, wasClean: false }],
+    ['1006', false, { wasClean: false }],
+    [1006, 'false', { code: 1006 }],
+    [-1, null, {}], [65536, {}, {}], [1000.5, undefined, {}],
+  ]) {
+    const input = liveObserverFixture(), expected = liveObserverFixture()
+    Object.assign(input.firstFailure, { code, wasClean })
+    delete expected.firstFailure.code
+    delete expected.firstFailure.wasClean
+    Object.assign(expected.firstFailure, expectedFields)
+    const { failed } = await failedLiveObserver(input)
+    assert.deepEqual(failed.liveObserver, expected)
+  }
+})
+
+test('live observer evidence leaves legacy, unrelated failures and passing receipts unchanged', async () => {
+  const legacy = await failedLiveObserver(undefined)
+  assert.ok(!Object.hasOwn(legacy.failed, 'liveObserver'))
+  for (const failure of [
+    { phase: 'cleanup', code: 'startup_live_disconnected' },
+    { phase: 'execution_watch', code: 'startup_execution_timeout' },
+  ]) {
+    const { failed } = await failedLiveObserver(liveObserverFixture(), { failure, error: failure.code })
+    assert.ok(!Object.hasOwn(failed, 'liveObserver'))
+    assert.deepEqual(failed.failure, failure)
+  }
+  const running = await failedLiveObserver(liveObserverFixture(), { status: 'running' })
+  assert.ok(!Object.hasOwn(running.failed, 'liveObserver'))
+  const diagnostics = [], fixture = candidateFixture(async options => {
+    const value = accepted(options.harness)
+    value.samples[0].liveObserver = liveObserverFixture()
+    return value
+  })
+  const result = await validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) })
+  for (const row of diagnostics) {
+    assert.ok(!Object.hasOwn(row, 'liveObserver'))
+    const harness = row.kind === 'claude' ? 'claude_code' : 'codex'
+    assert.deepEqual(result.subscriptionAcceptance[row.kind], candidateReceipt(report, row.kind,
+      { ...proof, bootstrapReceipt: bootstrapReceipt(harness) }, accepted(harness)))
+  }
+})
