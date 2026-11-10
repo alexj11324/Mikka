@@ -16,7 +16,7 @@ import type { RunTraceContext } from '@mikka/protocol/trace-context'
 
 const cleanups: Array<() => unknown | Promise<unknown>> = []
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close() })
-function fixture(mode = 'normal', diagnostics = false) {
+function fixture(mode = 'normal', diagnostics = false, version = '0.166.0') {
   const root = mkdtempSync(join(tmpdir(), 'anonymous-codex-')), home = join(root, 'home'), stateDir = join(home, '.mikka', 'worker', 'adapters')
   mkdirSync(home); cleanups.push(() => rmSync(root, { recursive: true, force: true }))
   const trace = join(root, 'protocol.jsonl'), binary = join(root, 'codex')
@@ -28,7 +28,7 @@ rl.createInterface({input:process.stdin}).on('line',line=>{
   owned.once('spawn',()=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:frame.id,result:{started:true}})+'\\n',()=>process.exit(0)));return;
  }
  if(frame.method==='initialize'&&process.env.FIXTURE_MODE==='hang')return;
- if(frame.id!==undefined)process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:frame.id,result:{userAgent:'mikka/'+(process.env.FIXTURE_MODE==='version'?'0.163.0':'0.166.0')+' (Linux)'}})+'\\n');
+ if(frame.id!==undefined)process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:frame.id,result:{userAgent:'mikka/'+process.env.FIXTURE_CODEX_VERSION+' (Linux)'}})+'\\n');
 });`
   writeFileSync(binary, '#!' + process.execPath + '\n' + fake, { mode: 0o755 })
   const runId = randomUUID(), policy = defaultRunPolicy()
@@ -38,7 +38,7 @@ rl.createInterface({input:process.stdin}).on('line',line=>{
       version: 1, tool: { name: 'record_decision', title: 'Record', description: 'Test decision', inputSchema: { type: 'object' }, annotations: { idempotentHint: true } },
     } }
   const bootstrap = { sha256: hint.bootstrapSha256, deviceId: randomUUID(), workspaceId: randomUUID() }
-  const env = { HOME: home, PATH: process.env.PATH!, FIXTURE_TRACE: trace, FIXTURE_MODE: mode }, lifetime = new AbortController()
+  const env = { HOME: home, PATH: process.env.PATH!, FIXTURE_TRACE: trace, FIXTURE_MODE: mode, FIXTURE_CODEX_VERSION: version }, lifetime = new AbortController()
   const candidate = startAnonymousCodex({ hint, bootstrap, stateDir, binary, env, signal: lifetime.signal, initializeTimeoutMs: 1000 })!
   cleanups.push(candidate.close)
   const cwd = join(home, '.mikka', 'repos', 'future-repo')
@@ -60,8 +60,8 @@ rl.createInterface({input:process.stdin}).on('line',line=>{
     checkout() { mkdirSync(join(cwd, '.git'), { recursive: true }) },
     events() { return existsSync(trace) ? readFileSync(trace, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line).method) : [] } }
 }
-it('sends only initialize before a repository exists, then adopts that exact process once', async () => {
-  const f = fixture(); await f.candidate.ready
+it.each(['0.166.0', '0.167.0'])('sends only initialize before a repository exists, then adopts that exact %s process once', async version => {
+  const f = fixture('normal', false, version); await f.candidate.ready
   expect(existsSync(f.cwd)).toBe(false); expect(f.events().filter(x => x === 'initialize')).toHaveLength(1); expect(f.events().every(x => ['initialize', 'initialized'].includes(x))).toBe(true)
   f.checkout()
   const adopted = await f.candidate.adopt(await f.binding())
@@ -91,12 +91,16 @@ it('cancels a pending initialize and drains without waiting for a login', async 
   await f.candidate.close(); await expect(f.candidate.ready).rejects.toThrow()
   expect(f.candidate.state).toBe('closed')
 })
-it('does not adopt a different native protocol version', async () => {
-  const f = fixture('version'); await expect(f.candidate.ready).rejects.toThrow('version')
+it.each(['0.163.0', '0.166.1', '0.168.0', '0.167.0-alpha.1'])('does not adopt unverified native protocol version %s', async version => {
+  const f = fixture('normal', true, version); await expect(f.candidate.ready).rejects.toThrow('version')
   await f.candidate.close(); expect(f.candidate.state).toBe('closed')
+  expect(f.candidate.nativeExitObserved).toBe(true)
+  expect(await f.candidate.adopt(await f.binding())).toBeUndefined()
+  expect(f.candidate.preparationTiming).toBeUndefined()
+  expect(f.events()).toEqual(['initialize'])
 })
-it('retains the true earlier timing origin only for successful adoption', async () => {
-  const f = fixture('normal', true); await f.candidate.ready; const earlier = Date.now(); f.checkout()
+it.each(['0.166.0', '0.167.0'])('retains the true earlier timing origin only for successful %s adoption', async version => {
+  const f = fixture('normal', true, version); await f.candidate.ready; const earlier = Date.now(); f.checkout()
   await f.candidate.adopt(await f.binding())
   const receipt = f.candidate.preparationTiming!
   expect(receipt.source).toBe('bootstrap_codex_initialize'); expect(receipt.harness).toBe('codex')
