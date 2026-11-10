@@ -62,9 +62,12 @@ test('a stopped run is never live', async () => {
 
 async function watchdogFixture(receipt = true) {
   const stoppedRun = randomUUID(), taskId = randomUUID(), attemptId = randomUUID(), epoch = randomUUID(), workerId = randomUUID()
+  // The workspace policy is the only policy now, so each fixture owns one: a
+  // second write in the same workspace would be a no-op and keep the revision.
+  const workspaceId = await seedWorkspace(actor.userId)
   await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`, [workerId,actor.userId,deviceId])
   await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"stopRequestedAt","leaseExpiresAt","agentId","workspaceId")
-    SELECT $1,"userId","deviceId",'running',now(),now()+interval '5 minutes',$3,"workspaceId" FROM agent_runs WHERE id=$2`, [stoppedRun,runId,workerId])
+    VALUES ($1,$2,$3,'running',now(),now()+interval '5 minutes',$4,$5)`, [stoppedRun,actor.userId,deviceId,workerId,workspaceId])
   const revision = (await readCliRunPolicy(pool,stoppedRun,actor.userId)).revision
   await pool.query(`INSERT INTO factory_tasks VALUES($1,$2,$3,'blocked')`, [taskId,actor.userId,epoch])
   await pool.query('INSERT INTO factory_attempts VALUES($1,$2,$3,$4)', [attemptId,taskId,stoppedRun,{
