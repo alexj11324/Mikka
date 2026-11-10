@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { withPendingWorkspaceChoices } from './workspace-choices'
 import { COMMIT_EXECUTOR } from '../db/commit-effects'
 import { currentRoute } from '../tracing/labels'
 import { isLiveRevisionKind, LIVE_ID } from '../live/events'
@@ -34,7 +35,7 @@ export async function withReadOnlyPolicyObservation<T>(read: () => Promise<T>): 
  * using the batch's authority/revision observations once its items settle. */
 export async function withReadBatchContext<T>(work: () => Promise<T>, actions: readonly BatchReadAction[] = []): Promise<T> {
   const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map(), subscriptionPolicies: new Map(), ownerRevisionKinds: readBatchOwnerRevisionKinds(actions), workspaceRevisionKinds: readBatchWorkspaceRevisionKinds(actions) }
-  try { return await batches.run(scope, work) }
+  try { return await withPendingWorkspaceChoices(() => batches.run(scope, work)) }
   finally { scope.active = false; scope.owners.clear(); scope.revisions.clear(); scope.subscriptionPolicies.clear() }
 }
 

@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { ownerLiveReadScope, ownerLiveScope } from '../live/owner-scope'
 import { readBatchOwnerRevisions, readBatchRevisions, withReadBatchContext } from './read-batch-context'
 import * as readContext from './read-batch-context'
+import { readPendingWorkspaceChoices } from './workspace-choices'
 import { COMMIT_EXECUTOR } from '../db/commit-effects'
 import { routeScope } from '../tracing/labels'
 
@@ -423,4 +424,175 @@ test('authorized Team list prefetch reduces three separately ready fixed-revisio
     'all three readers finish with the same counters and only their original requested key')
   assert.equal(f.calls.length, 1, 'the old per-reader queue issues three SQL reads after separate readiness')
   assert.deepEqual(f.calls[0], [['issue_list', 'task_run_list', 'thread_list'], [selectedTeam, selectedTeam, selectedTeam]])
+})
+
+type ChoiceReadInput = Parameters<typeof readPendingWorkspaceChoices>[0]
+const choiceFamily = {}, choiceRequest = {}, choiceDatabase = {}
+const choiceInput = (patch: Partial<ChoiceReadInput> = {}): ChoiceReadInput => ({
+  family: choiceFamily, database: choiceDatabase, request: choiceRequest, transaction: false,
+  identity: { userId: owner, nativeSessionId: 'choice-native-session', requestedId: workspace }, ...patch,
+})
+const choiceRow = () => ({ id: workspace, name: 'Fixture', kind: 'team', role: 'member', organizationId: null })
+
+test('pending workspace choices share one fresh SELECT and independent scalar rows before dispatch', async () => {
+  let reads = 0
+  const selected = choiceRow()
+  const read = async () => { reads++; return [selected] }
+  const result = await withReadBatchContext(() => Promise.all([
+    readPendingWorkspaceChoices(choiceInput(), read),
+    readPendingWorkspaceChoices(choiceInput(), read),
+  ]))
+  assert.equal(reads, 1)
+  assert.deepEqual(result, [[choiceRow()], [choiceRow()]])
+  assert.notEqual(result[0], result[1])
+  assert.notEqual(result[0][0], result[1][0])
+  result[0][0].name = 'Changed by one consumer'
+  assert.equal(result[1][0].name, 'Fixture')
+  assert.equal(selected.name, 'Fixture', 'a consumer cannot mutate the shared SQL observation')
+})
+
+test('a workspace SELECT is removed before callback construction and Drizzle thenable assimilation', async () => {
+  for (const point of ['construction', 'then'] as const) {
+    let reads = 0, following: Promise<ReturnType<typeof choiceRow>[]> | undefined
+    const fresh = () => { reads++; return Promise.resolve([]) }
+    const first = () => {
+      reads++
+      if (point === 'construction') following = readPendingWorkspaceChoices(choiceInput(), fresh)
+      return {
+        then(resolve: (rows: ReturnType<typeof choiceRow>[]) => void) {
+          if (point === 'then') following = readPendingWorkspaceChoices(choiceInput(), fresh)
+          resolve([choiceRow()])
+        },
+      } as PromiseLike<ReturnType<typeof choiceRow>[]>
+    }
+    await withReadBatchContext(async () => {
+      assert.deepEqual(await readPendingWorkspaceChoices(choiceInput(), first), [choiceRow()])
+      assert.ok(following)
+      assert.deepEqual(await following, [], 'a call after the dispatch fence cannot join the older SELECT')
+    })
+    assert.equal(reads, 2, point)
+  }
+})
+
+test('a later workspace read cannot join an in-flight or completed pre-revocation SELECT', async () => {
+  let reads = 0, member = true, release!: () => void, dispatched!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  const started = new Promise<void>(resolve => { dispatched = resolve })
+  const read = async () => {
+    const rows = member ? [choiceRow()] : []
+    if (++reads === 1) { dispatched(); await held }
+    return rows
+  }
+  await withReadBatchContext(async () => {
+    const earlier = readPendingWorkspaceChoices(choiceInput(), read)
+    await started
+    member = false
+    assert.deepEqual(await readPendingWorkspaceChoices(choiceInput(), read), [])
+    assert.equal(reads, 2, 'the old SQL remains unresolved while the revocation is observed')
+    release()
+    assert.deepEqual(await earlier, [choiceRow()])
+    assert.deepEqual(await readPendingWorkspaceChoices(choiceInput(), read), [])
+    assert.equal(reads, 3, 'completion is not a reusable authority cache')
+    member = true
+    assert.deepEqual(await readPendingWorkspaceChoices(choiceInput(), read), [choiceRow()])
+    assert.equal(reads, 4, 'the same batch also sees restoration')
+  })
+})
+
+test('workspace queue failures reject only their joined readers and never poison a later read', async () => {
+  for (const synchronous of [true, false]) {
+    let reads = 0
+    const error = new Error('workspace SELECT unavailable')
+    const failed = () => { reads++; if (synchronous) throw error; return Promise.reject(error) }
+    await withReadBatchContext(async () => {
+      const results = await Promise.allSettled([
+        readPendingWorkspaceChoices(choiceInput(), failed),
+        readPendingWorkspaceChoices(choiceInput(), failed),
+      ])
+      assert.ok(results.every(result => result.status === 'rejected' && result.reason === error))
+      assert.equal(reads, 1)
+      assert.deepEqual(await readPendingWorkspaceChoices(choiceInput(), async () => { reads++; return [choiceRow()] }), [choiceRow()])
+      assert.equal(reads, 2)
+    })
+  }
+})
+
+test('workspace choices are partitioned by request, SQL family, executor, session, reader, pin and principal', async () => {
+  const base = choiceInput()
+  const identities: ChoiceReadInput['identity'][] = [
+    { ...base.identity, userId: 'other-owner' },
+    { ...base.identity, nativeSessionId: 'another-session' },
+    { ...base.identity, requestedId: 'another-workspace' },
+    { ...base.identity, tokenWorkspaceId: 'pinned-workspace' },
+    { ...base.identity, principal: { kind: 'session', sessionId: 'explicit-session' } },
+    { ...base.identity, principal: { kind: 'pat', tokenId: 'pat-a', workspaceId: workspace } },
+    { ...base.identity, principal: { kind: 'pat', tokenId: 'pat-b', workspaceId: workspace } },
+    { ...base.identity, principal: { kind: 'delegation', credentialId: 'delegation', credentialKind: 'oauth' } },
+    { ...base.identity, principal: { kind: 'delegation', credentialId: 'delegation', credentialKind: 'run' } },
+    { ...base.identity, principal: { kind: 'delegation', credentialId: 'delegation', credentialKind: 'run', workspaceId: workspace } },
+    { ...base.identity, principal: { kind: 'admission', runId: 'run-a', workspaceId: workspace } },
+    { ...base.identity, principal: { kind: 'admission', runId: 'run-b', workspaceId: workspace } },
+    { ...base.identity, acting: { userId: owner } },
+    { ...base.identity, acting: { userId: 'other-acting-user' } },
+    { ...base.identity, acting: { userId: owner, tokenWorkspaceId: workspace } },
+    { ...base.identity, acting: { userId: owner, enterprisePrincipal: { kind: 'session', sessionId: 'acting-session' } } },
+  ]
+  const inputs = [base, choiceInput({ request: {} }), choiceInput({ family: {} }), choiceInput({ database: {} }),
+    ...identities.map(identity => choiceInput({ identity }))]
+  let reads = 0
+  await withReadBatchContext(() => Promise.all(inputs.flatMap(input => [
+    readPendingWorkspaceChoices(input, async () => { reads++; return [choiceRow()] }),
+    readPendingWorkspaceChoices(input, async () => { reads++; return [choiceRow()] }),
+  ])))
+  assert.equal(reads, inputs.length, 'only each exact pair shares its own new SELECT')
+  const execution = new AsyncLocalStorage<object>()
+  const proxy = new Proxy({}, { get: (_target, property) => property === COMMIT_EXECUTOR ? execution.getStore() : undefined })
+  await withReadBatchContext(() => Promise.all([{}, {}].map(executor => execution.run(executor, () =>
+    readPendingWorkspaceChoices(choiceInput({ database: proxy }), async () => { reads++; return [] })))))
+  assert.equal(reads, inputs.length + 2, 'one dynamic pool proxy cannot merge different actual executors')
+})
+
+test('transactions, absent Native identity, unknown principal and detached work bypass the workspace queue', async () => {
+  const base = choiceInput()
+  const unsupported = { kind: 'future-principal' } as unknown as NonNullable<ChoiceReadInput['identity']['principal']>
+  const extended = { kind: 'session', sessionId: 'session', futureAssurance: 'unknown' } as NonNullable<ChoiceReadInput['identity']['principal']>
+  const inputs = [
+    choiceInput({ transaction: true }), choiceInput({ request: undefined }),
+    choiceInput({ identity: { ...base.identity, nativeSessionId: undefined } }),
+    choiceInput({ identity: { ...base.identity, principal: unsupported } }),
+    choiceInput({ identity: { ...base.identity, principal: extended } }),
+    choiceInput({ identity: { ...base.identity, acting: { userId: owner, enterprisePrincipal: unsupported } } }),
+  ]
+  let reads = 0
+  const read = async () => { reads++; return [choiceRow()] }
+  for (const input of inputs) await withReadBatchContext(() => Promise.all([
+    readPendingWorkspaceChoices(input, read), readPendingWorkspaceChoices(input, read),
+  ]))
+  assert.equal(reads, inputs.length * 2)
+  let later!: () => Promise<ReturnType<typeof choiceRow>[][]>
+  const after = () => Promise.all([readPendingWorkspaceChoices(base, read), readPendingWorkspaceChoices(base, read)])
+  await assert.rejects(withReadBatchContext(async () => {
+    later = AsyncLocalStorage.bind(after)
+    throw new Error('batch stopped before its later callback')
+  }), /batch stopped/)
+  await later()
+  assert.equal(reads, inputs.length * 2 + 2, 'a bound callback cannot reactivate the closed queue')
+  for (const route of ['after:fixture', 'cron:fixture', 'workflow:fixture']) {
+    await withReadBatchContext(() => routeScope.run(route, after))
+  }
+  assert.equal(reads, inputs.length * 2 + 8)
+})
+
+test('parallel and successive Native batches never share a workspace observation', async () => {
+  let reads = 0
+  const read = async () => { reads++; return [choiceRow()] }
+  const run = () => withReadBatchContext(() => Promise.all([
+    readPendingWorkspaceChoices(choiceInput(), read), readPendingWorkspaceChoices(choiceInput(), read),
+  ]))
+  await Promise.all([run(), run()])
+  assert.equal(reads, 2)
+  await run()
+  assert.equal(reads, 3)
+  await Promise.all([readPendingWorkspaceChoices(choiceInput(), read), readPendingWorkspaceChoices(choiceInput(), read)])
+  assert.equal(reads, 5, 'ordinary reads outside Native batching always execute their own SELECT')
 })

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedRun, seedUser, seedPersonalWorkspace, seedWorkspace } from './support/workspace-admin-db'
 
 test('mobile bot page', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
@@ -12,9 +12,8 @@ test('mobile bot page', { skip: !dbUrl }, async t => {
   t.after(async () => { await Promise.all([pool.end(), appPool.end()]) })
 
   const owner = await seedUser(pool, 'owner'), other = await seedUser(pool, 'other')
-  const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
-  // The owner's own workspace: the personal one, where their older bot-less threads move.
-  await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [ws.id])
+  // The owner's own workspace: the Personal one, where their older bot-less threads move.
+  const ws = { id: await seedPersonalWorkspace(pool, owner) }
   const bot = await seedBot(pool, ws.id, owner, 'Reviewer'), sibling = await seedBot(pool, ws.id, owner, 'Writer')
   const agent = await seedAgent(pool, owner)
   const issue = await seedIssue(pool, owner)

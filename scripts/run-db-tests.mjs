@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/inbox/store.ts', file: 'lib/inbox/store.db.test.ts', script: 'test:inbox-db' },
   { marker: 'app/api/factory/tasks/[taskId]/activity/route.ts', file: 'tests/factory-activity-http.db.test.ts', script: 'test:factory-activity-http-db' },
   { marker: 'lib/factory/activity.ts', file: 'lib/factory/activity.db.test.ts', script: 'test:factory-activity-db' },
   { marker: 'lib/factory/activity-artifacts.ts', file: 'lib/factory/activity-artifacts.db.test.ts', script: 'test:factory-activity-db' },
@@ -20,7 +21,14 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/cloud-computer/thread-machine-sessions.ts', file: 'lib/cloud-computer/thread-machine-sessions.db.test.ts', script: 'test:factory-activity-db' },
   { marker: 'lib/factory/background-workspace.ts', file: 'tests/factory-background-workspace.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/factory/workspace-reader.ts', file: 'tests/factory-workspace-admission.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'lib/enterprise/audit-outbox.ts', file: 'lib/enterprise/audit-outbox.db.test.ts', script: 'test:enterprise-db' },
+  { marker: 'lib/enterprise/execution-authority.ts', file: 'lib/enterprise/execution-authority.db.test.ts', script: 'test:enterprise-db' },
+  { marker: 'lib/enterprise/live-authority.ts', file: 'lib/enterprise/live-authority.db.test.ts', script: 'test:enterprise-db' },
+  { marker: 'lib/enterprise/sso-plugin.ts', file: 'lib/enterprise/http.db.test.ts', script: 'test:enterprise-db' },
+  { marker: 'lib/governance/organizations.ts', file: 'lib/enterprise/governance.db.test.ts', script: 'test:enterprise-db' },
   { marker: 'lib/mobile-push.ts', file: 'tests/mobile-push-workspace.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'lib/governance/templates.ts', file: 'tests/team-governance-api.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'lib/governance/entitlements.ts', file: 'tests/governance-seats.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/task-workspace.ts', file: 'tests/task-workspace-governance.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/cloud-services/store.ts', file: 'lib/cloud-services/client.db.test.ts', script: 'test:cloud-services-db' },
   { marker: 'app/api/web/exchange/route.ts', file: 'tests/web-auth-handoff.db.test.ts', script: 'test:web-auth-db' },

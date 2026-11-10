@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { mock, test } from 'node:test'
+import { beforeEach, mock, test } from 'node:test'
 import type { Pool } from 'pg'
 import { COMMIT_EXECUTOR } from './db/commit-effects'
 import { createReadBatch } from './desktop-rpc/read-batch'
@@ -18,6 +18,34 @@ for (const [path, names] of [
 ] as const) mock.module(new URL(path, import.meta.url).href, {
   namedExports: Object.fromEntries(names.map(name => [name, changed])),
 })
+// Keep the real Organization policy decision in this query-boundary suite.
+const resourcePolicySql = "select w.kind,l.\"organizationId\",p.\"modelCredentialSharing\",p.\"mcpSharing\",p.\"allowedModelProviders\" from mikka_workspaces w left join mikka_organization_workspaces l on l.\"workspaceId\"=w.id left join mikka_organization_resource_policies p on p.\"organizationId\"=l.\"organizationId\" where w.id=$1"
+const resourceApprovalSql = 'select status from mikka_organization_resource_approvals where "organizationId"=$1 and "workspaceId"=$2 and kind=$3 and "resourceId"=$4 and "ownerId"=$5'
+let organizationId: string | null = null
+let sharing: 'allow' | 'approval_required' | 'deny' = 'allow'
+let approval: 'approved' | 'denied' | null = null
+const workspaceReads: string[] = []
+const policyFixtureWorkspaces = new Set(['workspace', '10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000004'])
+beforeEach(() => { organizationId = null; sharing = 'allow'; approval = null; workspaceReads.length = 0 })
+const unexpectedWorkspace = () => assert.fail('unexpected Workspace operation in share-policy fixture')
+mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: {
+  workspaceDb: { select: unexpectedWorkspace, transaction: unexpectedWorkspace },
+  workspacePool: { query: async (sql: string, values: unknown[]) => {
+    const normalized = sql.replace(/\s+/g, ' ').trim()
+    if (normalized === resourcePolicySql) {
+      assert.equal(values.length, 1)
+      assert.equal(typeof values[0], 'string')
+      assert.ok(policyFixtureWorkspaces.has(values[0] as string), 'only the three explicit fixture workspaces may read policy')
+      workspaceReads.push('policy')
+      return { rows: [{ kind: 'team', organizationId, modelCredentialSharing: sharing, mcpSharing: 'allow', allowedModelProviders: null }], rowCount: 1 }
+    }
+    assert.equal(normalized, resourceApprovalSql, 'only the exact policy and approval reads are admissible')
+    assert.deepEqual(values, [organizationId, 'workspace', 'subscription', 'payor', 'payor'])
+    assert.ok(organizationId)
+    workspaceReads.push('approval')
+    return { rows: approval ? [{ status: approval }] : [], rowCount: approval ? 1 : 0 }
+  } },
+} })
 const { othersMayUse, pooledOwners, memberSubscriptionsAllowed } = await import('./personal-policy')
 const { usableApiKeys } = await import('./model-api-keys')
 
@@ -121,12 +149,12 @@ test('a Native read batch shares its workspace policy across the real key and su
   assert.deepEqual(f.calls.filter(call => call !== 'policy'), ['own-keys', 'shared-keys', 'shared-owners'], 'consumer guards and data reads still run')
 })
 
-test('a refused batch policy still permits own keys and skips every shared credential read', async () => {
+test('a refused batch policy still permits own keys and returns no borrowed credential', async () => {
   const f = policyReader(false)
   assert.deepEqual(await batchConsumers(f.query), [{ ok: true, result: {
     keys: [{ id: '10000000-0000-4000-8000-000000000002', mine: true }], owners: [],
   } }])
-  assert.deepEqual(f.calls, ['policy', 'own-keys'])
+  assert.deepEqual(f.calls, ['own-keys', 'shared-keys', 'policy', 'shared-owners'])
   f.state.allowed = undefined
   const [next] = await batchConsumers(f.query)
   assert.equal(next.ok && (next.result as { owners: string[] }).owners.length, 1, 'the next request observes the original absent-policy default')
@@ -192,7 +220,7 @@ test('a failed batch policy preserves its original rejection and cannot poison t
   }
   const [failed] = await batchConsumers(f.query)
   assert.deepEqual(failed, { ok: false, status: 500, error: { code: 'desktop_rpc_failed' } })
-  assert.equal(f.calls.length, 2, 'an independent batch retries the original read once')
+  assert.equal(f.calls.filter(call => call === 'policy').length, 2, 'an independent batch retries the original policy read once')
   f.state.error = null
   assert.equal((await batchConsumers(f.query))[0].ok, true)
   assert.equal(f.calls.filter(call => call === 'policy').length, 3)
@@ -293,7 +321,7 @@ test('standalone read-only policy consumers share one observation and keep every
   const expected = await readPolicyConsumers(before.query)
   assert.equal(before.calls.filter(call => call === 'policy').length, 2, 'ordinary callers keep their existing fresh checks')
   assert.deepEqual(await observePolicy(() => readPolicyConsumers(after.query)), expected)
-  assert.deepEqual(after.calls, ['policy', 'own-keys', 'shared-keys', 'shared-owners'])
+  assert.deepEqual(after.calls, ['own-keys', 'shared-keys', 'policy', 'shared-owners'])
 })
 
 test('standalone policy refusal and absence are observed again by the next read', async () => {
@@ -301,7 +329,7 @@ test('standalone policy refusal and absence are observed again by the next read'
   assert.deepEqual(await observePolicy(() => readPolicyConsumers(f.query)), {
     keys: [{ id: '10000000-0000-4000-8000-000000000002', mine: true }], owners: [],
   })
-  assert.deepEqual(f.calls, ['policy', 'own-keys'])
+  assert.deepEqual(f.calls, ['own-keys', 'shared-keys', 'policy', 'shared-owners'])
   f.state.allowed = undefined
   assert.equal((await observePolicy(() => readPolicyConsumers(f.query))).owners.length, 1)
   assert.equal(f.calls.filter(call => call === 'policy').length, 2)
@@ -388,4 +416,38 @@ test('standalone read-only observation preserves the surrounding Native batch po
   })
   assert.equal(await observePolicy(() => memberSubscriptionsAllowed(f.query, workspace)), false)
   assert.equal(f.calls.length, 2)
+})
+
+test('the same local share cannot bypass a fresh Organization deny or approval decision', async () => {
+  organizationId = 'organization'
+  const { query, calls } = reader(Array.from({ length: 6 }, () => [{ allowOthers: true }]))
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), true)
+  sharing = 'deny'
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  sharing = 'approval_required'
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  approval = 'approved'
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), true)
+  approval = 'denied'
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  sharing = 'allow'
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  assert.equal(calls.length, 6, 'each local share and admin decision remains one APP read')
+  assert.equal(workspaceReads.filter(kind => kind === 'policy').length, 6, 'Organization policy is fresh on every permission check')
+})
+
+test('Organization deny remains fresh inside both read-only policy observation lifetimes', async () => {
+  for (const observe of [withReadBatchContext, observePolicy]) {
+    organizationId = 'organization'; sharing = 'allow'; workspaceReads.length = 0
+    const f = policyReader()
+    await observe(async () => {
+      assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
+      sharing = 'deny'
+      assert.equal(await memberSubscriptionsAllowed(f.query, workspace), false)
+      sharing = 'allow'
+      assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
+      assert.equal(f.calls.length, 1, 'only the existing APP policy observation is shared')
+      assert.equal(workspaceReads.filter(kind => kind === 'policy').length, 3, 'the Organization policy is re-read before every memo lookup')
+    })
+  }
 })
