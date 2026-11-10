@@ -54,7 +54,7 @@ export function sanitizeAnalyticsEvent<T extends { event: string; properties: Re
   }
   const referringDomain = event.properties.$referring_domain
   if (typeof referringDomain === 'string' && referringDomain.length <= 253
-    && /^(?:[a-z0-9-]+\\.)+[a-z]{2,}$/i.test(referringDomain)) {
+    && /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(referringDomain)) {
     properties.$referring_domain = referringDomain.toLowerCase()
   }
   const sanitized = { ...event, properties }
