@@ -34,6 +34,7 @@ export const dueJobs: Record<DueKind, DueJob> = {
     run: async () => {
       const [{ deliverWorkspaceAudits }, { sweepAuditRetention }] = await Promise.all([import('./audit/delivery'), import('./audit/retention')])
       await deliverWorkspaceAudits()
+      await (await import('./enterprise/maintenance')).maintainEnterpriseGovernance()
       await sweepAuditRetention()
       return auditRetentionNextDue()
     },
@@ -48,7 +49,10 @@ async function accountDeletionsNextDue() {
 
 async function auditRetentionNextDue() {
   const [{ pool }, { workspacePool }, { nextAuditRetentionDue }] = await Promise.all([import('./db'), import('./workspace-db'), import('./audit-retention-due')])
-  return nextAuditRetentionDue(pool, workspacePool)
+  const { nextEnterpriseMaintenanceDue } = await import('./enterprise/maintenance')
+  const due = await Promise.all([nextAuditRetentionDue(pool, workspacePool), nextEnterpriseMaintenanceDue(pool, workspacePool)])
+  const times = due.filter((value): value is number => value !== null)
+  return times.length ? Math.min(...times) : null
 }
 
 /** The run holding a timer's token, and the deployment it is pinned to. */

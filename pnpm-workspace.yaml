@@ -27,4 +27,5 @@ allowBuilds:
 
 patchedDependencies:
   '@novnc/novnc@1.6.0': patches/@novnc__novnc@1.6.0.patch
+  '@better-auth/sso@1.7.12': patches/@better-auth__sso@1.7.12.patch
   ffmpeg-static@5.3.0: patches/ffmpeg-static@5.3.0.patch
