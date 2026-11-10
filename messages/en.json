@@ -2403,7 +2403,43 @@
       "shadowConfirmMany": "{workspace} already has {names}. Use your own values in your runs?",
       "useMine": "Use mine"
     },
+    "permissionsPage": {
+      "heading": "What bots and members may do",
+      "detail": "Locked items are blocked for everyone in this workspace.",
+      "allowed": "Allowed",
+      "blocked": "Blocked",
+      "allowedEmpty": "Nothing is allowed",
+      "blockedEmpty": "Nothing is blocked",
+      "block": "Block {name}",
+      "unblock": "Allow {name}",
+      "readOnly": "Only admins can change these.",
+      "appColumn": "App",
+      "accessColumn": "Access",
+      "summary": "{allowed} allowed, {blocked} blocked"
+    },
     "audit": {
+      "adminOnly": "Only admins can see the audit log.",
+      "categoryFilter": "Category",
+      "columns": {
+        "time": "Time",
+        "actor": "Who",
+        "action": "What",
+        "category": "Category",
+        "place": "Where"
+      },
+      "range": {
+        "label": "Period",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "last7": "Last 7 days",
+        "last30": "Last 30 days",
+        "last90": "Last 90 days",
+        "apply": "Apply",
+        "pickEnd": "{start} – pick an end",
+        "days": "{count, plural, one {# day} other {# days}}",
+        "choose": "Choose a period",
+        "presets": "Periods"
+      },
       "loading": "Loading audit log",
       "filter": "Filter",
       "filters": {
