@@ -166,7 +166,15 @@ export async function callAppTool(deps: AppToolDeps, raw: unknown) {
   const call: AppToolCall = { toolkit, tool: tool.slug, name: tool.name.slice(0, 200), version: tool.version, arguments: args }
 
   // The person's explicit setting wins; otherwise the Decisions API judges every call, reads included (readOnlyHint is one of its inputs).
-  const setting = await deps.setting(toolSettingKey(tool.slug), toolkit)
+  // A layer that cannot be read fails closed with a code the model can act
+  // on; the diagnostic stays server-side and names nothing stored.
+  let setting: AppToolDecision | null
+  try {
+    setting = await deps.setting(toolSettingKey(tool.slug), toolkit)
+  } catch (failure) {
+    console.error('app_tool_policy_unavailable', { toolkit, tool: tool.slug, cause: failure instanceof Error ? failure.name : 'unknown' })
+    return { error: 'integrationPolicyUnavailable' }
+  }
   if (setting === 'deny') return { error: 'integrationActionDenied' }
   const card = setting === 'ask' || (setting === null && await deps.judge({ action: toolSettingKey(tool.slug), tool: tool.slug, annotations: tool.tags, input: args }) === 'ask')
   if (card) return deps.propose(call, ready.accountId)

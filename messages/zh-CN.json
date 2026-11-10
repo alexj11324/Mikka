@@ -2310,7 +2310,8 @@
         "saveFailed": "保存失败",
         "writePolicyChanged": "设置刚被改过，已重新读取",
         "agentPolicyUnavailable": "这项设置现在保存不了",
-        "workspaceAccessDenied": "只有管理员能改工作区设置"
+        "workspaceAccessDenied": "只有管理员能改工作区设置",
+        "noBotInWorkspace": "这个工作区还没有 Bot。新建一个 Bot 后才能读取和保存工作区的应用权限。"
       }
     },
     "workspaceLoading": "正在读取工作区…",

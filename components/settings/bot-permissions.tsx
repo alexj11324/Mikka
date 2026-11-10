@@ -39,6 +39,15 @@ async function agentPolicy<T>(body: unknown): Promise<T> {
   return value
 }
 
+/** The page's own error: a failed read, or a workspace with no Bot to anchor
+ * its policy. Without a Bot the save and catalogue routes have no target, so
+ * the page says why instead of failing silently. */
+export function botPermissionsErrorKey(input: { bots: unknown[] | undefined; workspaceId?: string; readFailed: boolean }): 'readFailed' | 'noBotInWorkspace' | null {
+  if (input.readFailed) return 'readFailed'
+  if (input.workspaceId && input.bots?.length === 0) return 'noBotInWorkspace'
+  return null
+}
+
 /**
  * The current workspace's permissions: one access level per connected app, the provider's real tool catalogue, and the
  * workspace's run policy. This is not per Bot: every Bot in the workspace inherits these choices, and the workspace
@@ -188,7 +197,10 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
     }) },
     onLoadTools: loadTools,
     saving,
-    error: error ?? (workspace.error || run.error || botsError ? tError('readFailed') : null),
+    error: error ?? (() => {
+      const key = botPermissionsErrorKey({ bots, workspaceId, readFailed: Boolean(workspace.error || run.error || botsError) })
+      return key ? tError(key as never) : null
+    })(),
   }
 }
 

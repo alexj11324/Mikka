@@ -1,11 +1,19 @@
 import { WRITE_TOOL_APPS } from '@/lib/app-policy/apps'
 
-// One app-level permission key, with the legacy first-class write tool that
-// acts in the same app. A settings page writes both so the app-level choice
-// governs generic app tools and the older write path together. The map is the
-// app policy's own (`WRITE_TOOL_APPS`), so a new first-class write action
-// cannot leave the workspace page silently unable to govern it.
-export const LEGACY_WRITE_ACTIONS: Readonly<Record<string, string>> = WRITE_TOOL_APPS
+/** The first-class mail and calendar writes (lib/composio-actions), and the app each one writes to. */
+export const APPROVAL_WRITE_ACTIONS: Readonly<Record<string, string>> = {
+  send_email: 'gmail',
+  create_calendar_event: 'googlecalendar',
+  update_calendar_event: 'googlecalendar',
+}
+
+// One app-level permission key, with the first-class write tools that act in
+// the same app. A settings page writes both so the app-level choice governs
+// generic app tools and the older write paths together. The team-permission
+// map is the app policy's own (`WRITE_TOOL_APPS`), extended with the mail and
+// calendar writes, so a new first-class write action cannot leave the workspace
+// page silently unable to govern it.
+export const LEGACY_WRITE_ACTIONS: Readonly<Record<string, string>> = { ...WRITE_TOOL_APPS, ...APPROVAL_WRITE_ACTIONS }
 
 export const LEGACY_APP_ACTIONS: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(LEGACY_WRITE_ACTIONS).map(([action, app]) => [app, action]),
@@ -13,10 +21,9 @@ export const LEGACY_APP_ACTIONS: Readonly<Record<string, string>> = Object.fromE
 
 export type AppPermissionValue = 'allow' | 'ask' | 'deny'
 
-/** The keys that carry one app's choice: the app itself, then its legacy tool. */
+/** The keys that carry one app's choice: the app itself, then every first-class write tool in it. */
 export function appPermissionKeys(app: string): string[] {
-  const legacy = LEGACY_APP_ACTIONS[app]
-  return legacy ? [app, legacy] : [app]
+  return [...new Set([app, ...Object.entries(LEGACY_WRITE_ACTIONS).filter(([, value]) => value === app).map(([action]) => action)])]
 }
 
 const VALUES = new Set<string>(['allow', 'ask', 'deny'])

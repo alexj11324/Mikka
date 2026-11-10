@@ -2310,7 +2310,8 @@
         "saveFailed": "Couldn't save",
         "writePolicyChanged": "The settings just changed; read again",
         "agentPolicyUnavailable": "This setting can't be saved right now",
-        "workspaceAccessDenied": "Only admins can change workspace settings"
+        "workspaceAccessDenied": "Only admins can change workspace settings",
+        "noBotInWorkspace": "This workspace has no Bot yet. Create one to read and save its app permissions."
       }
     },
     "workspaceLoading": "Loading the workspace…",

@@ -8,7 +8,7 @@
 -- has no workspace to restrict. The fold is idempotent: after the first run
 -- the worker policies are empty and the workspace values are stable.
 --
--- The network helpers come from 20261110230000_workspace_only_app_permissions.
+-- The network helpers come from 20261110250000_workspace_only_app_permissions.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';

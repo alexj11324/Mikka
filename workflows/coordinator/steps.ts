@@ -490,6 +490,8 @@ appTools.maxRetries = 0
 export async function accountWrite(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  // 团队权限 › 允许使用的应用 blocks the app for a named Bot; the workspace's
+  // one app setting (deny / ask / allow) decides inside writeAccountAction.
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return writeAccountAction(userId, action, input, accountId, botId ?? null)
 }

@@ -1,9 +1,10 @@
 import 'server-only'
 import { pendingActionsChanged } from './live/pending-actions'
 import { and, desc, eq, gt } from 'drizzle-orm'
-import { appToolCallSchema, APP_TOOL_ACTION, type AppToolCall } from '@/lib/app-tools'
+import { appToolCallSchema, APP_TOOL_ACTION, type AppToolCall, type AppToolDecision } from '@/lib/app-tools'
 import { COMPOSIO_ACTIONS, isApprovalAction, parseActionInput } from '@/lib/composio-actions'
 import { serverWriteJudge, type WriteJudge } from '@/lib/operations/write-judgment'
+import { accountWriteSetting } from '@/lib/operations/account-write-setting'
 import { resolveActionAccount, runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
 import { pendingActions } from '@/lib/db/schema'
@@ -14,21 +15,32 @@ const MAX_PENDING = 20
 
 /**
  * Sends mail or writes the calendar in the person's connected account, with
- * no card (decision 2026-10-31): the connection's grant is the permission and
- * only a destructive call asks. The Decisions API judges this exact call, with
- * the tool's MCP annotations as input; a destructive, unjudged or refused call
- * goes to `proposeAction` instead. The row is written before dispatch and kept
- * as the record; like other writes the policy allows, it has no `decidedAt`
- * and never shows as a card.
+ * no card (decision 2026-10-31): the workspace's setting is the permission.
+ * A workspace deny withholds the call, an ask makes the card, and only when
+ * the workspace names no key does the Decisions API judge the exact call.
+ * A destructive, unjudged or refused call goes to `proposeAction` instead.
+ * The row is written before dispatch and kept as the record; like other writes
+ * the policy allows, it has no `decidedAt` and never shows as a card.
  */
-export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId)) {
+export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId), settingOverride?: AppToolDecision | null) {
   if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
   const parsed = parseActionInput(action, input)
   if (!parsed) return { error: 'invalidIntegrationInput' }
+  let setting: AppToolDecision | null
+  if (settingOverride !== undefined) setting = settingOverride
+  else {
+    // A layer that cannot be read fails closed: never fall back to the judge
+    // for a workspace whose deny/ask choice is unknown.
+    try { setting = await accountWriteSetting(db, userId, botId, action) }
+    catch { return { error: 'integrationPolicyUnavailable' } }
+  }
   const id = crypto.randomUUID()
   let recorded = false as boolean
   const result = await runComposioAction(userId, action, parsed, selectedAccountId, async (accountId, tool) => {
-    if (await judge({ action, tool: COMPOSIO_ACTIONS[action].slug, annotations: tool.tags, input: parsed }) === 'ask') return { error: 'integrationApprovalRequired' }
+    // The workspace's one setting decides first: deny withholds, ask makes the
+    // card, allow runs without the judge. Only an unset key reaches the judge.
+    if (setting === 'deny') return { error: 'integrationActionDenied' }
+    if (setting === 'ask' || (setting === null && await judge({ action, tool: COMPOSIO_ACTIONS[action].slug, annotations: tool.tags, input: parsed }) === 'ask')) return { error: 'integrationApprovalRequired' }
     await db.insert(pendingActions).values({ id, userId, botId, action, input: parsed, connectedAccountId: accountId, status: 'running' })
     recorded = true
     return null

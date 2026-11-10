@@ -3,7 +3,9 @@ import { pendingActionsChanged } from './live/pending-actions'
 import { and, eq, gt } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { appToolCallSchema, APP_TOOL_ACTION } from '@/lib/app-tools'
-import { isApprovalAction } from '@/lib/composio-actions'
+import { COMPOSIO_ACTIONS, isApprovalAction } from '@/lib/composio-actions'
+import { accountWriteSetting, appToolWriteSetting } from '@/lib/operations/account-write-setting'
+import { botMayUseApp } from '@/lib/app-policy/store'
 import { runComposioAction } from '@/lib/composio'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { actionDecidedEvent } from '@/lib/coordinator-events'
@@ -33,28 +35,62 @@ export async function decidePendingAction(userId: string, id: string, approve: b
   let status: 'done' | 'failed' | 'declined' | 'running' = 'declined'
   let error: string | null = null
   let outcome: Record<string, string> = {}
+  // A card is not a permanent grant: the workspace's one setting is read again
+  // at approval, so a policy that turned deny after the proposal cannot run.
+  // An unreadable layer fails closed instead of executing on an unknown choice.
+  const blocked = approve ? await approvalPolicyBlock(userId, row) : null
   if (approve || (row.action === 'browser_operation' || row.action === 'credential_operation')) {
-    const result = (row.action === 'browser_operation' || row.action === 'credential_operation')
-      ? row.action === 'credential_operation'
-        ? await (await import('@/lib/cloud-computer/credential-reviews')).executeCredentialOperation(pool, userId, row.input, approve)
-        : await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve)
-      : row.action === APP_TOOL_ACTION
-        ? await runApprovedAppToolCall(userId, row.input, row.connectedAccountId ?? null)
-        : !row.connectedAccountId
-          ? { error: 'integrationAccountNotBound' }
-          : await runComposioAction(userId, row.action, row.input, row.connectedAccountId)
-    if ('error' in result) {
-      status = (isApprovalAction(row.action) || row.action === APP_TOOL_ACTION) && result.error === 'operationUncertain' ? 'running' : 'failed'
-      error = result.error
+    if (blocked) {
+      status = 'failed'
+      error = blocked
+      await db.update(pendingActions).set({ status, error, result: outcome }).where(eq(pendingActions.id, row.id))
     } else {
-      status = approve ? 'done' : 'declined'
-      outcome = actionOutcome(result.data)
+      const result = (row.action === 'browser_operation' || row.action === 'credential_operation')
+        ? row.action === 'credential_operation'
+          ? await (await import('@/lib/cloud-computer/credential-reviews')).executeCredentialOperation(pool, userId, row.input, approve)
+          : await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve)
+        : row.action === APP_TOOL_ACTION
+          ? await runApprovedAppToolCall(userId, row.input, row.connectedAccountId ?? null)
+          : !row.connectedAccountId
+            ? { error: 'integrationAccountNotBound' }
+            : await runComposioAction(userId, row.action, row.input, row.connectedAccountId)
+      if ('error' in result) {
+        status = (isApprovalAction(row.action) || row.action === APP_TOOL_ACTION) && result.error === 'operationUncertain' ? 'running' : 'failed'
+        error = result.error
+      } else {
+        status = approve ? 'done' : 'declined'
+        outcome = actionOutcome(result.data)
+      }
+      await db.update(pendingActions).set({ status, error, result: outcome }).where(eq(pendingActions.id, row.id))
     }
-    await db.update(pendingActions).set({ status, error, result: outcome }).where(eq(pendingActions.id, row.id))
   }
   await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }, { botId: row.botId }))
   await wakeCoordinator(userId)
   return { status, error }
+}
+
+/** The workspace's current decision for an approved card, or null to run it.
+ * First-class mail and calendar writes and store-app calls consult the same
+ * workspace layer, and the 团队权限 app block is rechecked for a named Bot.
+ * An unreadable layer or app block fails closed. */
+async function approvalPolicyBlock(userId: string, row: { action: string; botId: string | null; input: unknown }): Promise<string | null> {
+  let toolkit: string
+  let setting: 'allow' | 'ask' | 'deny' | null
+  try {
+    if (isApprovalAction(row.action)) {
+      toolkit = COMPOSIO_ACTIONS[row.action].toolkit
+      setting = await accountWriteSetting(db, userId, row.botId, row.action)
+    } else if (row.action === APP_TOOL_ACTION) {
+      const call = appToolCallSchema.safeParse(row.input)
+      if (!call.success) return 'invalidIntegrationInput'
+      toolkit = call.data.toolkit
+      setting = await appToolWriteSetting(db, userId, row.botId, call.data.tool, call.data.toolkit)
+    } else return null
+    if (row.botId && !(await botMayUseApp(row.botId, toolkit))) return 'integrationBlockedByWorkspace'
+  } catch {
+    return 'integrationPolicyUnavailable'
+  }
+  return setting === 'deny' ? 'integrationActionDenied' : null
 }
 
 /**
