@@ -651,6 +651,36 @@ for (const profileId of ['default', 'a1284000-0000-4000-8000-000000000005']) tes
   await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Build this feature', { ...options, profileId: undefined }), SubmissionConflictError)
 })
 
+test('a task title is trimmed, frozen in the immutable user submission and cannot be changed on retry', async () => {
+  const f = fixture()
+  const options = { botId: COORDINATOR_BOT, submissionId, taskTitle: '  Fix login redirect  ' }
+  const sent = await recordPersonalSubmission(f.executor, 'owner', 'Build this feature', options)
+  assert.deepEqual(await recordPersonalSubmission(f.executor, 'owner', 'Build this feature', options), { duplicate: true, eventId: sent.eventId })
+  assert.equal((([...f.rows.values()][0].payload) as Record<string, unknown>).taskTitle, 'Fix login redirect')
+  await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Build this feature', { ...options, taskTitle: 'Another title' }), SubmissionConflictError)
+  await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Build this feature', { ...options, taskTitle: undefined }), SubmissionConflictError)
+  for (const invalid of ['', '   ', 'x'.repeat(61), 'two\nlines']) await assert.rejects(recordPersonalSubmission(fixture().executor, 'owner', 'Build this feature', { ...options, taskTitle: invalid }), `rejects ${JSON.stringify(invalid)}`)
+})
+
+test('a task title makes the message a task submission with the normal gates and rejects an invalid title', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'; enabled = true
+  overrideDeploymentSwitch('issueTools', true)
+  const send = (title = 'Fix login redirect') => sendCoordinatorMessage('do the task', null, null, submissionId, undefined, undefined, undefined, undefined, undefined, undefined, title)
+  try {
+    assert.deepEqual(await send(), { queued: true })
+    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', taskTitle: 'Fix login redirect' })
+    assert.deepEqual(await send(), { queued: true })
+    assert.equal(current.rows.size, 1)
+    for (const invalid of ['', '   ', 'x'.repeat(61), 'two\nlines']) assert.deepEqual(await send(invalid), { error: 'validationGeneric', params: undefined })
+    assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'Fix login redirect'), { error: 'validationGeneric', params: undefined }, 'a titled task needs a submission id')
+    enabled = false
+    assert.deepEqual(await send(), { error: 'coordinatorUnavailable', params: undefined })
+    enabled = true; overrideDeploymentSwitch('issueTools', false)
+    assert.deepEqual(await send(), { error: 'issueToolsDisabled', params: undefined })
+    assert.equal(current.rows.size, 1)
+  } finally { enabled = true; overrideDeploymentSwitch('issueTools', undefined) }
+})
+
 test('the task-form Default choice needs no custom row and retains normal submission gates', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'; enabled = true
   overrideDeploymentSwitch('issueTools', true)

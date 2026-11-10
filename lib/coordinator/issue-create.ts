@@ -3,10 +3,11 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { systemActor } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
-import { bots, coordinatorEvents } from '@/lib/db/schema'
+import { bots, coordinatorEvents, issues } from '@/lib/db/schema'
 import { FactoryError } from '@/lib/factory/contract'
 import { issueForUser } from '@/lib/issue-access'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
+import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 
 const inputSchema = z.object({ sourceEventId: z.uuid(), title: z.string().trim().min(1).max(200) }).strict()
@@ -36,13 +37,17 @@ export async function createIssueFromRequest(userId: string, input: { sourceEven
       if (!issue || issue.workspaceId !== source.workspaceId) throw new FactoryError('factoryNotFound')
       return { issueId: issue.id, title: issue.title }
     }
+    // A title the person typed in the task form wins over the model's: it is stored on the user's own event.
+    const typed = taskTitleInputSchema.safeParse(event.payload.taskTitle)
     const issue = await createIssueForUserInTransaction(tx, userId, {
-      title: parsed.data.title,
+      title: typed.success ? typed.data : parsed.data.title,
       content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: event.payload.text }] }] },
       status: 'todo',
       priority: 'normal',
     }, systemActor('coordinator'), { workspaceId: source.workspaceId })
     if (!issue) throw new FactoryError('factoryInvalid')
+    // The person's own title is shown as it is in lists: a short title is only written while the task has none.
+    if (typed.success) await tx.update(issues).set({ shortTitle: typed.data, shortTitleFrom: typed.data }).where(eq(issues.id, issue.id))
     await tx.update(coordinatorEvents).set({ issueId: issue.id }).where(eq(coordinatorEvents.id, event.id))
     return { issueId: issue.id, title: issue.title }
   }))

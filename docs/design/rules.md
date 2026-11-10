@@ -145,8 +145,10 @@ source wins in a conflict is in [`README.md`](README.md).
   建议 when done; the dispatched task also shows up in the task lists.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
-  describes the task in a sentence and the Coordinator writes it. The dialog
-  shows a machine picker.
+  describes the task in a sentence and the Coordinator writes it, or types
+  the title themself in an optional title field above the description
+  ([decision](decisions/2026-11-10-1213-new-task-optional-title.md)). The
+  dialog shows a machine picker.
 - **R-23** Machine picker order: **Mikka Cloud** first; then the group
   **本机** (this Mac, a local Linux machine); then the group **Remote
   control** (VPS and SSH hosts reached through the user's machine). Settings ›
