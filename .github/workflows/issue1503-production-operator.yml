@@ -1,4 +1,4 @@
-# Root-bound exact #1503 child cleanup after the actual post-R7 consumer; source, receipt and time gates remain enforced.
+# Inactive #1503 exact child cleanup carrier; the terminal receipt records the actual outcome.
 name: Issue 1503 exact read-only child cleanup
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
   queue: max
 jobs:
   cleanup:
-    if: true # ROOT_BOUND_EXACT_CHILD_CLEANUP
+    if: false # CLOSED_AFTER_TERMINAL_ATTEMPT
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
