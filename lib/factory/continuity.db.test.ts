@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool, type PoolClient } from 'pg'
 import { dbUrl, seedAgent, seedIssue, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { threadPromptView } from '../thread-prompt'
 import { cleanAllowedModels, seedAllowedModel } from '../../tests/support/allowed-model'
 import { createFactoryStore, type FactoryTask } from './store'
 import { factoryBinding } from './dispatch'
@@ -293,7 +294,12 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
         VALUES($1,$2,$3,$4,$5,'uncertain',$6,$7)`, [excludedIds[index], other.owner, workspace.id,
         JSON.stringify({ executionRunId: other.runId, action: 'fixture_observation' }), `continuity:${excludedIds[index]}`, randomUUID(), other.runId])
     }
-    const leaseRecovery = await factoryRecoveryHandoff(pool, { id: task.runId, userId: owner }, 'Resume the current request.')
+    const visibleTask = 'Resume the current request. 🧪'
+    const leaseRecovery = await factoryRecoveryHandoff(pool, { id: task.runId, userId: owner }, {
+      prompt: visibleTask + '\n\nSYNTHETIC_INTERNAL_STANDING_INSTRUCTION', promptTaskStart: 0, promptTaskLength: Array.from(visibleTask).length,
+    })
+    assert.equal(threadPromptView(leaseRecovery.prompt, leaseRecovery.promptTaskStart, leaseRecovery.promptTaskLength).task, visibleTask)
+    assert.ok(leaseRecovery.promptTaskStart! > 0, 'the actual Factory request prefix moves the trusted range')
     assert.match(leaseRecovery.blocked ?? '', /Reconcile its existing receipt/)
     await pool.query(`UPDATE factory_tasks SET "updatedAt"=now()-interval '2 minutes' WHERE id=$1`, [task.id])
     const count = dispatches
