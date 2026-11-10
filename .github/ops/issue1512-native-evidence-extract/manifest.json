@@ -1,6 +1,6 @@
 {
   "schema": "issue1512-native-frozen-git-extraction-admission-v1",
-  "enabled": true,
+  "enabled": false,
   "repository": "alexj11324/Mikka",
   "repositoryId": 1427517699,
   "opsBranch": "ops/1512-task-runs-pg-20261110",
@@ -2018,5 +2018,6 @@
     "failure": "JSON_SIZE",
     "rawLog": "b0b39709271822f6405ebf6dc23a6b35e557b50b",
     "decodedLog": "9858022ae194d45a58d93c37c05b6e92646a17a3"
-  }
+  },
+  "closureReason": "One admitted extraction from already frozen Git ZIPs is terminal; no artifact download path exists."
 }
