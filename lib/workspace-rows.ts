@@ -5,6 +5,7 @@ import * as workspaceSchema from '@/lib/db/workspace-schema'
 import * as teamSchema from '@/lib/db/team-schema'
 import * as projectSchema from '@/lib/db/project-schema'
 import * as teamEntitlementsSchema from '@/lib/db/team-entitlements-schema'
+import * as governanceSchema from '@/lib/db/governance-schema'
 import { runToFixpoint } from '@/lib/account/delete'
 import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
@@ -17,7 +18,7 @@ import { armDueTimerAfterCommit } from '@/lib/due-timer'
  */
 export const WORKSPACE_COLUMNS = ['workspaceId', 'workspace_id'] as const
 
-const workspaceDatabaseTables = ([...Object.values(workspaceSchema), ...Object.values(teamSchema), ...Object.values(projectSchema), ...Object.values(teamEntitlementsSchema)] as unknown[])
+const workspaceDatabaseTables = ([...Object.values(workspaceSchema), ...Object.values(teamSchema), ...Object.values(projectSchema), ...Object.values(teamEntitlementsSchema), ...Object.values(governanceSchema)] as unknown[])
   .filter((value): value is PgTable => is(value, PgTable)).map(table => getTableName(table))
 
 /** Tables keyed by a workspace whose rows stay when it is deleted, and why. */

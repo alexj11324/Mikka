@@ -9,7 +9,12 @@ import { readHomeScopeProof } from './home-scope-proof'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
-if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
+if (url) {
+  assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
+  assert.equal(process.env.MIKKA_DATABASE_URL, url)
+  assert.equal(process.env.DATABASE_URL, url)
+  if (process.env.ORVILO_DATABASE_URL) assert.equal(process.env.ORVILO_DATABASE_URL, url)
+}
 
 test('real tickets project only the active owned personal home and recheck a revoked Better Auth session', { skip: !url, timeout: 120_000 }, async () => {
   const database = new Pool({ connectionString: url, max: 4 })
@@ -40,7 +45,6 @@ test('real tickets project only the active owned personal home and recheck a rev
     assert.equal((await auth.$context).checkSchema, undefined, 'the auth fixture uses the production schema validation policy')
     fresh.readFreshSessionsInScope(auth.api)
     mocks.push(mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { auth } }))
-    mocks.push(mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: database } }))
     mocks.push(mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_name: string, route: (request: Request) => Promise<Response>) => route } }))
     const { GET } = await import('../../app/api/live/ticket/route')
     handle = request => new URL(request.url).pathname.includes('/api/auth/') ? auth.handler(request) : GET(request)
@@ -97,6 +101,7 @@ test('real tickets project only the active owned personal home and recheck a rev
     await database.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [[workspaceId, homeWorkspaceId, foreignWorkspaceId]])
     if (userId) await database.query('DELETE FROM "user" WHERE id=$1', [userId])
     await database.query('DELETE FROM "user" WHERE id=$1', [foreignOwner])
-    await database.end()
+    const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
+    await Promise.all([database.end(), appPool.end(), workspacePool.end()])
   }
 })

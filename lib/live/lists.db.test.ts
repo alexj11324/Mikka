@@ -387,7 +387,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.equal(denied.status, 404); await drain(); assert.equal(received.length, 0)
     })
 
-    await t.test('the actual workspace member removal rolls back without notification and clears only previously known scopes after commit', async () => {
+    await t.test('the actual workspace member removal rolls back without notification and refreshes only authorized scopes after commit', async () => {
       await clear()
       const { removeMember } = await import('../workspace-admin/members')
       await database.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team])
@@ -412,8 +412,13 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.equal((await database.query(`SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"='foreign'`, [team])).rowCount, 0)
       await wrongScope.run(drain)
       const old = received.filter(value => value.scope.ownerId === 'foreign')
-      assert.equal(old.length, 2)
-      assert.deepEqual(new Set(old.map(value => value.scope.workspaceId)), new Set([team, foreignHome]))
+      // Capturing a former scope never grants post-removal delivery. The
+      // source barrier drops that channel; the still-active Personal home
+      // remains authorized to refresh this account's workspace directory.
+      assert.equal(old.length, 1)
+      assert.deepEqual(new Set(old.map(value => value.scope.workspaceId)), new Set([foreignHome]))
+      assert.ok(!received.some(value => value.scope.ownerId === 'foreign' && value.scope.workspaceId === team), 'removed members receive no former-workspace metadata')
+      assert.ok(received.some(value => value.scope.ownerId === 'owner' && value.scope.workspaceId === team && value.events.some(event => event.kind === 'workspace_settings')), 'active members still receive the committed workspace change')
       assert.ok(old.every(value => value.events.every(event => event.id === value.scope.workspaceId)))
       assert.ok(old.find(value => value.scope.workspaceId === foreignHome)!.events.some(event => event.kind === 'workspace_settings'))
       assert.ok(!received.some(value => value.scope.ownerId === 'inactive'))

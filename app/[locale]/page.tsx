@@ -14,6 +14,7 @@ import { onboardingDone } from '@/lib/onboarding'
 import { byoE2BKeyEnabled, getE2BKeyStatus } from '@/lib/secrets/e2b'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { authorizedCacheWorkspace } from '@/lib/swr/cache-scope'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 
 // Owner Retry may prepare the retained task runtime before resuming its session.
 export const maxDuration = 300
@@ -42,7 +43,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
   // A failed read must not lock anyone into the guide.
   const onboarding = !await onboardingDone(user.id).catch(() => true)
   const computer = onboarding ? await onboardingComputer().catch((): OnboardingComputer => 'none') : 'none'
-  const cacheWorkspace = await authorizedCacheWorkspace(user.id, query.workspace)
+  const cacheWorkspace = session ? await authorizedCacheWorkspace({ id: session.user.id, [enterprisePrincipal]: { kind: 'session', sessionId: session.session.id } }, query.workspace) : null
   return <IssueWorkspace key={user.id} cacheWorkspace={cacheWorkspace} onboarding={onboarding ? { computer } : undefined} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={sectionFromQuery(query.section)} initialSettingsSection={query.settings === 'account' || (query.settings === 'integrations' && query.google) ? 'account' : query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
   })
 }

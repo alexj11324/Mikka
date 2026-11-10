@@ -220,7 +220,8 @@
     "lint:runtime": "oxlint --no-ignore --deny-warnings apps/api/compat apps/api/plugins apps/api/routes apps/api/runtime apps/api/scripts apps/api/src apps/api/*.mjs apps/api/nitro.config.ts apps/frontend/scripts apps/frontend/src apps/frontend/vite.config.mjs",
     "test:cloud-services": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.test.ts lib/cloud-services/model.test.ts lib/cloud-services/model-billing.test.ts components/settings/cloud-settings.test.tsx",
     "test:cloud-services-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.db.test.ts lib/mobile-push-delivery.db.test.ts",
-    "test:governance": "node --import ./tests/support/server-only.mjs --import tsx --test lib/governance/policy.test.ts",
+    "test:enterprise-db": "node --experimental-test-module-mocks --test-force-exit --import ./scripts/server-test.mjs --import tsx --test lib/enterprise/http.db.test.ts lib/enterprise/governance.db.test.ts lib/enterprise/live-authority.db.test.ts lib/enterprise/audit-outbox.db.test.ts lib/enterprise/execution-authority.db.test.ts",
+    "test:governance": "node --import ./tests/support/server-only.mjs --import tsx --test lib/governance/policy.test.ts lib/enterprise/protocol.test.ts",
     "test:factory-activity": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/attempt-view.test.ts lib/factory/spec-artifact.test.ts lib/captures/poster.test.ts",
     "test:factory-activity-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/factory/activity.db.test.ts lib/factory/activity-artifacts.db.test.ts lib/factory/spec-artifact.db.test.ts lib/factory/task-media.db.test.ts lib/cloud-computer/thread-machine-sessions.db.test.ts",
     "test:factory-activity-http-db": "node --import ./scripts/server-test.mjs --import tsx --test tests/factory-activity-http.db.test.ts"
@@ -236,6 +237,7 @@
     "@better-auth/core": "1.7.12",
     "@better-auth/expo": "1.7.12",
     "@better-auth/oauth-provider": "1.7.12",
+    "@better-auth/sso": "1.7.12",
     "@chat-adapter/slack": "4.43.0",
     "@chat-adapter/state-pg": "^4.43.0",
     "@chat-adapter/telegram": "^4.43.0",
@@ -309,7 +311,6 @@
     "e2b": "^2.61.0",
     "embla-carousel-react": "8.5.1",
     "fflate": "0.8.3",
-    "ffmpeg-static": "5.3.0",
     "file-type": "^22.3.0",
     "h3": "2.0.8",
     "hono": "4.13.13",
@@ -355,7 +356,8 @@
     "workflow": "5.2.3",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.33",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "ffmpeg-static": "5.3.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

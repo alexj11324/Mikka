@@ -25,7 +25,7 @@ export async function getApiSession(options: { headers: Headers; query?: { disab
     import('@/lib/workspace-db'), import('@/lib/workspace-access'), import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm'),
   ])
   const enterprise: EnterprisePrincipal = { kind: 'pat', tokenId: principal.tokenId, workspaceId: principal.workspaceId }
-  try { await workspaceDb.transaction(tx => requireWorkspace(tx, principal.workspaceId, principal.userId)) }
+  try { await workspaceDb.transaction(tx => requireWorkspace(tx, principal.workspaceId, principal.userId, false, enterprise)) }
   catch (error) { if (error instanceof WorkspaceError) return null; throw error }
   const [user] = await db.select().from(users).where(eq(users.id, principal.userId)).limit(1)
   if (!user) return null

@@ -11,6 +11,7 @@ import { requireGovernanceFeature } from './entitlements'
 import { GovernanceError } from './errors'
 import { csvCell } from './policy'
 import { writeTransaction } from '@/lib/operations/write-transaction'
+import { enterprisePrincipal, type EnterpriseReader } from '@/lib/enterprise/principal'
 
 export type UsageRow = { day: string; model: string; requests: number; inputTokens: string; outputTokens: string; costMicroUsd: string; freeMicroUsd: string; purchasedMicroUsd: string }
 export function usageRange(input: { from?: string | null; to?: string | null }, now = new Date()) {
@@ -22,11 +23,12 @@ export function usageRange(input: { from?: string | null; to?: string | null }, 
 }
 
 /** Actual hosted ledger only: BYOS runs never acquire a synthetic cost or charge here. */
-export async function readWorkspaceUsage(workspaceId: string, userId: string, range: { from?: string | null; to?: string | null }) {
+export async function readWorkspaceUsage(workspaceId: string, reader: string | EnterpriseReader, range: { from?: string | null; to?: string | null }) {
+  const userId = typeof reader === 'string' ? reader : reader.id
   const { from, to } = usageRange(range)
   // Match task writers' WS -> APP order. workspacePool reuses the pinned
   // workspace transaction, including composed reads with a bounded pool.
-  return withTaskWorkspace(userId, workspaceId, () => writeTransaction(pool, async tx => {
+  return withTaskWorkspace(reader, workspaceId, () => writeTransaction(pool, async tx => {
     const scope = await readGovernanceLease(workspacePool, workspaceId, userId)
     if (scope.role !== 'admin') throw new GovernanceError('access_denied')
     if (!scope.entitlements.usageExport) throw new GovernanceError('feature_unavailable')
@@ -41,12 +43,13 @@ export async function readWorkspaceUsage(workspaceId: string, userId: string, ra
   }))
 }
 
-export async function exportWorkspaceUsage(workspaceId: string, userId: string, range: { from?: string | null; to?: string | null }) {
-  const usage = await readWorkspaceUsage(workspaceId, userId, range)
+export async function exportWorkspaceUsage(workspaceId: string, reader: string | EnterpriseReader, range: { from?: string | null; to?: string | null }) {
+  const userId = typeof reader === 'string' ? reader : reader.id
+  const usage = await readWorkspaceUsage(workspaceId, reader, range)
   const columns: (keyof UsageRow)[] = ['day', 'model', 'requests', 'inputTokens', 'outputTokens', 'costMicroUsd', 'freeMicroUsd', 'purchasedMicroUsd']
   const csv = [columns.map(csvCell).join(','), ...usage.hosted.map(row => columns.map(key => csvCell(row[key])).join(','))].join('\r\n') + '\r\n'
   await workspaceDb.transaction(async tx => {
-    const { membership } = await requireWorkspace(tx, workspaceId, userId, true)
+    const { membership } = await requireWorkspace(tx, workspaceId, userId, true, typeof reader === 'string' ? undefined : reader[enterprisePrincipal])
     await requireGovernanceFeature(tx, workspaceId, 'usageExport')
     await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: userId, name: membership.name }, action: 'audit.exported', target: { type: 'usage' }, metadata: { count: usage.hosted.length, digest: createHash('sha256').update(csv).digest('hex') } })
   })

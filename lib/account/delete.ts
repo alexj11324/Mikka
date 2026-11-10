@@ -6,6 +6,10 @@ import { workspaceDb } from '@/lib/workspace-db'
 import * as workspaceSchema from '@/lib/db/workspace-schema'
 import * as teamSchema from '@/lib/db/team-schema'
 import * as projectSchema from '@/lib/db/project-schema'
+import { organizationMembers } from '@/lib/db/governance-schema'
+import { GovernanceError } from '@/lib/governance/errors'
+import { lockAccountOrganizationOwnership } from '@/lib/governance/organization-ownership'
+import { enqueueOrganizationAudit } from '@/lib/governance/audit'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { workspaceListScopesBeforeChange, workspaceListScopeChanged, workspaceListChanged } from '@/lib/live/lists'
 
@@ -54,6 +58,13 @@ const SKIPPED = new Map<string, string>([
   ['user', 'user row'],
   ['account_deletion_jobs', 'durable deletion receipt'],
   ['account_deletion_guards', 'restore suppression tombstone'],
+  // Org configuration belongs to the Org; userId records only its creator.
+  // The original Auth FK clears that attribution when the user row is deleted.
+  ['enterprise_sso_provider', 'organization configuration'],
+  // The SCIM directory is Org-owned. Its original FK clears the account link;
+  // pending delivery then records pending_link without recreating membership.
+  ['enterprise_scim_user', 'organization directory'],
+  ['mikka_organization_members', 'workspace database'],
 ])
 /**
  * Append-only skill-evaluation ledgers: triggers reject every DELETE
@@ -148,7 +159,7 @@ export interface Plan {
   keptProjectIds: string[]
 }
 
-type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'delete' | 'execute'>
+type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'insert' | 'delete' | 'execute'>
 
 /** Checks, then deletes the account and everything it owns. The caller has verified the session and the typed email. */
 export async function deleteAccount(userId: string, email: string, options: import('./deletion-jobs').AccountDeletionOptions = {}): Promise<AccountDeletion> {
@@ -156,6 +167,7 @@ export async function deleteAccount(userId: string, email: string, options: impo
   const requested = await requestAccountDeletion(userId, email, undefined, options)
   if (!requested.ok) return requested
   const job = await resumeAccountDeletion(requested.id, options)
+  if (job.stage === 'cancelled' && job.blockedReasons.includes('last_owner')) throw new GovernanceError('last_owner')
   if (job.stage === 'completed') return job.warnings.length ? { ok: true, receipt: { id: job.id, warnings: job.warnings } } : { ok: true }
   return { ok: false, pending: true, id: job.id, stage: job.stage }
 }
@@ -246,6 +258,13 @@ export async function deleteWorkspaceData(wtx: WorkspaceTx, userId: string, emai
   await wtx.delete(projectEvents).where(kept.length ? and(eq(projectEvents.userId, userId), sql`not (${projectEvents.projectId} = any(${kept}::uuid[]))`) : eq(projectEvents.userId, userId))
   await wtx.delete(projects).where(kept.length ? and(eq(projects.userId, userId), sql`not (${projects.id} = any(${kept}::uuid[]))`) : eq(projects.userId, userId))
   for (const previous of previousLists) await workspaceListScopeChanged(wtx, previous.id, previous.scopes)
+  // Canonical Workspace membership is cleaned here, including split-store
+  // retries after the APP user has gone. Historical Org audit rows stay.
+  await lockAccountOrganizationOwnership(wtx, userId)
+  const removed = await wtx.delete(organizationMembers).where(eq(organizationMembers.userId, userId)).returning({ organizationId: organizationMembers.organizationId })
+  for (const { organizationId } of removed) await enqueueOrganizationAudit(wtx, {
+    organizationId, actorId: userId, action: 'organization.member_removed', targetId: userId, metadata: { reason: 'account_deletion' },
+  })
 }
 
 const ident = (name: string) => `"${name.replaceAll('"', '""')}"`

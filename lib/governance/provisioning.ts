@@ -29,6 +29,10 @@ export async function provisionWorkspacePlan(database: Pick<Pool, 'connect'>, in
     const { rows: [workspace] } = await client.query<{ kind: 'personal' | 'team' }>('select kind from mikka_workspaces where id=$1 for update', [value.workspaceId])
     if (!workspace) throw new GovernanceError('not_found')
     if (workspace.kind !== 'team') throw new GovernanceError('personal_workspace')
+    // Binding/unbinding takes this same Workspace lock. Bound plans belong to the
+    // Organization; a local grant would report success without changing access.
+    const { rows: [organization] } = await client.query('select "organizationId" from mikka_organization_workspaces where "workspaceId"=$1', [value.workspaceId])
+    if (organization) throw new GovernanceError('workspace_attached')
     const { rows: [previous] } = await client.query<PlanGrant>('select plan,source,"seatLimit","expiresAt" from mikka_workspace_entitlements where "workspaceId"=$1', [value.workspaceId])
     const before = resolveEntitlements({ kind: workspace.kind, mode, grant: previous })
     if (before.plan !== value.expectedPlan) throw new GovernanceError('plan_changed')

@@ -13,7 +13,7 @@ export class AccessProjectionMissing extends CodedError {
 }
 
 export async function authorizedAccessName(database: Pick<Pool, 'query'>, scope: CredentialScope, use: { bindingId: string; consumerId: string; runId?: string }, revision: unknown,
-  member: (userId: string, workspaceId: string) => Promise<void> = async () => { throw new Error('subscription_access_unavailable') }, allowMissingProjection = false): Promise<string> {
+  member: (userId: string, workspaceId: string, borrowerId?: string) => Promise<void> = async () => { throw new Error('subscription_access_unavailable') }, allowMissingProjection = false): Promise<string> {
   const timingDone = currentSubscriptionWorkerTiming()?.phase('parentAccessAuthority')
   try {
     if (!Number.isSafeInteger(revision) || Number(revision) < 1) throw new Error('subscription_access_unavailable')
@@ -25,7 +25,7 @@ export async function authorizedAccessName(database: Pick<Pool, 'query'>, scope:
     // A teammate's run on a shared subscription: both must still be active members (workspace database).
     const runOwner = rows[0].runOwner
     if (typeof runOwner === 'string' && runOwner !== scope.ownerId) {
-      try { await member(runOwner, String(rows[0].workspaceId)); await member(scope.ownerId, String(rows[0].workspaceId)) }
+      try { await member(runOwner, String(rows[0].workspaceId)); await member(scope.ownerId, String(rows[0].workspaceId), runOwner) }
       catch (error) { throw new CodedError('subscription_access_unavailable', { detail: 'member_inactive', cause: error }) }
     }
     if (allowMissingProjection && row.state === 'connected' && (name === null || name === '')) throw new AccessProjectionMissing()
