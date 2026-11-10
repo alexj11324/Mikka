@@ -224,8 +224,8 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
   if (once && await store.lastEventKind(userId, botId) === kind) return
   const { quotaSwitchMessage, pointsSwitchMessage } = await import('@/lib/coordinator/message-safety')
   // 点数不足时改用 (decision 2026-11-02-1450): Mikka 默认 had no points, this turn runs on the next allowed model.
-  if (selection.data.afterPoints) await store.appendMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], null, botId)
-  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
+  if (selection.data.afterPoints) await store.appendHostMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], botId)
+  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendHostMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], botId)
 }
 
 /**

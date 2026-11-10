@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { MessageDisplay } from '@/lib/coordinator/message-display'
 
 export const scheduleChatResultSchema = z.object({
   version: z.literal(1),
@@ -13,5 +14,8 @@ export function scheduleChatMessage(title: string, status: string, result: unkno
   const task = z.object({ id: z.uuid(), title: z.string(), status: z.string() }).safeParse(result)
   const marker = scheduleChatResultSchema.parse({ version: 1, title, status, ...(task.success ? { task: task.data } : {}) })
   const text = result && typeof result === 'object' && 'text' in result && typeof result.text === 'string' ? result.text : ''
-  return { role: 'assistant' as const, content: text, mikkaScheduleResult: marker }
+  const display: MessageDisplay = task.success ? { version: 1, kind: 'event', line: { kind: 'issueSnapshot', issueId: task.data.id, runId: null, title: task.data.title, status: task.data.status } }
+    : text ? { version: 1, kind: 'reply', text }
+      : { version: 1, kind: 'event', line: { kind: 'scheduleRan', issueId: null, runId: null, title, status: marker.status } }
+  return { role: 'assistant' as const, content: text, mikkaScheduleResult: marker, mikkaDisplay: display }
 }

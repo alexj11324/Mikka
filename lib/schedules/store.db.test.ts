@@ -148,6 +148,15 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     assert.equal(inbox.scheduledRead?.prompt,'Read current status only')
     const prompt=(await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2 ORDER BY position DESC LIMIT 1',[owner,botId])).rows[0].message
     assert.ok(!JSON.stringify(prompt).includes(inbox.scheduledRead!.leaseToken),'private occurrence fence must not enter model/chat data')
+    assert.match(prompt.content,/Use only the available allowed read tools/,'the runtime still receives execution instructions')
+    const dueView=await request.run(()=>coordinator.chatView(owner,200,botId))
+    assert.ok(dueView.items.some(item=>item.from==='event'&&item.line?.kind==='scheduleDue'))
+    assert.ok(!dueView.items.some(item=>item.text.includes('[Scheduled read-only task]')||item.text.includes('Use only the available')),'display never serializes the execution body')
+    const duePreview=(await request.run(()=>coordinator.botChats(owner)))[botId]
+    assert.equal(duePreview.line,null,'the bot list uses the same audience projection')
+    for (const page of [await request.run(()=>coordinator.chatView(owner,200,botId,{through:dueView.cursor})),await request.run(()=>coordinator.chatUpdate(owner,botId,dueView.continuation))]) {
+      assert.ok(!page.items.some(item=>item.text.includes('Use only the available')),'history and delta retain the same audience boundary')
+    }
     const streamId='wrun_schedule-fixture:0'
     await store().completeRead(owner,botId,inbox.scheduledRead!,'Read-only result',streamId)
     assert.equal((await pool.query('SELECT message FROM coordinator_messages WHERE id=$1',[read.operation_id])).rows[0].message.mikkaStreamId,streamId,'scheduled reply and stream identity persist atomically')
