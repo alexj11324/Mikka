@@ -5,7 +5,7 @@ import { Pool } from 'pg'
 import { readCliRunPolicy } from '../agent-tool-approval/policy-store'
 import { ApprovalUnavailable } from '../agent-tool-approval/store'
 import { RunToolApprovalStore } from '../agent-tool-approval/approvals'
-import { freezeThreadMode, readThreadMode, setThreadMode, ThreadModeConflict } from './store'
+import { freezeThreadMode, readThreadMode, threadModeLocked, setThreadMode, ThreadModeConflict } from './store'
 import { workspacePool } from '../workspace-db'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
@@ -157,6 +157,13 @@ test('a mode change fences a pending approval instead of granting it', async () 
   await pool.query(`UPDATE agent_runs SET mode='execute' WHERE id=$1`, [run])
   await assert.rejects(store.decide(owner, run, created.approvalId, 'approve'), error => error instanceof ApprovalUnavailable && error.revokeReason === 'mode_not_ask')
   assert.deepEqual((await pool.query(`SELECT status FROM agent_tool_approvals WHERE id=$1`, [created.approvalId])).rows, [{ status: 'pending' }])
+})
+
+test('the lock the picker reads follows the thread, not the run it was asked by', async () => {
+  const id = await issueId()
+  await askRun()
+  assert.equal(await threadModeLocked(pool, owner, id), true)
+  assert.equal(await threadModeLocked(pool, other, await issueId(other)), false)
 })
 
 test('a policy revision change fences a pending approval', async () => {

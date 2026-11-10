@@ -4096,6 +4096,17 @@
     "stepsCommands": "已运行 {count} 条命令",
     "stepsTools": "调用了 {count} 个工具",
     "composer": "告诉 {agent} 下一步做什么…",
+    "mode": {
+      "label": "线程模式",
+      "plan": "计划",
+      "execute": "执行",
+      "ask": "询问",
+      "frozen": "本次运行：{mode}",
+      "locked": "线程运行中不可切换；结束后选择的模式会在下一轮生效。",
+      "threadModeChanged": "模式已在其他标签页更改，已刷新为最新。",
+      "threadModeLocked": "线程正在运行，结束后再切换模式。",
+      "threadModeUnavailable": "模式切换失败，请重试。"
+    },
     "checkEnded": "独立检查已结束，请在验收中处理结果。",
     "sendFailed": "发送结果未确认，草稿已保留",
     "stop": "停止",

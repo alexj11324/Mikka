@@ -4096,6 +4096,17 @@
     "stepsCommands": "{count, plural, one {Ran # command} other {Ran # commands}}",
     "stepsTools": "{count, plural, one {Called # tool} other {Called # tools}}",
     "composer": "Tell {agent} what to do next…",
+    "mode": {
+      "label": "Thread mode",
+      "plan": "Plan",
+      "execute": "Execute",
+      "ask": "Ask",
+      "frozen": "This run: {mode}",
+      "locked": "This thread is running. The mode you pick after it ends applies to the next run.",
+      "threadModeChanged": "Another tab changed the mode. Showing the latest.",
+      "threadModeLocked": "This thread is running. Change the mode after it ends.",
+      "threadModeUnavailable": "Could not change the mode. Try again."
+    },
     "checkEnded": "This independent check has ended. Handle the result in Acceptance.",
     "sendFailed": "Send outcome unconfirmed. Draft kept",
     "stop": "Stop",

@@ -4,7 +4,7 @@ import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { issueForUser } from '@/lib/issue-access'
 import { requireTaskWorkspace } from '@/lib/task-workspace'
-import { readThreadMode, setThreadMode, threadModeTarget, ThreadModeConflict } from '@/lib/thread-mode/store'
+import { readThreadMode, threadModeLocked, setThreadMode, threadModeTarget, ThreadModeConflict } from '@/lib/thread-mode/store'
 import { threadModeTransitionSchema } from '@mikka/protocol/thread-mode'
 
 export const runtime = 'nodejs'
@@ -28,7 +28,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ runI
     const found = await target(session.user.id, runId)
     if (!found) return NextResponse.json({ error: 'notFound' }, { status: 404, headers: noStore })
     const current = await readThreadMode(pool, session.user.id, found.issueId)
-    return NextResponse.json({ mode: current.mode, version: current.version, frozenMode: found.frozenMode }, { headers: noStore })
+    // An unfinished run keeps the mode it froze; the picker must show that
+    // from the first read, not only after a refused transition.
+    const locked = await threadModeLocked(pool, session.user.id, found.issueId)
+    return NextResponse.json({ mode: current.mode, version: current.version, frozenMode: found.frozenMode, locked }, { headers: noStore })
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'invalidRequest' }, { status: 400, headers: noStore })
     return NextResponse.json({ error: 'threadModeUnavailable' }, { status: 503, headers: noStore })

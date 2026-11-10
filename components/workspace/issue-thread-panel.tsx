@@ -39,6 +39,7 @@ import { ThreadHeader, ThreadStatusLine } from './thread-header'
 import { useRightColumnWiden } from './right-column-widen'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
+import { ThreadModePicker } from './thread-mode-picker'
 import { cn } from '@/lib/utils'
 import { ThreadArtifactButton, ThreadArtifactCards } from './artifact-review'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -393,6 +394,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       running: working || (question === 'resuming' && !data?.thread.questionWake), thread: true }}
     pending={[...changeRequest ? [{ id: 'change-request', name: changeRequest.label, onRemove: changeRequest.onCancel }] : [], ...replyQuote ? [{ id: 'reply-quote', name: replyQuote, onRemove: () => setReplyQuote(null) }] : []]}
     notices={<>
+      {/* The mode is the owner's choice for their own task; a teammate's read is unchanged. */}
+      {data?.thread.ownedByCurrentUser && <ThreadModePicker runId={runId} liveRunId={liveRunId} active={active} />}
       {data?.thread.quota?.paused && <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />}
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
@@ -430,6 +433,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     {/* R-10: an open thread always ends in the composer, finished or not. A message to an ended thread runs it
         again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
+      {/* The thread's Plan / Execute / Ask choice sits directly above the composer (#1735). */}
+      {data?.thread.ownedByCurrentUser && <ThreadModePicker runId={runId} liveRunId={liveRunId} active={active} />}
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
         quote={changeRequest ? <QuoteChip slot="change-request-chip" text={changeRequest.label} icon={<MessageSquareDiff aria-hidden="true" className="size-3.5 shrink-0" />} onRemove={changeRequest.onCancel} />

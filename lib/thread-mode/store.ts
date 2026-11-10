@@ -30,9 +30,14 @@ export async function readThreadMode(query: Pick<Pool | PoolClient, 'query'>, us
   return row ? { mode: resolveThreadMode(row.mode), version: row.version } : { mode: 'execute', version: 0 }
 }
 
-async function unfinishedRun(client: Pick<PoolClient, 'query'>, userId: string, issueId: string) {
+async function unfinishedRun(client: Pick<Pool | PoolClient, 'query'>, userId: string, issueId: string) {
   const { rowCount } = await client.query(`SELECT 1 FROM agent_runs WHERE "userId"=$1 AND "issueId"=$2 AND status=ANY($3::text[]) LIMIT 1`, [userId, issueId, [...UNFINISHED_RUN_STATUSES]])
   return (rowCount ?? 0) > 0
+}
+
+/** Whether this thread's mode can change now: an unfinished run keeps it frozen. */
+export async function threadModeLocked(query: Pick<Pool | PoolClient, 'query'>, userId: string, issueId: string) {
+  return unfinishedRun(query, userId, issueId)
 }
 
 /**
