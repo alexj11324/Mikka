@@ -1,0 +1,66 @@
+{
+  "schema": "issue1512-live-routing-controller-count-gate-self-review/v1",
+  "supersedesControlsInSelfReview": "3b71628523ab0879a4f6c41f9b8ea2f5e8ccfae0",
+  "originalController": "5a324636acd4371726c62f90d1718ac1f3e663f3",
+  "finalController": {
+    "blob": "39f80294ee396b8b0ceb369bf41e8da25d1efffc",
+    "bytes": 31662,
+    "sha256": "fd47b3ab2f5abef1b2fbb368135f7d0c42bbf69ad6b80c8c82072adfe739bc81"
+  },
+  "finalTemplate": {
+    "blob": "457a82cae10889af03ae14fc307c8ea3b64c699c",
+    "bytes": 9574,
+    "sha256": "bda2577060977ced10cdd738f07fb0f1c9ae924e54e5ae005d1491bb1fe96c79"
+  },
+  "activeWorkflowUnchanged": "ea0877277da2b470be1b52fa7411ca84f48e3d0c",
+  "closedWorkflowUnchanged": "4961e05d943593c68d184b330ff402f3599b09bf",
+  "countsProof": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e",
+  "exactDelta": [
+    {
+      "oldLine": 116,
+      "newLine": 116,
+      "removed": [],
+      "added": [
+        "  assert.deepEqual(Object.keys(manifest.expectedUnitTests).sort(), unitGroups.map(unit => unit.label).sort())",
+        "  for (const unit of unitGroups) assert.ok(Number.isSafeInteger(manifest.expectedUnitTests[unit.label]) && manifest.expectedUnitTests[unit.label] > 0,",
+        "    'Every complete unit group requires a source-derived exact positive count')"
+      ]
+    },
+    {
+      "oldLine": 367,
+      "newLine": 370,
+      "removed": [
+        "      const row = { label: unit.label, startedAt: new Date().toISOString(), verdict: 'IN_PROGRESS' }"
+      ],
+      "added": [
+        "      const row = { label: unit.label, expectedTests: manifest.expectedUnitTests[unit.label], startedAt: new Date().toISOString(), verdict: 'IN_PROGRESS' }"
+      ]
+    },
+    {
+      "oldLine": 374,
+      "newLine": 377,
+      "removed": [
+        "        passing(unit.label, result, manifest.expectedUnitTests[unit.label] ?? null)"
+      ],
+      "added": [
+        "        passing(unit.label, result, manifest.expectedUnitTests[unit.label])"
+      ]
+    }
+  ],
+  "counts": {
+    "liveRoutingTs": 100,
+    "rendererBootstraps": 54,
+    "startupAndTemplateValidators": 126,
+    "pgCacheScope": 15
+  },
+  "consequence": "Unbound/null/non-positive/non-integer unit counts now fail admission before any database resource starts. Actual runtime totals must equal the exact static expectation; raw stdout/stderr is still preserved before parsing.",
+  "unchanged": "All command args, source/parent/tree guards, external credential rejection, PG resource ownership, full output framing, failure continuation and cleanup are unchanged.",
+  "finalProductCandidateReportedByRoot": {
+    "sha": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "parents": [
+      "9238b7092a39fce7edde2e488aef516c0b544677"
+    ]
+  },
+  "runtime": "NOT EXECUTED; Root still binds final G/source files/changed paths/lint scope/expiry and approves before activation."
+}

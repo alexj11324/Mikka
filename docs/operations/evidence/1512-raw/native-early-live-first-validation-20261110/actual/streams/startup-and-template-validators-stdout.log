@@ -1,0 +1,268 @@
+TAP version 13
+# node:internal/modules/esm/resolve:272
+#     throw new ERR_MODULE_NOT_FOUND(
+#           ^
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/home/runner/work/Mikka/Mikka/lib/secrets/mask' imported from /home/runner/work/Mikka/Mikka/lib/issue-run-conversation.ts
+#     at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+#     at moduleResolve (node:internal/modules/esm/resolve:879:10)
+#     at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+#     at \#cachedDefaultResolve (node:internal/modules/esm/loader:705:20)
+#     at \#resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:725:38)
+#     at ModuleLoader.resolveSync (node:internal/modules/esm/loader:763:56)
+#     at \#resolve (node:internal/modules/esm/loader:687:17)
+#     at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:607:35)
+#     at ModuleJob.syncLink (node:internal/modules/esm/module_job:276:33)
+#     at ModuleJob.link (node:internal/modules/esm/module_job:381:17) {
+#   code: 'ERR_MODULE_NOT_FOUND',
+#   url: 'file:///home/runner/work/Mikka/Mikka/lib/secrets/mask'
+# }
+# Node.js v24.22.1
+# Subtest: scripts/acceptance/cloud-startup.test.mjs
+not ok 1 - scripts/acceptance/cloud-startup.test.mjs
+  ---
+  duration_ms: 121.610668
+  type: 'test'
+  location: '/home/runner/work/Mikka/Mikka/scripts/acceptance/cloud-startup.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: the production gate logs in as SMOKE without pinning an owner workspace or bot
+ok 2 - the production gate logs in as SMOKE without pinning an owner workspace or bot
+  ---
+  duration_ms: 11.668537
+  type: 'test'
+  ...
+# Subtest: a different application commit is refused before login, enrollment or candidate creation
+ok 3 - a different application commit is refused before login, enrollment or candidate creation
+  ---
+  duration_ms: 27.464466
+  type: 'test'
+  ...
+# Subtest: a release receipt names the actual candidate, revision, model and registered device
+ok 4 - a release receipt names the actual candidate, revision, model and registered device
+  ---
+  duration_ms: 5.221909
+  type: 'test'
+  ...
+# Subtest: startup correlation survives claude_code failure before a run exists
+ok 5 - startup correlation survives claude_code failure before a run exists
+  ---
+  duration_ms: 13.982322
+  type: 'test'
+  ...
+# Subtest: startup correlation survives codex failure before a run exists
+ok 6 - startup correlation survives codex failure before a run exists
+  ---
+  duration_ms: 6.64379
+  type: 'test'
+  ...
+# Subtest: startup correlation requires exact candidate binding and existing metadata
+ok 7 - startup correlation requires exact candidate binding and existing metadata
+  ---
+  duration_ms: 33.41456
+  type: 'test'
+  ...
+# Subtest: startup correlation rejects malformed identifiers and preserves independently valid fields
+ok 8 - startup correlation rejects malformed identifiers and preserves independently valid fields
+  ---
+  duration_ms: 71.640707
+  type: 'test'
+  ...
+# Subtest: startup correlation keeps only closed refusal codes and never emits prompts or other identities
+ok 9 - startup correlation keeps only closed refusal codes and never emits prompts or other identities
+  ---
+  duration_ms: 28.838666
+  type: 'test'
+  ...
+# Subtest: successful candidate diagnostics do not gain startup correlation metadata
+ok 10 - successful candidate diagnostics do not gain startup correlation metadata
+  ---
+  duration_ms: 1.783363
+  type: 'test'
+  ...
+# Subtest: a pre-dispatch refusal keeps its phase without reading an unpublished proof and cleans both candidates
+ok 11 - a pre-dispatch refusal keeps its phase without reading an unpublished proof and cleans both candidates
+  ---
+  duration_ms: 2.762668
+  type: 'test'
+  ...
+# Subtest: dispatch refusal diagnostics admit only fixed business codes and never untrusted details
+ok 12 - dispatch refusal diagnostics admit only fixed business codes and never untrusted details
+  ---
+  duration_ms: 13.40464
+  type: 'test'
+  ...
+# Subtest: a failed subscription still tests the other candidate and closes every created instance and device
+ok 13 - a failed subscription still tests the other candidate and closes every created instance and device
+  ---
+  duration_ms: 2.081192
+  type: 'test'
+  ...
+# Subtest: candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session
+ok 14 - candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session
+  ---
+  duration_ms: 2.840464
+  type: 'test'
+  ...
+# Subtest: a real receipt rejection persists its run hash and reason without provider text or credentials
+ok 15 - a real receipt rejection persists its run hash and reason without provider text or credentials
+  ---
+  duration_ms: 4.695862
+  type: 'test'
+  ...
+# Subtest: preflight failures preserve their phase and closed error details without producing an accepted file
+ok 16 - preflight failures preserve their phase and closed error details without producing an accepted file
+  ---
+  duration_ms: 21.022957
+  type: 'test'
+  ...
+# Subtest: a failure before a sample exists preserves the startup phase without inventing sample evidence
+ok 17 - a failure before a sample exists preserves the startup phase without inventing sample evidence
+  ---
+  duration_ms: 1.661533
+  type: 'test'
+  ...
+# Subtest: startup failure projection drops unknown content and only admits numeric HTTP error statuses
+ok 18 - startup failure projection drops unknown content and only admits numeric HTTP error statuses
+  ---
+  duration_ms: 10.181462
+  type: 'test'
+  ...
+# Subtest: failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code
+ok 19 - failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code
+  ---
+  duration_ms: 2.052711
+  type: 'test'
+  ...
+# Subtest: retained cleanup identities must belong to this case and contain at most four distinct UUIDs
+ok 20 - retained cleanup identities must belong to this case and contain at most four distinct UUIDs
+  ---
+  duration_ms: 4.89777
+  type: 'test'
+  ...
+# Subtest: a terminal-before-proof failure identifies only its owned case and the missing evidence
+ok 21 - a terminal-before-proof failure identifies only its owned case and the missing evidence
+  ---
+  duration_ms: 1.533685
+  type: 'test'
+  ...
+# Subtest: cleanup failures retain bounded step families and HTTP status without arbitrary causes
+ok 22 - cleanup failures retain bounded step families and HTTP status without arbitrary causes
+  ---
+  duration_ms: 2.051469
+  type: 'test'
+  ...
+# Subtest: a failed pair preserves the genuine passing receipt without creating publishable evidence
+ok 23 - a failed pair preserves the genuine passing receipt without creating publishable evidence
+  ---
+  duration_ms: 4.902518
+  type: 'test'
+  ...
+# Subtest: failure projection bounds cleanup rows and refuses foreign or malformed fixture identities
+ok 24 - failure projection bounds cleanup rows and refuses foreign or malformed fixture identities
+  ---
+  duration_ms: 7.944149
+  type: 'test'
+  ...
+# Subtest: the observed Codex adapter-start failure retains false agent_start and error cli_init
+ok 25 - the observed Codex adapter-start failure retains false agent_start and error cli_init
+  ---
+  duration_ms: 2.391911
+  type: 'test'
+  ...
+# Subtest: failed execution retains only bound registration binary metadata without a passing receipt
+ok 26 - failed execution retains only bound registration binary metadata without a passing receipt
+  ---
+  duration_ms: 1.638549
+  type: 'test'
+  ...
+# Subtest: registration diagnostics reject unbounded or non-original binary metadata without leaking it
+ok 27 - registration diagnostics reject unbounded or non-original binary metadata without leaking it
+  ---
+  duration_ms: 8.793212
+  type: 'test'
+  ...
+# Subtest: bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish
+ok 28 - bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish
+  ---
+  duration_ms: 1.712519
+  type: 'test'
+  ...
+# Subtest: bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs
+ok 29 - bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs
+  ---
+  duration_ms: 5.093951
+  type: 'test'
+  ...
+# Subtest: bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair
+ok 30 - bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair
+  ---
+  duration_ms: 5.625835
+  type: 'test'
+  ...
+# Subtest: bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption
+ok 31 - bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption
+  ---
+  duration_ms: 1.144409
+  type: 'test'
+  ...
+# Subtest: bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values
+ok 32 - bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values
+  ---
+  duration_ms: 7.512511
+  type: 'test'
+  ...
+# Subtest: successful candidate gate adds no failure diagnostics and keeps the original accepted receipt
+ok 33 - successful candidate gate adds no failure diagnostics and keeps the original accepted receipt
+  ---
+  duration_ms: 2.28978
+  type: 'test'
+  ...
+# Subtest: failure projection distinguishes the closed 3c production shapes using synthetic identities
+ok 34 - failure projection distinguishes the closed 3c production shapes using synthetic identities
+  ---
+  duration_ms: 1.796021
+  type: 'test'
+  ...
+# Subtest: live observer close evidence survives the real failure projection without private fields
+ok 35 - live observer close evidence survives the real failure projection without private fields
+  ---
+  duration_ms: 2.363029
+  type: 'test'
+  ...
+# Subtest: live observer error evidence never invents close metadata
+ok 36 - live observer error evidence never invents close metadata
+  ---
+  duration_ms: 1.608605
+  type: 'test'
+  ...
+# Subtest: live observer projection rejects malformed required evidence without leaking its values
+ok 37 - live observer projection rejects malformed required evidence without leaking its values
+  ---
+  duration_ms: 33.59656
+  type: 'test'
+  ...
+# Subtest: live observer close metadata is independently optional and bounded
+ok 38 - live observer close metadata is independently optional and bounded
+  ---
+  duration_ms: 12.737214
+  type: 'test'
+  ...
+# Subtest: live observer evidence leaves legacy, unrelated failures and passing receipts unchanged
+ok 39 - live observer evidence leaves legacy, unrelated failures and passing receipts unchanged
+  ---
+  duration_ms: 7.477869
+  type: 'test'
+  ...
+1..39
+# tests 39
+# suites 0
+# pass 38
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 501.621701

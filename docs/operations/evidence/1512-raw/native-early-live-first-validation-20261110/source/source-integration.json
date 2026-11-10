@@ -1,0 +1,231 @@
+{
+  "schema": "issue1512-native-early-live-complete-source-integration/v1",
+  "source": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+  "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+  "parents": [
+    "9238b7092a39fce7edde2e488aef516c0b544677"
+  ],
+  "merge": {
+    "sha": "9238b7092a39fce7edde2e488aef516c0b544677",
+    "tree": "03712f2c1ca03ee45e61e124bd430fc9d1a377c9",
+    "parents": [
+      "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "ab2d00a43a79d35380b4d2db9014a3792fea63ca"
+    ],
+    "refMoved": false
+  },
+  "completeLeafCount": 6983,
+  "completeDirectoryCount": 894,
+  "independentTreeHash": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+  "gitApiCompleteTreeReadback": true,
+  "comparison": {
+    "status": "ahead",
+    "aheadBy": 1,
+    "changedPaths": 20,
+    "addedFiles": 5
+  },
+  "files": [
+    {
+      "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "base": "a9a93381269a4078d046464b252851e72d84656c",
+      "sha": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "base": null,
+      "sha": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "base": "c780d381fce0daa9c1646d63c7c099d48d197223",
+      "sha": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "base": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5",
+      "sha": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+      "base": "2463df1257aec4817e0fe625931d1897bb3ccbb7",
+      "sha": "ddeb2420392a0abb233bc3742cd539805424bc13",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+      "base": null,
+      "sha": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.ts",
+      "base": null,
+      "sha": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace.tsx",
+      "base": "e45052573bb4424f61da35eeaedb5f0a8d80844f",
+      "sha": "25891b5f8d7dc7a5d6b3cd4688789898052855fd",
+      "kind": "product"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "base": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "sha": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+      "kind": "product"
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "base": "3be4faece94b30d4a7f66ef2d3c8b2ef60134372",
+      "sha": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+      "kind": "product"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "base": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "sha": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "base": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "sha": "61cdf48b28ab9260f5567300f2411cb555b13427",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "base": null,
+      "sha": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "kind": "test"
+    },
+    {
+      "path": "lib/live/channels.ts",
+      "base": "d459548cbd8785bf2764d23543109b99ae146d18",
+      "sha": "c40864fe9386855994d3a4ece9480639514d85aa",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/preparation.ts",
+      "base": null,
+      "sha": "7377678b777279de0ab21717749743fcce446d73",
+      "kind": "product"
+    },
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "base": "f43f62b4798c971ebae3b52ab2a1db413925bf51",
+      "sha": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+      "kind": "product"
+    },
+    {
+      "path": "package.json",
+      "base": "677ab7d4849cbefe1b7dd33ebbc998b17e69ce09",
+      "sha": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+      "kind": "test-registration"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "base": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "sha": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+      "kind": "acceptance-adapter"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "base": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+      "sha": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+      "kind": "acceptance-adapter"
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "base": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+      "sha": "bbdae2625952b475c3488384bbd48c876887a805",
+      "kind": "test"
+    }
+  ],
+  "tests": {
+    "frontendManifest": "eaab7746ed888c6b245a47e63dfb37112faf70be",
+    "backendManifest": "9298c634e7935b3b898c5e2209dad23e43404ccf",
+    "unitCountProof": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e"
+  },
+  "reviews": {
+    "frontend": "19c1ec3b2c4ea4d3a5da3740eb4799aadeb560f9",
+    "backend": "9265500119ea12b3e50ee9a8f3e3b3455e8eafe0",
+    "rootBackend": "833538e00d413a95b653a4678403edf46ab2cd7d",
+    "controller": "83452fbf9b15149368b1e4a089db5d48bfadaee7",
+    "rootAdmission": "47ecb0539adcba5673b06929a849bbba9e69ae29"
+  },
+  "preserved": [
+    {
+      "path": "app/api/live/ticket/route.ts",
+      "sha": "312f16abd669c2f7587a4121e81192ef2ea9a4d1"
+    },
+    {
+      "path": "lib/live/session-ticket.ts",
+      "sha": "badb601666b9caf24a92d95fcc35f18c45bd78ac"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "sha": "69a827369bd71838ba8ac9ffbee928ca70219e76"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "sha": "dae8798653457afad334c2d909b10b63e9b3956f"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "sha": "e7f6972a23519ae45e059038cd0c404789d44a98"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "sha": "8251fc9aa56103614d1ddff944668930d1da937c"
+    },
+    {
+      "path": "packages/daemon/src/service.ts",
+      "sha": "277fae47e47d1ce4a2061838b1f08f457b7b3355"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha": "171de02abdaf1b9c414aa19aeb07690ef692bafe"
+    },
+    {
+      "path": "lib/live/channel.test.ts",
+      "sha": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc"
+    }
+  ],
+  "registration": {
+    "path": "package.json",
+    "base": "677ab7d4849cbefe1b7dd33ebbc998b17e69ce09",
+    "sha": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+    "script": "test:device-gateway",
+    "insertedTests": [
+      "lib/live/channels.test.ts",
+      "apps/desktop/src/renderer/workspace-live.test.ts"
+    ],
+    "dependencyChanges": false,
+    "desktopTestGlobUnchanged": true
+  },
+  "temporaryDiagnosticIncluded": false,
+  "formalRefAtAdmission": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "validation": {
+    "run": 42766089161,
+    "attempt": 1,
+    "job": 129662811912,
+    "activeCommit": "063cf037560c750d87aa93818bd5b58bdfc78d69",
+    "closedCommit": "6d7f36ea3c6b918f613cf22e848ed52d413d2bd6",
+    "closureRun": 42766253819,
+    "closureJob": 129663381273,
+    "closureConclusion": "skipped",
+    "closureRunner": null,
+    "closureSteps": []
+  },
+  "limitations": [
+    "This integration proof is not a runtime pass.",
+    "Formal before Native441/Web331 remains FAIL until a new uninstrumented complete window.",
+    "Candidate projection may add bytes per bootstrap result; aggregate SQL/byte acceptance is still required.",
+    "Production remains 0/2; issue remains open."
+  ]
+}

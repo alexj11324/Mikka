@@ -1,0 +1,60 @@
+{
+  "schema": "issue1512-cp58-g2-pending-supplement/v1",
+  "status": "SOURCE_CANDIDATE_ONLY; NO G2 RUNTIME RESULT INCLUDED",
+  "source": {
+    "sha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+    "parents": [
+      "ff385bfd91edcd40c3b3ee398b4b93098e5becbb"
+    ],
+    "binding": "Root reported exact four-file normal child; this archive contains the four immutable source blobs and reviews. Controls and future G2 execution are outside CP58."
+  },
+  "frontend": {
+    "manifest": "3578f33781eccdcd13254d5daea9fee421be5e4d",
+    "review": "d68afe9f8632ecd3f0faf34f972541d4e2ce19c1",
+    "freshnessCause": "b9402b98f534ddcb10d9b0e1dde4dd2b89d36300",
+    "files": [
+      {
+        "path": "apps/desktop/scripts/workspace-live.test.mjs",
+        "base": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+        "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+        "bytes": 18598,
+        "sha256": "4d55bb93c825c9ebd57f0a73f60bc3a98073ac295b7d6f22effaca5a90982979"
+      },
+      {
+        "path": "hooks/use-subagent-updates.ts",
+        "base": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+        "sha": "dd831e0e657d00de9210e39194a926b4e977ec56",
+        "bytes": 2462,
+        "sha256": "a30f8d08c655a807ea46048bf517aaf74461e317b5e3d5bd9959573e6cd97161"
+      },
+      {
+        "path": "lib/live/channels.test.ts",
+        "base": "91c96118f0040a4594eb57e76f58befa2150fe99",
+        "sha": "c9059d2c8be5122681f5c4657889b01633ed3736",
+        "bytes": 20020,
+        "sha256": "3d2ba4f08b855c1e6fae7afd5f0b98aaffa23c8a2d8dd72d2d33a6b603357b6e"
+      }
+    ]
+  },
+  "pg": {
+    "source": {
+      "baseCommit": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+      "baseTree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+      "path": "tests/read-cache-scope.db.test.ts",
+      "baseBlob": "bbdae2625952b475c3488384bbd48c876887a805",
+      "newBlob": "ee59feba1e29769805806ec6e166abbc65994233",
+      "newBytes": 18719,
+      "newSha256": "8bdc39aacac759baf1bf922824145caecd49a52d74af2c2b68246b1808f785ea"
+    },
+    "authorReview": "b0c991217f60d84853febb7352ad3f210b4a0be6",
+    "diff": "b489b010f444a17dc3ce3d37a3e0e5ef008c7f6a",
+    "independentReview": "ff3222c1bd1b3f553d5e9c85b2d490adc2afc3f2"
+  },
+  "notClaims": [
+    "G2 tests passed",
+    "Native SQL/bytes budget passed",
+    "production acceptance occurred",
+    "G first failure overwritten"
+  ]
+}

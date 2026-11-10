@@ -1,0 +1,642 @@
+TAP version 13
+# Subtest: only the existing InstalledWorkspace render routes are eligible for preparation
+ok 1 - only the existing InstalledWorkspace render routes are eligible for preparation
+  ---
+  duration_ms: 1.310415
+  type: 'test'
+  ...
+# Subtest: a fully parsed authorized workspace prepares selected and home once without awaiting ready
+ok 2 - a fully parsed authorized workspace prepares selected and home once without awaiting ready
+  ---
+  duration_ms: 1.976027
+  type: 'test'
+  ...
+# Subtest: disabled routes, missing identity and unverified selection do not prepare
+ok 3 - disabled routes, missing identity and unverified selection do not prepare
+  ---
+  duration_ms: 0.18973
+  type: 'test'
+  ...
+# Subtest: a missing home hint never guesses that the selected workspace is personal home
+ok 4 - a missing home hint never guesses that the selected workspace is personal home
+  ---
+  duration_ms: 0.206786
+  type: 'test'
+  ...
+# Subtest: an authorization or routing change retires the old preparation: owner
+ok 5 - an authorization or routing change retires the old preparation: owner
+  ---
+  duration_ms: 0.399329
+  type: 'test'
+  ...
+# Subtest: an authorization or routing change retires the old preparation: session
+ok 6 - an authorization or routing change retires the old preparation: session
+  ---
+  duration_ms: 0.306673
+  type: 'test'
+  ...
+# Subtest: an authorization or routing change retires the old preparation: server
+ok 7 - an authorization or routing change retires the old preparation: server
+  ---
+  duration_ms: 0.353081
+  type: 'test'
+  ...
+# Subtest: an authorization or routing change retires the old preparation: selector
+ok 8 - an authorization or routing change retires the old preparation: selector
+  ---
+  duration_ms: 0.261336
+  type: 'test'
+  ...
+# Subtest: an authorization or routing change retires the old preparation: role
+ok 9 - an authorization or routing change retires the old preparation: role
+  ---
+  duration_ms: 0.171333
+  type: 'test'
+  ...
+# Subtest: an authorization or routing change retires the old preparation: workspace
+ok 10 - an authorization or routing change retires the old preparation: workspace
+  ---
+  duration_ms: 0.178824
+  type: 'test'
+  ...
+# Subtest: an authorization or routing change retires the old preparation: home
+ok 11 - an authorization or routing change retires the old preparation: home
+  ---
+  duration_ms: 0.197251
+  type: 'test'
+  ...
+# Subtest: an invalid later result revokes the previous preparation instead of retaining its history
+ok 12 - an invalid later result revokes the previous preparation instead of retaining its history
+  ---
+  duration_ms: 0.940348
+  type: 'test'
+  ...
+# Subtest: returning to a legal workspace can create a fresh lifetime without reviving retired effects
+ok 13 - returning to a legal workspace can create a fresh lifetime without reviving retired effects
+  ---
+  duration_ms: 0.499116
+  type: 'test'
+  ...
+# Subtest: a provider-retired preparation is replaced even when bootstrap identity is unchanged
+ok 14 - a provider-retired preparation is replaced even when bootstrap identity is unchanged
+  ---
+  duration_ms: 0.255107
+  type: 'test'
+  ...
+# Subtest: dates, undefined and literal tag-shaped application objects round-trip
+ok 15 - dates, undefined and literal tag-shaped application objects round-trip
+  ---
+  duration_ms: 2.39799
+  type: 'test'
+  ...
+# Subtest: ordinary chat JSON has no serialization overhead
+ok 16 - ordinary chat JSON has no serialization overhead
+  ---
+  duration_ms: 6.117231
+  type: 'test'
+  ...
+# Subtest: tag decoding rejects malformed values, duplicates and excessive nesting
+ok 17 - tag decoding rejects malformed values, duplicates and excessive nesting
+  ---
+  duration_ms: 0.565474
+  type: 'test'
+  ...
+# Subtest: own __proto__ properties remain data without changing prototypes
+ok 18 - own __proto__ properties remain data without changing prototypes
+  ---
+  duration_ms: 0.170942
+  type: 'test'
+  ...
+# Subtest: the avatar FormData round-trips its bytes and rejects oversized files
+ok 19 - the avatar FormData round-trips its bytes and rejects oversized files
+  ---
+  duration_ms: 27.038678
+  type: 'test'
+  ...
+# Subtest: presence support alone retains fallback; only the exact acknowledged watch makes idle reads stop
+ok 20 - presence support alone retains fallback; only the exact acknowledged watch makes idle reads stop
+  ---
+  duration_ms: 6.9091
+  type: 'test'
+  ...
+# Subtest: old Workers, missing and oversized proofs preserve the existing minute fallback
+ok 21 - old Workers, missing and oversized proofs preserve the existing minute fallback
+  ---
+  duration_ms: 3.103221
+  type: 'test'
+  ...
+# Subtest: unknown, expired or overlong acknowledgements and explicit rejection cannot claim coverage
+ok 22 - unknown, expired or overlong acknowledgements and explicit rejection cannot claim coverage
+  ---
+  duration_ms: 1.167203
+  type: 'test'
+  ...
+# Subtest: watch expiry does not fetch or renew a ticket; it resumes the existing slow fallback
+ok 23 - watch expiry does not fetch or renew a ticket; it resumes the existing slow fallback
+  ---
+  duration_ms: 1.667031
+  type: 'test'
+  ...
+# Subtest: duplicate subscriptions refcount one watch and the last exit unregisters while other live keys stay open
+ok 24 - duplicate subscriptions refcount one watch and the last exit unregisters while other live keys stay open
+  ---
+  duration_ms: 0.888051
+  type: 'test'
+  ...
+# Subtest: changing the proof replaces only its watch, ignores stale acknowledgements and makes no data read
+ok 25 - changing the proof replaces only its watch, ignores stale acknowledgements and makes no data read
+  ---
+  duration_ms: 0.985054
+  type: 'test'
+  ...
+# Subtest: hidden, disconnected and replaced sockets lose watch coverage and cannot accept a late old acknowledgement
+ok 26 - hidden, disconnected and replaced sockets lose watch coverage and cannot accept a late old acknowledgement
+  ---
+  duration_ms: 1.366928
+  type: 'test'
+  ...
+# Subtest: watch bounds keep only uncovered keys on fallback and a freed slot admits the remaining subscription
+ok 27 - watch bounds keep only uncovered keys on fallback and a freed slot admits the remaining subscription
+  ---
+  duration_ms: 1.172121
+  type: 'test'
+  ...
+# Subtest: duplicate badges share a connection and one revalidation per SWR key
+ok 28 - duplicate badges share a connection and one revalidation per SWR key
+  ---
+  duration_ms: 1.191879
+  type: 'test'
+  ...
+# Subtest: a supported late subscription uses the continuous ready boundary instead of its registration time
+ok 29 - a supported late subscription uses the continuous ready boundary instead of its registration time
+  ---
+  duration_ms: 0.994979
+  type: 'test'
+  ...
+# Subtest: a late read keeps exact coverage after other-kind
+ok 30 - a late read keeps exact coverage after other-kind
+  ---
+  duration_ms: 0.990302
+  type: 'test'
+  ...
+# Subtest: a late read keeps exact coverage after own-kind
+ok 31 - a late read keeps exact coverage after own-kind
+  ---
+  duration_ms: 2.321327
+  type: 'test'
+  ...
+# Subtest: a late read keeps exact coverage after reconnect
+ok 32 - a late read keeps exact coverage after reconnect
+  ---
+  duration_ms: 0.800081
+  type: 'test'
+  ...
+# Subtest: a late read keeps exact coverage after before-open
+ok 33 - a late read keeps exact coverage after before-open
+  ---
+  duration_ms: 0.312501
+  type: 'test'
+  ...
+# Subtest: a late subscription without capabilities coverage retains its new read boundary
+ok 34 - a late subscription without capabilities coverage retains its new read boundary
+  ---
+  duration_ms: 0.371399
+  type: 'test'
+  ...
+# Subtest: a late subscription without kind coverage retains its new read boundary
+ok 35 - a late subscription without kind coverage retains its new read boundary
+  ---
+  duration_ms: 0.323988
+  type: 'test'
+  ...
+# Subtest: a late subscription without presence coverage retains its new read boundary
+ok 36 - a late subscription without presence coverage retains its new read boundary
+  ---
+  duration_ms: 0.233394
+  type: 'test'
+  ...
+# Subtest: a unversioned event for an unsubscribed key advances continuous coverage
+ok 37 - a unversioned event for an unsubscribed key advances continuous coverage
+  ---
+  duration_ms: 0.598684
+  type: 'test'
+  ...
+# Subtest: a versioned event for an unsubscribed key advances continuous coverage
+ok 38 - a versioned event for an unsubscribed key advances continuous coverage
+  ---
+  duration_ms: 0.336366
+  type: 'test'
+  ...
+# Subtest: a late subscription cannot replace a newer pending deadline boundary with older continuous coverage
+ok 39 - a late subscription cannot replace a newer pending deadline boundary with older continuous coverage
+  ---
+  duration_ms: 0.821613
+  type: 'test'
+  ...
+# Subtest: live observations describe received, skipped and read keys without changing reads
+ok 40 - live observations describe received, skipped and read keys without changing reads
+  ---
+  duration_ms: 0.71856
+  type: 'test'
+  ...
+# Subtest: online idle channels send pings and perform no polling reads
+ok 41 - online idle channels send pings and perform no polling reads
+  ---
+  duration_ms: 0.341464
+  type: 'test'
+  ...
+# Subtest: focus coverage follows this key, live capabilities and disconnects
+ok 42 - focus coverage follows this key, live capabilities and disconnects
+  ---
+  duration_ms: 0.249078
+  type: 'test'
+  ...
+# Subtest: duplicate visible events skip healthy live reads while a real hidden interval still catches up
+ok 43 - duplicate visible events skip healthy live reads while a real hidden interval still catches up
+  ---
+  duration_ms: 0.491816
+  type: 'test'
+  ...
+# Subtest: unsupported live kinds keep visibility catch-up even while their socket is connected
+ok 44 - unsupported live kinds keep visibility catch-up even while their socket is connected
+  ---
+  duration_ms: 0.305881
+  type: 'test'
+  ...
+# Subtest: offline fallback waits at least 60 seconds; hidden tabs make no requests
+ok 45 - offline fallback waits at least 60 seconds; hidden tabs make no requests
+  ---
+  duration_ms: 0.410386
+  type: 'test'
+  ...
+# Subtest: a reconnect reconciles missed changes immediately and resets the offline fallback
+ok 46 - a reconnect reconciles missed changes immediately and resets the offline fallback
+  ---
+  duration_ms: 0.439319
+  type: 'test'
+  ...
+# Subtest: unknown ids, kinds and payload fields cannot trigger revalidation
+ok 47 - unknown ids, kinds and payload fields cannot trigger revalidation
+  ---
+  duration_ms: 0.448903
+  type: 'test'
+  ...
+# Subtest: workspace teardown aborts a pending ticket and discards late events
+ok 48 - workspace teardown aborts a pending ticket and discards late events
+  ---
+  duration_ms: 0.279703
+  type: 'test'
+  ...
+# Subtest: ticket renewal reauthenticates and catches up without keeping an expired subscription
+ok 49 - ticket renewal reauthenticates and catches up without keeping an expired subscription
+  ---
+  duration_ms: 0.473168
+  type: 'test'
+  ...
+# Subtest: a late ticket cannot open a socket after the tab becomes hidden
+ok 50 - a late ticket cannot open a socket after the tab becomes hidden
+  ---
+  duration_ms: 0.238983
+  type: 'test'
+  ...
+# Subtest: a half-open socket becomes offline when pongs stop
+ok 51 - a half-open socket becomes offline when pongs stop
+  ---
+  duration_ms: 0.321635
+  type: 'test'
+  ...
+# Subtest: a healthy socket catches a lost invalidation at the full ticket lifetime
+ok 52 - a healthy socket catches a lost invalidation at the full ticket lifetime
+  ---
+  duration_ms: 0.628989
+  type: 'test'
+  ...
+# Subtest: a hung renewal still reconciles a lost invalidation after one offline fallback interval
+ok 53 - a hung renewal still reconciles a lost invalidation after one offline fallback interval
+  ---
+  duration_ms: 0.793291
+  type: 'test'
+  ...
+# Subtest: stream bursts retain the last change without reading more often than the old two-second cadence
+ok 54 - stream bursts retain the last change without reading more often than the old two-second cadence
+  ---
+  duration_ms: 2.176263
+  type: 'test'
+  ...
+# Subtest: semantic changes bypass a pending stream delay and deduplicate the same SWR key
+ok 55 - semantic changes bypass a pending stream delay and deduplicate the same SWR key
+  ---
+  duration_ms: 0.48103
+  type: 'test'
+  ...
+# Subtest: a change during an in-flight read gets one trailing read after it settles
+ok 56 - a change during an in-flight read gets one trailing read after it settles
+  ---
+  duration_ms: 3.02159
+  type: 'test'
+  ...
+# Subtest: hidden documents discard delayed reads and reconcile the current document on visibility return
+ok 57 - hidden documents discard delayed reads and reconcile the current document on visibility return
+  ---
+  duration_ms: 0.543803
+  type: 'test'
+  ...
+# Subtest: teardown during a read cannot schedule an old owner or workspace trailing read
+ok 58 - teardown during a read cannot schedule an old owner or workspace trailing read
+  ---
+  duration_ms: 0.379189
+  type: 'test'
+  ...
+# Subtest: a server question deadline performs one catch-up read and never becomes a poll
+ok 59 - a server question deadline performs one catch-up read and never becomes a poll
+  ---
+  duration_ms: 0.472618
+  type: 'test'
+  ...
+# Subtest: hidden question deadlines make no reads; visibility and teardown reconcile or discard them
+ok 60 - hidden question deadlines make no reads; visibility and teardown reconcile or discard them
+  ---
+  duration_ms: 1.048948
+  type: 'test'
+  ...
+# Subtest: a subscriber joining an already healthy channel reconciles a read that started before its subscription
+ok 61 - a subscriber joining an already healthy channel reconciles a read that started before its subscription
+  ---
+  duration_ms: 0.480209
+  type: 'test'
+  ...
+# Subtest: a pending shared-key catch-up uses a remaining subscriber when the last reader unmounts
+ok 62 - a pending shared-key catch-up uses a remaining subscriber when the last reader unmounts
+  ---
+  duration_ms: 0.414522
+  type: 'test'
+  ...
+# Subtest: a new client on an old Worker keeps the sixty-second fallback despite healthy auto-pongs
+ok 63 - a new client on an old Worker keeps the sixty-second fallback despite healthy auto-pongs
+  ---
+  duration_ms: 0.424287
+  type: 'test'
+  ...
+# Subtest: capabilities are per-kind, including subscriptions added after the channel is ready
+ok 64 - capabilities are per-kind, including subscriptions added after the channel is ready
+  ---
+  duration_ms: 0.623441
+  type: 'test'
+  ...
+# Subtest: malformed readiness cannot suppress fallback, and a verified readiness stops only supported-key fallback
+ok 65 - malformed readiness cannot suppress fallback, and a verified readiness stops only supported-key fallback
+  ---
+  duration_ms: 0.479157
+  type: 'test'
+  ...
+# Subtest: approval expiry still triggers one authoritative read when the old Worker has no capability announcement
+ok 66 - approval expiry still triggers one authoritative read when the old Worker has no capability announcement
+  ---
+  duration_ms: 0.364328
+  type: 'test'
+  ...
+# Subtest: moving the browser wall clock backwards cannot postpone a server-derived approval expiry
+ok 67 - moving the browser wall clock backwards cannot postpone a server-derived approval expiry
+  ---
+  duration_ms: 0.423645
+  type: 'test'
+  ...
+# Subtest: a backward wall-clock correction cannot postpone a pushed key beyond its existing pacing interval
+ok 68 - a backward wall-clock correction cannot postpone a pushed key beyond its existing pacing interval
+  ---
+  duration_ms: 0.392169
+  type: 'test'
+  ...
+# Subtest: updating or clearing a deadline retains the same subscription and cannot restart the same expiry
+ok 69 - updating or clearing a deadline retains the same subscription and cannot restart the same expiry
+  ---
+  duration_ms: 0.64309
+  type: 'test'
+  ...
+# Subtest: timing updates while hidden do not read, and updates after teardown cannot revive a subscription
+ok 70 - timing updates while hidden do not read, and updates after teardown cannot revive a subscription
+  ---
+  duration_ms: 0.645352
+  type: 'test'
+  ...
+# Subtest: updating read pacing retains the connection and applies the new spacing to subsequent pushes
+ok 71 - updating read pacing retains the connection and applies the new spacing to subsequent pushes
+  ---
+  duration_ms: 0.419349
+  type: 'test'
+  ...
+# Subtest: only a newer real observation can rearm the same fired deadline, and an active deadline is never postponed
+ok 72 - only a newer real observation can rearm the same fired deadline, and an active deadline is never postponed
+  ---
+  duration_ms: 0.934219
+  type: 'test'
+  ...
+# Subtest: a fresh server-future observation whose conservative remaining time is zero gets only one immediate recheck
+ok 73 - a fresh server-future observation whose conservative remaining time is zero gets only one immediate recheck
+  ---
+  duration_ms: 0.491135
+  type: 'test'
+  ...
+# Subtest: one coalesced read requires the highest pushed revision of every entity behind its key
+ok 74 - one coalesced read requires the highest pushed revision of every entity behind its key
+  ---
+  duration_ms: 1.149787
+  type: 'test'
+  ...
+# Subtest: an unversioned flush retains a higher revision from another active consumer of the same key
+ok 75 - an unversioned flush retains a higher revision from another active consumer of the same key
+  ---
+  duration_ms: 0.880901
+  type: 'test'
+  ...
+# Subtest: a version 2 channel asks for revisions and skips a push its data already holds, reading every newer or unknown one
+ok 76 - a version 2 channel asks for revisions and skips a push its data already holds, reading every newer or unknown one
+  ---
+  duration_ms: 1.005134
+  type: 'test'
+  ...
+# Subtest: a revision never skips a key it does not cover, a version 1 Worker, or a kind the Worker did not list
+ok 77 - a revision never skips a key it does not cover, a version 1 Worker, or a kind the Worker did not list
+  ---
+  duration_ms: 1.000898
+  type: 'test'
+  ...
+# Subtest: an unconditional push merged with a covered one still reads
+ok 78 - an unconditional push merged with a covered one still reads
+  ---
+  duration_ms: 0.395253
+  type: 'test'
+  ...
+# Subtest: equal selected and home hints prepare one connection without a business read
+ok 79 - equal selected and home hints prepare one connection without a business read
+  ---
+  duration_ms: 3.35287
+  type: 'test'
+  ...
+# Subtest: different selected and home hints join their exact existing registry entries
+ok 80 - different selected and home hints join their exact existing registry entries
+  ---
+  duration_ms: 0.926137
+  type: 'test'
+  ...
+# Subtest: confirming the selected hint before its first real subscriber preserves ready coverage
+ok 81 - confirming the selected hint before its first real subscriber preserves ready coverage
+  ---
+  duration_ms: 0.513768
+  type: 'test'
+  ...
+# Subtest: a stopped historical subscription cannot consume the selected reservation
+ok 82 - a stopped historical subscription cannot consume the selected reservation
+  ---
+  duration_ms: 0.443464
+  type: 'test'
+  ...
+# Subtest: an invalid entity does not count as a consumer or consume preparation
+ok 83 - an invalid entity does not count as a consumer or consume preparation
+  ---
+  duration_ms: 0.39285
+  type: 'test'
+  ...
+# Subtest: fresh selected and home scopes retire unused hints without relabelling a subscription
+ok 84 - fresh selected and home scopes retire unused hints without relabelling a subscription
+  ---
+  duration_ms: 1.458433
+  type: 'test'
+  ...
+# Subtest: a read begun after readiness is reused by the real late subscriber
+ok 85 - a read begun after readiness is reused by the real late subscriber
+  ---
+  duration_ms: 0.856885
+  type: 'test'
+  ...
+# Subtest: a read begun before readiness still catches up even when it finishes afterwards
+not ok 86 - a read begun before readiness still catches up even when it finishes afterwards
+  ---
+  duration_ms: 2.907953
+  type: 'test'
+  location: '/home/runner/work/Mikka/Mikka/lib/live/channels.test.ts:1:8506'
+  failureType: 'testCodeFailure'
+  error: |-
+    late completion is not a fresh dispatch/read-begin proof
+    
+    1 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/lib/live/channels.test.ts:201:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: an incoming push with no keys remains an obligation for a later matching subscriber
+not ok 87 - an incoming push with no keys remains an obligation for a later matching subscriber
+  ---
+  duration_ms: 0.652894
+  type: 'test'
+  location: '/home/runner/work/Mikka/Mikka/lib/live/channels.test.ts:1:9148'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/lib/live/channels.test.ts:214:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: a different event kind does not discard continuous coverage for the late key
+ok 88 - a different event kind does not discard continuous coverage for the late key
+  ---
+  duration_ms: 0.599465
+  type: 'test'
+  ...
+# Subtest: abandoned render owners do not claim a prepared cache lifetime
+ok 89 - abandoned render owners do not claim a prepared cache lifetime
+  ---
+  duration_ms: 0.268927
+  type: 'test'
+  ...
+# Subtest: a second cache cannot borrow the first cache live history
+ok 90 - a second cache cannot borrow the first cache live history
+  ---
+  duration_ms: 0.309958
+  type: 'test'
+  ...
+# Subtest: StrictMode cleanup and setup use a new lifetime and old cleanup cannot close it
+ok 91 - StrictMode cleanup and setup use a new lifetime and old cleanup cannot close it
+  ---
+  duration_ms: 0.454381
+  type: 'test'
+  ...
+# Subtest: retirement before the first effect blocks old owners but not a new ordinary owner
+ok 92 - retirement before the first effect blocks old owners but not a new ordinary owner
+  ---
+  duration_ms: 0.260414
+  type: 'test'
+  ...
+# Subtest: an authority retirement aborts an unfinished ticket and its result cannot revive a socket
+ok 93 - an authority retirement aborts an unfinished ticket and its result cannot revive a socket
+  ---
+  duration_ms: 0.166235
+  type: 'test'
+  ...
+# Subtest: a failed empty preparation does not retry on timers or repeated visible events: null
+ok 94 - a failed empty preparation does not retry on timers or repeated visible events: null
+  ---
+  duration_ms: 0.378569
+  type: 'test'
+  ...
+# Subtest: a failed empty preparation does not retry on timers or repeated visible events: reject
+ok 95 - a failed empty preparation does not retry on timers or repeated visible events: reject
+  ---
+  duration_ms: 0.250509
+  type: 'test'
+  ...
+# Subtest: an empty prepared connection expires without a renewal loop; a real subscriber can reconnect
+ok 96 - an empty prepared connection expires without a renewal loop; a real subscriber can reconnect
+  ---
+  duration_ms: 0.344689
+  type: 'test'
+  ...
+# Subtest: the last real subscriber cancels its scheduled retry while a preparation remains
+ok 97 - the last real subscriber cancels its scheduled retry while a preparation remains
+  ---
+  duration_ms: 0.630631
+  type: 'test'
+  ...
+# Subtest: a hidden preparation waits for a real subscriber instead of creating an idle visibility retry
+ok 98 - a hidden preparation waits for a real subscriber instead of creating an idle visibility retry
+  ---
+  duration_ms: 0.242137
+  type: 'test'
+  ...
+# Subtest: a release from a disposed registry entry cannot remove its same-scope replacement
+ok 99 - a release from a disposed registry entry cannot remove its same-scope replacement
+  ---
+  duration_ms: 0.349005
+  type: 'test'
+  ...
+# Subtest: malformed and nil routing hints never request a ticket or attach a visibility watcher
+ok 100 - malformed and nil routing hints never request a ticket or attach a visibility watcher
+  ---
+  duration_ms: 0.158915
+  type: 'test'
+  ...
+1..100
+# tests 100
+# suites 0
+# pass 98
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 460.677284

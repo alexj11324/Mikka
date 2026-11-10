@@ -1,0 +1,278 @@
+{
+  "schema": "issue1512-live-routing-validation-original-stream-index/v1",
+  "repository": "alexj11324/Mikka",
+  "runId": "42766089161",
+  "attempt": "1",
+  "jobId": 129662811912,
+  "head": "063cf037560c750d87aa93818bd5b58bdfc78d69",
+  "source": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+  "sourceTree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+  "originalLog": {
+    "sha": "0c9d3ed489bbba6098bd0ffdd8fa16c33c926564",
+    "bytes": 542259,
+    "sha256": "91fe62be813a722160d3b92759bb286bfef1ab6f9ad77ae21e41a90a0fcc70d5",
+    "responseBlob": "657d9cc84158e0b0ee70a9425e88eb6f6076968c"
+  },
+  "preservation": "One original job-log fetch. Full response and complete decoded log frozen before parsing; each raw stdout/stderr was decoded from authenticated-length/hash base64 log frames and frozen before TAP/receipt interpretation. Empty stderr streams share the empty Git blob. The original artifact ZIP has not been downloaded.",
+  "streamCount": 26,
+  "streams": [
+    {
+      "label": "live-routing-ts",
+      "stream": "stdout",
+      "file": "live-routing-ts-stdout.log",
+      "bytes": 24452,
+      "sha256": "d17dc68c6af17babc648e3cb78986382007a333223a6c3d1417563dca984a100",
+      "blob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1"
+    },
+    {
+      "label": "live-routing-ts",
+      "stream": "stderr",
+      "file": "live-routing-ts-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "renderer-bootstraps",
+      "stream": "stdout",
+      "file": "renderer-bootstraps-stdout.log",
+      "bytes": 28435,
+      "sha256": "36d4d9d95378f7f4fbff9c0b5f8fb9068e943be0832342b337406a5ed98d6e82",
+      "blob": "5667f9518de8521a415a606aa9c00741f7754701"
+    },
+    {
+      "label": "renderer-bootstraps",
+      "stream": "stderr",
+      "file": "renderer-bootstraps-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "startup-and-template-validators",
+      "stream": "stdout",
+      "file": "startup-and-template-validators-stdout.log",
+      "bytes": 11124,
+      "sha256": "f3ba89910a0ee9ff199aaffacbc845f38b2aa729a09ead714ea62a0f6c8feee8",
+      "blob": "4a51ba0fa4d3a6a35856f74490aff793e1f69e1f"
+    },
+    {
+      "label": "startup-and-template-validators",
+      "stream": "stderr",
+      "file": "startup-and-template-validators-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "changed-root-oxlint",
+      "stream": "stdout",
+      "file": "changed-root-oxlint-stdout.log",
+      "bytes": 91,
+      "sha256": "4c452688a33957aaefc79d86c2de2f284502b202d9f6dfe062fa94853d0c7b4f",
+      "blob": "b1c92f77078e25075187e27f1e41aef49f74605f"
+    },
+    {
+      "label": "changed-root-oxlint",
+      "stream": "stderr",
+      "file": "changed-root-oxlint-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "desktop-source-oxlint",
+      "stream": "stdout",
+      "file": "desktop-source-oxlint-stdout.log",
+      "bytes": 217,
+      "sha256": "a687d835d45c1a4f57538ac3e1481112c423b086752b613533db6698ac90d4c7",
+      "blob": "abb9e125983d687e14bf02b08d3950ed74b6ad99"
+    },
+    {
+      "label": "desktop-source-oxlint",
+      "stream": "stderr",
+      "file": "desktop-source-oxlint-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "ui-and-runtime-policy",
+      "stream": "stdout",
+      "file": "ui-and-runtime-policy-stdout.log",
+      "bytes": 212,
+      "sha256": "72dfe9e974107d55128589cf898be042e926c1ac3a25404b9d97c8e2821faaca",
+      "blob": "b7f13ec9a735846480339ff081824d73f38b9288"
+    },
+    {
+      "label": "ui-and-runtime-policy",
+      "stream": "stderr",
+      "file": "ui-and-runtime-policy-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "migration-bootstrap",
+      "stream": "stdout",
+      "file": "migration-bootstrap-stdout.log",
+      "bytes": 1405,
+      "sha256": "01a93f31b596d76d8251889ce70c35aeb9fc64db9898ced9f1d35c14ec5f31f5",
+      "blob": "d3abae3f676ed2d7dd17ae9f4d5f27146b4afce9"
+    },
+    {
+      "label": "migration-bootstrap",
+      "stream": "stderr",
+      "file": "migration-bootstrap-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "e2e-setup",
+      "stream": "stdout",
+      "file": "e2e-setup-stdout.log",
+      "bytes": 21440,
+      "sha256": "7fcbab4a666c5b23e8c58ac438f527275cbe0c4096e2b0f9357f53c7e73334ae",
+      "blob": "0345f9b3a0d9b951ce7a9b463daca28904d8e8f8"
+    },
+    {
+      "label": "e2e-setup",
+      "stream": "stderr",
+      "file": "e2e-setup-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "environment-bind",
+      "stream": "stdout",
+      "file": "environment-bind-stdout.log",
+      "bytes": 153,
+      "sha256": "77befcdb3fda5c613cb2f213b514d34b3ccf8aacbf758cd31eca1567ac25ef32",
+      "blob": "4dcc1a51d29317461ec74aca86c7d94e30a26dfe"
+    },
+    {
+      "label": "environment-bind",
+      "stream": "stderr",
+      "file": "environment-bind-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "cache-scope-pg",
+      "stream": "stdout",
+      "file": "cache-scope-pg-stdout.log",
+      "bytes": 5904,
+      "sha256": "b68b22ce3e702f47bcdcff9239d7e55003b8030bb7fdcb6a0a6d03a2d6d95305",
+      "blob": "f00a7cddc8e40a62a6b6b397650e8cb28d99c9c2"
+    },
+    {
+      "label": "cache-scope-pg",
+      "stream": "stderr",
+      "file": "cache-scope-pg-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "root-types",
+      "stream": "stdout",
+      "file": "root-types-stdout.log",
+      "bytes": 311,
+      "sha256": "2878c52d4492904ff795053b2151f8aeae553a20974ca328d60508747326fd61",
+      "blob": "9a0625f45efe4cb149583f5f1ee0e9e264c45c80"
+    },
+    {
+      "label": "root-types",
+      "stream": "stderr",
+      "file": "root-types-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "frontend-types",
+      "stream": "stdout",
+      "file": "frontend-types-stdout.log",
+      "bytes": 566,
+      "sha256": "6926e08ac553a2e630a5af40458fc2eb1a1666bd0a00a364e426fb4a7a50690f",
+      "blob": "beaa9f8e330ced10a15d18ca5dd02048cd8ed6f0"
+    },
+    {
+      "label": "frontend-types",
+      "stream": "stderr",
+      "file": "frontend-types-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "label": "desktop-renderer-types",
+      "stream": "stdout",
+      "file": "desktop-renderer-types-stdout.log",
+      "bytes": 457,
+      "sha256": "984408a322337b6b21248effd223bd1a2963e330c96039d80b33b4115bc58908",
+      "blob": "698911638c5d8ab286a8dc7e61b00d23d87d87fa"
+    },
+    {
+      "label": "desktop-renderer-types",
+      "stream": "stderr",
+      "file": "desktop-renderer-types-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    }
+  ],
+  "emittedRawJsonRecords": {
+    "CONTROL": {
+      "blob": "5ec35473ad957d166517fbd2e8617fdf8e233c72",
+      "bytes": 6934,
+      "sha256": "b4c37a5dc53103f58803bcfb1fa4ecc203555f71355575f99fae30feb7554bf3",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+    },
+    "DATABASE_STARTED": {
+      "blob": "dec69ccec4fd3f1c1b933af4911d195e283cd64c",
+      "bytes": 280,
+      "sha256": "569c78b7aeda7b5b55099770ab06e1f564026f5c438d002daf3bd421c98d2aab",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+    },
+    "VERDICT": {
+      "blob": "98e57b4910569fc3fbc7f82d52fd37840b8850b9",
+      "bytes": 181728,
+      "sha256": "727e96d62739f3815ac50d1c2bd81aa7e391323e46a7d179683a19616f6d1848",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+    },
+    "CLEANUP": {
+      "blob": "b5c2fc35e53cbcf7c16292d50cbafc8d2838a3c0",
+      "bytes": 576,
+      "sha256": "73b4b7004e6016a4972337936f3c7eb0f33d2c81f1ff236b51b73ae179c4cd59",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member"
+    }
+  },
+  "artifact": {
+    "metadataOnly": true,
+    "originalZipDownloaded": false,
+    "metadataBlob": "42b117ef08de2baed4aafc69145a0ddbc1bed010",
+    "id": 13739543979,
+    "node_id": "MDg6QXJ0aWZhY3QxMzczOTU0Mzk3OQ==",
+    "name": "issue1512-native-live-routing-validation-42766089161-attempt-1",
+    "size_in_bytes": 37224,
+    "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13739543979",
+    "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13739543979/zip",
+    "expired": false,
+    "digest": "sha256:f4f6e203ef3b3de86de90f37aa90584b3a4b34a7785f7643306504cbe4167981",
+    "created_at": "2026-11-10T06:07:45Z",
+    "updated_at": "2026-11-10T06:07:45Z",
+    "expires_at": "2026-11-17T06:07:44Z",
+    "workflow_run": {
+      "id": 42766089161,
+      "repository_id": 1427517699,
+      "head_repository_id": 1427517699,
+      "head_branch": "ops/1512-task-runs-pg-20261110",
+      "head_sha": "063cf037560c750d87aa93818bd5b58bdfc78d69"
+    }
+  },
+  "terminalJobsMetadataBlob": "26b4c685f4b8d94d59f19e9e557ac8cfdbc54441"
+}

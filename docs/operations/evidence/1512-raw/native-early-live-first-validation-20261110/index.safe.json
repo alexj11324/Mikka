@@ -1,0 +1,1053 @@
+{
+  "schema": "mikka.issue1512.cp58.native-early-live-first-validation.v1",
+  "createdAt": "2026-11-10T06:36:58Z",
+  "checkpoint": 58,
+  "status": "FIRST_G_ACTUAL_VALIDATION_FAIL_PRESERVED",
+  "evidenceBase": {
+    "ref": "refs/heads/evidence/1512-observability",
+    "commit": "044ec440137a1e1afe5070e51b37259b0950ce09",
+    "tree": "cd0e20cf25d2706cd0a37061728e2e0942cd9f93",
+    "completeBaseLeafCount": 9286,
+    "independentBaseTreeHashVerified": true
+  },
+  "prefix": "docs/operations/evidence/1512-raw/native-early-live-first-validation-20261110",
+  "source": {
+    "commit": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "parent": "9238b7092a39fce7edde2e488aef516c0b544677",
+    "changedPaths": 20,
+    "completeMBaseVerification": true
+  },
+  "run": {
+    "id": "42766089161",
+    "attempt": "1",
+    "jobId": 129662811912,
+    "head": "063cf037560c750d87aa93818bd5b58bdfc78d69",
+    "conclusion": "failure",
+    "source": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "sourceTree": "7b1f2dcafc18918611938cba3716a4237d8a1f64"
+  },
+  "results": [
+    {
+      "label": "live-routing-ts",
+      "summary": {
+        "tests": 100,
+        "pass": 98,
+        "fail": 2,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "failureNames": [
+        "a read begun before readiness still catches up even when it finishes afterwards",
+        "an incoming push with no keys remains an obligation for a later matching subscriber"
+      ],
+      "stdoutBlob": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1"
+    },
+    {
+      "label": "renderer-bootstraps",
+      "summary": {
+        "tests": 54,
+        "pass": 47,
+        "fail": 7,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "failureNames": [
+        "the actual App prepares before the first workspace read and the real LiveProvider joins that connection",
+        "a response status is insufficient: preparation waits for the complete bootstrap body and validation",
+        "leaving and returning to a workspace starts an ordinary live lifetime without a new bootstrap",
+        "an update-required boundary retires preparation and a stale ready signal cannot revive it",
+        "a confirmed session expiry closes the owned connection and cannot leave a prepared route behind",
+        "a superseded bootstrap body cannot prepare after a new owner has been accepted",
+        "an owner change retires the first connection and prepares a distinct registry lifetime"
+      ],
+      "stdoutBlob": "5667f9518de8521a415a606aa9c00741f7754701"
+    },
+    {
+      "label": "startup-and-template-validators",
+      "summary": {
+        "tests": 39,
+        "pass": 38,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "failureNames": [
+        "scripts/acceptance/cloud-startup.test.mjs"
+      ],
+      "stdoutBlob": "4a51ba0fa4d3a6a35856f74490aff793e1f69e1f"
+    },
+    {
+      "label": "migration-bootstrap",
+      "summary": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "failureNames": [],
+      "stdoutBlob": "d3abae3f676ed2d7dd17ae9f4d5f27146b4afce9"
+    },
+    {
+      "label": "cache-scope-pg",
+      "summary": {
+        "tests": 3,
+        "pass": 2,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "failureNames": [
+        "bootstrap derives only a unique owner Live route from the current cache membership read"
+      ],
+      "stdoutBlob": "f00a7cddc8e40a62a6b6b397650e8cb28d99c9c2"
+    }
+  ],
+  "otherCommands": [
+    {
+      "label": "changed-root-oxlint",
+      "code": 0,
+      "status": "EXITED",
+      "signal": null,
+      "timedOut": false
+    },
+    {
+      "label": "desktop-source-oxlint",
+      "code": 0,
+      "status": "EXITED",
+      "signal": null,
+      "timedOut": false
+    },
+    {
+      "label": "ui-and-runtime-policy",
+      "code": 0,
+      "status": "EXITED",
+      "signal": null,
+      "timedOut": false
+    },
+    {
+      "label": "e2e-setup",
+      "code": 0,
+      "status": "EXITED",
+      "signal": null,
+      "timedOut": false
+    },
+    {
+      "label": "environment-bind",
+      "code": 0,
+      "status": "EXITED",
+      "signal": null,
+      "timedOut": false
+    },
+    {
+      "label": "root-types",
+      "code": 2,
+      "status": "EXITED",
+      "signal": null,
+      "timedOut": false
+    },
+    {
+      "label": "frontend-types",
+      "code": 2,
+      "status": "EXITED",
+      "signal": null,
+      "timedOut": false
+    },
+    {
+      "label": "desktop-renderer-types",
+      "code": 1,
+      "status": "EXITED",
+      "signal": null,
+      "timedOut": false
+    }
+  ],
+  "nonExecution": {
+    "cloudStartupCases": 88,
+    "newPgSubtests": 12,
+    "productionScenarios": 2,
+    "statement": "Expected source counts not executed are not passes; production completed remains zero."
+  },
+  "originals": {
+    "reader": "/root/native_pending_final",
+    "secondActionsReadsByArchivist": 0,
+    "streamCount": 26,
+    "streamBytes": 94767,
+    "completeLogBytes": 542259,
+    "artifactZipDownloaded": false,
+    "rawJsonScope": "Exact emitted log payloads, not unobserved artifact JSON members."
+  },
+  "cleanup": {
+    "runId": "42766089161",
+    "attempt": "1",
+    "containerName": "issue1512-native-live-routing-validation-42766089161-1",
+    "networkName": "issue1512-native-live-routing-net-42766089161-1",
+    "startedAt": "2026-11-10T06:07:42.508Z",
+    "stopped": true,
+    "containerRemoved": true,
+    "networkRemoved": true,
+    "errors": [],
+    "containerId": "65c7cb2b80b6187913953bb8eae384e2d9321466c5048fbe408dfe35cdf8cd9a",
+    "removedVolumeNames": [
+      "537285b1708ebb83ced669d19a1b318aa7a1f5f6a89fb2e1191b5fa0a4dba76e"
+    ],
+    "networkId": "b109db2f77829024271e2aa0b831e66fe9818c73df62957d53f9ccb7a49fd611",
+    "finishedAt": "2026-11-10T06:07:44.170Z"
+  },
+  "closure": {
+    "commit": "6d7f36ea3c6b918f613cf22e848ed52d413d2bd6",
+    "runId": 42766253819,
+    "jobId": 129663381273,
+    "conclusion": "skipped",
+    "runner_name": null,
+    "steps": [],
+    "scope": "Historical G1 entry closure; no claim about later authorized G2 operations."
+  },
+  "pendingG2": {
+    "commit": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "tree": "a9e6c067fbceb7c49143b9f5d1110971c2e535a1",
+    "parent": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "changedFiles": 4,
+    "resultsIncluded": false,
+    "notPassed": true
+  },
+  "formalStatus": {
+    "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "nativeFullLoginSql": 441,
+    "webFullLoginSql": 331,
+    "result": "FAIL",
+    "productionPassed": 0,
+    "productionRequired": 2,
+    "issueOpen": true
+  },
+  "archive": {
+    "newLeafCount": 107,
+    "payloadAndReadmeCount": 106,
+    "self": {
+      "path": "index.safe.json",
+      "excludedFromEntriesToAvoidSelfReference": true
+    },
+    "mode": "100644",
+    "onlyNewPathsUnderPrefix": true,
+    "allPayloadGitSha1BytesAndSha256Verified": true,
+    "sourceCopiesAddTxtSuffixWithoutByteChanges": true,
+    "resourcesStarted": 0,
+    "refsMoved": false
+  },
+  "entries": [
+    {
+      "path": "actual/artifact-metadata-only.original.json",
+      "sha": "42b117ef08de2baed4aafc69145a0ddbc1bed010",
+      "kind": "artifact metadata only; ZIP not downloaded",
+      "bytes": 2344,
+      "sha256": "a669ce347ae4842354026b68291374e50110ba8de3b17f818ba0b8e81114183a"
+    },
+    {
+      "path": "actual/emitted/CLEANUP.original.json",
+      "sha": "b5c2fc35e53cbcf7c16292d50cbafc8d2838a3c0",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member",
+      "bytes": 576,
+      "sha256": "73b4b7004e6016a4972337936f3c7eb0f33d2c81f1ff236b51b73ae179c4cd59"
+    },
+    {
+      "path": "actual/emitted/CONTROL.original.json",
+      "sha": "5ec35473ad957d166517fbd2e8617fdf8e233c72",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member",
+      "bytes": 6934,
+      "sha256": "b4c37a5dc53103f58803bcfb1fa4ecc203555f71355575f99fae30feb7554bf3"
+    },
+    {
+      "path": "actual/emitted/DATABASE_STARTED.original.json",
+      "sha": "dec69ccec4fd3f1c1b933af4911d195e283cd64c",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member",
+      "bytes": 280,
+      "sha256": "569c78b7aeda7b5b55099770ab06e1f564026f5c438d002daf3bd421c98d2aab"
+    },
+    {
+      "path": "actual/emitted/VERDICT.original.json",
+      "sha": "98e57b4910569fc3fbc7f82d52fd37840b8850b9",
+      "kind": "exact JSON payload emitted in job log; not asserted to be the artifact JSON member",
+      "bytes": 181728,
+      "sha256": "727e96d62739f3815ac50d1c2bd81aa7e391323e46a7d179683a19616f6d1848"
+    },
+    {
+      "path": "actual/job-log-response.original.json",
+      "sha": "657d9cc84158e0b0ee70a9425e88eb6f6076968c",
+      "kind": "complete one-read job-log response",
+      "bytes": 569560,
+      "sha256": "e4a72b04d10941572f6a19bff7a721646bf96a204ba580bb2e3e7f9311f9dcbb"
+    },
+    {
+      "path": "actual/job.original.log",
+      "sha": "0c9d3ed489bbba6098bd0ffdd8fa16c33c926564",
+      "kind": "complete decoded original job log",
+      "bytes": 542259,
+      "sha256": "91fe62be813a722160d3b92759bb286bfef1ab6f9ad77ae21e41a90a0fcc70d5"
+    },
+    {
+      "path": "actual/jobs-terminal.original.json",
+      "sha": "26b4c685f4b8d94d59f19e9e557ac8cfdbc54441",
+      "kind": "frozen terminal jobs metadata",
+      "bytes": 8880,
+      "sha256": "d4d109c43af31b899282c60cc6c9bdfb82ecddb7e41c8ad86d349daac40f524f"
+    },
+    {
+      "path": "actual/mechanical-verification.json",
+      "sha": "f0ab2b884b55dafa339f7d8559fc12f65667152f",
+      "kind": "actual source/bytes/TAP mechanical verification",
+      "bytes": 24977,
+      "sha256": "f623af7e9c56579f3acee2d88de955ce2a077295c8b012c4f0405a311ce06daf"
+    },
+    {
+      "path": "actual/original-stream-index.json",
+      "sha": "fa3ad0f12efec4794103f7311f3017825a59859a",
+      "kind": "original stream index",
+      "bytes": 10596,
+      "sha256": "4b96ac2b26807d02382a1a6b4e344c0a2ac80307c45a15959df5d165072d5bdf"
+    },
+    {
+      "path": "actual/streams/cache-scope-pg-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "cache-scope-pg",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/cache-scope-pg-stdout.log",
+      "sha": "f00a7cddc8e40a62a6b6b397650e8cb28d99c9c2",
+      "kind": "exact original command stdout",
+      "label": "cache-scope-pg",
+      "bytes": 5904,
+      "sha256": "b68b22ce3e702f47bcdcff9239d7e55003b8030bb7fdcb6a0a6d03a2d6d95305"
+    },
+    {
+      "path": "actual/streams/changed-root-oxlint-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "changed-root-oxlint",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/changed-root-oxlint-stdout.log",
+      "sha": "b1c92f77078e25075187e27f1e41aef49f74605f",
+      "kind": "exact original command stdout",
+      "label": "changed-root-oxlint",
+      "bytes": 91,
+      "sha256": "4c452688a33957aaefc79d86c2de2f284502b202d9f6dfe062fa94853d0c7b4f"
+    },
+    {
+      "path": "actual/streams/desktop-renderer-types-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "desktop-renderer-types",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/desktop-renderer-types-stdout.log",
+      "sha": "698911638c5d8ab286a8dc7e61b00d23d87d87fa",
+      "kind": "exact original command stdout",
+      "label": "desktop-renderer-types",
+      "bytes": 457,
+      "sha256": "984408a322337b6b21248effd223bd1a2963e330c96039d80b33b4115bc58908"
+    },
+    {
+      "path": "actual/streams/desktop-source-oxlint-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "desktop-source-oxlint",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/desktop-source-oxlint-stdout.log",
+      "sha": "abb9e125983d687e14bf02b08d3950ed74b6ad99",
+      "kind": "exact original command stdout",
+      "label": "desktop-source-oxlint",
+      "bytes": 217,
+      "sha256": "a687d835d45c1a4f57538ac3e1481112c423b086752b613533db6698ac90d4c7"
+    },
+    {
+      "path": "actual/streams/e2e-setup-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "e2e-setup",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/e2e-setup-stdout.log",
+      "sha": "0345f9b3a0d9b951ce7a9b463daca28904d8e8f8",
+      "kind": "exact original command stdout",
+      "label": "e2e-setup",
+      "bytes": 21440,
+      "sha256": "7fcbab4a666c5b23e8c58ac438f527275cbe0c4096e2b0f9357f53c7e73334ae"
+    },
+    {
+      "path": "actual/streams/environment-bind-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "environment-bind",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/environment-bind-stdout.log",
+      "sha": "4dcc1a51d29317461ec74aca86c7d94e30a26dfe",
+      "kind": "exact original command stdout",
+      "label": "environment-bind",
+      "bytes": 153,
+      "sha256": "77befcdb3fda5c613cb2f213b514d34b3ccf8aacbf758cd31eca1567ac25ef32"
+    },
+    {
+      "path": "actual/streams/frontend-types-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "frontend-types",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/frontend-types-stdout.log",
+      "sha": "beaa9f8e330ced10a15d18ca5dd02048cd8ed6f0",
+      "kind": "exact original command stdout",
+      "label": "frontend-types",
+      "bytes": 566,
+      "sha256": "6926e08ac553a2e630a5af40458fc2eb1a1666bd0a00a364e426fb4a7a50690f"
+    },
+    {
+      "path": "actual/streams/live-routing-ts-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "live-routing-ts",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/live-routing-ts-stdout.log",
+      "sha": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+      "kind": "exact original command stdout",
+      "label": "live-routing-ts",
+      "bytes": 24452,
+      "sha256": "d17dc68c6af17babc648e3cb78986382007a333223a6c3d1417563dca984a100"
+    },
+    {
+      "path": "actual/streams/migration-bootstrap-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "migration-bootstrap",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/migration-bootstrap-stdout.log",
+      "sha": "d3abae3f676ed2d7dd17ae9f4d5f27146b4afce9",
+      "kind": "exact original command stdout",
+      "label": "migration-bootstrap",
+      "bytes": 1405,
+      "sha256": "01a93f31b596d76d8251889ce70c35aeb9fc64db9898ced9f1d35c14ec5f31f5"
+    },
+    {
+      "path": "actual/streams/renderer-bootstraps-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "renderer-bootstraps",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/renderer-bootstraps-stdout.log",
+      "sha": "5667f9518de8521a415a606aa9c00741f7754701",
+      "kind": "exact original command stdout",
+      "label": "renderer-bootstraps",
+      "bytes": 28435,
+      "sha256": "36d4d9d95378f7f4fbff9c0b5f8fb9068e943be0832342b337406a5ed98d6e82"
+    },
+    {
+      "path": "actual/streams/root-types-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "root-types",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/root-types-stdout.log",
+      "sha": "9a0625f45efe4cb149583f5f1ee0e9e264c45c80",
+      "kind": "exact original command stdout",
+      "label": "root-types",
+      "bytes": 311,
+      "sha256": "2878c52d4492904ff795053b2151f8aeae553a20974ca328d60508747326fd61"
+    },
+    {
+      "path": "actual/streams/startup-and-template-validators-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "startup-and-template-validators",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/startup-and-template-validators-stdout.log",
+      "sha": "4a51ba0fa4d3a6a35856f74490aff793e1f69e1f",
+      "kind": "exact original command stdout",
+      "label": "startup-and-template-validators",
+      "bytes": 11124,
+      "sha256": "f3ba89910a0ee9ff199aaffacbc845f38b2aa729a09ead714ea62a0f6c8feee8"
+    },
+    {
+      "path": "actual/streams/ui-and-runtime-policy-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "kind": "exact original command stderr",
+      "label": "ui-and-runtime-policy",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "actual/streams/ui-and-runtime-policy-stdout.log",
+      "sha": "b7f13ec9a735846480339ff081824d73f38b9288",
+      "kind": "exact original command stdout",
+      "label": "ui-and-runtime-policy",
+      "bytes": 212,
+      "sha256": "72dfe9e974107d55128589cf898be042e926c1ac3a25404b9d97c8e2821faaca"
+    },
+    {
+      "path": "control/closure.json",
+      "sha": "ca21c1e6759aebdfbfe8c4ec054f655fca8ec4f0",
+      "kind": "historical closure projection",
+      "bytes": 847,
+      "sha256": "ebfd920f115fa8ff4bb523daa21c0859cff33b5314795313de33a8c431e44b23"
+    },
+    {
+      "path": "control/driver.original.mjs.txt",
+      "sha": "39f80294ee396b8b0ceb369bf41e8da25d1efffc",
+      "kind": "exact controller source",
+      "bytes": 31662,
+      "sha256": "fd47b3ab2f5abef1b2fbb368135f7d0c42bbf69ad6b80c8c82072adfe739bc81"
+    },
+    {
+      "path": "control/manifest.active.json",
+      "sha": "74ed0ab00b09aa345120360373725f93edd6d2d3",
+      "kind": "admitted manifest",
+      "bytes": 12601,
+      "sha256": "4c6d00503aa69b0c767196518ddbba5da606798e694a0fa6683ddf43205c416a"
+    },
+    {
+      "path": "control/manifest.closed.json",
+      "sha": "55382bad571c63f4a76aa7462b31d4256da237df",
+      "kind": "closed manifest",
+      "bytes": 12849,
+      "sha256": "83d3b0373c509742f79418c7bb319e6823a3be39c01f7226b3073256a900099c"
+    },
+    {
+      "path": "control/root-admission.json",
+      "sha": "47ecb0539adcba5673b06929a849bbba9e69ae29",
+      "kind": "historical admission",
+      "bytes": 8826,
+      "sha256": "ec58dcb2c2178c7e526130faf6f3043fa1f47a5a14f7797cf9b219e28d5eea61"
+    },
+    {
+      "path": "control/workflow.active.yml.txt",
+      "sha": "ea0877277da2b470be1b52fa7411ca84f48e3d0c",
+      "kind": "exact active workflow",
+      "bytes": 3895,
+      "sha256": "eeebcee70e157c044427e0a520a8e61f3bfe30468a4e453fb82217e3bed6b1a3"
+    },
+    {
+      "path": "control/workflow.closed.yml.txt",
+      "sha": "4961e05d943593c68d184b330ff402f3599b09bf",
+      "kind": "exact closed workflow",
+      "bytes": 3618,
+      "sha256": "477daa6c6be8ef513e145634f382ab88250cc1a67a92b473ec46c5fa0af2deab"
+    },
+    {
+      "path": "pending-G2/base/hooks/use-subagent-updates.ts.txt",
+      "sha": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+      "kind": "exact G type consumer base",
+      "bytes": 2441,
+      "sha256": "b0cd032a561d97a27ad453d0669c4fc119858f621c5f44f992ac7c862201120c"
+    },
+    {
+      "path": "pending-G2/freshness-fixture-cause.json",
+      "sha": "b9402b98f534ddcb10d9b0e1dde4dd2b89d36300",
+      "kind": "actual failure cause independent proof",
+      "bytes": 7420,
+      "sha256": "794f5914fdb29a8bfd2dd9cf97c137c3ed0905587843a642669e8f85b4ccb2e4"
+    },
+    {
+      "path": "pending-G2/frontend-diff.json",
+      "sha": "0d7a1d5286598722af2e58a80911d46f30a2c06c",
+      "kind": "pending frontend exact line diffs",
+      "bytes": 5364,
+      "sha256": "3dddcbe3c1833c62706d59aa9fa918781a87de60f00cc0675ae1fc3bb99a0c66"
+    },
+    {
+      "path": "pending-G2/frontend-fix-manifest.json",
+      "sha": "3578f33781eccdcd13254d5daea9fee421be5e4d",
+      "kind": "pending frontend fix manifest",
+      "bytes": 5551,
+      "sha256": "9e8a2f4f8f90bf430bcd83e0a8611364b22d4cbefcc77ef7904b874ef88149ff"
+    },
+    {
+      "path": "pending-G2/frontend-static-review.json",
+      "sha": "d68afe9f8632ecd3f0faf34f972541d4e2ce19c1",
+      "kind": "pending frontend static review",
+      "bytes": 6113,
+      "sha256": "5a1c0f9a51efbc25b33f44d9ccfdfbdd9029834aedae3400dac12c47aa58479a"
+    },
+    {
+      "path": "pending-G2/pg-fixture-author-review.json",
+      "sha": "b0c991217f60d84853febb7352ad3f210b4a0be6",
+      "kind": "pending PG fixture rationale",
+      "bytes": 9021,
+      "sha256": "1e728d4b88f78190984532acbf32efb7d547b76acf1730e0bbf2afb06de89ceb"
+    },
+    {
+      "path": "pending-G2/pg-fixture-diff.json",
+      "sha": "b489b010f444a17dc3ce3d37a3e0e5ef008c7f6a",
+      "kind": "pending PG fixture exact diff",
+      "bytes": 3255,
+      "sha256": "42df86edab1ea301111d950b3e5dcd665f91473d8da12807c1296882e18b9daf"
+    },
+    {
+      "path": "pending-G2/pg-fixture-independent-review.json",
+      "sha": "ff3222c1bd1b3f553d5e9c85b2d490adc2afc3f2",
+      "kind": "pending PG independent static review",
+      "bytes": 6378,
+      "sha256": "8c842510280c701e6a6702e5de5d67ccfb2c58e4934238fc7b1e78044be9b581"
+    },
+    {
+      "path": "pending-G2/source/apps/desktop/scripts/workspace-live.test.mjs.txt",
+      "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+      "kind": "pending G2 source",
+      "originalPath": "apps/desktop/scripts/workspace-live.test.mjs",
+      "base": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "bytes": 18598,
+      "sha256": "4d55bb93c825c9ebd57f0a73f60bc3a98073ac295b7d6f22effaca5a90982979"
+    },
+    {
+      "path": "pending-G2/source/hooks/use-subagent-updates.ts.txt",
+      "sha": "dd831e0e657d00de9210e39194a926b4e977ec56",
+      "kind": "pending G2 source",
+      "originalPath": "hooks/use-subagent-updates.ts",
+      "base": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+      "bytes": 2462,
+      "sha256": "a30f8d08c655a807ea46048bf517aaf74461e317b5e3d5bd9959573e6cd97161"
+    },
+    {
+      "path": "pending-G2/source/lib/live/channels.test.ts.txt",
+      "sha": "c9059d2c8be5122681f5c4657889b01633ed3736",
+      "kind": "pending G2 source",
+      "originalPath": "lib/live/channels.test.ts",
+      "base": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "bytes": 20020,
+      "sha256": "3d2ba4f08b855c1e6fae7afd5f0b98aaffa23c8a2d8dd72d2d33a6b603357b6e"
+    },
+    {
+      "path": "pending-G2/source/tests/read-cache-scope.db.test.ts.txt",
+      "sha": "ee59feba1e29769805806ec6e166abbc65994233",
+      "kind": "pending G2 PG test source",
+      "bytes": 18719,
+      "sha256": "8bdc39aacac759baf1bf922824145caecd49a52d74af2c2b68246b1808f785ea"
+    },
+    {
+      "path": "pending-G2/status-and-four-files.json",
+      "sha": "8c8437f81b55ab48cd4e861bf2a18549f4929f7e",
+      "kind": "pending source-only G2 supplement",
+      "bytes": 2417,
+      "sha256": "174799464928aaa1dc128b313e2e1b5ab41957528a9c87d8d391c3bb5d2c03e6"
+    },
+    {
+      "path": "README.md",
+      "sha": "be40576abff45a7cfd1a6cb1203e8b758a2840c4",
+      "kind": "CP58 checkpoint explanation",
+      "bytes": 8003,
+      "sha256": "d2d8c7027ac4e5b062ff465c53e30a989dde6cc3faba494f0d3f37d094516c39"
+    },
+    {
+      "path": "reviews/controller-count-delta.json",
+      "sha": "bbdb716763e8d63077f5e8773b317b20fd93bc14",
+      "kind": "count delta review",
+      "bytes": 2905,
+      "sha256": "3dd4fd334ddba7954dd6ad6cd3f124c0b1e3e2424d0c4cf7620d5413b4dac1a4"
+    },
+    {
+      "path": "reviews/controller-self-review.json",
+      "sha": "3b71628523ab0879a4f6c41f9b8ea2f5e8ccfae0",
+      "kind": "controller self review",
+      "bytes": 10622,
+      "sha256": "5f82ff6a26a4cb88d34ad5b7aa141d3b6ccd946630b1da09c4b46f3753157192"
+    },
+    {
+      "path": "reviews/controller-static.json",
+      "sha": "83452fbf9b15149368b1e4a089db5d48bfadaee7",
+      "kind": "static controller review",
+      "bytes": 14523,
+      "sha256": "eba72c2a63bbbfc63b4c20426d20875b40fb2562dede1a554f42244a7c64755c"
+    },
+    {
+      "path": "reviews/frontend-final-static.json",
+      "sha": "19c1ec3b2c4ea4d3a5da3740eb4799aadeb560f9",
+      "kind": "static source review; not runtime PASS",
+      "bytes": 27141,
+      "sha256": "26d371b829138a9a44898d48e33b6f8059e389f54df7f270f5b0c0cab36dc71a"
+    },
+    {
+      "path": "reviews/native-backend-static.json",
+      "sha": "9265500119ea12b3e50ee9a8f3e3b3455e8eafe0",
+      "kind": "backend static review",
+      "bytes": 7706,
+      "sha256": "0b7da450283d06833b09db73d1e6cd7ab3b9016b6f24484644d9e07a5dc9d8a2"
+    },
+    {
+      "path": "reviews/root-backend-static.json",
+      "sha": "833538e00d413a95b653a4678403edf46ab2cd7d",
+      "kind": "root backend review",
+      "bytes": 3628,
+      "sha256": "e40f5bc5c2a3de193efae14682250aef41e12f63eb17e3de6621dcfb6aa7f153"
+    },
+    {
+      "path": "reviews/root-G-binding.json",
+      "sha": "3cf31f0d784876f9524e642a3bc9de711a21ded0",
+      "kind": "root exact G binding",
+      "bytes": 3644,
+      "sha256": "193d3ad9d89289d1cf37a67c32decd476bd6afcc94f06d5c505f4ccc83ab3603"
+    },
+    {
+      "path": "reviews/source-and-closure-binding.json",
+      "sha": "50b01c430f36bc3703669496375086da3ffdb479",
+      "kind": "binding/closure independent review",
+      "bytes": 22926,
+      "sha256": "bcf076e47d14349b940b0eb17af360b34b8b82b2bd54c5317cb5728cbb071a27"
+    },
+    {
+      "path": "reviews/static-test-counts.json",
+      "sha": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e",
+      "kind": "predicted counts; not executed totals",
+      "bytes": 12435,
+      "sha256": "7504fb71b8242af06b062fd209b38bf6010142fa3ac02ae04c6b55614e49484d"
+    },
+    {
+      "path": "source-G/apps/desktop/scripts/renderer-startup.test.mjs.txt",
+      "sha": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "kind": "exact G source",
+      "originalPath": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "bytes": 7297,
+      "sha256": "2081f0f75b66243de5f92428e9758d88aa4af5ad673eef6128766a7d45fbd373"
+    },
+    {
+      "path": "source-G/apps/desktop/scripts/workspace-live.test.mjs.txt",
+      "sha": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "kind": "exact G source",
+      "originalPath": "apps/desktop/scripts/workspace-live.test.mjs",
+      "bytes": 18364,
+      "sha256": "21bb3903a5f4580e2cb7035dfb31a80166978bf634751687c842722e31c575c7"
+    },
+    {
+      "path": "source-G/apps/desktop/src/renderer/app.tsx.txt",
+      "sha": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+      "kind": "exact G source",
+      "originalPath": "apps/desktop/src/renderer/app.tsx",
+      "bytes": 16378,
+      "sha256": "7f17c4f811b1a654a788348e1fe95528bf4330b941556e00a0bc2378954e26a2"
+    },
+    {
+      "path": "source-G/apps/desktop/src/renderer/bootstrap.ts.txt",
+      "sha": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+      "kind": "exact G source",
+      "originalPath": "apps/desktop/src/renderer/bootstrap.ts",
+      "bytes": 4058,
+      "sha256": "71efe48c2ce5f487bf1a1f697d0103313b57061aa37a7f6552e9d90a16030995"
+    },
+    {
+      "path": "source-G/apps/desktop/src/renderer/installed-workspace.tsx.txt",
+      "sha": "ddeb2420392a0abb233bc3742cd539805424bc13",
+      "kind": "exact G source",
+      "originalPath": "apps/desktop/src/renderer/installed-workspace.tsx",
+      "bytes": 1083,
+      "sha256": "bb459b49b48d90cb082a0d441def9940c48d2fc86e35a408007f026c15092255"
+    },
+    {
+      "path": "source-G/apps/desktop/src/renderer/workspace-live.test.ts.txt",
+      "sha": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "kind": "exact G source",
+      "originalPath": "apps/desktop/src/renderer/workspace-live.test.ts",
+      "bytes": 6704,
+      "sha256": "248b06b5cb84dd1b29f5b7d9ecf233080f14f64c4ff7428742cd60c02bdc5b12"
+    },
+    {
+      "path": "source-G/apps/desktop/src/renderer/workspace-live.ts.txt",
+      "sha": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+      "kind": "exact G source",
+      "originalPath": "apps/desktop/src/renderer/workspace-live.ts",
+      "bytes": 2326,
+      "sha256": "09b7ee0c047ced2955cae95176914492e5d0a18b0f7d958bb0c992d0d3a148fa"
+    },
+    {
+      "path": "source-G/apps/desktop/src/renderer/workspace.tsx.txt",
+      "sha": "25891b5f8d7dc7a5d6b3cd4688789898052855fd",
+      "kind": "exact G source",
+      "originalPath": "apps/desktop/src/renderer/workspace.tsx",
+      "bytes": 2814,
+      "sha256": "f6f85a6b610d06202f111cb5d67e28e06a354f209865e3b1e3714a173629b04d"
+    },
+    {
+      "path": "source-G/hooks/use-live-key.tsx.txt",
+      "sha": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+      "kind": "exact G source",
+      "originalPath": "hooks/use-live-key.tsx",
+      "bytes": 8326,
+      "sha256": "1d353f65b1670b1b23c3d7ad6f5eeeb48ea2a62356da447bf12f9d7743443a8b"
+    },
+    {
+      "path": "source-G/lib/desktop-rpc/bootstrap.ts.txt",
+      "sha": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+      "kind": "exact G source",
+      "originalPath": "lib/desktop-rpc/bootstrap.ts",
+      "bytes": 2765,
+      "sha256": "f6c0d4263c288fd21729a1fce033ebf8df68a61b2e5a68c6cd02048b7f02fc3d"
+    },
+    {
+      "path": "source-G/lib/desktop-rpc/wire.ts.txt",
+      "sha": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+      "kind": "exact G source",
+      "originalPath": "lib/desktop-rpc/wire.ts",
+      "bytes": 5477,
+      "sha256": "c74f75beb53b16b0ba12ddb6f8d7900076089f8af88344fb7262e8d905f95fdd"
+    },
+    {
+      "path": "source-G/lib/live/channel.ts.txt",
+      "sha": "61cdf48b28ab9260f5567300f2411cb555b13427",
+      "kind": "exact G source",
+      "originalPath": "lib/live/channel.ts",
+      "bytes": 24726,
+      "sha256": "0d103ddf280c92c8a46129b8641938fb794b162a5408dc5b3a4918943bb3bbc6"
+    },
+    {
+      "path": "source-G/lib/live/channels.test.ts.txt",
+      "sha": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "kind": "exact G source",
+      "originalPath": "lib/live/channels.test.ts",
+      "bytes": 19553,
+      "sha256": "44ee90f7e427b700e3f0c7c2254929bd04f4e6e73b8faad41ac20dde984c9f7a"
+    },
+    {
+      "path": "source-G/lib/live/channels.ts.txt",
+      "sha": "c40864fe9386855994d3a4ece9480639514d85aa",
+      "kind": "exact G source",
+      "originalPath": "lib/live/channels.ts",
+      "bytes": 2806,
+      "sha256": "fb1906245cbbff73acf3e1b77ac51a87c764d0b2b104c32536a59599618a8a3b"
+    },
+    {
+      "path": "source-G/lib/live/preparation.ts.txt",
+      "sha": "7377678b777279de0ab21717749743fcce446d73",
+      "kind": "exact G source",
+      "originalPath": "lib/live/preparation.ts",
+      "bytes": 6264,
+      "sha256": "d3f457669d5f487e66a9c222b3158dcd30b9f1800bff562ba114d95c06eae2ac"
+    },
+    {
+      "path": "source-G/lib/swr/cache-scope.ts.txt",
+      "sha": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+      "kind": "exact G source",
+      "originalPath": "lib/swr/cache-scope.ts",
+      "bytes": 3832,
+      "sha256": "5fafae50e3157eb84664dd503cf3878227e10cddb34518bf445b5c6f4a611249"
+    },
+    {
+      "path": "source-G/package.json.txt",
+      "sha": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+      "kind": "exact G source",
+      "originalPath": "package.json",
+      "bytes": 81867,
+      "sha256": "a29caf1116312b0adc335f761a3200f8244f3342e55a2345ed01f5ae2b7e5ee9"
+    },
+    {
+      "path": "source-G/scripts/acceptance/run-observability-browser.mjs.txt",
+      "sha": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+      "kind": "exact G source",
+      "originalPath": "scripts/acceptance/run-observability-browser.mjs",
+      "bytes": 29150,
+      "sha256": "f89d826441bf5317231087a4e04b9ae72ba900337058a1a4644f3424861253eb"
+    },
+    {
+      "path": "source-G/scripts/acceptance/run-observability-browser.test.mjs.txt",
+      "sha": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+      "kind": "exact G source",
+      "originalPath": "scripts/acceptance/run-observability-browser.test.mjs",
+      "bytes": 40049,
+      "sha256": "4a5b27fc6429ee958526fc92e57cdf99daa2f2b7c348a9e14ab42cac44814a70"
+    },
+    {
+      "path": "source-G/tests/read-cache-scope.db.test.ts.txt",
+      "sha": "bbdae2625952b475c3488384bbd48c876887a805",
+      "kind": "exact G source",
+      "originalPath": "tests/read-cache-scope.db.test.ts",
+      "bytes": 18275,
+      "sha256": "9ab8f45f29d3840277d2573ca7969d4db9f6740cbc3e5cfa1f5feb368ce9ece4"
+    },
+    {
+      "path": "source-M/apps/desktop/scripts/renderer-startup.test.mjs.txt",
+      "sha": "a9a93381269a4078d046464b252851e72d84656c",
+      "kind": "exact M base source",
+      "originalPath": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "bytes": 4803,
+      "sha256": "303daa958d627a2cd45623befa8f4fda2ebbd45530aa6afc8ba86cd6a09f58aa"
+    },
+    {
+      "path": "source-M/apps/desktop/src/renderer/app.tsx.txt",
+      "sha": "c780d381fce0daa9c1646d63c7c099d48d197223",
+      "kind": "exact M base source",
+      "originalPath": "apps/desktop/src/renderer/app.tsx",
+      "bytes": 14784,
+      "sha256": "f1135aa822bc092b6f2c490e0f1b5fdbbafe93b990c484055a5939478a07603d"
+    },
+    {
+      "path": "source-M/apps/desktop/src/renderer/bootstrap.ts.txt",
+      "sha": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5",
+      "kind": "exact M base source",
+      "originalPath": "apps/desktop/src/renderer/bootstrap.ts",
+      "bytes": 3596,
+      "sha256": "1aac5eb7968426e8ec6158f4c2d511b13993d392e4f204111e631ccc6d58a333"
+    },
+    {
+      "path": "source-M/apps/desktop/src/renderer/installed-workspace.tsx.txt",
+      "sha": "2463df1257aec4817e0fe625931d1897bb3ccbb7",
+      "kind": "exact M base source",
+      "originalPath": "apps/desktop/src/renderer/installed-workspace.tsx",
+      "bytes": 976,
+      "sha256": "2ddcc1753054ea0caf78a7c43b98e9187583d06f246c83c16d6d4e96c1c5f61b"
+    },
+    {
+      "path": "source-M/apps/desktop/src/renderer/workspace.tsx.txt",
+      "sha": "e45052573bb4424f61da35eeaedb5f0a8d80844f",
+      "kind": "exact M base source",
+      "originalPath": "apps/desktop/src/renderer/workspace.tsx",
+      "bytes": 2569,
+      "sha256": "2307562ffbbb8c4e95a693f8b234987649bdbb746ded23137d8a8ca37772016c"
+    },
+    {
+      "path": "source-M/hooks/use-live-key.tsx.txt",
+      "sha": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "kind": "exact M base source",
+      "originalPath": "hooks/use-live-key.tsx",
+      "bytes": 8050,
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857"
+    },
+    {
+      "path": "source-M/lib/desktop-rpc/bootstrap.ts.txt",
+      "sha": "3be4faece94b30d4a7f66ef2d3c8b2ef60134372",
+      "kind": "exact M base source",
+      "originalPath": "lib/desktop-rpc/bootstrap.ts",
+      "bytes": 2699,
+      "sha256": "832522a7f17c81487e6078220e0e14f50f019348530acc0678f21590908cf29b"
+    },
+    {
+      "path": "source-M/lib/desktop-rpc/wire.ts.txt",
+      "sha": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "kind": "exact M base source",
+      "originalPath": "lib/desktop-rpc/wire.ts",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3"
+    },
+    {
+      "path": "source-M/lib/live/channel.ts.txt",
+      "sha": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "kind": "exact M base source",
+      "originalPath": "lib/live/channel.ts",
+      "bytes": 24031,
+      "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede"
+    },
+    {
+      "path": "source-M/lib/live/channels.ts.txt",
+      "sha": "d459548cbd8785bf2764d23543109b99ae146d18",
+      "kind": "exact M base source",
+      "originalPath": "lib/live/channels.ts",
+      "bytes": 1580,
+      "sha256": "b54a1ea2cb517ce4135d91423c1999420591f3bfc9487d1a9c11396460a321c8"
+    },
+    {
+      "path": "source-M/lib/swr/cache-scope.ts.txt",
+      "sha": "f43f62b4798c971ebae3b52ab2a1db413925bf51",
+      "kind": "exact M base source",
+      "originalPath": "lib/swr/cache-scope.ts",
+      "bytes": 2409,
+      "sha256": "ba40f186a10700cf6b398a94ed90a34ec4704e53335e57540af41b40dd70f2d9"
+    },
+    {
+      "path": "source-M/package.json.txt",
+      "sha": "677ab7d4849cbefe1b7dd33ebbc998b17e69ce09",
+      "kind": "exact M base source",
+      "originalPath": "package.json",
+      "bytes": 81792,
+      "sha256": "d180836e31aa9a317e7d22973f4c88c6f3935d737402df6c6f14aef322eac59a"
+    },
+    {
+      "path": "source-M/scripts/acceptance/run-observability-browser.mjs.txt",
+      "sha": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "kind": "exact M base source",
+      "originalPath": "scripts/acceptance/run-observability-browser.mjs",
+      "bytes": 25516,
+      "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606"
+    },
+    {
+      "path": "source-M/scripts/acceptance/run-observability-browser.test.mjs.txt",
+      "sha": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+      "kind": "exact M base source",
+      "originalPath": "scripts/acceptance/run-observability-browser.test.mjs",
+      "bytes": 29638,
+      "sha256": "b9b3eb221835ec336089e89974e9fd2bbc873277a6602c285c96e087c2bca9e4"
+    },
+    {
+      "path": "source-M/tests/read-cache-scope.db.test.ts.txt",
+      "sha": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+      "kind": "exact M base source",
+      "originalPath": "tests/read-cache-scope.db.test.ts",
+      "bytes": 5971,
+      "sha256": "445e851d57383ed30583bd90fd92c2a5aac934e8aff364d344f9e88796001449"
+    },
+    {
+      "path": "source/backend-diff.json",
+      "sha": "8c97ec080ea859fc696fce9dacaff569d2fb71b4",
+      "kind": "backend source diff",
+      "bytes": 23254,
+      "sha256": "88af6d5360167debdb92598e26849199205140d34b7a4e0eadff53f5adf2f86a"
+    },
+    {
+      "path": "source/backend-manifest.json",
+      "sha": "9298c634e7935b3b898c5e2209dad23e43404ccf",
+      "kind": "backend candidate manifest",
+      "bytes": 6354,
+      "sha256": "316742a0bb9282909610e0c5e5179aba933281cbe43a035769e4e2c2dafdb177"
+    },
+    {
+      "path": "source/frontend-manifest.json",
+      "sha": "eaab7746ed888c6b245a47e63dfb37112faf70be",
+      "kind": "frontend candidate manifest",
+      "bytes": 10728,
+      "sha256": "139f3e1d8a5c8cb18f4a52c618912c5f5d8b2a14833b87c4233ea879b0399ec0"
+    },
+    {
+      "path": "source/G-from-M-diff.json",
+      "sha": "ac8be22b4860444566ac21ef85cef27716ea9fc3",
+      "kind": "exact 20-file Git diff",
+      "bytes": 140947,
+      "sha256": "81ff384fad8515d5e3875c7766e09e16db33f6b903f61dafc9e5f2ba7638b386"
+    },
+    {
+      "path": "source/source-integration.json",
+      "sha": "a87dcfcc61da83dc5700cb5b6f687362444eb4d2",
+      "kind": "G source/tree integration",
+      "bytes": 7519,
+      "sha256": "55c084c9343eef3472b50a640e873e28466ddc3344522c147cd45210cc7d73a0"
+    }
+  ]
+}

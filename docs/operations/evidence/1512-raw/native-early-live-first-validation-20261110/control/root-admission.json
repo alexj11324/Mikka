@@ -1,0 +1,223 @@
+{
+  "schema": "issue1512-live-routing-validation-root-approval/v1",
+  "decision": "AUTHORIZE_ONE_ISOLATED_FIXED_SOURCE_VALIDATION",
+  "reviewedAt": "2026-11-10 06:04:00 UTC",
+  "source": {
+    "sha": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "parents": [
+      "9238b7092a39fce7edde2e488aef516c0b544677"
+    ],
+    "completeLeafCount": 6983,
+    "wholeTreeHashIndependentlyReconstructed": true,
+    "allLeafModeTypeShaReadback": true
+  },
+  "merge": {
+    "sha": "9238b7092a39fce7edde2e488aef516c0b544677",
+    "tree": "03712f2c1ca03ee45e61e124bd430fc9d1a377c9",
+    "parents": [
+      "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "ab2d00a43a79d35380b4d2db9014a3792fea63ca"
+    ]
+  },
+  "previousOps": {
+    "sha": "a4f88bb178f893eee979bdf3f34262e0f8f661c5",
+    "tree": "8c2f71d1a87654072a939d64e6754ef22c2b19da"
+  },
+  "controls": {
+    "driver": "39f80294ee396b8b0ceb369bf41e8da25d1efffc",
+    "driverSha256": "fd47b3ab2f5abef1b2fbb368135f7d0c42bbf69ad6b80c8c82072adfe739bc81",
+    "workflow": "ea0877277da2b470be1b52fa7411ca84f48e3d0c",
+    "closedWorkflow": "4961e05d943593c68d184b330ff402f3599b09bf",
+    "coreManifestSha256": "13a3623b6767edfa59edbb26bc51dd44e9f07baf6a981d05ec8b2f44958b5b0e",
+    "coreManifestDefinition": "Exact final manifest serialization with candidateEvidence.finalRootApproval=null; all other fields fixed"
+  },
+  "productDiff": [
+    {
+      "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "base": "a9a93381269a4078d046464b252851e72d84656c",
+      "sha": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "base": null,
+      "sha": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "base": "c780d381fce0daa9c1646d63c7c099d48d197223",
+      "sha": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "base": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5",
+      "sha": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+      "base": "2463df1257aec4817e0fe625931d1897bb3ccbb7",
+      "sha": "ddeb2420392a0abb233bc3742cd539805424bc13",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+      "base": null,
+      "sha": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.ts",
+      "base": null,
+      "sha": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace.tsx",
+      "base": "e45052573bb4424f61da35eeaedb5f0a8d80844f",
+      "sha": "25891b5f8d7dc7a5d6b3cd4688789898052855fd",
+      "kind": "product"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "base": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "sha": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+      "kind": "product"
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "base": "3be4faece94b30d4a7f66ef2d3c8b2ef60134372",
+      "sha": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+      "kind": "product"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "base": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "sha": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "base": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "sha": "61cdf48b28ab9260f5567300f2411cb555b13427",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "base": null,
+      "sha": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "kind": "test"
+    },
+    {
+      "path": "lib/live/channels.ts",
+      "base": "d459548cbd8785bf2764d23543109b99ae146d18",
+      "sha": "c40864fe9386855994d3a4ece9480639514d85aa",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/preparation.ts",
+      "base": null,
+      "sha": "7377678b777279de0ab21717749743fcce446d73",
+      "kind": "product"
+    },
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "base": "f43f62b4798c971ebae3b52ab2a1db413925bf51",
+      "sha": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+      "kind": "product"
+    },
+    {
+      "path": "package.json",
+      "base": "677ab7d4849cbefe1b7dd33ebbc998b17e69ce09",
+      "sha": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+      "kind": "test-registration"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "base": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "sha": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+      "kind": "acceptance-adapter"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "base": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+      "sha": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+      "kind": "acceptance-adapter"
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "base": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+      "sha": "bbdae2625952b475c3488384bbd48c876887a805",
+      "kind": "test"
+    }
+  ],
+  "evidence": {
+    "frontendManifest": "eaab7746ed888c6b245a47e63dfb37112faf70be",
+    "backendManifest": "9298c634e7935b3b898c5e2209dad23e43404ccf",
+    "backendRootReview": "833538e00d413a95b653a4678403edf46ab2cd7d",
+    "backendIndependentReview": "9265500119ea12b3e50ee9a8f3e3b3455e8eafe0",
+    "frontendIndependentCheckpoint": "df8f0f10e844c6a7a478d8d00111de5fc0e9d302",
+    "frontendIndependentFinalStatus": "All final 13 sources/tests read; L1-L7 statically closed, no remaining static blocker, final written review being frozen. No runtime PASS claimed.",
+    "controllerSelfReview": "3b71628523ab0879a4f6c41f9b8ea2f5e8ccfae0",
+    "controllerCountDeltaReview": "bbdb716763e8d63077f5e8773b317b20fd93bc14",
+    "unitCountProof": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e",
+    "actualGBindingReview": "3cf31f0d784876f9524e642a3bc9de711a21ded0",
+    "before": "044ec440137a1e1afe5070e51b37259b0950ce09"
+  },
+  "reviewedBehavior": [
+    "Root read all final frontend product changes and all four new or extended frontend tests; current URL guard matches actual location notification ordering.",
+    "Real subscription adopts the same ready/push history; exact cache identity and committed owner lifetime fence adoption. Authority retirement blocks old effects while legitimate route reentry uses an ordinary fresh owner.",
+    "Read freshness, pending/dispatch proof, original snapshot action whitelist, live-ticket authorization and full Native query windows remain unchanged.",
+    "Backend uses the existing membership SELECT projection. Extra columns may add row bytes, so no zero-byte-overhead or final budget pass is inferred.",
+    "Root package minimally registers both new TS tests; desktop existing test glob and own lint config are retained. No dependencies or lock change.",
+    "Root reviewed the complete controller, active and closed workflows, all source-bound guards, command/output preservation and owned cleanup.",
+    "Exact command groups are separate processes. All raw stdout/stderr bytes are screened for temporary credentials, persisted and hashed before parsing; errors and source mutations force failure."
+  ],
+  "execution": {
+    "expiresAt": "2026-11-10T07:30:00.000Z",
+    "attempt": 1,
+    "runner": "ubuntu-22.04",
+    "node": "24.22.1",
+    "pnpm": "10.34.3",
+    "dependencyInstalls": 1,
+    "postgres": "postgres:17; one fresh loopback-owned container and network",
+    "unitExpected": {
+      "live-routing-ts": 100,
+      "renderer-bootstraps": 54,
+      "startup-and-template-validators": 126
+    },
+    "pgExpected": 15,
+    "actualRuntimeResults": "PENDING",
+    "unitCountsAreStaticPredictions": true
+  },
+  "constraints": {
+    "productionCredentials": false,
+    "productionAccount": false,
+    "externalModelCalls": false,
+    "nativeAcceptanceRun": false,
+    "mainOrFormalRefMutation": false,
+    "noRetryToGreen": true,
+    "temporaryDiagnosticsInProduct": false
+  },
+  "cleanup": {
+    "always": true,
+    "exactOwnedRunAttemptShaLabels": true,
+    "stopAndRemoveContainerAndAnonymousVolumes": true,
+    "removeOwnedEmptyNetwork": true,
+    "verifyAbsence": true,
+    "closedEntryAfterAdmission": true
+  },
+  "originalReader": "/root/native_pending_final only; Root and other agents use frozen Git copies",
+  "formalStatus": {
+    "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "fullLoginNative": 441,
+    "fullLoginWeb": 331,
+    "verdict": "FAIL",
+    "productionPassed": 0,
+    "productionRequired": 2,
+    "issueOpen": true
+  }
+}

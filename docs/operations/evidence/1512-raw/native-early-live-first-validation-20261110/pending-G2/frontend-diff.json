@@ -1,0 +1,157 @@
+{
+  "schema": "issue1512-cp58-frontend-g2-diff/v1",
+  "parent": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+  "files": [
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "base": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+      "bytes": 18598,
+      "sha256": "4d55bb93c825c9ebd57f0a73f60bc3a98073ac295b7d6f22effaca5a90982979",
+      "hunks": [
+        {
+          "oldLine": 75,
+          "newLine": 75,
+          "removed": [
+            "    builder.onResolve({ filter: /^(?:react(?:\\/.*)?|swr)$/ }, args => ({ path: require.resolve(args.path), external: true }))"
+          ],
+          "added": [
+            "    builder.onResolve({ filter: /^(?:react(?:\\/.*)?|swr)$/ }, args => ({",
+            "      // Node ESM must resolve SWR's import condition: its CommonJS default is",
+            "      // the exports object, not the useSWR hook used by this real component.",
+            "      path: args.path === 'swr' ? fileURLToPath(import.meta.resolve('swr')) : require.resolve(args.path), external: true,",
+            "    }))"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "base": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+      "sha": "dd831e0e657d00de9210e39194a926b4e977ec56",
+      "bytes": 2462,
+      "sha256": "a30f8d08c655a807ea46048bf517aaf74461e317b5e3d5bd9959573e6cd97161",
+      "hunks": [
+        {
+          "oldLine": 7,
+          "newLine": 7,
+          "removed": [
+            "import type { LiveChannels } from '@/lib/live/channels'"
+          ],
+          "added": [
+            "import type { LiveChannelRegistry } from '@/lib/live/channels'"
+          ]
+        },
+        {
+          "oldLine": 11,
+          "newLine": 11,
+          "removed": [
+            "const feeds = new WeakMap<LiveChannels, Map<string, ComputerEventFeed>>()"
+          ],
+          "added": [
+            "const feeds = new WeakMap<LiveChannelRegistry, Map<string, ComputerEventFeed>>()"
+          ]
+        },
+        {
+          "oldLine": 16,
+          "newLine": 16,
+          "removed": [
+            "function sharedFeed(channels: LiveChannels, workspaceId: string) {"
+          ],
+          "added": [
+            "function sharedFeed(channels: LiveChannelRegistry, workspaceId: string) {"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "base": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "sha": "c9059d2c8be5122681f5c4657889b01633ed3736",
+      "bytes": 20020,
+      "sha256": "3d2ba4f08b855c1e6fae7afd5f0b98aaffa23c8a2d8dd72d2d33a6b603357b6e",
+      "hunks": [
+        {
+          "oldLine": 77,
+          "newLine": 77,
+          "removed": [
+            "  let reads = 0"
+          ],
+          "added": [
+            "  let reads = 0, refreshes = 0"
+          ]
+        },
+        {
+          "oldLine": 84,
+          "newLine": 84,
+          "removed": [
+            "  return { cache, commit, count: () => reads,",
+            "    refresh: (_key: string, _required?: unknown, _reuse?: boolean, after?: number) => readFresh(cache, 'chat', after!, () => commit(), () => true, () => true) }"
+          ],
+          "added": [
+            "  return { cache, commit, count: () => reads, refreshCount: () => refreshes,",
+            "    refresh: (_key: string, _required?: unknown, _reuse?: boolean, after?: number) => {",
+            "      refreshes++",
+            "      return readFresh(cache, 'chat', after!, () => commit(), () => true, () => true)",
+            "    } }"
+          ]
+        },
+        {
+          "oldLine": 94,
+          "newLine": 97,
+          "removed": [
+            "  assert.deepEqual(reads, [])"
+          ],
+          "added": [
+            "  assert.equal(reads.length, 0)"
+          ]
+        },
+        {
+          "oldLine": 184,
+          "newLine": 187,
+          "removed": [
+            "  await f.advance(0)"
+          ],
+          "added": [
+            "  await f.advance(100)",
+            "  assert.equal(data.refreshCount(), 1, 'the original debounce must invoke the real refresh')"
+          ]
+        },
+        {
+          "oldLine": 200,
+          "newLine": 204,
+          "removed": [
+            "  await f.advance(0)"
+          ],
+          "added": [
+            "  await f.advance(100)",
+            "  assert.equal(data.refreshCount(), 1, 'the original debounce must invoke the real refresh')"
+          ]
+        },
+        {
+          "oldLine": 213,
+          "newLine": 218,
+          "removed": [
+            "  await f.advance(0)"
+          ],
+          "added": [
+            "  await f.advance(100)",
+            "  assert.equal(data.refreshCount(), 1, 'the original debounce must invoke the real refresh')"
+          ]
+        },
+        {
+          "oldLine": 227,
+          "newLine": 233,
+          "removed": [
+            "  await f.advance(0)"
+          ],
+          "added": [
+            "  await f.advance(100)",
+            "  assert.equal(data.refreshCount(), 1, 'the original debounce must invoke the real refresh')"
+          ]
+        }
+      ]
+    }
+  ],
+  "meaning": "Only the three evidence-supported changes from the frozen failed source. Original behavior assertions preserved; the four fixture cases now invoke the original 100 ms debounce and assert that invocation."
+}

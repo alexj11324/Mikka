@@ -1,0 +1,277 @@
+{
+  "schema": "mikka.issue1512.independent-green-controller-review.v1",
+  "repository": "alexj11324/Mikka",
+  "reviewer": "/root/independent_final",
+  "decision": "STATIC_NO_BLOCKER_FOR_REVIEWED_CONTROLLER_AND_SOURCE_DERIVED_COUNT_DELTA; FINAL_BOUND_MANIFEST_AND_REAL_EXECUTION_PENDING",
+  "sources": {
+    "controller": {
+      "sha": "39f80294ee396b8b0ceb369bf41e8da25d1efffc",
+      "bytes": 31662,
+      "sha256": "fd47b3ab2f5abef1b2fbb368135f7d0c42bbf69ad6b80c8c82072adfe739bc81",
+      "previousFullyRead": "5a324636acd4371726c62f90d1718ac1f3e663f3"
+    },
+    "template": {
+      "sha": "457a82cae10889af03ae14fc307c8ea3b64c699c",
+      "bytes": 9574,
+      "sha256": "bda2577060977ced10cdd738f07fb0f1c9ae924e54e5ae005d1491bb1fe96c79",
+      "status": "draft=true enabled=false; source.sha/tree and final integration fields still unbound"
+    },
+    "workflow": "ea0877277da2b470be1b52fa7411ca84f48e3d0c",
+    "closedWorkflow": "4961e05d943593c68d184b330ff402f3599b09bf",
+    "staticCountProof": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e",
+    "frontendIndependentReview": "6bed8d2e7fdf3891c84dcf20dcba63665bc9b086",
+    "backendIndependentReview": "9265500119ea12b3e50ee9a8f3e3b3455e8eafe0"
+  },
+  "method": "Read the complete base controller, template and both workflows. Read exact final controller/template diff. Independently retrieved and rehashed ten exact test source blobs, reconciled every ordinary test and t.test call site, inspected literal registration loops and awaited child-loop forms. Unchanged old test assertion semantics were not re-audited as part of the count review.",
+  "countDelta": {
+    "codeChanges": [
+      "Require exactly the three fixed expectedUnitTests keys.",
+      "Require every group count to be a safe positive integer.",
+      "Persist each expected count in its result row.",
+      "Pass the exact required count to passing(), replacing the optional null fallback."
+    ],
+    "sourceBinding": "The template now binds all ten test blobs and the count proof. No test source, test-name filter, test command or result acceptance condition was weakened.",
+    "groups": [
+      {
+        "label": "live-routing-ts",
+        "paths": [
+          "lib/live/channel.test.ts",
+          "lib/live/channels.test.ts",
+          "apps/desktop/src/renderer/workspace-live.test.ts",
+          "lib/desktop-rpc/wire.test.ts"
+        ],
+        "formula": "59 + 22 + 14 + 5",
+        "expected": 100
+      },
+      {
+        "label": "renderer-bootstraps",
+        "paths": [
+          "apps/desktop/scripts/workspace-live.test.mjs",
+          "apps/desktop/scripts/renderer-startup.test.mjs",
+          "apps/desktop/scripts/installed-workspace.test.mjs",
+          "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
+        ],
+        "formula": "13 + 17 + 3 + 21",
+        "expected": 54
+      },
+      {
+        "label": "startup-and-template-validators",
+        "paths": [
+          "scripts/acceptance/cloud-startup.test.mjs",
+          "scripts/e2b/validate-template-subscriptions.test.mjs"
+        ],
+        "formula": "88 + 38",
+        "expected": 126
+      }
+    ],
+    "perFileIndependentChecks": [
+      {
+        "path": "lib/live/channel.test.ts",
+        "blob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+        "identityMatch": true,
+        "regular": 50,
+        "regularMatches": true,
+        "bare": 53,
+        "bareMatches": true,
+        "children": 0,
+        "childrenMatch": true,
+        "expected": 59,
+        "formula": "50+4+3+2",
+        "formulaMatches": true,
+        "skipTodoOnly": [],
+        "sha256": "591ca7d47e4af01661817bac8466fdaeaac240858dc5cf1bac42ba3aa5da3baa",
+        "bytes": 45859
+      },
+      {
+        "path": "lib/live/channels.test.ts",
+        "blob": "91c96118f0040a4594eb57e76f58befa2150fe99",
+        "identityMatch": true,
+        "regular": 20,
+        "regularMatches": true,
+        "bare": 21,
+        "bareMatches": true,
+        "children": 0,
+        "childrenMatch": true,
+        "expected": 22,
+        "formula": "20+2",
+        "formulaMatches": true,
+        "skipTodoOnly": [],
+        "sha256": "44ee90f7e427b700e3f0c7c2254929bd04f4e6e73b8faad41ac20dde984c9f7a",
+        "bytes": 19553
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+        "blob": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+        "identityMatch": true,
+        "regular": 7,
+        "regularMatches": true,
+        "bare": 8,
+        "bareMatches": true,
+        "children": 0,
+        "childrenMatch": true,
+        "expected": 14,
+        "formula": "7+7",
+        "formulaMatches": true,
+        "skipTodoOnly": [],
+        "sha256": "248b06b5cb84dd1b29f5b7d9ecf233080f14f64c4ff7428742cd60c02bdc5b12",
+        "bytes": 6704
+      },
+      {
+        "path": "lib/desktop-rpc/wire.test.ts",
+        "blob": "2170c999f99b2cfa2f6bbf6667b9de56296a0ada",
+        "identityMatch": true,
+        "regular": 5,
+        "regularMatches": true,
+        "bare": 5,
+        "bareMatches": true,
+        "children": 0,
+        "childrenMatch": true,
+        "expected": 5,
+        "formula": "5",
+        "formulaMatches": true,
+        "skipTodoOnly": [],
+        "sha256": "e3b76e18e90edcbecd5a2dce696742a487623925ee63ece69017572e32534eab",
+        "bytes": 2409
+      },
+      {
+        "path": "apps/desktop/scripts/workspace-live.test.mjs",
+        "blob": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+        "identityMatch": true,
+        "regular": 9,
+        "regularMatches": true,
+        "bare": 9,
+        "bareMatches": true,
+        "children": 1,
+        "childrenMatch": true,
+        "expected": 13,
+        "formula": "9+4",
+        "formulaMatches": true,
+        "skipTodoOnly": [],
+        "sha256": "21bb3903a5f4580e2cb7035dfb31a80166978bf634751687c842722e31c575c7",
+        "bytes": 18364
+      },
+      {
+        "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+        "blob": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+        "identityMatch": true,
+        "regular": 6,
+        "regularMatches": true,
+        "bare": 6,
+        "bareMatches": true,
+        "children": 2,
+        "childrenMatch": true,
+        "expected": 17,
+        "formula": "6+3+8",
+        "formulaMatches": true,
+        "skipTodoOnly": [],
+        "sha256": "2081f0f75b66243de5f92428e9758d88aa4af5ad673eef6128766a7d45fbd373",
+        "bytes": 7297
+      },
+      {
+        "path": "apps/desktop/scripts/installed-workspace.test.mjs",
+        "blob": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa",
+        "identityMatch": true,
+        "regular": 3,
+        "regularMatches": true,
+        "bare": 3,
+        "bareMatches": true,
+        "children": 0,
+        "childrenMatch": true,
+        "expected": 3,
+        "formula": "3",
+        "formulaMatches": true,
+        "skipTodoOnly": [],
+        "sha256": "d95c69072e11d85647e51c3c7115f9386fb5c95ed5d82b07106059eb47d9a215",
+        "bytes": 7916
+      },
+      {
+        "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+        "blob": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae",
+        "identityMatch": true,
+        "regular": 13,
+        "regularMatches": true,
+        "bare": 13,
+        "bareMatches": true,
+        "children": 4,
+        "childrenMatch": true,
+        "expected": 21,
+        "formula": "13+2+2+2+2",
+        "formulaMatches": true,
+        "skipTodoOnly": [],
+        "sha256": "e007c0e6c422ee98d7d13650701d22358d179507c9677306569f196788860730",
+        "bytes": 20084
+      },
+      {
+        "path": "scripts/acceptance/cloud-startup.test.mjs",
+        "blob": "ded31e330bef5e83f00659b4383e41b53afd1b81",
+        "identityMatch": true,
+        "regular": 82,
+        "regularMatches": true,
+        "bare": 84,
+        "bareMatches": true,
+        "children": 0,
+        "childrenMatch": true,
+        "expected": 88,
+        "formula": "82+3+3",
+        "formulaMatches": true,
+        "skipTodoOnly": [],
+        "sha256": "5a5066f771e153d112454456b80efc9ad57a8367d2756fffff0d6140e5e61c34",
+        "bytes": 127436
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "blob": "06dceefec477df850087b47002266e612dddb63a",
+        "identityMatch": true,
+        "regular": 36,
+        "regularMatches": true,
+        "bare": 37,
+        "bareMatches": true,
+        "children": 0,
+        "childrenMatch": true,
+        "expected": 38,
+        "formula": "36+2",
+        "formulaMatches": true,
+        "skipTodoOnly": [],
+        "sha256": "34b918ec6946b1cd29e4aee8b30a741305abd2a3afff3dff63d5320dd3e65172",
+        "bytes": 78998
+      }
+    ],
+    "reasonStrongGateIsNowSupported": "The final fixed source expands to 100=59+22+14+5; 54=13+17+3+21; 126=88+38. Parent tests and awaited child tests are both counted, while assertion loops/hooks do not add registrations. All top-level and child call sites are accounted for; no skip/todo/only test registration was found. This is a source prediction, not an executed result.",
+    "correctionOfEarlierShortcut": "The unchanged channel.test.ts contains 50 direct tests plus fixed 4+3+2 registration loops =59, not 50 total. The final manifest uses the expanded count.",
+    "actualFailureRule": "Syntax/import/runtime failures, missing child registrations, mismatched totals or nonzero exit must remain failed validation. Do not recalculate expectations from a failed run or rewrite its original TAP."
+  },
+  "admissionAndSource": [
+    "Push-only one exact ops branch/message, attempt 1, GitHub-hosted Linux, fixed Node24.22.1/pnpm10.34.3 and expiry; enabled/non-draft complete manifest required. Reviewed draft cannot run as-is.",
+    "Driver content SHA256, workflow Git blob, source G/M/old-ops commit/tree/parents, exact ops-only three control-file diff and exact G-minus-M productPaths/lintPaths are validated.",
+    "Checkout the one fixed G detached before one frozen pnpm install with a fresh store. No original-source mutation, retry with another source, persistent Actions/compile/tsx cache or failed-test substitution is present.",
+    "Before/after install and every validation command, sourceProof validates HEAD/tree/tracked worktree, bound source/common blobs, preserved complete original PG-test prefix and a rebuilt tracked tree through a separate index.",
+    "The run checks the owned loopback database environment and container identity; no production database fallback is accepted. Non-DB unit/type/lint environments strip database targets and shard flags.",
+    "Bound final G/tree, exact product/lint path sets, package registration blob, expiry and integration approval still require final completed manifest review. Root reported G ff385bfd91edcd40c3b3ee398b4b93098e5becbb/tree7b1f2dcafc18918611938cba3716a4237d8a1f64; this template review does not claim a fresh read of the final manifest."
+  ],
+  "runtimeOutcomeTruthfulness": [
+    "Each of three fixed complete unit groups catches its own failure, records it, and continues to remaining units/lint/PG/types. Each independent lint/type command also retains its own real outcome.",
+    "Full PG test file must run with 15 exact tests; schema bootstrap and target verification use a fresh isolated database before the tests. No synthetic RED or expected unknown failure is claimed.",
+    "Root changed-source oxlint, existing desktop lint, existing lint-ui, and three typechecks are included; desktop source is not assumed covered by root ignored paths.",
+    "Commands retain actual code/signal/timeout information. Process group timeouts are failures. Full stdout/stderr buffers are screened for temporary credentials then archived separately with byte length/SHA256 before interpretation, and emitted in complete encoded frames for preservation.",
+    "Credential-screening failure is blocking; sensitive originals must not be exported. Install/Docker setup output is workflow output, not falsely described as one of the per-validation-command archived streams.",
+    "Node checkSummary must accept exit0, nonzero tests, all-pass and zero skip/todo/cancel/fail; exact static count is an additional condition. Raw output remains available before parsing failure.",
+    "A failed command cannot be made successful by a summary. Final success requires every unit, every check, PG and final source proof. A source-integrity/admission failure may block later execution rather than run unbound source.",
+    "Cleanup failures produce nonzero exit, independent of successful test summaries."
+  ],
+  "ownedResourcesAndClosure": [
+    "Container/network names include this job identity and carry exact issue/run/attempt/SHA labels; start rejects existing named resources. Temporary PostgreSQL credentials are masked and stored only in runner-private files.",
+    "Database binds loopback127.0.0.1:5432; server version17, fresh schema state, actual container/image identity and target are recorded. postgres:17 is not a digest pin: minor/image identity must be read from the actual receipt, not inferred from this review.",
+    "Cleanup is available outside normal admission so expiration does not prevent it. It inspects exact owned labels, stops/removes only that container, removes its actual volumes and verifies their absence.",
+    "Network removal requires the exact owned labels and no remaining container endpoints. No host-wide prune/adoption or unrelated resource deletion is present.",
+    "Cleanup deletes private database environment/secret files. errors[] must be empty; both container and network absence are verified. Always cleanup and archive steps run after a successful prepare even when later steps fail.",
+    "Workflow has contents:read and only installs with the scoped repository token; no production/account credential or dispatch permission is requested. Concurrency does not cancel unrelated work.",
+    "Closed workflow differs in its false job condition and comment only. Root must close the entry after the one admitted run; no reviewer ref write or run has occurred."
+  ],
+  "limits": [
+    "No Node, PG, Docker, YAML-engine or Actions execution performed by reviewer.",
+    "No new original Actions log, artifact ZIP or credential read.",
+    "No branch/ref changes or resources started.",
+    "Static no-blocker is permission to proceed with a properly bound reviewable validation candidate under existing task authorization, not proof of tests passing.",
+    "Formal Native441/Web331 budget still FAIL; early-live effectiveness and final #1512 production trace acceptance remain separate gates."
+  ]
+}

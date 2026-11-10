@@ -1,0 +1,106 @@
+{
+  "schema": "mikka.issue1512.native-early-live.failure-fix.v1",
+  "createdAt": "2026-11-10T06:19:01Z",
+  "repository": "alexj11324/Mikka",
+  "candidateParent": {
+    "commit": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "rule": "G2 must normally inherit G. Preserve this failed run and the prior source."
+  },
+  "failure": {
+    "runId": 42766089161,
+    "attempt": 1,
+    "conclusion": "failure",
+    "reader": "/root/native_pending_final exclusively read Actions originals; this agent used only frozen Git copies",
+    "inputs": [
+      {
+        "label": "TS TAP",
+        "sha": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+        "bytes": 24452,
+        "sha256": "d17dc68c6af17babc648e3cb78986382007a333223a6c3d1417563dca984a100"
+      },
+      {
+        "label": "Renderer TAP",
+        "sha": "5667f9518de8521a415a606aa9c00741f7754701",
+        "bytes": 28435,
+        "sha256": "36d4d9d95378f7f4fbff9c0b5f8fb9068e943be0832342b337406a5ed98d6e82"
+      },
+      {
+        "label": "Root types stdout",
+        "sha": "9a0625f45efe4cb149583f5f1ee0e9e264c45c80",
+        "bytes": 311,
+        "sha256": "2878c52d4492904ff795053b2151f8aeae553a20974ca328d60508747326fd61"
+      },
+      {
+        "label": "Frontend types stdout",
+        "sha": "beaa9f8e330ced10a15d18ca5dd02048cd8ed6f0",
+        "bytes": 566,
+        "sha256": "6926e08ac553a2e630a5af40458fc2eb1a1666bd0a00a364e426fb4a7a50690f"
+      },
+      {
+        "label": "Desktop types stdout",
+        "sha": "698911638c5d8ab286a8dc7e61b00d23d87d87fa",
+        "bytes": 457,
+        "sha256": "984408a322337b6b21248effd223bd1a2963e330c96039d80b33b4115bc58908"
+      }
+    ]
+  },
+  "files": [
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "base": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+      "bytes": 18598,
+      "sha256": "4d55bb93c825c9ebd57f0a73f60bc3a98073ac295b7d6f22effaca5a90982979"
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "base": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+      "sha": "dd831e0e657d00de9210e39194a926b4e977ec56",
+      "bytes": 2462,
+      "sha256": "a30f8d08c655a807ea46048bf517aaf74461e317b5e3d5bd9959573e6cd97161"
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "base": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "sha": "c9059d2c8be5122681f5c4657889b01633ed3736",
+      "bytes": 20020,
+      "sha256": "3d2ba4f08b855c1e6fae7afd5f0b98aaffa23c8a2d8dd72d2d33a6b603357b6e"
+    }
+  ],
+  "rationale": [
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "observed": "Renderer 54 tests / 47 pass / 7 fail. First cause TypeError: useSWR is not a function at Reads in the actual bundled application; downstream undefined preparations are consequences.",
+      "cause": "The test external resolver used require.resolve for swr, selecting its CommonJS export. The generated ESM default import received the exports object rather than the useSWR function.",
+      "change": "Use fileURLToPath(import.meta.resolve('swr')) for every swr external, retaining the import export-condition and shared SWR module instance. React external resolution and every behavioral assertion are unchanged."
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "observed": "All three actual typechecks rejected passing LiveChannelRegistry to the old LiveChannels concrete annotation.",
+      "cause": "The consumer uses only the registry interface subscribe method and object identity as WeakMap key; its three old concrete class annotations were not updated with LiveProvider's proxy.",
+      "change": "Three type-only replacements LiveChannels => LiveChannelRegistry (import, WeakMap key, sharedFeed parameter); executable behavior unchanged."
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "observed": "TS group 100 tests / 98 pass / 2 fail. Old-read-before-ready and no-key incoming push expected two business reads but saw one. Root types additionally reported string not assignable to never at reads.push.",
+      "cause": "The actual channel scheduleFlush has an existing minimum 100 ms. All four new freshness cases advanced the fake clock zero ms and never called refresh; the two positive cases therefore passed without exercising readFresh. Separately assert.deepEqual(reads, []) narrowed the mutable array to never[].",
+      "change": "All four cases advance the original 100 ms debounce and assert refreshCount exactly one before retaining the original business-read expectations 1/2/2/1. Add only a fixture refresh counter; observe/accept/cache logic stays identical. Use reads.length === 0 for the same empty-read assertion without a mutable array narrowing."
+    }
+  ],
+  "preserved": [
+    "All product live timer values and retry policies",
+    "readFresh predicates and proof whitelist",
+    "Existing data reads, SQL windows, five pairs and budgets",
+    "All original behavioral test assertions; new refresh assertion strengthens coverage",
+    "All other files in eaab7746ed888c6b245a47e63dfb37112faf70be except the two named test files"
+  ],
+  "verification": {
+    "executed": false,
+    "status": "Frozen for static review and one actual G2 verification; no PASS claimed",
+    "resourcesStarted": 0,
+    "refsMoved": false,
+    "priorManifest": "eaab7746ed888c6b245a47e63dfb37112faf70be",
+    "commands": "Unchanged groups/typechecks/lints from previous manifest. Include the new changed hook in root lint."
+  }
+}

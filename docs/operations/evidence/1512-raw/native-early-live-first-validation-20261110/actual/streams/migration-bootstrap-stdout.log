@@ -1,0 +1,31 @@
+TAP version 13
+# Created retained migration test database: bootstrap_e907018e71364a3a9fe599883c9868df
+# Created migration test schema: bootstrap_app_acdf9b9f14ea42ab85d940090d2333cd
+# Verified 267 migrations from empty CI schema, current app/workspace columns, rerun ledger, and populated baseline replay (shared)
+# Retained migration test schemas: bootstrap_app_acdf9b9f14ea42ab85d940090d2333cd
+# Subtest: pnpm migrate bootstraps empty shared target and safely reruns
+ok 1 - pnpm migrate bootstraps empty shared target and safely reruns
+  ---
+  duration_ms: 2949.914726
+  type: 'test'
+  ...
+# Created retained migration test database: bootstrap_25cd61e7ac97441dbfcf619129277a15
+# Created migration test schema: bootstrap_app_3efe591331e7427c882cad5506a3cf65
+# Created migration test schema: bootstrap_ws_6a7bd93234d3437f8e0fddf8a310f393
+# Verified 267 migrations from empty CI schema, current app/workspace columns, rerun ledger, and populated baseline replay (split)
+# Retained migration test schemas: bootstrap_app_3efe591331e7427c882cad5506a3cf65, bootstrap_ws_6a7bd93234d3437f8e0fddf8a310f393
+# Subtest: pnpm migrate bootstraps empty separate targets and safely reruns
+ok 2 - pnpm migrate bootstraps empty separate targets and safely reruns
+  ---
+  duration_ms: 2082.469965
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5564.242578

@@ -1,0 +1,155 @@
+{
+  "schema": "issue1512.independent-backend-live-home-hint-review.v1",
+  "author": "/root/independent_final",
+  "status": "STATIC_NO_BLOCKER_FOR_EXACT_FOUR_FILE_BACKEND_CANDIDATE",
+  "repository": "alexj11324/Mikka",
+  "base": {
+    "commit": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a"
+  },
+  "candidateManifest": {
+    "sha": "9298c634e7935b3b898c5e2209dad23e43404ccf"
+  },
+  "files": [
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "baseBlob": "f43f62b4798c971ebae3b52ab2a1db413925bf51",
+      "newBlob": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+      "bytes": 3832,
+      "sha256": "5fafae50e3157eb84664dd503cf3878227e10cddb34518bf445b5c6f4a611249",
+      "readInFull": true,
+      "gitShaAndUtf8BytesAndSha256Verified": true,
+      "baseBlobMatchesExactHProductTree": true
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "baseBlob": "3be4faece94b30d4a7f66ef2d3c8b2ef60134372",
+      "newBlob": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+      "bytes": 2765,
+      "sha256": "f6c0d4263c288fd21729a1fce033ebf8df68a61b2e5a68c6cd02048b7f02fc3d",
+      "readInFull": true,
+      "gitShaAndUtf8BytesAndSha256Verified": true,
+      "baseBlobMatchesExactHProductTree": true
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "baseBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "newBlob": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+      "bytes": 5477,
+      "sha256": "c74f75beb53b16b0ba12ddb6f8d7900076089f8af88344fb7262e8d905f95fdd",
+      "readInFull": true,
+      "gitShaAndUtf8BytesAndSha256Verified": true,
+      "baseBlobMatchesExactHProductTree": true
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "baseBlob": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+      "newBlob": "bbdae2625952b475c3488384bbd48c876887a805",
+      "bytes": 18275,
+      "sha256": "9ab8f45f29d3840277d2573ca7969d4db9f6740cbc3e5cfa1f5feb368ce9ece4",
+      "readInFull": true,
+      "gitShaAndUtf8BytesAndSha256Verified": true,
+      "baseBlobMatchesExactHProductTree": true
+    }
+  ],
+  "scope": "后端same-query routing hint、旧cache授权返回合同与新增真实PG测试源码的独立静态审查；无产品执行、Node/PG运行、新资源、原Actions读取或ref变化。",
+  "reviewedSupportingSources": [
+    {
+      "path": "lib/db/workspace-schema.ts",
+      "sha": "4599664e6d893304cee3858c4097fc0e81a2ddba",
+      "fact": "workspaces.kind为personal|team，role为admin|member；membership主键(workspaceId,userId)。"
+    },
+    {
+      "path": "drizzle/20261101020200_personal_workspace_kind.sql",
+      "sha": "3425bcdd9bce7dafd038d61b708795b36be71ffd",
+      "fact": "真实migration保留mikka_workspaces_personal_owner_unique partial index(kind=personal)。"
+    },
+    {
+      "path": "lib/enterprise/access.ts",
+      "sha": "834c8d940e6a66f0c0a724f6abf80146d60ea6d4",
+      "fact": "selected额外门先查canonical Org link；有link再查current policy；archived/managed-revoked拒绝；enforceSso时继续原principal/session核验。"
+    },
+    {
+      "path": "lib/live/owner-scope.ts",
+      "sha": "962829a3e69f508f93621e897209e408f6ad1d2a",
+      "fact": "既有真实owner routing同样要求active membership+personal+owner匹配且恰好一row。"
+    },
+    {
+      "path": "app/api/live/ticket/route.ts",
+      "sha": "312f16abd669c2f7587a4121e81192ef2ea9a4d1",
+      "fact": "未修改；fresh ticket/session/member/Org授权仍独立执行，早前ecf461源码图已读。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "B1",
+      "result": "PASS_STATIC",
+      "claim": "原malformed header和requested/pin mismatch短路仍在membership查询前，两值null。"
+    },
+    {
+      "id": "B2",
+      "result": "PASS_STATIC",
+      "claim": "只有一处workspaceDb.select；JOIN、WHERE(active reader membership，team或本人owner)、ORDER BY createdAt、cookie/requested/header选择和fallback规则逐字保留；仅投影新增kind/ownerId。没有home SELECT、ensurePersonalWorkspace、ownerLiveScope调用或跨调用memo。"
+    },
+    {
+      "id": "B3",
+      "result": "PASS_STATIC",
+      "claim": "personal route仅从同次active投影中过滤kind===personal && ownerId===reader.id，length===1；0/多null。selected不存在或原enterpriseWorkspaceAllowed返回false时cache和hint同时null；原门异常继续抛出，不吞成授权。"
+    },
+    {
+      "id": "B4",
+      "result": "PASS_STATIC",
+      "claim": "authorizedCacheWorkspace继续返回严格重投影{workspaceId,role}|null；不会把kind/ownerId暴露到原cache合同。返回对象和unavailable均每调用新建，未扩大已完成或dispatch后的授权共享寿命。"
+    },
+    {
+      "id": "B5",
+      "result": "PASS_STATIC",
+      "claim": "desktopBootstrap仅调用一次combined授权函数，保留原Promise.all位置与真实session principal；wire顶层新增liveHomeWorkspaceId:string|null，注释明确仅路由。没有从selected推定home。"
+    },
+    {
+      "id": "B6",
+      "result": "PASS_STATIC",
+      "claim": "旧DB测试5971B完整前缀保留；新增parent内12子例顺序await，包括11真实PG场景与1明确synthetic projection例。原unique index未修改，真实重复personal用23505+精确constraint名验证，synthetic才测试多row防御。"
+    },
+    {
+      "id": "B7",
+      "result": "PASS_STATIC",
+      "claim": "新fixture所有随机IDs在写入前登记t.after；唯一约束失败的duplicateHome也清理。membership status/kind/deletion和selected撤权变更有finally恢复；Org场景在末尾，统一after删除policy/link/org及workspace/member/user。"
+    },
+    {
+      "id": "B8",
+      "result": "PASS_STATIC",
+      "claim": "SQL断言与原helper对比：无Org 2条=membership+selected link；带非SSO Org 3条再加policy。不是额外home查询，静态数目合理；真实计数仍待PG运行。"
+    },
+    {
+      "id": "B9",
+      "result": "PASS_STATIC_WITH_INTEGRATION_GATE",
+      "claim": "新的renderer必须把missing/malformed/nil hint当null，invalid workspace query/401/public config/expiry清空hint；Native已明确此文件由Mac维护。后端本次4文件审查不冒充renderer集成通过。"
+    }
+  ],
+  "coverage": [
+    "owned-team不能当personal",
+    "foreign-personal membership不能当owner home或cache授权",
+    "suspended/deleted home不给hint，selected仍可正常授权",
+    "restored unique home与selected team分离",
+    "cookie fallback与explicit pin原优先级",
+    "malformed/conflicting pin零查询",
+    "unknown/unauthorized target无任意fallback",
+    "cross-reader不能借别人的home",
+    "kind变化和membership变化下一调用新读，无缓存延命",
+    "selected membership撤权清两值",
+    "selected Org archived动态拒绝/恢复，原cachewrapper同步拒绝",
+    "synthetic重复投影明确不冒充能违反PG唯一索引的真实fixture"
+  ],
+  "pendingGates": [
+    "Root在真实隔离PG17/Node24.22.1运行exact bbdae测试；当前15 tests是源码预期，不是已观察结果。",
+    "完整renderer候选的same-instance lifecycle/retirement/hint兼容审查与测试尚未完成；frontend3个已识别边界由Mac定点修复。",
+    "新正式合流及实际Native全量SQL窗口验证尚未进行，H Native441/Web331仍FAIL。临时诊断441/365不是验收。",
+    "不以新增字段或静态query结构宣称生产、端到端覆盖或预算达成。"
+  ],
+  "references": {
+    "causality": "e993556bac59d68d013016f2938d4e3920e4f37c",
+    "rendererDesign": "dc231329aa0717faf3ebcce5eb7fcb2754efd113",
+    "pathMap": "ecf461ccffeb54fb9f645b0247abc7e0b72f12e4"
+  }
+}

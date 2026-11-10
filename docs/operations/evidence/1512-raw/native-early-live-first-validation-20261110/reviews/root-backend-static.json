@@ -1,0 +1,62 @@
+{
+  "schema": "issue1512-backend-live-routing-root-static-review-v1",
+  "at": "2026-11-10 05:38:54 UTC",
+  "base": {
+    "commit": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a"
+  },
+  "manifest": "9298c634e7935b3b898c5e2209dad23e43404ccf",
+  "files": [
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "baseBlob": "f43f62b4798c971ebae3b52ab2a1db413925bf51",
+      "newBlob": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+      "bytes": 3832,
+      "sha256": "5fafae50e3157eb84664dd503cf3878227e10cddb34518bf445b5c6f4a611249"
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "baseBlob": "3be4faece94b30d4a7f66ef2d3c8b2ef60134372",
+      "newBlob": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+      "bytes": 2765,
+      "sha256": "f6c0d4263c288fd21729a1fce033ebf8df68a61b2e5a68c6cd02048b7f02fc3d"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "baseBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "newBlob": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+      "bytes": 5477,
+      "sha256": "c74f75beb53b16b0ba12ddb6f8d7900076089f8af88344fb7262e8d905f95fdd"
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "baseBlob": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+      "newBlob": "bbdae2625952b475c3488384bbd48c876887a805",
+      "bytes": 18275,
+      "sha256": "9ab8f45f29d3840277d2573ca7969d4db9f6740cbc3e5cfa1f5feb368ce9ece4"
+    }
+  ],
+  "decision": "No static blocker in four backend files; runtime/type/PG results still pending.",
+  "findings": [
+    "Expanded membership SELECT retains original active/owner/team WHERE, JOIN, ORDER and selected pin/cookie/fallback semantics.",
+    "authorizedCacheWorkspace reprojects exactly workspaceId/role or null; new routing projection does not escape into cache authorization.",
+    "Both selected cache and home hint are null when selected membership/Org gate fails; bootstrap invokes combined resolver once.",
+    "Home is exactly one active projected personal row owned by the reader; no home lookup/create, query cache or cross-request sharing introduced.",
+    "Live ticket/Enterprise use-site authorization remains untouched. Hint cannot itself authorize data hydration, subscribe capabilities or business actions.",
+    "Original DB test5971-byte prefix is unchanged; appended suite contains actual PG cases plus explicitly synthetic duplicate projection test. Production uniqueness remains enforced, and rejected duplicate fixture ID is included in cleanup.",
+    "Added kind/owner columns can add bytes to each bootstrap membership result. No added SQL statements is a source expectation; zero per-call bytes overhead is not claimed. Whole-window SQL/bytes and actual readiness must be measured."
+  ],
+  "mergeRisk": {
+    "alignment": "Directly supports #1512 additional Native login/startup query requirement using the measured live-connection dependency gap.",
+    "impact": "Changes bootstrap routing metadata and a shared projection; keeps selected authorization and legacy return shape. Frontend is a separate pending review.",
+    "verification": "Exact full diffs and hashes reviewed; isolated PG17 full15 expected tests, wire tests and type checks must actually run before claiming pass.",
+    "rollback": "Normal code revert; no schema/data migration or persisted authority state.",
+    "detection": "New PG pin/role/membership/Org/unique/zero-query assertions and original formal Native full windows remain."
+  },
+  "limits": {
+    "testsExecuted": false,
+    "productionActions": 0,
+    "refsMoved": false,
+    "noProductAcceptanceClaim": true
+  }
+}

@@ -1,0 +1,46 @@
+TAP version 13
+# Read metrics trace: {"measurement":1,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:32:24)","databaseStatements":2,"databaseJsonResultBytes":216,"databaseSocketBytes":1037,"databaseSocketBytesWritten":1079,"actionJsonBytes":69,"socketTrace":{"beforeCount":1,"afterCount":2,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":2,"newInMeasurement":true,"beforeRead":0,"afterRead":1037,"readDelta":1037,"beforeWritten":0,"afterWritten":1079,"writtenDelta":1079,"statements":2}]}}
+# Subtest: disk hydration authority follows actual membership, role, selected workspace and account deletion
+ok 1 - disk hydration authority follows actual membership, role, selected workspace and account deletion
+  ---
+  duration_ms: 645.604379
+  type: 'test'
+  ...
+# {"scenario":"authenticated_cache_scope_gate","databaseStatements":2,"databaseJsonResultBytes":216,"databaseSocketBytes":1037,"databaseSocketBytesWritten":1079,"actionJsonBytes":69}
+# Read metrics trace: {"measurement":2,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:64:24)","databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":1226,"databaseSocketBytesWritten":1398,"actionJsonBytes":292,"socketTrace":{"beforeCount":2,"afterCount":3,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":1,"newInMeasurement":false,"beforeRead":1181,"afterRead":1740,"readDelta":559,"beforeWritten":4448,"afterWritten":5430,"writtenDelta":982,"statements":2},{"socket":3,"newInMeasurement":true,"beforeRead":0,"afterRead":667,"readDelta":667,"beforeWritten":0,"afterWritten":416,"writtenDelta":416,"statements":1}]}}
+# Read metrics trace: {"measurement":3,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:65:24)","databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":621,"databaseSocketBytesWritten":1175,"actionJsonBytes":292,"socketTrace":{"beforeCount":3,"afterCount":3,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":1,"newInMeasurement":false,"beforeRead":1740,"afterRead":1802,"readDelta":62,"beforeWritten":5430,"afterWritten":5623,"writtenDelta":193,"statements":1},{"socket":3,"newInMeasurement":false,"beforeRead":667,"afterRead":1226,"readDelta":559,"beforeWritten":416,"afterWritten":1398,"writtenDelta":982,"statements":2}]}}
+# Read metrics trace: {"measurement":4,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:66:26)","databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":621,"databaseSocketBytesWritten":1175,"actionJsonBytes":292,"socketTrace":{"beforeCount":3,"afterCount":3,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":1,"newInMeasurement":false,"beforeRead":1802,"afterRead":1864,"readDelta":62,"beforeWritten":5623,"afterWritten":5816,"writtenDelta":193,"statements":1},{"socket":3,"newInMeasurement":false,"beforeRead":1226,"afterRead":1785,"readDelta":559,"beforeWritten":1398,"afterWritten":2380,"writtenDelta":982,"statements":2}]}}
+# Read metrics trace: {"measurement":5,"caller":"at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:71:27)","databaseStatements":3,"databaseJsonResultBytes":147,"databaseSocketBytes":720,"databaseSocketBytesWritten":1175,"actionJsonBytes":295,"socketTrace":{"beforeCount":3,"afterCount":3,"unrepresentedStatements":0,"truncated":false,"intervals":[{"socket":1,"newInMeasurement":false,"beforeRead":2980,"afterRead":3638,"readDelta":658,"beforeWritten":8280,"afterWritten":9262,"writtenDelta":982,"statements":2},{"socket":3,"newInMeasurement":false,"beforeRead":1785,"afterRead":1847,"readDelta":62,"beforeWritten":2380,"afterWritten":2573,"writtenDelta":193,"statements":1}]}}
+# Subtest: settings cache restores presentation immediately but revalidates the real current preferences
+ok 2 - settings cache restores presentation immediately but revalidates the real current preferences
+  ---
+  duration_ms: 629.852338
+  type: 'test'
+  ...
+# {"scenario":"settings_notifications_and_prefix_reads","cold":{"databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":1226,"databaseSocketBytesWritten":1398,"actionJsonBytes":292},"warm":{"databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":621,"databaseSocketBytesWritten":1175,"actionJsonBytes":292},"reload":{"databaseStatements":3,"databaseJsonResultBytes":68,"databaseSocketBytes":621,"databaseSocketBytesWritten":1175,"actionJsonBytes":292},"changed":{"databaseStatements":3,"databaseJsonResultBytes":147,"databaseSocketBytes":720,"databaseSocketBytesWritten":1175,"actionJsonBytes":295},"measurement":"real_read_paths_without_hidden_prefetch_or_browser_assets; settings_without_live_coverage_always_revalidate"}
+# Subtest: bootstrap derives only a unique owner Live route from the current cache membership read
+not ok 3 - bootstrap derives only a unique owner Live route from the current cache membership read
+  ---
+  duration_ms: 21.769977
+  type: 'test'
+  location: '/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:1:6223'
+  failureType: 'testCodeFailure'
+  error: 'personal workspace admits only its owner'
+  code: '23514'
+  name: 'error'
+  stack: |-
+    /home/runner/work/Mikka/Mikka/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-scope.db.test.ts:114:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 2
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1518.255432

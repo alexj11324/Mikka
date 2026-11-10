@@ -1,0 +1,573 @@
+{
+  "schema": "issue1512-green-static-node-test-registration-counts/v1",
+  "status": "STATIC EXPECTATION ONLY; NOT EXECUTED",
+  "files": [
+    {
+      "path": "lib/live/channel.test.ts",
+      "regular": 50,
+      "topLoops": [
+        {
+          "values": [
+            "other-kind",
+            "own-kind",
+            "reconnect",
+            "before-open"
+          ],
+          "count": 4
+        },
+        {
+          "values": [
+            "capabilities",
+            "kind",
+            "presence"
+          ],
+          "count": 3
+        },
+        {
+          "values": [
+            "undefined",
+            6
+          ],
+          "count": 2
+        }
+      ],
+      "subtests": [],
+      "expected": 59,
+      "blob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+      "bytes": 45859,
+      "sha256": "591ca7d47e4af01661817bac8466fdaeaac240858dc5cf1bac42ba3aa5da3baa",
+      "topLevelDeclarationLines": [
+        78,
+        97,
+        112,
+        134,
+        151,
+        168,
+        187,
+        209,
+        228,
+        243,
+        319,
+        333,
+        352,
+        362,
+        376,
+        386,
+        395,
+        411,
+        423,
+        432,
+        443,
+        453,
+        466,
+        476,
+        498,
+        524,
+        543,
+        556,
+        571,
+        583,
+        596,
+        611,
+        626,
+        638,
+        652,
+        663,
+        675,
+        692,
+        701,
+        711,
+        722,
+        741,
+        754,
+        766,
+        788,
+        816,
+        842,
+        855,
+        883,
+        909
+      ],
+      "bareCallSites": 53,
+      "nestedCallSites": 0,
+      "unexpectedSkipTodoOnly": false
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "regular": 20,
+      "topLoops": [
+        {
+          "values": [
+            "null",
+            "reject"
+          ],
+          "count": 2
+        }
+      ],
+      "subtests": [],
+      "expected": 22,
+      "blob": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "bytes": 19553,
+      "sha256": "44ee90f7e427b700e3f0c7c2254929bd04f4e6e73b8faad41ac20dde984c9f7a",
+      "topLevelDeclarationLines": [
+        88,
+        107,
+        123,
+        136,
+        149,
+        162,
+        176,
+        190,
+        205,
+        219,
+        232,
+        245,
+        263,
+        285,
+        301,
+        333,
+        348,
+        363,
+        375,
+        391
+      ],
+      "bareCallSites": 21,
+      "nestedCallSites": 0,
+      "unexpectedSkipTodoOnly": false
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+      "regular": 7,
+      "topLoops": [
+        {
+          "values": [
+            "owner",
+            "session",
+            "server",
+            "selector",
+            "role",
+            "workspace",
+            "home"
+          ],
+          "count": 7
+        }
+      ],
+      "subtests": [],
+      "expected": 14,
+      "blob": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "bytes": 6704,
+      "sha256": "248b06b5cb84dd1b29f5b7d9ecf233080f14f64c4ff7428742cd60c02bdc5b12",
+      "topLevelDeclarationLines": [
+        30,
+        37,
+        49,
+        68,
+        94,
+        102,
+        117
+      ],
+      "bareCallSites": 8,
+      "nestedCallSites": 0,
+      "unexpectedSkipTodoOnly": false
+    },
+    {
+      "path": "lib/desktop-rpc/wire.test.ts",
+      "regular": 5,
+      "topLoops": [],
+      "subtests": [],
+      "expected": 5,
+      "blob": "2170c999f99b2cfa2f6bbf6667b9de56296a0ada",
+      "bytes": 2409,
+      "sha256": "e3b76e18e90edcbecd5a2dce696742a487623925ee63ece69017572e32534eab",
+      "topLevelDeclarationLines": [
+        5,
+        10,
+        15,
+        23,
+        31
+      ],
+      "bareCallSites": 5,
+      "nestedCallSites": 0,
+      "unexpectedSkipTodoOnly": false
+    },
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "regular": 9,
+      "topLoops": [],
+      "subtests": [
+        {
+          "values": [
+            "/mikka/en/device",
+            "/mikka/en/sign-in?addAccount=1",
+            "/mikka/en/invite/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "/mikka/en/a/public-share"
+          ],
+          "count": 4
+        }
+      ],
+      "expected": 13,
+      "blob": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "bytes": 18364,
+      "sha256": "21bb3903a5f4580e2cb7035dfb31a80166978bf634751687c842722e31c575c7",
+      "topLevelDeclarationLines": [
+        171,
+        183,
+        196,
+        220,
+        238,
+        253,
+        266,
+        282,
+        295
+      ],
+      "bareCallSites": 9,
+      "nestedCallSites": 1,
+      "unexpectedSkipTodoOnly": false
+    },
+    {
+      "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "regular": 6,
+      "topLoops": [],
+      "subtests": [
+        {
+          "values": [
+            "/mikka",
+            "/mikka/en/sign-in",
+            "/mikka/en/a/public-share"
+          ],
+          "count": 3
+        },
+        {
+          "values": [
+            "undefined",
+            "null",
+            "",
+            "not-a-workspace",
+            "42",
+            "{}",
+            "nil UUID",
+            "valid UUID"
+          ],
+          "count": 8
+        }
+      ],
+      "expected": 17,
+      "blob": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "bytes": 7297,
+      "sha256": "2081f0f75b66243de5f92428e9758d88aa4af5ad673eef6128766a7d45fbd373",
+      "topLevelDeclarationLines": [
+        39,
+        61,
+        76,
+        85,
+        103,
+        116
+      ],
+      "bareCallSites": 6,
+      "nestedCallSites": 2,
+      "unexpectedSkipTodoOnly": false
+    },
+    {
+      "path": "apps/desktop/scripts/installed-workspace.test.mjs",
+      "regular": 3,
+      "topLoops": [],
+      "subtests": [],
+      "expected": 3,
+      "blob": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa",
+      "bytes": 7916,
+      "sha256": "d95c69072e11d85647e51c3c7115f9386fb5c95ed5d82b07106059eb47d9a215",
+      "topLevelDeclarationLines": [
+        114,
+        130,
+        150
+      ],
+      "bareCallSites": 3,
+      "nestedCallSites": 0,
+      "unexpectedSkipTodoOnly": false
+    },
+    {
+      "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+      "regular": 13,
+      "topLoops": [],
+      "subtests": [
+        {
+          "values": [
+            "malformed desktop handoff",
+            "Electron bridge"
+          ],
+          "count": 2
+        },
+        {
+          "values": [
+            401,
+            503
+          ],
+          "count": 2
+        },
+        {
+          "values": [
+            "other-owner",
+            "owner"
+          ],
+          "count": 2
+        },
+        {
+          "values": [
+            401,
+            503
+          ],
+          "count": 2
+        }
+      ],
+      "expected": 21,
+      "blob": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae",
+      "bytes": 20084,
+      "sha256": "e007c0e6c422ee98d7d13650701d22358d179507c9677306569f196788860730",
+      "topLevelDeclarationLines": [
+        124,
+        133,
+        142,
+        157,
+        166,
+        173,
+        188,
+        198,
+        214,
+        226,
+        239,
+        259,
+        270
+      ],
+      "bareCallSites": 13,
+      "nestedCallSites": 4,
+      "unexpectedSkipTodoOnly": false
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "regular": 82,
+      "topLoops": [
+        {
+          "values": [
+            "prepared_agent_start",
+            "bootstrap_claude_start",
+            "bootstrap_codex_initialize"
+          ],
+          "count": 3
+        },
+        {
+          "values": [
+            "prepared_agent_start",
+            "bootstrap_claude_start",
+            "bootstrap_codex_initialize"
+          ],
+          "count": 3
+        }
+      ],
+      "subtests": [],
+      "expected": 88,
+      "blob": "ded31e330bef5e83f00659b4383e41b53afd1b81",
+      "bytes": 127436,
+      "sha256": "5a5066f771e153d112454456b80efc9ad57a8367d2756fffff0d6140e5e61c34",
+      "topLevelDeclarationLines": [
+        49,
+        252,
+        264,
+        283,
+        309,
+        327,
+        343,
+        373,
+        392,
+        410,
+        421,
+        439,
+        451,
+        470,
+        484,
+        494,
+        521,
+        531,
+        547,
+        576,
+        595,
+        621,
+        646,
+        655,
+        667,
+        680,
+        688,
+        762,
+        777,
+        798,
+        810,
+        835,
+        860,
+        891,
+        905,
+        920,
+        935,
+        952,
+        976,
+        992,
+        1003,
+        1015,
+        1024,
+        1054,
+        1066,
+        1076,
+        1087,
+        1110,
+        1132,
+        1192,
+        1214,
+        1225,
+        1269,
+        1297,
+        1314,
+        1342,
+        1354,
+        1361,
+        1380,
+        1393,
+        1409,
+        1419,
+        1438,
+        1453,
+        1485,
+        1511,
+        1536,
+        1553,
+        1606,
+        1626,
+        1638,
+        1656,
+        1668,
+        1685,
+        1700,
+        1719,
+        1789,
+        1809,
+        1826,
+        1836,
+        1855,
+        1867
+      ],
+      "bareCallSites": 84,
+      "nestedCallSites": 0,
+      "unexpectedSkipTodoOnly": false
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "regular": 36,
+      "topLoops": [
+        {
+          "values": [
+            [
+              "claude_code",
+              "startup_dispatch_refused",
+              {
+                "code": "githubNotConnected"
+              }
+            ],
+            [
+              "codex",
+              "startup_timeout",
+              null
+            ]
+          ],
+          "count": 2
+        }
+      ],
+      "subtests": [],
+      "expected": 38,
+      "blob": "06dceefec477df850087b47002266e612dddb63a",
+      "bytes": 78998,
+      "sha256": "34b918ec6946b1cd29e4aee8b30a741305abd2a3afff3dff63d5320dd3e65172",
+      "topLevelDeclarationLines": [
+        67,
+        74,
+        84,
+        285,
+        300,
+        328,
+        346,
+        358,
+        387,
+        411,
+        421,
+        435,
+        478,
+        525,
+        542,
+        572,
+        602,
+        622,
+        647,
+        678,
+        716,
+        753,
+        798,
+        818,
+        844,
+        869,
+        906,
+        960,
+        1007,
+        1038,
+        1057,
+        1144,
+        1158,
+        1173,
+        1212,
+        1231
+      ],
+      "bareCallSites": 37,
+      "nestedCallSites": 0,
+      "unexpectedSkipTodoOnly": false
+    }
+  ],
+  "groups": [
+    {
+      "label": "live-routing-ts",
+      "paths": [
+        "lib/live/channel.test.ts",
+        "lib/live/channels.test.ts",
+        "apps/desktop/src/renderer/workspace-live.test.ts",
+        "lib/desktop-rpc/wire.test.ts"
+      ],
+      "formula": "59 + 22 + 14 + 5",
+      "expected": 100
+    },
+    {
+      "label": "renderer-bootstraps",
+      "paths": [
+        "apps/desktop/scripts/workspace-live.test.mjs",
+        "apps/desktop/scripts/renderer-startup.test.mjs",
+        "apps/desktop/scripts/installed-workspace.test.mjs",
+        "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
+      ],
+      "formula": "13 + 17 + 3 + 21",
+      "expected": 54
+    },
+    {
+      "label": "startup-and-template-validators",
+      "paths": [
+        "scripts/acceptance/cloud-startup.test.mjs",
+        "scripts/e2b/validate-template-subscriptions.test.mjs"
+      ],
+      "formula": "88 + 38",
+      "expected": 126
+    }
+  ],
+  "method": [
+    "Count each explicit top-level node:test registration.",
+    "Expand only the source's fixed literal arrays which register top-level cases or awaited t.test children; ordinary loops inside assertions do not add tests.",
+    "Include named parent tests as well as their registered child tests. Hooks and file setup helpers do not add cases.",
+    "All bare test call sites and all t.test child call sites match the accounted source forms; no skip/todo/only registration is present.",
+    "Final source binding must match these exact test blobs. Actual node:test TAP totals, all-pass, no skipped/todo/cancelled, real exit0 and before/after source proofs remain mandatory."
+  ],
+  "limits": [
+    "This is not a Node execution or a success result.",
+    "A syntax/import/runtime failure may produce a different actual count and must remain a failed validation, not a reason to rewrite its raw TAP or infer missing cases."
+  ]
+}

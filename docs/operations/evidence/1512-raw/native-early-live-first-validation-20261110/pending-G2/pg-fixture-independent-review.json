@@ -1,0 +1,99 @@
+{
+  "schema": "mikka.issue1512.independent-pg-fixture-repair-review.v1",
+  "reviewer": "/root/independent_final",
+  "repository": "alexj11324/Mikka",
+  "decision": "STATIC_NO_BLOCKER_FOR_EXACT_PG_TEST_ONLY_REPAIR; REAL_PG_EXECUTION_PENDING",
+  "candidate": {
+    "path": "tests/read-cache-scope.db.test.ts",
+    "base": "bbdae2625952b475c3488384bbd48c876887a805",
+    "sha": "ee59feba1e29769805806ec6e166abbc65994233",
+    "bytes": 18719,
+    "sha256": "8bdc39aacac759baf1bf922824145caecd49a52d74af2c2b68246b1808f785ea",
+    "parentSource": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "parentTree": "7b1f2dcafc18918611938cba3716a4237d8a1f64"
+  },
+  "sourceEvidence": {
+    "guard": {
+      "path": "drizzle/20261109035010_team_entitlements.sql",
+      "sha": "f4bde1c93a54c5694ae9e0c5aaa96c6a142a8f17",
+      "bytes": 2267,
+      "sha256": "6b38bc045fc8125ae4dc27b1a8b7be87ac902d8997cfedd0fbad2644bdedfa45",
+      "verifiedInActualGTree": true
+    },
+    "personalOwnerUniqueIndex": "3425bcdd9bce7dafd038d61b708795b36be71ffd",
+    "priorBackendReview": "9265500119ea12b3e50ee9a8f3e3b3455e8eafe0"
+  },
+  "actualBefore": {
+    "runId": 42766089161,
+    "attempt": 1,
+    "tap": {
+      "sha": "f00a7cddc8e40a62a6b6b397650e8cb28d99c9c2",
+      "bytes": 5904,
+      "sha256": "b68b22ce3e702f47bcdcff9239d7e55003b8030bb7fdcb6a0a6d03a2d6d95305"
+    },
+    "counts": {
+      "tests": 3,
+      "pass": 2,
+      "fail": 1
+    },
+    "failure": {
+      "test": "bootstrap derives only a unique owner Live route from the current cache membership read",
+      "sourceLine": 114,
+      "code": "23514",
+      "message": "personal workspace admits only its owner"
+    },
+    "limits": "The invalid setup failed before any of the twelve added child tests began. The earlier kind-change child was not executed; its impossibility is separately established by the exact installed trigger, not presented as a second observed failure."
+  },
+  "changes": [
+    {
+      "item": "Legal fixture setup and explicit foreign-personal rejection",
+      "fact": "Remove only the attempted owner-reader membership in peer-owned foreignHome from the multi-row setup INSERT. Retain the genuine peer owner membership and all selected/team/home fixture rows. Inside the first child, execute that same forbidden INSERT under assert.rejects with actual SQLSTATE23514 and exact trigger message. Subsequent cache/home reads still assert no route while own home is suspended, selected cache retains member role, and no extra membership/Organization statements are added.",
+      "coverageLimit": "The real PG case now proves the database rejects this illegal membership and that the foreign target is unavailable. It does not claim to have seeded or exercised an active corrupt personal peer row. The separately labelled synthetic projection still tests foreign/team filtering."
+    },
+    {
+      "item": "Immutable kind contract",
+      "fact": "Replace the unsupported personal→team UPDATE and reverse UPDATE with assert.rejects on the actual23514 immutability guard. The same reader then still receives the original home and selected member role, with2 membership/Organization reads. Count(*) remains2 owner-owned workspaces, proving this routing read did not create a replacement.",
+      "coverageLimit": "A kind transition is not a valid runtime state under this schema. Team/foreign routing exclusion remains explicitly covered by the synthetic projection and the other legal PG scenarios."
+    }
+  ],
+  "constraintIntegrity": {
+    "noTriggerOrIndexDisabled": true,
+    "noSchemaChange": true,
+    "noProductChange": true,
+    "personalMembershipCode": "23514",
+    "personalMembershipMessage": "personal workspace admits only its owner",
+    "kindMutationCode": "23514",
+    "kindMutationMessage": "workspace kind and personal ownership are immutable",
+    "noInventedConstraintField": "Both23514 errors come from RAISE EXCEPTION without a CONSTRAINT field; assertions correctly omit it.",
+    "uniquePersonalConstraintUnchanged": "The separate actual duplicate-home test still expects23505 and mikka_workspaces_personal_owner_unique."
+  },
+  "testReview": {
+    "originalPrefixBytes": 5971,
+    "originalPrefixGitSha": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+    "expectedOriginalPrefix": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+    "topLevelCount": 3,
+    "awaitedChildren": 12,
+    "totalExpected": 15,
+    "syntheticChildCount": 1,
+    "realPgChildCount": 11,
+    "allTwelveChildrenRead": true,
+    "remainingScenarios": "Same authorized selection and role shape; cookie/pin precedence; malformed/conflicting pins with zero statements; other-reader/unknown-target rejection; fresh home suspension/restoration; home membership delete/reinsert; selected membership revocation; per-call Organization archive policy.",
+    "cleanup": "t.after is registered before insertion and retains all fixture IDs, including failed duplicateHome. Membership suspension/delete cases retain finally restoration. The repaired rejected statements are individual pool queries outside an explicit transaction, so the next query is not left in an aborted transaction.",
+    "actualResult": "NOT_EXECUTED",
+    "queryCountClaims": "2/3/0/1 expectations are preserved or strengthened as shown by source. New PG counts are not yet observed."
+  },
+  "risk": {
+    "occurrence": 10,
+    "impact": 4,
+    "score": 40,
+    "scope": "Invalid new validation fixture, not a production defect.",
+    "basis": "The exact always-on personal-owner and immutable-kind triggers deterministically reject the attempted fixture operations; the first rejection is already present in actual TAP."
+  },
+  "reviewCorrection": "The earlier backend static review read the unique-owner migration but did not account for the later existing immutability/membership guard migration when judging the new fixture. This review explicitly binds that migration and corrects the fixture assumptions without weakening the database or product authority checks.",
+  "limits": [
+    "Only frozen Git TAP and source were read; original Actions reader remains Native.",
+    "No Node/PG execution, new resource, source mutation or ref change by reviewer.",
+    "No formal Native or production acceptance success follows from this test-only static decision.",
+    "Final candidate must bind ee59feba exactly and preserve the prior failed evidence."
+  ]
+}

@@ -1,0 +1,6 @@
+
+> @mikka/desktop@0.1.2 lint /home/runner/work/Mikka/Mikka/apps/desktop
+> oxlint --deny-warnings -c oxlint.json src scripts
+
+Found 0 warnings and 0 errors.
+Finished in 14ms on 117 files with 96 rules using 4 threads.

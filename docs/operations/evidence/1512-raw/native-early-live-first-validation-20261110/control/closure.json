@@ -1,0 +1,20 @@
+{
+  "schema": "issue1512-cp58-g1-closure/v1",
+  "source": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+  "activeCommit": "063cf037560c750d87aa93818bd5b58bdfc78d69",
+  "closedCommit": "6d7f36ea3c6b918f613cf22e848ed52d413d2bd6",
+  "runId": 42766253819,
+  "jobId": 129663381273,
+  "job": {
+    "id": 129663381273,
+    "head_sha": "6d7f36ea3c6b918f613cf22e848ed52d413d2bd6",
+    "status": "completed",
+    "conclusion": "skipped",
+    "runner_name": null,
+    "steps": []
+  },
+  "closedManifest": "55382bad571c63f4a76aa7462b31d4256da237df",
+  "closedWorkflow": "4961e05d943593c68d184b330ff402f3599b09bf",
+  "basedOnFrozenReview": "50b01c430f36bc3703669496375086da3ffdb479",
+  "limits": "Historical closure of the first admitted G validation entry. This is not a fresh assertion that the ops ref cannot later move for a separately authorized G2 run."
+}

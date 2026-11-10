@@ -1,0 +1,299 @@
+{
+  "schema": "issue1512-live-routing-controller-template-self-review/v1",
+  "status": "STATIC TEMPLATE SELF-CHECK; NOT ACTIVATED, NOT NODE-EXECUTED, NOT A PRODUCT TEST PASS",
+  "candidateControls": {
+    "controller": {
+      "blob": "5a324636acd4371726c62f90d1718ac1f3e663f3",
+      "bytes": 31274,
+      "sha256": "c19dcf4fc89e0856c49f94b606194d7f6261aaee53b4af96c4c7f3521155fd17"
+    },
+    "manifestTemplate": {
+      "blob": "5928f0325fcd376d8da2dd758fe894910fe2d15a",
+      "bytes": 8851,
+      "sha256": "17d539ba46a7e18ff425ba4f179bbdd2c9b15b93a6a80a8cb9c39490ee9eaebb"
+    },
+    "activeWorkflowDraft": {
+      "blob": "ea0877277da2b470be1b52fa7411ca84f48e3d0c",
+      "bytes": 3895,
+      "sha256": "eeebcee70e157c044427e0a520a8e61f3bfe30468a4e453fb82217e3bed6b1a3"
+    },
+    "closedWorkflow": {
+      "blob": "4961e05d943593c68d184b330ff402f3599b09bf",
+      "bytes": 3618,
+      "sha256": "477daa6c6be8ef513e145634f382ab88250cc1a67a92b473ec46c5fa0af2deab"
+    }
+  },
+  "merge": {
+    "sha": "9238b7092a39fce7edde2e488aef516c0b544677",
+    "tree": "03712f2c1ca03ee45e61e124bd430fc9d1a377c9",
+    "parents": [
+      "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "ab2d00a43a79d35380b4d2db9014a3792fea63ca"
+    ]
+  },
+  "previousOps": {
+    "sha": "a4f88bb178f893eee979bdf3f34262e0f8f661c5",
+    "tree": "8c2f71d1a87654072a939d64e6754ef22c2b19da"
+  },
+  "backendBaseCompatibilityWithMerge": [
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "baseBlob": "f43f62b4798c971ebae3b52ab2a1db413925bf51",
+      "mergeBlob": "f43f62b4798c971ebae3b52ab2a1db413925bf51",
+      "matches": true
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "baseBlob": "3be4faece94b30d4a7f66ef2d3c8b2ef60134372",
+      "mergeBlob": "3be4faece94b30d4a7f66ef2d3c8b2ef60134372",
+      "matches": true
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "baseBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "mergeBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "matches": true
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "baseBlob": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+      "mergeBlob": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+      "matches": true
+    }
+  ],
+  "sourceUnbound": {
+    "enabled": false,
+    "draft": true,
+    "sourceSha": null,
+    "sourceTree": null,
+    "expiry": null,
+    "unresolvedSourceFiles": [
+      "lib/live/channel.test.ts",
+      "lib/live/channels.test.ts",
+      "apps/desktop/src/renderer/workspace-live.test.ts",
+      "lib/desktop-rpc/wire.test.ts",
+      "apps/desktop/scripts/workspace-live.test.mjs",
+      "apps/desktop/scripts/installed-workspace.test.mjs",
+      "apps/desktop/scripts/renderer-startup.test.mjs",
+      "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+      "scripts/acceptance/cloud-startup.test.mjs",
+      "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "scripts/acceptance/run-observability-browser.mjs",
+      "scripts/acceptance/run-observability-browser.test.mjs",
+      "scripts/e2b/validate-template-subscriptions.mjs"
+    ],
+    "productPathsAwaitFinalGitDiff": true,
+    "lintPathsAwaitFinalGitDiff": true,
+    "frontendManifestPending": true
+  },
+  "commandPlan": [
+    {
+      "label": "live-routing-ts",
+      "executable": "node",
+      "args": [
+        "--test-reporter=tap",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/live/channel.test.ts",
+        "lib/live/channels.test.ts",
+        "apps/desktop/src/renderer/workspace-live.test.ts",
+        "lib/desktop-rpc/wire.test.ts"
+      ],
+      "kind": "node:test TAP; actual totals required and no skip/todo/cancel/fail"
+    },
+    {
+      "label": "renderer-bootstraps",
+      "executable": "node",
+      "args": [
+        "--test-reporter=tap",
+        "--test",
+        "apps/desktop/scripts/workspace-live.test.mjs",
+        "apps/desktop/scripts/installed-workspace.test.mjs",
+        "apps/desktop/scripts/renderer-startup.test.mjs",
+        "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
+      ],
+      "kind": "node:test TAP; actual totals required and no skip/todo/cancel/fail"
+    },
+    {
+      "label": "startup-and-template-validators",
+      "executable": "node",
+      "args": [
+        "--test-reporter=tap",
+        "--test",
+        "scripts/acceptance/cloud-startup.test.mjs",
+        "scripts/e2b/validate-template-subscriptions.test.mjs"
+      ],
+      "kind": "node:test TAP; actual totals required and no skip/todo/cancel/fail"
+    },
+    {
+      "label": "changed-root-oxlint",
+      "executable": "pnpm",
+      "args": [
+        "exec",
+        "oxlint",
+        "--deny-warnings",
+        "<fixed final non-desktop TS/TSX/MJS paths, including main validators and browser adapter>"
+      ]
+    },
+    {
+      "label": "desktop-source-oxlint",
+      "executable": "pnpm",
+      "args": [
+        "--filter",
+        "@mikka/desktop",
+        "lint"
+      ],
+      "actualScript": "oxlint --deny-warnings -c oxlint.json src scripts",
+      "guard": "Every changed desktop lint path must be inside src/ or scripts/"
+    },
+    {
+      "label": "ui-and-runtime-policy",
+      "executable": "node",
+      "args": [
+        "scripts/lint-ui.mjs"
+      ],
+      "source": "9c2f44bc94cf1fbfe4fa8097caba8afc20b93268"
+    },
+    {
+      "label": "migration-bootstrap",
+      "executable": "node",
+      "args": [
+        "--test-reporter=tap",
+        "--experimental-strip-types",
+        "--test",
+        "tests/migrate-empty-db.test.mjs"
+      ],
+      "env": {
+        "MIGRATION_BOOTSTRAP_CI": "1",
+        "REQUIRE_DB": "1",
+        "allDbTargets": "same owned loopback PG17"
+      }
+    },
+    {
+      "label": "e2e-setup",
+      "executable": "pnpm",
+      "args": [
+        "test:e2e:setup"
+      ]
+    },
+    {
+      "label": "environment-bind",
+      "executable": "node",
+      "args": [
+        "scripts/test-accounts/bootstrap.mjs",
+        "--output",
+        "<private runner state>/green-environment.json"
+      ]
+    },
+    {
+      "label": "cache-scope-pg",
+      "executable": "node",
+      "args": [
+        "--test-reporter=tap",
+        "--import",
+        "tsx",
+        "--import",
+        "./tests/fixtures/activity-runtime.mjs",
+        "--test",
+        "tests/read-cache-scope.db.test.ts"
+      ],
+      "predictedRequiredNodeTests": 15,
+      "actualStatus": "PENDING"
+    },
+    {
+      "label": "root-types",
+      "executable": "pnpm",
+      "args": [
+        "exec",
+        "tsrs",
+        "--noEmit"
+      ],
+      "nodeOptions": "--max-old-space-size=4096"
+    },
+    {
+      "label": "frontend-types",
+      "executable": "pnpm",
+      "args": [
+        "--filter",
+        "@mikka/frontend",
+        "typecheck"
+      ],
+      "nodeOptions": "--max-old-space-size=4096"
+    },
+    {
+      "label": "desktop-renderer-types",
+      "executable": "pnpm",
+      "args": [
+        "--filter",
+        "@mikka/desktop",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.renderer.json"
+      ],
+      "nodeOptions": "--max-old-space-size=4096"
+    }
+  ],
+  "packageGuards": {
+    "mergePackage": "677ab7d4849cbefe1b7dd33ebbc998b17e69ce09",
+    "registeredPackage": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+    "onlyScriptChanged": "test:device-gateway",
+    "dependencyObjectsUnchanged": true,
+    "newRegisteredTests": [
+      "lib/live/channels.test.ts",
+      "apps/desktop/src/renderer/workspace-live.test.ts"
+    ],
+    "newTestsInSameNodeTsxStepAsChannel": true,
+    "wireOriginalDesktopAuthPrefixAndToken": true,
+    "pgOriginalActivityRuntimePrefixAndToken": true,
+    "e2eSetupCommand": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
+    "frontendTypecheckCommand": "tsc --noEmit -p tsconfig.json",
+    "actualRootLint": "oxlint --deny-warnings",
+    "eslintDependencyOrEntry": false,
+    "rootConfigExplicitlyIgnoresDesktop": true,
+    "desktopOwnLintCommandIncluded": true
+  },
+  "staticChecks": {
+    "controllerGitShaAndSha256": true,
+    "templateReferencesControllerAndWorkflow": true,
+    "unitAndTypeArraysEqualTemplate": true,
+    "v8SyntaxParseOnly": "imports removed and import.meta replaced for non-executed async-function parse; this is not Node execution",
+    "noOldRedOrMergeUnitsOrControlDatabaseLogic": true,
+    "originalCacheTestPrefixBinding": {
+      "bytes": 5971,
+      "blob": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd"
+    },
+    "wholeTrackedWorktreeProof": "temporary Git index rebuilt with git add --update and write-tree == fixed source.tree before install, after install, before/after every command and final",
+    "sourceMutationDoesNotTriggerResetOrSilentRepair": "The only force checkout is the initial fixed-source checkout during prepare.",
+    "noCrossCommandOutputSummaryBeforePreservation": "command saves both raw streams with bytes/hash and full base64 frames; callers parse only its returned strings",
+    "failuresStayFailures": "three unit groups, root/desktop lint, policy, PG and three type checks record independent real outcomes; any failed group or final source proof fails the run",
+    "fixedSourceNoSkipRequired": true,
+    "onlyPgPhaseFreshDatabase": true,
+    "unrelatedProductionCredentialsRejectedByNameBeforeStart": true
+  },
+  "cleanup": {
+    "inheritedFromController": "fe3e2611b0babfe8b8e750058bbeba92127fe9a7",
+    "exactBodyAfterOnlyNamespaceAndObsoleteRedEnvironmentRemoval": true,
+    "bodyBytes": 2040,
+    "bodySha256": "e9bb0d9b99b257eaffc16435c43a4309b96792f8f8c7af0b43bad99467e3a9ba",
+    "checks": [
+      "Match exact run/attempt/SHA labels before touching resource",
+      "Stop exact owned container and observe running=false",
+      "Remove exact container with --volumes; every observed volume name must be absent",
+      "Observe container absent",
+      "Require owned network has zero attached containers, remove it and observe absent",
+      "Remove only private temporary database/auth environment files",
+      "Always preserve cleanup receipt and return failure on any cleanup error"
+    ],
+    "workflowAlways": true,
+    "artifactContainsOnlyOriginalsDirectory": true
+  },
+  "remaining": [
+    "Root must supply exact final G commit/tree/parents and complete file binding map, actual changed path list, final lint list and expiry.",
+    "Root must perform final review/admission and create/CAS entry; this agent has not published it.",
+    "No current Node/PG/lint/typecheck result exists for this candidate. Original full-window Native budget failure remains.",
+    "The one extra projection can add row bytes; statement reuse does not establish zero byte cost or Native acceptance."
+  ]
+}

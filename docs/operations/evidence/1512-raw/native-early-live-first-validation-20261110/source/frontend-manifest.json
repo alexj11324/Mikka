@@ -1,0 +1,226 @@
+{
+  "schema": "mikka.issue1512.native-early-live-candidate.v2",
+  "generatedAt": "2026-11-10T05:58:33Z",
+  "repository": "alexj11324/Mikka",
+  "source": {
+    "commit": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "candidateOnly": true,
+    "refsMoved": false,
+    "resourcesStarted": 0
+  },
+  "status": "Source and behavioral counterexamples frozen; no Node/TypeScript/lint execution by this author; no acceptance PASS claimed.",
+  "files": [
+    {
+      "path": "lib/live/channel.ts",
+      "base": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "sha": "61cdf48b28ab9260f5567300f2411cb555b13427",
+      "bytes": 24726,
+      "sha256": "0d103ddf280c92c8a46129b8641938fb794b162a5408dc5b3a4918943bb3bbc6",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/channels.ts",
+      "base": "d459548cbd8785bf2764d23543109b99ae146d18",
+      "sha": "c40864fe9386855994d3a4ece9480639514d85aa",
+      "bytes": 2806,
+      "sha256": "fb1906245cbbff73acf3e1b77ac51a87c764d0b2b104c32536a59599618a8a3b",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/preparation.ts",
+      "base": null,
+      "sha": "7377678b777279de0ab21717749743fcce446d73",
+      "bytes": 6264,
+      "sha256": "d3f457669d5f487e66a9c222b3158dcd30b9f1800bff562ba114d95c06eae2ac",
+      "kind": "product"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "base": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "sha": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+      "bytes": 8326,
+      "sha256": "1d353f65b1670b1b23c3d7ad6f5eeeb48ea2a62356da447bf12f9d7743443a8b",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.ts",
+      "base": null,
+      "sha": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+      "bytes": 2326,
+      "sha256": "09b7ee0c047ced2955cae95176914492e5d0a18b0f7d958bb0c992d0d3a148fa",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "base": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5",
+      "sha": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+      "bytes": 4058,
+      "sha256": "71efe48c2ce5f487bf1a1f697d0103313b57061aa37a7f6552e9d90a16030995",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "base": "c780d381fce0daa9c1646d63c7c099d48d197223",
+      "sha": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+      "bytes": 16378,
+      "sha256": "7f17c4f811b1a654a788348e1fe95528bf4330b941556e00a0bc2378954e26a2",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+      "base": "2463df1257aec4817e0fe625931d1897bb3ccbb7",
+      "sha": "ddeb2420392a0abb233bc3742cd539805424bc13",
+      "bytes": 1083,
+      "sha256": "bb459b49b48d90cb082a0d441def9940c48d2fc86e35a408007f026c15092255",
+      "kind": "product"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace.tsx",
+      "base": "e45052573bb4424f61da35eeaedb5f0a8d80844f",
+      "sha": "25891b5f8d7dc7a5d6b3cd4688789898052855fd",
+      "bytes": 2814,
+      "sha256": "f6f85a6b610d06202f111cb5d67e28e06a354f209865e3b1e3714a173629b04d",
+      "kind": "product"
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "base": null,
+      "sha": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "bytes": 19553,
+      "sha256": "44ee90f7e427b700e3f0c7c2254929bd04f4e6e73b8faad41ac20dde984c9f7a",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+      "base": null,
+      "sha": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "bytes": 6704,
+      "sha256": "248b06b5cb84dd1b29f5b7d9ecf233080f14f64c4ff7428742cd60c02bdc5b12",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "base": null,
+      "sha": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "bytes": 18364,
+      "sha256": "21bb3903a5f4580e2cb7035dfb31a80166978bf634751687c842722e31c575c7",
+      "kind": "test"
+    },
+    {
+      "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "base": "a9a93381269a4078d046464b252851e72d84656c",
+      "sha": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "bytes": 7297,
+      "sha256": "2081f0f75b66243de5f92428e9758d88aa4af5ad673eef6128766a7d45fbd373",
+      "kind": "test"
+    }
+  ],
+  "relatedBackend": {
+    "owner": "/root/native_pending_final",
+    "wireBlob": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+    "bootstrapBlob": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+    "contract": "Top-level liveHomeWorkspaceId:string|null; same authorized membership projection, routing hint only; no new query. Backend owner supplies its exact final manifest."
+  },
+  "beforeEvidence": {
+    "formalHead": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "formalFullLogin": {
+      "native": 441,
+      "web": 331,
+      "result": "FAIL"
+    },
+    "diagnosticLifecycle": "5ea6109ead93772b5ede58170cd20cce067c2be9",
+    "diagnosticProjection": "a5b4c4bd1b3d71d1e9a30ff2978ece47314a18c6",
+    "deltaCausality": "3ba51bc17e91e41addeec42ea94483c475773a09",
+    "snapshotIndependentReview": "e993556bac59d68d013016f2938d4e3920e4f37c",
+    "limits": [
+      "Diagnostic Native441/Web365 does not replace the formal before denominator.",
+      "Web ordinary-login diagnostic lost its first document; no reconstruction.",
+      "Bootstrap response status was before body decode and stale validation, not a measured preparation continuation.",
+      "Earlier connection effectiveness remains unmeasured. Delta reads still need read-begin after coverage; no whitelist expansion."
+    ]
+  },
+  "behavior": [
+    "After existing full bootstrap decode and original generation guard, prepare eligible current URL scopes before setBootstrap; no wait for ready and no additional business action.",
+    "Use the exact same registry/channel that real LiveProvider subscriptions adopt; retain tickets without fake entity subscriptions.",
+    "Prepare current verified selected scope and optional unique owner-home routing hint; fresh actual subscriber scopes never inherit authority from hints.",
+    "Current URL uses new URL(window.location.href) at the continuation; route predicate is the same InstalledWorkspace render whitelist.",
+    "Retire by owner/session/server/selected-role/workspace/home/selector changes and route/expiry/update boundaries; cache adoption is limited to a committed provider lifetime.",
+    "Render creates inert owner. StrictMode cleanup/re-setup uses fresh lifetime, cannot reuse old coverage, and parent retirement reaches fallback registry.",
+    "Equal selected hint confirmation waits for a currently active valid subscriber; historical or invalid subscriptions cannot consume its reservation.",
+    "Zero-key preparation has one visible attempt. Retry/fallback remain for true subscriptions; last real subscriber cancels existing retry/fallback; no new timers or polling.",
+    "Missing/malformed/nil hint from an old server normalizes to null. Invalid selector and public-config/401 clear both routing hints."
+  ],
+  "preserved": [
+    "read-observer proof predicates, readBoundary semantics, five-action snapshot whitelist and native batching",
+    "Actual data action count/arguments, fetch response/body awaits, original error and generation behavior",
+    "Fresh ticket authorization, main native socket limits, native own-origin/credential boundaries",
+    "Original Native lifecycle fixture, query-count windows, first startup, five pairs and SQL budgets",
+    "Existing public/auth, shared, invite, device and workspace routes",
+    "No trace acceptance, production account, model, public main, PR head or entry mutation"
+  ],
+  "testPlan": {
+    "runtime": "Node 24.22.1; pnpm 10.34.3; existing installed dependencies only",
+    "groups": [
+      "node --import tsx --test lib/live/channel.test.ts lib/live/channels.test.ts apps/desktop/src/renderer/workspace-live.test.ts lib/desktop-rpc/wire.test.ts",
+      "node --test apps/desktop/scripts/workspace-live.test.mjs apps/desktop/scripts/installed-workspace.test.mjs apps/desktop/scripts/renderer-startup.test.mjs apps/frontend/scripts/auth-only-bootstrap.test.mjs"
+    ],
+    "typechecks": [
+      "pnpm exec tsrs --noEmit",
+      "pnpm --filter @mikka/frontend typecheck",
+      "pnpm --filter @mikka/desktop exec tsc --noEmit -p tsconfig.renderer.json"
+    ],
+    "lint": [
+      "Root .oxlintrc.json ignores apps/desktop/**; root oxlint changed shared/backend paths is not sufficient for renderer.",
+      "Use existing pnpm --filter @mikka/desktop lint (its own oxlint.json) plus root oxlint --deny-warnings for shared/backend/merged validators/browser paths. Root controls final CI policy commands."
+    ],
+    "registrations": {
+      "rootPackage": "Root owns latest merged package; append lib/live/channels.test.ts and apps/desktop/src/renderer/workspace-live.test.ts after existing lib/live/channel.test.ts in test:device-gateway.",
+      "desktopPackage": "Existing node --test scripts/*.test.mjs automatically includes new integration file; unchanged."
+    },
+    "staticDeclarations": {
+      "registry": 22,
+      "controller": 14,
+      "app": {
+        "topLevel": 9,
+        "subtests": 4
+      },
+      "startup": {
+        "topLevel": 6,
+        "subtests": 11
+      },
+      "installedWorkspace": {
+        "topLevel": 3,
+        "subtests": 0
+      },
+      "authOnly": {
+        "topLevel": 13,
+        "subtests": 8
+      }
+    },
+    "redOption": {
+      "required": false,
+      "command": "node --test --test-name-pattern='^the actual App prepares before the first workspace read' apps/desktop/scripts/workspace-live.test.mjs",
+      "reason": "Same test entry imports existing App, actual platform/bootstrap/LiveProvider and a fixture workspace. Old App can compile and perform its normal read; the expected behavioral failure is firstReads[0].tickets 0 !== 1. No missing new export is used as failure evidence. Not executed. Root may use already frozen actual diagnosis as the before instead."
+    },
+    "execution": "Not executed; actual full TAP and type/lint outputs must be archived before any claim. No new resource requested."
+  },
+  "unchangedRegressionFiles": [
+    {
+      "path": "lib/live/channel.test.ts",
+      "sha": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc"
+    },
+    {
+      "path": "apps/desktop/scripts/installed-workspace.test.mjs",
+      "sha": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa"
+    },
+    {
+      "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+      "sha": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae"
+    }
+  ],
+  "supersedes": [
+    "378133e3e36da0bf94ba433cf66aac22158b4107",
+    "6fd884d94c0838483de4f5debcc5827139b22d5b"
+  ]
+}

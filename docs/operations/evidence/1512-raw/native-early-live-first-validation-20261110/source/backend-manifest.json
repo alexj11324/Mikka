@@ -1,0 +1,137 @@
+{
+  "schema": "issue1512-backend-bootstrap-live-routing-hint/v1",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "base": {
+    "commit": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a"
+  },
+  "files": [
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "baseBlob": "f43f62b4798c971ebae3b52ab2a1db413925bf51",
+      "newBlob": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+      "bytes": 3832,
+      "sha256": "5fafae50e3157eb84664dd503cf3878227e10cddb34518bf445b5c6f4a611249"
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "baseBlob": "3be4faece94b30d4a7f66ef2d3c8b2ef60134372",
+      "newBlob": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+      "bytes": 2765,
+      "sha256": "f6c0d4263c288fd21729a1fce033ebf8df68a61b2e5a68c6cd02048b7f02fc3d"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "baseBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "newBlob": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+      "bytes": 5477,
+      "sha256": "c74f75beb53b16b0ba12ddb6f8d7900076089f8af88344fb7262e8d905f95fdd"
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "baseBlob": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+      "newBlob": "bbdae2625952b475c3488384bbd48c876887a805",
+      "bytes": 18275,
+      "sha256": "9ab8f45f29d3840277d2573ca7969d4db9f6740cbc3e5cfa1f5feb368ce9ece4"
+    }
+  ],
+  "diffBlob": "8c97ec080ea859fc696fce9dacaff569d2fb71b4",
+  "wire": {
+    "field": "liveHomeWorkspaceId",
+    "type": "string | null",
+    "scope": "routing hint only",
+    "selected": "existing cacheWorkspace.workspaceId",
+    "legacyMissingFieldHandling": "renderer owner: null"
+  },
+  "behavior": [
+    "One fresh membership SELECT with the same WHERE, JOIN and ORDER; project kind and ownerId in that SELECT.",
+    "Only active memberships selected by that query may contribute a hint; kind=personal and ownerId=reader.id must have exactly one row, otherwise null.",
+    "Selected malformed pin and requested/pin mismatch retain zero-query rejection.",
+    "Existing selection, cookie and fallback semantics remain; selected membership and selected Organization policy must pass before either field is returned.",
+    "authorizedCacheWorkspace retains the exact two-field object or null runtime contract; expanded query row is never returned directly.",
+    "No cross-call memo, in-flight sharing, additional home SELECT, workspace creation or reuse of this routing hint as data/ticket authority.",
+    "Live ticket endpoint and its fresh session/workspace/Organization checks are unchanged.",
+    "Bootstrap consumes the combined result once; it does not call the legacy wrapper again."
+  ],
+  "staticInvariants": {
+    "membershipWhereAndOrderUnchanged": true,
+    "selectionCookieFallbackUnchanged": true,
+    "oldDbTestWholePrefixUnchanged": true,
+    "membershipSelectCount": 1,
+    "enterpriseGateCallCount": 1,
+    "queryCacheCalls": 0
+  },
+  "unchangedInBase": [
+    {
+      "path": "app/api/live/ticket/route.ts",
+      "blob": "312f16abd669c2f7587a4121e81192ef2ea9a4d1"
+    },
+    {
+      "path": "lib/enterprise/live-authority.ts",
+      "blob": "c10f1d294945ceb2122b2094cd53ef738943a40e"
+    },
+    {
+      "path": "lib/live/owner-scope.ts",
+      "blob": "962829a3e69f508f93621e897209e408f6ad1d2a"
+    },
+    {
+      "path": "lib/workspace-selection.ts",
+      "blob": "058c9cc0855614cd2fa21067fe823a850390c11a"
+    },
+    {
+      "path": "lib/enterprise/access.ts",
+      "blob": "834c8d940e6a66f0c0a724f6abf80146d60ea6d4"
+    },
+    {
+      "path": "tests/fixtures/activity-runtime.mjs",
+      "blob": "1f510854af9306cfb6b73b274d73a398f2bdfa05"
+    },
+    {
+      "path": "tests/helpers/read-metrics.ts",
+      "blob": "5c836b5b3663ba8152319f92bc603a7fcc545b90"
+    },
+    {
+      "path": "drizzle/20261101020200_personal_workspace_kind.sql",
+      "blob": "3425bcdd9bce7dafd038d61b708795b36be71ffd"
+    }
+  ],
+  "tests": {
+    "sourcePath": "tests/read-cache-scope.db.test.ts",
+    "originalPrefixBytes": 5971,
+    "addedParent": 1,
+    "addedSubtests": 12,
+    "addedRealPgScenarios": 11,
+    "addedSyntheticProjectionScenarios": 1,
+    "expectedTotalNodeTests": 15,
+    "expectedTotalIsNotAnObservation": true,
+    "sqlExpectation": "Compare combined bootstrap with the original authorizedCacheWorkspace entry: unchanged membership+selected Org-link SELECTs (2 without Org, 3 with linked non-SSO Org).",
+    "duplicateBoundary": "Production migration has personal-owner partial UNIQUE index. Real PG asserts SQLSTATE23505 and exact constraint name; synthetic active projections alone exercise 0/multiple fail-closed logic. No schema/index edits.",
+    "fixtureCleanup": "Unique fixed IDs registered in t.after before inserts; duplicate insert ID included; home status/kind/deletion/selected suspension restored in finally; Organization policy/link/org, workspace members/workspaces and users removed.",
+    "targetCommand": "REQUIRE_DB=1 MIKKA_READ_METRICS_TRACE=1 node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/read-cache-scope.db.test.ts",
+    "packageScriptSource": {
+      "path": "package.json",
+      "blob": "4b0b4d88bfa19cc2fe9a792a415d89a247a27e56",
+      "script": "test:activity-actor-db"
+    },
+    "runtimeStatus": "NOT EXECUTED: Root will bind these exact candidate sources to one isolated PG17/Node validation with renderer.",
+    "preflightOrProductPassClaim": false
+  },
+  "limits": [
+    "No performance/SQL budget success is claimed from this patch alone.",
+    "H formal complete login Native441/Web331 remains FAIL; instrumented diagnostic441/365 also FAIL.",
+    "This backend only supplies the route needed by the reviewed early-Live connection hypothesis; renderer must acquire/adopt the exact registry scope and fresh ticket.",
+    "No original acceptance window, five-pair fixture, unknown count, auth principal or SQL budget is modified."
+  ],
+  "evidence": {
+    "diagnosticLifecycle": "5ea6109ead93772b5ede58170cd20cce067c2be9",
+    "diagnosticFiveJson": "5fb9bd39d47f2f7ae81405a5b0d83d8ba49a7baa",
+    "causalAnalyzerOutput": "a5b4c4bd1b3d71d1e9a30ff2978ece47314a18c6",
+    "independentlyRebuiltSnapshotPairs": "e993556bac59d68d013016f2938d4e3920e4f37c"
+  },
+  "publication": {
+    "gitBlobsOnly": true,
+    "refsChanged": false,
+    "resourcesStarted": false
+  }
+}

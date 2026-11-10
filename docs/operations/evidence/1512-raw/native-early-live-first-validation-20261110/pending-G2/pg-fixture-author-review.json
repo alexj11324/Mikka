@@ -1,0 +1,160 @@
+{
+  "schema": "issue1512-cache-scope-pg-fixture-fix-review/v1",
+  "status": "SOURCE_READY; actual corrected PG run pending",
+  "source": {
+    "baseCommit": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "baseTree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "path": "tests/read-cache-scope.db.test.ts",
+    "baseBlob": "bbdae2625952b475c3488384bbd48c876887a805",
+    "newBlob": "ee59feba1e29769805806ec6e166abbc65994233",
+    "newBytes": 18719,
+    "newSha256": "8bdc39aacac759baf1bf922824145caecd49a52d74af2c2b68246b1808f785ea"
+  },
+  "failureEvidence": {
+    "runId": 42766089161,
+    "attempt": 1,
+    "jobId": 129662811912,
+    "originalTapBlob": "f00a7cddc8e40a62a6b6b397650e8cb28d99c9c2",
+    "actualTests": 3,
+    "actualPass": 2,
+    "actualFail": 1,
+    "failedAt": "tests/read-cache-scope.db.test.ts:114:3 in original bbdae fixture setup",
+    "code": "23514",
+    "message": "personal workspace admits only its owner",
+    "unstartedSubtests": 12
+  },
+  "guard": {
+    "path": "drizzle/20261109035010_team_entitlements.sql",
+    "blob": "f4bde1c93a54c5694ae9e0c5aaa96c6a142a8f17",
+    "bytes": 2267,
+    "sha256": "6b38bc045fc8125ae4dc27b1a8b7be87ac902d8997cfedd0fbad2644bdedfa45",
+    "rules": [
+      {
+        "function": "mikka_guard_personal_membership",
+        "trigger": "mikka_personal_membership_guard",
+        "events": "BEFORE INSERT OR UPDATE ON mikka_workspace_members",
+        "predicate": "tenant.kind='personal' AND NEW.userId<>tenant.userId AND (TG_OP='INSERT' OR NEW.status='active')",
+        "code": "23514",
+        "message": "personal workspace admits only its owner"
+      },
+      {
+        "function": "mikka_guard_workspace_kind",
+        "trigger": "mikka_workspace_kind_guard",
+        "events": "BEFORE UPDATE ON mikka_workspaces",
+        "predicate": "NEW.kind<>OLD.kind OR (OLD.kind='personal' AND NEW.userId<>OLD.userId)",
+        "code": "23514",
+        "message": "workspace kind and personal ownership are immutable"
+      }
+    ],
+    "errorConstraintField": "Both PL/pgSQL RAISE statements set ERRCODE only, not CONSTRAINT. Candidate asserts actual code/message and does not invent a constraint field."
+  },
+  "changes": [
+    "Remove only the impossible foreignHome/reader membership tuple from setup; keep the actual foreignHome owned by peer with its legal owner member.",
+    "Attempt the identical forbidden INSERT in existing first PG subtest and require rejection with exact code/message.",
+    "Preserve foreign cache null assertion; correct its explanatory message so it no longer claims the forbidden member exists.",
+    "Replace impossible kind-change setup/restore with rejection of the original UPDATE. Assert same reader still sees home, measured statement count2, and workspace count2."
+  ],
+  "diffBlob": "b489b010f444a17dc3ce3d37a3e0e5ef008c7f6a",
+  "preservation": {
+    "originalTwoTestPrefixBlob": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+    "originalPrefixBytes": 5971,
+    "originalPrefixIdentical": true,
+    "topLevelTests": 3,
+    "subtests": 12,
+    "totalExpectedTests": 15,
+    "syntheticTeamForeignAndMultipleAssertionsUnchanged": true,
+    "otherTenSubtestsUnchanged": true,
+    "productionFilesChanged": [],
+    "schemaChanged": false,
+    "authorizationChanged": false
+  },
+  "setupReview": "Workspace INSERTs establish two team workspaces and one personal workspace per user. Member INSERTs contain only the actual owner for both personal workspaces. The owner-home status may be suspended; that is permitted by the existing guard. Team membership may belong to a different owner. No setup UPDATE changes kind or personal owner.",
+  "subtestWriteReview": [
+    {
+      "case": 1,
+      "writes": "Attempt the same forbidden foreign-home INSERT, now inside assert.rejects.",
+      "guard": "mikka_personal_membership_guard",
+      "result": "Expected SQLSTATE 23514 and exact message; peer-owned personal workspace already has only its peer-owner membership. Reader's cache remains null for foreignHome. Failed INSERT precedes measured reads.",
+      "name": "real PG: owned teams, foreign personal rows and suspended home membership produce no owner route"
+    },
+    {
+      "case": 2,
+      "writes": "None; synthetic projection input only.",
+      "guard": "Not a database fixture.",
+      "result": "Owned-team, foreign-personal, zero/multiple and duplicate projection rows keep their existing fail-closed assertions.",
+      "name": "synthetic projection: zero or multiple owned personal rows fail closed without changing the PG uniqueness constraint"
+    },
+    {
+      "case": 3,
+      "writes": "Attempt duplicate personal workspace INSERT.",
+      "guard": "mikka_workspaces_personal_owner_unique partial unique index",
+      "result": "Existing assert.rejects23505 with exact constraint unchanged; no guard disabling or duplicate owner personal fixture.",
+      "name": "real PG: the personal-owner unique index remains enforced"
+    },
+    {
+      "case": 4,
+      "writes": "Before case: home owner membership status becomes active.",
+      "guard": "mikka_personal_membership_guard",
+      "result": "NEW.userId equals personal workspace owner, so allowed. All selection/cache response-shape and two-query assertions unchanged.",
+      "name": "real PG: a restored unique home remains separate from the selected team and cache response shape"
+    },
+    {
+      "case": 5,
+      "writes": "None.",
+      "guard": "No write triggers.",
+      "result": "Cookie/header/requested precedence assertions unchanged.",
+      "name": "real PG: cookie fallback and an explicit valid selection keep their original precedence"
+    },
+    {
+      "case": 6,
+      "writes": "None.",
+      "guard": "No write triggers.",
+      "result": "Invalid header/requested mismatch zero-query assertions unchanged.",
+      "name": "real PG: malformed and conflicting request pins still reject before any SELECT"
+    },
+    {
+      "case": 7,
+      "writes": "None.",
+      "guard": "No write triggers.",
+      "result": "Explicit foreign home, unknown pin/target and other reader rejection assertions unchanged.",
+      "name": "real PG: unauthorized explicit targets, pinned targets and other readers cannot borrow the home hint"
+    },
+    {
+      "case": 8,
+      "writes": "Suspend/restore home owner membership in try/finally.",
+      "guard": "mikka_personal_membership_guard",
+      "result": "Both changes preserve userId==personal owner and do not mutate workspace kind or ownership; allowed. Null-then-home freshness assertions unchanged.",
+      "name": "real PG: a later call observes home membership suspension and restoration"
+    },
+    {
+      "case": 9,
+      "writes": "Attempt the original home.kind='team' UPDATE, now inside assert.rejects.",
+      "guard": "mikka_workspace_kind_guard",
+      "result": "Expected SQLSTATE23514 and exact immutable-kind/ownership message. Same reader subsequently gets original home via exactly2SELECTs; workspace count remains2. No impossible kind-change state or repair UPDATE.",
+      "name": "real PG: the immutable personal kind remains enforced without creating a replacement home"
+    },
+    {
+      "case": 10,
+      "writes": "Delete home owner membership; reinsert same home owner in finally.",
+      "guard": "Membership guard is BEFORE INSERT OR UPDATE, not DELETE; restored INSERT has userId==owner.",
+      "result": "Deletion-based later-read null-route counterexample preserved; allowed owner insertion restores fixture.",
+      "name": "real PG: deleted home membership cannot supply a route while the selected team stays authorized"
+    },
+    {
+      "case": 11,
+      "writes": "Suspend/restore selected team membership.",
+      "guard": "Membership guard checks only personal workspaces; selected.kind remains team.",
+      "result": "Both-field null rejection unchanged; no kind/ownership write.",
+      "name": "real PG: revoking the selected membership removes both fields even when the owner home is active"
+    },
+    {
+      "case": 12,
+      "writes": "Create Organization, policy and selected-workspace link; archive/unarchive policy.",
+      "guard": "Different tables; neither personal membership nor workspace-kind trigger applies.",
+      "result": "Independent current Organization reads and both-field rejection assertions unchanged.",
+      "name": "real PG: every call rechecks the selected Organization policy before returning either field"
+    }
+  ],
+  "cleanupReview": "Existing t.after deletion order and pretracked duplicateHome ID remain identical. DELETE is outside both INSERT/UPDATE guards. Failed guarded writes leave no new row/state to restore. Existing membership status/delete restoration finally blocks remain intact.",
+  "requiredVerification": "Run the full unchanged-path PG file on a fresh owned PostgreSQL17 database after schema setup; require exactly15 tests, all pass and no skipped/cancelled/todo. Re-run changed-file lint as needed in the joint G2 validation. This review is static and makes no runtime pass claim."
+}

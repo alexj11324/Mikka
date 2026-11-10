@@ -1,0 +1,63 @@
+{
+  "schema": "issue1512-cache-scope-pg-fixture-fix-diff/v1",
+  "path": "tests/read-cache-scope.db.test.ts",
+  "baseCommit": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+  "baseBlob": "bbdae2625952b475c3488384bbd48c876887a805",
+  "candidateBlob": "ee59feba1e29769805806ec6e166abbc65994233",
+  "hunks": [
+    {
+      "oldLine": 116,
+      "newLine": 116,
+      "removed": [
+        "    ($3,$5,$5,$7,'admin','suspended'),($4,$5,$5,$7,'admin','active'),($4,$6,$6,$8,'admin','active')`,"
+      ],
+      "added": [
+        "    ($3,$5,$5,$7,'admin','suspended'),($4,$6,$6,$8,'admin','active')`,"
+      ]
+    },
+    {
+      "oldLine": 120,
+      "newLine": 120,
+      "removed": [],
+      "added": [
+        "    await assert.rejects(pool.query('INSERT INTO mikka_workspace_members (\"workspaceId\",\"userId\",name,email,role,status) VALUES ($1,$2,$2,$3,\\'admin\\',\\'active\\')',",
+        "      [foreignHome, owner, `${owner}@example.invalid`]), { code: '23514', message: 'personal workspace admits only its owner' })"
+      ]
+    },
+    {
+      "oldLine": 126,
+      "newLine": 128,
+      "removed": [
+        "    assert.equal(await authorizedCacheWorkspace(reader, foreignHome), null, 'an active foreign-personal membership cannot authorize a cache')"
+      ],
+      "added": [
+        "    assert.equal(await authorizedCacheWorkspace(reader, foreignHome), null, 'a foreign personal workspace cannot authorize a cache for this reader')"
+      ]
+    },
+    {
+      "oldLine": 196,
+      "newLine": 198,
+      "removed": [
+        "  await t.test('real PG: a later call observes kind changes without creating a replacement home', async () => {",
+        "    await pool.query('UPDATE mikka_workspaces SET kind=\\'team\\' WHERE id=$1', [home])",
+        "    try {",
+        "      assert.deepEqual(await authorizedBootstrapScopes(reader, selected), expected(selected, 'member', null))",
+        "      const count = await pool.query<{ count: number }>('SELECT count(*)::int AS count FROM mikka_workspaces WHERE \"userId\"=$1', [owner])",
+        "      assert.equal(count.rows[0].count, 2, 'routing lookup does not create a workspace')",
+        "    } finally {",
+        "      await pool.query('UPDATE mikka_workspaces SET kind=\\'personal\\' WHERE id=$1', [home])",
+        "    }"
+      ],
+      "added": [
+        "  await t.test('real PG: the immutable personal kind remains enforced without creating a replacement home', async () => {",
+        "    await assert.rejects(pool.query('UPDATE mikka_workspaces SET kind=\\'team\\' WHERE id=$1', [home]),",
+        "      { code: '23514', message: 'workspace kind and personal ownership are immutable' })",
+        "    const bootstrap = await measured(() => authorizedBootstrapScopes(reader, selected))",
+        "    assert.deepEqual(bootstrap.value, expected(selected, 'member'))",
+        "    assert.equal(bootstrap.statements, 2, 'the rejected kind mutation does not change the fresh membership and selected Organization reads')",
+        "    const count = await pool.query<{ count: number }>('SELECT count(*)::int AS count FROM mikka_workspaces WHERE \"userId\"=$1', [owner])",
+        "    assert.equal(count.rows[0].count, 2, 'routing lookup does not create a workspace')"
+      ]
+    }
+  ]
+}

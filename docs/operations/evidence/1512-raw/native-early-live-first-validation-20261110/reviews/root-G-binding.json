@@ -1,0 +1,111 @@
+{
+  "schema": "issue1512-live-routing-final-g-input-readback/v1",
+  "sha": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+  "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+  "parents": [
+    "9238b7092a39fce7edde2e488aef516c0b544677"
+  ],
+  "leafCount": 6983,
+  "changedPathsFromM": [
+    "apps/desktop/scripts/renderer-startup.test.mjs",
+    "apps/desktop/scripts/workspace-live.test.mjs",
+    "apps/desktop/src/renderer/app.tsx",
+    "apps/desktop/src/renderer/bootstrap.ts",
+    "apps/desktop/src/renderer/installed-workspace.tsx",
+    "apps/desktop/src/renderer/workspace-live.test.ts",
+    "apps/desktop/src/renderer/workspace-live.ts",
+    "apps/desktop/src/renderer/workspace.tsx",
+    "hooks/use-live-key.tsx",
+    "lib/desktop-rpc/bootstrap.ts",
+    "lib/desktop-rpc/wire.ts",
+    "lib/live/channel.ts",
+    "lib/live/channels.test.ts",
+    "lib/live/channels.ts",
+    "lib/live/preparation.ts",
+    "lib/swr/cache-scope.ts",
+    "package.json",
+    "scripts/acceptance/run-observability-browser.mjs",
+    "scripts/acceptance/run-observability-browser.test.mjs",
+    "tests/read-cache-scope.db.test.ts"
+  ],
+  "changedCount": 20,
+  "verifiedCandidateAndTestSources": [
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "blob": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+      "kind": "backend"
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "blob": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+      "kind": "backend"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "blob": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+      "kind": "backend"
+    },
+    {
+      "path": "tests/read-cache-scope.db.test.ts",
+      "blob": "bbdae2625952b475c3488384bbd48c876887a805",
+      "kind": "backend"
+    },
+    {
+      "path": "lib/live/channel.test.ts",
+      "blob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+      "kind": "unit-count-source"
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "blob": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "kind": "unit-count-source"
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+      "blob": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "kind": "unit-count-source"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.test.ts",
+      "blob": "2170c999f99b2cfa2f6bbf6667b9de56296a0ada",
+      "kind": "unit-count-source"
+    },
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "blob": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "kind": "unit-count-source"
+    },
+    {
+      "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "blob": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "kind": "unit-count-source"
+    },
+    {
+      "path": "apps/desktop/scripts/installed-workspace.test.mjs",
+      "blob": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa",
+      "kind": "unit-count-source"
+    },
+    {
+      "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+      "blob": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae",
+      "kind": "unit-count-source"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "blob": "ded31e330bef5e83f00659b4383e41b53afd1b81",
+      "kind": "unit-count-source"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "blob": "06dceefec477df850087b47002266e612dddb63a",
+      "kind": "unit-count-source"
+    },
+    {
+      "path": "package.json",
+      "blob": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+      "kind": "CI-registration"
+    }
+  ],
+  "countsProof": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e",
+  "status": "READ-ONLY SOURCE BINDING; NO WORKFLOW OR TEST EXECUTION"
+}

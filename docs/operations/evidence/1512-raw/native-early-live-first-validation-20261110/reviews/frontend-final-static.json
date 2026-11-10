@@ -1,0 +1,490 @@
+{
+  "schema": "mikka.issue1512.independent-final-early-live-review.v1",
+  "reviewer": "/root/independent_final",
+  "decision": "STATIC_NO_BLOCKER_FOR_EXACT_FRONTEND_13_FILE_CANDIDATE; EXECUTION_AND_ACCEPTANCE_PENDING",
+  "repository": "alexj11324/Mikka",
+  "scope": {
+    "baseCommit": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "baseTree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "manifest": {
+      "sha": "eaab7746ed888c6b245a47e63dfb37112faf70be",
+      "bytes": 10728,
+      "sha256": "139f3e1d8a5c8cb18f4a52c618912c5f5d8b2a14833b87c4233ea879b0399ec0"
+    },
+    "files": [
+      {
+        "path": "lib/live/channel.ts",
+        "base": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+        "sha": "61cdf48b28ab9260f5567300f2411cb555b13427",
+        "bytes": 24726,
+        "sha256": "0d103ddf280c92c8a46129b8641938fb794b162a5408dc5b3a4918943bb3bbc6",
+        "kind": "product"
+      },
+      {
+        "path": "lib/live/channels.ts",
+        "base": "d459548cbd8785bf2764d23543109b99ae146d18",
+        "sha": "c40864fe9386855994d3a4ece9480639514d85aa",
+        "bytes": 2806,
+        "sha256": "fb1906245cbbff73acf3e1b77ac51a87c764d0b2b104c32536a59599618a8a3b",
+        "kind": "product"
+      },
+      {
+        "path": "lib/live/preparation.ts",
+        "base": null,
+        "sha": "7377678b777279de0ab21717749743fcce446d73",
+        "bytes": 6264,
+        "sha256": "d3f457669d5f487e66a9c222b3158dcd30b9f1800bff562ba114d95c06eae2ac",
+        "kind": "product"
+      },
+      {
+        "path": "hooks/use-live-key.tsx",
+        "base": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+        "sha": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+        "bytes": 8326,
+        "sha256": "1d353f65b1670b1b23c3d7ad6f5eeeb48ea2a62356da447bf12f9d7743443a8b",
+        "kind": "product"
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.ts",
+        "base": null,
+        "sha": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+        "bytes": 2326,
+        "sha256": "09b7ee0c047ced2955cae95176914492e5d0a18b0f7d958bb0c992d0d3a148fa",
+        "kind": "product"
+      },
+      {
+        "path": "apps/desktop/src/renderer/bootstrap.ts",
+        "base": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5",
+        "sha": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+        "bytes": 4058,
+        "sha256": "71efe48c2ce5f487bf1a1f697d0103313b57061aa37a7f6552e9d90a16030995",
+        "kind": "product"
+      },
+      {
+        "path": "apps/desktop/src/renderer/app.tsx",
+        "base": "c780d381fce0daa9c1646d63c7c099d48d197223",
+        "sha": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+        "bytes": 16378,
+        "sha256": "7f17c4f811b1a654a788348e1fe95528bf4330b941556e00a0bc2378954e26a2",
+        "kind": "product"
+      },
+      {
+        "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+        "base": "2463df1257aec4817e0fe625931d1897bb3ccbb7",
+        "sha": "ddeb2420392a0abb233bc3742cd539805424bc13",
+        "bytes": 1083,
+        "sha256": "bb459b49b48d90cb082a0d441def9940c48d2fc86e35a408007f026c15092255",
+        "kind": "product"
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace.tsx",
+        "base": "e45052573bb4424f61da35eeaedb5f0a8d80844f",
+        "sha": "25891b5f8d7dc7a5d6b3cd4688789898052855fd",
+        "bytes": 2814,
+        "sha256": "f6f85a6b610d06202f111cb5d67e28e06a354f209865e3b1e3714a173629b04d",
+        "kind": "product"
+      },
+      {
+        "path": "lib/live/channels.test.ts",
+        "base": null,
+        "sha": "91c96118f0040a4594eb57e76f58befa2150fe99",
+        "bytes": 19553,
+        "sha256": "44ee90f7e427b700e3f0c7c2254929bd04f4e6e73b8faad41ac20dde984c9f7a",
+        "kind": "test"
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+        "base": null,
+        "sha": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+        "bytes": 6704,
+        "sha256": "248b06b5cb84dd1b29f5b7d9ecf233080f14f64c4ff7428742cd60c02bdc5b12",
+        "kind": "test"
+      },
+      {
+        "path": "apps/desktop/scripts/workspace-live.test.mjs",
+        "base": null,
+        "sha": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+        "bytes": 18364,
+        "sha256": "21bb3903a5f4580e2cb7035dfb31a80166978bf634751687c842722e31c575c7",
+        "kind": "test"
+      },
+      {
+        "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+        "base": "a9a93381269a4078d046464b252851e72d84656c",
+        "sha": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+        "bytes": 7297,
+        "sha256": "2081f0f75b66243de5f92428e9758d88aa4af5ad673eef6128766a7d45fbd373",
+        "kind": "test"
+      }
+    ],
+    "integratorReportedCommit": {
+      "sha": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+      "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+      "parent": "9238b7092a39fce7edde2e488aef516c0b544677",
+      "provenance": "Root reported independent API/tree/hash verification; this review independently binds exact 13 blobs, not a fresh ref/commit read."
+    }
+  },
+  "verification": {
+    "all13BlobsRehashed": true,
+    "utf8LengthsAndSha256MatchManifest": true,
+    "gitBlobSha1Matches": true,
+    "allBaseBlobsMatchReadHCompatibleProductTree": true,
+    "checks": [
+      {
+        "path": "lib/live/channel.ts",
+        "sha": "61cdf48b28ab9260f5567300f2411cb555b13427",
+        "base": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+        "bytes": 24726,
+        "sha256": "0d103ddf280c92c8a46129b8641938fb794b162a5408dc5b3a4918943bb3bbc6",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "lib/live/channel.ts:v2"
+      },
+      {
+        "path": "lib/live/channels.ts",
+        "sha": "c40864fe9386855994d3a4ece9480639514d85aa",
+        "base": "d459548cbd8785bf2764d23543109b99ae146d18",
+        "bytes": 2806,
+        "sha256": "fb1906245cbbff73acf3e1b77ac51a87c764d0b2b104c32536a59599618a8a3b",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "lib/live/channels.ts:v3"
+      },
+      {
+        "path": "lib/live/preparation.ts",
+        "sha": "7377678b777279de0ab21717749743fcce446d73",
+        "base": null,
+        "bytes": 6264,
+        "sha256": "d3f457669d5f487e66a9c222b3158dcd30b9f1800bff562ba114d95c06eae2ac",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "lib/live/preparation.ts:v3"
+      },
+      {
+        "path": "hooks/use-live-key.tsx",
+        "sha": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+        "base": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+        "bytes": 8326,
+        "sha256": "1d353f65b1670b1b23c3d7ad6f5eeeb48ea2a62356da447bf12f9d7743443a8b",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "hooks/use-live-key.tsx"
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.ts",
+        "sha": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+        "base": null,
+        "bytes": 2326,
+        "sha256": "09b7ee0c047ced2955cae95176914492e5d0a18b0f7d958bb0c992d0d3a148fa",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "apps/desktop/src/renderer/workspace-live.ts"
+      },
+      {
+        "path": "apps/desktop/src/renderer/bootstrap.ts",
+        "sha": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+        "base": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5",
+        "bytes": 4058,
+        "sha256": "71efe48c2ce5f487bf1a1f697d0103313b57061aa37a7f6552e9d90a16030995",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "apps/desktop/src/renderer/bootstrap.ts"
+      },
+      {
+        "path": "apps/desktop/src/renderer/app.tsx",
+        "sha": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+        "base": "c780d381fce0daa9c1646d63c7c099d48d197223",
+        "bytes": 16378,
+        "sha256": "7f17c4f811b1a654a788348e1fe95528bf4330b941556e00a0bc2378954e26a2",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "apps/desktop/src/renderer/app.tsx:v3"
+      },
+      {
+        "path": "apps/desktop/src/renderer/installed-workspace.tsx",
+        "sha": "ddeb2420392a0abb233bc3742cd539805424bc13",
+        "base": "2463df1257aec4817e0fe625931d1897bb3ccbb7",
+        "bytes": 1083,
+        "sha256": "bb459b49b48d90cb082a0d441def9940c48d2fc86e35a408007f026c15092255",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "apps/desktop/src/renderer/installed-workspace.tsx"
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace.tsx",
+        "sha": "25891b5f8d7dc7a5d6b3cd4688789898052855fd",
+        "base": "e45052573bb4424f61da35eeaedb5f0a8d80844f",
+        "bytes": 2814,
+        "sha256": "f6f85a6b610d06202f111cb5d67e28e06a354f209865e3b1e3714a173629b04d",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "apps/desktop/src/renderer/workspace.tsx"
+      },
+      {
+        "path": "lib/live/channels.test.ts",
+        "sha": "91c96118f0040a4594eb57e76f58befa2150fe99",
+        "base": null,
+        "bytes": 19553,
+        "sha256": "44ee90f7e427b700e3f0c7c2254929bd04f4e6e73b8faad41ac20dde984c9f7a",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "registryTests"
+      },
+      {
+        "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+        "sha": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+        "base": null,
+        "bytes": 6704,
+        "sha256": "248b06b5cb84dd1b29f5b7d9ecf233080f14f64c4ff7428742cd60c02bdc5b12",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "controllerTests"
+      },
+      {
+        "path": "apps/desktop/scripts/workspace-live.test.mjs",
+        "sha": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+        "base": null,
+        "bytes": 18364,
+        "sha256": "21bb3903a5f4580e2cb7035dfb31a80166978bf634751687c842722e31c575c7",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "appTestsFinal"
+      },
+      {
+        "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+        "sha": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+        "base": "a9a93381269a4078d046464b252851e72d84656c",
+        "bytes": 7297,
+        "sha256": "2081f0f75b66243de5f92428e9758d88aa4af5ad673eef6128766a7d45fbd373",
+        "shaOk": true,
+        "manifestHashOk": true,
+        "manifestSizeOk": true,
+        "baseOk": true,
+        "storageKey": "parserTests"
+      }
+    ],
+    "reads": "All nine changed product files were read by complete new-file read or complete base plus exact diff; all four test files were read, including unchanged fixture context and final 627f appended parser cases.",
+    "executionByReviewer": 0,
+    "resourcesStarted": 0,
+    "originalActionsLogsOrArtifactsRead": 0,
+    "refsChanged": 0,
+    "independentReviewCheckpoint": "df8f0f10e844c6a7a478d8d00111de5fc0e9d302"
+  },
+  "sourceConclusions": [
+    "成功 bootstrap 完整 body 解码与原 generation/owner 校验后，在 setBootstrap 前 prepare；没有将 response status 当可用 bootstrap，未新增 await、UI 等待、业务 action、SQL 或 poll。",
+    "只为当前真实 InstalledWorkspace URL 准备；当前 URL 与响应 request scope/selector 一致，路由白名单同 rendering predicate。401、公有配置、失效 query、expiry、update-required 均不能带入有效 preparation。",
+    "selected 来自既有 cacheWorkspace；optional home 仅用后端唯一 owned personal 同次投影路由 hint。它不代替 fresh ticket/member/Org/principal 校验，也不把 selected 猜成 home。",
+    "预热与真实消费者交接同一 LiveChannels/LiveChannel 实例，保留 ready、coverageAfter、各 kind incoming invalidation 历史；没有另开 raw socket、假实体订阅或绕过 main 的连接上限。",
+    "render 只创建 inert owner；cache identity 在 committed subscribe/mount 首次绑定。不同 cache 对象不可借用历史；parent authority/route 退休影响所有已提交 owner，包括 StrictMode 普通 fallback；旧 cleanup/release 不影响新 lifetime/entry。",
+    "同 selected hint 仅在当前有效真实消费者已存在后释放预留；fresh selected mismatch 立即退旧 hint，home 只由实际合法 owner-wide subscription 确认；实际数据订阅 scope 没有被 hint 改写。",
+    "zero-key preparation 只具有首次可见连接尝试；原 visibility/disconnected real-subscription gates 保留，不生成空订阅 retry/poll 循环；最后真实订阅退出清除已有 retry/fallback。",
+    "read-observer、readFresh 谓词/次数、readBoundary、原五项 snapshot whitelist、Native batching、原 data read 参数与原 ticket 授权路径均未改变。旧 read 开始早于 live ready 时仍必须 catch up，即使其完成晚于 ready。",
+    "Routes 退休后的合法 reentry 使用普通新 registry；同文档 update-required 按原 transport-state 是 terminal，最终 App 测试已改为拒绝 stale ready，未通过改产品状态机制造恢复。"
+  ],
+  "draftFindings": [
+    {
+      "id": "L1",
+      "occurrence": 4,
+      "impact": 4,
+      "score": 16,
+      "likelihoodBasis": "真实 provider 可以先确认 selected scope，再由稍晚挂载的组件注册该 scope；不依赖非法输入。",
+      "failurePath": "prepare(S) → socket ready → mount → confirmWorkspace(S) → later subscribe(S)。初稿 confirm 提前释放最后 reservation，销毁 ready 历史并另开连接。",
+      "fix": "737767 用当前有效 subscriber 判断是否可交接；同 hint 未有消费者时保留，实际首次消费者到达后再释放。",
+      "cases": [
+        "confirming the selected hint before its first real subscriber preserves ready coverage"
+      ],
+      "status": "FIXED_IN_UNPUBLISHED_DRAFT_STATICALLY_REVIEWED",
+      "runtimeRegressionStatus": "NOT_YET_EXECUTED",
+      "riskScale": "Occurrence and impact are ordinal reviewer estimates on 1–10 scales, not measured frequencies."
+    },
+    {
+      "id": "L2",
+      "occurrence": 2,
+      "impact": 3,
+      "score": 6,
+      "likelihoodBasis": "需要连接失败、重试已排队且最后真实消费者在重试前退出；断线和组件卸载均为正常可达事件。",
+      "failurePath": "retain → real subscribe → disconnect schedules retry → last real unsubscribe while retain remains → old retry would request an empty-scope ticket。",
+      "fix": "61cdf 最后真实订阅退出时清除 retry 与 fallback；活 socket 的原续期规则保留。",
+      "cases": [
+        "the last real subscriber cancels its scheduled retry while a preparation remains"
+      ],
+      "status": "FIXED_IN_UNPUBLISHED_DRAFT_STATICALLY_REVIEWED",
+      "runtimeRegressionStatus": "NOT_YET_EXECUTED",
+      "riskScale": "Occurrence and impact are ordinal reviewer estimates on 1–10 scales, not measured frequencies."
+    },
+    {
+      "id": "L3",
+      "occurrence": 3,
+      "impact": 6,
+      "score": 18,
+      "likelihoodBasis": "异步组件提交或 StrictMode 的 effect 清理/重建可与父 route/authority 退休交错；无需服务端授权失效才能到达。",
+      "failurePath": "render creates inert owner → parent retires before first committed claim → failed claim previously fell back to a fresh ordinary registry; a later parent retirement also failed to reach a StrictMode fallback registry。",
+      "fix": "737767 将 provider cleanup 与 authority retirement 分离；每个 committed owner（包括普通 fallback）注册 authority disposer，已退休对象不能首次 claim/subscribe，旧 lifetime cleanup 不能关闭后继 lifetime。",
+      "cases": [
+        "retirement before the first effect blocks old owners but not a new ordinary owner",
+        "StrictMode cleanup and setup use a new lifetime and old cleanup cannot close it",
+        "an authority retirement aborts an unfinished ticket and its result cannot revive a socket"
+      ],
+      "impactLimit": "这是废弃 scope/连接生命周期漏洞；仍执行 fresh ticket，未发现或声称服务端权限绕过。",
+      "status": "FIXED_IN_UNPUBLISHED_DRAFT_STATICALLY_REVIEWED",
+      "runtimeRegressionStatus": "NOT_YET_EXECUTED",
+      "riskScale": "Occurrence and impact are ordinal reviewer estimates on 1–10 scales, not measured frequencies."
+    },
+    {
+      "id": "L4",
+      "occurrence": 2,
+      "impact": 3,
+      "score": 6,
+      "likelihoodBasis": "同 scope 消费者可以在 current-workspace 确认之前挂载又卸载；需要特定时序但 API 合同允许。",
+      "failurePath": "subscribe(S) → unsubscribe(S) → confirmWorkspace(S)。历史 Set 被误当成当前消费者，使尚无人接管的 reservation 被释放。",
+      "fix": "c408/737767 读取当前 registry entry 的 hasSubscribers，而非曾订阅历史。",
+      "cases": [
+        "a stopped historical subscription cannot consume the selected reservation"
+      ],
+      "status": "FIXED_IN_UNPUBLISHED_DRAFT_STATICALLY_REVIEWED",
+      "runtimeRegressionStatus": "NOT_YET_EXECUTED",
+      "riskScale": "Occurrence and impact are ordinal reviewer estimates on 1–10 scales, not measured frequencies."
+    },
+    {
+      "id": "L5",
+      "occurrence": 2,
+      "impact": 3,
+      "score": 6,
+      "likelihoodBasis": "subscribe 的实体参数是 string，原 channel 明确允许非法 ID 为 no-op；registry 新增计数必须与这一既有拒绝分支一致。",
+      "failurePath": "invalid entity subscribe counted at outer registry → inner channel returns no-op → confirm consumes selected reservation although no real subscriber exists。",
+      "fix": "c408 在 registry 计数之前复用既有 LIVE_ID 条件；内层原校验仍保留，因此合法输入会经过两处同条件检查。没有扩大接受范围，也不会记录无效消费者。",
+      "cases": [
+        "an invalid entity does not count as a consumer or consume preparation"
+      ],
+      "impactLimit": "影响连接交接和 ready 历史，不构成非法实体数据访问。",
+      "status": "FIXED_IN_UNPUBLISHED_DRAFT_STATICALLY_REVIEWED",
+      "runtimeRegressionStatus": "NOT_YET_EXECUTED",
+      "riskScale": "Occurrence and impact are ordinal reviewer estimates on 1–10 scales, not measured frequencies."
+    },
+    {
+      "id": "L6",
+      "occurrence": 5,
+      "impact": 6,
+      "score": 30,
+      "likelihoodBasis": "已登录用户从 workspace 进入 device 页面再返回是普通导航；Native bootstrapScope/selector 可完全不变，因此不会依靠新 bootstrap 自动恢复。",
+      "failurePath": "workspace → /device retires preparation → workspace with same selector retains old bootstrap object → a new provider receives authority-retired preparation and silently cannot subscribe。",
+      "fix": "cfe14be 保留 35aec 的 Routes handoff：新合法 workspace 只接收未 authority-retired preparation；退休时传 undefined 使用原普通新 registry。旧 pending owner 仍被旧 preparation 阻断。",
+      "cases": [
+        "leaving and returning to a workspace starts an ordinary live lifetime without a new bootstrap"
+      ],
+      "status": "FIXED_IN_UNPUBLISHED_DRAFT_STATICALLY_REVIEWED",
+      "runtimeRegressionStatus": "NOT_YET_EXECUTED",
+      "riskScale": "Occurrence and impact are ordinal reviewer estimates on 1–10 scales, not measured frequencies."
+    },
+    {
+      "id": "L7",
+      "occurrence": 2,
+      "impact": 4,
+      "score": 8,
+      "likelihoodBasis": "真实 location.ts 先同步 history write 再 queueMicrotask LOCATION_EVENT；bootstrap body 的 Promise continuation 可位于两者之间。",
+      "failurePath": "bootstrap continuation resumes after actual URL changed but before queued location notification updates requested.current; stale route ref previously prepared on an excluded route。",
+      "fix": "cfe14be 在成功 continuation 同步读取 new URL(window.location.href)，核对同一 InstalledWorkspace 路由白名单、bootstrapScope 和 query selector 后才 prepare。",
+      "cases": [
+        "a history write before its queued route notification blocks the old bootstrap preparation"
+      ],
+      "supportingSource": "ac2d1c163497cb165bab470c30661560ae78f053",
+      "status": "FIXED_IN_UNPUBLISHED_DRAFT_STATICALLY_REVIEWED",
+      "runtimeRegressionStatus": "NOT_YET_EXECUTED",
+      "riskScale": "Occurrence and impact are ordinal reviewer estimates on 1–10 scales, not measured frequencies."
+    }
+  ],
+  "testsReviewed": [
+    {
+      "path": "lib/live/channels.test.ts",
+      "sha": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "expectedStaticCount": 22,
+      "basis": "20 single registrations plus a fixed two-value null/reject registration loop.",
+      "coverage": "same-instance selected/home; confirmation before first consumer; historical/invalid consumer; fresh mismatch; actual readFresh ready-before-read / old-read-finishes-late / push-before-key / other-kind; cache/abandoned render/explicit StrictMode lifetime; authority retirement; null/reject/expiry/visibility; last-real retry cleanup; stale release.",
+      "limits": "Controlled LiveChannel runtime. Explicit StrictMode lifecycle sequence is not a React StrictMode renderer execution."
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace-live.test.ts",
+      "sha": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "expectedStaticCount": 14,
+      "basis": "Seven direct tests plus seven fixed owner/session/server/selector/role/workspace/home change registrations.",
+      "coverage": "route whitelist, complete identity/cache validity, same preparation reuse, missing home not guessed, all controller retirement keys and replacement."
+    },
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "sha": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "expectedStaticCount": 13,
+      "basis": "Nine top-level tests plus four awaited fixed route subtests.",
+      "coverage": "Actual App/bootstrap/rpc/native-platform/InstalledWorkspace/LiveProvider/useLiveKey/location/transport-state; full-body gate; real history/microtask race; route reentry; terminal update; expiry; stale bootstrap; owner replacement; excluded routes.",
+      "limits": "Workspace view, SWRDefaults/persistent cache side effects, decorative UI, network and clock are fixtures. Actual Workspace pass-through is statically reviewed; this is not full persistent authenticated UI/Electron or production acceptance. First-read ticket assertion proves call ordering in fixture, not candidate production ready-before-read latency."
+    },
+    {
+      "path": "apps/desktop/scripts/renderer-startup.test.mjs",
+      "sha": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "expectedStaticCount": 17,
+      "basis": "Six top-level tests plus three original route subtests plus eight awaited hint subtests.",
+      "coverage": "Original startup tests preserved byte-for-byte; old server missing hint, null/malformed/type/nil/valid hint; invalid explicit selector clears both hints; expired session public-config fallback has no hint."
+    }
+  ],
+  "relatedReviews": {
+    "backend": {
+      "manifest": "9298c634e7935b3b898c5e2209dad23e43404ccf",
+      "independentReview": "9265500119ea12b3e50ee9a8f3e3b3455e8eafe0",
+      "status": "Four exact backend files statically reviewed with no blocker; real PG still pending at this review."
+    },
+    "actualBeforeCausality": {
+      "lifecycle": "5ea6109ead93772b5ede58170cd20cce067c2be9",
+      "v3": "a5b4c4bd1b3d71d1e9a30ff2978ece47314a18c6",
+      "fiveSnapshotIndependent": "e993556bac59d68d013016f2938d4e3920e4f37c",
+      "deltaIndependent": "3ba51bc17e91e41addeec42ea94483c475773a09"
+    }
+  },
+  "riskAssessment": {
+    "alignment": "LOW: targets measured late connection/correct catch-up mechanism while preserving authorization, freshness and acceptance denominators.",
+    "impact": "MEDIUM: shared live lifecycle and provider ownership are changed; Native initiates connections earlier. Web/default no-preparation path and route/StrictMode cleanup need the planned existing plus new regressions.",
+    "verification": "HIGH UNTIL ACTUAL GATES: static review is complete; no new Node/TAP/PG/type/lint outcome exists in this review. Predicted declarations are not executed tests.",
+    "rollback": "Revert the early-live preparation/hand-off and backend hint changes together using exact reviewed commits; restore ordinary subscription-driven connection behavior. No migration, persisted authorization cache, server data change or irreversible side effect is introduced.",
+    "detection": "Planned fixed-source behavioral unit/App tests, exact 15-case real PG file, existing root/frontend/desktop type/lint gates, then unchanged Native lifecycle startup and full-login SQL comparison. Inspect real ticket/socket generations and catch-up counts only through source-bound evidence.",
+    "mergeAuthorization": "No merge, deployment, acceptance PASS, production window or issue closure is authorized by this static decision."
+  },
+  "remainingGates": [
+    "Execute final source-bound Node groups and archive original full TAP/exit codes; run real PG17 15-case file, typechecks and lints. Static expected counts are not results.",
+    "Verify actual candidate Native packaged lifecycle with original startup/full-login windows, five pairs and unchanged budgets. Need measured coverage/read ordering and SQL totals; earlier connection is an unproved performance hypothesis until then.",
+    "Formal before remains Native441 versus Web331 FAIL. Temporary diagnostic Native441/Web365 is not the formal denominator; missing Web diagnostic first document cannot be reconstructed.",
+    "Then complete formal merged-head CI and main-only exact-deployment production trace acceptance required by #1512 before closing issue. This review does not substitute for those gates."
+  ],
+  "claimsExcluded": [
+    "No product test execution by reviewer.",
+    "No claim seven draft defects occurred in production.",
+    "No extrapolation from response-status-to-read gaps to usable preparation time.",
+    "No inference that all 110 extra formal SQL queries will disappear.",
+    "No authority result reuse or connection completion timestamp used as snapshot freshness proof."
+  ],
+  "supersedes": {
+    "sha": "6bed8d2e7fdf3891c84dcf20dcba63665bc9b086",
+    "scope": "One wording clarification only: L5 reuses the same acceptance condition at the registry boundary; the existing inner validation remains."
+  }
+}

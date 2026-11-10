@@ -1,0 +1,94 @@
+{
+  "schema": "mikka.issue1512.independent-three-failure-fixes-review.v1",
+  "reviewer": "/root/independent_final",
+  "repository": "alexj11324/Mikka",
+  "decision": "STATIC_NO_BLOCKER_FOR_EXACT_THREE_FILE_FIX; ACTUAL_REEXECUTION_REQUIRED",
+  "manifest": {
+    "sha": "3578f33781eccdcd13254d5daea9fee421be5e4d",
+    "bytes": 5551,
+    "sha256": "9e8a2f4f8f90bf430bcd83e0a8611364b22d4cbefcc77ef7904b874ef88149ff"
+  },
+  "parent": {
+    "commit": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "rule": "G2 must normally inherit G. Preserve this failed run and the prior source."
+  },
+  "files": [
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "base": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+      "bytes": 18598,
+      "sha256": "4d55bb93c825c9ebd57f0a73f60bc3a98073ac295b7d6f22effaca5a90982979",
+      "contentAndManifestMatch": true,
+      "baseMatchesActualG": true
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "base": "0c72a4ca1fb9f7a7937b0a92160b765315a49b26",
+      "sha": "dd831e0e657d00de9210e39194a926b4e977ec56",
+      "bytes": 2462,
+      "sha256": "a30f8d08c655a807ea46048bf517aaf74461e317b5e3d5bd9959573e6cd97161",
+      "contentAndManifestMatch": true,
+      "baseMatchesActualG": true
+    },
+    {
+      "path": "lib/live/channels.test.ts",
+      "base": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "sha": "c9059d2c8be5122681f5c4657889b01633ed3736",
+      "bytes": 20020,
+      "sha256": "3d2ba4f08b855c1e6fae7afd5f0b98aaffa23c8a2d8dd72d2d33a6b603357b6e",
+      "contentAndManifestMatch": true,
+      "baseMatchesActualG": true
+    }
+  ],
+  "scope": "Read the complete affected fixture/import/type context and exact old-to-new diffs. No code execution, resources, Actions original or ref mutation.",
+  "findings": [
+    {
+      "path": "lib/live/channels.test.ts",
+      "sha": "c9059d2c8be5122681f5c4657889b01633ed3736",
+      "basis": "Independently read frozen actual TS TAP6e5bfcc and unchanged product scheduler/read observer. Causal proof b9402b98f534ddcb10d9b0e1dde4dd2b89d36300.",
+      "changes": "Adds a fixture refresh-entry counter; all four freshness scenarios drive the original100ms flush and assert exactly one callback before preserving business-read counts1/2/2/1. The cache/observe/accept implementation and test registrations are unchanged. The empty mutable reads assertion becomes reads.length===0, avoiding never[] narrowing while preserving emptiness for the fixture's known Array.",
+      "expectedTestCount": 22,
+      "registeredNamesUnchanged": true,
+      "productionFreshnessOrTimerChanges": false
+    },
+    {
+      "path": "apps/desktop/scripts/workspace-live.test.mjs",
+      "sha": "6671d0d9ba8721e255578f4aa74c9beacfcb5531",
+      "basis": "Mac's frozen manifest binds actual renderer failure5667f951; this reviewer independently verifies the narrow loader change against the complete original fixture. Original renderer Actions were not reread.",
+      "changes": "Only the generated ESM test bundle's swr external resolves through fileURLToPath(import.meta.resolve('swr')), selecting the installed package's import resolution rather than the CJS path returned by require.resolve. All SWR imports in that bundle use the same resolved module. React external resolution, actual App/bootstrap/LiveProvider/useLiveKey paths, fixture scopes and behavioral assertions remain identical.",
+      "expectedTestCount": 13,
+      "registeredNamesUnchanged": true,
+      "remainingValidation": "Actual installed Node24/pnpm dependency graph must confirm the corrected import and execute all thirteen cases. Static review does not claim the prior TypeError is already fixed in a running process."
+    },
+    {
+      "path": "hooks/use-subagent-updates.ts",
+      "sha": "dd831e0e657d00de9210e39194a926b4e977ec56",
+      "basis": "The actual G tree identifies the base0c72a4. Fully read the consumer: it uses channels.subscribe and the channels object as a WeakMap identity, without concrete LiveChannels private state or dispose.",
+      "changes": "Exactly three type-only LiveChannels→LiveChannelRegistry replacements (import, WeakMap key, sharedFeed parameter). Replacing those three names restores the complete original bytes. All executable expressions, fetches, scope keys, cache identity and effects remain unchanged. The type now matches useLiveScope's existing structural registry contract.",
+      "rawReversalProved": true,
+      "replacementCount": 3,
+      "remainingValidation": "Rerun the previously failing root/frontend/desktop renderer typechecks."
+    }
+  ],
+  "risk": {
+    "scope": "Observed validation/fixture failures in an unpublished candidate, not production-reproduced authorization defects.",
+    "occurrence": 10,
+    "impact": 4,
+    "score": 40,
+    "reason": "Under the fixed validation environment these failures deterministically block tests/types and can make untouched positive freshness cases pass without invoking the intended read. Corrections preserve product safety checks and add the missing test precondition."
+  },
+  "constraints": [
+    "Keep the original failed run42766089161/A1 and frozen originals; next candidate must descend normally from G.",
+    "No debounce, readBoundary, readFresh proof predicate, snapshot whitelist, authorization cache, SQL window, five-pair or budget change is included.",
+    "New counts remain22 registry and13 App; no tests were removed or added. Actual results still pending.",
+    "Root's separate cloud-startup TS-loader correction and Native's separate PG fixture correction are outside this three-file decision.",
+    "Include the newly changed hooks/use-subagent-updates.ts in source/lint binding; preserve all original product changes and exact new blobs in the next manifest."
+  ],
+  "related": {
+    "originalFrontendReview": "19c1ec3b2c4ea4d3a5da3740eb4799aadeb560f9",
+    "bindingReview": "50b01c430f36bc3703669496375086da3ffdb479",
+    "freshnessFailureReview": "b9402b98f534ddcb10d9b0e1dde4dd2b89d36300"
+  }
+}

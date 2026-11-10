@@ -1,0 +1,137 @@
+{
+  "schema": "mikka.issue1512.independent-green-freshness-failure-review.v1",
+  "reviewer": "/root/independent_final",
+  "repository": "alexj11324/Mikka",
+  "decision": "THE_TWO_OBSERVED_ASSERTION_FAILURES_ARE_EXPLAINED_BY_THE_NEW_FIXTURE_NOT_ADVANCING_THE_EXISTING_100MS_FLUSH; NO_PRODUCT_FRESHNESS_RELAXATION_SUPPORTED",
+  "source": {
+    "commit": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "tests": "91c96118f0040a4594eb57e76f58befa2150fe99",
+    "channel": "61cdf48b28ab9260f5567300f2411cb555b13427",
+    "readObserver": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+    "liveHook": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+    "swrDefaults": "9b7a4385896b9aacc69ea898be23636b5a8c62fb"
+  },
+  "actualEvidence": {
+    "runId": 42766089161,
+    "attempt": 1,
+    "originalFrozenBy": "/root/native_pending_final",
+    "tap": {
+      "sha": "6e5bfcc11ca25a44070d3ef882c9cddd03ea54b1",
+      "bytes": 24452,
+      "sha256": "d17dc68c6af17babc648e3cb78986382007a333223a6c3d1417563dca984a100"
+    },
+    "summary": {
+      "tests": 100,
+      "pass": 98,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "failures": [
+      {
+        "name": "a read begun before readiness still catches up even when it finishes afterwards",
+        "expected": 2,
+        "actual": 1,
+        "testSourceLine": 201
+      },
+      {
+        "name": "an incoming push with no keys remains an obligation for a later matching subscriber",
+        "expected": 2,
+        "actual": 1,
+        "testSourceLine": 214
+      }
+    ],
+    "reviewerReads": "Only already-frozen Git TAP; no original Actions read, artifact or execution."
+  },
+  "causalPath": [
+    {
+      "step": 1,
+      "source": "lib/live/channels.test.ts fixture.advance",
+      "fact": "The fixture holds now constant until advance(ms). It sets end=now+milliseconds and breaks before invoking a timer when next.at>end."
+    },
+    {
+      "step": 2,
+      "source": "lib/live/channel.ts subscribe",
+      "fact": "A genuine subscription to a connected supported prepared channel invalidates using max(coverageAfter, matching-kind invalidationAfter). It enters scheduleFlush()."
+    },
+    {
+      "step": 3,
+      "source": "lib/live/channel.ts scheduleFlush",
+      "fact": "The exact original and candidate code both compute at=Math.max(this.localNow()+100, ...), placing the earliest refresh at now+100. The complete scheduleFlush/flush block is byte-identical to H.",
+      "comparison": {
+        "scheduleFlushAndFlushByteIdentical": true,
+        "baseBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+        "currentBlob": "61cdf48b28ab9260f5567300f2411cb555b13427"
+      }
+    },
+    {
+      "step": 4,
+      "source": "lib/live/channels.test.ts four readFresh cases",
+      "fact": "All four call await f.advance(0) after subscription. The timer at now+100 is later than end=now, so no flush, refresh callback or readFresh invocation occurs before the assertion."
+    },
+    {
+      "step": 5,
+      "source": "actual 6e5bfcc TAP",
+      "fact": "The two cases requiring a second read observe only the original read (1 instead of 2). The two cases expecting reuse also see 1, but can pass without exercising reuse at all."
+    }
+  ],
+  "readFixtureProtocolReview": [
+    "observeSWRRead is invoked before the fetcher result; its own continuation marks received before the caller await continuation calls acceptSWRRead and writes the same response object into cache. The following microtask checks the real applied object. This ordering matches the documented SWR protocol.",
+    "The two () => true callbacks are accepts(data) for revision-free fixture data and current() for an owner still alive at the assertion. They do not bypass readFresh's read-begin/pending-dispatch comparison.",
+    "Without a dispatch proof, the observed read keeps its original read.began. Completing it after ready cannot advance that barrier. When readFresh actually runs, read.began<=after with no later pendingDispatchAt takes revalidate().",
+    "Incoming matching-kind push advances invalidationAfter even with no keys; later subscribe uses that newer boundary. A different kind leaves the bot_chat boundary unchanged.",
+    "Final prepared-channel release occurs after an actual subscriber is installed, so it does not cancel this pending flush. The immediate cause of the observed assertions is the fixture timer not being advanced."
+  ],
+  "minimalTestOnlyCorrection": {
+    "owner": "/root/mac_inprocess_diag combines with its separate test/type fixes; reviewer does not mutate source",
+    "changes": [
+      "Drive the original 100ms coalescing timer in ALL FOUR cases, rather than only changing the two failed assertions.",
+      "Count refresh callback entry in readFixture and assert exactly one refresh invocation for every case, so reuse cases cannot pass before readFresh executes.",
+      "Retain business-read expectations 1/2/2/1 for ready-before-read / old-read-completes-late / matching-kind push-before-key / other-kind push.",
+      "Keep original product debounce, readBoundary, dispatch proof, freshness predicates, selected/home routing, acceptance windows and SQL budgets unchanged."
+    ],
+    "requiredCases": [
+      {
+        "case": "a read begun after readiness is reused by the real late subscriber",
+        "refreshCalls": 1,
+        "businessReads": 1
+      },
+      {
+        "case": "a read begun before readiness still catches up even when it finishes afterwards",
+        "refreshCalls": 1,
+        "businessReads": 2
+      },
+      {
+        "case": "an incoming push with no keys remains an obligation for a later matching subscriber",
+        "refreshCalls": 1,
+        "businessReads": 2
+      },
+      {
+        "case": "a different event kind does not discard continuous coverage for the late key",
+        "refreshCalls": 1,
+        "businessReads": 1
+      }
+    ],
+    "noExecutionYet": true
+  },
+  "risk": {
+    "occurrence": 10,
+    "impact": 4,
+    "score": 40,
+    "scope": "The deterministic new test fixture, not a measured production defect.",
+    "basis": "The zero-advance assertion always runs before a 100ms timer; two negative tests fail and positive tests cannot establish their intended freshness coverage."
+  },
+  "reviewCorrection": {
+    "previousReview": "19c1ec3b2c4ea4d3a5da3740eb4799aadeb560f9",
+    "correction": "The source review confirmed test intent but missed the zero-advance versus existing debounce mismatch. The four freshness tests cannot be counted as validated coverage until their callback is actually driven and the corrected group passes. Previous review already stated execution pending; this evidence now records the actual failure and exact missing test precondition."
+  },
+  "limits": [
+    "This source explanation matches both actual failures, but it is not an executed result of the corrected tests.",
+    "It does not establish that the entire early-live candidate is bug-free or meets Native441/Web331 budget.",
+    "Other App import/type/PG fixture/cloud loader failures are assigned to their owners and are not reinterpreted here.",
+    "No old snapshot/read proof may be accepted based on its late completion; no new authorization-result reuse is justified.",
+    "Reviewer started no resource, ran no product/test, changed no source or ref and read no original Actions endpoint."
+  ]
+}
