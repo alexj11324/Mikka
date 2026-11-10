@@ -13,6 +13,8 @@ export type AuditExportManifest = {
   format: 'mikka-audit-export'; version: 1; id: string; workspaceId: string
   createdAt: string; expiresAt: string; from: string; until: string
   filter: 'all' | 'security'; count: number; digest: string
+  /** Only the events of these categories, when the export was narrowed to them. */
+  categories?: string[]
 }
 
 export function auditExportRecords(events: readonly { id: string }[]): AuditExportRecord[] {

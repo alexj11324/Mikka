@@ -244,8 +244,14 @@ test('audit CSV requires a session and service authorization, preserves the work
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
   assert.deepEqual(calls.at(-1), ['admin', workspaceId, 'security'])
   assert.match(await response.text(), /"'=SUM\(1,2\)"/)
+  // A narrower export: some categories in a shorter period, passed on as asked.
+  const from = '2026-10-01T00:00:00.000Z', until = '2026-10-08T00:00:00.000Z'
+  assert.equal((await auditRoute.GET(new Request(`https://mikka.example/export?filter=all&category=secret,member&from=${from}&until=${until}`), params)).status, 200)
+  assert.deepEqual(calls.at(-1), ['admin', workspaceId, 'all', undefined, undefined, undefined, { categories: ['secret', 'member'], from, until }])
   const before = calls.length
   assert.equal((await auditRoute.GET(new Request('https://mikka.example/export?filter=invalid'), params)).status, 400)
+  assert.equal((await auditRoute.GET(new Request('https://mikka.example/export?category=nope'), params)).status, 400)
+  assert.equal((await auditRoute.GET(new Request(`https://mikka.example/export?from=${until}&until=${from}`), params)).status, 400)
   assert.equal((await auditRoute.GET(request(), { params: Promise.resolve({ workspaceId: 'not-a-uuid' }) })).status, 404)
   assert.equal(calls.length, before)
 })
