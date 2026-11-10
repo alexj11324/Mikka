@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { isThreadModeTransitionError, threadModePicker } from './view'
+import { frozenThreadMode, isThreadModeTransitionError, threadModePicker } from './view'
 
 test('no read yet: no picker rather than a guessed execute', () => {
   assert.equal(threadModePicker(undefined, false), null)
@@ -16,8 +16,6 @@ test('a thread with no stored choice offers execute, and nothing is locked', () 
     { mode: 'execute', selected: true, disabled: false },
     { mode: 'ask', selected: false, disabled: false },
   ])
-  // The displayed run's own mode is a fact, even when it matches the choice.
-  assert.equal(view.frozenMode, 'execute')
 })
 
 test('an active run makes every option read-only', () => {
@@ -33,11 +31,12 @@ test('the server lock alone is enough, even when the panel read an earlier attem
   assert.equal(view.locked, true)
 })
 
-test('a frozen mode different from the stored choice is a badge', () => {
-  const view = threadModePicker({ mode: 'execute', version: 3, frozenMode: 'ask' }, true)
-  assert.ok(view)
-  assert.equal(view.frozenMode, 'ask')
-  assert.equal(view.mode, 'execute')
+test('the header badge names the mode the displayed run froze, whatever the stored choice', () => {
+  assert.equal(frozenThreadMode({ mode: 'execute', version: 3, frozenMode: 'ask' }), 'ask')
+  assert.equal(frozenThreadMode({ mode: 'execute', version: 3, frozenMode: 'execute' }), 'execute')
+  // A response without a frozen mode (or no read yet) draws no badge.
+  assert.equal(frozenThreadMode({ mode: 'plan', version: 1 }), null)
+  assert.equal(frozenThreadMode(undefined), null)
 })
 
 test('transition errors are a closed set', () => {

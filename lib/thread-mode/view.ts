@@ -26,8 +26,6 @@ export interface ThreadModePickerView {
   /** The version a transition must echo. */
   version: number
   locked: boolean
-  /** The mode the displayed run froze; shown as a badge beside the picker. */
-  frozenMode: ThreadMode | null
   options: ThreadModeOptionView[]
 }
 
@@ -44,10 +42,13 @@ export function threadModePicker(read: ThreadModeRead | undefined, active: boole
     mode,
     version: read.version,
     locked,
-    // The displayed run's own mode: a fact beside the thread's stored choice.
-    frozenMode: read.frozenMode ?? null,
     options: THREAD_MODES.map(option => ({ mode: option, selected: option === mode, disabled: locked })),
   }
+}
+
+/** The mode the displayed run froze, for the header's read-only badge. */
+export function frozenThreadMode(read: ThreadModeRead | undefined): ThreadMode | null {
+  return read?.frozenMode ?? null
 }
 
 /** A transition the server refused, as the picker words it. */

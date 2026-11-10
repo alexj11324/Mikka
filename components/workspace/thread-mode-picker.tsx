@@ -3,14 +3,14 @@
 // #1735 slice A: the thread's Plan / Execute / Ask choice above the composer.
 // The control shows the mode the server stored; while an unfinished run keeps
 // its frozen mode it is read-only, so the UI never shows a mode a run cannot
-// have. Frozen mode is a badge, never a second editable control.
+// have. The run's frozen mode is a read-only badge in the header.
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useThreadMode } from '@/hooks/use-thread-mode'
-import { threadModePicker, type ThreadModePickerView, type ThreadModeTransitionError } from '@/lib/thread-mode/view'
+import { frozenThreadMode, threadModePicker, type ThreadModePickerView, type ThreadModeTransitionError } from '@/lib/thread-mode/view'
 import type { ThreadMode } from '@mikka/protocol/thread-mode'
 
 export interface ThreadModePickerContentProps {
@@ -36,10 +36,21 @@ export function ThreadModePickerContent({ view, pending = false, error = null, o
     <span className="shrink-0 text-muted-foreground">{t('label')}</span>
     {group}
     {view.locked && <span className="text-muted-foreground">{t('locked')}</span>}
-    {view.frozenMode && <Badge variant="secondary" data-thread-mode-frozen="">{t('frozen', { mode: t(view.frozenMode) })}</Badge>}
     {pending && <Spinner aria-hidden="true" />}
     {error && <span role="alert" className="text-destructive-foreground">{t(error)}</span>}
   </div>
+}
+
+/** The header's read-only badge: what the displayed run actually froze. */
+export function ThreadModeFrozenBadgeContent({ mode }: { mode: ThreadMode | null }) {
+  const t = useTranslations('IssueThreads.mode')
+  if (!mode) return null
+  return <Badge variant="secondary" data-thread-mode-frozen="">{t('frozen', { mode: t(mode) })}</Badge>
+}
+
+export function ThreadModeFrozenBadge({ runId, liveRunId }: { runId: string; liveRunId?: string }) {
+  const { state } = useThreadMode(runId, liveRunId)
+  return <ThreadModeFrozenBadgeContent mode={frozenThreadMode(state)} />
 }
 
 /**

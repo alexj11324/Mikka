@@ -10,7 +10,7 @@ import { ThreadStatus } from '@/components/workspace/thread-status-icon'
 import { cn } from '@/lib/utils'
 import type { ThreadHeaderProps, ThreadStatusLineProps } from './thread-header-contract'
 
-export function ThreadHeader({ title, headingRef, onBack, onClose, onStop, onOpenTask, place, acceptanceBadge, identity, artifact, tabs, wraps }: ThreadHeaderProps) {
+export function ThreadHeader({ title, headingRef, onBack, onClose, onStop, onOpenTask, place, acceptanceBadge, mode, identity, artifact, tabs, wraps }: ThreadHeaderProps) {
   const t = useTranslations('IssueThreads')
   return <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', onBack && 'pl-2', wraps && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
     {onBack && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('back')} aria-keyshortcuts="Escape" onClick={onBack} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>}
@@ -18,6 +18,8 @@ export function ThreadHeader({ title, headingRef, onBack, onClose, onStop, onOpe
     {/* Icons only after the title: where it runs and its Agent; names on hover (Alex, 2026-11-06). */}
     {place}
     {acceptanceBadge}
+    {/* The run's frozen mode (#1730): read-only here; the switch lives above the composer. */}
+    {mode}
     <span className="flex-1" />
     {identity}
     {/* Always there, left of stop: off until the thread hands an Artifact over (decision 2026-11-06-1615). */}

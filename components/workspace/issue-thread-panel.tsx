@@ -39,7 +39,7 @@ import { ThreadHeader, ThreadStatusLine } from './thread-header'
 import { useRightColumnWiden } from './right-column-widen'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
-import { ThreadModePicker } from './thread-mode-picker'
+import { ThreadModeFrozenBadge, ThreadModePicker } from './thread-mode-picker'
 import { cn } from '@/lib/utils'
 import { ThreadArtifactButton, ThreadArtifactCards } from './artifact-review'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -408,6 +408,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       widen={widen ?? undefined} liveRunId={liveRunId} status={data?.thread.status ?? ''} acceptanceTaskId={acceptance?.id ?? null}
       place={detail ? <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} /> : null}
       acceptanceBadge={acceptance ? <AcceptanceStateBadge task={acceptance} /> : null}
+      mode={data?.thread.ownedByCurrentUser ? <ThreadModeFrozenBadge runId={runId} liveRunId={liveRunId} /> : null}
       identity={data?.thread.ownedByCurrentUser ? <ThreadExecutionIdentity runId={liveRunId} /> : null}
       artifact={!readRejected ? <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} /> : null}
       tabs={acceptance && !hasChanges ? <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">

@@ -14,7 +14,10 @@ const copy = (namespace: string) => {
 mock.module('next-intl', { namedExports: { useTranslations: copy } })
 
 let Content: typeof import('./thread-mode-picker')['ThreadModePickerContent']
-before(async () => { ({ ThreadModePickerContent: Content } = await import('./thread-mode-picker')) })
+let BadgeContent: typeof import('./thread-mode-picker')['ThreadModeFrozenBadgeContent']
+before(async () => {
+  ({ ThreadModePickerContent: Content, ThreadModeFrozenBadgeContent: BadgeContent } = await import('./thread-mode-picker'))
+})
 
 function pick(read: ThreadModeRead, active = false): ThreadModePickerView {
   const view = threadModePicker(read, active)
@@ -46,11 +49,16 @@ test('a running thread disables every option and says why in plain text', () => 
   assert.ok((html.match(/disabled=""/g)?.length ?? 0) >= 3)
 })
 
-test('a frozen mode that differs from the stored choice is a badge, not another control', () => {
+test('the picker never draws the frozen mode; the header badge is the only place it appears', () => {
   const html = renderToStaticMarkup(<Content view={pick({ mode: 'execute', version: 4, frozenMode: 'ask' }, true)} />)
-  assert.match(html, /data-thread-mode-frozen/)
-  assert.match(html, /本次运行：询问/)
-  // The badge adds no switchable control: still exactly the three options.
+  assert.doesNotMatch(html, /data-thread-mode-frozen/)
+  assert.doesNotMatch(html, /本次运行/)
+  const badge = renderToStaticMarkup(<BadgeContent mode="ask" />)
+  assert.match(badge, /data-thread-mode-frozen/)
+  assert.match(badge, /本次运行：询问/)
+  // No read or no frozen mode: nothing is drawn.
+  assert.equal(renderToStaticMarkup(<BadgeContent mode={null} />), '')
+  // The badge adds no switchable control.
   assert.equal(html.match(/aria-pressed=/g)?.length, 3)
 })
 
