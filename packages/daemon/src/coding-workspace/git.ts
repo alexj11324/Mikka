@@ -22,7 +22,7 @@ import { buildChildEnv } from '../env'
 import type { JournalEntry } from '../runs/journal'
 import { gitFor, missing, readWorkspaceRevertPreview, statFence } from './diff'
 import { mountId, safeFile, type WorkspaceRoot } from './files'
-import { gitLogArgs, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from './git-parse'
+import { gitLogArgs, gitText, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from './git-parse'
 
 const digest = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 const oid = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/
@@ -430,7 +430,7 @@ async function dryRunCheckpoint(git: Git, root: WorkspaceRoot, identity: Workspa
     try { await runGit(worktree, ['apply', '--binary', '--3way', '--whitespace=nowarn', patchFile], tempEnv(), signal) }
     catch { applied = false }
     const raw = await runGit(worktree, ['status', '--porcelain=v2', '-z', '--untracked-files=all'], tempEnv(), signal)
-    const parsed = parsePorcelainV2(raw.stdout.toString())
+    const parsed = parsePorcelainV2(gitText(raw.stdout))
     const files: PlanFile[] = [], conflicts: PlanConflict[] = [], contents: RestorePlan['contents'] = new Map()
     const seen = new Set<string>()
     let total = 0

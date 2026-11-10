@@ -51,6 +51,13 @@ function parseBranchField(field: string, branch: ParsedBranch) {
 
 /** `git status --porcelain=v2 --branch -z --untracked-files=all`.
  * Records are NUL-terminated; a rename/copy original path is the next field. */
+/** `execa` returns a `Uint8Array` for `encoding: 'buffer'`, and its inherited
+ * `toString()` joins the byte values ("49,32,77,...") instead of decoding
+ * them, so every Git read must decode explicitly. */
+export function gitText(bytes: Uint8Array | string): string {
+  return typeof bytes === 'string' ? bytes : Buffer.from(bytes).toString('utf8')
+}
+
 export function parsePorcelainV2(output: string): ParsedStatus {
   const fields = output.split('\0')
   const branch: ParsedBranch = { headSha: null, branch: null, detached: false, upstream: null }

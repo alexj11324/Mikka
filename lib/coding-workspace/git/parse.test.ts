@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { gitLogArgs, gitLogFormat, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from '../../../packages/daemon/src/coding-workspace/git-parse'
+import { gitLogArgs, gitLogFormat, gitText, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from '../../../packages/daemon/src/coding-workspace/git-parse'
 
 const sha = (letter: string) => letter.repeat(40)
 const head = sha('a'), base = sha('b')
@@ -31,6 +31,15 @@ test('porcelain v2 detached heads and missing upstream stay explicit', () => {
   assert.equal(parsed.branch.branch, null)
   assert.equal(parsed.branch.upstream, null)
   assert.throws(() => parsePorcelainV2('1 nope\0'))
+})
+
+test('git output is decoded from bytes, never from a Uint8Array join', () => {
+  // execa hands back a Uint8Array for `encoding: 'buffer'`; its toString()
+  // produces "63,32,110,..." which parses as no record at all.
+  const bytes = new Uint8Array(Buffer.from('? notes.md\0'))
+  assert.equal(gitText(bytes), '? notes.md\0')
+  assert.deepEqual(parsePorcelainV2(gitText(bytes)).entries.map(entry => entry.path), ['notes.md'])
+  assert.equal(gitText('already text'), 'already text')
 })
 
 test('porcelain v2 names the record it cannot read and skips ignored paths', () => {
