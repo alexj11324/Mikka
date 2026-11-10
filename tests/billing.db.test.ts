@@ -16,23 +16,50 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
   t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
   const rejects = (promise: Promise<unknown>, code: string) => assert.rejects(promise, (error: unknown) => error instanceof WorkspaceError && error.code === code)
   const id = (prefix: string) => `${prefix}_${randomUUID().replaceAll('-', '')}`
-  const env = { MIKKA_EDITION: 'cloud', STRIPE_SECRET_KEY: 'sk_test_fake', STRIPE_TEAM_PRICE_ID: 'price_legacy', STRIPE_TEAM_RESOURCE_PRICE_ID: 'price_resource' }
+  const env = { MIKKA_EDITION: 'cloud', STRIPE_SECRET_KEY: 'sk_test_fake', STRIPE_WEBHOOK_SECRET: 'whsec_synthetic',
+    BETTER_AUTH_URL: 'https://mikka.example', STRIPE_TEAM_PRICE_ID: 'price_legacy', STRIPE_TEAM_RESOURCE_PRICE_ID: 'price_resource' }
   const price = { id: 'price_resource', active: true, currency: 'usd', type: 'recurring', billing_scheme: 'per_unit', unit_amount: 2000,
     recurring: { interval: 'month', interval_count: 1, usage_type: 'licensed' },
     metadata: { mikka_billing_model: 'resource_v1', mikka_plan: 'pro', mikka_monthly_points: '1000' } }
-  const requests: Array<{ url: string; body: string }> = []
+  const requests: Array<{ url: string; body: string; method: string; key: string | null }> = []
   const subscriptions = new Map<string, Record<string, unknown>>(), invoices = new Map<string, Record<string, unknown>>()
+  const customers = new Map<string, string>(), checkoutKeys = new Map<string, string>(), sessions = new Map<string, Record<string, unknown>>()
+  let loseCheckoutResponse = false
   const payments = new Map<string, { id: string; amount_received: number; currency: string; metadata: Record<string, string> }>()
   const invoicePayments = new Map<string, Array<{ id: string; amount_paid: number; currency: string; invoice: string; status: string; payment: { type: string; payment_intent: string } }>>()
   const fake = (async (input: string, init: RequestInit = {}) => {
-    const url = new URL(input); requests.push({ url: input, body: String(init.body ?? '') })
+    const url = new URL(input), body = new URLSearchParams(String(init.body ?? '')), key = new Headers(init.headers).get('idempotency-key')
+    requests.push({ url: input, body: body.toString(), method: init.method ?? 'GET', key })
     let result: unknown
     if (url.pathname === '/v1/prices/price_resource') result = price
+    else if (url.pathname === '/v1/customers') {
+      const target = body.get('metadata[workspaceId]')!
+      if (!customers.has(target)) customers.set(target, target === ws.id ? customer : id('cus'))
+      result = { id: customers.get(target) }
+    }
+    else if (url.pathname === '/v1/subscriptions') result = { has_more: false,
+      data: [...subscriptions.values()].filter(row => row.customer === url.searchParams.get('customer')) }
     else if (url.pathname.startsWith('/v1/subscriptions/')) result = subscriptions.get(url.pathname.split('/').at(-1)!)
     else if (url.pathname.startsWith('/v1/invoices/')) result = invoices.get(url.pathname.split('/').at(-1)!)
     else if (url.pathname.startsWith('/v1/payment_intents/')) result = payments.get(url.pathname.split('/').at(-1)!)
     else if (url.pathname === '/v1/invoice_payments') result = { has_more: false, data: invoicePayments.get(url.searchParams.get('invoice')!) ?? [] }
-    else if (url.pathname === '/v1/checkout/sessions') result = { url: 'https://checkout.stripe.com/c/pay_synthetic' }
+    else if (url.pathname === '/v1/checkout/sessions' && init.method === 'POST') {
+      assert.ok(key)
+      assert.ok(key.startsWith('resource-checkout:'))
+      let sid = checkoutKeys.get(key)
+      if (!sid) {
+        sid = id('cs'); checkoutKeys.set(key, sid)
+        sessions.set(sid, { id: sid, mode: 'subscription', status: 'open', customer: body.get('customer'), subscription: null,
+          client_reference_id: body.get('client_reference_id'), expires_at: Number(body.get('expires_at')), created: Math.floor(Date.now() / 1000),
+          metadata: { workspaceId: body.get('metadata[workspaceId]'), billingModel: body.get('metadata[billingModel]'), checkoutRequestId: body.get('metadata[checkoutRequestId]') },
+          url: 'https://checkout.stripe.com/c/pay_synthetic' })
+      }
+      result = sessions.get(sid)
+      if (loseCheckoutResponse) { loseCheckoutResponse = false; throw new TypeError('synthetic_checkout_response_lost') }
+    }
+    else if (url.pathname === '/v1/checkout/sessions') result = { has_more: false,
+      data: [...sessions.values()].filter(row => row.customer === url.searchParams.get('customer')) }
+    else if (url.pathname.startsWith('/v1/checkout/sessions/')) result = sessions.get(url.pathname.split('/').at(-1)!)
     else if (url.pathname === '/v1/billing_portal/sessions') result = { url: 'https://billing.stripe.com/p/session_synthetic' }
     return new Response(JSON.stringify(result ?? { error: 'unknown_synthetic_route' }), { status: result ? 200 : 404 })
   }) as typeof fetch
@@ -48,7 +75,6 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
   invoices.set(invoiceId, invoice)
   const sub = { id: subId, customer, status: 'active', metadata: { workspaceId: ws.id, billingModel: 'resource_v1' },
     latest_invoice: invoice, items: { data: [{ quantity: 1, current_period_end: end, price: { id: price.id, nickname: 'Team resources' } }] } }
-  subscriptions.set(subId, sub)
   const event = (type = 'customer.subscription.updated', object: Record<string, unknown> = sub) => ({ id: id('evt'), type, data: { object } })
 
   await t.test('only admins may buy a separately configured resource plan; legacy prices cannot be sold as resources', async () => {
@@ -56,6 +82,8 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
     await rejects(billing.planCheckoutUrl(admin, ws.id, back, fake, {}), 'billingNotConfigured')
     await rejects(billing.workspaceBillingView(member, ws.id, env), 'workspaceAccessDenied')
     await rejects(billing.planCheckoutUrl(member, ws.id, back, fake, env), 'workspaceAccessDenied')
+    await rejects(billing.planCheckoutUrl(admin, ws.id, back, fake, { ...env, STRIPE_WEBHOOK_SECRET: '' }), 'billingNotConfigured')
+    await rejects(billing.planCheckoutUrl(admin, ws.id, 'https://attacker.invalid/return', fake, env), 'billingPlanInvalid')
     await rejects(billing.planCheckoutUrl(admin, ws.id, back, fake, { ...env, STRIPE_TEAM_RESOURCE_PRICE_ID: '' }), 'billingResourcePlanUnavailable')
     requests.length = 0
     assert.deepEqual(await billing.planCheckoutUrl(admin, ws.id, back, fake, env), { url: 'https://checkout.stripe.com/c/pay_synthetic' })
@@ -68,6 +96,7 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
   })
 
   await t.test('paid webhook grants credits and entitlements once, without replacing operator grants', async () => {
+    subscriptions.set(subId, sub)
     await pool.query(`insert into mikka_workspace_entitlements ("workspaceId",plan,source,"seatLimit") values($1,'enterprise','cloud',20)`, [ws.id])
     const created = event('customer.subscription.created')
     assert.equal(await billing.applyStripeEvent(created, options), true)
@@ -87,6 +116,63 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
     assert.equal((await pool.query('select "purchasedMicroUsd"::int p,"planMicroUsd"::int c from hosted_usage where id=$1', [call])).rows[0].p, 0)
     await rejects(billing.planCheckoutUrl(admin, ws.id, back, fake, env), 'billingPlanInvalid')
     assert.equal((await billing.billingPortalUrl(admin, ws.id, back, fake, env)).url, 'https://billing.stripe.com/p/session_synthetic')
+  })
+
+  await t.test('concurrent Checkout clicks reuse one durable request and one provider Session', async () => {
+    const target = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), before = sessions.size
+    const urls = await Promise.all(Array.from({ length: 3 }, () => billing.planCheckoutUrl(admin, target.id, back, fake, env)))
+    assert.deepEqual(urls, Array(3).fill({ url: 'https://checkout.stripe.com/c/pay_synthetic' }))
+    assert.equal(sessions.size, before + 1)
+    const receipts = (await pool.query('select id,"sessionId" from billing_checkout_requests where "workspaceId"=$1', [target.id])).rows
+    assert.equal(receipts.length, 1)
+    assert.ok(receipts[0].sessionId)
+    const posts = requests.filter(row => row.method === 'POST' && new URLSearchParams(row.body).get('client_reference_id') === target.id)
+    assert.ok(posts.length > 0)
+    assert.equal(new Set(posts.map(row => row.key)).size, 1)
+    assert.equal(new Set(posts.map(row => row.body)).size, 1)
+    assert.equal((await pool.query(`select count(*)::int n from workspace_audit_events where "workspaceId"=$1 and action='billing.checkout_started'`, [target.id])).rows[0].n, 1)
+  })
+
+  await t.test('lost Checkout response keeps its idempotency key, fixed return URL and original provider Session', async () => {
+    const target = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), before = sessions.size
+    loseCheckoutResponse = true
+    await rejects(billing.planCheckoutUrl(admin, target.id, back, fake, env), 'billingProviderFailed')
+    const prior = (await pool.query('select id,"sessionId" from billing_checkout_requests where "workspaceId"=$1', [target.id])).rows[0]
+    assert.equal(prior.sessionId, null)
+    await billing.planCheckoutUrl(admin, target.id, `${back}&retried=true`, fake, env)
+    assert.equal(sessions.size, before + 1)
+    const posts = requests.filter(row => row.method === 'POST' && new URLSearchParams(row.body).get('client_reference_id') === target.id)
+    assert.equal(posts.length, 2)
+    assert.equal(posts[0].key, posts[1].key)
+    assert.equal(posts[0].body, posts[1].body)
+    assert.ok((await pool.query('select "sessionId" from billing_checkout_requests where id=$1', [prior.id])).rows[0].sessionId)
+  })
+
+  await t.test('canonical subscription blocks another Checkout before its webhook; expired lost responses recover without replaying a pruned key', async () => {
+    const target = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    loseCheckoutResponse = true
+    await rejects(billing.planCheckoutUrl(admin, target.id, back, fake, env), 'billingProviderFailed')
+    const prior = (await pool.query('select * from billing_checkout_requests where "workspaceId"=$1', [target.id])).rows[0]
+    const session = sessions.get(checkoutKeys.get(`resource-checkout:${prior.id}`)!)!
+    const sid = id('sub')
+    session.status = 'complete'; session.subscription = sid; session.url = null
+    subscriptions.set(sid, { id: sid, customer: prior.customerId, status: 'active' })
+    const count = sessions.size
+    await rejects(billing.planCheckoutUrl(admin, target.id, back, fake, env), 'billingPlanInvalid')
+    assert.equal(sessions.size, count)
+    assert.equal((await pool.query('select status from workspace_billing where "workspaceId"=$1', [target.id])).rows[0].status, null)
+    // Age the synthetic request beyond Stripe's retention and close its real
+    // provider object. The retry must list/retrieve that object before replacing it.
+    subscriptions.set(sid, { id: sid, customer: prior.customerId, status: 'canceled' })
+    const createdAt = new Date(Date.now() - 27 * 3600_000), expiresAt = new Date(Math.floor((createdAt.getTime() + 2 * 3600_000) / 1000) * 1000)
+    await pool.query(`update billing_checkout_requests set "createdAt"=$2,"expiresAt"=$3,params=jsonb_set(params,'{expires_at}',to_jsonb($4::bigint)) where id=$1`,
+      [prior.id, createdAt, expiresAt, Math.floor(expiresAt.getTime() / 1000)])
+    session.created = Math.floor(createdAt.getTime() / 1000); session.expires_at = Math.floor(expiresAt.getTime() / 1000)
+    await billing.planCheckoutUrl(admin, target.id, back, fake, env)
+    assert.equal(sessions.size, count + 1)
+    assert.equal(requests.filter(row => row.method === 'POST' && row.key === `resource-checkout:${prior.id}`).length, 1)
+    assert.equal((await pool.query('select count(*)::int n from billing_checkout_requests where "workspaceId"=$1 and "closedAt" is null', [target.id])).rows[0].n, 1)
+    assert.ok((await pool.query('select "sessionId","closedAt" from billing_checkout_requests where id=$1', [prior.id])).rows[0].closedAt)
   })
 
   await t.test('out-of-order active snapshots do not revive a canonically canceled subscription', async () => {

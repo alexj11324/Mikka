@@ -1265,6 +1265,7 @@
     "billingResourcePlanUnavailable": "资源套餐尚未开通。现有订阅和点数保持不变。",
     "billingAutoRechargeUnavailable": "当前支付渠道不支持自动充值。请使用「充值」逐次授权购买点数。",
     "billingPolicyChanged": "计费限制在编辑期间已变更，请重新读取当前设置后再试。",
+    "billingCheckoutPending": "上一笔结账仍在对账，请稍后回到计费页继续同一笔购买。",
     "billingNoSubscription": "工作区还没有订阅。",
     "billingPlanInvalid": "无法选择这个方案。",
     "billingProviderFailed": "支付服务暂时无法完成请求。",

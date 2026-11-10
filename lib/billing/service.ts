@@ -20,6 +20,8 @@ import { drainBillingEntitlements } from './entitlement-outbox'
 import { organizationBillingAccounts, organizationMembers } from '@/lib/db/governance-schema'
 import { requireOrganizationAdmin } from '@/lib/governance/organizations'
 import { autoRechargePolicy, type AutoRechargePolicyView } from './auto-recharge'
+import { authTrustedOrigins } from '@/lib/auth-config'
+import { resourcePlanCheckout } from './plan-checkout'
 
 type Env = Readonly<Record<string, string | undefined>>
 
@@ -77,7 +79,7 @@ async function readBillingAccount(workspaceId: string, env: Env): Promise<Billin
   const status = billing?.status ?? null
   return {
     configured: Boolean(stripeConfig(env)),
-    resourceCheckoutAvailable: Boolean(stripeConfig(env)?.resourcePriceId),
+    resourceCheckoutAvailable: Boolean(stripeConfig(env)?.resourcePriceId && stripeConfig(env)?.webhookSecret),
     billingModel: billing?.billingModel ?? null,
     entitlementPlan: billing?.billingExpiresAt && billing.billingExpiresAt > new Date() ? billing.billingPlan : 'free',
     entitlementExpiresAt: billing?.billingExpiresAt?.toISOString() ?? null,
@@ -92,7 +94,11 @@ async function readBillingAccount(workspaceId: string, env: Env): Promise<Billin
   }
 }
 
-const returnUrl = z.url().refine(url => /^https?:\/\//.test(url))
+function returnUrl(back: string, env: Env) {
+  const url = new URL(z.url().parse(back))
+  if (url.username || url.password || !authTrustedOrigins(env).includes(url.origin)) throw new WorkspaceError('billingPlanInvalid')
+  return url.href
+}
 
 function provider<T>(work: () => Promise<T>): Promise<T> {
   return work().catch(error => {
@@ -116,32 +122,24 @@ export async function billingPortalUrl(actorId: string, workspaceId: string, bac
   await requireAdmin(actorId, workspaceId)
   const [billing] = await db.select({ customer: workspaceBilling.stripeCustomerId }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)
   if (!billing?.customer) throw new WorkspaceError('billingNoSubscription')
-  const session = await provider(() => stripePost<{ url: string }>(config, 'billing_portal/sessions', { customer: billing.customer, return_url: returnUrl.parse(back) }, fetchImpl))
-  return { url: z.url().parse(session.url) }
+  const session = await provider(() => stripePost<{ url: string }>(config, 'billing_portal/sessions', { customer: billing.customer, return_url: returnUrl(back, env) }, fetchImpl))
+  const url = z.url().parse(session.url)
+  if (new URL(url).origin !== 'https://billing.stripe.com') throw new WorkspaceError('billingProviderFailed')
+  return { url }
 }
 
 /** A capacity plan is one verified resource price, regardless of human membership. */
 export async function planCheckoutUrl(actorId: string, workspaceId: string, back: string, fetchImpl: typeof fetch = fetch, env: Env = process.env): Promise<{ url: string }> {
   const config = requireConfig(env)
   await requireAdmin(actorId, workspaceId)
+  if (!config.webhookSecret) throw new WorkspaceError('billingNotConfigured')
   if (!config.resourcePriceId) throw new WorkspaceError('billingResourcePlanUnavailable')
-  const [billing] = await db.select({ status: workspaceBilling.status, customer: workspaceBilling.stripeCustomerId }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)
-  if (billing?.status && (BILLING_LIVE_STATUSES as readonly string[]).includes(billing.status)) throw new WorkspaceError('billingPlanInvalid')
-  const back_ = returnUrl.parse(back)
+  const back_ = returnUrl(back, env)
   let price: ReturnType<typeof resourcePrice>
   const configuredPrice = await provider(() => stripeGet<unknown>(config, `prices/${config.resourcePriceId}`, fetchImpl))
   try { price = resourcePrice(configuredPrice, config.resourcePriceId) }
   catch (error) { throw new WorkspaceError('billingResourcePlanUnavailable', { cause: error }) }
-  const session = await provider(() => stripePost<{ url: string }>(config, 'checkout/sessions', {
-    mode: 'subscription', managed_payments: { enabled: true },
-    line_items: [{ price: price.id, quantity: 1 }],
-    client_reference_id: workspaceId,
-    ...(billing?.customer ? { customer: billing.customer } : {}),
-    subscription_data: { metadata: { workspaceId, billingModel: price.version, plan: price.plan } },
-    metadata: { workspaceId, billingModel: price.version },
-    success_url: back_, cancel_url: back_,
-  }, fetchImpl))
-  return { url: z.url().parse(session.url) }
+  return provider(() => resourcePlanCheckout(actorId, workspaceId, back_, price, config, fetchImpl))
 }
 
 const subscriptionEvent = z.object({

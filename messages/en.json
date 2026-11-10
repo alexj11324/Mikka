@@ -1265,6 +1265,7 @@
     "billingResourcePlanUnavailable": "Resource plans are not available yet. Your existing subscription and credits are unchanged.",
     "billingAutoRechargeUnavailable": "Automatic top-ups are unavailable with the current payment provider. Use Add points to authorize each purchase.",
     "billingPolicyChanged": "Billing limits changed while you were editing. Reload the current limits and try again.",
+    "billingCheckoutPending": "A previous checkout is still being reconciled. Return to billing shortly to continue the same purchase.",
     "billingNoSubscription": "This workspace has no subscription yet.",
     "billingPlanInvalid": "This plan is not available.",
     "billingProviderFailed": "The payment service could not complete the request.",

@@ -1285,6 +1285,20 @@ export const workspaceBilling = pgTable('workspace_billing', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
+/** One recoverable subscription Checkout per account, with immutable provider parameters. */
+export const billingCheckoutRequests = pgTable('billing_checkout_requests', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspaceId').notNull().references(() => workspaceBilling.workspaceId),
+  actorId: text('actorId').notNull(),
+  customerId: text('customerId').notNull(),
+  priceId: text('priceId').notNull(),
+  params: jsonb('params').$type<Record<string, unknown>>().notNull(),
+  sessionId: text('sessionId').unique(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  closedAt: timestamp('closedAt', { withTimezone: true }),
+}, table => [uniqueIndex('billing_checkout_requests_active_idx').on(table.workspaceId).where(sql`${table.closedAt} IS NULL`)])
+
 /** Credit grants: 'plan' per paid invoice (replaces the previous period's), 'purchased' never expires. */
 export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
   id: uuid('id').primaryKey(),

@@ -35,6 +35,16 @@ Shared Workspace 的 `activeHumanLimit` 为 `null`。Personal Workspace 仍只�
 
 没有配置或者验证失败时，返回 `billingResourcePlanUnavailable`。不能用昵称猜测套餐、复用旧每席位 Price 或在应用启动时创建价格。年度计划需要独立的按月授额合同，不得把一年的付款误当成一份月度额度。归档 Price 不影响其已付费订阅的付款期间。
 
+### Checkout 请求一致性
+
+新订阅 Checkout 还要求 webhook 密钥已配置，并只接受部署已信任的返回来源。Checkout 与 Customer Portal 返回的 URL 必须分别来自 `https://checkout.stripe.com` 和 `https://billing.stripe.com`。
+
+`billing_checkout_requests` 保存一份待支付请求的 UUID、账户、Actor、客户、Price 和固定参数，不保存卡片或凭证。每个账户同时只能有一份未结束请求。APP 先提交请求，再以 `resource-checkout:<UUID>` 为 Stripe 幂等键创建 Session；并发点击、网络超时或调用方改变返回页面都不能改变正在执行的付款参数。点数购买与套餐复用现有客户绑定代码，避免建立不同的付款客户来源。
+
+继续结账前按客户读取 Stripe 的权威订阅列表。即使付款已经完成而 webhook 尚未抵达，任何非 `canceled` / `incomplete_expired` 订阅都阻止创建第二份订阅。Session 结果丢失且已经接近过期时，按固定客户、创建期间和请求 metadata 恢复原始 Session，不重放可能已超过 Stripe 保留期的幂等键。只有提供商确认过期，或已完成 Session 的订阅确认终结后，才能关闭旧请求并新建请求。无法确认的状态返回 `billingCheckoutPending`，不自动取消真实订阅或发起退款。
+
+列表恢复每次最多读取 20 页；分页不完整或状态未知时拒绝新付款，保留原请求供下一次明确操作重试。没有自动轮询、真实支付或后台重复扣款。每份新请求只写一次 `billing.checkout_started` 审计。
+
 ## Stripe 与 Entitlements 一致性
 
 订阅与相关 invoice 事件先校验 webhook 签名，再由 `applyStripeEvent` 处理。订阅处理在 APP 数据库的账户锁内重新读取 Stripe 的权威 Subscription 和 Invoice，避免乱序事件快照恢复已经取消的订阅。
@@ -106,7 +116,7 @@ Project、Thread 和 Run 的预算管理只查询 APP `resource_access_policies`
 
 ## 迁移与回滚
 
-本合同使用五份只增迁移：`20261110020030_billing_consistency.sql`、`20261110020031_billing_entitlements.sql`、`20261110020032_plan_credit_usage.sql`、`20261110020033_resource_budgets.sql`、`20261110020034_billing_financial_receipts.sql`。第二份用于 Workspace 数据库，其余用于 APP 数据库。
+本合同使用六份只增迁移：`20261110020030_billing_consistency.sql`、`20261110020031_billing_entitlements.sql`、`20261110020032_plan_credit_usage.sql`、`20261110020033_resource_budgets.sql`、`20261110020034_billing_financial_receipts.sql`、`20261110020035_billing_checkout_requests.sql`。第二份用于 Workspace 数据库，其余用于 APP 数据库。
 
 发布前保存部署 SHA 和数据库备份，并核对 `workspace_credit_grants` 的原记录数、各账户各桶金额总和、Stripe 客户/订阅 ID 及历史 `hosted_usage` 金额。发布后核对这些历史值保持不变，再检查增量授额和使用收据。
 
@@ -116,7 +126,7 @@ Project、Thread 和 Run 的预算管理只查询 APP `resource_access_policies`
 
 ## 验证依据
 
-`tests/billing.db.test.ts` 覆盖付款期间、乱序 webhook、跨库投递失败后重试、旧订阅、显式 Organization 账户、套餐点数结算、部分/全额退款、多笔付款、退款先到和并发对账、Owner 自动充值限制与拒绝未支持扣款。`tests/billing-points.db.test.ts` 覆盖含税购买与退款的点数/实际金额分离。`lib/abuse/store.db.test.ts` 覆盖真实 PostgreSQL 的并发预算、未知成本预留、期间边界和账本幂等性。`tests/governance-seats.db.test.ts` 保留 Personal 边界、配额容量以及单连接池锁顺序验收。
+`tests/billing.db.test.ts` 覆盖付款期间、乱序 webhook、跨库投递失败后重试、旧订阅、显式 Organization 账户、套餐点数结算、部分/全额退款、多笔付款、退款先到和并发对账、Owner 自动充值限制与拒绝未支持扣款，以及 Checkout 并发、响应丢失、完成后 webhook 延迟和幂等键过期后的恢复。`tests/billing-points.db.test.ts` 覆盖含税购买与退款的点数/实际金额分离。`lib/abuse/store.db.test.ts` 覆盖真实 PostgreSQL 的并发预算、未知成本预留、期间边界和账本幂等性。`tests/governance-seats.db.test.ts` 保留 Personal 边界、配额容量以及单连接池锁顺序验收。
 
 上述数据库测试使用隔离数据库和合成 Stripe HTTP 响应，只证明应用和数据库行为。它们不等同于真实 Stripe、Claude Code/Codex、E2B 或生产验收。生产价格修改、真实扣款及不可逆余额转移需要另外的明确财务授权。
 
@@ -127,3 +137,5 @@ Project、Thread 和 Run 的预算管理只查询 APP `resource_access_policies`
 Stripe 的 [订阅 webhook 文档](https://docs.stripe.com/billing/subscriptions/webhooks) 将已支付 invoice 与有效订阅作为权限依据；[webhook 文档](https://docs.stripe.com/webhooks) 要求处理重复和乱序事件；[Invoice 对象](https://docs.stripe.com/api/invoices/object) 要求使用 invoice 行的服务期间；[订阅项期间变更](https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-subscription-current-period-start-and-end) 解释项级期间字段。本实现兼容项级期间及历史顶层期间，不以 webhook 到达时间作为付费期限。
 
 Stripe 的 [Invoice Payment 对象](https://docs.stripe.com/api/invoice-payment/object) 和 [列表接口](https://docs.stripe.com/api/invoice-payment/list) 定义实际付款分配；[Managed Payments 文档](https://docs.stripe.com/payments/managed-payments) 列出当前不支持的集成，[配置文档](https://docs.stripe.com/payments/managed-payments/set-up) 定义 Checkout 的显式启用参数。这些是提供商能力边界；退款时保留已发生用量、追加补偿账目以及不在未知外部成本上扣点，是 Mikka 的财务归属要求。
+
+Stripe 的 [幂等请求](https://docs.stripe.com/api/idempotent_requests) 明确 API v1 幂等键可能在至少 24 小时后被清除；[Checkout 创建](https://docs.stripe.com/api/checkout/sessions/create)、[列表](https://docs.stripe.com/api/checkout/sessions/list)、[读取](https://docs.stripe.com/api/checkout/sessions/retrieve) 和 [订阅列表](https://docs.stripe.com/api/subscriptions/list) 是请求恢复使用的官方接口。本实现保留固定 Session 过期时间，不能因键被清除而重新创建同一历史付款请求。
