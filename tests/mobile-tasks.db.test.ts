@@ -105,8 +105,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const peer = await authContext.internalAdapter.createSession(other); assert.ok(peer)
   const signature = createHmac('sha256', authContext.secret).update(native.token).digest('base64')
   const cookie = authContext.authCookies.sessionToken.name + '=' + encodeURIComponent(native.token + '.' + signature)
-  const { createPersonalAccessToken, revokePersonalAccessToken } = await import('../lib/tokens/store')
-  const pat = await createPersonalAccessToken(owner, teamWorkspace.id, { name: 'Mobile task isolated fixture', expiresAt: null })
+  const { createLegacyPersonalAccessToken, revokePersonalAccessToken } = await import('../lib/tokens/store')
+  const pat = await createLegacyPersonalAccessToken(owner, teamWorkspace.id, { name: 'Mobile task isolated fixture', expiresAt: null })
   const teamSelection = { workspaceId: teamWorkspace.id }
   const run = async <T>(path: string, handler: (request: Request) => Promise<T>, options: ReadOptions = {}) => {
     const bearer = options.bearer === undefined ? native.token : options.bearer
@@ -305,7 +305,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   })
 
   await t.test('explicit workspace selections return 404 across tenants, and workspace tokens stay scoped', async () => {
-    const personalPat = await createPersonalAccessToken(owner, own.id, { name: 'Mobile personal pin fixture', expiresAt: null })
+    const personalPat = await createLegacyPersonalAccessToken(owner, own.id, { name: 'Mobile personal pin fixture', expiresAt: null })
     const ownerMember = (await workspace.query('select name,email,role from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [teamWorkspace.id, owner])).rows[0]
     assert.ok(ownerMember)
     try {

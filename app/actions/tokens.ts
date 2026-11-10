@@ -7,12 +7,14 @@ import { auditRequestContext } from '@/lib/audit/events'
 import { settingsWorkspaceAction } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { createPersonalAccessToken, listPersonalAccessTokens, revokePersonalAccessToken, type CreatedPersonalAccessToken, type PersonalAccessTokenView } from '@/lib/tokens/store'
+import { DEFAULT_API_SCOPES, type ApiScope } from '@/lib/tokens/format'
 
-/** 设置 › 个人访问令牌: creates a token. `token` in the result is the plaintext, returned this once only. */
-async function createAccessTokenBody(input: { name: string; expiresAt?: string | null }, workspaceId?: string): Promise<SettingsActionResult<CreatedPersonalAccessToken>> {
+/** 设置 › 个人访问令牌: creates a token. `token` in the result is the plaintext, returned this once only.
+ * The settings page creates `/api/v1` tokens, so scopes default to the full public set. */
+async function createAccessTokenBody(input: { name: string; expiresAt?: string | null; scopes?: ApiScope[] }, workspaceId?: string): Promise<SettingsActionResult<CreatedPersonalAccessToken>> {
   return settingsWorkspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
-    return createPersonalAccessToken(actor.userId, actor.workspaceId, input, new Date(), { actorName: actor.name, ...auditRequestContext(await headers()) })
+    return createPersonalAccessToken(actor.userId, actor.workspaceId, { ...input, scopes: input.scopes ?? DEFAULT_API_SCOPES }, new Date(), { actorName: actor.name, ...auditRequestContext(await headers()) })
   })
 }
 

@@ -291,8 +291,8 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     const before = sent.length
     await push(); assert.equal(sent.length, before)
     await rebind()
-    const { createPersonalAccessToken } = await import('../lib/tokens/store')
-    const pat = await createPersonalAccessToken(owner, alpha, { name: 'Phone negative fixture', expiresAt: null })
+    const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+    const pat = await createLegacyPersonalAccessToken(owner, alpha, { name: 'Phone negative fixture', expiresAt: null })
     const signature = createHmac('sha256', context.secret).update(ownerSession.token).digest('base64')
     const cookie = context.authCookies.sessionToken.name + '=' + encodeURIComponent(ownerSession.token + '.' + signature)
     const snapshot = await tokenRows()
@@ -376,10 +376,10 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     await admin.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,\'Phone organization\',$2)', [organizationId, owner])
     await admin.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES($1,$2)', [alpha, organizationId])
     await changePolicy(false)
-    const { createPersonalAccessToken } = await import('../lib/tokens/store')
+    const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
     const { getApiSession } = await import('../lib/api-auth')
     const { actAs } = await import('../lib/acting-user')
-    const pat = await createPersonalAccessToken(owner, beta, { name: 'Phone ambient fixture', expiresAt: null })
+    const pat = await createLegacyPersonalAccessToken(owner, beta, { name: 'Phone ambient fixture', expiresAt: null })
     const caller = await getApiSession({ headers: new Headers({ authorization: 'Bearer ' + pat.token }), query: { disableCookieCache: true } })
     assert.ok(caller)
     const before = sent.length
