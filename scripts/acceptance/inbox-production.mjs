@@ -9,7 +9,8 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace } from './cloud-startup.mjs'
 import { assertCoreProductionTarget, attestCoreProduction, CORE_ORIGIN } from './self-hosted-production-target.mjs'
-import { selectInboxProduction, inboxSelectionFailure } from './inbox-production-target.mjs'
+import { inboxSelectionFailure } from './inbox-production-target.mjs'
+import { selectInboxAcceptance } from './self-hosted-production-followup-target.mjs'
 import { inboxBindingJournal, inboxJournalEnvelope, INBOX_JOURNAL_PREFIX, inboxRecoveryFailure, readInboxRecovery } from './inbox-production-recovery.mjs'
 import { liveInvalidation, liveReadiness } from '../../lib/live/events.ts'
 
@@ -218,8 +219,91 @@ function reviewSummary(flow) {
     branchPresent: Boolean(summary.branch), checks: summary.checks, checksUpdatedAt: summary.checksUpdatedAt }
 }
 
+/** Discover real samples through the existing owner APIs. The task endpoint
+ * limits raw rows before source/scope filtering and has no cursor: neither an
+ * empty nor a short response proves that an issue has no other tasks or PRs.
+ * Only issue pagination and the reads of actually returned tasks can exhaust.
+ */
+export async function readInboxFactoryInventory({ workspaceId, request, observe = () => {}, beforePage = async () => {}, now = Date.now,
+  deadline = now() + 180_000, requestLimit = 400, issuePageLimit = 10 } = {}) {
+  check(UUID.test(workspaceId ?? ''))
+  check(positive(requestLimit) && requestLimit <= 400 && positive(issuePageLimit) && issuePageLimit <= 10
+    && Number.isFinite(deadline))
+  const inventory = { selectedWorkspaceId: workspaceId, issuesRead: 0, tasksRead: 0, denied: 0, complete: false,
+    taskCompleteness: 'unknown_server_limit_before_filter', issuePaginationComplete: false,
+    returnedTaskReadsComplete: false, requests: 0, stopReason: null,
+    bounds: { requests: requestLimit, issuePagesPerWorkspace: issuePageLimit },
+    workspaces: [{ workspaceId, visited: false, issuePages: 0,
+      issuesRead: 0, tasksReturned: 0, tasksRead: 0, denied: 0, issuePaginationComplete: false,
+      returnedTaskReadsComplete: false, stopReason: 'not_visited' }], summaries: [] }
+  observe(inventory)
+  const bounded = () => {
+    if (now() >= deadline) inventory.stopReason = 'time_limit'
+    else if (inventory.requests >= requestLimit) inventory.stopReason = 'request_limit'
+    return inventory.stopReason === null
+  }
+  const read = async (step, path, workspaceId, expected = [200]) => {
+    inventory.requests++
+    return request(step, path, { headers: { 'x-mikka-workspace-id': workspaceId } }, expected)
+  }
+  discovery: for (const [workspaceIndex, scope] of inventory.workspaces.entries()) {
+    const workspaceId = scope.workspaceId, issueIds = new Set(), cursors = new Set()
+    let cursor
+    for (let pageIndex = 0; pageIndex < issuePageLimit; pageIndex++) {
+      if (!bounded()) { scope.stopReason = inventory.stopReason; break discovery }
+      await beforePage()
+      if (!bounded()) { scope.stopReason = inventory.stopReason; break discovery }
+      scope.visited = true; scope.stopReason = null
+      const { body: issues } = await read(`factory_issues_${workspaceIndex}_${pageIndex}`, '/api/issues/search?' + new URLSearchParams({
+        workspaceId, limit: '50', ...(cursor ? { cursor } : {}),
+      }), workspaceId)
+      check(Array.isArray(issues?.items) && issues.items.length <= 50 && typeof issues.truncated === 'boolean'
+        && (issues.nextCursor === null || typeof issues.nextCursor === 'string' && issues.nextCursor.length > 0 && issues.nextCursor.length <= 2048))
+      scope.issuePages++
+      for (const [issueIndex, issue] of issues.items.entries()) {
+        check(UUID.test(issue?.id ?? '') && !issueIds.has(issue.id)); issueIds.add(issue.id)
+        if (!bounded()) { scope.stopReason = inventory.stopReason; break discovery }
+        const tag = `${workspaceIndex}_${pageIndex}_${issueIndex}`
+        const list = await read('factory_tasks_' + tag, '/api/factory/tasks?issueId=' + issue.id, workspaceId, [200, 404])
+        inventory.issuesRead++; scope.issuesRead++
+        if (list.status === 404) { inventory.denied++; scope.denied++; continue }
+        check(list.body?.issueId === issue.id && list.body.liveWorkspaceId === workspaceId
+          && Array.isArray(list.body.tasks) && list.body.tasks.length <= 50)
+        const taskIds = new Set()
+        scope.tasksReturned += list.body.tasks.length
+        for (const [taskIndex, task] of list.body.tasks.entries()) {
+          check(UUID.test(task?.id ?? '') && !taskIds.has(task.id)); taskIds.add(task.id)
+          if (!bounded()) { scope.stopReason = inventory.stopReason; break discovery }
+          const path = `/api/factory/tasks/${task.id}/flow`
+          const { body: flow } = await read(`factory_flow_${tag}_${taskIndex}`, path, workspaceId)
+          check(flow?.id === task.id && flow.issueId === issue.id, 'fixture_binding_failed')
+          const observed = { workspaceId, issueId: issue.id, ...reviewSummary(flow) }
+          inventory.tasksRead++; scope.tasksRead++; inventory.summaries.push(observed)
+          if (observed.kind === 'pr' && observed.complete && observed.handoff) {
+            if (!bounded()) { scope.stopReason = inventory.stopReason; break discovery }
+            const { body: second } = await read(`factory_readback_${tag}_${taskIndex}`, path, workspaceId)
+            check(second?.id === task.id && second.issueId === issue.id, 'fixture_binding_failed')
+            const readback = reviewSummary(second)
+            observed.sameReadback = readback.kind === 'pr' && readback.complete && readback.handoff
+              && readback.revision === observed.revision && readback.summaryDigest === observed.summaryDigest
+          }
+        }
+      }
+      if (issues.truncated) { scope.stopReason = 'issue_search_truncated'; break }
+      if (issues.nextCursor === null) { scope.issuePaginationComplete = true; break }
+      check(!cursors.has(issues.nextCursor)); cursors.add(issues.nextCursor); cursor = issues.nextCursor
+      if (pageIndex === issuePageLimit - 1) scope.stopReason = 'issue_page_limit'
+    }
+    scope.returnedTaskReadsComplete = scope.tasksRead === scope.tasksReturned && scope.denied === 0
+  }
+  inventory.issuePaginationComplete = inventory.workspaces.every(row => row.issuePaginationComplete)
+  inventory.returnedTaskReadsComplete = inventory.stopReason === null
+    && inventory.workspaces.every(row => row.visited && row.returnedTaskReadsComplete)
+  return inventory
+}
+
 export async function runInboxProduction({ env = process.env, event, attestation, selection, fetchImpl = fetch,
-  selectTarget = selectInboxProduction,
+  selectTarget = selectInboxAcceptance,
   assertTarget = assertCoreProductionTarget, selectTeam = selectAcceptanceTeam, restoreWorkspace = restoreAcceptanceWorkspace,
   now = Date.now, socketFactory, readRecovery = readInboxRecovery, writeReceipt = async () => { throw new ProbeError('receipt_failed') } } = {}) {
   const report = { schema: 1, kind: 'mikka1820-production-api', status: 'failed', completeAcceptance: false,
@@ -341,7 +425,9 @@ export async function runInboxProduction({ env = process.env, event, attestation
     const target = selected.attestation
     check(target?.status === 'ready' && target.openIssues?.includes(1820) && SHA.test(target.applicationSha ?? ''), 'target_refused')
     source = target.applicationSha; report.applicationSha = source; report.driverRunId = target.driverRunId
-    report.selection = { pr: 1822, headSha: selected.headSha, phase: selected.window.phase,
+    report.selection = { pr: selected.pr ?? 1822, headSha: selected.headSha, phase: selected.window.phase,
+      ...(selected.purpose === 'inbox-1820-followup-selection' ? { featurePr: 1822, branch: selected.branch,
+        originMergeSha: selected.originMergeSha, originHeadSha: selected.originHeadSha } : {}),
       commentId: selected.window.commentId, markerSha256: selected.window.markerSha256, expiresAt: selected.window.expiresAt }
     fixture = selected.window.phase === 'fixture' ? selected.window.fixture : undefined
     deadline = Date.now() + 240_000
@@ -462,34 +548,15 @@ export async function runInboxProduction({ env = process.env, event, attestation
         report.inventory.github.recipients.push({ id: String(githubUser.id), source: 'plugin' })
       }
 
-      // Existing read-only task discovery. No model run, publication, approval,
-      // GitHub resynchronization or task mutation is requested here.
-      report.inventory.factory = { issuesRead: 0, tasksRead: 0, denied: 0, complete: false, summaries: [] }
-      const issues = await read('recent_team_issues', '/api/issues/search?' + new URLSearchParams({ workspaceId: teamSelection.workspaceId, limit: '50' }))
-      check(Array.isArray(issues?.items) && (issues.nextCursor === null || typeof issues.nextCursor === 'string'))
-      report.inventory.factory.complete = issues.nextCursor === null && issues.items.length <= 20
-      for (const [index, issue] of issues.items.slice(0, 20).entries()) {
-        check(UUID.test(issue?.id ?? ''))
-        const list = await request('factory_tasks_' + index, '/api/factory/tasks?issueId=' + issue.id, {}, [200, 404])
-        report.inventory.factory.issuesRead++
-        if (list.status === 404) { report.inventory.factory.denied++; continue }
-        check(list.body?.issueId === issue.id && Array.isArray(list.body.tasks))
-        if (list.body.tasks.length > 5) report.inventory.factory.complete = false
-        for (const [taskIndex, task] of list.body.tasks.slice(0, 5).entries()) {
-          check(UUID.test(task?.id ?? ''))
-          const path = `/api/factory/tasks/${task.id}/flow`
-          const flow = await read(`factory_flow_${index}_${taskIndex}`, path)
-          check(flow?.id === task.id && flow.issueId === issue.id, 'fixture_binding_failed')
-          const observed = reviewSummary(flow); report.inventory.factory.tasksRead++
-          if (observed.kind === 'no_pr') report.coverage.noPrNull = 'normal_owner_flow_null'
-          else if (observed.complete && observed.handoff) {
-            const readback = reviewSummary(await read(`factory_readback_${index}_${taskIndex}`, path))
-            observed.sameReadback = readback.kind === 'pr' && readback.revision === observed.revision && readback.summaryDigest === observed.summaryDigest
-            if (observed.sameReadback) report.coverage.cachedReviewSummary = 'handoff_complete_snapshot_readback'
-          }
-          report.inventory.factory.summaries.push(observed)
-        }
-      }
+      // No model, publication, approval, GitHub sync or task mutation. The
+      // explicit header pins only the already verified acceptance team. Other
+      // accessible choices do not authorize additional Factory acceptance.
+      const factory = await readInboxFactoryInventory({ workspaceId: teamSelection.workspaceId, request,
+        deadline: deadline - 60_000, beforePage: lease, observe: value => { report.inventory.factory = value } })
+      await lease()
+      if (factory.summaries.some(row => row.kind === 'no_pr')) report.coverage.noPrNull = 'normal_owner_flow_null'
+      if (factory.summaries.some(row => row.kind === 'pr' && row.sameReadback === true))
+        report.coverage.cachedReviewSummary = 'handoff_complete_snapshot_readback'
       if (fixture) {
         phase = 'fixture_source'
         boundFixture = await verifyInboxFixture(fixture, { ownerId, personalWorkspaceId, recipientIds, githubRead, now,
@@ -628,7 +695,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))
     const attestation = selecting ? JSON.parse(await readFile(directory + '/attestation.json', 'utf8')) : await attestCoreProduction({ event })
     coreRequired = attestation.openIssues?.some(number => number !== 1820) === true
-    if (selecting) report = await selectInboxProduction({ event, attestation })
+    if (selecting) report = await selectInboxAcceptance({ event, attestation })
     else {
       const selection = JSON.parse(await readFile(directory + '/inbox-selection.json', 'utf8'))
       report = await runInboxProduction({ event, attestation, selection,

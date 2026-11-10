@@ -66,6 +66,19 @@ test('foreign source, workflow, repository, attempt and active original job cann
   await assert.rejects(readInboxRecovery(f.args), /recovery_proof_invalid/); assert.equal(f.calls.length, 0)
 })
 
+test('a 1856 continuation cannot rename the original 325 run or journal into its own source', async () => {
+  const original = '32523d5955479de800a94ba002c551666c4ddeb1'
+  const run = fixture({ run: { head_sha: original } })
+  run.selected.purpose = 'inbox-1820-followup-selection'; run.selected.pr = 1856
+  await assert.rejects(readInboxRecovery(run.args), /recovery_proof_invalid/)
+  assert.equal(run.calls.some(call => call.url.includes('/logs')), false)
+  const oldJournal = inboxJournalEnvelope(journal({ applicationSha: original }))
+  const log = fixture({ log: ({ line }) => line(oldJournal) })
+  log.selected.purpose = 'inbox-1820-followup-selection'; log.selected.pr = 1856
+  log.reference.journalSha256 = oldJournal.sha256
+  await assert.rejects(readInboxRecovery(log.args), /recovery_log_invalid/)
+})
+
 test('missing, duplicate, conflicting, noncanonical and unanchored records fail closed instead of guessing first or last', async () => {
   const options = [
     { log: () => 'no journal' },

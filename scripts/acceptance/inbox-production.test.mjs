@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { InboxSelectionError } from './inbox-production-target.mjs'
 import { InboxRecoveryError, inboxBindingJournal } from './inbox-production-recovery.mjs'
-import { inboxLiveSocket, inboxProductionExitCode, runInboxProduction, verifyInboxFixture } from './inbox-production.mjs'
+import { INBOX_FOLLOWUP_BRANCH, INBOX_ORIGINAL_HEAD, INBOX_ORIGINAL_MERGE } from './self-hosted-production-followup-target.mjs'
+import { inboxLiveSocket, inboxProductionExitCode, readInboxFactoryInventory, runInboxProduction, verifyInboxFixture } from './inbox-production.mjs'
 
 const SHA = 'a'.repeat(40), NOW = Date.parse('2026-11-09T22:00:00.000Z')
 const OWNER = 'private-owner-canary', EMAIL = 'fixture+mikka-smoke@example.invalid'
@@ -14,6 +15,9 @@ const TEAM = '10000000-0000-4000-8000-000000000001', HOME = '10000000-0000-4000-
 const ITEM = '20000000-0000-4000-8000-000000000001', HISTORICAL = '20000000-0000-4000-8000-000000000002'
 const ISSUE = '30000000-0000-4000-8000-000000000001', TASK_PR = '40000000-0000-4000-8000-000000000001'
 const TASK_EMPTY = '40000000-0000-4000-8000-000000000002', NONCE = '50000000-0000-4000-8000-000000000001'
+const OTHER_TEAM = '10000000-0000-4000-8000-000000000003'
+const LATER_ISSUE = '30000000-0000-4000-8000-000000000002'
+const OTHER_TASKS = Array.from({ length: 5 }, (_, index) => '40000000-0000-4000-8000-' + String(index + 10).padStart(12, '0'))
 const hash = value => createHash('sha256').update(value).digest('hex')
 const marker = `<!-- mikka-inbox-1820:${NONCE} -->`
 const PUBLIC_ISSUE = 'https://github.com/alexj11324/Mikka-handoff/issues/73'
@@ -38,6 +42,7 @@ class Socket extends EventTarget {
 
 function fixture(options = {}) {
   const calls = [], receipts = [], history = [], mutations = [], sockets = []
+  const flowReads = new Map()
   let clock = NOW, loggedIn = false, selected = HOME, snoozedUntil = null, rejectedAt = null, due = false, versionReads = 0
   let oldSessionPresent = options.originalSessionAbsent !== true
   if (options.recovery) {
@@ -54,7 +59,7 @@ function fixture(options = {}) {
     status: done ? 'done' : snoozedUntil && id === ITEM ? 'snoozed' : 'pending',
     snoozedUntil: id === ITEM ? snoozedUntil : null, rejectedAt: id === ITEM ? rejectedAt : null, rejectedBy: id === ITEM && rejectedAt ? OWNER : null,
     actions: done ? rejectedAt ? ['undo_reject'] : [] : ['accept', 'reject', snoozedUntil && id === ITEM ? 'reopen' : 'snooze'] })
-  const flow = id => ({ version: 2, id, issueId: ISSUE, revision: 4, stage: id === TASK_PR ? 'handoff' : 'implement',
+  const flow = id => ({ version: 2, id, issueId: options.extendedFactory && id !== TASK_EMPTY ? LATER_ISSUE : ISSUE, revision: 4, stage: id === TASK_PR ? 'handoff' : 'implement',
     ...(id === TASK_PR ? { needsYou: { kind: 'pr_review', since: new Date(NOW).toISOString() } } : {}),
     pullRequest: id === TASK_PR ? { url: 'https://github.com/alexj11324/Mikka-handoff/pull/61', state: 'open' } : null,
     review: id === TASK_PR ? { candidateId: NONCE, currentCandidateReviewed: true, verdict: 'passed', summary: {
@@ -65,7 +70,7 @@ function fixture(options = {}) {
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), path = url.pathname.replace(/^\/mikka/, ''), method = init.method ?? 'GET'
     const headers = new Headers(init.headers), body = init.body ? JSON.parse(init.body) : null
-    calls.push({ path, method }); assert.equal(init.redirect, 'error')
+    calls.push({ path, method, workspaceHeader: headers.get('x-mikka-workspace-id'), search: url.search }); assert.equal(init.redirect, 'error')
     if (url.origin === 'https://api.github.com') {
       assert.equal(headers.has('authorization'), false); assert.equal(headers.has('cookie'), false)
       if (path.endsWith('/issues/73')) return response({ ...sourceIssue(), ...(options.sourceOwner ? { user: { id: 99 } } : {}) })
@@ -97,15 +102,36 @@ function fixture(options = {}) {
       return response({ version: 1, ok: true, result: { ok: true, data: { workspaceId: selected } } })
     }
     if (path === '/api/workspace') return response({ currentUserId: OWNER, workspace: { id: selected, kind: selected === HOME ? 'personal' : 'team' },
-      choices: [{ id: HOME, kind: 'personal' }, { id: TEAM, kind: 'team' }] })
+      choices: [{ id: HOME, kind: 'personal' }, { id: TEAM, kind: 'team' }, ...(options.extendedFactory ? [{ id: OTHER_TEAM, kind: 'team' }] : [])] })
     if (path === '/api/auth/list-accounts') return response(options.noGitHub || options.cloudIdentity ? [] : [{ providerId: 'github', accountId: '42', userId: OWNER }])
     if (path === '/api/integrations/github') return response({ ...(options.cloudIdentity ? { githubAccountId: '42', source: 'cloud', login: null } : {}),
       viewerId: OWNER, connected: Boolean(options.cloudIdentity), configured: true, installed: Boolean(options.cloudIdentity),
       repositories: options.cloudIdentity ? [{ fullName: 'alexj11324/Mikka-handoff' }] : [] })
-    if (path === '/api/issues/search') return response({ items: [{ id: ISSUE }], nextCursor: null, truncated: false })
-    if (path === '/api/factory/tasks') return response({ issueId: ISSUE, tasks: options.noFactory ? [] : [{ id: TASK_PR }, { id: TASK_EMPTY }] })
+    if (path === '/api/issues/search') {
+      if (options.extendedFactory) {
+        const workspace = url.searchParams.get('workspaceId'), cursor = url.searchParams.get('cursor')
+        assert.equal(workspace, TEAM)
+        return response({ items: [{ id: cursor ? LATER_ISSUE : ISSUE }], nextCursor: cursor ? null : 'issue-next', truncated: false })
+      }
+      return response({ items: options.repeatIssueCursor ? [] : [{ id: ISSUE }], nextCursor: options.repeatIssueCursor ? 'same-cursor' : null, truncated: false })
+    }
+    if (path === '/api/factory/tasks') {
+      const issueId = url.searchParams.get('issueId'), workspace = headers.get('x-mikka-workspace-id')
+      let tasks = options.noFactory ? [] : [{ id: TASK_PR }, { id: TASK_EMPTY }]
+      if (options.extendedFactory) {
+        assert.ok([ISSUE, LATER_ISSUE].includes(issueId))
+        tasks = issueId === ISSUE ? [{ id: TASK_EMPTY }] : [...OTHER_TASKS, TASK_PR].map(id => ({ id }))
+      }
+      return response({ issueId, liveWorkspaceId: workspace ?? TEAM, tasks })
+    }
     const task = /^\/api\/factory\/tasks\/([^/]+)\/flow$/.exec(path)
-    if (task) { assert.equal(method, 'GET'); return response(flow(task[1])) }
+    if (task) {
+      assert.equal(method, 'GET')
+      const count = (flowReads.get(task[1]) ?? 0) + 1; flowReads.set(task[1], count)
+      const value = flow(task[1])
+      if (options.changedReadback && task[1] === TASK_PR && count > 1) { value.stage = 'implement'; delete value.needsYou }
+      return response(value)
+    }
     if (path === '/api/suggestions') return response({ groups: [{ source: 'github', items: options.noSuggestion ? [] : [{ id: ITEM, source: 'github', action: 'reply', required: false,
       url: options.wrongSourceUrl ? PUBLIC_ISSUE + '#issuecomment-90' : SOURCE, occurredAt: sourceComment().created_at }] }], inProgress: [] })
     if (path === '/api/live/ticket') {
@@ -158,10 +184,13 @@ function fixture(options = {}) {
     event: {}, attestation: {}, fetchImpl, now: () => clock,
     selectTarget: async ({ assertTarget }) => {
       if (options.windowLost && mutations.length) throw new InboxSelectionError('inbox_window_invalid', 'marker')
-      return { purpose: 'inbox-1820-production-selection', selected: true, applicationSha: SHA, headSha: 'b'.repeat(40),
+      return { purpose: options.followup ? 'inbox-1820-followup-selection' : 'inbox-1820-production-selection', selected: true,
+        ...(options.followup ? { pr: 1856, branch: INBOX_FOLLOWUP_BRANCH, originMergeSha: INBOX_ORIGINAL_MERGE, originHeadSha: INBOX_ORIGINAL_HEAD } : {}),
+        applicationSha: SHA, headSha: 'b'.repeat(40),
         driverRunId: 123, driverRunAttempt: options.recovery ? 2 : 1,
         window: { commentId: 5, markerSha256: 'c'.repeat(64), phase: options.recovery ? 'cleanup' : options.inventoryOnly ? 'inventory' : 'fixture',
-          expiresAt: new Date(NOW + 1200_000).toISOString(), fixture: options.inventoryOnly || options.recovery ? null : fixtureManifest(),
+          expiresAt: new Date(NOW + 1200_000).toISOString(), fixture: options.inventoryOnly || options.recovery ? null
+            : { ...fixtureManifest(), ...(options.oldFollowupFixture ? { applicationSha: INBOX_ORIGINAL_MERGE } : {}) },
           recovery: options.recovery ? reference : null },
         attestation: await assertTarget({}) }
     },
@@ -254,6 +283,104 @@ test('inventory reads real owner metadata without suggestions side effects or hi
   noLeaks(report)
 })
 
+test('Factory discovery follows selected-team issue pages and the sixth returned task without reading another accessible team', async () => {
+  const f = fixture({ inventoryOnly: true, noGitHub: true, extendedFactory: true }), report = await runInboxProduction(f.args)
+  assert.equal(report.status, 'partial', JSON.stringify(report.failure))
+  assert.equal(report.coverage.cachedReviewSummary, 'handoff_complete_snapshot_readback')
+  assert.equal(report.coverage.noPrNull, 'normal_owner_flow_null')
+  assert.equal(report.inventory.factory.selectedWorkspaceId, TEAM)
+  assert.deepEqual(report.inventory.factory.workspaces.map(row => row.workspaceId), [TEAM])
+  assert.equal(report.inventory.factory.issuesRead, 2)
+  assert.equal(report.inventory.factory.tasksRead, 7)
+  assert.equal(report.inventory.factory.issuePaginationComplete, true)
+  assert.equal(report.inventory.factory.returnedTaskReadsComplete, true)
+  assert.equal(report.inventory.factory.complete, false)
+  assert.equal(report.inventory.factory.taskCompleteness, 'unknown_server_limit_before_filter')
+  assert.equal(f.calls.filter(call => call.path === '/api/issues/search').length, 2)
+  assert.equal(f.calls.filter(call => call.path === '/api/factory/tasks/' + TASK_PR + '/flow').length, 2)
+  for (const call of f.calls.filter(call => call.path.startsWith('/api/factory/tasks') || call.path === '/api/issues/search')) {
+    assert.equal(call.workspaceHeader, TEAM)
+    assert.equal(call.search.includes(OTHER_TEAM), false)
+  }
+  assert.equal(f.mutations.length, 0)
+  assert.equal(f.calls.some(call => call.path === '/api/suggestions'), false)
+  assert.equal(report.cleanup.originalCookieRejected, true)
+  assert.equal(report.cleanup.workspaceRestored, true)
+  noLeaks(report)
+})
+
+test('empty or short Factory responses never prove all tasks enumerated or absence of a PR', async () => {
+  for (const noFactory of [true, false]) {
+    const f = fixture({ inventoryOnly: true, noFactory }), report = await runInboxProduction(f.args)
+    assert.equal(report.inventory.factory.complete, false)
+    assert.equal(report.inventory.factory.taskCompleteness, 'unknown_server_limit_before_filter')
+    assert.equal(report.inventory.factory.issuePaginationComplete, true)
+    assert.equal(report.inventory.factory.returnedTaskReadsComplete, true)
+    assert.equal(report.completeAcceptance, false)
+    if (noFactory) assert.equal(report.coverage.cachedReviewSummary, 'not_observed')
+  }
+})
+
+test('a repeating issue cursor cannot claim exhaustive discovery and still signs out the exact session', async () => {
+  const f = fixture({ inventoryOnly: true, repeatIssueCursor: true }), report = await runInboxProduction(f.args)
+  assert.equal(report.status, 'failed')
+  assert.equal(report.failure.code, 'response_invalid')
+  assert.equal(report.inventory.factory.complete, false)
+  assert.equal(report.inventory.factory.issuePaginationComplete, false)
+  assert.equal(report.cleanup.originalCookieRejected, true)
+  noLeaks(report)
+})
+
+test('Factory discovery does not truncate the twenty-first issue and reports bounded live traversal separately', async () => {
+  const issues = Array.from({ length: 21 }, (_, index) => '30000000-0000-4000-8000-' + String(index + 100).padStart(12, '0'))
+  let listReads = 0
+  const inventory = await readInboxFactoryInventory({ workspaceId: TEAM, request: async (_, path, init) => {
+    assert.equal(init.headers['x-mikka-workspace-id'], TEAM)
+    const url = new URL(path, 'https://example.invalid')
+    if (url.pathname === '/api/issues/search') return { status: 200, body: { items: issues.map(id => ({ id })), nextCursor: null, truncated: false } }
+    assert.equal(url.pathname, '/api/factory/tasks'); listReads++
+    return { status: 200, body: { issueId: url.searchParams.get('issueId'), liveWorkspaceId: TEAM, tasks: [] } }
+  } })
+  assert.equal(listReads, 21); assert.equal(inventory.issuesRead, 21)
+  assert.equal(inventory.issuePaginationComplete, true); assert.equal(inventory.returnedTaskReadsComplete, true)
+  assert.equal(inventory.complete, false); assert.equal(inventory.taskCompleteness, 'unknown_server_limit_before_filter')
+})
+
+test('request and time bounds leave incomplete issue/task discovery explicit instead of claiming the account has no PR', async () => {
+  for (const limit of ['requests', 'time']) {
+    let clock = NOW, calls = 0
+    const inventory = await readInboxFactoryInventory({ workspaceId: TEAM,
+      now: () => clock, deadline: NOW + 1000, requestLimit: limit === 'requests' ? 1 : 400,
+      request: async () => { calls++; clock += limit === 'time' ? 1001 : 0
+        return { status: 200, body: { items: [{ id: ISSUE }], nextCursor: null, truncated: false } } },
+    })
+    assert.equal(calls, 1); assert.equal(inventory.complete, false)
+    assert.equal(inventory.stopReason, limit === 'requests' ? 'request_limit' : 'time_limit')
+    assert.equal(inventory.workspaces[0].visited, true); assert.equal(inventory.workspaces[0].issuesRead, 0)
+    assert.equal(inventory.workspaces[0].stopReason, inventory.stopReason)
+    assert.equal(inventory.issuePaginationComplete, false); assert.equal(inventory.returnedTaskReadsComplete, false)
+  }
+})
+
+test('a Factory list returned for another live tenant cannot be read through or count as coverage', async () => {
+  let flows = 0
+  await assert.rejects(readInboxFactoryInventory({ workspaceId: TEAM, request: async (_, path) => {
+    if (path.startsWith('/api/issues/search')) return { status: 200, body: { items: [{ id: ISSUE }], nextCursor: null, truncated: false } }
+    if (path.startsWith('/api/factory/tasks?')) return { status: 200, body: { issueId: ISSUE, liveWorkspaceId: OTHER_TEAM, tasks: [{ id: TASK_PR }] } }
+    flows++; assert.fail('foreign tenant flow')
+  } }), /response_invalid/)
+  assert.equal(flows, 0)
+})
+
+test('a withdrawn source/window between issue pages prevents the next page from being requested', async () => {
+  let pages = 0, leases = 0
+  await assert.rejects(readInboxFactoryInventory({ workspaceId: TEAM,
+    beforePage: async () => { if (++leases === 2) throw new InboxSelectionError('inbox_window_invalid', 'marker') },
+    request: async () => { pages++; return { status: 200, body: { items: [], nextCursor: 'next-page', truncated: false } } },
+  }), /inbox_window_invalid/)
+  assert.equal(pages, 1); assert.equal(leases, 2)
+})
+
 test('exact owned source runs transitions, duplicates, real push boundary and receipt readbacks, then cleans', async () => {
   const f = fixture(), report = await runInboxProduction(f.args)
   assert.equal(report.status, 'passed', JSON.stringify(report.failure)); assert.equal(report.completeAcceptance, true)
@@ -292,13 +419,33 @@ test('wrong exact URL or Decision suppression never falls back to another sugges
 })
 
 test('unknown cached checks are not zero or green; missing Factory fixtures remain explicit', async () => {
-  for (const options of [{ unknownChecks: true }, { noFactory: true }]) {
+  for (const options of [{ unknownChecks: true }, { noFactory: true }, { changedReadback: true }]) {
     const f = fixture({ ...options, inventoryOnly: true }), report = await runInboxProduction(f.args)
     assert.equal(report.status, 'partial'); assert.equal(report.coverage.cachedReviewSummary, 'not_observed')
     assert.equal(report.completeAcceptance, false); noLeaks(report)
   }
   const f = fixture({ inventoryOnly: true, nonNullNoPr: true }), report = await runInboxProduction(f.args)
   assert.equal(report.status, 'failed'); assert.equal(report.failure.code, 'response_invalid')
+})
+
+test('follow-up receipts name actual release 1856 and keep original-source fixtures out of new-source business', async () => {
+  const inventory = fixture({ followup: true, inventoryOnly: true }), observed = await runInboxProduction(inventory.args)
+  assert.equal(observed.status, 'partial'); assert.equal(observed.selection.pr, 1856); assert.equal(observed.selection.featurePr, 1822)
+  assert.equal(observed.selection.originMergeSha, INBOX_ORIGINAL_MERGE); assert.equal(inventory.mutations.length, 0)
+  assert.equal(observed.cleanup.originalCookieRejected, true); noLeaks(observed)
+  const old = fixture({ followup: true, oldFollowupFixture: true }), rejected = await runInboxProduction(old.args)
+  assert.equal(rejected.status, 'failed'); assert.equal(rejected.failure.code, 'fixture_binding_failed')
+  assert.equal(old.mutations.length, 0); assert.equal(old.calls.some(call => call.path === '/api/suggestions'), false)
+  assert.equal(rejected.cleanup.originalCookieRejected, true); noLeaks(rejected)
+})
+
+test('withdrawn follow-up authority still allows only that attempt journal cleanup and session logout', async () => {
+  const f = fixture({ followup: true, windowLost: true }), report = await runInboxProduction(f.args)
+  assert.equal(report.status, 'failed'); assert.equal(report.failure.code, 'inbox_window_invalid')
+  assert.equal(report.selection.pr, 1856); assert.equal(report.completeAcceptance, false)
+  assert.deepEqual(f.mutations, ['snooze', 'reopen', 'reject'])
+  assert.equal(report.cleanup.ownSuggestionDismissed, true); assert.equal(report.cleanup.originalCookieRejected, true)
+  assert.equal(report.cleanup.workspaceRestored, true); noLeaks(report)
 })
 
 test('lost accepted write uses only the journaled UUID for normal idempotent cleanup', async () => {
@@ -378,6 +525,9 @@ test('workflow keeps the existing current-main queue and two narrow Infisical se
   assert.deepEqual([...workflow.matchAll(/secret-name: (.+)/g)].map(match => match[1]), ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD'])
   assert.match(workflow, /production-smoke-owner-acceptance/); assert.match(workflow, /scripts\/acceptance\/inbox-production\.mjs/)
   assert.match(workflow, /pull-requests: read/)
+  assert.match(workflow, /scripts\/acceptance\/self-hosted-production\*\.mjs/)
+  assert.match(workflow, /run: node --import tsx --test[^\n]*scripts\/acceptance\/inbox-production-target\.test\.mjs/)
+  assert.equal((workflow.match(/name: Verify the exact Inbox fixture or inventory under its current release window/g) ?? []).length, 1)
   assert.ok(workflow.indexOf('inbox-production.mjs --select') < workflow.indexOf('uses: Infisical/secrets-action'))
   assert.match(workflow, /if: steps\.inbox_selection\.outputs\.selected == 'true'/)
   assert.doesNotMatch(workflow, /workflow_dispatch:|contents: write|actions: write|continue-on-error: true[\s\S]{0,180}inbox-production\.mjs/)
