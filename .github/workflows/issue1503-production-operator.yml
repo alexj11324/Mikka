@@ -1,4 +1,4 @@
-# Active #1503 carrier for the unchanged legacy #1505 read-only child contract.
+# Inactive #1503 carrier for the unchanged legacy #1505 read-only child contract.
 # Bound to the actual f5 R7 handoff, its audited closed ordinary merge and the recorded UTC deadlines.
 # Source and shared-account admission reviewed by Root for the current bounded entry.
 # Does not revoke or renew any historical child. Cleanup must use this run's new receipt.
@@ -18,7 +18,7 @@ concurrency:
   queue: max
 jobs:
   prepare:
-    if: true
+    if: false
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
