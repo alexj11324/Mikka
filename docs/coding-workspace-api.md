@@ -249,6 +249,12 @@ session request is not same-origin or when a PAT attempts `submit`; every
 other `workspace_not_found` is 404. Treat the 403 as "send from the app or its
 mobile BFF", not as missing authority.
 
+An expired mention is never replayed from a previous submission; the caller
+must reselect it. Deployments behind a reverse proxy must preserve the public
+request origin: this endpoint compares `Origin` with the request URL's origin
+and does not consult a separately configured application origin, so a rewritten
+internal origin is refused as 403.
+
 ## Acceptance records
 
 `packages/daemon/test/coding-workspace-files.test.ts` uses real Git, filesystem
