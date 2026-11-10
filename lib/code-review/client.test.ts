@@ -24,6 +24,7 @@ const summary: ReviewSummary = {
   checks: { failed: 1, passed: 5, pending: 0 },
   running: false,
   branch: 'fix/ios-login',
+  agent: { name: 'Claude Code', model: 'Opus' },
   permissions: { canMerge: false, canSend: true, canTerminal: false, reasons: { merge: 'not_owner_merge', terminal: 'not_owner_terminal' } },
   live: { workspaceId: '0d9e8f7a-6b5c-4d3e-8f2a-1b0c9d8e7f6a' },
 }
@@ -41,7 +42,7 @@ test('a summary is narrowed to the contract: unknown fields drop, permissions ke
 })
 
 test('a running task with no PR is a valid summary, and missing reasons default to none', async () => {
-  answer(200, { ...summary, pr: null, running: true, branch: undefined, live: undefined, permissions: { canMerge: true, canSend: true, canTerminal: true } })
+  answer(200, { ...summary, pr: null, running: true, branch: undefined, agent: undefined, live: undefined, permissions: { canMerge: true, canSend: true, canTerminal: true } })
   const read = await getReviewSummary(TASK)
   assert.equal(read.pr, null)
   assert.deepEqual(read.permissions.reasons, {})

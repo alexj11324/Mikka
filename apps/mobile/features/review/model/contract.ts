@@ -48,6 +48,8 @@ export type ReviewSummary = {
   running: boolean
   /** Shown in ⋯ and tooltips, never on the bar (R-91). */
   branch?: string
+  /** The Agent whose runs made the changes (Claude Code, Codex) and its model, as the review page names who proposes them. */
+  agent?: { name: string; model?: string }
   permissions: ReviewPermissions
   /** The live channel this read belongs to, as other reads carry it; the hooks subscribe to it. */
   live?: { workspaceId: string }

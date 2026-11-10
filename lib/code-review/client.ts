@@ -55,6 +55,7 @@ const summarySchema = z.object({
   checks: z.object({ failed: count, passed: count, pending: count }),
   running: z.boolean(),
   branch: z.string().min(1).optional(),
+  agent: z.object({ name: z.string().min(1), model: z.string().min(1).optional() }).optional(),
   permissions: z.object({
     canMerge: z.boolean(),
     canSend: z.boolean(),
