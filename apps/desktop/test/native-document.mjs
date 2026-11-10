@@ -113,7 +113,7 @@ export function nativeLifecycleFailure(error) {
   const kind = names.includes(error?.name) ? error.name : 'other'
   const code = /Execution context was destroyed|Cannot find context with specified id/.test(String(error?.message))
     ? 'navigation-context-destroyed' : error?.code === 'ERR_ASSERTION' ? 'assertion' : 'other'
-  const locations = [...String(error?.stack ?? '').matchAll(/(?:^|[/\\])(lifecycle|native-document|bundled-session|native-device-ready|native-viewport)\.mjs:(\d+):(\d+)/g)]
+  const locations = [...String(error?.stack ?? '').matchAll(/(?:^|[/\\])(lifecycle|native-document|bundled-session|bundled-sign-in|native-device-ready|native-viewport)\.mjs:(\d+):(\d+)/g)]
     .slice(0, 6).map(([, file, line, column]) => ({ file: `${file}.mjs`, line: Number(line), column: Number(column) }))
   return { kind, code, locations }
 }

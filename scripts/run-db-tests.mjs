@@ -25,6 +25,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/task-identity-store.ts', file: 'tests/task-identity.db.test.ts', script: 'test:task-identity-db' },
   { marker: 'scripts/project-v2-backfill.mjs', file: 'tests/project-v2.db.test.ts', script: 'test:project-v2-db' },
   { marker: 'drizzle/20261109143003_team_lifecycle.sql', file: 'tests/team-lifecycle.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/inbox/store.ts', file: 'lib/inbox/store.db.test.ts', script: 'test:inbox-db' },
   { marker: 'app/api/factory/tasks/[taskId]/activity/route.ts', file: 'tests/factory-activity-http.db.test.ts', script: 'test:factory-activity-http-db' },
   { marker: 'lib/factory/activity.ts', file: 'lib/factory/activity.db.test.ts', script: 'test:factory-activity-db' },
   { marker: 'lib/factory/activity-artifacts.ts', file: 'lib/factory/activity-artifacts.db.test.ts', script: 'test:factory-activity-db' },
