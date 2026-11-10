@@ -5729,6 +5729,9 @@
       "pending": "Loading"
     }
   },
+  "HostedPlugins": {
+    "manageApp": "Manage {name}"
+  },
   "HostedTasks": {
     "open": "Open task",
     "status": "Status",
