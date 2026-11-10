@@ -33,6 +33,7 @@ import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/q
 import { NOTE_MAX, NOTES_MAX, withBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { coordinatorWelcome } from '@/lib/agent-welcome'
+import { suggestionInboxChanged } from '@/lib/inbox/live'
 import { claimSuggestion, readClaimedSuggestion } from '@/lib/suggestions/store'
 import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
@@ -375,6 +376,7 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
         // The suggestion stored its Coordinator bot row when it was made (null only on an older one).
         if (claimed) await recordPersonalSubmission(tx, userId, text, { submissionId: item.id, botId: item.botId })
         else if (!await personalSubmissionRecorded(tx, userId, text, item.id, item.botId)) throw new ActionFailureError('suggestionNotFound')
+        if (claimed) await suggestionInboxChanged(tx, userId, item.botId)
       })
     } catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
