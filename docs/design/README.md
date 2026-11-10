@@ -33,12 +33,13 @@ source is now out of date and who owns it.
 | # | Source | Decides |
 | --- | --- | --- |
 | 1 | Alex's latest explicit decision, once it is in `decisions/` (or the frozen `decisions.md`) | Anything it names |
-| 2 | `glossary.md` | Words and the bot / chat / thread model |
-| 3 | `rules.md` | Product and visual rules |
-| 4 | A Figma draft Alex is reviewing now | Layout: what goes where, sizes, order, grouping |
-| 5 | The running app on `main` ([decision 2026-11-01-0015](decisions/2026-11-01-0015-main-is-the-design.md)) | Layout everywhere else; it wins over any other Figma frame |
-| 6 | Comma (app.comma.surf) | Look and feel: shell structure, density, type, radii, shadows |
-| 7 | reUI / shadcn defaults | Only what nothing above covers |
+| 2 | `Mikka-parity/docs/design/capy-parity.md` (Capy parity plan) | Feature scope, authorization model, shipped-vs-planned status |
+| 3 | `glossary.md` | Words and the bot / chat / thread model |
+| 4 | `rules.md` | Product and visual rules |
+| 5 | A Figma draft Alex is reviewing now | Layout: what goes where, sizes, order, grouping |
+| 6 | The running app on `main` ([decision 2026-11-01-0015](decisions/2026-11-01-0015-main-is-the-design.md)) | Layout everywhere else; it wins over any other Figma frame |
+| 7 | Comma (app.comma.surf) | Look and feel: shell structure, density, type, radii, shadows |
+| 8 | reUI / shadcn defaults | Only what nothing above covers |
 
 A paid block or component (BoardUI Pro, affectUI, beUI Pro) is outside this
 order: the library's shipped demo decides its look, and only data and text

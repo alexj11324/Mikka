@@ -163,7 +163,7 @@ type ActivitySummary =
 | `local_computer_reviews.deviceId` | CASCADE | 本机电脑操作审批记录被删 |
 | `thread_machines.deviceId` | 无 on delete（RESTRICT） | 有引用时删除直接失败（云设备） |
 | `cloud_machines.deviceId` | SET NULL | 云设备专用 |
-| `agent_tool_approvals`、`improvement_skill_selections`、`improvement_skill_mounts` 的 `deviceId` | 无外键 | 留下悬空 id |
+| `improvement_skill_selections`、`improvement_skill_mounts` 的 `deviceId` | 无外键 | 留下悬空 id |
 | `device_token_devices.deviceId`（新增） | CASCADE | — |
 
 物理删除会级联删掉仓库和审批记录，并让历史线程失去设备和仓库。墓碑保留这一切：历史线程的 `deviceId`、`deviceRepoId`、`agentId` 都不变，设备名仍可显示；对历史影响最小。

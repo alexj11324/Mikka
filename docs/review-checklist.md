@@ -35,6 +35,7 @@ what they came for. A reviewer who did not build the screen runs this.
       permission, keyboard, touch and narrow width.
 - [ ] Each task rated Found / Hard to find / Missing / Present but
       insufficient, with severity 0–4. No task at severity 3 or 4 is left.
+- [ ] Authorization is workspace-scoped: no per-Bot permission settings, no per-Bot allow/ask/deny layer, no per-action approval control (Capy parity).
 - [ ] Every capability the code already ships for this area is reachable;
       the change removes no recovery or safety control.
 - [ ] The walk-through table (task | before | after) is in the PR body or the
