@@ -4601,7 +4601,9 @@
         "groups": "群聊",
         "tasks": "任务"
       },
-      "sourceSeparator": "、"
+      "sourceSeparator": "、",
+      "sectionsHint": "在分组间跳转",
+      "openHint": "打开"
     }
   },
   "SuggestionsPage": {
