@@ -5603,6 +5603,15 @@
   },
   "FactoryFlow": {
     "trail": {
+      "ask": {
+        "specReview": "Review the spec",
+        "question": "Answer the Bot's question",
+        "prReview": "Review the PR",
+        "prReviewNumber": "Review PR #{number}",
+        "blocked": "Unblock the task",
+        "failed": "Look at the failed task",
+        "result": "Acceptance results"
+      },
       "done": "Done",
       "running": "Working",
       "waiting": "Needs you",

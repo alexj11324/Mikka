@@ -46,6 +46,8 @@ export type AcceptanceFlowProps = {
   waitingSince: string | null
   /** What it waits on (待你审阅规格 …), null when it waits on nothing. */
   needsYou: string | null
+  /** What the person is asked to do, as a title (审阅 PR #12, 回答 Bot 的问题), or the PR / 验收结果 when nothing waits. */
+  headline: string
   /** Why it stopped (blocked / failed). */
   reason: string | null
   /** The last 批准规格 failed: the words and its code. */

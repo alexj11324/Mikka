@@ -119,9 +119,9 @@ function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () 
 }
 
 /** A v2 task's block (decision 2026-11-04-2200); nothing until its snapshot says it follows that flow. */
-function FactoryFlowEntry({ task, onOpenThread }: { task: FactoryTask; onOpenThread?: (runId: string) => void }) {
+function FactoryFlowEntry({ task, onOpen, onOpenThread }: { task: FactoryTask; onOpen?: (task: FactoryTask) => void; onOpenThread?: (runId: string) => void }) {
   const { data: detail } = useFactoryTaskDetail(task.id)
-  return isFlowV2(detail) ? <FactoryFlowCard task={task} detail={detail} onOpenThread={runId => onOpenThread?.(runId)} /> : null
+  return isFlowV2(detail) ? <FactoryFlowCard task={task} detail={detail} onOpen={onOpen && (() => onOpen(task))} onOpenThread={runId => onOpenThread?.(runId)} /> : null
 }
 
 /** An older task's acceptance row; a v2 task has its own block instead. */
@@ -168,7 +168,7 @@ export function FactoryAcceptance({ issueId, onOpen, onOpenThread }: { issueId: 
     <div className="h-16 w-full max-w-[26.25rem] overflow-hidden rounded-xl"><Skeleton data-testid="factory-acceptance-loading" className="size-full" /></div>
   </section>
   return <>
-    {allTasks.map(task => <FactoryFlowEntry key={task.id} task={task} onOpenThread={onOpenThread} />)}
+    {allTasks.map(task => <FactoryFlowEntry key={task.id} task={task} onOpen={onOpen} onOpenThread={onOpenThread} />)}
     {/* A heading over rows that all turned out to be v2 would stand alone, so it hides with them. */}
     {tasks.length > 0 && <section className="flex flex-col gap-2 [&:not(:has([data-slot=item]))]:hidden">
       {heading}

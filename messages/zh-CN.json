@@ -5603,6 +5603,15 @@
   },
   "FactoryFlow": {
     "trail": {
+      "ask": {
+        "specReview": "审阅方案",
+        "question": "回答 Bot 的问题",
+        "prReview": "审阅 PR",
+        "prReviewNumber": "审阅 PR #{number}",
+        "blocked": "处理受阻的任务",
+        "failed": "处理失败的任务",
+        "result": "验收结果"
+      },
       "done": "完成",
       "running": "进行中",
       "waiting": "等你处理",
