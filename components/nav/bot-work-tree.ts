@@ -2,6 +2,7 @@ import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
 import { localTaskState, type TaskReason, type TaskState } from '@/hooks/use-bot-tasks'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
+import { compactTaskTitle } from '@/lib/short-title'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type BotWorkRun = { id: string; name: string; harness: string | null }
@@ -34,7 +35,7 @@ export function botWorkTree(workspaceId: string | null, botIds: readonly string[
     let row = rows.get(id)
     if (!row) {
       const own = issue ? localTaskState(issue, newest.get(issue.id)) : null
-      row = { id, issueId: issue?.id ?? null, name: issue ? [issueIdentifier(issue), issue.title].filter(Boolean).join(' ') : run.prompt.split('\n').find(line => line.trim())?.trim().slice(0, 80) || run.agentName,
+      row = { id, issueId: issue?.id ?? null, name: issue ? [issueIdentifier(issue), compactTaskTitle(issue)].filter(Boolean).join(' ') : compactTaskTitle({ title: run.prompt.split('\n').find(line => line.trim())?.trim() || run.agentName }),
         state: own?.state ?? null, reason: own?.reason ?? null, runs: [] }
       rows.set(id, row)
     }

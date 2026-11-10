@@ -3,6 +3,7 @@
 - Date: 2026-11-10
 - Source: Alex, looking at the 新建任务 window with only a description box: 「这里可以加上 title，允许自建吧，看看 capy 怎么做的」.
 - Rule: R-22
+- Superseded in part by: [2026-11-10-1341](2026-11-10-1341-sidebar-short-title-limits.md): the typed full title remains exact, but the derived short title and compact sidebar label obey the shared 12-character / 6-word limit.
 - Replaces: R-22's 「describes the task in a sentence and the Coordinator writes it」 as the only way to name a task.
 
 ## How Capy does it

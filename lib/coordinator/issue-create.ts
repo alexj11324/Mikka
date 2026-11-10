@@ -8,6 +8,7 @@ import { FactoryError } from '@/lib/factory/contract'
 import { issueForUser } from '@/lib/issue-access'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
+import { compactTaskTitle } from '@/lib/short-title'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 
 const inputSchema = z.object({ sourceEventId: z.uuid(), title: z.string().trim().min(1).max(200) }).strict()
@@ -46,8 +47,8 @@ export async function createIssueFromRequest(userId: string, input: { sourceEven
       priority: 'normal',
     }, systemActor('coordinator'), { workspaceId: source.workspaceId })
     if (!issue) throw new FactoryError('factoryInvalid')
-    // The person's own title is shown as it is in lists: a short title is only written while the task has none.
-    if (typed.success) await tx.update(issues).set({ shortTitle: typed.data, shortTitleFrom: typed.data }).where(eq(issues.id, issue.id))
+    // Preserve the person's full title; its derived navigation label obeys the shared compact-title limit.
+    if (typed.success) await tx.update(issues).set({ shortTitle: compactTaskTitle({ title: typed.data }), shortTitleFrom: typed.data }).where(eq(issues.id, issue.id))
     await tx.update(coordinatorEvents).set({ issueId: issue.id }).where(eq(coordinatorEvents.id, event.id))
     return { issueId: issue.id, title: issue.title }
   }))

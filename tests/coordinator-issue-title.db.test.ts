@@ -13,7 +13,7 @@ if (enabled) {
   assert.equal(process.env.DATABASE_URL, connection)
 }
 
-test('a title typed in the task form is the task\'s title and short title, whatever the model passes', { skip: !enabled }, async () => {
+test('a typed title stays full while its derived short title obeys the navigation limit, whatever the model passes', { skip: !enabled }, async () => {
   const { db, pool } = await import('../lib/db')
   const { eq } = await import('drizzle-orm')
   const { issues, coordinatorEvents } = await import('../lib/db/schema')
@@ -35,6 +35,12 @@ test('a title typed in the task form is the task\'s title and short title, whate
     assert.deepEqual(await read(first.issueId), { title: '修复登录后回跳丢前缀', shortTitle: '修复登录后回跳丢前缀', shortTitleFrom: '修复登录后回跳丢前缀' })
     // A replay returns the same task and cannot rename it.
     assert.deepEqual(await createIssueFromRequest(owner, { sourceEventId: typed, title: 'Replay cannot rename' }), first)
+
+    const longTitle = '修复登录后回跳丢前缀并保留工作区路径和查询参数'
+    const longEvent = await event({ taskTitle: longTitle })
+    const long = await createIssueFromRequest(owner, { sourceEventId: longEvent, title: 'Ignore this model title' })
+    assert.equal(long.title, longTitle)
+    assert.deepEqual(await read(long.issueId), { title: longTitle, shortTitle: [...longTitle].slice(0, 12).join(''), shortTitleFrom: longTitle })
 
     // No title typed: the model's title is used and no short title is set here (the short-title job writes it).
     const untitled = await event({})

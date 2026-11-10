@@ -17,6 +17,11 @@ source wins in a conflict is in [`README.md`](README.md).
   its own row, like Capy's Captains; tasks are named for the work and use their
   own state icon. Bots and groups retain their own avatars. This is not a
   separate global Agent list ([2026-11-10](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
+  Child work titles use the existing generated short title and are limited
+  to 12 CJK characters or 6 words (60 characters maximum); the task code is
+  separate from that budget. A missing short title has a bounded text fallback;
+  the full task title stays in detail
+  ([short titles](decisions/2026-11-10-1341-sidebar-short-title-limits.md)).
   The right column is 概览 with its tabs, including 任务, or 全部任务 (R-50).
 - **R-02** The right panel's 概览 header shows the bot selected on the left:
   the same bloub avatar and the same name as its left row, then the tabs
