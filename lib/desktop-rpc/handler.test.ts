@@ -166,6 +166,9 @@ test('registry schemas reject forged authority, malformed nested input and extra
     ['workspace-secrets.createSecret', [{ name: 'KEY', kind: 'secret', value: 'fixture', scope: { type: 'repository', repository: {} } }]],
     ['preferences.updatePreferences', [{ administrator: true }]],
     ['artifacts.listArtifacts', ['unwanted']],
+    ['teams.deleteTeam', ['not-a-team', 'Design']],
+    ['teams.deleteTeam', [owner]],
+    ['teams.getTeamDeletionImpact', [owner, { workspaceId: peer }]],
   ]
   for (const [name, args] of cases) assert.equal(desktopActionSchemas[name].safeParse(args).success, false, name)
   assert.equal(desktopActionSchemas['coordinator.pollCoordinatorChat'].safeParse([null, undefined, { after: 2, cursor: 1, prefix: 'a'.repeat(32) }]).success, true)

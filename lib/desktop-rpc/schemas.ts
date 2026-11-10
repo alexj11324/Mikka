@@ -269,6 +269,9 @@ export const desktopActionSchemas = {
   'teams.saveTeam': tuple(object({ id: uuid.optional(), workspaceId: uuid, name: text(120).trim().min(1), identifier: text(20).min(1), description: text(2000) })),
   'teams.listTeamMembers': tuple(uuid, workspace),
   'teams.changeTeamMember': tuple(object({ teamId: uuid, userId: id.optional(), action: z.enum(['join', 'leave', 'add', 'remove', 'owner', 'member']) })),
+  // 删除团队: the server checks the workspace admin and that the typed name equals the team's (app/actions/teams.ts).
+  'teams.getTeamDeletionImpact': tuple(uuid),
+  'teams.deleteTeam': tuple(uuid, text(120)),
   'telegram.getTelegramIntegrationStatus': none,
   'telegram.createTelegramConnectLink': none,
   'telegram.disconnectTelegram': none,

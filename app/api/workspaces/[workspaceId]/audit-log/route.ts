@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
-import { AUDIT_FILTERS, csvField } from '@/lib/audit/cursor'
+import { auditPageInput, auditScopeQuery, csvField } from '@/lib/audit/cursor'
 import { createHash } from 'node:crypto'
 import { AuditExportError, createAuditExport, readAuditExportPage } from '@/lib/audit/export'
 import { WorkspaceError } from '@/lib/workspace-access'
@@ -11,7 +11,7 @@ export const maxDuration = 60
 
 type Context = { params: Promise<{ workspaceId: string }> }
 
-/** 审计日志 › 导出 CSV: the last 90 days (or only 安全), admins only. */
+/** 审计日志 › 导出 CSV: the last 90 days (or only 安全, some categories, a shorter period), admins only. */
 export async function GET(request: Request, { params }: Context) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) return new NextResponse(null, { status: 401 })
@@ -19,8 +19,9 @@ export async function GET(request: Request, { params }: Context) {
   if (!apiWorkspaceAllowed(session, workspaceId)) return new NextResponse(null, { status: 403 })
   if (!z.uuid().safeParse(workspaceId).success) return new NextResponse(null, { status: 404 })
   const search = new URL(request.url).searchParams
-  const filter = search.get('filter') ?? 'all'
-  if (!(AUDIT_FILTERS as readonly string[]).includes(filter)) return new NextResponse(null, { status: 400 })
+  const scope = auditPageInput.safeParse(auditScopeQuery(search))
+  if (!scope.success) return new NextResponse(null, { status: 400 })
+  const { filter, categories, from, until } = scope.data
   const format = search.get('format') ?? 'csv'
   const page = z.object({ exportId: z.uuid().nullable(), offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(1000).default(100) }).safeParse({
     exportId: search.get('exportId'), offset: search.get('offset') ?? undefined, limit: search.get('limit') ?? undefined,
@@ -29,7 +30,9 @@ export async function GET(request: Request, { params }: Context) {
   try {
     const result = page.data.exportId
       ? await readAuditExportPage(session.user.id, workspaceId, page.data.exportId, page.data.offset, page.data.limit)
-      : await createAuditExport(session.user.id, workspaceId, filter as 'all' | 'security')
+      : categories || from || until
+        ? await createAuditExport(session.user.id, workspaceId, filter, undefined, undefined, undefined, { categories, from, until })
+        : await createAuditExport(session.user.id, workspaceId, filter)
     if (format === 'json') {
       const events = page.data.exportId ? result.events : result.events.slice(0, page.data.limit)
       const nextOffset = page.data.exportId && 'nextOffset' in result ? result.nextOffset : events.length < result.manifest.count ? events.length : null
