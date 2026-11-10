@@ -248,7 +248,12 @@
     "opsBranch": "ops/1512-task-runs-pg-20261110",
     "workflowJobIf": "false",
     "manifestEnabled": false,
-    "closingRunVerification": "to be attached after this closure commit becomes the branch head"
+    "closingCommit": "c925615d7bbb7a135f89e8f4421a82d7f5206d95",
+    "closingRunId": 42730247567,
+    "closingRunConclusion": "skipped",
+    "closingJobs": 0,
+    "allocatedRunners": 0,
+    "proofBlob": "84f9e3cda40a6bed4061618c84b754679fcee06f"
   },
   "evidence": [
     {
@@ -354,7 +359,12 @@
     {
       "path": "commands/green-action-read-egress-stderr.log",
       "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "closure-proof.json",
+      "sha": "84f9e3cda40a6bed4061618c84b754679fcee06f"
     }
   ],
-  "scope": "This validates the exact task-runs reader change and retained authorization behavior. Native budget and deployed production acceptance remain separate pending gates; no feature/main publication was performed by this runner."
+  "scope": "This validates the exact task-runs reader change and retained authorization behavior. Native budget and deployed production acceptance remain separate pending gates; no feature/main publication was performed by this runner.",
+  "independentReview": "Root independently read the frozen RED/GREEN TAP blobs and rechecked their Git SHA1/SHA256, exact target failure, complete GREEN, unchanged selected row count and fresh workspace-member read."
 }
