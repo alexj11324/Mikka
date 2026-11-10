@@ -33,7 +33,11 @@ test('a task is one row, grouped by its newest thread; threads without a listed 
 
 test('an In Review task with an open PR whose newest run succeeded without an outcome waits for review (F1503-18)', () => {
   const task = issue('a', 'review', [{ url: 'https://github.com/o/r/pull/17', state: 'open' }])
-  assert.deepEqual(localTaskState(task, { status: 'succeeded', outcome: null }), { state: 'waiting', reason: 'review' })
+  // localTaskState is the legacy attempt-only slot: it intentionally ignores
+  // the business Task's PR. The canonical mapper is what lists use.
+  assert.deepEqual(localTaskState(task, { status: 'succeeded', outcome: null }), { state: 'done', reason: null })
+  assert.deepEqual(taskStateOf(task, { runId: 'r', status: 'succeeded', outcome: null }),
+    { state: 'waiting', reason: 'pr_review', blockedBy: null, group: 'pending' })
 })
 
 test('a closed task is done whatever its thread is doing', () => {
@@ -162,7 +166,7 @@ test("收件箱's count is what it lists: one row per waiting task (not per thre
     thread('a3', 'a', 'waiting_input', '2026-11-07T10:00:00Z'),
     thread('a2', 'a', 'waiting_input', '2026-11-07T09:00:00Z'),
     thread('a1', 'a', 'succeeded', '2026-11-07T08:00:00Z'),
-    thread('rb', 'b', 'succeeded', '2026-11-07T07:00:00Z'),
+    thread('rb', 'b', 'waiting_input', '2026-11-07T07:00:00Z'),
     // Blocked and failed tasks are in 等待你 but not in 收件箱.
     thread('rc', 'c', 'paused', '2026-11-07T06:00:00Z'),
     thread('rd', 'd', 'failed', '2026-11-07T05:00:00Z'),

@@ -939,7 +939,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "6c84f889ccb33e59c75cac7fc6b324e55010b6df67178aa9e7b6dfac40af0eac"
+      "sourceHash": "57ebcd52bb3b71b75a8b4fa49ec677c31557cd3080cd73a153e6d463c238116e"
     },
     {
       "path": "/mikka/api/factory/tasks/route",
@@ -1283,7 +1283,7 @@
         "POST"
       ],
       "maxDuration": 120,
-      "sourceHash": "2d7a9689d2950876251582474f08a57b1a605fc61cb71d1e4a60ab7fa823cdfa"
+      "sourceHash": "fe52357a984946c4578c0d56c653e01f15be49bae10c07386ea628afd0b3cbbc"
     },
     {
       "path": "/mikka/api/mobile/artifacts/[id]",
@@ -1447,13 +1447,22 @@
       "sourceHash": "0a7f4d96a0a9c554222ae3a1718cbfba4f79e193ac5a03c3fe6f6c29081c94f9"
     },
     {
+      "path": "/mikka/api/mobile/task-presentations",
+      "template": "/api/mobile/task-presentations",
+      "source": "app/api/mobile/task-presentations/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "523320ae8a8aac677c1d76b16e5a6980ff2358f7291441c1b427ada14354d5ca"
+    },
+    {
       "path": "/mikka/api/mobile/tasks",
       "template": "/api/mobile/tasks",
       "source": "app/api/mobile/tasks/route.ts",
       "methods": [
         "GET"
       ],
-      "sourceHash": "d11e0922e0c939bc07ecea520e0c0a577a5a2774e84030ca9cc44bf64ac048e4"
+      "sourceHash": "320d7c8da26b0552b1eb66bc4eecc7a5aa25bdcf418e1bd1001c39905197d590"
     },
     {
       "path": "/mikka/api/mobile/tasks/[id]",
@@ -2452,7 +2461,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "a4161f568a71d5a7ce69f244b25f86917a4054f535d0a2c96c431d94f37cad07"
+      "sourceHash": "33627d8252edd79e412cc110663a1de9a2f449263c3d85eea70feaa3611af542"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
