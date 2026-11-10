@@ -90,6 +90,8 @@ test('Slack control syntax in the task renders as text, never a mention', () => 
     title: '<!channel> <!here> <@U123> & <https://evil.example|click>',
   })
   const header = head(text)
+  assert.equal(header.includes('<'), false, 'no raw Slack control delimiter survives')
+  assert.equal(header.includes('>'), false, 'no raw Slack control delimiter survives')
   assert.equal(/<!(?:channel|here)\b/.test(header), false)
   assert.equal(/<@U\d+>/.test(header), false)
   assert.equal(header.includes('&lt;!channel&gt;'), true)

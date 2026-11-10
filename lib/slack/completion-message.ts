@@ -1,7 +1,7 @@
 // The one Slack line a finished run posts back to its thread. Pure: the
 // caller supplies the visible task label, the fixed status and the deep link,
 // so prompt, report, error, stop reason and failure details can never reach
-// Slack. Only the task label may shrink; the link is never truncated.
+// Slack. Only the display labels give way; the link is never truncated.
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { withBasePath } from '@/lib/base-path'
 
