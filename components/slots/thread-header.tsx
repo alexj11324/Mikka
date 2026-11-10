@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ThreadStatus } from '@/components/workspace/thread-status-icon'
 import { cn } from '@/lib/utils'
+import { HEADER_CONTAINER, HEADER_NARROW, MODE_SLOT_NARROW } from './thread-header-layout'
 import type { ThreadHeaderProps, ThreadStatusLineProps } from './thread-header-contract'
 
 export function ThreadHeader({ title, headingRef, onBack, onClose, onStop, onOpenTask, place, acceptanceBadge, mode, identity, artifact, tabs, wraps }: ThreadHeaderProps) {
@@ -16,15 +17,15 @@ export function ThreadHeader({ title, headingRef, onBack, onClose, onStop, onOpe
   // the column's own width, never the viewport: a 1440 px window still opens a
   // 320–360 px column. The wrapper is the query container and the header is its
   // child, because a container query cannot size the container itself.
-  return <div data-slot="thread-header-container" className="@container/thread-header w-full min-w-0 shrink-0">
-    <header className={cn('flex h-12 items-center gap-2 border-b border-rule px-4', onBack && 'pl-2', wraps && '@max-[22rem]/thread-header:h-auto @max-[22rem]/thread-header:flex-wrap @max-[22rem]/thread-header:py-2')}>
+  return <div data-slot="thread-header-container" className={HEADER_CONTAINER}>
+    <header className={cn('flex h-12 items-center gap-2 border-b border-rule px-4', onBack && 'pl-2', wraps && HEADER_NARROW)}>
       {onBack && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('back')} aria-keyshortcuts="Escape" onClick={onBack} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>}
       <h2 ref={headingRef} tabIndex={-1} className="min-w-0 truncate text-sm font-semibold outline-none">{title}</h2>
       {/* Icons only after the title: where it runs and its Agent; names on hover (Alex, 2026-11-06). */}
       {place}
       {acceptanceBadge}
       {/* The mode control the panel renders (#1730): the owner's picker, laid out here only. */}
-      {mode && <div data-slot="thread-mode-slot" className={cn('flex min-w-0 items-center', wraps ? '@max-[22rem]/thread-header:order-last @max-[22rem]/thread-header:w-full' : 'shrink-0')}>{mode}</div>}
+      {mode && <div data-slot="thread-mode-slot" className={cn('flex min-w-0 items-center', wraps ? MODE_SLOT_NARROW : 'shrink-0')}>{mode}</div>}
       <span className="flex-1" />
       {identity}
       {/* Always there, left of stop: off until the thread hands an Artifact over (decision 2026-11-06-1615). */}

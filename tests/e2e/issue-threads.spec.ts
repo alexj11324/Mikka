@@ -266,6 +266,12 @@ test('A failed thread offers 重试 beside its error', async ({ page }, testInfo
 // viewport. A 1440 px window still opens a 320–360 px right column, so a
 // `max-sm:` header never wrapped there. Measured, not asserted from class names:
 // the column is forced to the two widths the review named.
+//
+// CI runs no browser tests (decision 2026-11-01-1520: the "Browser tests (before
+// merge)" job only keeps the required check name), so this spec is the local /
+// desktop proof. The CI guard for the same contract is
+// components/slots/thread-header-layout.test.ts, which compiles the classes and
+// asserts `@container thread-header (width < 22rem)`, never `@media`.
 test('the thread header wraps by its column width at 320 and stays one row at 360', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   const { email } = await register(page)

@@ -16,9 +16,11 @@ export interface IssueThread {
   status: string
   /**
    * The mode this run froze (#1730), visible wherever the thread row is read,
-   * also to a teammate. Not drawn yet: the panel's control is the owner's picker
-   * and a teammate's read-only badge waits for thread visibility to widen
-   * (ThreadModeBadge, #1891 review).
+   * also to a teammate. It has no consumer yet: the panel's control is the
+   * owner's picker, and a teammate's read-only badge waits for thread
+   * visibility to widen. Kept deliberately (team lead ruling, #1891 review) as
+   * that badge's only non-ACL data source — not a dead-code cleanup candidate.
+   * Reading it never widens who may see a thread.
    */
   mode?: ThreadMode
   /** How the run came out once it ended (R-52); null while running or not judged yet. */
