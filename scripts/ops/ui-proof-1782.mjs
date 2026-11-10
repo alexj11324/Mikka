@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 
 export const PRODUCT = 'e3c0b0e050515986a8e42cc15ce0a3de15b8e88c'
 export const PRODUCT_TREE = '1e9b0ebbc340aa68096356bd75a9d00a61d88a82'
-export const CONTROL_PARENT = '2d92f93c6e38a64efef170c71c887f8fbb9b6065'
+export const CONTROL_PARENT = 'ab865334ef3ac2067513e04bae8c3a4cce145db9'
 export const OVERLAY = 'fe20f19bcf82e6541430b62c450920ba42c95fb0'
 export const BRANCH = 'ops/1782-official-ui-proof-20261109'
 export const DATABASE = 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e'
@@ -49,7 +49,8 @@ export function validateInvocation(env, event, actual) {
 const FAILURE_PHASES = new Set(['source', 'acquire', 'workspace_name_baseline', 'base_seed', 'extension_seed', 'scope', 'browser',
   'browser_launch', 'browser_context', 'browser_home', 'workspace_menu', 'workspace_sidebar', 'workspace_selection',
   'workspace_navigation', 'workspace_ready', 'theme_persist', 'theme_reload', 'theme_ready',
-  'task_list', 'task_detail', 'task_detail_activity', 'task_detail_history', 'project_stale_form', 'source_after',
+  'task_list', 'task_detail', 'task_detail_title', 'task_detail_properties', 'task_detail_assignee',
+  'task_detail_delegate', 'task_detail_status', 'task_detail_activity', 'task_detail_history', 'project_stale_form', 'source_after',
   'cleanup_browser', 'cleanup_extension', 'cleanup_base', 'cleanup_workspaceName', 'cleanup_lease'])
 const ACCOUNT_FAILURE_CODES = new Set([
   'ACCOUNT_POOL_DATABASE_ERROR', 'ACCOUNT_FOOTPRINT_UNPROVEN', 'INVALID_REQUEST', 'STALE_LEASE', 'LEASE_LOST',
@@ -164,9 +165,11 @@ export function officialTaskLocators(page, { title, titleLabel, propertiesLabel,
   const task = page.getByRole('region', { name: title, exact: true }).filter({ has: page.locator('textarea.ui-kb-issue__title') })
   const properties = task.getByRole('complementary', { name: propertiesLabel, exact: true })
   const activity = task.getByRole('region', { name: activityLabel, exact: true })
+  const assignee = properties.getByRole('button', { name: assigneeLabel, exact: true })
+  const delegate = properties.getByLabel(delegateLabel, { exact: true })
   return { task, title: task.getByRole('textbox', { name: titleLabel, exact: true }), properties,
-    assignee: properties.getByRole('button', { name: assigneeLabel, exact: true }),
-    delegate: properties.getByLabel(delegateLabel, { exact: true }),
+    assignee, assigneeValue: assignee.locator(':scope > span.ui-kb-create__clip'),
+    delegate, delegateValue: delegate.locator(':scope > span.ui-kb-create__clip'),
     activity, delegation: activity.getByText(delegated, { exact: false }),
     result: activity.getByRole('button', { name: threadLabel, exact: true }) }
 }

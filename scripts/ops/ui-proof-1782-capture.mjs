@@ -156,14 +156,23 @@ async function taskDetail(page, theme, viewport) {
   const { task, properties } = frame
   await expect(task).toHaveCount(1)
   await expect(task).toHaveAttribute('aria-busy', 'false')
+  phase = 'task_detail_title'
   await expect(frame.title).toHaveValue(row.title)
+  phase = 'task_detail_properties'
   await expect(properties).toHaveCount(1)
+  phase = 'task_detail_assignee'
   await expect(frame.assignee).toHaveCount(1)
   await expect(frame.assignee).toBeVisible()
-  await expect(frame.assignee).toHaveText(humanAssigneeName)
+  await expect(frame.assigneeValue).toHaveCount(1)
+  await expect(frame.assigneeValue).toBeVisible()
+  await expect(frame.assigneeValue).toHaveText(humanAssigneeName)
+  phase = 'task_detail_delegate'
   await expect(frame.delegate).toHaveCount(1)
   await expect(frame.delegate).toBeVisible()
-  await expect(frame.delegate).toHaveText(base.fixture.botName)
+  await expect(frame.delegateValue).toHaveCount(1)
+  await expect(frame.delegateValue).toBeVisible()
+  await expect(frame.delegateValue).toHaveText(base.fixture.botName)
+  phase = 'task_detail_status'
   await expect(properties.getByRole('button', { name: messages.Issue.status.doing, exact: true })).toBeVisible()
   await properties.scrollIntoViewIfNeeded()
   await capture(page, 'human-and-delegate', 'Human assignee and separate Agent Delegate', theme, viewport)

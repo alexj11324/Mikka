@@ -3,6 +3,7 @@ import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
+import { stripVTControlCharacters } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { officialInboxLocators, officialTaskLocators, openOfficialOverview, selectOfficialWorkspace, taskActivityLocators } from './ui-proof-1782.mjs'
 
@@ -200,5 +201,53 @@ test('the hosted frame independently locates the human, explicit Delegate and ex
     // The old public frame cannot silently stand in for this hosted frame.
     await frame.title.evaluate(node => { node.className = ''; node.id = 'task-title' })
     await expect(frame.task).toHaveCount(0)
+  } finally { await browser.close() }
+})
+
+test('official property labels stay exact when the human control also contains an aria-hidden avatar', { timeout: 20_000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage()
+    const values = { title: 'Proof task', titleLabel: 'Task title', propertiesLabel: 'Properties',
+      assigneeLabel: 'Assignee: Test owner', delegateLabel: 'Delegated to Ada',
+      activityLabel: 'Activity', delegated: 'Delegated to Ada', threadLabel: "Open Codex's conversation" }
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 })
+      // Owned markup reproduces the published Value / Avatar DOM contract:
+      // the accessible control identity excludes the decorative initials,
+      // while its whole textContent necessarily includes those initials.
+      await page.setContent(`<main role="region" aria-label="Proof task" aria-busy="false">
+        <textarea class="ui-kb-issue__title" aria-label="Task title">Proof task</textarea>
+        <aside aria-label="Properties"><button aria-label="Assignee: Test owner"><span class="ui-kb-avatar" aria-hidden="true">TO</span><span class="ui-kb-create__clip">Test owner</span></button>
+          <span aria-label="Delegated to Ada"><span aria-hidden="true"><svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" /></svg></span><span class="ui-kb-create__clip">Ada</span></span>
+        </aside></main>`)
+      const frame = officialTaskLocators(page, values)
+      await expect(frame.assignee).toHaveCount(1)
+      await expect(frame.assignee).toBeVisible()
+      await expect(frame.assignee).toHaveText('TOTest owner')
+      await assert.rejects(expect(frame.assignee).toHaveText('Test owner', { timeout: 150 }), error => {
+        const message = stripVTControlCharacters(String(error.message))
+        return message.includes('Expected string: "Test owner"') && message.includes('Received string: "TOTest owner"')
+      })
+      await expect(frame.assigneeValue).toHaveCount(1)
+      await expect(frame.assigneeValue).toBeVisible()
+      await expect(frame.assigneeValue).toHaveText('Test owner')
+      await expect(frame.delegate).toHaveCount(1)
+      await expect(frame.delegate).toBeVisible()
+      await expect(frame.delegateValue).toHaveCount(1)
+      await expect(frame.delegateValue).toBeVisible()
+      await expect(frame.delegateValue).toHaveText('Ada')
+      // A correct aria-label or decorative text cannot hide a wrong, missing,
+      // duplicated or invisible displayed value.
+      await frame.assigneeValue.evaluate(node => { node.textContent = 'Different person' })
+      await assert.rejects(expect(frame.assigneeValue).toHaveText('Test owner', { timeout: 150 }))
+      await frame.assigneeValue.evaluate(node => { node.textContent = 'Test owner'; node.after(node.cloneNode(true)) })
+      await assert.rejects(expect(frame.assigneeValue).toHaveCount(1, { timeout: 150 }))
+      await frame.assigneeValue.evaluateAll(nodes => nodes.forEach(node => node.remove()))
+      await expect(frame.assigneeValue).toHaveCount(0)
+      await expect(frame.assignee).toHaveCount(1)
+      await frame.delegateValue.evaluate(node => { node.style.display = 'none' })
+      await assert.rejects(expect(frame.delegateValue).toBeVisible({ timeout: 150 }))
+    }
   } finally { await browser.close() }
 })

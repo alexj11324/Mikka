@@ -179,6 +179,13 @@ test('activity and historical-attempt failures remain separate closed phases', (
   }
 })
 
+test('hosted Task detail assertion stages retain only finite names and never a DOM or error message', () => {
+  for (const phase of ['task_detail_title', 'task_detail_properties', 'task_detail_assignee', 'task_detail_delegate', 'task_detail_status']) {
+    assert.deepEqual(closedFailure(phase, { name: 'Error', message: 'private DOM or locator', stack: 'private stack' }), { phase, kind: 'Error' })
+    assert.deepEqual(closedFailure(`${phase}:private-value`, { name: 'Error', message: 'private DOM or locator' }), { phase: 'unknown', kind: 'Error' })
+  }
+})
+
 function semanticChecks() {
   return [1440, 390].flatMap(width => ['light', 'dark'].flatMap(theme => [
     { case: 'task_groups', theme, width, taskCount: 5, surface: 'dispatcher_overview', pendingIndicator: 'inbox', globalWaitingCount: 1,
