@@ -1,0 +1,30 @@
+name: PR1782 fixed CI artifact verification
+
+on:
+  push:
+    branches: [ops/1782-ui-evidence-reader-20261110]
+    paths:
+      - scripts/ops/ci-evidence-reader-1782.py
+      - .github/workflows/issue1782-ci-evidence-reader.yml
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify:
+    if: ${{ github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.event_name == 'push' && github.ref == 'refs/heads/ops/1782-ui-evidence-reader-20261110' && github.run_attempt == 1 && github.event.before == 'a63a155087ddb3220bfa2952bb8c261d3a7d96d7' && github.event.created == false && github.event.deleted == false && github.event.forced == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Check reader syntax without generating checkout files
+        run: python3 -c "from pathlib import Path; p=Path('scripts/ops/ci-evidence-reader-1782.py'); compile(p.read_text(encoding='utf-8'), str(p), 'exec')"
+      - name: Verify six exact CI archives and original evidence contracts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ops/ci-evidence-reader-1782.py
