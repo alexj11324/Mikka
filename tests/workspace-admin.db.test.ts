@@ -212,6 +212,28 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
   })
 
 
+  await t.test('workspace deletion removes task artifacts when their run has no Bot', async () => {
+    const admin = await seedUser(pool, 'artifact-delete-admin')
+    const workspace = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }], 'Artifact deletion')
+    const keep = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }], 'Keep artifacts')
+    const seed = async (workspaceId: string) => {
+      const issueId = await seedIssue(pool, admin, workspaceId)
+      const agentId = await seedAgent(pool, admin)
+      const runId = await seedRun(pool, { userId: admin, agentId, issueId, workspaceId })
+      const artifactId = randomUUID()
+      await pool.query(`INSERT INTO artifacts(id,"userId","workspaceId",kind,title,"runId","issueId") VALUES($1,$2,$3,'markdown','Acceptance',$4,$5)`, [artifactId, admin, workspaceId, runId, issueId])
+      return { issueId, runId, artifactId }
+    }
+    const doomed = await seed(workspace.id), retained = await seed(keep.id)
+    await general.deleteWorkspaceData(admin, workspace.id, workspace.name)
+    assert.equal(await count(pool, 'issues where id=$1', [doomed.issueId]), 0)
+    assert.equal(await count(pool, 'agent_runs where id=$1', [doomed.runId]), 0)
+    assert.equal(await count(pool, 'artifacts where id=$1', [doomed.artifactId]), 0)
+    assert.equal(await count(pool, 'issues where id=$1', [retained.issueId]), 1)
+    assert.equal(await count(pool, 'agent_runs where id=$1', [retained.runId]), 1)
+    assert.equal(await count(pool, 'artifacts where id=$1', [retained.artifactId]), 1)
+  })
+
   await t.test('workspace deletion counts persisted tenant tasks without Team links and never follows a foreign link', async () => {
     const admin = await seedUser(pool, 'ungrouped-admin'), member = await seedUser(pool, 'ungrouped-member')
     const workspace = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }], 'Ungrouped tenant')

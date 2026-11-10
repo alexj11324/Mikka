@@ -794,7 +794,7 @@
         "POST"
       ],
       "maxDuration": 300,
-      "sourceHash": "9983459187c605d4344fa04981be50ee7adca650d17e22b3f92b4d0f7dad8a3f"
+      "sourceHash": "1e10e4d68acb421783e54f4cc8d7e0a8ee3455f444f59b27bd8cb36cc9fae2f8"
     },
     {
       "path": "/mikka/api/device-tokens",
