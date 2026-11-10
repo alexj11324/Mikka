@@ -5773,7 +5773,9 @@
     }
   },
   "HostedPlugins": {
-    "manageApp": "Manage {name}"
+    "manageApp": "Manage {name}",
+    "moreTwo": "{first} and {second}",
+    "moreMany": "{first}, {second} and {count, number} more"
   },
   "HostedTasks": {
     "open": "Open task",

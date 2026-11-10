@@ -10,8 +10,8 @@ import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
 
 type TelegramStatus = Awaited<ReturnType<typeof getTelegramIntegrationStatus>>
 
-export function TelegramSettings() {
-  const t = useTranslations('Settings.telegram')
+/** Telegram's connection as data and actions; `disconnect` acts at once, so a UI confirms first. Shared with UI layers. */
+export function useTelegramPlugin() {
   const [status, setStatus] = useState<TelegramStatus | null>(null)
   const [connectLink, setConnectLink] = useState('')
   const [busy, setBusy] = useState(false)
@@ -63,7 +63,6 @@ export function TelegramSettings() {
   }
 
   async function disconnect() {
-    if (!window.confirm(t('disconnectConfirm'))) return
     setBusy(true)
     setError('')
     try {
@@ -77,6 +76,13 @@ export function TelegramSettings() {
     }
   }
 
+  return { status, connectLink, busy, error, connect, disconnect, checkOnReturn }
+}
+
+export function TelegramSettings() {
+  const t = useTranslations('Settings.telegram')
+  const { status, connectLink, busy, error, connect, disconnect: disconnectNow, checkOnReturn } = useTelegramPlugin()
+  const disconnect = async () => { if (window.confirm(t('disconnectConfirm'))) await disconnectNow() }
   return <SettingsSection id="telegram-heading">
     <SettingRow title={t('title')}>
       {status === null

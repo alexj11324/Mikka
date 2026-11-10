@@ -5773,7 +5773,9 @@
     }
   },
   "HostedPlugins": {
-    "manageApp": "管理 {name}"
+    "manageApp": "管理 {name}",
+    "moreTwo": "{first} 和 {second}",
+    "moreMany": "{first}、{second} 等 {count, number} 个"
   },
   "HostedTasks": {
     "open": "打开任务",
