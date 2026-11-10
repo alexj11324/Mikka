@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
+import { escapeMarkdown } from './markdown'
 
 /** The only run outcomes a Linear comment may name. Anything else renders the safe fallback. */
 export const LINEAR_RUN_STATUS_TEXT = {
@@ -44,8 +45,8 @@ export function linearRunCommentLocale(value: string | null | undefined): Linear
   return value === 'zh-CN' ? 'zh-CN' : 'en'
 }
 
-/** Task text is display text, never a second line: newlines and controls become spaces. */
-const oneLine = (value: string) => value.replace(/[\s\p{Cc}]+/gu, ' ').trim()
+/** Task text is display text, never a second line: newlines, controls and bidi/format characters become spaces. */
+const oneLine = (value: string) => value.replace(/[\s\p{Cc}\p{Cf}]+/gu, ' ').trim()
 
 /** Collapse whitespace and cap the value without splitting a surrogate pair. */
 function truncatePoints(value: string, max: number): string {
@@ -94,9 +95,10 @@ export function linearRunCommentBody(input: LinearRunCommentInput): string {
   if (!HTTP_URL.test(deepLink)) throw new TypeError('deep link must be an http(s) URL without whitespace or a closing parenthesis')
   const linkLine = `[${LINK_LABEL}](${deepLink})`
   const render = (subject: string) => `${PREFIX}${subject ? `${subject}${SEPARATOR}` : ''}${label}\n${linkLine}`
+  // Only the subject is escaped; the fixed Markdown link line stays as built.
   const subject = fitSubject(oneLine(input.identifier), truncateCommentTitle(input.title), EMPTY_SUBJECT[locale],
-    candidate => render(candidate).length <= RUN_COMMENT_MAX)
-  return render(subject)
+    candidate => render(escapeMarkdown(candidate)).length <= RUN_COMMENT_MAX)
+  return render(escapeMarkdown(subject))
 }
 
 export type LinearRunDeepLinkInput = {

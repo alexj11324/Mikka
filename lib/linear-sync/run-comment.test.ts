@@ -172,6 +172,42 @@ test('a link that alone exceeds the budget stays whole and keeps the two-line st
   assert.equal(lines[1], `[Open in Mikka](${deepLink})`)
 })
 
+test('markdown in the task text stays inert and the fixed link line is untouched', () => {
+  const cases = [
+    '[x](https://evil.example)',
+    '![x](https://evil.example)',
+    '**bold** and _em_ and `code`',
+  ]
+  for (const title of cases) {
+    const body = linearRunCommentBody({ identifier: '[MIK-42](https://evil.example)', title, status: 'succeeded', locale: 'en', deepLink: DEEP_LINK })
+    const [header, link] = body.split('\n')
+    assert.equal(link, `[Open in Mikka](${DEEP_LINK})`, 'the real link stays byte-for-byte intact')
+    assert.equal(header.includes('[x](https://evil.example)'), false, title)
+    assert.equal(header.includes('![x](https://evil.example)'), false, title)
+    assert.equal(header.includes('[MIK-42](https://evil.example)'), false, 'the identifier is escaped too')
+    assert.ok(header.includes('\\[MIK-42\\]'), header)
+    assert.equal(header.includes('**bold**'), false, title)
+    assert.equal(header.includes('_em_'), false, title)
+  }
+})
+
+test('markdown escaping cannot push the message over the budget', () => {
+  const title = '[x](https://evil.example) '.repeat(40)
+  const body = linearRunCommentBody({ identifier: 'MIK-42', title, status: 'succeeded', locale: 'en', deepLink: DEEP_LINK })
+  assert.ok(body.length <= RUN_COMMENT_MAX, `${body.length} characters`)
+  assert.equal(body.split('\n')[1], `[Open in Mikka](${DEEP_LINK})`)
+})
+
+test('bidi and zero-width format characters never reach the header', () => {
+  const title = `safe‮evil⁦a⁧b⁨c⁩d​e`
+  const body = linearRunCommentBody({ identifier: `MIK‮-42`, title, status: 'succeeded', locale: 'en', deepLink: DEEP_LINK })
+  const header = body.split('\n')[0]
+  for (const point of ['‮', '⁦', '⁧', '⁨', '⁩', '​']) {
+    assert.equal(header.includes(point), false, JSON.stringify(point))
+  }
+  assert.ok(header.includes('safe evil a b c d e'), header)
+})
+
 test('the comment id is a stable RFC 4122 UUID per run', () => {
   const id = commentIdForRun(RUN)
   assert.equal(id, 'd8e3074c-5a64-5946-ae8b-9401b36787c8', 'pins the SHA-256 prefix, version and variant')

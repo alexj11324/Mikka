@@ -1,6 +1,7 @@
 import type { JSONContent } from '@tiptap/core'
 
-function escapeMarkdown(value: string) {
+/** Backslash-escape inline Markdown syntax so plain text stays text. */
+export function escapeMarkdown(value: string) {
   return value.replace(/([\\`*_{}[\]<>])/g, '\\$1')
 }
 
