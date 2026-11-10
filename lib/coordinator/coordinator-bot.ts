@@ -307,6 +307,11 @@ async function copyAgentHead(client: PoolClient, ownerId: string, botId: string,
     FROM agent_kit_heads h LEFT JOIN agent_kit_versions v ON v.owner_id=h.owner_id AND v.bot_key=h.bot_key AND v.id=h.active_version
     WHERE h.owner_id=$1 AND h.bot_key='coordinator'`, [ownerId])).rows[0]
   if (!old) return
+  const created = await client.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id)
+      VALUES ($1,$2,$3,$4) ON CONFLICT (owner_id,bot_key) DO NOTHING`, [ownerId, botId, workspaceId])
+  // Fold only when this head is first created. A later backfill must not
+  // re-apply the legacy ceiling over an admin's newer workspace choice.
+  if (!created.rowCount) return
   // The same locks the workspace policy writers take, before the row read.
   await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`workspace-external-write:${workspaceId}`])
   await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`workspace-cli-policy:${workspaceId}`])
@@ -319,9 +324,7 @@ async function copyAgentHead(client: PoolClient, ownerId: string, botId: string,
       ON CONFLICT ("workspaceId") DO UPDATE SET external_write_permissions=excluded.external_write_permissions,cli_run_policy=excluded.cli_run_policy
       WHERE workspace_computer_policies.external_write_permissions IS DISTINCT FROM excluded.external_write_permissions
          OR workspace_computer_policies.cli_run_policy IS DISTINCT FROM excluded.cli_run_policy`, [workspaceId, external, cli])
-  const created = await client.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id)
-      VALUES ($1,$2,$3,$4) ON CONFLICT (owner_id,bot_key) DO NOTHING`, [ownerId, botId, workspaceId])
-  if (!created.rowCount || !old.definition) return
+  if (!old.definition) return
   const versionId = crypto.randomUUID()
   await client.query(`INSERT INTO agent_kit_versions (id,owner_id,bot_key,version,definition,digest,source,request_key,base_version)
       VALUES ($1,$2,$3,1,$4,$5,$6,'coordinator-bot-backfill',NULL)`, [versionId, ownerId, botId, old.definition, old.digest, old.source])

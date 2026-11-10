@@ -42,8 +42,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const { readOrder } = await import('../lib/model-order')
   const { queueRun, queueFactoryRun } = await import('../lib/agent-runs')
   const { acceptedEventStillMatches } = await import('../lib/run-admission-store')
-  const { lockCliAgentPolicy, readCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-store')
-  const { setCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-settings')
+  const { lockCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-store')
   const { factoryStore, dispatchFactoryRun, factoryQuestions } = await import('../lib/factory/server')
   const { factoryBinding } = await import('../lib/factory/dispatch')
   const { beginFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('../lib/factory/transaction')
@@ -59,9 +58,12 @@ test('real Factory admission preserves host scope, policy and transaction owners
     catch (error) { await tx.query('ROLLBACK'); throw error }
     finally { tx.release() }
   }
+  // The workspace is the only policy source (per-Bot and per-worker layers are
+  // retired), so the fixture writes the workspace row directly.
   async function policy(f: Fixture, permission: 'allow' | 'ask' | 'deny') {
-    const current = await readCliAgentPolicy(pool, f.userId, f.agentId, null)
-    await setCliAgentPolicy(pool, f.userId, f.agentId, null, 'agent', current.revision, { permissions: { git_push: permission } })
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy)
+      VALUES ($1,'allow',jsonb_build_object('permissions',jsonb_build_object('git_push',$2::text)))
+      ON CONFLICT ("workspaceId") DO UPDATE SET cli_run_policy=excluded.cli_run_policy`, [f.workspaceId, permission])
   }
   async function addEvent(f: Pick<Fixture, 'userId' | 'issueId' | 'deviceId'>, options: { destination?: unknown; bound?: boolean; delivered?: boolean; botId?: string } = {}) {
     const id = randomUUID()
@@ -159,7 +161,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [f.userId])).rows[0].n, 0, 'no approval card')
     })
 
-    async function lostAdmission(options: { destination?: 'selected'; revoke?: boolean; legacyEpoch?: boolean; workerPolicy?: unknown } = {}) {
+    async function lostAdmission(options: { destination?: 'selected'; revoke?: boolean; legacyEpoch?: boolean; policyCeiling?: unknown } = {}) {
       const f = await fixture(options)
       const admitted = await dispatch(f)
       const deviceB = randomUUID(), agentB = randomUUID()
@@ -173,9 +175,11 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const before = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [admitted.runId])).rows[0]
       if (options.revoke) await pool.query(`UPDATE byos_connections SET paused=true WHERE "ownerId"=$1`, [f.userId])
       if (options.legacyEpoch) await pool.query(`UPDATE factory_attempts SET output=output-'requestEpoch' WHERE id=$1`, [f.task.attemptId])
-      if (options.workerPolicy) {
-        const current = await readCliAgentPolicy(pool, f.userId, f.agentId, null)
-        await setCliAgentPolicy(pool, f.userId, f.agentId, null, 'worker', current.revision, options.workerPolicy)
+      if (options.policyCeiling) {
+        // A frozen ceiling (provider fallback / Factory check) is the one
+        // stricter-than-live policy that survives the workspace-only model.
+        await pool.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{policyCeiling}',$2::jsonb) WHERE id=$1`,
+          [admitted.runId, JSON.stringify(options.policyCeiling)])
       }
       return { f, admitted, deviceB, agentB, now, before }
     }
@@ -299,13 +303,16 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0].status, 'blocked')
     })
 
+    // RunPolicy shape: every permission filled in, plus the workspace allow-list.
+    const livePermissions = { install_dependency: 'allow' as const, write_outside_repo: 'ask' as const, git_push: 'allow' as const, network: 'allow' as const, computer_use: 'ask' as const }
+    const liveNetwork = ['github.com', '*.github.com', '*.githubusercontent.com']
     for (const options of [
       { label: 'owner pinned A', destination: 'selected' as const },
       { label: 'the frozen model grant was revoked', revoke: true },
       { label: 'a legacy attempt has no epoch', legacyEpoch: true },
-      { label: 'B would drop an A worker deny', workerPolicy: { permissions: { install_dependency: 'deny' } } },
-      { label: 'B would drop A read-only mode', workerPolicy: { approvalMode: 'read_only' } },
-      { label: 'B would widen A network ceiling', workerPolicy: { networkAllow: ['allowed.example.com'] } },
+      { label: 'the original run had a frozen action deny', policyCeiling: { permissions: { ...livePermissions, install_dependency: 'deny' }, networkAllow: liveNetwork } },
+      { label: 'the original run was frozen read-only', policyCeiling: { permissions: livePermissions, networkAllow: liveNetwork, readOnly: true } },
+      { label: 'the original run had a frozen network ceiling', policyCeiling: { permissions: livePermissions, networkAllow: liveNetwork, networkCeiling: ['allowed.example.com'] } },
     ]) await t.test(`admitted recovery blocks without replaying offline A when ${options.label}`, async () => {
       const { f, admitted, now } = await lostAdmission(options)
       await reclaim(f.userId, now)

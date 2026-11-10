@@ -57,7 +57,7 @@ export async function setCliPolicy(pool: Pick<Pool, 'connect'>, ownerId: string,
   } })
 }
 
-/** A person may configure a worker before its first run. */
+/** A worker's settings page writes its Bot's workspace policy; the worker has no layer of its own. */
 export async function setCliAgentPolicy(pool: Pick<Pool, 'connect'>, ownerId: string, agentId: string, botId: string | null, target: 'workspace', expectedRevision: string, input: unknown, membership: CliMembershipGuard = realCliMembershipGuard) {
   const policy = cliPolicyLayerSchema.parse(input)
   const guard = cliAgentPolicyGuard(ownerId,agentId,botId,membership)

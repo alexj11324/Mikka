@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import type { PoolClient } from 'pg'
 import { createWritePolicySettings } from './write-policy-settings'
 
 function fixture() {
@@ -17,7 +18,7 @@ function fixture() {
  } }) } as unknown as Parameters<typeof createWritePolicySettings>[0]
  const settings=createWritePolicySettings(pool, s => s.botId ? async () => {
   if (!state.member) throw Error('membership revoked')
-  return { check:async()=>{ if (!state.member) throw Error('membership revoked') }, close:async()=>{state.closed++}, workspaceClient:{ query:async (sql:string) => sql.includes('mikka_workspace_members') ? { rows:[{ role:'admin' }] } : { rows:[] } } }
+  return { check:async()=>{ if (!state.member) throw Error('membership revoked') }, close:async()=>{state.closed++}, workspaceClient:{ query:(async (sql:string) => sql.includes('mikka_workspace_members') ? { rows:[{ role:'admin' }] } : { rows:[] }) as unknown as PoolClient['query'] } }
  } : undefined)
  return {settings,scope,state}
 }

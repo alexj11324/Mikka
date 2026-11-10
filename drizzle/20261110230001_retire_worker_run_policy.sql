@@ -114,10 +114,21 @@ CREATE TEMP TABLE workspace_only_worker_patch ON COMMIT DROP AS
   FULL JOIN workspace_only_worker_read_only r USING (workspace_id);
 
 UPDATE workspace_computer_policies w
-SET cli_run_policy = merged.value
-FROM workspace_only_worker_patch p,
-LATERAL (
-  SELECT jsonb_strip_nulls(jsonb_build_object(
+SET cli_run_policy = jsonb_strip_nulls(jsonb_build_object(
+  'permissions', CASE WHEN p.patch ? 'permissions'
+    THEN coalesce(w.cli_run_policy->'permissions', '{}'::jsonb) || (p.patch->'permissions')
+    ELSE w.cli_run_policy->'permissions' END,
+  'networkAllow', CASE WHEN p.patch ? 'networkAllow'
+    THEN p.patch->'networkAllow'
+    ELSE w.cli_run_policy->'networkAllow' END,
+  'approvalMode', CASE WHEN p.patch ? 'approvalMode'
+    THEN p.patch->'approvalMode'
+    ELSE w.cli_run_policy->'approvalMode' END,
+  'defaults', w.cli_run_policy->'defaults'
+))
+FROM workspace_only_worker_patch p
+WHERE w."workspaceId" = p.workspace_id
+  AND w.cli_run_policy IS DISTINCT FROM jsonb_strip_nulls(jsonb_build_object(
     'permissions', CASE WHEN p.patch ? 'permissions'
       THEN coalesce(w.cli_run_policy->'permissions', '{}'::jsonb) || (p.patch->'permissions')
       ELSE w.cli_run_policy->'permissions' END,
@@ -128,10 +139,7 @@ LATERAL (
       THEN p.patch->'approvalMode'
       ELSE w.cli_run_policy->'approvalMode' END,
     'defaults', w.cli_run_policy->'defaults'
-  )) AS value
-) merged
-WHERE w."workspaceId" = p.workspace_id
-  AND w.cli_run_policy IS DISTINCT FROM merged.value;
+  ));
 
 INSERT INTO workspace_computer_policies ("workspaceId", permission, cli_run_policy)
 SELECT p.workspace_id, 'allow', p.patch

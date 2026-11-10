@@ -457,7 +457,7 @@ export async function personalMcp(userId: string, botId: string, executionId: st
 // preserve the first uncertain outcome rather than replaying this step.
 personalMcp.maxRetries = 0
 
-/** GitHub's workspace/Bot app policy for github_call, read in a step: a workflow body never does DB I/O. */
+/** GitHub's workspace app policy for github_call, read in a step: a workflow body never does DB I/O. */
 export async function githubCallAllowedStep(userId: string, botId: string | null) {
   'use step'
   const { githubCallDecision } = await import('@/lib/operations/github-call-policy')

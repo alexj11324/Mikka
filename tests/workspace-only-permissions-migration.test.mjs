@@ -82,8 +82,8 @@ async function fold(client) {
   // A second pass must be a no-op on every value and version.
   for (const name of NEW_MIGRATIONS) await client.query(await sql(name))
 }
-const external = async (client, workspaceId) => (await client.query('select external_write_permissions,external_write_policy_version from workspace_computer_policies where "workspaceId"=$1', [workspaceId])).rows[0]
-const cli = async (client, workspaceId) => (await client.query('select cli_run_policy,cli_run_policy_version from workspace_computer_policies where "workspaceId"=$1', [workspaceId])).rows[0]
+const external = async (client, workspaceId) => (await client.query('select external_write_permissions,external_write_policy_version::int from workspace_computer_policies where "workspaceId"=$1', [workspaceId])).rows[0]
+const cli = async (client, workspaceId) => (await client.query('select cli_run_policy,cli_run_policy_version::int from workspace_computer_policies where "workspaceId"=$1', [workspaceId])).rows[0]
 
 test('external and CLI restrictions fold into the workspace, never an allow; the fold is idempotent', { skip: !enabled }, async () => {
   assert.ok(isE2eTarget(target.href), E2E_DB_RULE)
@@ -210,7 +210,7 @@ test('malformed and over-limit policies abort before any write', { skip: !enable
     await owner(client)
     const w = id(), b = await bot(client, w)
     await workspace(client, w, { slack: 'allow' })
-    await client.query(`insert into agent_kit_heads(owner_id,bot_key,bot_id,workspace_id,external_write_permissions) values ('owner',$1,$1,$2,'[]'::jsonb)`, [b, w])
+    await client.query(`insert into agent_kit_heads(owner_id,bot_key,bot_id,workspace_id,external_write_permissions) values ('owner',$1,$2,$3,'[]'::jsonb)`, [b, b, w])
     await assert.rejects(client.query(await sql(NEW_MIGRATIONS[0])), /external_write_permissions is not an object/)
   })
   await withSchema(async client => {

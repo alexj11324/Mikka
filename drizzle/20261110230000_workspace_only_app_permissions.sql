@@ -51,7 +51,7 @@ BEGIN
   SELECT h.owner_id, h.bot_key, e.key, e.value INTO bad
   FROM agent_kit_heads h
   CROSS JOIN LATERAL jsonb_each_text(h.external_write_permissions) e
-  WHERE e.key !~ '^[a-z][a-z0-9_]{0,63}$' OR e.value NOT IN ('allow', 'ask', 'deny')
+  WHERE e.value IS NULL OR e.key !~ '^[a-z][a-z0-9_]{0,63}$' OR e.value NOT IN ('allow', 'ask', 'deny')
   LIMIT 1;
   IF FOUND THEN
     RAISE EXCEPTION 'workspace-only: agent_kit_heads(%,%) stores invalid external setting %=%', bad.owner_id, bad.bot_key, bad.key, bad.value;
@@ -68,7 +68,7 @@ BEGIN
   SELECT w."workspaceId", e.key, e.value INTO bad
   FROM workspace_computer_policies w
   CROSS JOIN LATERAL jsonb_each_text(w.external_write_permissions) e
-  WHERE e.key !~ '^[a-z][a-z0-9_]{0,63}$' OR e.value NOT IN ('allow', 'ask', 'deny')
+  WHERE e.value IS NULL OR e.key !~ '^[a-z][a-z0-9_]{0,63}$' OR e.value NOT IN ('allow', 'ask', 'deny')
   LIMIT 1;
   IF FOUND THEN
     RAISE EXCEPTION 'workspace-only: workspace % stores invalid external setting %=%', bad."workspaceId", bad.key, bad.value;
@@ -271,15 +271,16 @@ DECLARE
   match text[];
 BEGIN
   IF value = '*' THEN
-    host := '*'; port := NULL; wildcard := false; RETURN;
+    host := '*'; port := NULL; wildcard := false; RETURN NEXT; RETURN;
   END IF;
   match := regexp_match(lower(value), '^(\*\.)?([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)(?::([1-9][0-9]{0,4}))?$');
   IF match IS NULL THEN RETURN; END IF;
   host := match[2]; port := match[3]; wildcard := match[1] IS NOT NULL;
   IF port IS NOT NULL AND port::int > 65535 THEN
-    host := NULL; port := NULL; RETURN;
+    host := NULL; port := NULL; RETURN NEXT; RETURN;
   END IF;
   IF position('..' IN host) > 0 THEN host := NULL; port := NULL; END IF;
+  RETURN NEXT;
 END $$;
 
 CREATE OR REPLACE FUNCTION mikka_network_includes(outer_host text, outer_wildcard boolean, inner_host text, inner_wildcard boolean)
@@ -386,10 +387,21 @@ CREATE TEMP TABLE workspace_only_cli_patch ON COMMIT DROP AS
   FULL JOIN workspace_only_cli_read_only r USING (workspace_id);
 
 UPDATE workspace_computer_policies w
-SET cli_run_policy = merged.value
-FROM workspace_only_cli_patch p,
-LATERAL (
-  SELECT jsonb_strip_nulls(jsonb_build_object(
+SET cli_run_policy = jsonb_strip_nulls(jsonb_build_object(
+  'permissions', CASE WHEN p.patch ? 'permissions'
+    THEN coalesce(w.cli_run_policy->'permissions', '{}'::jsonb) || (p.patch->'permissions')
+    ELSE w.cli_run_policy->'permissions' END,
+  'networkAllow', CASE WHEN p.patch ? 'networkAllow'
+    THEN p.patch->'networkAllow'
+    ELSE w.cli_run_policy->'networkAllow' END,
+  'approvalMode', CASE WHEN p.patch ? 'approvalMode'
+    THEN p.patch->'approvalMode'
+    ELSE w.cli_run_policy->'approvalMode' END,
+  'defaults', w.cli_run_policy->'defaults'
+))
+FROM workspace_only_cli_patch p
+WHERE w."workspaceId" = p.workspace_id
+  AND w.cli_run_policy IS DISTINCT FROM jsonb_strip_nulls(jsonb_build_object(
     'permissions', CASE WHEN p.patch ? 'permissions'
       THEN coalesce(w.cli_run_policy->'permissions', '{}'::jsonb) || (p.patch->'permissions')
       ELSE w.cli_run_policy->'permissions' END,
@@ -400,10 +412,7 @@ LATERAL (
       THEN p.patch->'approvalMode'
       ELSE w.cli_run_policy->'approvalMode' END,
     'defaults', w.cli_run_policy->'defaults'
-  )) AS value
-) merged
-WHERE w."workspaceId" = p.workspace_id
-  AND w.cli_run_policy IS DISTINCT FROM merged.value;
+  ));
 
 INSERT INTO workspace_computer_policies ("workspaceId", permission, cli_run_policy)
 SELECT p.workspace_id, 'allow', p.patch

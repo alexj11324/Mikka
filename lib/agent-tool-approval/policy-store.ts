@@ -123,7 +123,11 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
   for (const id of workspaceIds) {
     const row = await tx.query<{ policy: unknown; version: string; generation: string }>(`SELECT cli_run_policy AS policy,cli_run_policy_version AS version,cli_run_policy_generation AS generation FROM workspace_computer_policies WHERE "workspaceId"=$1 FOR SHARE`, [id])
     if (!row.rows[0]) throw new Error('agentPolicyUnavailable')
-    const layer = cliPolicyLayerSchema.parse(row.rows[0].policy)
+    // A malformed stored policy fails closed; a ZodError would escape as a
+    // generic 500 and bypass the caller's agentPolicyUnavailable handling.
+    const parsed = cliPolicyLayerSchema.safeParse(row.rows[0].policy)
+    if (!parsed.success) throw new Error('agentPolicyUnavailable', { cause: parsed.error })
+    const layer = parsed.data
     workspaceLayers.push(layer); workspaceById.set(id, layer)
     if (id === primaryWorkspaceId) workspace = layer
     const version = String(row.rows[0].version)
@@ -140,7 +144,9 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     await tx.query(`INSERT INTO cli_scope_policies(kind,scope_id,workspace_id) VALUES($1,$2,$3) ON CONFLICT(kind,scope_id) DO NOTHING`, [kind,id,hierarchy.workspaceId])
     const { rows: [row] } = await tx.query<{ workspaceId: string; policy: unknown; version: string; generation: string }>(`SELECT workspace_id AS "workspaceId",cli_run_policy AS policy,cli_run_policy_version AS version,cli_run_policy_generation AS generation FROM cli_scope_policies WHERE kind=$1 AND scope_id=$2 FOR SHARE`,[kind,id])
     if (!row || row.workspaceId !== hierarchy.workspaceId || !/^\d+$/.test(String(row.version))) throw new Error('agentPolicyUnavailable')
-    const layer = cliPolicyLayerSchema.parse(row.policy)
+    const parsed = cliPolicyLayerSchema.safeParse(row.policy)
+    if (!parsed.success) throw new Error('agentPolicyUnavailable', { cause: parsed.error })
+    const layer = parsed.data
     scopedLayers.push(layer); scopeLayers[kind] = layer
     scopeVersions.push([kind,id,row.generation,String(row.version)])
   }

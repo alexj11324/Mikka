@@ -65,8 +65,10 @@ before(async () => {
   const workspaceId = await seedFixtureWorkspace(pool, owner)
   await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope) VALUES ($1,$2,$4,\'Synthetic approval task\',$3,\'todo\',\'normal\',\'personal\')',[issueId,owner,JSON.stringify({type:'doc',attrs:{mikka:{number:1}},content:[]}),workspaceId])
   // Network is open by default (decision 2026-11-01-1230). The owner chose
-  // `ask` for this bot; the run gate below still asks nothing per tool.
-  await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id,cli_run_policy) VALUES ($1,'coordinator',NULL,'{"permissions":{"install_dependency":"allow","network":"ask"}}'::jsonb)`, [owner])
+  // `ask` for this workspace; the run gate below still asks nothing per tool.
+  // The workspace row is the only policy source (per-Bot and per-worker layers
+  // are retired), so the choice is written there, not on a head.
+  await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy) VALUES ($1,'allow','{"permissions":{"install_dependency":"allow","network":"ask"}}'::jsonb)`, [workspaceId])
   await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId","issueId","deviceRepoId",status,"agentId",kind,prompt) VALUES ($1,$2,$3,$4,$5,'queued',$6,'implement','APPROVAL_TEST')`, [runId,owner,deviceId,issueId,repoId,agentId])
   const device = await import('../../app/v1/runs/[runId]/tool-approval/route')
   const policy = await import('../../app/v1/runs/[runId]/policy-snapshot/route')
@@ -114,19 +116,22 @@ test('real HTTP claim carries policy, and its run gate creates no approvals (dec
   const settings = async (cookie: string, payload: object) => fetch(`${origin}/api/agent-cli-policy`, { method:'POST', headers:{cookie,origin,'content-type':'application/json'}, body:JSON.stringify(payload) })
   const unstartedAgent = randomUUID()
   await pool.query(`INSERT INTO agents (id,"userId",harness,name) VALUES ($1,$2,'codex','Synthetic unstarted worker')`, [unstartedAgent,owner])
-  const beforeFirstRun = await settings('owner=1',{operation:'readAgent',agentId:unstartedAgent,botId:null})
+  // A worker alone has no workspace to authorize; the settings Bot binds it to the fixture workspace.
+  const settingsBot = randomUUID()
+  await pool.query(`INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,'Synthetic settings Bot')`, [settingsBot,owner,workspaceId])
+  const beforeFirstRun = await settings('owner=1',{operation:'readAgent',agentId:unstartedAgent,botId:settingsBot})
   assert.equal(beforeFirstRun.status,200)
   const empty = await beforeFirstRun.json() as {revision:string}
-  assert.equal((await settings('other=1',{operation:'setAgent',agentId:unstartedAgent,botId:null,target:'worker',expectedRevision:empty.revision,policy:{permissions:{install_dependency:'deny'}}})).status,409)
-  assert.equal((await settings('owner=1',{operation:'setAgent',agentId:unstartedAgent,botId:null,target:'worker',expectedRevision:empty.revision,policy:{permissions:{install_dependency:'deny'}}})).status,200)
+  assert.equal((await settings('other=1',{operation:'setAgent',agentId:unstartedAgent,botId:settingsBot,target:'workspace',expectedRevision:empty.revision,policy:{permissions:{install_dependency:'deny'}}})).status,409)
+  assert.equal((await settings('owner=1',{operation:'setAgent',agentId:unstartedAgent,botId:settingsBot,target:'workspace',expectedRevision:empty.revision,policy:{permissions:{install_dependency:'deny'}}})).status,200)
   assert.equal((await pool.query('SELECT count(*)::int AS count FROM agent_runs WHERE "agentId"=$1',[unstartedAgent])).rows[0].count,0)
   const settingsRead = await settings('owner=1',{operation:'read',runId})
   assert.equal(settingsRead.status,200)
   const previous = await settingsRead.json() as {revision:string}
-  assert.equal((await settings('other=1',{operation:'set',runId,target:'worker',expectedRevision:previous.revision,policy:{permissions:{install_dependency:'deny'}}})).status,409)
-  const changed = await settings('owner=1',{operation:'set',runId,target:'worker',expectedRevision:previous.revision,policy:{permissions:{install_dependency:'allow'}}})
+  assert.equal((await settings('other=1',{operation:'set',runId,target:'workspace',expectedRevision:previous.revision,policy:{permissions:{install_dependency:'deny'}}})).status,409)
+  const changed = await settings('owner=1',{operation:'set',runId,target:'workspace',expectedRevision:previous.revision,policy:{permissions:{install_dependency:'allow'}}})
   assert.equal(changed.status,200)
-  assert.equal((await settings('owner=1',{operation:'set',runId,target:'worker',expectedRevision:previous.revision,policy:{}})).status,409)
+  assert.equal((await settings('owner=1',{operation:'set',runId,target:'workspace',expectedRevision:previous.revision,policy:{}})).status,409)
   await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[deviceId,harnesses(false)])
   const oldDaemon = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ 'x-mikka-client-version':'0.0.456', authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1' } })
   assert.equal(oldDaemon.status,409)
@@ -191,7 +196,7 @@ test('policy changes persist a stop command; operations check locally and legacy
     const settings = async (payload: object) => fetch(`${origin}/api/agent-cli-policy`, { method:'POST', headers:{cookie:'owner=1',origin,'content-type':'application/json'}, body:JSON.stringify(payload) })
     const current = await (await settings({operation:'read',runId})).json() as {revision:string}
     assert.equal(current.revision, claimed.policyRevision, 'nothing changed the run policy since its claim')
-    assert.equal((await settings({operation:'set',runId,target:'worker',expectedRevision:current.revision,policy:{permissions:{install_dependency:'deny'}}})).status,200)
+    assert.equal((await settings({operation:'set',runId,target:'workspace',expectedRevision:current.revision,policy:{permissions:{install_dependency:'deny'}}})).status,200)
     const persisted = (await pool.query('SELECT "stopRequestedAt","leaseExpiresAt"<=clock_timestamp() AS expired FROM agent_runs WHERE id=$1',[runId])).rows[0]
     assert.ok(persisted.stopRequestedAt)
     assert.equal(persisted.expired, true)

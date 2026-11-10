@@ -67,7 +67,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "19862adf06437994a520dd9189c704b59ab01c32ea0dc5b1c3f6c58fab7b530b"
+      "sourceHash": "22e6f1033ad134b32a9e4a300851ff050fc14ef5ddf4a16a715be459c1477658"
     },
     {
       "path": "/mikka/api/agent/images",
@@ -1195,16 +1195,6 @@
         "GET"
       ],
       "sourceHash": "7eaa7d4da7df0917328fb6ee3f352eb121ea21f357885d83db46fccec2d9c623"
-    },
-    {
-      "path": "/mikka/api/integrations/github/permissions",
-      "template": "/api/integrations/github/permissions",
-      "source": "app/api/integrations/github/permissions/route.ts",
-      "methods": [
-        "GET",
-        "PATCH"
-      ],
-      "sourceHash": "907c0bb40a8c70c9faefe5adbefec58ba35ad61b70091c17202d9e4fe4703d61"
     },
     {
       "path": "/mikka/api/integrations/github/repositories/verification",
