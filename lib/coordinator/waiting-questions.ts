@@ -10,19 +10,23 @@ export interface WaitingQuestionRun {
 
 export interface WaitingQuestionItem {
   position: number
-  line: EventLine | null
+  line?: EventLine | null
 }
 
 /**
- * The runs a person still has to answer for. A question is a live state, not a
- * stored transcript line: the chat shows one sentence above the composer and
+ * The tasks a person still has to answer for. A question is a live state, not
+ * a stored transcript line: the chat shows one sentence above the composer and
  * draws no `runQuestion` row (decision 2026-11-10).
  *
+ * A `runQuestion` event only says a question was asked once. Whether it is
+ * still waiting follows the same rule as the inbox and the thread's 等待你
+ * badge: the task's newest run is `waiting_input`, or ended and judged
+ * `needs_input`. Answering starts a continuation run on the same task, so the
+ * newest run moves on and the sentence disappears.
+ *
  * - Only the latest non-stale `runQuestion` event counts.
- * - A readable run must still be `waiting_input` and unfinished; an unread
- *   source falls back to the event itself, so a slow lookup never hides it.
  * - One row per task (two threads of one task answer the same question), and
- *   the rows are oldest first, so the thread that has waited longest is first.
+ *   the rows are oldest first, so the task that has waited longest is first.
  */
 export function waitingQuestionRuns(
   items: readonly WaitingQuestionItem[],
@@ -39,10 +43,12 @@ export function waitingQuestionRuns(
     const key = run?.issue?.id ?? line.runId ?? `position-${item.position}`
     if (seen.has(key)) continue
     seen.add(key)
-    if (run && (run.status !== 'waiting_input' || run.finishedAt)) continue
-    const title = run ? runTitle(run) : line.title
-    if (!title) continue
-    rows.push({ runId: line.runId, title })
+    // `issue.run` is the task's newest run (lib/issue-summary-columns): the same
+    // row the inbox reads, so the sentence and needsReply cannot disagree.
+    const newest = run ? run.issue?.run ?? { status: run.status, outcome: run.outcome ?? null } : null
+    if (!run || !newest) continue
+    if (newest.status !== 'waiting_input' && !(newest.status === 'stopped' && newest.outcome === 'needs_input')) continue
+    rows.push({ runId: line.runId, title: runTitle(run) })
   }
   return rows.reverse()
 }

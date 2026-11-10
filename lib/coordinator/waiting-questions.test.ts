@@ -6,35 +6,65 @@ import type { CitationSource } from './citations'
 
 const question = (runId: string | null, title: string | null = null): EventLine => ({ kind: 'runQuestion', runId, issueId: null, status: null, title })
 
-function run(id: string, options: { status?: string; finishedAt?: string | null; issue?: string; title?: string } = {}) {
+type Newest = { status: string; outcome: string | null }
+
+/**
+ * The run that asked and, on its task, the task's newest run (`issue.run`).
+ * An answered question keeps the old run `stopped/needs_input` and starts a
+ * continuation on the same task, so `newest` is what decides that it moved on.
+ */
+function run(id: string, options: { status?: string; outcome?: string | null; issue?: string; title?: string; newest?: Newest } = {}) {
+  const status = options.status ?? 'stopped'
+  const outcome = options.outcome === undefined ? (status === 'stopped' ? 'needs_input' : null) : options.outcome
   return {
     kind: 'run' as const,
     id,
-    status: options.status ?? 'waiting_input',
-    finishedAt: options.finishedAt ?? null,
+    agentName: 'Coordinator',
+    harness: 'codex',
+    status,
+    outcome,
+    summary: null,
+    steps: 0,
+    createdAt: '2026-11-10T19:00:00Z',
+    finishedAt: status === 'waiting_input' ? null : '2026-11-10T19:30:00Z',
     name: options.title ?? `what ${id} was asked`,
-    issue: options.issue ? { id: options.issue, number: 1, identifier: 'ALEX-1', title: '登录页白屏' } : null,
+    issue: options.issue ? { id: options.issue, number: 1, identifier: 'ALEX-1', title: '登录页白屏', run: options.newest ?? { status, outcome } } : null,
   } satisfies CitationSource
 }
 
 const sources = (entries: Record<string, CitationSource>) => entries
 
-test('a waiting run with a live source is shown by its thread title, without the task code', () => {
+test('an ended run judged needs_input is still waiting: the live shape of a question', () => {
   assert.deepEqual(
     waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { issue: 'i1' }) }), new Set()),
     [{ runId: 'r1', title: '登录页白屏' }],
   )
 })
 
-test('a run that moved on, finished, or whose event is stale is not waiting', () => {
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'running' }) }), new Set()), [])
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { finishedAt: '2026-11-10T19:00:00Z' }) }), new Set()), [])
+test('a run still waiting inside its turn is waiting', () => {
+  assert.deepEqual(
+    waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'waiting_input', issue: 'i1' }) }), new Set()),
+    [{ runId: 'r1', title: '登录页白屏' }],
+  )
+})
+
+test('answering starts a continuation run: the task moved on, so the sentence goes', () => {
+  const answered = run('r1', { issue: 'i1', newest: { status: 'queued', outcome: null } })
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: answered }), new Set()), [])
+})
+
+test('a run judged done, idle or blocked is not waiting', () => {
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'done' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'idle' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'blocked' }) }), new Set()), [])
+})
+
+test('a stale event is not waiting', () => {
   assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1') }), new Set([1])), [])
 })
 
-test('an unreadable source falls back to the event, and a question with no title disappears instead of rendering a bare row', () => {
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1', 'what it was asked') }], undefined, new Set()), [{ runId: 'r1', title: 'what it was asked' }])
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], undefined, new Set()), [])
+test('an unreadable run source is not invented from model text; the question waits for the next chat read', () => {
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1', 'what it was asked') }], undefined, new Set()), [])
 })
 
 test('two threads of one task answer the same question: the newest event wins and the task appears once', () => {
@@ -58,7 +88,7 @@ test('the task that has waited longest comes first', () => {
 test('the latest question for one run replaces an earlier one', () => {
   const result = waitingQuestionRuns(
     [{ position: 1, line: question('r1', 'old') }, { position: 2, line: question('r1', 'new') }],
-    undefined,
+    sources({ r1: run('r1', { title: 'new' }) }),
     new Set(),
   )
   assert.deepEqual(result, [{ runId: 'r1', title: 'new' }])

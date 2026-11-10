@@ -15,7 +15,9 @@ Two chat-chrome problems were reported on 2026-11-10:
 
 **A. Reply actions are always there.** 复制, 「N 个来源」 and reactions sit under every stored reply in one row. The icons stay muted; hover or focus raises contrast. No container, border, shadow or floating toolbar is added, and nothing appears or disappears as the pointer moves. The issue-thread panel keeps `HOVER_ACTIONS` for the person's own messages; a reply in the Coordinator chat uses the persistent row.
 
-**B. A question is a live state, not a message.** `runQuestion` is no longer drawn as a transcript event line. While a run is `waiting_input`, the composer column shows one sentence above the input: a warning icon, an ICU-plural count, and the oldest waiting thread as an inline link inside the sentence. The thread is never a row of its own. Answering the run, ending it, stopping it or a newer event for the same task removes the sentence; two threads of one task count once. When the run source cannot be read, the event itself still keeps the sentence visible.
+**B. A question is a live state, not a message.** `runQuestion` is no longer drawn as a transcript event line. While a task still waits on the person, the composer column shows one sentence above the input: a warning icon, an ICU-plural count, and the task that has waited longest as an inline link inside the sentence. The thread is never a row of its own, and two threads of one task count once.
+
+Whether it still waits follows the inbox's rule: the task's **newest** run is `waiting_input`, or ended and judged `needs_input`. The stored event never carries a title and the asking run ends as `stopped`, so the sentence reads the run source: an answered question starts a continuation run on the same task, whose newer state removes the sentence. A source that has not loaded yet waits for the next chat read instead of showing model text.
 
 This does not change [2026-11-10-0659](2026-11-10-0659-task-code-chips-and-work-area-tabs.md): a thread named in a sentence is its title in the link colour, with no icon, chip fill, accent or state badge.
 
