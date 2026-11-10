@@ -227,7 +227,7 @@ test('official property labels stay exact when the human control also contains a
       await expect(frame.assignee).toHaveText('TOTest owner')
       await assert.rejects(expect(frame.assignee).toHaveText('Test owner', { timeout: 150 }), error => {
         const message = stripVTControlCharacters(String(error.message))
-        return message.includes('Expected string: "Test owner"') && message.includes('Received string: "TOTest owner"')
+        return message.includes('Expected: "Test owner"') && message.includes('Received: "TOTest owner"')
       })
       await expect(frame.assigneeValue).toHaveCount(1)
       await expect(frame.assigneeValue).toBeVisible()

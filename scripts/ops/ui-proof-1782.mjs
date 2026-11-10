@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 
 export const PRODUCT = 'e3c0b0e050515986a8e42cc15ce0a3de15b8e88c'
 export const PRODUCT_TREE = '1e9b0ebbc340aa68096356bd75a9d00a61d88a82'
-export const CONTROL_PARENT = 'ab865334ef3ac2067513e04bae8c3a4cce145db9'
+export const CONTROL_PARENT = '6872f4aaa207ebc7036393d87c30224261e002ba'
 export const OVERLAY = 'fe20f19bcf82e6541430b62c450920ba42c95fb0'
 export const BRANCH = 'ops/1782-official-ui-proof-20261109'
 export const DATABASE = 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e'
