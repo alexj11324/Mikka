@@ -480,16 +480,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   incident kill switch or a recorded Alex decision (`decisions.md`). Safety
   and money defaults (approval requirements, auto-recharge) are not features;
   they change only with Alex's decision. Source: Alex, 2026-10-31.
-- **R-77** An app write has the permission its connection grants, and only
-  a destructive call asks. If the Gmail, Calendar, Notion or Slack
-  connection allows the write, the agent writes without a card. Explicit
-  person or admin allow/ask/deny win first. Otherwise the Decisions API
-  answers one predicate, `destructive`: does this exact call delete,
-  overwrite or remove existing data? The tool's MCP annotations
-  (`destructiveHint`, `readOnlyHint`) are input; a `readOnlyHint` tool is not
-  asked about. Creating, sending, appending and adding never ask. An
-  unavailable or refused judgment shows a card, never a silent write.
-  Source: Alex, 2026-10-31.
+- **R-77** App access belongs to the workspace. 设置 › 应用与运行权限 sets one level per connected app or MCP server — allow, read-only or disabled — and every Bot in the workspace inherits it. No Bot, person or per-action layer adds an allow/ask/deny rule. A disabled app is absolute: direct app and GitHub calls refuse it. Read-only refuses writes and tells the model why. Allow runs reads and writes directly, with no approval card and no Decision API call. A device is allowed or denied on its own; that device level is the only other authorization surface. Source: Alex, 2026-11-10 (Capy parity; supersedes the 2026-10-31 destructive-call rule).
 - **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…)
   in an Agent 配置. Where an Agent stretch is drawn with a mark (the line where
   the Agent changes, a plan step, the execution identity), the main mark is

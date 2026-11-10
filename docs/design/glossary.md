@@ -188,7 +188,7 @@ _Avoid_: Agent, assistant, 机器人.
 **Agent**:
 As defined above: the coding worker (Claude Code, Codex) that runs a thread.
 Which Agent a person's bots use is the person's choice per workspace
-(Bot 与 Agents).
+(模型与订阅).
 _Owner_: the account (Agent aggregate).
 _Avoid_: harness, 执行器, bot.
 
