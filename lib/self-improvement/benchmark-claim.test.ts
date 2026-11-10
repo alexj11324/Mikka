@@ -11,6 +11,7 @@ import * as policySnapshotProtocol from '@mikka/protocol/policy-snapshot'
 import * as repositoryProtocol from '@mikka/protocol/repository'
 import * as subscriptionProtocol from '@mikka/protocol/subscription'
 import * as taskSecretsProtocol from '@mikka/protocol/task-secrets'
+import * as threadModeProtocol from '@mikka/protocol/thread-mode'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '../run-assignment-policy'
 import { serverRunFailure } from '../run-failure-details'
@@ -67,6 +68,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@mikka/protocol/repository':repositoryProtocol,
     '@mikka/protocol/subscription':subscriptionProtocol,
     '@mikka/protocol/task-secrets':taskSecretsProtocol,
+    '@mikka/protocol/thread-mode':threadModeProtocol,
     '@mikka/protocol/policy-snapshot':policySnapshotProtocol,
     '@/messages/zh-CN.json':{default:messages},
     // This legacy-capability fixture has no managed organization policy.
