@@ -42,19 +42,24 @@ test('a deny stored only under the first-class action still governs its app', ()
 
 test('deny refuses, ask cards and allow skips the judge — for all three first-class writes', async () => {
   for (const { action, app } of WRITES) {
+    // Each outcome is driven by the choice the page saves for this write's app, not by a bare literal.
+    const fromSetting = async (value: AppPermissionValue, judge: () => Promise<'allow' | 'ask'>) =>
+      await accountWriteOutcome(settingFor(stored(app, value), action, app), judge)
+    const refuseToJudge = async (): Promise<'allow' | 'ask'> => { throw new Error(`judged ${action}`) }
+
     // deny: nothing runs, and the judge is never consulted (a deny is absolute).
-    const denied = await accountWriteOutcome('deny', async () => { throw new Error(`judged ${action}`) })
+    const denied = await fromSetting('deny', refuseToJudge)
     assert.equal(denied, 'deny', action)
     assert.deepEqual(accountWriteError(denied), { error: 'integrationActionDenied' }, action)
 
     // ask: a card, also without the judge.
-    const asked = await accountWriteOutcome('ask', async () => { throw new Error(`judged ${action}`) })
+    const asked = await fromSetting('ask', refuseToJudge)
     assert.equal(asked, 'ask', action)
     assert.deepEqual(accountWriteError(asked), { error: 'integrationApprovalRequired' }, action)
 
     // allow: the workspace's grant is real, so the judge is never asked and the call runs.
     let judged = false
-    const allowed = await accountWriteOutcome('allow', async () => { judged = true; return 'ask' })
+    const allowed = await fromSetting('allow', async () => { judged = true; return 'ask' })
     assert.equal(allowed, 'run', action)
     assert.equal(judged, false, `${action}: allow never consults the judge`)
     assert.equal(accountWriteError(allowed), null, action)
