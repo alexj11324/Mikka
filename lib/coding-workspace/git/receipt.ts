@@ -29,6 +29,12 @@ function undoShape(receipt: WorkspaceReadReceipt, path: string) {
  * proofs may become a public patch; write receipts must match the confirmed
  * preview byte-for-byte before the server records them. */
 export function validateGitReceipt(request: WorkspaceReadRequest, receipt: WorkspaceReadReceipt, mask: Masker): WorkspaceReadResult | null {
+  // A refusal is a real answer, not a malformed receipt. Parsing it as a
+  // success DTO would erase the device's code and surface every honest
+  // conflict (stale fence, unsupported mode, expired request) as "receipt
+  // rejected". A refusal may not carry proofs or an Undo capture, though:
+  // those only describe a write that happened.
+  if (!receipt.result.ok) return receipt.blobs?.length || receipt.gitUndo ? null : receipt.result
   switch (request.kind) {
     case 'git_status': {
       const parsed = gitStatus.safeParse(receipt.result)

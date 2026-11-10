@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { gitLogFormat, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from '../../../packages/daemon/src/coding-workspace/git-parse'
+import { gitLogArgs, gitLogFormat, gitText, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from '../../../packages/daemon/src/coding-workspace/git-parse'
 
 const sha = (letter: string) => letter.repeat(40)
 const head = sha('a'), base = sha('b')
@@ -33,6 +33,23 @@ test('porcelain v2 detached heads and missing upstream stay explicit', () => {
   assert.throws(() => parsePorcelainV2('1 nope\0'))
 })
 
+test('git output is decoded from bytes, never from a Uint8Array join', () => {
+  // execa hands back a Uint8Array for `encoding: 'buffer'`; its toString()
+  // produces "63,32,110,..." which parses as no record at all.
+  const bytes = new Uint8Array(Buffer.from('? notes.md\0'))
+  assert.equal(gitText(bytes), '? notes.md\0')
+  assert.deepEqual(parsePorcelainV2(gitText(bytes)).entries.map(entry => entry.path), ['notes.md'])
+  assert.equal(gitText('already text'), 'already text')
+})
+
+test('porcelain v2 names the record it cannot read and skips ignored paths', () => {
+  // An ignored path is never tracked, so it cannot join a restore plan.
+  assert.deepEqual(parsePorcelainV2('! build/\0? notes.md\0').entries.map(entry => entry.path), ['notes.md'])
+  // The message carries the record itself: `status_parse` alone cannot be
+  // traced back to whichever repository printed it.
+  assert.throws(() => parsePorcelainV2('x unreadable\0'), /status_parse: "x unreadable"/)
+})
+
 test('git log parsing normalizes offsets and marks HEAD/base without inventing authorship', () => {
   const first = sha('1'), second = sha('2')
   const output = [
@@ -47,6 +64,10 @@ test('git log parsing normalizes offsets and marks HEAD/base without inventing a
   assert.deepEqual(commits[1], { sha: second, parents: [], authorName: 'Grace', authorEmail: 'grace@example.invalid',
     authoredAt: '2026-11-09T08:00:00.000Z', committedAt: '2026-11-09T08:00:00.000Z', subject: 'Base change', head: false, base: true })
   assert.match(gitLogFormat, /%H%x00%P/)
+  // Git writes a newline before every record after the first unless `-z` asks
+  // for NUL separators, and the format must leave the separator to `-z`.
+  assert.ok(gitLogArgs(5, 0).includes('-z'))
+  assert.equal(gitLogFormat.endsWith('%s'), true)
 })
 
 test('history cursors are bound to the observed HEAD and bounded', () => {

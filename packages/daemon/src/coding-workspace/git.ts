@@ -22,7 +22,7 @@ import { buildChildEnv } from '../env'
 import type { JournalEntry } from '../runs/journal'
 import { gitFor, missing, readWorkspaceRevertPreview, statFence } from './diff'
 import { mountId, safeFile, type WorkspaceRoot } from './files'
-import { gitLogFormat, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from './git-parse'
+import { gitLogArgs, gitText, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from './git-parse'
 
 const digest = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 const oid = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/
@@ -41,6 +41,12 @@ const conflict = (cause?: unknown) => cause === undefined
 const unavailable = () => new CodingWorkspaceError('workspace_checkout_unavailable')
 
 function failure(command: WorkspaceReadCommand, cause: unknown): WorkspaceReadReceipt {
+  // The wire code is a closed set, so anything outside the typed contract has
+  // to travel as "checkout unavailable" — which also describes a genuinely
+  // missing checkout. Keep the real reason in the log or the two are
+  // indistinguishable from the server.
+  if (!(cause instanceof CodingWorkspaceError))
+    console.error(`coding-workspace-git: ${command.request.kind} failed`, cause)
   return { result: { ok: false, code: Date.parse(command.expiresAt) <= Date.now() ? 'workspace_request_expired'
     : cause instanceof CodingWorkspaceError ? cause.code : 'workspace_checkout_unavailable' }, files: [] }
 }
@@ -255,8 +261,7 @@ async function readGitHistory(command: WorkspaceReadCommand, entry: JournalEntry
     const status = await observeStatus(git, opened.root, opened.parsed.identity, entry?.baseCommit ?? null, signal)
     const offset = parseHistoryCursor(request.cursor, status.commitSha)
     if (offset === null) throw conflict()
-    const raw = await git(['log', `--format=${gitLogFormat}`, '-n', String(Math.min(request.limit, WORKSPACE_GIT_MAX_COMMITS) + 1),
-      `--skip=${offset}`, '--no-decorate'], STATUS_BYTES)
+    const raw = await git(gitLogArgs(Math.min(request.limit, WORKSPACE_GIT_MAX_COMMITS) + 1, offset), STATUS_BYTES)
     const commits = parseGitLog(raw.toString('utf8'), { headSha: status.commitSha, baseSha: entry?.baseCommit ?? null })
     const history: GitHistory = gitHistorySchema.parse({ ok: true, identity: opened.parsed.identity, kind: 'git_history',
       observedAt: new Date().toISOString(), availability: 'online', revision: status.revision, commitSha: status.commitSha,
@@ -298,6 +303,7 @@ async function readWorkspaceRevertApply(command: WorkspaceReadCommand, entry: Jo
     if (observed.exists === request.after.exists && observed.contentSha256 === request.after.contentSha256
       && (!observed.exists || observed.mode === request.after.mode)) {
       const result = workspaceGitRevertApplyResult.parse({ ok: true, identity: opened.parsed.identity, kind: 'git_revert_applied',
+        observedAt: new Date().toISOString(), availability: 'online',
         operationId: request.operationId, previewVersion: request.previewVersion, appliedAt: new Date().toISOString(), headSha: head,
         after: fenceOf(request.file.path, head, observed), idempotent: true })
       return { result, files: [] }
@@ -320,6 +326,7 @@ async function readWorkspaceRevertApply(command: WorkspaceReadCommand, entry: Jo
       || (after.exists && after.mode !== request.after.mode)) throw conflict()
     if ((await headSha(git)) !== head) throw conflict()
     const result = workspaceGitRevertApplyResult.parse({ ok: true, identity: opened.parsed.identity, kind: 'git_revert_applied',
+      observedAt: new Date().toISOString(), availability: 'online',
       operationId: request.operationId, previewVersion: request.previewVersion, appliedAt: new Date().toISOString(), headSha: head,
       after: fenceOf(request.file.path, head, after), idempotent: false })
     const undo: GitUndoFile = { path: request.file.path, existed: observed.exists, mode: observed.mode,
@@ -423,7 +430,7 @@ async function dryRunCheckpoint(git: Git, root: WorkspaceRoot, identity: Workspa
     try { await runGit(worktree, ['apply', '--binary', '--3way', '--whitespace=nowarn', patchFile], tempEnv(), signal) }
     catch { applied = false }
     const raw = await runGit(worktree, ['status', '--porcelain=v2', '-z', '--untracked-files=all'], tempEnv(), signal)
-    const parsed = parsePorcelainV2(raw.stdout.toString())
+    const parsed = parsePorcelainV2(gitText(raw.stdout))
     const files: PlanFile[] = [], conflicts: PlanConflict[] = [], contents: RestorePlan['contents'] = new Map()
     const seen = new Set<string>()
     let total = 0

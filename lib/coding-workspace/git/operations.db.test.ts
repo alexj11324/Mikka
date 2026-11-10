@@ -146,8 +146,10 @@ test('Git status, history, safe revert, Undo and checkpoint restore on PostgreSQ
       const receipt = command.request.kind.startsWith('git_')
         ? await handleWorkspaceGitRequest(command, f.entry, f.repository)
         : await readWorkspaceDiffReceipt(command, f.entry, f.repository)
-      assert.equal(await finishWorkspaceRead(pool, pool, f.caller, f.deviceId, command.id, receipt), true,
-        `receipt rejected for ${command.request.kind}`)
+      const saved = await finishWorkspaceRead(pool, pool, f.caller, f.deviceId, command.id, receipt)
+      // `finishWorkspaceRead` reports refusal as `false`; the device's own code
+      // is the only thing that says why, so surface it instead of hiding it.
+      assert.equal(saved, true, saved ? '' : `receipt rejected for ${command.request.kind}: ${JSON.stringify(receipt.result)}`)
     }
 
     await t.test('live status and commit timeline come from the exact checkout', async () => {
@@ -215,6 +217,13 @@ test('Git status, history, safe revert, Undo and checkpoint restore on PostgreSQ
     await t.test('hunk revert changes only the selected hunk', async () => {
       const f = await fixture()
       const original = Array.from({ length: 20 }, (_, index) => `line${String(index + 1).padStart(2, '0')}`).join('\n') + '\n'
+      // The base must already be the twenty-line file: diffing two edits
+      // against the one-line fixture commit would collapse into a single hunk
+      // that describes the whole replacement.
+      await f.write('src/example.ts', original)
+      await git(f.worktree, 'add', '--all')
+      await git(f.worktree, '-c', 'user.name=Mikka fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'twenty lines')
+      f.entry.baseCommit = await git(f.worktree, 'rev-parse', 'HEAD')
       const changed = original.replace('line02', 'LINE02').replace('line18', 'LINE18')
       await f.write('src/example.ts', changed)
       const snapshot = await exchange(f, signal => captureDiffSnapshot(dependencies, actor(), f.runId, f.repoId, { source: 'working' }, signal))

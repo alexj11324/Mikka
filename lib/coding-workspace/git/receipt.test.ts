@@ -98,3 +98,20 @@ test('a revert apply receipt must match the confirmed preview and its Undo captu
   assert.equal(validateWorkspaceReceipt(request, identity,
     { result, files: [], gitUndo: { files: [{ ...undo.files[0]!, sha256: '4'.repeat(64) }] } } as WorkspaceReadReceipt, mask), null)
 })
+
+test('a device refusal keeps its own code and may not carry write evidence', () => {
+  const previewVersion = gitRevertPreviewVersion({ operationId, revision, file, target: { kind: 'file' }, before: fence, after })
+  const request: WorkspaceReadRequest = { kind: 'git_revert_apply', operationId, previewVersion, revision, file,
+    target: { kind: 'file' }, expected: fence, after, contentBase64: base.toString('base64') }
+  const refused: WorkspaceReadReceipt['result'] = { ok: false, code: 'workspace_version_conflict' }
+  // The device owns the checkout; its refusal is the answer the caller needs.
+  assert.deepEqual(validateWorkspaceReceipt(request, identity, { result: refused, files: [] }, mask), refused)
+  assert.deepEqual(validateWorkspaceReceipt({ kind: 'git_history', limit: 10 }, identity,
+    { result: { ok: false, code: 'workspace_unsupported' }, files: [] }, mask), { ok: false, code: 'workspace_unsupported' })
+  // A write that never happened cannot present its proofs or Undo capture.
+  assert.equal(validateWorkspaceReceipt(request, identity,
+    { result: refused, files: [], blobs: [{ sha: file.oldBlob!, base64: base.toString('base64') }] }, mask), null)
+  assert.equal(validateWorkspaceReceipt(request, identity, { result: refused, files: [], gitUndo: { files: [{
+    path: file.path, existed: true, mode: '100644', base64: before.toString('base64'), sha256: digest(before),
+    after: { exists: true, contentSha256: digest(base) } }] } } as WorkspaceReadReceipt, mask), null)
+})
