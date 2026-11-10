@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   verify:
-    if: ${{ github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.event_name == 'push' && github.ref == 'refs/heads/ops/1782-ui-evidence-reader-20261110' && github.run_attempt == 1 && github.event.before == 'a63a155087ddb3220bfa2952bb8c261d3a7d96d7' && github.event.created == false && github.event.deleted == false && github.event.forced == false }}
+    if: ${{ github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.event_name == 'push' && github.ref == 'refs/heads/ops/1782-ui-evidence-reader-20261110' && github.run_attempt == 1 && github.event.before == '816ff3690a108efaae2c3b47ea24406dd400f46b' && github.event.created == false && github.event.deleted == false && github.event.forced == false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

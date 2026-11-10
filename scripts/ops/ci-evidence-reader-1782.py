@@ -28,7 +28,7 @@ WORKFLOW = ".github/workflows/issue1782-ci-evidence-reader.yml"
 DRIVER = "scripts/ops/ci-evidence-reader-1782.py"
 OWN_PATHS = {DRIVER, WORKFLOW}
 # Root binds this only after the preceding private reader has an actual commit.
-READER_PARENT = "a63a155087ddb3220bfa2952bb8c261d3a7d96d7"
+READER_PARENT = "816ff3690a108efaae2c3b47ea24406dd400f46b"
 PRODUCT = "ce6ad923bbb449023783052d0848db22e4360f1d"
 PRODUCT_TREE = "dffda64a4975b22cfc649908a8c5e19749ea8a96"
 PRODUCT_PARENTS = ["e3c0b0e050515986a8e42cc15ce0a3de15b8e88c", "ab2d00a43a79d35380b4d2db9014a3792fea63ca"]
@@ -275,7 +275,7 @@ def local_guard():
     require(git("rev-parse", "HEAD") == control and git("status", "--porcelain", "--untracked-files=all") == "", "checkout_identity")
     require(git("rev-list", "--parents", "-n", "1", "HEAD").split() == [control, READER_PARENT], "checkout_parent")
     lines = git("diff", "--name-status", READER_PARENT, control, "--").splitlines()
-    require(sorted(lines) == sorted("A\t" + path for path in OWN_PATHS), "whole_commit_paths")
+    require(sorted(lines) == sorted("M\t" + path for path in OWN_PATHS), "whole_commit_paths")
     source = []
     for path in sorted(OWN_PATHS):
         file = Path(path)
@@ -450,15 +450,17 @@ def verify_daemon(entries):
             and value.get("numTotalTests") == 1600, "daemon_totals")
     results = value.get("testResults")
     require(type(results) is list and len(results) == 143, "daemon_files")
+    # Fixed Vitest 5.0.5 maps skip to "skipped"; numPendingTests still counts skips.
+    # Source: vitest-dev/vitest v5.0.5 packages/vitest/src/node/reporters/json.ts.
     assertions = []
     for file in results:
         require(type(file.get("name")) is str and type(file.get("assertionResults")) is list, "daemon_shape")
         for result in file["assertionResults"]:
-            require(result.get("status") in ("passed", "pending"), "daemon_assertion")
+            require(result.get("status") in ("passed", "skipped"), "daemon_assertion")
             assertions.append((file["name"], result))
     require(sum(result["status"] == "passed" for _, result in assertions) == 1595
-            and sum(result["status"] == "pending" for _, result in assertions) == 5, "daemon_assertion_totals")
-    pending = [(path, result) for path, result in assertions if result["status"] == "pending"]
+            and sum(result["status"] == "skipped" for _, result in assertions) == 5, "daemon_assertion_totals")
+    pending = [(path, result) for path, result in assertions if result["status"] == "skipped"]
     allowances = {"packages/daemon/test/adapters.test.ts": 2, "packages/daemon/src/runs/workspace-control.test.ts": 3}
     require(all(any(path.endswith("/" + allowed) for allowed in allowances) for path, _ in pending), "daemon_pending_scope")
     for path, number in allowances.items():
@@ -474,7 +476,7 @@ def verify_daemon(entries):
         require(len(files) == 1 and len(files[0]["assertionResults"]) == total
                 and all(row.get("status") == "passed" for row in files[0]["assertionResults"]), "daemon_required60")
         verified.append({"path": path, "passed": total, "skipped": 0})
-    return {"passed": 1595, "failed": 0, "originalPending": 5, "files": 143,
+    return {"passed": 1595, "failed": 0, "originalSkipped": 5, "files": 143,
             "criticalTests": verified, "criticalPassed": 60}
 
 def verify_pg(entries):
