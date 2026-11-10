@@ -10,6 +10,7 @@ import { Box, Check, CircleUserRound, UserRoundPen, Columns3, Flag, List, ListFi
 import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
 import { useLiveTaskRunList } from '@/hooks/use-live-lists'
+import { localTaskState } from '@/hooks/use-bot-tasks'
 import { useListExpiry } from '@/hooks/use-list-expiry'
 import { getLinearBoardSync } from '@/app/actions/linear-sync'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
@@ -32,6 +33,8 @@ import { cn } from '@/lib/utils'
 import { statusIconTints } from '@/lib/status-appearance'
 import { personFilters } from '@/lib/board-filters'
 import { IssueBoard } from './issue-board'
+import { BoardScreen, BoardScreenView } from './board-screen'
+import type { BoardMenuItem } from '@/components/slots/board-contract'
 import { IssueList } from './issue-list'
 import { AgentSphere } from './issue-assignee-menu'
 import { LabelDot } from './issue-metadata-controls'
@@ -166,6 +169,11 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   // listTaskRuns returns each task's newest run once; the card shows that run's group, never its raw status.
   const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run, issues.find(issue => issue.id === run.issueId)); return state ? [[run.issueId, state] as const] : [] })), [runs, issues])
+  // Each task's own state, from the one derivation (localTaskState, decision #1864 point 6): the card's status line.
+  const taskStates = useMemo(() => {
+    const newest = new Map((runs ?? []).map(run => [run.issueId, run] as const))
+    return new Map(issues.map(issue => [issue.id, localTaskState(issue, newest.get(issue.id))] as const))
+  }, [runs, issues])
   // 受阻 is worked out here from the task and its newest thread; the task keeps its own status (lib/task-blocked.ts).
   const blocks = useMemo(() => boardBlocks(issues, runs), [issues, runs])
   const newestRuns = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, run.runId] as const)), [runs])
@@ -223,73 +231,103 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
   const setDisplay = (patch: Partial<Display>) => update({ display: { ...display, ...patch } })
   const activeFilters = (Object.entries(filters) as [FilterField, string[]][]).filter(([, values]) => values?.length)
 
+  const discuss = (issue: Issue) => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }
+  const refreshButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
+  const panelButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} aria-keyshortcuts="Control+j Meta+j" onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}<ShortcutKeys keys={['mod', 'J']} /></TooltipContent></Tooltip>
+  // The template's own menus (the `board` slot's BoardScreen) carry the filters and the 显示 options.
+  const scoped = (value: Scope) => issues
+    .filter(issue => value === 'all' || issue.scope === value)
+    .filter(issue => Object.entries(filters).every(([field, values]) => !values?.length || valuesOf(issue, field as FilterField).some(item => values.includes(item))))
+    .filter(issue => issue.status !== 'done' || now - new Date(issue.updatedAt).getTime() <= COMPLETED_DAYS[display.completed] * 86400000).length
+  const scopes = (personalWorkspace ? ['all'] as const : ['all', 'workspace', 'personal'] as const).map(value => ({ id: value, label: t(`scope.${value}`), count: scoped(value) }))
+  const filterItems: BoardMenuItem[] = [
+    ...FILTER_FIELDS.map(({ field }): BoardMenuItem => field === 'creator'
+      ? { label: t(`filterField.${field}`), checked: filters.creator?.includes(ME) ?? false, onSelect: () => toggleFilter(field, ME) }
+      : { label: t(`filterField.${field}`), submenu: options[field].map(option => ({ label: option.label, checked: filters[field]?.includes(option.value) ?? false, onSelect: () => toggleFilter(field, option.value) })) }),
+    { label: t('columns'), divider: true, submenu: BOARD_COLUMNS.map(column => ({ label: statusLabel(column.value), checked: !display.hidden.includes(column.value), onSelect: () => setDisplay({ hidden: display.hidden.includes(column.value) ? display.hidden.filter(item => item !== column.value) : [...display.hidden, column.value] }) })) },
+    { label: t('showEmpty'), checked: display.showEmpty, onSelect: () => setDisplay({ showEmpty: !display.showEmpty }) },
+  ]
+  const sortItems: BoardMenuItem[] = [
+    ...(['priority', 'updated', 'created'] as const).map(value => ({ label: t(`sortBy.${value}`), checked: display.sort === value, onSelect: () => setDisplay({ sort: value }) })),
+    { label: t('completed'), divider: true, submenu: (['week', 'month', 'all'] as const).map(value => ({ label: t(`completedRange.${value}`), checked: display.completed === value, onSelect: () => setDisplay({ completed: value }) })) },
+    { label: t('cardProperties'), submenu: CARD_PROPERTIES.map(property => ({ label: t(`property.${property}`), checked: display.properties.includes(property), onSelect: () => setDisplay({ properties: display.properties.includes(property) ? display.properties.filter(item => item !== property) : [...display.properties, property] }) })) },
+  ]
+
   return <div className="flex min-h-0 flex-1">
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <h1 id={titleId} className="sr-only">{t('title')}</h1>
-      <div role="toolbar" aria-label={t('toolbar')} className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 px-5 py-3">
-        {!personalWorkspace && <ToggleGroup aria-label={t('scopeLabel')} variant="segment" size="sm" spacing={0.5} value={[scope]} onValueChange={values => { const next = values[0] as Scope | undefined; if (next) update({ scope: next }) }}>
-          {(['all', 'workspace', 'personal'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`scope.${value}`)}</ToggleGroupItem>)}
-        </ToggleGroup>}
-        {!personalWorkspace && <Separator orientation="vertical" className="mx-1 h-5" />}
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}><ListFilter data-icon="inline-start" />{t('filter')}</DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-52"><DropdownMenuGroup>
-            {FILTER_FIELDS.map(({ field, icon: Icon }) => field === 'creator'
-              ? <DropdownMenuCheckboxItem key={field} checked={filters.creator?.includes(ME) ?? false} closeOnClick={false} onCheckedChange={() => toggleFilter(field, ME)}><Icon />{t(`filterField.${field}`)}</DropdownMenuCheckboxItem>
-              : <DropdownMenuSub key={field}>
-              <DropdownMenuSubTrigger><Icon />{t(`filterField.${field}`)}</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="max-h-80 w-52 overflow-y-auto">
-                {options[field].map(option => <DropdownMenuCheckboxItem key={option.value} checked={filters[field]?.includes(option.value) ?? false} closeOnClick={false} onCheckedChange={() => toggleFilter(field, option.value)}>{option.mark}<span className="truncate">{option.label}</span></DropdownMenuCheckboxItem>)}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>)}
-          </DropdownMenuGroup></DropdownMenuContent>
-        </DropdownMenu>
-        {/* One chip per filter (Linear): field, value and remove in a single control-grey container. */}
-        {activeFilters.map(([field, values]) => <div key={field} role="group" aria-label={t(`filterField.${field}`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-md bg-control pr-0.5 pl-2.5 text-xs">
-          <span className="text-muted-foreground">{t(`filterField.${field}`)}</span>
-          {field !== 'creator' && <span className="max-w-48 truncate font-medium">{values.map(value => options[field].find(option => option.value === value)?.label ?? value).join(', ')}</span>}
-          <Button variant="ghost" size="icon-xs" className="rounded-sm text-muted-foreground hover:bg-control-hover" aria-label={t('removeFilter', { field: t(`filterField.${field}`) })} onClick={() => setFilters({ ...filters, [field]: [] })}><X data-icon="inline-start" /></Button>
-        </div>)}
-        <div className="ml-auto flex items-center gap-1">
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
-          <ToggleGroup aria-label={t('viewLabel')} variant="segment" size="sm" spacing={0.5} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') update({ view: next }) }}>
-            <ToggleGroupItem value="board" aria-label={t('viewBoard')}><Columns3 /></ToggleGroupItem>
-            <ToggleGroupItem value="list" aria-label={t('viewList')}><List /></ToggleGroupItem>
-          </ToggleGroup>
-          <Popover>
-            <PopoverTrigger render={<Button variant="outline" size="sm" />}><Settings2 data-icon="inline-start" />{t('display')}</PopoverTrigger>
-            <PopoverContent align="end" className="w-80 gap-3">
-              <div className="flex items-center justify-between gap-3"><Label>{t('sort')}</Label>
-                <Select value={display.sort} onValueChange={value => setDisplay({ sort: value as Sort })} items={(['priority', 'updated', 'created'] as const).map(value => ({ value, label: t(`sortBy.${value}`) }))}>
-                  <SelectTrigger size="sm" className="w-28" aria-label={t('sort')}><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectGroup>{(['priority', 'updated', 'created'] as const).map(value => <SelectItem key={value} value={value}>{t(`sortBy.${value}`)}</SelectItem>)}</SelectGroup></SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between gap-3"><Label>{t('completed')}</Label>
-                <Select value={display.completed} onValueChange={value => setDisplay({ completed: value as Completed })} items={(['week', 'month', 'all'] as const).map(value => ({ value, label: t(`completedRange.${value}`) }))}>
-                  <SelectTrigger size="sm" className="w-28" aria-label={t('completed')}><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectGroup>{(['week', 'month', 'all'] as const).map(value => <SelectItem key={value} value={value}>{t(`completedRange.${value}`)}</SelectItem>)}</SelectGroup></SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between gap-3"><Label htmlFor={`${titleId}-empty`}>{t('showEmpty')}</Label><Switch id={`${titleId}-empty`} checked={display.showEmpty} onCheckedChange={showEmpty => setDisplay({ showEmpty })} /></div>
-              <p className="pt-2 text-xs text-muted-foreground">{t('cardProperties')}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {CARD_PROPERTIES.map(property => <Toggle key={property} size="sm" variant="outline" pressed={display.properties.includes(property)} className={DISPLAY_CHIP} onPressedChange={pressed => setDisplay({ properties: pressed ? [...display.properties, property] : display.properties.filter(item => item !== property) })}>{display.properties.includes(property) && <Check data-icon="inline-start" />}{t(`property.${property}`)}</Toggle>)}
-              </div>
-              {/* Both groups read the same way: checked and tinted means shown (R-30). */}
-              <p className="pt-2 text-xs text-muted-foreground">{t('columns')}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {BOARD_COLUMNS.map(column => { const isShown = !display.hidden.includes(column.value); return <Toggle key={column.value} size="sm" variant="outline" pressed={isShown} className={DISPLAY_CHIP} onPressedChange={pressed => setDisplay({ hidden: pressed ? display.hidden.filter(item => item !== column.value) : [...display.hidden, column.value] })}>{isShown && <Check data-icon="inline-start" />}{statusLabel(column.value)}</Toggle> })}
-              </div>
-            </PopoverContent>
-          </Popover>
-          <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask(true)}><Plus data-icon="inline-start" />{t('newTask')}</Button>
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} aria-keyshortcuts="Control+j Meta+j" onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}<ShortcutKeys keys={['mod', 'J']} /></TooltipContent></Tooltip>
+      {BoardScreen ? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks, personalWorkspace }}
+        view={view} onView={next => update({ view: next })} scopes={scopes} scope={scope} onScope={next => update({ scope: next as Scope })}
+        filterItems={filterItems} filterCount={activeFilters.length} sortItems={sortItems} tools={<span className="flex items-center gap-1 max-md:hidden">{refreshButton}{panelButton}</span>}
+        onNew={() => setNewTask(true)} onOpen={id => { onOpen(id) }} onDiscuss={discuss} onUpdated={onUpdated} onBusyChange={onBusyChange} />
+      : <>
+        <div role="toolbar" aria-label={t('toolbar')} className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 px-5 py-3">
+          {!personalWorkspace && <ToggleGroup aria-label={t('scopeLabel')} variant="segment" size="sm" spacing={0.5} value={[scope]} onValueChange={values => { const next = values[0] as Scope | undefined; if (next) update({ scope: next }) }}>
+            {(['all', 'workspace', 'personal'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`scope.${value}`)}</ToggleGroupItem>)}
+          </ToggleGroup>}
+          {!personalWorkspace && <Separator orientation="vertical" className="mx-1 h-5" />}
+          <DropdownMenu>
+            {/* On a phone Filter and Display show their icons only, so the toolbar keeps one row (UI audit gap-02, work-12). */}
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" aria-label={t('filter')} />}><ListFilter data-icon="inline-start" /><span className="max-md:hidden">{t('filter')}</span></DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-52"><DropdownMenuGroup>
+              {FILTER_FIELDS.map(({ field, icon: Icon }) => field === 'creator'
+                ? <DropdownMenuCheckboxItem key={field} checked={filters.creator?.includes(ME) ?? false} closeOnClick={false} onCheckedChange={() => toggleFilter(field, ME)}><Icon />{t(`filterField.${field}`)}</DropdownMenuCheckboxItem>
+                : <DropdownMenuSub key={field}>
+                <DropdownMenuSubTrigger><Icon />{t(`filterField.${field}`)}</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="max-h-80 w-52 overflow-y-auto">
+                  {options[field].map(option => <DropdownMenuCheckboxItem key={option.value} checked={filters[field]?.includes(option.value) ?? false} closeOnClick={false} onCheckedChange={() => toggleFilter(field, option.value)}>{option.mark}<span className="truncate">{option.label}</span></DropdownMenuCheckboxItem>)}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>)}
+            </DropdownMenuGroup></DropdownMenuContent>
+          </DropdownMenu>
+          {/* One chip per filter (Linear): field, value and remove in a single control-grey container. */}
+          {activeFilters.map(([field, values]) => <div key={field} role="group" aria-label={t(`filterField.${field}`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-md bg-control pr-0.5 pl-2.5 text-xs">
+            <span className="text-muted-foreground">{t(`filterField.${field}`)}</span>
+            {field !== 'creator' && <span className="max-w-48 truncate font-medium">{values.map(value => options[field].find(option => option.value === value)?.label ?? value).join(', ')}</span>}
+            <Button variant="ghost" size="icon-xs" className="rounded-sm text-muted-foreground hover:bg-control-hover" aria-label={t('removeFilter', { field: t(`filterField.${field}`) })} onClick={() => setFilters({ ...filters, [field]: [] })}><X data-icon="inline-start" /></Button>
+          </div>)}
+          <div className="ml-auto flex items-center gap-1">
+            {refreshButton}
+            <ToggleGroup aria-label={t('viewLabel')} variant="segment" size="sm" spacing={0.5} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') update({ view: next }) }}>
+              <ToggleGroupItem value="board" aria-label={t('viewBoard')}><Columns3 /></ToggleGroupItem>
+              <ToggleGroupItem value="list" aria-label={t('viewList')}><List /></ToggleGroupItem>
+            </ToggleGroup>
+            <Popover>
+              <PopoverTrigger render={<Button variant="outline" size="sm" aria-label={t('display')} />}><Settings2 data-icon="inline-start" /><span className="max-md:hidden">{t('display')}</span></PopoverTrigger>
+              <PopoverContent align="end" className="w-80 gap-3">
+                <div className="flex items-center justify-between gap-3"><Label>{t('sort')}</Label>
+                  <Select value={display.sort} onValueChange={value => setDisplay({ sort: value as Sort })} items={(['priority', 'updated', 'created'] as const).map(value => ({ value, label: t(`sortBy.${value}`) }))}>
+                    <SelectTrigger size="sm" className="w-28" aria-label={t('sort')}><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectGroup>{(['priority', 'updated', 'created'] as const).map(value => <SelectItem key={value} value={value}>{t(`sortBy.${value}`)}</SelectItem>)}</SelectGroup></SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between gap-3"><Label>{t('completed')}</Label>
+                  <Select value={display.completed} onValueChange={value => setDisplay({ completed: value as Completed })} items={(['week', 'month', 'all'] as const).map(value => ({ value, label: t(`completedRange.${value}`) }))}>
+                    <SelectTrigger size="sm" className="w-28" aria-label={t('completed')}><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectGroup>{(['week', 'month', 'all'] as const).map(value => <SelectItem key={value} value={value}>{t(`completedRange.${value}`)}</SelectItem>)}</SelectGroup></SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between gap-3"><Label htmlFor={`${titleId}-empty`}>{t('showEmpty')}</Label><Switch id={`${titleId}-empty`} checked={display.showEmpty} onCheckedChange={showEmpty => setDisplay({ showEmpty })} /></div>
+                <p className="pt-2 text-xs text-muted-foreground">{t('cardProperties')}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {CARD_PROPERTIES.map(property => <Toggle key={property} size="sm" variant="outline" pressed={display.properties.includes(property)} className={DISPLAY_CHIP} onPressedChange={pressed => setDisplay({ properties: pressed ? [...display.properties, property] : display.properties.filter(item => item !== property) })}>{display.properties.includes(property) && <Check data-icon="inline-start" />}{t(`property.${property}`)}</Toggle>)}
+                </div>
+                {/* Both groups read the same way: checked and tinted means shown (R-30). */}
+                <p className="pt-2 text-xs text-muted-foreground">{t('columns')}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {BOARD_COLUMNS.map(column => { const isShown = !display.hidden.includes(column.value); return <Toggle key={column.value} size="sm" variant="outline" pressed={isShown} className={DISPLAY_CHIP} onPressedChange={pressed => setDisplay({ hidden: pressed ? display.hidden.filter(item => item !== column.value) : [...display.hidden, column.value] })}>{isShown && <Check data-icon="inline-start" />}{statusLabel(column.value)}</Toggle> })}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask(true)}><Plus data-icon="inline-start" />{t('newTask')}</Button>
+            {panelButton}
+          </div>
         </div>
-      </div>
-      {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, subtasks, owners, blocks, personalWorkspace }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
-        : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} blocks={blocks} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
+        {/* A board with nothing to show is one empty state, not five blank columns (UI audit states-06): the list's. */}
+        {view === 'board' && shown.length > 0
+          ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, subtasks, owners, blocks, personalWorkspace }} onOpen={id => { onOpen(id) }} onDiscuss={discuss} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+          : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} blocks={blocks} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} onClearFilters={activeFilters.length > 0 ? () => setFilters({}) : undefined} /></div>}
+      </>}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}

@@ -140,7 +140,7 @@ export class SubscriptionRepository {
       try {
         const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
         await authorizeSubscriptionWorkspace(ownerId, row.workspaceId)
-        await authorizeSubscriptionWorkspace(row.ownerId, row.workspaceId)
+        await authorizeSubscriptionWorkspace(row.ownerId, row.workspaceId, ownerId)
       } catch { return null }
     }
     if (!options.currentConnection) return this.binding(row.ownerId, row.id)

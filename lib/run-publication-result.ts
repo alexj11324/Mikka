@@ -41,4 +41,9 @@ export interface PublishedPullRequest {
   /** Lines added and removed, when GitHub's reply carried them (a single PR does; a list of PRs does not). */
   additions?: number
   deletions?: number
+  /** Review metadata synchronized during publication or a verified webhook. */
+  branch?: string
+  headSha?: string
+  changedFiles?: number
+  reviewChecks?: import('./github/review-checks').ReviewChecks | null
 }

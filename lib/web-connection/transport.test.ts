@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createWebTransport } from './transport'
+import { WORKSPACE_SELECTION_HEADER } from '../workspace-selection'
 
 const origin = 'https://app.aspectlylabs.com'
 const bearer = `Bearer ${'s'.repeat(40)}`
@@ -48,5 +49,35 @@ test('public discovery never receives ambient authority, and disabling blocks an
   for (const path of ['/api/auth/sign-out', '/api/cron/reconcile', '/api/web/return', '/api/desktop/exchange', '/api/rpc']) {
     const result = await create()(request(path, { method: 'POST', headers: { authorization: bearer } }), path)
     assert.ok(result instanceof Response); assert.equal(result.status, 403, path)
+  }
+})
+
+test('Workspace preference has an explicit header contract without transporting any Cookie authority', async () => {
+  const workspaceId = '07a38989-1ca9-42ba-9788-742bef75916c'
+  const prepare = createWebTransport({ env: {}, authenticate: async headers => {
+    assert.deepEqual([...headers], [['authorization', bearer]])
+    return { user: { id: 'owner' }, session: { id: 'real-session' } }
+  }, scope: (_, work) => work() })
+  const preflight = await prepare(request('/api/desktop/rpc', { method: 'OPTIONS', headers: {
+    'access-control-request-method': 'POST', 'access-control-request-headers': `authorization,${WORKSPACE_SELECTION_HEADER}`,
+  } }), '/api/desktop/rpc')
+  assert.ok(preflight instanceof Response); assert.equal(preflight.status, 204)
+  const prepared = await prepare(request('/api/desktop/rpc', { method: 'POST', headers: { authorization: bearer, [WORKSPACE_SELECTION_HEADER]: workspaceId } }), '/api/desktop/rpc')
+  assert.ok(prepared && !(prepared instanceof Response))
+  assert.equal(prepared.request.headers.get(WORKSPACE_SELECTION_HEADER), workspaceId)
+  const headers = new Headers({ [WORKSPACE_SELECTION_HEADER]: 'untrusted-existing-response-header', 'x-mikka-session-cache': 'private-cache' })
+  headers.append('set-cookie', 'auth.session=private; HttpOnly; Secure')
+  headers.append('set-cookie', `mikka-workspace=${workspaceId}; Path=/; HttpOnly; Secure`)
+  const confirmed = prepared.response(Response.json({ ok: true }, { headers }))
+  assert.equal(confirmed.headers.get(WORKSPACE_SELECTION_HEADER), workspaceId)
+  assert.match(confirmed.headers.get('access-control-expose-headers')!, /x-mikka-workspace-id/)
+  for (const name of ['set-cookie', 'x-mikka-session-cache', 'access-control-allow-credentials']) assert.equal(confirmed.headers.has(name), false)
+  assert.equal(prepared.response(new Response(null, { status: 403, headers })).headers.has(WORKSPACE_SELECTION_HEADER), false)
+  const cleared = prepared.response(new Response(null, { status: 204, headers: { 'set-cookie': 'mikka-workspace=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/' } }))
+  assert.equal(cleared.headers.get(WORKSPACE_SELECTION_HEADER), '')
+  for (const value of ['', 'not-a-workspace', `${workspaceId}, ${workspaceId}`]) {
+    const refused = await prepare(request('/api/desktop/rpc', { headers: { authorization: bearer, [WORKSPACE_SELECTION_HEADER]: value } }), '/api/desktop/rpc')
+    assert.ok(refused instanceof Response); assert.equal(refused.status, 403)
+    assert.equal((await refused.json()).error.code, 'workspaceAccessDenied')
   }
 })

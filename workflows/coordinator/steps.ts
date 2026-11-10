@@ -32,10 +32,13 @@ import type { ModelMessage } from 'ai'
 import { summarizeConversation } from '@/lib/coordinator/summary-model'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
+import { actAs } from '@/lib/acting-user'
+import { tokenWorkspace } from '@/lib/tokens/principal'
+import { coordinatorTaskWorkspace } from '@/lib/coordinator/issue-team'
 import { addRunMessage,  readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, cachedContextLines, promptMessages, promptWithCachedContext, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
-import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
+import { withPersonalInstructionText } from '@/lib/coordinator/personal-instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import * as store from '@/lib/coordinator/store'
@@ -187,6 +190,16 @@ export async function turnSettings(userId: string, botId: string) {
   return { computerEnabled: cloudComputerRunsEnabled(), mailboxEnabled: personalMailboxEnabled(), writeEnabled: personalWritesEnabled(), agentKitEnabled: agentKitEnabled(), switches: (await import('./tools')).readCoordinatorSwitches(), coordinator, runtime: selected }
 }
 
+/** Node-only candidate, frozen by takeStartupInbox's first successful COMMIT.
+ * Current runtime() is the pure ai_sdk selection; native keeps its old path. */
+export async function hostedStartupSettings(userId: string): Promise<import('@/lib/coordinator/startup-receipt').CoordinatorStartupSettingsCandidate | null> {
+  const { runtime } = await import('./native-steps')
+  const selected = await runtime(userId)
+  if (selected.harness !== 'ai_sdk') return null
+  const { personalWritesEnabled } = await import('@/lib/operations/write-feature')
+  return { computerEnabled: cloudComputerRunsEnabled(), mailboxEnabled: personalMailboxEnabled(), writeEnabled: personalWritesEnabled(), agentKitEnabled: agentKitEnabled(), switches: (await import('./tools')).readCoordinatorSwitches(), runtime: selected }
+}
+
 /**
  * Everything a round needs between starting its execution and its first model
  * call, in one step: the mailbox catalogue, the model-switch notice and the
@@ -211,8 +224,8 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
   if (once && await store.lastEventKind(userId, botId) === kind) return
   const { quotaSwitchMessage, pointsSwitchMessage } = await import('@/lib/coordinator/message-safety')
   // 点数不足时改用 (decision 2026-11-02-1450): Mikka 默认 had no points, this turn runs on the next allowed model.
-  if (selection.data.afterPoints) await store.appendMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], null, botId)
-  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
+  if (selection.data.afterPoints) await store.appendHostMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], botId)
+  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendHostMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], botId)
 }
 
 /**
@@ -221,7 +234,7 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
  * and duration. Durations and counts only. Each model call logs its own line
  * (`model_call_timing`, lib/model-call-timing.ts) with the same workflowRunId.
  */
-export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
+export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; storeTimingOrigin?: 'startup_checkpoint' | 'inbox_checkpoint'; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { startup?: number; settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
   'use step'
   try { console.info(JSON.stringify({ msg: 'turn_timing', ...timing })) } catch { /* timing never fails the turn */ }
 }
@@ -296,7 +309,8 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
     await factoryRuntimeForBot(botId).reconcile(userId)
   }
 
-  let { summary, memory, messages } = await store.loadConversation(userId, botId)
+  const conversation = await store.loadConversationForPrompt(userId, botId)
+  let { summary, memory, messages } = conversation
   if (messages.some(row => 'mikkaUserEvent' in row.message && typeof row.message.content === 'string' && row.message.content.includes('[mikka-file:'))) {
     const { chatFileContent } = await import('@/lib/chat-attachments/store')
     messages = await Promise.all(messages.map(async row => {
@@ -336,7 +350,7 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   }
   const [execution, rules, github] = await Promise.all([
     timed('execution', () => executionContextParts(userId, botId)),
-    timed('personal', () => withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
+    timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
     timed('github', () => githubPromptContext(userId, githubScope, undefined, undefined, botId)),
   ])
   // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
@@ -475,12 +489,14 @@ export async function accountWrite(userId: string, action: ApprovalActionName, i
 // A send has no idempotency key: a replayed step could send it twice.
 accountWrite.maxRetries = 0
 
-export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {
+export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  if (!botId) throw new ActionFailureError('workspaceAccessDenied')
+  const workspace = await coordinatorTaskWorkspace(userId, botId)
   const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
+    .where(and((await issueVisibility(userId, false, workspace.id)).predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)
   return rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50).map(({ content, updatedAt, ...row }) => ({
     ...row, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
@@ -490,6 +506,8 @@ export async function listIssues(userId: string, input: { status?: string }, sco
 export async function getIssue(userId: string, input: { issueId: string }, scope: NativeToolScope | undefined, botId: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  const workspace = await coordinatorTaskWorkspace(userId, botId)
+  return actAs({ id: userId, [tokenWorkspace]: workspace.id }, async () => {
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
   const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
@@ -502,6 +520,7 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
     thread: latest ? { runId: latest.id, status: latest.status, repository: latest.remoteUrl } : null,
     ...(deploymentSwitch('factoryRouting') ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listPublicForIssue(userId,issue.id) } : {}),
   }
+  })
 }
 
 export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string, taskEventId?: string, sourceEventId?: string) {
@@ -981,17 +1000,21 @@ export async function bindComputerSubscription(userId: string, input: { botId: s
   } catch { return { error: 'subscriptionUnavailable' } }
 }
 
-export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope) {
+export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  const rows = await visibleRuns(userId, input)
+  if (!botId) throw new ActionFailureError('workspaceAccessDenied')
+  const workspace = await coordinatorTaskWorkspace(userId, botId)
+  const rows = await actAs({ id: userId, [tokenWorkspace]: workspace.id }, () => visibleRuns(userId, input))
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }
 
-export async function getRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
+export async function getRun(userId: string, input: { runId: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  const detail = await readRun(userId, input.runId)
+  if (!botId) throw new ActionFailureError('workspaceAccessDenied')
+  const workspace = await coordinatorTaskWorkspace(userId, botId)
+  const detail = await actAs({ id: userId, [tokenWorkspace]: workspace.id }, () => readRun(userId, input.runId))
   if (!detail) return { error: 'runNotFound' }
   const { run } = detail
   return {
@@ -1008,16 +1031,26 @@ export async function getRun(userId: string, input: { runId: string }, scope?: N
   }
 }
 
-export async function sendToRun(userId: string, input: { runId: string; text: string }, scope?: NativeToolScope) {
+export async function sendToRun(userId: string, input: { runId: string; text: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => { await addRunMessage(userId, input, 'peer'); return { sent: true } })
+  return asToolResult(async () => {
+    if (!botId) throw new ActionFailureError('workspaceAccessDenied')
+    const workspace = await coordinatorTaskWorkspace(userId, botId)
+    await actAs({ id: userId, [tokenWorkspace]: workspace.id }, () => addRunMessage(userId, input, 'peer'))
+    return { sent: true }
+  })
 }
 
-export async function stopRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
+export async function stopRun(userId: string, input: { runId: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => { await requestRunStop(userId, input.runId); return { stopRequested: true } })
+  return asToolResult(async () => {
+    if (!botId) throw new ActionFailureError('workspaceAccessDenied')
+    const workspace = await coordinatorTaskWorkspace(userId, botId)
+    await actAs({ id: userId, [tokenWorkspace]: workspace.id }, () => requestRunStop(userId, input.runId))
+    return { stopRequested: true }
+  })
 }
 
 /** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */

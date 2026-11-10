@@ -6,6 +6,7 @@ import {
   type WorkspaceReadRequest, type WorkspaceReadReceipt, type WorkspaceReadResult,
 } from '@mikka/protocol/coding-workspace'
 import { maskDeep, type Masker } from '../secrets/mask'
+import { validateDiffReceipt } from './diff/receipt'
 
 /** Validate in memory and return only the public result. Checking the complete
  * source prevents reconstructing a multiline secret through separate ranges.
@@ -16,6 +17,8 @@ export function validateWorkspaceReceipt(request: WorkspaceReadRequest, identity
   if (!parsed.success) return null
   const { result, files } = parsed.data
   if (!matchesWorkspaceResponse(request, identity, result)) return null
+  if (request.kind === 'diff_snapshot' || request.kind === 'diff_file') return validateDiffReceipt(request, parsed.data, mask)
+  if (parsed.data.blobs?.length) return null
   const textFiles = !result.ok ? [] : result.kind === 'file' ? (result.format === 'text' ? [result] : [])
     : result.kind === 'context' ? result.files : []
   const expected = new Set(textFiles.map(file => file.path))

@@ -226,7 +226,7 @@ export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDepen
       const result = await dependencies.queue(tx,userId,{issueId:instance.issueId,agentId:instance.agentId,deviceRepoId:instance.repoId,
         note:`Frozen benchmark ${instance.id} ${slot.arm} ${slot.caseId}`,requestKey:`benchmark:${evaluation?.id ?? instance.id}:${slot.arm}:${slot.caseId}`},instance.sourceRunId)
       if (result.replayed) throw new ImprovementError('conflict')
-      const updated = await tx.query('UPDATE agent_runs SET kind=$2,"baseBranch"=$3,prompt=$4 WHERE id=$1 AND "userId"=$5 AND status=\'queued\' RETURNING id', [result.runId,'implement',instance.sourceCommit,task.prompt,userId])
+      const updated = await tx.query('UPDATE agent_runs SET kind=$2,"baseBranch"=$3,prompt=$4,"promptTaskStart"=0,"promptTaskLength"=0 WHERE id=$1 AND "userId"=$5 AND status=\'queued\' RETURNING id', [result.runId,'implement',instance.sourceCommit,task.prompt,userId])
       if (updated.rowCount !== 1) throw new ImprovementError('runUnavailable')
       if (slot.arm !== 'candidate') await dependencies.selectBaseline(userId,result.runId,tx)
       await tx.query(`INSERT INTO improvement_benchmark_runs("runId","instanceId","evaluationId","caseId",arm,"versionId","userId") VALUES($1,$2,$3,$4,$5,$6,$7)`,

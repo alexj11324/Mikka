@@ -14,9 +14,13 @@ export type CoordinatorMessageContext = {
   botId?: string | null
   taskDestination?: TaskDestination
   profileId?: string
+  /** The composer's captured target; the server checks it against its trusted selection. */
+  expectedWorkspaceId?: string
   notes?: readonly BrowserNote[] | null
   /** 重新发送 on a failed message: its position, so the server retries it in place. */
   retryOf?: number
+  /** 标题 the person wrote for the new task; the task gets exactly it. */
+  taskTitle?: string
 }
 
 // The account the next request's cookie belongs to, read fresh from the server
@@ -36,7 +40,10 @@ export function useCoordinatorSubmit() {
   const submit = useCallback((text: string, context?: CoordinatorMessageContext) => {
     submitter.current ??= createCoordinatorSubmitter({ currentOwner, transport: async submission => {
       const details = submission.context as CoordinatorMessageContext | undefined
-      const result = await sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes, undefined, details?.retryOf, details?.profileId)
+      const expectation: [expectedWorkspaceId?: string] = details?.expectedWorkspaceId === undefined ? [] : [details.expectedWorkspaceId]
+      const args = [submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes, undefined, details?.retryOf, details?.profileId] as const
+      // taskTitle is the trailing argument, so a title needs the (possibly undefined) workspace before it.
+      const result = details?.taskTitle ? await sendCoordinatorMessage(...args, details.expectedWorkspaceId, details.taskTitle) : await sendCoordinatorMessage(...args, ...expectation)
       return readActionOutcome(result)
     } })
     return submitter.current.submit(text, undefined, context)

@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -65,7 +66,7 @@ test('device identity convergence, repository URL deduplication and history pres
     assert.equal(migrated.remoteUrl, 'git@github.com:example/legacy.git', 'legacy endpoint is never replaced by an alias')
     assert.equal(migrated.baseBranch, 'release')
 
-    await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Disposable local task','{"type":"doc","content":[]}','todo','normal')`, [issue, owner])
+    await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,$2,$3,'Disposable local task','{"type":"doc","content":[]}','todo','normal')`, [issue, owner, await seedFixtureWorkspace(pool, owner)])
     await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","baseBranch") VALUES ($1,$2,$3,$4,$5,$6,NULL)`, [run, owner, issue, codex.id, first, records[0]!.id])
     const aURL = 'https://git.example.com:8443/Team/Repo.git'
     const bURL = 'https://git.example.com:9443/team/repo.git'

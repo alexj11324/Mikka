@@ -358,6 +358,14 @@ export class DaemonTracer {
     return pending.then(value => { end(); return value }, (error: unknown) => { end(error, true); throw error })
   }
 
+  /** Carry only the opted-in startup recorder across an already parked Promise. */
+  bindStartupTiming<Args extends unknown[], Result>(work: (...args: Args) => Result): (...args: Args) => Result {
+    const scope = this.startupScope.getStore()
+    return (...args) => scope && !scope.closed
+      ? this.startupScope.run(scope, () => work(...args))
+      : this.startupScope.exit(() => work(...args))
+  }
+
   /** The current span plus validated run/session references, for delayed callbacks. */
   capture(): RunTraceContext | undefined {
     try {

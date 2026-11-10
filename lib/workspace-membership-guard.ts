@@ -10,7 +10,7 @@ import { mailboxDiagnostic } from './mailbox-diagnostics'
  * initialization's APP-head -> workspace authorization order.
  */
 export async function acquireWorkspaceMembership(pool: Pick<Pool, 'connect'>, identity: {
-  workspaceId: string; userId: string
+  workspaceId: string; userId: string; pinWorkspace?: boolean
 }, signal?: AbortSignal): Promise<MailboxTransactionLease> {
   const denied = () => new MailboxError('Workspace membership lease unavailable or cancelled', 403)
   if (signal?.aborted) throw denied()
@@ -68,6 +68,12 @@ export async function acquireWorkspaceMembership(pool: Pick<Pool, 'connect'>, id
   try {
     await query({ text: 'begin', query_timeout: 2000 }); began = true
     await query({ text: "select set_config('lock_timeout','5s',true),set_config('statement_timeout','5s',true),set_config('idle_in_transaction_session_timeout','30s',true)", query_timeout: 6000 })
+    // Governance reads also pin plan/linkage. Match writers' workspace -> member
+    // order before taking a membership row; never upgrade a later workspace lock.
+    if (identity.pinWorkspace) {
+      const workspace = await query({ text: 'select id from mikka_workspaces where id=$1 for share', values: [identity.workspaceId], query_timeout: 6000 })
+      if (!workspace.rowCount) throw denied()
+    }
     const result = await query({ text: 'select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2 and status=\'active\' for share', values: [identity.workspaceId, identity.userId], query_timeout: 6000 })
     assert()
     if (!result.rowCount) throw denied()

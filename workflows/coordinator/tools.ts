@@ -88,7 +88,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
     list_issues: tool({
       description: 'List the person\'s issues, most recently updated first. Optionally only one status (todo, doing, review, done and so on).',
       inputSchema: z.object({ status: z.string().optional() }),
-      execute: input => steps.listIssues(userId, input, scope),
+      execute: input => steps.listIssues(userId, input, scope, botId),
     }),
     get_issue: tool({
       description: 'Read one issue: its text, status, priority, latest runs, and its thread (runId, status, repository) when it has one. More work for a task with a thread goes to that thread: dispatch_run without repo, or send_to_run while it runs.',
@@ -121,7 +121,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       list_factory_requests: tool({description:'Read original personal requests from this owner and Bot chat. Peer/runtime data is not a human request.',inputSchema:z.object({}).strict(),execute:()=>steps.listFactoryRequestsScoped(userId,scope,botId)}),
       intake_factory_request: tool({description:'Create and persist the task requested by an actual source event. Clear authorized work starts implementation; only material missing information or permissions require clarification. Spec is optional. Routing grants no permission and does not dispatch a run. V2 returns an operation binding; get_factory_task reads current stage and needsYou.',inputSchema:intakeSchema,execute:input=>steps.intakeFactoryRequest(userId,input,scope,botId)}),
       stop_factory_task: tool({description:'Cancel this task or record withdrawn permission. This cannot restart or grant permission.',inputSchema:stopInput,execute:input=>steps.stopFactoryTaskScoped(userId,input,scope,botId)}),
-      get_factory_task: tool({description:'Read this chat’s task, exact operation binding and retained execution evidence. V2 uses one public stage with optional needsYou; clarification records missing information/permissions and needsSpec. Use binding for subsequent controls. Older tasks keep their legacy contract.',inputSchema:z.object({taskId:id}).strict(),execute:input=>steps.readFactoryTask(userId,input.taskId,scope,botId)}),
+      get_factory_task: tool({description:'Read this chat\'s Factory state/evidence and control binding (V2 stage/needsYou; legacy unchanged). Use Issue IDs with get_issue/dispatch_run.',inputSchema:z.object({taskId:id.describe('Factory receipt: readTask.input.taskId or binding.taskId; legacy task.id. Not an Issue ID.')}).strict(),execute:input=>steps.readFactoryTask(userId,input.taskId,scope,botId)}),
       resolve_factory_task: tool({description:'Record a subsequent actual user response to intake clarification. It grants no execution or publication permission. Use the exact current binding and original response event.',inputSchema:resolveInput,execute:input=>steps.resolveFactoryTaskScoped(userId,input,scope,botId)}),
     } : {}),
     list_agents: tool({
@@ -217,17 +217,17 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
     list_runs: tool({
       description: 'List recent runs, newest first, optionally for one issue or only those still going.',
       inputSchema: z.object({ issueId: id.optional(), activeOnly: z.boolean().optional() }),
-      execute: input => steps.listRuns(userId, input, scope),
+      execute: input => steps.listRuns(userId, input, scope, botId),
     }),
     get_run: tool({
       description: 'Read one run: status, how it ended, the agent\'s summary, and its latest events.',
       inputSchema: z.object({ runId: id }),
-      execute: input => steps.getRun(userId, input, scope),
+      execute: input => steps.getRun(userId, input, scope, botId),
     }),
     send_to_run: tool({
       description: 'Send a message to a running agent. It reads it on its next poll.',
       inputSchema: z.object({ runId: id, text: z.string().min(1).max(10_000) }),
-      execute: input => steps.sendToRun(userId, input, scope),
+      execute: input => steps.sendToRun(userId, input, scope, botId),
     }),
     record_attention: tool({
       description: 'Record your decision on a matter handed to you as [Handoff] evidence, before you reply: notify (you are telling the person now; fails while the notification budget is closed and returns when it reopens), quiet (nothing reaches the person; give the reason), snooze (needs the person later; give runAt, and personAsked when the person asked to be reminded), or handled (the person answered it, did it, or said it is not needed).',
@@ -258,7 +258,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
     stop_run: tool({
       description: 'Ask a run to stop.',
       inputSchema: z.object({ runId: id }),
-      execute: input => steps.stopRun(userId, input, scope),
+      execute: input => steps.stopRun(userId, input, scope, botId),
     }),
     load_skill:tool({ description:'Load an assigned, version-pinned skill from this execution.',inputSchema:z.object({skillId:z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/)}),execute:input=>kit.loadAgentSkill(userId,botId,execution?.id,input.skillId,scope) }),
   }

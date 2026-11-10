@@ -24,9 +24,11 @@ const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
 const ROOT_CA = '/usr/local/share/ca-certificates/e2b-ca.crt'
 // Desktop is official-only artifact 13538924302; Claude is the d63 fresh-scan
 // failure (42326876749 / 128264238545), not by itself a production gate pass.
+// Codex is the official-only ready/fresh observation in run 42670291715.
 const ROOT_CA_ROTATIONS = {
   desktop: ['7177f680c9c87f91ff9ab72a4409511cc4781d7c3dc549f302bfa17bd973b6b9', '88a5a279fec06a155bf9de1dd28abc93aae0f17db5f9febe69d5e25b15f8ff4d'],
   claude: ['fd1175201e861f159f0d6ae42523b0f5d754ade8a36d105e8b7110b180101862', '21899698fbaa1da5314e42bc049b146f16cddb2e7540822b2a15f009f8342996'],
+  codex: ['713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a', '545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a'],
 }
 const mcpTiming = (runId, harness) => ({ version: 1, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children',
   generationCoverage: 'unverified', allFirstPartyHttpComplete: false, remoteMcpServerCount: 0, childPathAuditVersion: 1,
@@ -176,9 +178,37 @@ test('exact root CA publication rules preserve metadata and reject other certifi
   const codex = conservation('codex')
   codex.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }]
   assert.doesNotThrow(() => assertConservation(codex, 'codex'))
-  codex.finalization.providerChanges[0] = { path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 511 } }
+  codex.finalization.providerChanges[0] = { path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 493 } }
   assert.throws(() => assertConservation(codex, 'codex'), /runtime_release_conservation_invalid/)
 })
+
+test('Codex observed root CA mode-only finalization does not require a simultaneous digest change', () => {
+  const proof = conservation('codex')
+  proof.finalization.originalAfter = { ...PROOF, sha256: 'e'.repeat(64) }
+  // The official pre_finalization -> ready pair keeps the same 713ed37b digest.
+  // The producer reports only changed fields; its outer kind is the original kind.
+  proof.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 511 } }]
+  assert.doesNotThrow(() => assertConservation(proof, 'codex'))
+})
+
+for (const [kind, path, entryKind, beforeMode] of [
+  ['claude', '/usr/local/share/e2b', 'directory', 493],
+  ['codex', ROOT_CA, 'file', 420],
+]) {
+  test(`${kind} finalization requires the policy's original ${entryKind} kind`, () => {
+    const proof = conservation(kind)
+    proof.finalization.originalAfter = { ...PROOF, sha256: 'e'.repeat(64) }
+    proof.finalization.providerChanges = [{ path, kind: entryKind, before: { mode: beforeMode }, after: { mode: 511 } }]
+    assert.doesNotThrow(() => assertConservation(proof, kind))
+    for (const invalidKind of [undefined, null, 'link', entryKind === 'file' ? 'directory' : 'file', 1]) {
+      const invalid = structuredClone(proof)
+      if (invalidKind === undefined) delete invalid.finalization.providerChanges[0].kind
+      else invalid.finalization.providerChanges[0].kind = invalidKind
+      assert.throws(() => assertConservation(invalid, kind), /runtime_release_conservation_invalid/,
+        `reject original kind ${String(invalidKind)}`)
+    }
+  })
+}
 
 test('certificate conversion proof fixes the original bytes and exact link target', () => {
   const certificate = JSON.parse(readFileSync(new URL('./e2b-certificate-relinks.json', import.meta.url)))
@@ -414,7 +444,7 @@ test('GitHub-only build timeline waits for source upload before the single runti
   }
   // Run the same fixture with either checkout's actual orchestration. The
   // workflow contract test separately requires the new lock-free await step.
-  const workflow = readFileSync(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
+  const workflow = readFileSync(new URL('../../.github/workflows/e2b-runtime-release.yml', import.meta.url), 'utf8')
   if (workflow.includes('\n  await-web:')) await webRelease.waitForWebDeployment({ expectedBuild: COMMIT, token: 'github-read-fixture',
     fetchImpl, now: () => elapsed, wait: async ms => { elapsed += ms }, intervalMs: 100, maxWaitMs: 500 })
   const result = await publish({ token: 'vercel-fixture', githubToken: 'github-read-fixture', templates: TEMPLATES, sourceSha: SHA,

@@ -16,8 +16,8 @@ if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQ
 if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 
 // The app's 置顶 / 通知 used to reach the person's other screens by a 15–60 s poll; now the actual writer
-// (lib/chat-preferences.ts setChatPreference) pushes the bot's chat keys to the owner's home only.
-test('a pin or mute change pushes its bot chat keys to the owner home, after the write', { skip: !url, timeout: 180_000 }, async t => {
+// (lib/chat-preferences.ts setChatPreference) pushes the bot's chat keys in its persisted workspace.
+test('a pin or mute change pushes its bot chat keys to the owner in the bot workspace, after the write', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
   const nextServer = await import('next/server')
@@ -65,11 +65,11 @@ test('a pin or mute change pushes its bot chat keys to the owner home, after the
     await database.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Scout')`, [bot, team])
     const { setChatPreference, chatPreferences } = await import('../chat-preferences')
 
-    await t.test('the owner home gets the bot list key and the chat key; the team and its other member get nothing', async () => {
+    await t.test('the owner gets the bot list and chat keys in the bot tenant; the personal home and other members get nothing', async () => {
       sent.length = 0
       assert.equal(await scope.run(() => setChatPreference('owner', bot, { pinned: true })), 'ok')
       await drain()
-      assert.deepEqual(sent, [{ scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'bot_chat_list', id: home }, { kind: 'bot_chat', id: bot }] }])
+      assert.deepEqual(sent, [{ scope: { ownerId: 'owner', workspaceId: team }, events: [{ kind: 'bot_chat_list', id: team }, { kind: 'bot_chat', id: bot }] }])
       assert.equal((await scope.run(() => chatPreferences('owner')))[bot]?.pinned, true, 'the write itself is unchanged')
     })
 

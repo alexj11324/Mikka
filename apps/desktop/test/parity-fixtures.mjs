@@ -20,7 +20,7 @@ export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DE
   const coordinatorIds = [ids.coordinator, ...(includePeerCoordinator ? [ids.peerCoordinator] : [])]
   const fixture = {
     ...ids, epoch, workspaceName: 'Desktop acceptance', teamName: 'Application', botName: 'Ada', groupName: 'Release review',
-    issueTitle: 'Review the desktop workspace', issueIdentifier: 'APP-1', artifactTitle: 'Desktop review notes', htmlTitle: 'Desktop review preview',
+    issueTitle: 'Review the desktop workspace', issueIdentifier: 'APP-1', agentLabel: 'Codex', artifactTitle: 'Desktop review notes', htmlTitle: 'Desktop review preview',
     // The address is visible in Settings. Independent baseline/candidate
     // databases need the same display text; fresh UUIDs still own every row.
     workspaceSlug: 'desktop-review',
@@ -123,15 +123,17 @@ export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DE
         await insert(client, 'bots', { id: ids.peerCoordinator, ownerId: scope.peer.userId, workspaceId: ids.workspace, name: 'Coordinator', color: 'encre', shape: 'cercle', publicRole: '', createdAt: AT, updatedAt: AT })
         await insert(client, 'coordinator_bots', { ownerId: scope.peer.userId, workspaceId: ids.workspace, botId: ids.peerCoordinator, createdAt: AT })
       }
-      await insert(client, 'issues', { id: ids.issue, userId: owner, title: fixture.issueTitle, content: JSON.stringify(content), status: 'todo', priority: 'normal', scope: 'workspace', scopeSetBy: 'user', linearSyncBlocked: true, createdAt: AT, updatedAt: AT })
+      // Every application row uses the same freshly reserved, leased Team
+      // workspace created above; legacy display scope is not tenant evidence.
+      await insert(client, 'issues', { id: ids.issue, userId: owner, workspaceId: ids.workspace, ownershipState: 'bound', title: fixture.issueTitle, content: JSON.stringify(content), status: 'todo', priority: 'normal', scope: 'workspace', scopeSetBy: 'user', linearSyncBlocked: true, createdAt: AT, updatedAt: AT })
       await insert(client, 'issue_versions', { id: ids.version, issueId: ids.issue, userId: owner, revision: 1, title: fixture.issueTitle, content: JSON.stringify(content), status: 'todo', priority: 'normal', actor_type: 'user', actor_id: owner, createdAt: AT })
       await insert(client, 'mikka_team_issues', { issueId: ids.issue, teamId: ids.team, workspaceId: ids.workspace, userId: owner, createdAt: AT })
       await insert(client, 'devices', { id: ids.device, ownerId: owner, name: 'Review laptop', hostname: 'review-laptop', kind: 'local', deviceType: 'laptop', platform: 'darwin', arch: 'arm64', harnesses: '[]', enabled: false, nameLocked: true, lastSeenAt: AT, createdAt: AT, updatedAt: AT })
       await insert(client, 'agents', { id: ids.agent, userId: owner, harness: 'codex', name: 'Desktop reviewer', description: 'Review fixture', deviceId: ids.device, createdAt: AT, updatedAt: AT })
-      await insert(client, 'agent_runs', { id: ids.run, userId: owner, issueId: ids.issue, agentId: ids.agent, botId: ids.bot, deviceId: ids.device, status: 'succeeded', kind: 'implement', prompt: 'Review the desktop workspace', lastReply: 'The review is complete. Conversations, task details and artifacts are ready.', lastReplyPart: 'review-answer', lastReplyAt: AT, outcome: 'done', outcomeDecidedBy: 'decision', outcomeAt: AT, startedAt: AT, finishedAt: AT, createdAt: AT, updatedAt: AT })
+      await insert(client, 'agent_runs', { id: ids.run, userId: owner, workspaceId: ids.workspace, issueId: ids.issue, agentId: ids.agent, botId: ids.bot, deviceId: ids.device, status: 'succeeded', kind: 'implement', prompt: 'Review the desktop workspace', lastReply: 'The review is complete. Conversations, task details and artifacts are ready.', lastReplyPart: 'review-answer', lastReplyAt: AT, outcome: 'done', outcomeDecidedBy: 'decision', outcomeAt: AT, startedAt: AT, finishedAt: AT, createdAt: AT, updatedAt: AT })
       await insert(client, 'run_chunks', { id: ids.chunk, runId: ids.run, seq: 1, chunk: JSON.stringify({ type: 'text-delta', id: 'review-answer', delta: 'The review is complete. Conversations, task details and artifacts are ready.' }), createdAt: AT })
       for (const [id, version, title, kind, text] of [[ids.markdown, ids.markdownVersion, fixture.artifactTitle, 'markdown', markdown], [ids.html, ids.htmlVersion, fixture.htmlTitle, 'html', html]]) {
-        await insert(client, 'artifacts', { id, userId: owner, kind, title, runId: ids.run, issueId: ids.issue, latestVersion: 1, createdAt: AT, updatedAt: AT })
+        await insert(client, 'artifacts', { id, userId: owner, workspaceId: ids.workspace, kind, title, runId: ids.run, issueId: ids.issue, latestVersion: 1, createdAt: AT, updatedAt: AT })
         await insert(client, 'artifact_versions', { id: version, artifactId: id, version: 1, storageKey: `desktop-parity/${id}/1`, inlineContent: text, sha256: createHash('sha256').update(text).digest('hex'), size: Buffer.byteLength(text), authorName: fixture.botName, createdAt: AT })
       }
       for (const [id, artifactId, token] of [[ids.markdownShare, ids.markdown, fixture.markdownToken], [ids.htmlShare, ids.html, fixture.htmlToken]]) {

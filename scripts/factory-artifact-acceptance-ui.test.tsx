@@ -33,13 +33,16 @@ mock.module('swr', { defaultExport: (key: string | readonly unknown[] | null) =>
     : key?.endsWith('view=ledger') ? ledger : key?.endsWith('/approval') ? evidence : { tasks: listed }
   return { data, mutate: async () => { if (key) { reloaded.push(key); onRevalidate?.(key) }; return data }, isLoading: false }
 }, namedExports: { unstable_serialize: JSON.stringify, useSWRConfig: () => ({ cache, mutate: async (key: string) => { reloaded.push(key); onRevalidate?.(key) } }) } })
+// The report's CI checks row reads the review summary (its own SWR and live keys); these tests cover the flow, not that row.
+mock.module(new URL('../hooks/code-review/use-review-summary.ts', import.meta.url).href, { namedExports: { useReviewSummary: () => ({ data: undefined }) } })
 mock.module('next-intl', { namedExports: {
   useTranslations: (namespace: string) => (key: string, args?: Record<string, string | number>) => {
     const value = `${namespace}.${key}`.split('.').reduce((node, part) => node?.[part], messages)
     assert.equal(typeof value, 'string', `missing copy ${namespace}.${key}`)
     return String(value).replace(/\{(\w+)\}/g, (_, name) => String(args?.[name] ?? ''))
   },
-  useFormatter: () => ({ dateTime: () => '' }),
+  useFormatter: () => ({ dateTime: () => '', relativeTime: () => '' }),
+  useNow: () => new Date('2026-11-05T01:00:00.000Z'),
 } })
 const Pass = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 const Dialog = ({ children, open }: { children?: ReactNode; open?: boolean }) => open ? <div role="dialog">{children}</div> : null

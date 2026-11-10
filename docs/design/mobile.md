@@ -194,6 +194,8 @@ precedent. Figma frames 07, 07a–07e.
 | 外观 | top | Claude, ChatGPT, Comma Android |
 | 语言 (opens iOS Settings) | top | Comma iOS |
 | 版本 | top | Comma iOS Version; ChatGPT 关于. Shows the version, the build and, when an update is running, when it was published (「1.0.0 (6) · 10-31 22:51」) |
+| 隐私政策 | top; also available before sign-in | Opens the existing public `https://aspectlylabs.com/privacy` page |
+| 删除账户 | 个人资料 | Opens the existing account settings through the signed web handoff; the web page owns deletion confirmation |
 | 退出登录 | top, last | ChatGPT, Claude, Comma |
 | Push not deliverable (only when it fails) | top, first | Comma iOS |
 

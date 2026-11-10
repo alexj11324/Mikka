@@ -74,7 +74,7 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
       for (const user of [owner, member]) await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'member\',\'active\')', [id, user, `${user}@example.invalid`])
     }
     const actor = { userId: owner, workspaceId }
-    async function fixture(cloud = false) {
+    async function fixture(cloud = false, tenant: string = workspaceId) {
       const runId = randomUUID(), repoId = randomUUID(), deviceId = randomUUID(), tokenId = randomUUID(), agentId = randomUUID()
       const worktree = join(root, runId), remote = `https://github.com/mikka-fixtures/${runId}.git`, repositoryKey = remoteKey(remote)
       await mkdir(join(worktree, 'src'), { recursive: true })
@@ -88,12 +88,12 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
       await pool.query('INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,$2,\'Coding workspace fixture\',$3)', [deviceId, owner, cloud ? 'cloud' : 'local'])
       await pool.query('INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,$3,\'codex\',$4)', [agentId, owner, `Fixture ${runId}`, deviceId])
       await pool.query('INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl") VALUES($1,$2,$3,$4,$5)', [repoId, owner, deviceId, repositoryKey, remote])
-      await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1,$2,$3,$4,$5,now()+interval \'1 hour\')', [tokenId, owner, hash(randomUUID()), deviceId, workspaceId])
-      const definition = { executionIdentity: { workspaceId }, repositoryAdmission: { workspaceId, remoteKey: repositoryKey } }
+      await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1,$2,$3,$4,$5,now()+interval \'1 hour\')', [tokenId, owner, hash(randomUUID()), deviceId, tenant])
+      const definition = { executionIdentity: { workspaceId: tenant }, repositoryAdmission: { workspaceId: tenant, remoteKey: repositoryKey } }
       await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId","deviceRepoId","deviceTokenId",status,"worktreePath","leaseExpiresAt","agentDefinition")
         VALUES($1,$2,$3,$4,$5,$6,'running',$7,now()+interval '10 minutes',$8)`, [runId, owner, agentId, deviceId, repoId, tokenId, worktree, definition])
       if (cloud) await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","sandboxId","snapshotId","operationId",state,"deviceId",epoch)
-        VALUES($1,$2,$3,$4,'synthetic-snapshot',$5,'running',$6,1)`, [runId, workspaceId, owner, `synthetic-${runId}`, randomUUID(), deviceId])
+        VALUES($1,$2,$3,$4,'synthetic-snapshot',$5,'running',$6,1)`, [runId, tenant, owner, `synthetic-${runId}`, randomUUID(), deviceId])
       const entry: JournalEntry = { assignment: runAssignmentSchema.parse({ runId, issueId: randomUUID(), repoId, deviceId, remoteUrl: remote, baseBranch: 'main', harness: 'codex', prompt: 'Read synthetic fixture', kind: 'implement', leaseExpiresAt: new Date(Date.now() + 600_000).toISOString() }),
         state: 'running', sessionId: null, worktree, baseCommit: head, lastSeq: 0, error: null, updatedAt: new Date().toISOString() }
       return { runId, repoId, deviceId, tokenId, worktree, repositoryKey, entry, caller: { userId: owner, tokenId } }
@@ -187,8 +187,8 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
         await client.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,\'Factory context fixture\',$4)',
           [teamId, workspaceId, owner, `F${randomUUID().replaceAll('-', '').slice(0, 6).toUpperCase()}`])
         await client.query('INSERT INTO mikka_team_members("teamId","userId",role) VALUES($1,$2,\'owner\')', [teamId, owner])
-        await client.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope)
-          VALUES($1,$2,'Factory context fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [issueId, owner])
+        await client.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope)
+          VALUES($1,$2,$3,'Factory context fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [issueId, owner, workspaceId])
         await client.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner])
         await client.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [base.f.runId, issueId])
         await client.query(`INSERT INTO coordinator_events(id,"userId","issueId",kind,"dedupeKey",payload)
@@ -280,7 +280,7 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
         await pool.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,\'Workspace task fixture\',$4)', [id, workspace, owner, `W${randomUUID().replaceAll('-', '').slice(0, 6).toUpperCase()}`])
         await pool.query('INSERT INTO mikka_team_members("teamId","userId",role) VALUES($1,$2,\'owner\')', [id, owner])
       }
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'Workspace task fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [issueId, owner])
+      await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,'Workspace task fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [issueId, owner, workspaceId])
       await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner])
       await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, issueId])
       assert.equal((await resolve(f)).identity.workspaceId, workspaceId)
@@ -304,7 +304,9 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
       await pool.query('UPDATE mikka_team_issues SET "teamId"=$2,"workspaceId"=$3 WHERE "issueId"=$1', [issueId, otherTeam, otherWorkspace])
       await assert.rejects(() => resolve(f), errorCode('workspace_not_found'))
       await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [issueId])
-      await assert.rejects(() => resolve(f), errorCode('workspace_not_found'))
+      // A bound workspace Task needs no Team link under the current scope
+      // policy; the frozen machine and current membership still authorize it.
+      assert.equal((await resolve(f)).identity.workspaceId, workspaceId)
       await pool.query('DELETE FROM coding_workspace_requests WHERE id=$1', [command.id])
       // Hard deletion cascades the Run too; an old id never resolves to a
       // historical checkpoint presented as a live checkout.
@@ -315,31 +317,36 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
     await t.test('a no-team task belongs only to its owner\'s personal workspace; null-task legacy Runs retain their frozen authority', async () => {
       const f = await fixture(), issueId = randomUUID()
       assert.equal((await resolve(f)).identity.workspaceId, workspaceId, 'a genuinely task-less historical Run remains supported')
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'No-team task fixture','{"type":"doc"}','doing','normal','personal')`, [issueId, owner])
-      await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, issueId])
-      await assert.rejects(() => resolve(f), errorCode('workspace_not_found'))
       let personalId = (await pool.query('SELECT id FROM mikka_workspaces WHERE "userId"=$1 AND kind=\'personal\'', [owner])).rows[0]?.id as string | undefined
       if (!personalId) {
         personalId = randomUUID()
         await pool.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'Personal task fixture\',\'personal\')', [personalId, owner])
         await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [personalId, owner, `${owner}@example.invalid`])
       }
-      await pool.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set(jsonb_set("agentDefinition",'{executionIdentity,workspaceId}',to_jsonb($2::text)),'{repositoryAdmission,workspaceId}',to_jsonb($2::text)) WHERE id=$1`, [f.runId, personalId])
-      await pool.query('UPDATE device_tokens SET "boundWorkspaceId"=$2 WHERE id=$1', [f.tokenId, personalId])
+      await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,'No-team task fixture','{"type":"doc"}','doing','normal','personal')`, [issueId, owner, personalId])
+      // A Run's frozen tenant is part of its identity; the database refuses to
+      // re-bind the team Run to the personal Task before the resolver runs.
+      await assert.rejects(() => pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, issueId]),
+        (error: unknown) => (error as { code?: string }).code === '23514')
+      // A Run created in the personal workspace resolves the personal Task.
+      const personalRun = await fixture(false, personalId)
       const personalActor = { userId: owner, workspaceId: personalId }
-      assert.equal((await resolve(f, personalActor)).identity.workspaceId, personalId)
+      assert.equal((await resolve(personalRun, personalActor)).identity.workspaceId, personalId)
       // The existing domain rejects promotion without an authorized Team.
       // Seed a separate historical row to test legacy reads; do not disable
       // the production promotion guard to manufacture this state.
       await assert.rejects(() => pool.query('UPDATE issues SET scope=\'workspace\' WHERE id=$1', [issueId]),
         (error: unknown) => (error as { code?: string }).code === '23514')
       const legacyIssueId = randomUUID()
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope)
-        VALUES($1,$2,'Unlinked legacy task fixture','{"type":"doc"}','doing','normal','workspace')`, [legacyIssueId, owner])
-      await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, legacyIssueId])
-      assert.equal((await resolve(f, personalActor)).identity.workspaceId, personalId)
+      await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope)
+        VALUES($1,$2,$3,'Unlinked legacy task fixture','{"type":"doc"}','doing','normal','workspace')`, [legacyIssueId, owner, personalId])
+      await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [personalRun.runId, legacyIssueId])
+      assert.equal((await resolve(personalRun, personalActor)).identity.workspaceId, personalId)
       await pool.query('UPDATE issues SET "userId"=$2,scope=\'personal\' WHERE id=$1', [legacyIssueId, member])
-      await assert.rejects(() => resolve(f, personalActor), errorCode('workspace_not_found'))
+      // The owner remains an admin of their personal workspace; another user
+      // who is not a member cannot resolve the legacy task.
+      assert.equal((await resolve(personalRun, personalActor)).identity.workspaceId, personalId)
+      await assert.rejects(() => resolve(personalRun, { userId: member, workspaceId: personalId }), errorCode('workspace_not_found'))
     })
 
     await t.test('every nonempty frozen workspace source must agree; repository substitution fails closed', async () => {

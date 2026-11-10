@@ -9,7 +9,12 @@ import { readHomeScopeProof } from './home-scope-proof'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
-if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
+if (url) {
+  assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
+  assert.equal(process.env.MIKKA_DATABASE_URL, url)
+  assert.equal(process.env.DATABASE_URL, url)
+  if (process.env.ORVILO_DATABASE_URL) assert.equal(process.env.ORVILO_DATABASE_URL, url)
+}
 
 test('real tickets project only the active owned personal home and recheck a revoked Better Auth session', { skip: !url, timeout: 120_000 }, async () => {
   const database = new Pool({ connectionString: url, max: 4 })
@@ -27,7 +32,7 @@ test('real tickets project only the active owned personal home and recheck a rev
   })
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  const workspaceId = randomUUID()
+  const workspaceId = randomUUID(), homeWorkspaceId = randomUUID(), foreignWorkspaceId = randomUUID()
   const foreignOwner = `live-ticket-foreign-${randomUUID()}`
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   let userId: string | undefined
@@ -40,7 +45,6 @@ test('real tickets project only the active owned personal home and recheck a rev
     assert.equal((await auth.$context).checkSchema, undefined, 'the auth fixture uses the production schema validation policy')
     fresh.readFreshSessionsInScope(auth.api)
     mocks.push(mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { auth } }))
-    mocks.push(mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: database } }))
     mocks.push(mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_name: string, route: (request: Request) => Promise<Response>) => route } }))
     const { GET } = await import('../../app/api/live/ticket/route')
     handle = request => new URL(request.url).pathname.includes('/api/auth/') ? auth.handler(request) : GET(request)
@@ -57,22 +61,23 @@ test('real tickets project only the active owned personal home and recheck a rev
     const headers = { cookie: cookies.map(cookie => cookie.split(';')[0]).join('; ') }
     await database.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES ($1,$2,'Live ticket fixture')`, [workspaceId, userId])
     await database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,'Fixture',$3,'admin')`, [workspaceId, userId, email])
-    const ticket = () => fetch(`${origin}/mikka/api/live/ticket?workspace=${workspaceId}`, { headers })
+    const ticket = (selectedWorkspaceId = workspaceId) => fetch(`${origin}/mikka/api/live/ticket?workspace=${selectedWorkspaceId}`, { headers })
     const issued = await ticket()
     assert.equal(issued.status, 200)
     const team = await issued.json()
     assert.equal(typeof team.protocol, 'string')
     assert.equal(team.homeScope, undefined, 'team membership alone cannot attest the personal home')
     await database.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Foreign fixture',$2,true,now(),now())`, [foreignOwner, `${foreignOwner}@example.invalid`])
-    await database.query(`UPDATE mikka_workspaces SET kind='personal',"userId"=$2 WHERE id=$1`, [workspaceId, foreignOwner])
-    const foreign = await (await ticket()).json()
-    assert.equal(typeof foreign.protocol, 'string', 'the original active membership still grants its ordinary channel')
-    assert.equal(foreign.homeScope, undefined, 'membership in another owner\'s personal workspace is not the reader\'s home')
-    await database.query(`UPDATE mikka_workspaces SET "userId"=$2 WHERE id=$1`, [workspaceId, userId])
-    const home = await (await ticket()).json()
+    await database.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES ($1,$2,'Foreign personal fixture','personal'),($3,$4,'Owned personal fixture','personal')`, [foreignWorkspaceId, foreignOwner, homeWorkspaceId, userId])
+    await database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES ($1,$2,'Foreign fixture',$3,'admin'),($4,$5,'Fixture',$6,'admin')`, [foreignWorkspaceId, foreignOwner, `${foreignOwner}@example.invalid`, homeWorkspaceId, userId, email])
+    await assert.rejects(database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES ($1,$2,'Forged peer',$3,'member')`, [foreignWorkspaceId, userId, email]), { code: '23514' }, 'Personal cannot admit another user even through direct SQL')
+    const foreign = await ticket(foreignWorkspaceId)
+    assert.equal(foreign.status, 403, 'another owner\'s Personal Workspace cannot issue a ticket')
+    assert.equal((await foreign.json()).error, 'workspaceAccessDenied')
+    const home = await (await ticket(homeWorkspaceId)).json()
     assert.equal(home.homeScope.expiresAt, home.expiresAt)
     assert.deepEqual(readHomeScopeProof(home.homeScope.token, userId!, process.env.DEVICE_GATEWAY_PUSH_SECRET), {
-      ownerId: userId, workspaceId, expiresAt: home.expiresAt,
+      ownerId: userId, workspaceId: homeWorkspaceId, expiresAt: home.expiresAt,
     }, 'the real membership statement projects the actual owned personal workspace')
     await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspaceId, userId])
     assert.equal((await ticket()).status, 403, 'the existing active-member gate remains fresh')
@@ -80,7 +85,7 @@ test('real tickets project only the active owned personal home and recheck a rev
     await database.query('DELETE FROM session WHERE "userId"=$1', [userId])
     const cached = await fetch(`${origin}/mikka/api/auth/get-session`, { headers })
     assert.equal((await cached.json()).user.id, userId, 'the ordinary 5-minute cache still sees the revoked session')
-    const refused = await ticket()
+    const refused = await ticket(homeWorkspaceId)
     assert.equal(refused.status, 401, 'minting another capability must read the revoked session from PostgreSQL')
     const body = await refused.json()
     assert.equal(body.error, 'authRequired')
@@ -92,10 +97,11 @@ test('real tickets project only the active owned personal home and recheck a rev
     if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
     if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
     await new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections() })
-    await database.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspaceId])
-    await database.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspaceId])
+    await database.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [[workspaceId, homeWorkspaceId, foreignWorkspaceId]])
+    await database.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [[workspaceId, homeWorkspaceId, foreignWorkspaceId]])
     if (userId) await database.query('DELETE FROM "user" WHERE id=$1', [userId])
     await database.query('DELETE FROM "user" WHERE id=$1', [foreignOwner])
-    await database.end()
+    const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
+    await Promise.all([database.end(), appPool.end(), workspacePool.end()])
   }
 })

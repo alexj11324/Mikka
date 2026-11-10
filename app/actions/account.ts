@@ -6,6 +6,7 @@ import { headers } from 'next/headers'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
+import { GovernanceError } from '@/lib/governance/errors'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { appOrigin } from '@/lib/mcp/resource'
@@ -221,7 +222,12 @@ async function deleteAccountBody(input: { email: string }): Promise<ActionResult
     const { user, headers: requestHeaders } = await requireSession(true)
     const typed = z.object({ email: z.string().max(320) }).safeParse(input)
     if (!typed.success || typed.data.email.trim().toLowerCase() !== user.email.toLowerCase()) throw new ActionFailureError('accountEmailMismatch')
-    const outcome = await deleteAccountData(user.id, user.email)
+    const outcome = await deleteAccountData(user.id, user.email).catch(error => {
+      if (!(error instanceof GovernanceError) || error.detail !== 'last_owner') throw error
+      const failure = new ActionFailureError('accountLastOrganizationOwner')
+      failure.cause = error
+      throw failure
+    })
     if (!outcome.ok && 'pending' in outcome) throw new ActionFailureError('accountDeletionPending')
     if (!outcome.ok) throw new ActionFailureError('accountSoleAdmin', { workspaces: outcome.soleAdminOf.join(', '), count: outcome.soleAdminOf.length })
     // The sessions went with the user row; this clears the cookie too.

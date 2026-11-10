@@ -3,7 +3,7 @@
 import useSWR from 'swr'
 import { fetchGroupMembers, type GroupMember } from '@/lib/group-messages'
 import { cn } from '@/lib/utils'
-import { BotAvatar } from './bot-avatar'
+import { BotAvatar, COORDINATOR_AVATAR } from './bot-avatar'
 import { LetterAvatar } from './letter-avatar'
 
 /** The SWR key for a group's members, shared by the chat's pill and its 详情. */
@@ -11,6 +11,11 @@ export const groupMembersKey = (id: string) => ['group-members', id] as const
 
 export function useGroupMembers(id: string) {
   return useSWR(groupMembersKey(id), ([, groupId]: readonly [string, string]) => fetchGroupMembers(groupId))
+}
+
+/** A bot member's avatar props: the Coordinator wears its own look (COORDINATOR_AVATAR) here as everywhere else. */
+export function memberAvatar(member: Pick<GroupMember, 'id' | 'color' | 'shape' | 'coordinator'>) {
+  return member.coordinator ? COORDINATOR_AVATAR : { id: member.id, color: member.color, shape: member.shape }
 }
 
 /** At most this many bloubs stand in the group's avatar. */
@@ -25,12 +30,18 @@ export function GroupAvatar({ title, members, size = 'pill' }: { title: string; 
   const bots = (members ?? []).filter(member => member.memberType === 'bot').slice(0, STACKED)
   if (!bots.length) return <LetterAvatar name={title} size={size} />
   return <span aria-hidden="true" className={cn('flex shrink-0 items-center', size === 'pill' ? '-space-x-1.5' : '-space-x-4')}>
-    {bots.map(bot => <BotAvatar key={bot.id} id={bot.id} color={bot.color} shape={bot.shape} size={size === 'pill' ? 'row' : 'cell'} still />)}
+    {bots.map(bot => <BotAvatar key={bot.id} {...memberAvatar(bot)} size={size === 'pill' ? 'row' : 'cell'} still />)}
   </span>
 }
 
 /** The avatar for a group's pill, loading its members by the shared key. */
 export function GroupPillAvatar({ id, title }: { id: string; title: string }) {
   const { data: members } = useGroupMembers(id)
+  return <GroupAvatar title={title} members={members} />
+}
+
+/** Sidebar reuse of an already read member list; mounting a row never starts a member request. */
+export function CachedGroupAvatar({ id, title }: { id: string; title: string }) {
+  const { data: members } = useSWR<GroupMember[]>(groupMembersKey(id), null)
   return <GroupAvatar title={title} members={members} />
 }

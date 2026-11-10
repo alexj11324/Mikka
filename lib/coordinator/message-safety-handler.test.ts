@@ -3,7 +3,7 @@ import { after, before, mock, test } from 'node:test'
 import { createHash } from 'node:crypto'
 import net from 'node:net'
 import type { SQL } from 'drizzle-orm'
-import { PgDialect } from 'drizzle-orm/pg-core'
+import { PgDialect, QueryBuilder, type PgTable, type SelectedFields } from 'drizzle-orm/pg-core'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, runMessages } from '../db/schema'
 import { sourcedEventMessage } from './message-safety'
 import { createApiHandler } from '../../apps/api/src/application'
@@ -50,7 +50,15 @@ const transport = {
         return selection
       },
       orderBy() { return selection },
-      limit() { return table === agentRuns ? selection : Promise.resolve(table === coordinatorMessages ? [...historical] : table === coordinatorSessions ? [] : []) },
+      limit() {
+        if (table === agentRuns && fields && Object.keys(fields).length === 1 && 'workspaceId' in fields) {
+          assert.ok(dialect.sqlToQuery(condition).params.includes(runId))
+          // Initial tenant lookup succeeds; the locked read below still
+          // exercises a concurrent ownership/STOP change before the write.
+          return Promise.resolve([{ workspaceId: workspace }])
+        }
+        return table === agentRuns ? selection : Promise.resolve(table === coordinatorMessages ? [...historical] : table === coordinatorSessions ? [] : [])
+      },
       async for(mode: string) {
         assert.equal(table, agentRuns); assert.equal(mode, 'update'); locks++
         beforeLock?.()
@@ -88,8 +96,47 @@ stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () =
 // The person's Coordinator is an ordinary bot row; MCP resolves it for the authenticated owner.
 const coordinator = '28700000-0000-4000-8000-0000000c0de1'
 const workspace = '28700000-0000-4000-8000-0000000000a1'
-stub('../workspace-db.ts', { workspacePool: { query: async (sql: string, params: unknown[]) => {
-  assert.equal(sql, `SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active'`)
+const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
+stub('../workspace-db.ts', { workspaceDb: { select: (fields?: Record<string, unknown>) => {
+  assert.ok(fields)
+  assert.deepEqual(Object.keys(fields), ['id', 'kind', 'organizationId'])
+  let source: PgTable | undefined, member: PgTable | undefined, organization: PgTable | undefined
+  let memberJoin: SQL | undefined, organizationJoin: SQL | undefined, condition: SQL | undefined
+  const selection = {
+    from: (table: PgTable) => { assert.equal(source, undefined); source = table; return selection },
+    innerJoin: (table: PgTable, predicate: SQL) => {
+      assert.ok(source); assert.equal(member, undefined)
+      member = table; memberJoin = predicate
+      return selection
+    },
+    leftJoin: (table: PgTable, predicate: SQL) => {
+      assert.ok(member); assert.equal(organization, undefined)
+      organization = table; organizationJoin = predicate
+      return selection
+    },
+    where: (predicate: SQL) => { assert.equal(condition, undefined); condition = predicate; return selection },
+    orderBy: async (order: SQL) => {
+      assert.ok(source && member && organization && memberJoin && organizationJoin && condition)
+      const compiled = new QueryBuilder().select(fields as SelectedFields).from(source)
+        .innerJoin(member, memberJoin).leftJoin(organization, organizationJoin).where(condition).orderBy(order).toSQL()
+      let actualSql = compiled.sql
+      // Preserve the complete authenticated owner/Workspace query while
+      // allowing only its three fixed declaration/qualifier aliases.
+      for (const [table, name] of [['mikka_workspaces', 'w'], ['mikka_workspace_members', 'm'], ['mikka_organization_workspaces', 'o']]) {
+        actualSql = actualSql.replaceAll('"' + table + '" "' + name + '"', '"' + table + '"')
+          .replaceAll('"' + name + '".', '"' + table + '".')
+      }
+      assert.equal(actualSql, expectedMembershipSql)
+      assert.deepEqual(compiled.params, [owner, 'active', workspace, 'team', 'personal', owner])
+      return [{ id: workspace, kind: 'team', organizationId: null }]
+    },
+  }
+  return selection
+} }, workspacePool: { query: async (sql: string, params: unknown[]) => {
+  assert.match(sql, /mikka_workspace_members m JOIN mikka_workspaces w/)
+  assert.match(sql, /m.status='active'/)
+  assert.match(sql, /w.kind='team'/)
+  assert.match(sql, /w.kind='personal' AND w\."userId"=\$2/)
   assert.deepEqual(params, [workspace, owner], 'scope membership uses the same authenticated owner')
   return { rows: [{ allowed: 1 }], rowCount: 1 }
 } } })
@@ -100,8 +147,9 @@ stub('./coordinator-bot.ts', {
 })
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('Unrelated tool outside test') } })
 stub('../issue-access.ts', { issueForUser: () => {} })
-stub('../acting-user.ts', { actAs: () => { throw Error('Unrelated tool outside test') } })
-stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000 })
+const unexpectedAuth = () => { throw new Error('No browser authentication or OAuth issuance in MCP bearer fixture') }
+stub('../auth.ts', { auth: new Proxy({}, { get: unexpectedAuth }), authBaseURL: 'https://auth-fixture.example.invalid' })
+stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, issueDeviceToken: unexpectedAuth })
 stub('../composio.ts', { runComposioAction: () => { throw Error('No provider') } })
 stub('../mcp/worker.ts', { RUN_TOKEN_PREFIX: 'mkw_', verifyRunToken: async () => undefined, workerRun: () => { throw Error('Worker outside this batch') }, report: () => {}, ask: () => {}, blocked: () => {} })
 stub('../mcp/artifacts.ts', { submit: () => {}, oauthSubmitter: () => {}, runSubmitter: () => {} })
@@ -121,7 +169,7 @@ before(async () => {
 })
 let id = 0
 async function request(name: string, args: unknown, bearer: string | null = syntheticBearer) {
-  return POST(new Request('http://localhost/mikka/api/mcp', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(bearer ? { authorization: 'Bearer ' + bearer } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name, arguments: args } }) }))
+  return POST(new Request('http://localhost/mikka/api/mcp', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(bearer ? { authorization: 'Bearer ' + bearer } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name, arguments: { workspaceId: workspace, ...args as object } } }) }))
 }
 async function result(response: Response) {
   assert.equal(response.status, 200)

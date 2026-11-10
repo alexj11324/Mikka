@@ -52,7 +52,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
   const scope = createRequestDatabaseScope(urls[0]), wrongScope = createRequestDatabaseScope(urls[1])
   const home = randomUUID(), team = randomUUID(), foreignHome = randomUUID(), inactiveHome = randomUUID()
   const issueId = randomUUID(), runId = randomUUID(), foreignRunId = randomUUID(), groupId = randomUUID()
-  const personalIssueId = randomUUID(), unlinkedIssueId = randomUUID(), movedIssueId = randomUUID()
+  const personalIssueId = randomUUID(), unlinkedIssueId = randomUUID(), policyIssueId = randomUUID()
   const channels = new Map<string, LiveScope>()
   for (const ownerId of ['owner', 'peer', 'foreign', 'inactive', 'no-home']) for (const workspaceId of [home, team, foreignHome, inactiveHome]) {
     const value = { ownerId, workspaceId }; channels.set(`/v1/live/${liveChannelId(value)}/push`, value)
@@ -92,33 +92,38 @@ test('real PG: lists retain their reader scope and publish only the originating 
     for (const [id, owner, kind] of [[home, 'owner', 'personal'], [team, 'owner', 'team'], [foreignHome, 'foreign', 'personal'], [inactiveHome, 'inactive', 'personal']]) {
       await database.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,'Fixture',$3)`, [id, owner, kind])
     }
-    for (const [workspace, owner, status] of [[home, 'owner', 'active'], [home, 'peer', 'active'], [team, 'owner', 'active'], [team, 'peer', 'active'], [team, 'foreign', 'active'], [team, 'inactive', 'suspended'], [team, 'no-home', 'active'], [foreignHome, 'foreign', 'active'], [inactiveHome, 'inactive', 'suspended']]) {
+    for (const [workspace, owner, status] of [[home, 'owner', 'active'], [team, 'owner', 'active'], [team, 'peer', 'active'], [team, 'foreign', 'active'], [team, 'inactive', 'suspended'], [team, 'no-home', 'active'], [foreignHome, 'foreign', 'active'], [inactiveHome, 'inactive', 'suspended']]) {
       await database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,'member',$3)`, [workspace, owner, status])
     }
+    await assert.rejects(database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,'peer','peer','peer','member','active')`, [home]), { code: '23514' }, 'a Personal workspace cannot admit another owner')
     const ownerAgent = randomUUID(), foreignAgent = randomUUID()
     await database.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,'owner','Fixture','codex'),($2,'foreign','Fixture','codex')`, [ownerAgent, foreignAgent])
     await foreign.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,'foreign','Other source','codex')`, [foreignAgent])
-    for (const target of [database, foreign]) await target.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal','workspace')`, [issueId])
+    for (const target of [database, foreign]) await target.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES($1,'owner',$2,'bound','Fixture','{"type":"doc","content":[]}','todo','normal','workspace')`, [issueId, team])
     await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,'owner')`, [issueId, randomUUID(), team])
-    await database.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES
-      ($1,'owner','Personal','{"type":"doc","content":[]}','todo','normal','personal'),
-      ($2,'owner','Unlinked','{"type":"doc","content":[]}','todo','normal','workspace'),
-      ($3,'owner','Moved','{"type":"doc","content":[]}','todo','normal','workspace')`, [personalIssueId, unlinkedIssueId, movedIssueId])
-    await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,'owner')`, [movedIssueId, randomUUID(), team])
-    await database.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt) VALUES($1,'owner',$2,$3,'running','Fixture'),($4,'foreign',$2,$5,'running','Fixture')`, [runId, issueId, ownerAgent, foreignRunId, foreignAgent])
+    await database.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES
+      ($1,'owner',$4,'bound','Personal','{"type":"doc","content":[]}','todo','normal','personal'),
+      ($2,'owner',$5,'bound','Unlinked','{"type":"doc","content":[]}','todo','normal','workspace'),
+      ($3,'owner',$5,'bound','Sync policy','{"type":"doc","content":[]}','todo','normal','workspace')`, [personalIssueId, unlinkedIssueId, policyIssueId, home, team])
+    await database.query(`UPDATE issues SET "linearSyncPolicy"='explicit',"linearSyncBlocked"=false WHERE id=$1`, [policyIssueId])
+    await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,'owner')`, [policyIssueId, randomUUID(), team])
+    await database.query(`INSERT INTO agent_runs(id,"userId","workspaceId","issueId","agentId",status,prompt) VALUES($1,'owner',$6,$2,$3,'running','Fixture'),($4,'foreign',$6,$2,$5,'running','Fixture')`, [runId, issueId, ownerAgent, foreignRunId, foreignAgent, team])
     // Same UUID, different owner in an actual second database: losing the
     // originating request would publish to a different valid channel.
-    await foreign.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt) VALUES($1,'foreign',$2,$3,'running','Other database')`, [runId, issueId, foreignAgent])
+    await foreign.query(`INSERT INTO agent_runs(id,"userId","workspaceId","issueId","agentId",status,prompt) VALUES($1,'foreign',$4,$2,$3,'running','Other database')`, [runId, issueId, foreignAgent, team])
     await database.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy") VALUES($1,$2,'group','Private fixture','owner')`, [groupId, team])
     await database.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role) VALUES($1,'user','owner','owner'),($1,'user','peer','member')`, [groupId])
 
-    await t.test('owner-wide lists use the real home, not the selected team or another personal member', async () => {
-      assert.deepEqual(await runListTargets(database, database, runId), [{ scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'thread_list', id: home }, { kind: 'task_run_list', id: home }] }])
-      assert.deepEqual(await runListTargets(database, database, foreignRunId), [{ scope: { ownerId: 'foreign', workspaceId: foreignHome }, events: [{ kind: 'thread_list', id: foreignHome }, { kind: 'task_run_list', id: foreignHome }] }])
+    await t.test('run lists use their persisted tenant; account-wide lists retain the verified home', async () => {
+      assert.deepEqual(await runListTargets(database, database, runId), [{ scope: { ownerId: 'owner', workspaceId: team }, events: [{ kind: 'thread_list', id: team }, { kind: 'task_run_list', id: team }] }])
+      assert.deepEqual(await runListTargets(database, database, foreignRunId), [{ scope: { ownerId: 'foreign', workspaceId: team }, events: [{ kind: 'thread_list', id: team }, { kind: 'task_run_list', id: team }] }])
+      await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team])
+      try { assert.deepEqual(await runListTargets(database, database, runId), [], 'revoked membership never falls back to the owner personal channel') }
+      finally { await database.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team]) }
       const before = (await database.query('SELECT count(*)::integer AS n FROM mikka_workspaces')).rows[0].n
       assert.deepEqual(await ownerListTargets(database, 'no-home', ['thread_list']), [])
       assert.deepEqual(await ownerListTargets(database, 'inactive', ['bot_chat_list']), [])
-      assert.deepEqual(await ownerListTargets(database, 'peer', ['thread_list']), [], 'membership in another owner home never substitutes for an owned home')
+      assert.deepEqual(await ownerListTargets(database, 'peer', ['thread_list']), [], 'Shared workspace membership never substitutes for an owned Personal workspace')
       assert.equal((await database.query('SELECT count(*)::integer AS n FROM mikka_workspaces')).rows[0].n, before, 'notifications never create a workspace')
     })
 
@@ -138,7 +143,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
       const audience = async () => (await ownerSettingsTargets(database, database, 'owner')).map(value => `${value.scope.ownerId}@${value.scope.workspaceId === home ? 'home' : 'team'}:${value.events.map(event => event.kind).join(',')}`).sort()
       // Not shared: only the account itself, in each workspace it is an active member of; never the app-wide workspace_settings.
       assert.deepEqual(await audience(), ['owner@home:model_settings', 'owner@team:model_settings'])
-      // 分享我的订阅给团队成员 on in the team: its active members too (not the suspended one, not the home's peer).
+      // 分享我的订阅给团队成员 on in the team: its active members too, excluding the suspended member.
       await database.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ('owner',$1,true)`, [team])
       assert.deepEqual(await audience(), ['foreign@team:model_settings', 'no-home@team:model_settings', 'owner@home:model_settings', 'owner@team:model_settings', 'peer@team:model_settings'])
       // An admin who does not allow sharing subscriptions: back to the account alone.
@@ -149,37 +154,46 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.deepEqual(await ownerSettingsTargets(database, database, 'no-such-account'), [])
     })
 
-    await t.test('issue lists retain personal/unlinked visibility; body saves do not invalidate unrelated chat/run summaries', async () => {
+    await t.test('issue lists follow the task tenant without a Team link; body saves do not invalidate unrelated chat/run summaries', async () => {
       const linked = await issueListTargets(database, database, issueId)
       assert.deepEqual(new Set(linked.filter(value => value.events.some(event => event.kind === 'issue_list')).map(value => value.scope.ownerId)), new Set(['owner', 'peer', 'foreign', 'no-home']))
       assert.ok(linked.every(value => value.events.every(event => event.kind === 'issue_list')))
-      for (const id of [personalIssueId, unlinkedIssueId]) assert.deepEqual(await issueListTargets(database, database, id), [
+      assert.deepEqual(await issueListTargets(database, database, personalIssueId), [
         { scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'issue_list', id: home }] },
       ])
+      const unlinked = await issueListTargets(database, database, unlinkedIssueId)
+      assert.deepEqual(new Set(unlinked.map(value => value.scope.ownerId)), new Set(['owner', 'peer', 'foreign', 'no-home']))
+      assert.ok(unlinked.every(value => value.scope.workspaceId === team && value.events.every(event => event.kind === 'issue_list' && event.id === team)))
       const renamed = await issueListTargets(database, database, issueId, true)
       assert.deepEqual(new Set(renamed.filter(value => value.events.some(event => event.kind === 'task_run_list')).map(value => value.scope.ownerId)), new Set(['owner', 'foreign']))
       assert.deepEqual(new Set(renamed.filter(value => value.events.some(event => event.kind === 'bot_chat_list')).map(value => value.scope.ownerId)), new Set(['owner', 'foreign']), 'only actual owned personal scopes route the derived previews')
     })
 
-    await t.test('a committed scope change clears old list keys and former members own previews without disclosing the issue', async () => {
+    await t.test('sync-policy changes retain the task tenant and recheck members at delivery, while former members clear only their own previews', async () => {
       await clear()
+      const beforeTransfer = (await database.query('SELECT * FROM issues WHERE id=$1', [policyIssueId])).rows[0]
+      await assert.rejects(database.query('UPDATE issues SET "workspaceId"=$2 WHERE id=$1', [policyIssueId, home]), /taskWorkspaceTransferDenied/)
+      assert.deepEqual((await database.query('SELECT * FROM issues WHERE id=$1', [policyIssueId])).rows[0], beforeTransfer)
+      assert.equal(scheduled.length, 0)
       const client = await scope.run(() => pool.connect())
       try {
         await client.query('BEGIN')
         await scope.run(() => withDatabaseClient(client, async () => {
-          const { rows: [locked] } = await client.query('SELECT id,"userId",scope FROM issues WHERE id=$1 FOR UPDATE', [movedIssueId])
+          const { rows: [locked] } = await client.query('SELECT id,"userId",scope,"workspaceId" FROM issues WHERE id=$1 FOR UPDATE', [policyIssueId])
           const previousLists = await issueListScopesBeforeChange(locked)
-          await client.query(`UPDATE issues SET scope='personal',"scopeSetBy"='user' WHERE id=$1`, [movedIssueId])
-          await issueListScopeChanged(client, movedIssueId, previousLists)
+          await client.query(`UPDATE issues SET "linearSyncPolicy"='disabled',"linearSyncBlocked"=true,"scopeSetBy"='user' WHERE id=$1`, [policyIssueId])
+          await issueListScopeChanged(client, policyIssueId, previousLists)
         }))
         assert.equal(scheduled.length, 0)
         // The former member retains their own home but loses this workspace.
         await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='foreign'`, [team])
         await wrongScope.run(() => client.query('COMMIT'))
+        assert.deepEqual((await database.query('SELECT "workspaceId",scope,"linearSyncPolicy" FROM issues WHERE id=$1', [policyIssueId])).rows, [{ workspaceId: team, scope: 'workspace', linearSyncPolicy: 'disabled' }])
         await wrongScope.run(drain)
         const oldLists = received.filter(value => value.scope.workspaceId === team && value.events.some(event => event.kind === 'issue_list'))
         assert.deepEqual(new Set(oldLists.map(value => value.scope.ownerId)), new Set(['owner', 'peer', 'no-home']))
-        assert.ok(received.some(value => value.scope.ownerId === 'owner' && value.scope.workspaceId === home && value.events.some(event => event.kind === 'issue_list')))
+        assert.ok(received.every(value => !value.events.some(event => event.kind === 'issue_list') || value.scope.workspaceId === team), 'disabling provider sync never moves issue-list invalidations to a personal tenant')
+        assert.ok(received.some(value => value.scope.ownerId === 'owner' && value.scope.workspaceId === home && value.events.some(event => event.kind === 'bot_chat_list')))
         assert.deepEqual(received.filter(value => value.scope.ownerId === 'foreign'), [
           { scope: { ownerId: 'foreign', workspaceId: foreignHome }, events: [{ kind: 'bot_chat_list', id: foreignHome }], committedStatus: 'running' },
         ], 'clearing a former citation carries only the former member’s own list key')
@@ -204,7 +218,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
       } finally { client.release() }
       await wrongScope.run(drain)
       assert.equal(received.length, 1)
-      assert.deepEqual(received[0].scope, { ownerId: 'owner', workspaceId: home })
+      assert.deepEqual(received[0].scope, { ownerId: 'owner', workspaceId: team })
       assert.equal(received[0].committedStatus, 'waiting_input', 'a different PG connection observes the committed change before HTTP delivery')
     })
 
@@ -245,7 +259,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
       })
       await drain()
       assert.equal(received.length, 1)
-      assert.deepEqual(received[0].events, [{ kind: 'thread_list', id: home }])
+      assert.deepEqual(received[0].events, [{ kind: 'thread_list', id: team }])
       assert.ok((await database.query('SELECT "lastReply" FROM agent_runs WHERE id=$1', [runId])).rows[0].lastReply.startsWith('First'))
     })
 
@@ -266,7 +280,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.ok((await database.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0].stopRequestedAt)
       await drain()
       assert.deepEqual(received.map(value => ({ scope: value.scope, events: value.events })), [{
-        scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'thread_list', id: home }, { kind: 'task_run_list', id: home }],
+        scope: { ownerId: 'owner', workspaceId: team }, events: [{ kind: 'thread_list', id: team }, { kind: 'task_run_list', id: team }],
       }])
       await clear(); await scope.run(() => stopOwnedRun(db, 'owner', runId)); await drain()
       assert.equal(received.length, 0, 'an already-recorded stop is not a new list mutation')
@@ -373,7 +387,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.equal(denied.status, 404); await drain(); assert.equal(received.length, 0)
     })
 
-    await t.test('the actual workspace member removal rolls back without notification and clears only previously known scopes after commit', async () => {
+    await t.test('the actual workspace member removal rolls back without notification and refreshes only authorized scopes after commit', async () => {
       await clear()
       const { removeMember } = await import('../workspace-admin/members')
       await database.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team])
@@ -398,8 +412,13 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.equal((await database.query(`SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"='foreign'`, [team])).rowCount, 0)
       await wrongScope.run(drain)
       const old = received.filter(value => value.scope.ownerId === 'foreign')
-      assert.equal(old.length, 2)
-      assert.deepEqual(new Set(old.map(value => value.scope.workspaceId)), new Set([team, foreignHome]))
+      // Capturing a former scope never grants post-removal delivery. The
+      // source barrier drops that channel; the still-active Personal home
+      // remains authorized to refresh this account's workspace directory.
+      assert.equal(old.length, 1)
+      assert.deepEqual(new Set(old.map(value => value.scope.workspaceId)), new Set([foreignHome]))
+      assert.ok(!received.some(value => value.scope.ownerId === 'foreign' && value.scope.workspaceId === team), 'removed members receive no former-workspace metadata')
+      assert.ok(received.some(value => value.scope.ownerId === 'owner' && value.scope.workspaceId === team && value.events.some(event => event.kind === 'workspace_settings')), 'active members still receive the committed workspace change')
       assert.ok(old.every(value => value.events.every(event => event.id === value.scope.workspaceId)))
       assert.ok(old.find(value => value.scope.workspaceId === foreignHome)!.events.some(event => event.kind === 'workspace_settings'))
       assert.ok(!received.some(value => value.scope.ownerId === 'inactive'))

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { after, test } from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { Pool, type PoolClient } from 'pg'
 import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
 
@@ -91,6 +92,66 @@ test('between bursts (a wait, network IO) the fence is not held: a revocation go
   })
   assert.equal((await route(request(f))).status, 401, 'the next burst takes the fence again and finds the token revoked')
   assert.equal(second, 0)
+})
+
+test('deferred heartbeat work cannot retain a token lock after its request; owner revoke fences its next statement', { skip: !url, timeout: 20_000 }, async t => {
+  const [{ afterJob }, { withDeviceUnitFence, deviceScopedPool, FENCE_IDLE_MS, isDeviceAuthorityRevoked },
+    { revokeDeviceCredential }] = await Promise.all([import('./background'), import('./db/device-scope'), import('./device-revocation')])
+  const f = await fixture(), applicationName = `cleanup1826_${randomUUID()}`
+  const target = new URL(url!)
+  target.searchParams.set('application_name', applicationName)
+  const source = new Pool({ connectionString: target.toString(), max: 2 })
+  let scheduled!: () => unknown, release!: () => void, ready!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const began = new Promise<void>(resolve => { ready = resolve })
+  let pending: Promise<unknown> | undefined
+  // Vercel can suspend a request's unref timers once its response/job settles.
+  // Freeze only the fence's idle timer; PG lock_timeout still runs in the server.
+  const timers: ReturnType<typeof setTimeout>[] = [], originalSetTimeout = globalThis.setTimeout
+  t.mock.method(globalThis, 'setTimeout', ((callback: (...args: unknown[]) => void, ms?: number, ...args: unknown[]) => {
+    const timer = originalSetTimeout(callback, ms === FENCE_IDLE_MS ? 60_000 : ms, ...args)
+    if (ms === FENCE_IDLE_MS) timers.push(timer)
+    return timer
+  }) as typeof setTimeout)
+  t.after(async () => {
+    release()
+    await pending?.catch(() => undefined)
+    for (const timer of timers) clearTimeout(timer)
+    // Only this test's dedicated source/fence connections, including a leak
+    // in the old implementation; no shared application/other-test backend.
+    await source.end()
+    await admin!.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name=$1 AND pid<>pg_backend_pid()', [applicationName])
+  })
+  await withDeviceUnitFence({ tokenId: f.tokenId, userId: f.owner }, async () => {
+    afterJob('after:factory-dispatch-recovery', async () => {
+      await deviceScopedPool(source).query('SELECT 1')
+      ready()
+      await gate
+      await deviceScopedPool(source).query('UPDATE devices SET name=$1 WHERE id=$2', ['must not land after revoke', f.device])
+    }, { retainContext: true, schedule: task => { scheduled = task } })
+  })
+  pending = Promise.resolve(scheduled())
+  // Observe rejection now as well as below; a failed assertion still closes
+  // the deferred job in the test's cleanup without an unhandled rejection.
+  void pending.catch(() => undefined)
+  await began
+  const started = Date.now()
+  const receipt = await revokeDeviceCredential(admin!, f.owner, f.tokenId)
+  assert.equal(receipt?.revokedBy, f.owner)
+  assert.ok(Date.now() - started < 2_000, 'owner revoke does not wait for a background idle timer or its 5-second lock timeout')
+  release()
+  await assert.rejects(pending, isDeviceAuthorityRevoked)
+  assert.equal((await admin!.query('SELECT name FROM devices WHERE id=$1', [f.device])).rows[0].name, 'Unit fence device')
+})
+
+test('an async callback cannot reopen an already-finished request unit fence', { skip: !url }, async () => {
+  const { withDeviceUnitFence, deviceScopedPool, isDeviceAuthorityError } = await import('./db/device-scope')
+  const f = await fixture()
+  let deferred!: () => Promise<unknown>
+  await withDeviceUnitFence({ tokenId: f.tokenId, userId: f.owner }, async () => {
+    deferred = AsyncLocalStorage.bind(() => deviceScopedPool(admin!).query('SELECT 1'))
+  })
+  await assert.rejects(deferred(), isDeviceAuthorityError)
 })
 
 test('a hung unit loses its fence after 10 s; the revocation then completes and the unit fails closed', { skip: !url, timeout: 30_000 }, async t => {

@@ -10,13 +10,13 @@ const workspace = '19df8afd-0f8c-4c6b-bc9c-20df0b046a72'
 const scope = { ownerId: 'owner', workspaceId: workspace }
 const channel = liveChannelId(scope)
 function gateway() {
-  const names: string[] = [], pushed: LiveInvalidation[][] = [], protocols: string[] = []
+  const names: string[] = [], pushed: LiveInvalidation[][] = [], protocols: string[] = [], revoked: string[] = []
   const env: GatewayEnv = { GATEWAY_PUSH_SECRET: secret, DEVICE_SESSION: { getByName(name) {
     names.push(name)
-    return { notify: async () => {}, notifyLive: async events => { pushed.push(events) }, status: async () => ({ online: false, lastSeenAt: null }), fetch: async request => { protocols.push(request.headers.get('sec-websocket-protocol')!); return new Response(null) },
+    return { notify: async () => {}, notifyLive: async events => { pushed.push(events) }, revokeLive: async () => { revoked.push(name) }, status: async () => ({ online: false, lastSeenAt: null }), fetch: async request => { protocols.push(request.headers.get('sec-websocket-protocol')!); return new Response(null) },
       watchPresence: async () => ({ accepted: true, changed: false }), unwatchPresence: async () => {}, presenceChanged: async () => [] }
   } } }
-  return { names, pushed, protocols, env }
+  return { names, pushed, protocols, revoked, env }
 }
 
 test('a browser upgrade can reach only its signed owner/workspace object', async () => {
@@ -56,4 +56,21 @@ test('only the authenticated publisher can deliver bounded invalidation keys', a
   assert.equal((await push(revised)).status, 204)
   assert.deepEqual(g.pushed.at(-1), revised)
   assert.equal((await push([{ ...revised[0], rev: 'three' }])).status, 400)
+})
+
+test('the existing push endpoint accepts only an authenticated closed revocation control and returns an explicit ACK', async () => {
+  const g = gateway()
+  const push = (body: unknown, authorization = `Bearer ${secret}`) => handleRequest(new Request(`https://gateway.test/v1/live/${channel}/push`, {
+    method: 'POST', headers: { authorization }, body: JSON.stringify(body),
+  }), g.env)
+  assert.equal((await push({ type: 'live_revoked' }, '')).status, 401)
+  for (const body of [{ type: 'live_revoked', sessionId: 'not-a-wire-field' }, { type: 'session_revoked' }, [{ type: 'live_revoked' }]]) {
+    assert.equal((await push(body)).status, 400)
+  }
+  assert.deepEqual(g.names, [])
+  const accepted = await push({ type: 'live_revoked' })
+  assert.equal(accepted.status, 200)
+  assert.deepEqual(await accepted.json(), { revoked: true })
+  assert.deepEqual(g.revoked, [`live:${channel}`])
+  assert.deepEqual(g.pushed, [])
 })

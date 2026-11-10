@@ -44,6 +44,11 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
    now=new Date(now.getTime()+60_000);await Promise.all(Array.from({length:10},()=>store().tick()))
    const done=await history(id);assert.equal(done.length,1);assert.equal(done[0].status,'succeeded');assert.equal(done[0].attempts,1)
    assert.equal((await pool.query('SELECT count(*)::int n FROM coordinator_messages WHERE id=$1 AND "userId"=$2 AND "botId"=$3',[done[0].operation_id,owner,botId])).rows[0].n,1)
+   const message=(await pool.query('SELECT message FROM coordinator_messages WHERE id=$1',[done[0].operation_id])).rows[0].message
+   assert.equal(message.content,'Controlled reminder','chat body is the useful result, not execution bookkeeping')
+   assert.deepEqual(message.mikkaScheduleResult,{version:1,title:d.title,status:'succeeded'})
+   assert.ok(!JSON.stringify(message).includes(done[0].operation_id))
+   assert.ok(done[0].operation_id,'history retains the operation identity')
    assert.equal((await create(d,requestId)).id,id)
    await assert.rejects(create({...d,title:'Different request'},requestId),/scheduleRequestConflict/)
   })
@@ -58,6 +63,28 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
    assert.equal(resumed.schedule.next_at.toISOString(),'2030-01-02T00:00:00.000Z')
    await store().command(actor,{action:'cancel',scheduleId:row.id,version:4})
    await assert.rejects(store().command(actor,{action:'resume',scheduleId:row.id,version:5}),/scheduleCancelled/)
+  })
+  await t.test('legacy protocol rows are projected by their persisted operation identity without rewriting history',async()=>{
+   const scheduled=await create(def({kind:'reminder',text:'Legacy useful reminder'}))
+   now=new Date(now.getTime()+60_000);await store().tick()
+   const occurrence=(await history(scheduled.id))[0]
+   const content=`[Schedule ${scheduled.id}; occurrence ${occurrence.id}; operation ${occurrence.operation_id}] Legacy: succeeded\nLegacy useful reminder`
+   const old={role:'assistant',content}
+   await pool.query('UPDATE coordinator_messages SET message=$2 WHERE id=$1',[occurrence.operation_id,old])
+   const {createRequestDatabaseScope}=await import('../db/request-scope')
+   const request=createRequestDatabaseScope(target!)
+   try{
+    const coordinator=await import('../coordinator/store')
+    const chat=await request.run(()=>coordinator.chatView(owner,200,botId))
+    assert.equal(chat.items.find(item=>item.id===occurrence.operation_id)?.text,'Legacy useful reminder')
+    const previews=await request.run(()=>coordinator.botChats(owner))
+    assert.equal(previews[botId].line,'Legacy useful reminder')
+    assert.deepEqual((await pool.query('SELECT message FROM coordinator_messages WHERE id=$1',[occurrence.operation_id])).rows[0].message,old,'read projection preserves the original receipt')
+    const plainId=randomUUID()
+    await pool.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,coalesce(max(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId"=$3`,[plainId,owner,botId,old])
+    const again=await request.run(()=>coordinator.chatView(owner,200,botId))
+    assert.equal(again.items.find(item=>item.id===plainId)?.text,content,'same words with no persisted occurrence identity are not stripped')
+   }finally{await request.close()}
   })
   await t.test('a killed claimant recovers the same occurrence; stale lease cannot publish',async()=>{
    const row=await create();now=new Date(now.getTime()+60_000);await store().materialize()
@@ -121,11 +148,22 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     assert.equal(inbox.scheduledRead?.prompt,'Read current status only')
     const prompt=(await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2 ORDER BY position DESC LIMIT 1',[owner,botId])).rows[0].message
     assert.ok(!JSON.stringify(prompt).includes(inbox.scheduledRead!.leaseToken),'private occurrence fence must not enter model/chat data')
+    assert.match(prompt.content,/Use only the available allowed read tools/,'the runtime still receives execution instructions')
+    const dueView=await request.run(()=>coordinator.chatView(owner,200,botId))
+    assert.ok(dueView.items.some(item=>item.from==='event'&&item.line?.kind==='scheduleDue'))
+    assert.ok(!dueView.items.some(item=>item.text.includes('[Scheduled read-only task]')||item.text.includes('Use only the available')),'display never serializes the execution body')
+    const duePreview=(await request.run(()=>coordinator.botChats(owner)))[botId]
+    assert.equal(duePreview.line,null,'the bot list uses the same audience projection')
+    for (const page of [await request.run(()=>coordinator.chatView(owner,200,botId,{through:dueView.cursor})),await request.run(()=>coordinator.chatUpdate(owner,botId,dueView.continuation))]) {
+      assert.ok(!page.items.some(item=>item.text.includes('Use only the available')),'history and delta retain the same audience boundary')
+    }
     const streamId='wrun_schedule-fixture:0'
     await store().completeRead(owner,botId,inbox.scheduledRead!,'Read-only result',streamId)
     assert.equal((await pool.query('SELECT message FROM coordinator_messages WHERE id=$1',[read.operation_id])).rows[0].message.mikkaStreamId,streamId,'scheduled reply and stream identity persist atomically')
     assert.ok((await request.run(()=>coordinator.chatView(owner,200,botId))).persistedStreamIds?.includes(streamId))
-    assert.ok((await request.run(()=>coordinator.loadConversation(owner,botId))).messages.every(({message})=>!('mikkaStreamId' in message)))
+    const modelHistory=(await request.run(()=>coordinator.loadConversation(owner,botId))).messages
+    assert.ok(modelHistory.every(({message})=>!('mikkaStreamId' in message)&&!('mikkaScheduleResult' in message)))
+    assert.ok(modelHistory.every(({message})=>message.role!=='assistant'||message.content!==''),'status-only receipts do not become empty model messages')
     const holder=(await pool.query('SELECT "leaseHolder" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2',[owner,botId])).rows[0].leaseHolder
     await request.run(()=>coordinator.releaseLease(owner,holder,botId))
     const human=randomUUID();await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier) VALUES($1,$2,$3,'user_message',$4,'{"text":"Create a reminder"}','attention')`,[human,owner,botId,human])

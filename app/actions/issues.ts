@@ -11,11 +11,11 @@ import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
 import { currentUser } from '@/lib/acting-user'
 import { accessibleTeamScopes } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
-import { issueVisibility } from '@/lib/issue-visibility'
+import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
 import { agents, issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
-import { requireIssueAccess, requireIssueAccessWithoutBody } from '@/lib/issue-access'
+import { requireIssueAccess, requireIssueAccessWithoutBody, requireUser } from '@/lib/issue-access'
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
@@ -33,7 +33,7 @@ import { changeIssueScopeLocally, previewPersonalScope } from '@/lib/issue-scope
 import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { actingContext, activityActor } from '@/lib/activity-actor'
-import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
+import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspace } from '@/lib/issue-scope-authorization'
 import { queryVersion } from '@/lib/db/query-version'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues, teams as localTeams } from '@/lib/db/team-schema'
@@ -43,6 +43,7 @@ import { ownerListRead } from '@/lib/live/list-read-server'
 import { beginOwnerListRead } from '@/lib/live/revision-read'
 import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
+import { requireTaskWorkspace, taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 
 type IssueRow = typeof issues.$inferSelect
 export type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null; linearTargetVerified: boolean }
@@ -115,8 +116,13 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   // with a newer fingerprint while returning its older team.
   const linksVersion = await queryVersion(workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId, number: teamIssues.number, key: localTeams.identifier }).from(teamIssues)
     .leftJoin(localTeams, eq(localTeams.id, teamIssues.teamId))
-    .where(or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined)), workspaceDb)
-  const visibility = await issueVisibility(userId, false, undefined, db, { teams: allTeams, withTaskNumbers: true })
+    .where(and(eq(teamIssues.workspaceId, context.workspace.id), or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined))), workspaceDb)
+  // This operation already authorized the selected tenant in loadWorkspaceContext.
+  // Keep that fresh membership result instead of loading it a second time.
+  const visibility = {
+    predicate: issueVisibilityPredicate(userId, { allowedIds: [], workspaceIds: [context.workspace.id] }),
+    links: await issueTeamScope(userId, [], { teams, withTaskNumbers: true }),
+  }
   const candidates = db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(100).as('task_list')
   // Include identifier dependencies: a prefix, profile or Linear rename can change a list without editing a task.
   // Qualified by alias: drizzle renders columns bare here, and a bare "userId" inside
@@ -148,7 +154,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   // A timestamp alone misses deletions, membership changes, identifiers and
   // link moves. Rebuild the small authorized id manifest and read only rows
   // whose visible projection differs from the caller's held snapshot.
-  const positions = manifest.filter(row => { const link = links.find(item => item.issueId === row.id); return row.scope === 'personal' || !link || teams.some(team => team.id === link.teamId) })
+  const positions = manifest
     .map(row => ({ id: row.id, version: createHash('sha256').update(JSON.stringify([userId, context.workspace.id, row.signature, links.find(link => link.issueId === row.id)?.teamId ?? null, row.scope === 'workspace' ? taskTeams.get(row.id) ?? null : null])).digest('hex').slice(0, 32) }))
   // Every request rebuilds visibility and the complete manifest before it may
   // join. A removed task/link therefore cannot inherit an older flight even
@@ -182,7 +188,8 @@ export async function pollIssue(id: string, known?: string): Promise<ActionResul
     const { issue, user, teamId } = await requireIssueAccessWithoutBody(id)
     return db.transaction(async tx => {
       const [locked] = await tx.select({ ...issueSummaryColumns, content: issueAttrsContent, bodyVersion: sql<string>`md5(${issues.content}::text)` }).from(issues).where(eq(issues.id, id)).for('share')
-      requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+      requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
+      await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       // Same unavailable task as the entry ACL, when deletion committed before
       // this lock. A cursor never turns a deleted task into an unchanged result.
       if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
@@ -200,14 +207,17 @@ async function readIssue(id: string) {
   const { issue, user, teamId } = await requireIssueAccessWithoutBody(id)
   return db.transaction(async tx => {
     const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
-    requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+    requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
+    await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
+    if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
     return issueView(locked, tx, teamId === null ? new Map() : undefined)
   })
 }
 
-export async function saveIssue(input: { id?: string; revision?: number; title: string; content: JSONContent; status: string; priority: string }): Promise<ActionResult<{ issue: IssueView }>> {
+export async function saveIssue(input: { id?: string; revision?: number; workspaceId?: string; title: string; content: JSONContent; status: string; priority: string }): Promise<ActionResult<{ issue: IssueView }>> {
   return runAction(async () => {
-    const userId = await getUserId()
+    const user = await requireUser()
+    const userId = user.id
     const parsed = inputSchema.safeParse(input)
     if (!parsed.success) return { error: validationCode(parsed.error) }
     let id: string | undefined
@@ -217,23 +227,27 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
       id = parsedId.data
     }
     const existing = id ? (await requireIssueAccess(id)).issue : null
+    const pinnedWorkspaceId = taskReaderScope(user).workspaceId
+    const context = pinnedWorkspaceId
+      ? { workspace: await requireTaskWorkspace(user, input.workspaceId ?? pinnedWorkspaceId) }
+      : await loadWorkspaceContext(input.workspaceId, user)
+    if (existing && existing.workspaceId !== context.workspace.id) throw new ActionFailureError('workspaceAccessDenied')
     const ownerId = existing?.userId ?? userId
     const observedScopeVersion = existing?.scopeVersion ?? null
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
     let statusEvent = false
-    // A status change is recorded for its owner's Coordinator (triage decides whether it matters); its bot row is resolved
-    // here, before the transaction. A task names no workspace, so it is the personal workspace's Coordinator.
-    const coordinator = existing && parsed.data.status !== undefined && existing.status !== parsed.data.status ? (await coordinatorBot(ownerId, null, { backfill: false })).botId : null
+    // Status events stay in the task's stored tenant, including shared tasks.
+    const coordinator = existing && parsed.data.status !== undefined && existing.status !== parsed.data.status ? (await coordinatorBot(ownerId, context.workspace.id, { backfill: false })).botId : null
     try {
-      const result = await db.transaction(async tx => {
+      const save = () => db.transaction(async tx => {
         if (!id) {
-          const issue = await createIssueForUserInTransaction(tx, userId, parsed.data, activityActor(userId))
+          const issue = await createIssueForUserInTransaction(tx, userId, parsed.data, activityActor(userId), { workspaceId: context.workspace.id })
           return issue ? { issue } : { error: 'issueCreateFailed' }
         }
         let issue
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
         if (!latest) return { error: 'issueNotFound' }
-        requireLockedIssueScope(latest, userId, observedScopeVersion!)
+        requireLockedIssueScope(latest, userId, observedScopeVersion!, context.workspace.id)
         ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
         const changed = issue && coordinator && issueStatusEvent(latest, issue, coordinator)
         if (changed) {
@@ -247,8 +261,8 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         await issueRelationsChanged(tx, [id])
         return { issue: await issueView(issue, tx) }
       })
-      if ('issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
-      if (!id && 'issue' in result && result.issue) scheduleIssueEffect({ kind: 'scope', issueId: result.issue.id })
+      const result = existing ? await withIssueWorkspace(user, context.workspace.id, { issueId: existing.id, action: 'canSteer' }, save) : await withTaskWorkspace(user, context.workspace.id, save)
+      if ('issue' in result && result.issue?.linearSyncPolicy === 'explicit' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
       if (statusEvent && 'issue' in result) scheduleIssueEffect({ kind: 'wake', userId: ownerId })
       return result
     } catch (error) {
@@ -271,7 +285,7 @@ export async function createIssueForTeam(input: { requestId: string; teamId: str
   })
 }
 
-/** Explicitly move an existing personal issue to a Mikka team. */
+/** Attach an existing task to a team in the task's immutable workspace. */
 export async function promoteIssueToTeam(input: { requestId: string; issueId: string; revision: number; teamId: string; expectedTeamId: string | null }) {
   return runAction(async () => {
     if (actingContext.getStore()) return { error: 'teamIssueAccessDenied' as const }
@@ -286,7 +300,7 @@ export async function moveIssue(input: { id: string; status: string; revision: n
     const issue = await readIssue(parsed.data.id)
     if (issue.revision !== parsed.data.revision) return { error: 'issueStale' }
     if (issue.status === parsed.data.status) return { issue }
-    return saveIssue({ ...issue, status: parsed.data.status })
+    return saveIssue({ ...issue, workspaceId: issue.workspaceId ?? undefined, status: parsed.data.status })
   })
 }
 
@@ -297,7 +311,7 @@ export async function changeIssuePriority(input: { id: string; priority: string;
     const issue = await readIssue(parsed.data.id)
     if (issue.revision !== parsed.data.revision) return { error: 'issueStale' }
     if (issue.priority === parsed.data.priority) return { issue }
-    return saveIssue({ ...issue, priority: parsed.data.priority })
+    return saveIssue({ ...issue, workspaceId: issue.workspaceId ?? undefined, priority: parsed.data.priority })
   })
 }
 
@@ -307,6 +321,7 @@ export async function previewIssuePersonalScope(id: string) {
   return runAction(async () => {
     const userId = await getUserId()
     if (!z.uuid().safeParse(id).success) return { error: 'issueScopeInvalid' as const }
+    await requireIssueAccess(id)
     return previewPersonalScope(userId, id)
   })
 }
@@ -317,6 +332,7 @@ export async function confirmIssuePersonalScope(input: { id: string; revision: n
     const userId = await getUserId()
     const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), confirmation: z.string().regex(/^[a-f0-9]{64}$/) }).safeParse(input)
     if (!parsed.success) return { error: 'issueScopeInvalid' as const }
+    await requireIssueAccess(parsed.data.id)
     const result = await changeIssueScopeLocally(userId, { id: parsed.data.id, revision: parsed.data.revision, scope: 'personal' }, { allowLinkedPersonal: true, confirmation: parsed.data.confirmation })
     if ('issue' in result && result.issue) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
     return result
@@ -327,8 +343,9 @@ export async function listIssueVersions(id: string) {
   const { issue, user } = await requireIssueAccessWithoutBody(id)
   const userId = issue.userId
   const versions = await db.transaction(async tx => {
-    const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
-    requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+    const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
+    requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
+    await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
     return tx.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
   })
   return enrichActivityActors(versions, userId)
@@ -343,8 +360,9 @@ export async function pollIssueVersionSummaries(id: string, known?: string, prev
     const { issue, user } = await requireIssueAccessWithoutBody(id)
     const held = readListPositions(previous, 50)
     const result = await db.transaction(async tx => {
-      const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
-      requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+      const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
+      requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
+      await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       // The same deleted-task refusal as pollIssue, after taking the shared lock.
       if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
       const summaries = tx.select({ ...versionSummaryColumns, content: sql<JSONContent>`jsonb_build_object('type', 'doc', 'attrs', ${issueVersions.content}->'attrs')`.as('content') })

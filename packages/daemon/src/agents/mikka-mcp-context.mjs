@@ -6,7 +6,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const ENTRY = fileURLToPath(new URL('./mikka-mcp.mjs', import.meta.url))
-const KEYS = new Set(['MIKKA_DECISION_MCP_URL', 'MIKKA_DECISION_MCP_TOKEN', 'MIKKA_DECISION_MCP_CATALOGUE', 'MIKKA_MCP_HTTP_OBSERVATION_URL', 'ELECTRON_RUN_AS_NODE'])
+const KEYS = new Set(['MIKKA_DECISION_MCP_URL', 'MIKKA_DECISION_MCP_TOKEN', 'MIKKA_DECISION_MCP_TRACEPARENT', 'MIKKA_DECISION_MCP_CATALOGUE', 'MIKKA_MCP_HTTP_OBSERVATION_URL', 'ELECTRON_RUN_AS_NODE'])
 export function readMcpContext(path, runId, nonce) {
   if (!/^[a-f0-9-]{36}$/.test(runId ?? '') || !/^[a-f0-9-]{36}$/.test(nonce ?? '') || resolve(path) !== path) throw Error('mcp_context_invalid')
   const parent = lstatSync(dirname(path))

@@ -26,7 +26,7 @@ export async function sendOwnedRunMessageInTransaction(tx: RunMessageWriter, use
   input: { runId: string; text: string; messageId?: string }, origin: 'user' | 'peer' = 'user') {
   const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt,
     agentDefinition: agentRuns.agentDefinition, deviceRepoId: agentRuns.deviceRepoId, deviceId: agentRuns.deviceId,
-    issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId })
+    issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId, workspaceId: agentRuns.workspaceId })
     .from(agentRuns).where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId))).limit(1).for('update')
   if (!run) throw new ActionFailureError('runNotFound')
   if (input.messageId) {
@@ -47,8 +47,8 @@ export async function sendOwnedRunMessageInTransaction(tx: RunMessageWriter, use
     const receipt = run.agentDefinition?.repositoryAdmission
     if (receipt) {
       const [bot] = run.botId ? await tx.select().from(bots).where(and(eq(bots.id, run.botId), eq(bots.ownerId, userId))).for('share') : []
-      if (!run.issueId || !run.deviceId || repo.deviceId !== run.deviceId || repo.repoPath !== key || !matchesRepositoryAdmission(receipt, { userId, issueId: run.issueId, deviceId: run.deviceId, agentId: run.agentId,
-        remoteKey: key, remoteUrl: repo.remoteUrl, targetBranch: receipt.targetBranch, workspaceId: bot?.workspaceId, workspaceLinked: receipt.workspaceLinked, requestEventId: receipt.requestEventId })
+      if ((run.botId && bot?.workspaceId !== run.workspaceId) || !run.issueId || !run.deviceId || repo.deviceId !== run.deviceId || repo.repoPath !== key || !matchesRepositoryAdmission(receipt, { userId, issueId: run.issueId, deviceId: run.deviceId, agentId: run.agentId,
+        remoteKey: key, remoteUrl: repo.remoteUrl, targetBranch: receipt.targetBranch, workspaceId: run.workspaceId ?? undefined, workspaceLinked: receipt.workspaceLinked, requestEventId: receipt.requestEventId })
         || !await (await import('./run-admission-store')).acceptedEventStillMatches(receipt, run.botId, tx)) throw new ActionFailureError('runInvalid')
     }
   }

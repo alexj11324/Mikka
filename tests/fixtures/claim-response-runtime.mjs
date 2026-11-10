@@ -1,9 +1,95 @@
 // In-memory claim boundary tests. No sockets, providers or database connections.
 import { registerHooks } from 'node:module'
+import assert from 'node:assert/strict'
+import { PgDialect, QueryBuilder } from 'drizzle-orm/pg-core'
+
+const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
+function expandMembershipAliases(sql) {
+  for (const [table, name] of [['mikka_workspaces', 'w'], ['mikka_workspace_members', 'm'], ['mikka_organization_workspaces', 'o']]) {
+    sql = sql.replaceAll('"' + table + '" "' + name + '"', '"' + table + '"')
+      .replaceAll('"' + name + '".', '"' + table + '".')
+  }
+  return sql
+}
+const dialect = new PgDialect()
+function workspaceQuery(columns) {
+  let table, condition, organizationJoin = false, statement = new QueryBuilder().select(columns)
+  const organizations = () => {
+    const p = globalThis.claimResponseProbe
+    assert.equal(table, 'mikka_organization_workspaces')
+    assert.deepEqual(condition.params, [p.workspace.id])
+    assert.ok(condition.sql === '"mikka_organization_workspaces"."workspaceId" = $1'
+      || condition.sql === '"mikka_organization_workspaces"."workspaceId" in ($1)')
+    if (columns !== undefined) assert.deepEqual(Object.keys(columns), ['organizationId'])
+    // This claim-composition fixture has no Organization-link row. The real
+    // Enterprise gate consumes that exact projection; unknown queries fail.
+    return []
+  }
+  const query = {
+    from(value) { table = value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')]; statement = statement.from(value); return query },
+    innerJoin(value, predicate) { statement = statement.innerJoin(value, predicate); return query },
+    leftJoin(value, predicate) {
+      const join = dialect.sqlToQuery(predicate)
+      assert.deepEqual(join.params, [])
+      if (table === 'mikka_workspace_members') {
+        assert.equal(value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')], 'mikka_organization_workspaces')
+        assert.equal(join.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+        assert.deepEqual(Object.keys(columns), ['id', 'organizationId'])
+      } else {
+        // The unlocked membership path is checked as a complete real query
+        // at orderBy, including its original base tables and all predicates.
+        assert.deepEqual(Object.keys(columns), ['id', 'kind', 'organizationId'])
+      }
+      statement = statement.leftJoin(value, predicate)
+      organizationJoin = true
+      return query
+    },
+    where(value) { condition = dialect.sqlToQuery(value); statement = statement.where(value); return query },
+    async for(mode, options) {
+      const p = globalThis.claimResponseProbe
+      assert.equal(mode, 'share')
+      if (table === 'mikka_workspaces') {
+        assert.deepEqual(condition.params, [p.workspace.id])
+        p.locks.push('workspaces')
+        return [p.workspace]
+      }
+      assert.equal(table, 'mikka_workspace_members')
+      assert.equal(organizationJoin, true)
+      assert.ok(options?.of)
+      assert.equal(options.of[Object.getOwnPropertySymbols(options.of).find(s => s.description === 'drizzle:Name')], 'mikka_workspace_members')
+      assert.deepEqual(condition.params, [p.workspace.id, p.run.userId, 'active'])
+      p.locks.push('workspace_members')
+      return p.memberAllowed && p.workspaceMemberAllowed ? [{ id: p.run.userId, organizationId: null }] : []
+    },
+    async limit(value) { assert.equal(value, 1); return organizations() },
+    // oxlint-disable-next-line unicorn/no-thenable -- Match the awaited Org-link SELECT.
+    then(resolve, reject) { return Promise.resolve().then(organizations).then(resolve, reject) },
+    async orderBy(order) {
+      const p = globalThis.claimResponseProbe
+      assert.equal(organizationJoin, true)
+      assert.deepEqual(Object.keys(columns), ['id', 'kind', 'organizationId'])
+      const compiled = statement.orderBy(order).toSQL()
+      assert.equal(expandMembershipAliases(compiled.sql), expectedMembershipSql)
+      assert.deepEqual(compiled.params, [p.run.userId, 'active', p.workspace.id, 'team', 'personal', p.run.userId])
+      return p.memberAllowed && p.workspaceMemberAllowed ? [{ ...p.workspace, organizationId: null }] : []
+    },
+  }
+  return query
+}
+// Keep withRunWorkspace, mayCompleteIssue and their lock order real. Only the
+// workspace database transport is modeled alongside the App transaction below.
+export const claimWorkspaceDatabase = { select: workspaceQuery, transaction: callback => callback({ select: workspaceQuery }) }
+export const claimWorkspacePool = { async query(sql, args) {
+  const p = globalThis.claimResponseProbe
+  assert.equal(sql.replace(/\s+/g, ' ').trim(), 'SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[]) AND status=\'active\'')
+  ;(p.membershipReads ??= []).push(args)
+  return { rows: p.workspaceMemberAllowed === false ? [] : args[1].map(userId => ({ userId })) }
+} }
 const nextServer = import.meta.resolve('next/server')
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
 const repositoryContract = import.meta.resolve('@mikka/protocol/repository')
-const dbSource = `import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
+const dbSource = `import assert from 'node:assert/strict'
+import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
 
 function query(columns){
   let table
@@ -34,23 +120,37 @@ function update(value){
     return {then(resolve,reject){return once().then(()=>undefined).then(resolve,reject)},returning(){return once()}}
   }}}}
 }
-export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
+let checkedOutClient
+export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
 export const pool={async query(sql,args){
   const p=globalThis.claimResponseProbe
+  assert.equal(p.appActive,1,'execution identity remains inside the checked-out APP transaction')
   if(sql==='SELECT "ownerId",kind,enabled FROM devices WHERE id=$1'&&args[0]===p.device.id)return {rows:[p.device]}
   throw new Error('unsupported claim identity query: '+sql)
+},connect:async()=>{
+  const p=globalThis.claimResponseProbe
+  assert.equal(checkedOutClient,undefined,'claim cannot acquire a second APP client')
+  assert.equal(p.appActive,0)
+  assert.equal(p.locks.at(-1),'workspace_members','Workspace admission precedes APP checkout')
+  p.appActive=1;p.appCheckouts++
+  const client={release(){
+    assert.equal(checkedOutClient,client,'release the exact owning APP client')
+    assert.equal(p.appActive,1)
+    checkedOutClient=undefined;p.appActive=0;p.appReleases++
+  }}
+  checkedOutClient=client
+  return client
 }}
+export async function withDatabaseClient(client,operation){
+  assert.equal(client,checkedOutClient,'bind the exact checked-out APP client')
+  return operation()
+}
 `
 const sources = new Map([
   ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],
   ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
   ['/lib/db/index.ts', dbSource],
-  ['/lib/workspace-db.ts', `export const workspacePool={async query(sql,args){
-    const p=globalThis.claimResponseProbe
-    if(sql.replace(/\\s+/g,' ').trim()!==${JSON.stringify('SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[]) AND status=\'active\'')})throw new Error('unsupported claim membership query')
-    ;(p.membershipReads??=[]).push(args)
-    return {rows:p.workspaceMemberAllowed===false?[]:args[1].map(userId=>({userId}))}
-  }}`],
+  ['/lib/workspace-db.ts', `export {claimWorkspaceDatabase as workspaceDb, claimWorkspacePool as workspacePool} from ${JSON.stringify(import.meta.url)}`],
   ['/lib/device-link.ts', 'export async function authenticateDevice(){const p=globalThis.claimResponseProbe;return Object.hasOwn(p,"caller") ? (p.caller && {tokenId:"synthetic-device-token",...p.caller}) : {userId:"member",tokenId:"synthetic-device-token"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device};export async function ownedDeviceWithReport(){return globalThis.claimResponseProbe.device}'],
   ['/lib/device-repositories.ts', 'export async function readRepositorySettings(...args){const p=globalThis.claimResponseProbe;p.preparation.push("settings");(p.settingsReads??=[]).push(args);return p.repositorySettings??null}'],
   ['/lib/agent-tool-approval/policy-store.ts', 'export async function readCliRunPolicy(){const p=globalThis.claimResponseProbe;p.preparation.push("policy");return structuredClone(p.cliPolicy)}'],

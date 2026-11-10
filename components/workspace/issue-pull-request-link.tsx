@@ -1,7 +1,7 @@
 'use client'
 
 import useSWR, { unstable_serialize } from 'swr'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
@@ -45,7 +45,35 @@ export function IssuePullRequestLink(props: LinkProps) {
   return <ViewerPullRequestLink key={JSON.stringify([userId, props.issueId, props.pr.url])} {...props} userId={userId} isPending={isPending} />
 }
 
-function ViewerPullRequestLink({ issueId, pr, compact = false, userId, isPending }: LinkProps & { userId: string | undefined; isPending: boolean }) {
+/** A PR's number, its GitHub state and the words beside it, for a layer that draws the link itself (task-detail slot). */
+export type PullRequestView = { number: string; state: IssuePullRequest['state']; confirmed: boolean; text: string | null; title: string }
+
+/** The same GitHub read as the link, handed to `children` to draw. */
+export function PullRequestStatus({ issueId, pr, children }: { issueId: string; pr: IssuePullRequest; children: (view: PullRequestView) => ReactNode }) {
+  const { data: session, isPending } = authClient.useSession()
+  const userId = !isPending ? session?.user.id : undefined
+  return <ViewerPullRequestStatus key={JSON.stringify([userId, issueId, pr.url])} issueId={issueId} pr={pr} userId={userId} isPending={isPending}>{children}</ViewerPullRequestStatus>
+}
+
+function ViewerPullRequestStatus({ children, ...props }: LinkProps & { userId: string | undefined; isPending: boolean; children: (view: PullRequestView) => ReactNode }) {
+  const view = usePullRequestView(props)
+  return <>{children({ number: view.number, state: view.state ?? props.pr.state, confirmed: !!view.state, text: view.disconnected ? null : view.state ? view.stateLabel : view.statusLabel, title: view.title })}</>
+}
+
+function ViewerPullRequestLink(props: LinkProps & { userId: string | undefined; isPending: boolean }) {
+  const { pr, compact = false } = props
+  const { state, disconnected, statusLabel, stateLabel, title, number } = usePullRequestView(props)
+  // The icon's shape is the PR state (Figma icon/14/pr-*): GitHub's when it answered, else the state saved on the task.
+  // Only a state GitHub just confirmed for this viewer gets its colour; a saved or stale one stays grey.
+  const Icon = PR_ICONS[state ?? pr.state]
+  const content = <><Icon data-icon="inline-start" className={cn(!state && 'text-muted-foreground', state === 'open' && 'text-success-foreground', state === 'merged' && 'text-info-foreground', state === 'closed' && 'text-destructive-foreground')} />#{number}{!compact && !disconnected && <span className="text-muted-foreground">{state ? stateLabel : statusLabel}</span>}</>
+  const link = <a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" title={title} aria-label={title} />
+  return compact
+    ? <BoardBadge variant="outline" size="lg" className="h-5 gap-1 border-transparent px-0 text-xs font-normal text-muted-foreground tabular-nums [&_svg]:size-3.5" render={link}>{content}</BoardBadge>
+    : <Badge tone={state === 'merged' ? 'focus' : state === 'closed' ? 'destructive' : state === 'open' ? 'success' : undefined} variant="outline" className="h-6" render={link}>{content}</Badge>
+}
+
+function usePullRequestView({ issueId, pr, compact = false, userId, isPending }: LinkProps & { userId: string | undefined; isPending: boolean }) {
   const tState = useTranslations('Metadata.prState')
   const tSync = useTranslations('Metadata.prSync')
   const [mountedAt] = useState(() => performance.now())
@@ -60,16 +88,10 @@ function ViewerPullRequestLink({ issueId, pr, compact = false, userId, isPending
   // A refresh rechecks permission; the previous response is not proof of current access.
   const state = userId && !isValidating && data && 'state' in data && data.checkedAt >= mountedAt ? data.state : undefined
   const error = data && 'error' in data ? data.error : undefined
-  const statusLabel = state ? tSync('synced', { state: tState(state) })
-    : isPending || isValidating || (userId && (!data || ('state' in data && data.checkedAt < mountedAt))) ? tSync('loading')
-      : !userId || error === 'githubNotConnected' || error === 'githubReconnectRequired' ? tSync('disconnected') : tSync('unavailable')
+  const loading = !state && (isPending || isValidating || (userId && (!data || ('state' in data && data.checkedAt < mountedAt))))
+  // No GitHub connection here (none set up, or not this person's): the link stays, with no status words beside it.
+  const disconnected = !state && !loading && (!userId || error === 'githubNotConnected' || error === 'githubReconnectRequired' || error === 'githubNotConfigured')
+  const statusLabel = state ? tSync('synced', { state: tState(state) }) : loading ? tSync('loading') : disconnected ? tSync('disconnected') : tSync('unavailable')
   const title = `${statusLabel} · ${tSync('manual', { state: tState(pr.state) })} · ${pr.url}`
-  // The icon's shape is the PR state (Figma icon/14/pr-*): GitHub's when it answered, else the state saved on the task.
-  // Only a state GitHub just confirmed for this viewer gets its colour; a saved or stale one stays grey.
-  const Icon = PR_ICONS[state ?? pr.state]
-  const content = <><Icon data-icon="inline-start" className={cn(!state && 'text-muted-foreground', state === 'open' && 'text-success-foreground', state === 'merged' && 'text-info-foreground', state === 'closed' && 'text-destructive-foreground')} />#{pr.url.split('/').filter(Boolean).at(-1)}{!compact && <span className="text-muted-foreground">{state ? tState(state) : statusLabel}</span>}</>
-  const link = <a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" title={title} aria-label={title} />
-  return compact
-    ? <BoardBadge variant="outline" size="lg" className="h-5 gap-1 border-transparent px-0 text-xs font-normal text-muted-foreground tabular-nums [&_svg]:size-3.5" render={link}>{content}</BoardBadge>
-    : <Badge tone={state === 'merged' ? 'focus' : state === 'closed' ? 'destructive' : state === 'open' ? 'success' : undefined} variant="outline" className="h-6" render={link}>{content}</Badge>
+  return { state, disconnected, statusLabel, stateLabel: state ? tState(state) : '', title, number: pr.url.split('/').filter(Boolean).at(-1) ?? '' }
 }

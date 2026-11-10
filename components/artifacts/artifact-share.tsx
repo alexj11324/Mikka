@@ -122,7 +122,7 @@ export function ArtifactShare({ artifactId, shared, onChange }: { artifactId: st
   const showLink = Boolean(link) && mode !== 'stop-unconfirmed' && mode !== 'stopped' && mode !== 'create-failed'
 
   return <Popover open={open} onOpenChange={next => { setOpen(next); if (!next) reset() }}>
-    <PopoverTrigger render={<Button variant="ghost" size="sm" />}><Link2 data-icon="inline-start" />{t('share')}</PopoverTrigger>
+    <PopoverTrigger render={<Button variant="ghost" size="sm" className="shrink-0 max-sm:size-8 max-sm:px-0" />}><Link2 data-icon="inline-start" /><span className="max-sm:sr-only">{t('share')}</span></PopoverTrigger>
     <PopoverContent align="end" className="w-80 gap-3 p-3">
       <div className="flex flex-col gap-1">
         <PopoverTitle>{t('share')}</PopoverTitle>

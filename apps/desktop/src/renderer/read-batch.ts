@@ -1,5 +1,11 @@
+import { carryReadDispatch } from '@/lib/swr/read-observer'
 import { MAX_READ_BATCH, READ_BATCH_ACTION, type BatchReadAction, type ReadBatchItem } from '@/lib/desktop-rpc/read-batch-contract'
 import type { Locale } from './location'
+
+// These hooks return their response snapshot without merging cached rows or
+// issuing a second read, so its actual dispatch can prove live coverage.
+const snapshotReads: ReadonlySet<string> = new Set(['task-runs.pollTaskRuns', 'coordinator.pollBotChatSummaries', 'bots.pollBots'])
+export const isSnapshotReadAction = (action: string) => snapshotReads.has(action)
 
 export class DesktopTransportError extends Error {
   readonly status?: number
@@ -62,7 +68,7 @@ async function batch(items: Pending[]) {
     for (let index = 0; index < items.length; index++) {
       const item = items[index], value = result[index]
       if (!current(item)) item.reject(changed())
-      else if (value.ok) item.resolve(value.result)
+      else if (value.ok) item.resolve(isSnapshotReadAction(item.action) ? carryReadDispatch(result, value.result) : value.result)
       else item.reject(new DesktopTransportError(value.error.code, { status: value.status }))
     }
   } catch (cause) {

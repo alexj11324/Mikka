@@ -5,6 +5,7 @@ import { KeyRound, Maximize2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { E2BKeyDialog, useE2BKeyStatus } from '@/components/settings/e2b-key-dialog'
 import useSWR from 'swr'
@@ -28,7 +29,6 @@ export function AgentComputer({ botId, name, header = true, workspaceId }: { bot
   const { data: bots } = useSWR('bots', listBots)
   const bot = bots?.find(item => item.id === botId)
   const t = useTranslations('Computer')
-  const e2b = useTranslations('Settings.secrets.e2b')
   const [viewing, setViewing] = useState(false)
   const [adding, setAdding] = useState(false)
   const keyDialog = usePresence(adding)
@@ -43,15 +43,20 @@ export function AgentComputer({ botId, name, header = true, workspaceId }: { bot
       <h2 className="max-w-full truncate pb-3 text-xl font-semibold">{bot?.name ?? name}</h2>
     </>}
     {loading ? <Skeleton className="aspect-[16/10] w-full rounded-lg" />
-      : missing ? <div className="flex aspect-[16/10] w-full items-center justify-center rounded-lg bg-screen text-screen-foreground">
-        <Button size="sm" className="h-9 rounded-full bg-screen-foreground/15 px-3.5 text-screen-foreground hover:bg-screen-foreground/25" onClick={() => setAdding(true)}><KeyRound data-icon="inline-start" />{t('addE2BKey')}</Button>
-      </div>
+      // No key yet: an empty state on the page's own surface, not a dark screen with nothing on it.
+      : missing ? <Empty className="aspect-[16/10] w-full gap-4 rounded-xl bg-muted/50 p-6">
+        <EmptyHeader>
+          <EmptyMedia variant="icon"><KeyRound /></EmptyMedia>
+          <EmptyTitle>{t('e2bKeyNeeded')}</EmptyTitle>
+        </EmptyHeader>
+        <Button size="sm" onClick={() => setAdding(true)}>{t('addE2BKey')}</Button>
+      </Empty>
       : <ComputerScreen botId={botId} name={name}>
         <Button variant="ghost" aria-label={t('openScreen', { name })} className="absolute inset-0 size-full rounded-lg p-0 hover:bg-transparent" onClick={() => setViewing(true)}>
           <span className="inline-flex h-9 items-center gap-2 rounded-full bg-screen/80 px-3.5 text-screen-foreground backdrop-blur-sm"><Maximize2 data-icon="inline-start" aria-hidden="true" className="size-4" />{t('open')}</span>
         </Button>
       </ComputerScreen>}
-    <p className="max-w-full truncate text-xs text-muted-foreground">{missing ? `E2B API Key ${e2b('missing')}` : t('screenOf', { name })}</p>
+    {!missing && <p className="max-w-full truncate text-xs text-muted-foreground">{t('screenOf', { name })}</p>}
     {viewing && <ComputerViewer botId={botId} name={name} open={viewing} onOpenChange={setViewing} />}
     {keyDialog.value && <E2BKeyDialog workspaceId={workspaceId} open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAdding(false); if (changed) void status.mutate() }} />}
   </div>

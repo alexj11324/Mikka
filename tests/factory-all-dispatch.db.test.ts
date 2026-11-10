@@ -55,8 +55,8 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'acme-build-01','local','server',true,now(),$3)`, [deviceId, userId, JSON.stringify(codex)])
   await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','Codex on acme-build-01')`, [randomUUID(), userId, deviceId])
   const issueId = randomUUID()
-  await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Checkout rounds sales tax down on multi-item carts',$3,'todo','high')`,
-    [issueId, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: Math.floor(Math.random() * 1000000000) } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Acme storefront: a cart of 3 x $19.99 in CA shows $5.24 tax instead of $5.25.' }] }] })])
+  await pool.query(`INSERT INTO issues (id,"userId","workspaceId","ownershipState",scope,title,content,status,priority) VALUES ($1,$2,$4,'bound','workspace','Checkout rounds sales tax down on multi-item carts',$3,'todo','high')`,
+    [issueId, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: Math.floor(Math.random() * 1000000000) } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Acme storefront: a cart of 3 x $19.99 in CA shows $5.24 tax instead of $5.25.' }] }] }), ws.id])
   const botId = await chatBotId(userId, null, ws.id)
   const sourceEventId = randomUUID()
   await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,'user_message',$4,$5)`,
@@ -193,8 +193,8 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
     let number = 1276000
     const request = async () => {
       const issue = randomUUID(), source = randomUUID()
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Plan the tax fix',$3,'todo','normal')`,
-        [issue, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: ++number } } })])
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES($1,$2,'Plan the tax fix',$3,'todo','normal',$4,'bound','workspace')`,
+        [issue, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: ++number } } }), ws.id])
       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
         VALUES($1,$2,$3,$4,'user_message',$5,$6)`, [source, userId, botId, issue, `spec-source:${source}`, JSON.stringify({ text: 'Write a specification before implementing the tax fix.' })])
       // Like the normal host entry, finish Profile/model placement before the

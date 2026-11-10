@@ -62,7 +62,7 @@ export function PendingActions() {
     } catch { toast.error(actionError()) } finally { setBusy(null) }
   }
 
-  return <ul aria-label={t('label')} className="flex max-h-[50vh] flex-col gap-2 overflow-y-auto empty:hidden">
+  return <ul data-pending-actions="" aria-label={t('label')} className="flex max-h-[50vh] flex-col gap-2 overflow-y-auto empty:hidden">
     {/* A failed load says so instead of looking like nothing waits on the person, or that the list is current. */}
     {error && <li className="px-4 py-2"><InlineLoadError message={t('approvalLoadFailed')} retryLabel={tCommon('retry')} onRetry={() => { void mutate() }} /></li>}
     {data?.items.filter(item => !pendingActionExpired(item, data)).map(item => {

@@ -20,6 +20,7 @@ const MODELS = { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' }
 const ROUTES = { claude_code: 'claude_code_cli', codex: 'codex_cli' }
 const REPOSITORY = 'alexj11324/Mikka-handoff'
 const TERMINAL = new Set(['succeeded', 'completed', 'failed', 'stopped', 'cancelled'])
+const HANDOFF_TOOLS = new Set(['mcp__mikka__submit', 'mcp__mikka__request_help', 'mcp__mikka__ask_human', 'mcp__mikka__report_blocked'])
 // Kept closed like the daemon collector: never copy arbitrary chunk fields.
 const STARTUP_PHASES = new Set(['daemon.adapter.model_report', 'daemon.adapter.auth', 'daemon.adapter.auth.gate',
   'daemon.adapter.auth.context', 'daemon.adapter.auth.access', 'daemon.adapter.auth.token', 'daemon.adapter.auth.native_auth',
@@ -481,6 +482,29 @@ export function observeChunks(record, detail, observedAt) {
   // getIssueThread replays the stream. Derive ordering afresh from this read,
   // never from toolCalls retained by an earlier read of the same chunks.
   const toolInputs = new Set()
+  const successfulExecutionTools = new Set()
+  // A successful handoff is delivery, not evidence that the task was read or
+  // executed. Resolve known handoff identities across this replay first: an
+  // input-start can omit the name that a later input-available supplies.
+  const handoffCalls = new Set()
+  const codexNativeCalls = new Map()
+  const codexInputs = new Set()
+  let codexStarted = false
+  for (const { chunk } of detail.chunks ?? []) {
+    if (chunk?.type === 'data-run-stage' && chunk.data?.stage === 'agent_start'
+      && Number.isFinite(chunk.data.ms) && chunk.data.ok === true) codexStarted = true
+    if (['tool-input-start', 'tool-input-available'].includes(chunk?.type)
+      && typeof chunk.toolCallId === 'string' && chunk.toolCallId.length > 0 && chunk.toolCallId.length <= 512) {
+      const toolCallHash = sha(chunk.toolCallId).slice(0, 16)
+      if (HANDOFF_TOOLS.has(chunk.toolName)) handoffCalls.add(toolCallHash)
+      // Match the execution pass's first 64 inputs, while accepting a later
+      // name for an already admitted call. Never downgrade a known native tool.
+      if (record.harness === 'codex' && codexStarted && (codexInputs.has(toolCallHash) || codexInputs.size < 64)) {
+        codexInputs.add(toolCallHash)
+        if (!codexNativeCalls.has(toolCallHash) && ['bash', 'apply_patch'].includes(chunk.toolName)) codexNativeCalls.set(toolCallHash, chunk.toolName)
+      }
+    }
+  }
   const submittedReplies = new Set()
   let submittedAt = null
   let started = false, reply = '', completedTool = false, replyAfterTool = '', replyVerifiedAfterTool = false
@@ -529,7 +553,15 @@ export function observeChunks(record, detail, observedAt) {
           && typeof chunk.input?.summary === 'string' && chunk.input.summary.includes(`STARTUP_OK_${record.sampleId}`)) submittedReplies.add(toolCallHash)
         if (chunk.type === 'tool-output-available' && submittedReplies.has(toolCallHash) && Number.isFinite(at)) submittedAt = at
         if (chunk.type.startsWith('tool-input-') && toolInputs.size < 64) toolInputs.add(toolCallHash)
-        if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash)) completedTool = true
+        if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash) && !handoffCalls.has(toolCallHash)) {
+          const native = codexNativeCalls.get(toolCallHash)
+          const succeeded = native === 'bash' ? chunk.output?.exitCode === 0
+            : native === 'apply_patch' ? chunk.output?.status === 'completed' : true
+          if (succeeded) successfulExecutionTools.add(toolCallHash)
+          else successfulExecutionTools.delete(toolCallHash)
+        }
+        if (chunk.type === 'tool-output-error') successfulExecutionTools.delete(toolCallHash)
+        completedTool = successfulExecutionTools.size > 0
         let tool = toolCalls.find(call => call.toolCallHash === toolCallHash)
         if (!tool && chunk.type.startsWith('tool-input-') && toolCalls.length < 64) {
           tool = { toolCallHash, startedAt: Number.isFinite(at) ? iso(at) : null, outcome: 'pending' }; toolCalls.push(tool)
@@ -574,7 +606,7 @@ export function observeChunks(record, detail, observedAt) {
   record.replyVerifiedAfterTool = replyVerifiedAfterTool
   record.lastStatus = typeof detail.thread?.status === 'string' && /^[a-z_]+$/.test(detail.thread.status) ? detail.thread.status : null
   return Boolean(record.agentStart && record.firstProviderChunk && (!record.requireReply || record.replyVerified)
-    && toolCalls.filter(tool => tool.outcome === 'ok').length >= (record.minToolCalls ?? 0)
+    && successfulExecutionTools.size >= (record.minToolCalls ?? 0)
     && (!record.requireReplyAfterTool || record.replyVerifiedAfterTool)
     && (!record.requireRuntimeReceipt || record.runtimeTimingStatus === 'complete')
     && (!record.requireTerminal || (detail.thread?.id === record.runId && TERMINAL.has(record.lastStatus))))
@@ -598,7 +630,11 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
   const watchedRunIds = new Set([record.runId])
   const extraScopes = new Set()
   let closed = false, reading = false, dirty = false, deadline = false, settle, refreshWork
-  const outcome = new Promise((resolve, reject) => { settle = { resolve, reject } })
+  let readsStarted = 0, readsCompleted = 0, lastCompletedAt = null, readInFlight = false, liveObserver, outcomeSettled = false
+  const outcome = new Promise((resolve, reject) => { settle = {
+    resolve: () => { outcomeSettled = true; resolve() },
+    reject: error => { outcomeSettled = true; reject(error) },
+  } })
   const abort = () => settle.reject(new Error('startup_observation_aborted'))
   if (hooks.signal?.aborted) abort()
   else hooks.signal?.addEventListener('abort', abort, { once: true })
@@ -631,21 +667,42 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
     url.searchParams.set('revisions', '1')
     const socket = new WebSocketImpl(url, ticket.protocol)
     sockets.set(workspaceId, socket)
-    socket.onclose = socket.onerror = () => { if (!closed) failLive('live_disconnected') }
+    const timeline = { openedAt: null, readyAt: null, lastNotificationAt: null }
     const failLive = code => reject(new Error(`startup_${code}`))
+    const disconnected = (event, close) => {
+      if (closed || outcomeSettled) return
+      // Freeze only the first observed transport fault. No event bodies, tickets
+      // or identifiers leave; later callbacks cannot rewrite the failure.
+      if (!liveObserver) {
+        const firstFailure = { event, at: iso(now()), scopeHash: sha(workspaceId).slice(0, 16),
+          readyState: Number.isInteger(socket.readyState) && socket.readyState >= 0 && socket.readyState <= 3 ? socket.readyState : null }
+        if (event === 'close') {
+          if (Number.isInteger(close?.code) && close.code >= 0 && close.code <= 65535) firstFailure.code = close.code
+          if (typeof close?.wasClean === 'boolean') firstFailure.wasClean = close.wasClean
+        }
+        liveObserver = record.liveObserver = { version: 1, firstFailure, ...timeline,
+          detailReads: { started: readsStarted, completed: readsCompleted, lastCompletedAt, inFlightAtFailure: readInFlight },
+          shutdownAt: null }
+      }
+      failLive('live_disconnected')
+    }
+    socket.onclose = event => disconnected('close', event)
+    socket.onerror = () => disconnected('error')
     socket.onmessage = message => {
       if (closed || message.data === 'pong' || typeof message.data !== 'string' || message.data.length > 2048) return
       let value
       try { value = JSON.parse(message.data) } catch { return }
       if (value.type === 'live_ready') {
         if (!Array.isArray(value.kinds) || !value.kinds.includes('thread') || !value.kinds.includes('run')) return failLive('live_capability_missing')
+        timeline.readyAt ??= iso(now())
         kick(); return
       }
       if ((['thread', 'run'].includes(value.kind) && watchedRunIds.has(value.id))
         || (value.kind === 'issue_threads' && value.id === record.issueId)
-        || hooks.matches?.(value)) kick()
+        || hooks.matches?.(value)) { timeline.lastNotificationAt = iso(now()); kick() }
     }
     socket.onopen = () => {
+      timeline.openedAt ??= iso(now())
       const heartbeat = () => { if (closed) return; if (socket.readyState === 1) socket.send('ping'); later(heartbeat, 30000) }
       later(heartbeat, 30000)
     }
@@ -657,7 +714,12 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
       do {
         dirty = false
         const finalRead = deadline
-        const detail = await client.rpc('agents.getIssueThread', [record.issueId, record.runId])
+        readsStarted++; readInFlight = true
+        let detail
+        try {
+          detail = await client.rpc('agents.getIssueThread', [record.issueId, record.runId])
+          readsCompleted++; lastCompletedAt = iso(now())
+        } finally { readInFlight = false }
         if (closed) return
         record.detailReads = (record.detailReads ?? 0) + 1
         record.runCreatedAt ??= detail.thread?.createdAt ?? null
@@ -679,6 +741,7 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
   try { await outcome }
   finally {
     closed = true
+    if (liveObserver) liveObserver.shutdownAt = iso(now())
     hooks.signal?.removeEventListener('abort', abort)
     for (const timer of timers) clearTimeout(timer)
     for (const socket of sockets.values()) { socket.onclose = socket.onerror = socket.onmessage = socket.onopen = null; socket.close() }

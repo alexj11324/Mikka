@@ -12,6 +12,7 @@ export type RunPolicyStopScope =
   | { kind: 'team' | 'project'; scopeId: string; ownerId?: string }
   | { kind: 'task'; issueId: string }
   | { kind: 'tasks'; issueIds: string[] }
+  | { kind: 'runs'; runIds: string[] }
 export type StoppedPolicyRun = { id: string; deviceId: string; stopped: boolean }
 
 /** Direct runners hold their authority on the machine. A policy mutation
@@ -22,13 +23,15 @@ export function runPolicyStopSQL(scope: RunPolicyStopScope): SQL {
   switch (scope.kind) {
     case 'worker': where = sql`r."userId"=${scope.ownerId} AND r."agentId"=${scope.agentId}`; break
     case 'agent': where = sql`r."userId"=${scope.ownerId} AND r."botId" IS NOT DISTINCT FROM ${scope.botId}::uuid`; break
-    case 'workspace': where = sql`(r."botId" IN (SELECT id FROM bots WHERE "workspaceId"=${scope.workspaceId}::uuid)
-      OR r.cli_policy_hierarchy->>'workspaceId'=${scope.workspaceId})
+    case 'workspace': where = sql`(r."workspaceId"=${scope.workspaceId}::uuid
+      OR (r."workspaceId" IS NULL AND (r."botId" IN (SELECT id FROM bots WHERE "workspaceId"=${scope.workspaceId}::uuid)
+        OR r.cli_policy_hierarchy->>'workspaceId'=${scope.workspaceId})))
       ${scope.ownerId ? sql`AND r."userId"=${scope.ownerId}` : sql``}`; break
     case 'team': case 'project': where = sql`r.cli_policy_hierarchy->>${scope.kind === 'team' ? 'teamId' : 'projectId'}=${scope.scopeId}
       ${scope.ownerId ? sql`AND r."userId"=${scope.ownerId}` : sql``}`; break
     case 'task': where = sql`r."issueId"=${scope.issueId}::uuid`; break
     case 'tasks': where = sql`r."issueId"=ANY(${sql.param(scope.issueIds)}::uuid[])`; break
+    case 'runs': where = sql`r.id=ANY(${sql.param(scope.runIds)}::uuid[])`; break
   }
   return sql`WITH affected AS MATERIALIZED (
     SELECT r.id,r."deviceId",r."machineAuthority" FROM agent_runs r

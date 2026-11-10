@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool, type PoolClient } from 'pg'
 import { dbUrl, seedAgent, seedIssue, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { threadPromptView } from '../thread-prompt'
 import { cleanAllowedModels, seedAllowedModel } from '../../tests/support/allowed-model'
 import { createFactoryStore, type FactoryTask } from './store'
 import { factoryBinding } from './dispatch'
@@ -137,7 +138,7 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
   }
   async function fixture() {
-    const issueId = await seedIssue(pool, owner)
+    const issueId = await seedIssue(pool, owner, workspace.id)
     const sourceEventId = randomUUID()
     await pool.query(`INSERT INTO coordinator_events(id,"userId","issueId",kind,"dedupeKey",payload)
       VALUES($1::uuid,$2,$3,'user_message',$1::text,$4)`, [sourceEventId, owner, issueId, JSON.stringify({ text: 'Write exactly 53 bytes and retain the null-input test.' })])
@@ -293,7 +294,12 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
         VALUES($1,$2,$3,$4,$5,'uncertain',$6,$7)`, [excludedIds[index], other.owner, workspace.id,
         JSON.stringify({ executionRunId: other.runId, action: 'fixture_observation' }), `continuity:${excludedIds[index]}`, randomUUID(), other.runId])
     }
-    const leaseRecovery = await factoryRecoveryHandoff(pool, { id: task.runId, userId: owner }, 'Resume the current request.')
+    const visibleTask = 'Resume the current request. 🧪'
+    const leaseRecovery = await factoryRecoveryHandoff(pool, { id: task.runId, userId: owner }, {
+      prompt: visibleTask + '\n\nSYNTHETIC_INTERNAL_STANDING_INSTRUCTION', promptTaskStart: 0, promptTaskLength: Array.from(visibleTask).length,
+    })
+    assert.equal(threadPromptView(leaseRecovery.prompt, leaseRecovery.promptTaskStart, leaseRecovery.promptTaskLength).task, visibleTask)
+    assert.ok(leaseRecovery.promptTaskStart! > 0, 'the actual Factory request prefix moves the trusted range')
     assert.match(leaseRecovery.blocked ?? '', /Reconcile its existing receipt/)
     await pool.query(`UPDATE factory_tasks SET "updatedAt"=now()-interval '2 minutes' WHERE id=$1`, [task.id])
     const count = dispatches
@@ -322,7 +328,7 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1', [pending.id])).rows[0].status, 'blocked')
   })
 
-  await t.test('commit-time membership revocation rolls back watchdog dispatch without launching or reporting recovery', async () => {
+  await t.test('membership revocation that wins the Workspace admission race prevents watchdog dispatch and all side effects', async () => {
     const original = await fixture()
     const pending = await advance(original, await followup(original, 'Continue only while this workspace membership remains active'))
     const deviceId = randomUUID(), childId = randomUUID()
@@ -333,47 +339,75 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     const beforeTask = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [pending.id])).rows[0]
     const beforeAttempt = (await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [pending.attemptId])).rows[0]
     const beforeEvents = (await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [pending.id])).rows
+    const beforeBindings = (await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [owner])).rows
     const { resolveAgentProfileDispatch } = await import('./agent-profile')
-    let planned = 0, revoked = false, starts = 0, wakes = 0, reconciles = 0
-    let bindingId: string | undefined
+    let planned = 0, starts = 0, wakes = 0, reconciles = 0
     const callbacks: WatchdogDependencies = {
       runtime: () => ({ store, reconcile: { run: async () => { reconciles++ } } }),
       wake: async () => { wakes++ },
       dispatch: async (tx, currentStore, task) => {
+        planned++
         assert.equal(task.id, pending.id)
         const selected = await resolveAgentProfileDispatch(pool, { ownerId: owner, workspaceId: workspace.id, botId: null },
           { issueId: task.issueId, location: 'local', agentId }, { transaction: tx })
         assert.equal(selected.target.kind, 'device')
         if (selected.target.kind !== 'device') assert.fail('the real subscription catalogue must select the fixture device')
         assert.equal(selected.agentProfile?.source, 'default')
-        bindingId = selected.target.subscriptionBindingId
+        const bindingId = selected.target.subscriptionBindingId
         assert.ok(bindingId)
         assert.equal((await tx.query('SELECT id FROM byos_bindings WHERE id=$1 AND "consumerId"=$2', [bindingId, agentId])).rowCount, 1)
         assert.equal((await pool.query('SELECT id FROM byos_bindings WHERE id=$1', [bindingId])).rowCount, 0, 'binding is still uncommitted')
-        // This synthetic queue write isolates the real watchdog owner's commit
-        // boundary; model selection, source binding and membership are real.
-        await tx.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","issueId",kind,status,prompt,"agentDefinition")
-          VALUES ($1,$2,$3,$4,$5,'implement','queued','Watchdog commit fixture',$6)`,
-          [childId, owner, agentId, deviceId, task.issueId, JSON.stringify({ agentProfile: selected.agentProfile })])
+        // These writes make an accidental dispatch observable. The Workspace
+        // admission below must refuse before this real planning path starts.
+        await tx.query(`INSERT INTO agent_runs (id,"userId","workspaceId","agentId","deviceId","issueId",kind,status,prompt,"agentDefinition")
+          VALUES ($1,$2,$3,$4,$5,$6,'implement','queued','Watchdog commit fixture',$7)`,
+          [childId, owner, workspace.id, agentId, deviceId, task.issueId, JSON.stringify({ agentProfile: selected.agentProfile })])
         await currentStore.apply(owner, factoryBinding(task), randomUUID(), { action: 'bind_run', runId: childId }, tx)
-        planned++
-        await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, owner])
-        revoked = true
         return async () => { starts++ }
       },
     }
+    const revoker = await pool.connect()
+    let sweeping: ReturnType<typeof sweepFactoryWatchdog> | undefined
+    let settled = false, revocationOpen = false
     try {
-      const result = await sweepFactoryWatchdog(pool, callbacks)
-      assert.equal(planned, 1, 'the child and exact subscription binding reached the owning transaction')
-      assert.equal(revoked, true, 'authority changes after planning and before the real COMMIT')
-      assert.deepEqual(result, { scanned: 1, recovered: 0, blocked: 0, deferred: 0, failed: 1 })
+      await revoker.query('BEGIN')
+      revocationOpen = true
+      const { rows: [{ pid }] } = await revoker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')
+      await revoker.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, owner])
+      sweeping = sweepFactoryWatchdog(pool, callbacks)
+      void sweeping.then(() => { settled = true }, () => { settled = true })
+      // The revoker owns the member write lock first. Observe PostgreSQL's
+      // actual wait, then commit; never synchronously revoke from inside a
+      // callback whose outer transaction holds this same member FOR SHARE.
+      const deadline = Date.now() + 5_000
+      let blocked = false
+      while (!blocked && Date.now() < deadline) {
+        assert.equal(settled, false, 'watchdog must wait for the uncommitted member decision')
+        blocked = (await pool.query(`SELECT 1 FROM pg_stat_activity
+          WHERE datname=current_database() AND wait_event_type='Lock'
+            AND $1::int=ANY(pg_blocking_pids(pid)) AND query ILIKE '%mikka_workspace_members%'`, [pid])).rowCount! > 0
+        if (!blocked) await new Promise(resolve => setTimeout(resolve, 10))
+      }
+      assert.equal(blocked, true, 'the real Workspace admission waits on the revoker')
+      assert.equal(planned, 0, 'dispatch cannot begin while Workspace membership is unresolved')
+      await revoker.query('COMMIT')
+      revocationOpen = false
+      const result = await sweeping
+      assert.equal(planned, 0, 'fresh inactive membership denies before child or subscription planning')
+      assert.deepEqual(result, { scanned: 1, recovered: 0, blocked: 0, deferred: 0, failed: 0 })
       assert.deepEqual({ starts, wakes, reconciles }, { starts: 0, wakes: 0, reconciles: 0 })
+      assert.equal((await pool.query('SELECT status FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspace.id, owner])).rows[0].status, 'suspended')
       assert.equal((await pool.query('SELECT id FROM agent_runs WHERE id=$1', [childId])).rowCount, 0)
-      assert.equal((await pool.query('SELECT id FROM byos_bindings WHERE id=$1', [bindingId])).rowCount, 0)
+      assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [owner])).rows, beforeBindings)
       assert.deepEqual((await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [pending.id])).rows[0], beforeTask)
       assert.deepEqual((await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [pending.attemptId])).rows[0], beforeAttempt)
       assert.deepEqual((await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [pending.id])).rows, beforeEvents)
     } finally {
+      // Release the blocker even when an assertion fails, then join the sweep
+      // before cleanup deletes the same rows or waits for the pools to close.
+      try { if (revocationOpen) await revoker.query('ROLLBACK') }
+      finally { revoker.release() }
+      if (sweeping) await Promise.allSettled([sweeping])
       await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, owner])
     }
   })

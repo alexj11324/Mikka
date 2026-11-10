@@ -15,10 +15,12 @@ test('teammate projection is an allowlist; never spread untyped private fields',
   assert.equal(shared.report, null)
   assert.equal(run.report.summary, 'secret-report')
 })
-test('owners retain access; nonowners require active linked workspace IDs', () => {
-  const { sql, params } = new PgDialect().sqlToQuery(issueVisibilityPredicate('viewer', { allowedIds: ['allowed'] }))
-  assert.doesNotMatch(sql, /issue_members|not in/)
-  assert.deepEqual(params, ['viewer', 'workspace', 'allowed'])
+test('creators and teammates both need an authorized immutable workspace', () => {
+  const { sql, params } = new PgDialect().sqlToQuery(issueVisibilityPredicate('viewer', { allowedIds: ['old-team-link'], workspaceIds: ['tenant'] }))
+  assert.doesNotMatch(sql, /issue_members|userId|not in/)
+  assert.match(sql, /workspaceId/)
+  assert.match(sql, /mikka_resource_acl_allowed/)
+  assert.deepEqual(params, ['bound', 'tenant', 'viewer', 'task', 'canReadContent'])
   const denied = new PgDialect().sqlToQuery(issueVisibilityPredicate('viewer', { allowedIds: [] }))
   assert.match(denied.sql, /false/)
 })

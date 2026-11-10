@@ -20,8 +20,8 @@ test('bot thread list', { skip: !dbUrl }, async t => {
   const bot = await seedBot(pool, ws.id, owner, 'Reviewer')
   const foreignBot = await seedBot(pool, other.id, outsider)
   const agent = await seedAgent(pool, owner)
-  const issueA = await seedIssue(pool, owner), issueB = await seedIssue(pool, owner)
-  await pool.query(`update issues set title='Owner private task' where id=$1`, [issueA])
+  const issueA = await seedIssue(pool, owner, ws.id), issueB = await seedIssue(pool, owner, ws.id)
+  await pool.query(`update issues set title='Workspace task' where id=$1`, [issueA])
   await pool.query(`update issues set title='Second task' where id=$1`, [issueB])
   // run(user, issue, status, prompt, minutes ago created, minutes ago updated, lastReply minutes ago)
   const run = async (userId: string, issueId: string | null, status: string, prompt: string, created: number, updated: number, reply: number | null = null) => {
@@ -42,7 +42,8 @@ test('bot thread list', { skip: !dbUrl }, async t => {
   // Member's chat: same activity as owner's chat to exercise keyset ties.
   await run(member, null, 'queued', 'Member private ask', 15, 10)
   await pool.query(`update agent_runs set "updatedAt"=(select max("updatedAt") from agent_runs where "botId"=$1 and "issueId" is null and "userId"=$2) where "botId"=$1 and "userId"=$3`, [bot, owner, member])
-  await seedRun(pool, { userId: outsider, agentId: await seedAgent(pool, outsider), botId: foreignBot })
+  const foreignIssue = await seedIssue(pool, outsider, other.id)
+  await seedRun(pool, { userId: outsider, agentId: await seedAgent(pool, outsider), botId: foreignBot, issueId: foreignIssue })
   await pool.query(`update "user" set image='/api/avatars/' || id || '/abc' where id=$1`, [owner])
   const tid = (key: string) => botThreadPublicId(bot, key)
   const T = { a: tid(`issue:${issueA}`), b: tid(`issue:${issueB}`), ownerChat: tid(`chat:${owner}`), memberChat: tid(`chat:${member}`) }
@@ -55,7 +56,7 @@ test('bot thread list', { skip: !dbUrl }, async t => {
     assert.equal(page.nextCursor, null)
     assert.deepEqual(page.threads.map(row => row.threadId).sort(), [...allThreads].sort())
     const by = new Map(page.threads.map(row => [row.threadId, row]))
-    assert.deepEqual(by.get(T.a), { threadId: T.a, initiator: { id: owner, name: by.get(T.a)!.initiator.name, avatarUrl: `/api/avatars/${owner}/abc` }, title: 'Owner private task', status: 'running', lastActivityAt: by.get(T.a)!.lastActivityAt, canOpen: true, href: `/?issue=${issueA}&thread=${latestA}` })
+    assert.deepEqual(by.get(T.a), { threadId: T.a, initiator: { id: owner, name: by.get(T.a)!.initiator.name, avatarUrl: `/api/avatars/${owner}/abc` }, title: 'Workspace task', status: 'running', lastActivityAt: by.get(T.a)!.lastActivityAt, canOpen: true, href: `/?issue=${issueA}&thread=${latestA}` })
     assert.equal(by.get(T.b)!.status, 'done')
     assert.equal(page.threads[0].threadId, T.b, 'lastReplyAt counts as activity; most recent first')
     assert.equal(page.summary.lastActivityAt, page.threads[0].lastActivityAt)
@@ -67,16 +68,19 @@ test('bot thread list', { skip: !dbUrl }, async t => {
     assert.ok(!JSON.stringify(page).includes('Member private ask'))
   })
 
-  await t.test('another member: no task titles, no owner prompt, only own chat opens', async () => {
+  await t.test('another member sees workspace tasks, while other people\'s chats and foreign tasks remain private', async () => {
     const page = await botAdmin.listBotThreadsFor(member, ws.id, { botId: bot })
     assert.equal(page.summary.totalThreads, 4)
     const by = new Map(page.threads.map(row => [row.threadId, row]))
-    for (const id of [T.a, T.b, T.ownerChat]) assert.deepEqual([by.get(id)!.title, by.get(id)!.canOpen, by.get(id)!.href], [null, false, null], id)
+    assert.deepEqual([by.get(T.a)!.title, by.get(T.a)!.canOpen, by.get(T.a)!.href], ['Workspace task', true, `/?issue=${issueA}`])
+    assert.deepEqual([by.get(T.b)!.title, by.get(T.b)!.canOpen, by.get(T.b)!.href], ['Second task', true, `/?issue=${issueB}`])
+    assert.deepEqual([by.get(T.ownerChat)!.title, by.get(T.ownerChat)!.canOpen, by.get(T.ownerChat)!.href], [null, false, null])
     assert.deepEqual([by.get(T.memberChat)!.title, by.get(T.memberChat)!.href], ['Member private ask', `/?bot=${bot}`])
     assert.ok(!JSON.stringify(page).includes('Chat opening'))
-    // Invisible tasks: no task reference at all (no id in threadId, href or anywhere), initiator still shown.
+    // Membership makes tasks in this workspace visible, never a foreign workspace's task.
     const json = JSON.stringify(page)
-    for (const issueId of [issueA, issueB]) assert.ok(!json.includes(issueId), 'issue id leaked')
+    assert.ok(!json.includes(foreignIssue), 'foreign issue id leaked')
+    assert.ok(!json.includes(latestA), 'another member\'s private run id leaked')
     for (const id of [T.a, T.b, T.ownerChat]) assert.equal(by.get(id)!.initiator.id, owner)
     assert.ok(by.get(T.a)!.initiator.name, 'initiator name shown with a null title')
     assert.equal(by.get(T.memberChat)!.initiator.avatarUrl, null)

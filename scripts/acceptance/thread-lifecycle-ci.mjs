@@ -87,20 +87,26 @@ export function selectRelease(expected, data, files) {
     return matches[0].id
   }
   const jobs = { test: job('test', 'success'), check: job('check', 'success') }
-  const validated = data.jobs.some(item => item.name === 'validate / build')
+  const nested = data.jobs.some(item => item.name === 'release / recheck')
+  const prefix = nested ? 'release / ' : ''
+  if (nested) jobs.recheck = job('release / recheck', 'success')
+  const validated = data.jobs.some(item => item.name === prefix + 'validate / build')
   if (validated) {
-    require(!data.jobs.some(item => item.name === 'validate'), 'jobs')
-    jobs.validate = job('validate / build', 'success')
-    jobs.awaitWeb = job('await-web', 'success')
-    jobs.subscriptions = job('subscriptions', 'success')
-    jobs.publish = job('publish / deploy', 'success')
-    jobs.cleanup = job('cleanup', 'success')
+    require(!data.jobs.some(item => item.name === prefix + 'validate'), 'jobs')
+    jobs.validate = job(prefix + 'validate / build', 'success')
+    jobs.awaitWeb = job(prefix + 'await-web', 'success')
+    jobs.subscriptions = job(prefix + 'subscriptions', 'success')
+    jobs.publish = job(prefix + 'publish / deploy', 'success')
+    jobs.cleanup = job(prefix + 'cleanup', 'success')
+  } else if (data.jobs.some(item => item.name === 'release')) {
+    jobs.release = job('release', 'skipped')
+    require(!nested && !data.jobs.some(item => /^(?:release \/ )?(?:validate|subscriptions|publish|cleanup)(?: \/|$)/.test(item.name)), 'jobs')
   } else {
-    jobs.validate = job('validate', 'skipped')
-    jobs.awaitWeb = job('await-web', 'skipped')
-    jobs.subscriptions = job('subscriptions', 'skipped')
-    jobs.publish = job('publish', 'skipped')
-    jobs.cleanup = job('cleanup', 'skipped')
+    jobs.validate = job(prefix + 'validate', 'skipped')
+    jobs.awaitWeb = job(prefix + 'await-web', 'skipped')
+    jobs.subscriptions = job(prefix + 'subscriptions', 'skipped')
+    jobs.publish = job(prefix + 'publish', 'skipped')
+    jobs.cleanup = job(prefix + 'cleanup', 'skipped')
   }
   const relevant = lifecycleChanged(files)
   return { selected: relevant || validated, reason: validated ? 'validated_runtime' : relevant ? 'lifecycle_changes' : 'unrelated',

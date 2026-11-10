@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { WorkspaceError } from '@/lib/workspace-access'
-import { AUDIT_WINDOW_DAYS } from './cursor'
+import { auditWindow, type AuditScope } from './cursor'
 import { recordAudit } from './record'
 import { auditDigest, auditExportRecords, type AuditExportManifest, type AuditExportRecord } from './integrity'
 import type { AuditEventView } from './query'
@@ -32,7 +32,7 @@ async function admin(tx: PoolClient, actorId: string, workspaceId: string) {
 }
 
 /** A stable, bounded snapshot. Oversized exports fail explicitly instead of returning a partial CSV. */
-export async function createAuditExport(actorId: string, workspaceId: string, filter: 'all' | 'security', now = new Date(), cap = AUDIT_EXPORT_MAX, database = targets()) {
+export async function createAuditExport(actorId: string, workspaceId: string, filter: 'all' | 'security', now = new Date(), cap = AUDIT_EXPORT_MAX, database = targets(), scope: Pick<AuditScope, 'categories' | 'from' | 'until'> = {}) {
   if (!Number.isSafeInteger(cap) || cap < 1 || cap > AUDIT_EXPORT_MAX) throw new RangeError('Invalid audit export limit')
   const ws = await database.workspace.connect(), app = await database.main.connect()
   try {
@@ -40,15 +40,15 @@ export async function createAuditExport(actorId: string, workspaceId: string, fi
     await ws.query('SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))', [`mikka-audit-retention:${workspaceId}`])
     const actor = await admin(ws, actorId, workspaceId)
     await app.query('BEGIN ISOLATION LEVEL REPEATABLE READ')
-    const from = new Date(now.getTime() - AUDIT_WINDOW_DAYS * 86_400_000)
+    const { since: from, until } = auditWindow(scope, now)
     const selected = (await app.query<RawEvent>(`SELECT ${columns} FROM workspace_audit_events
-      WHERE "workspaceId"=$1 AND "createdAt">$2 AND "createdAt"<=$3 AND ($4='all' OR category='security')
-      ORDER BY "createdAt" DESC,id DESC LIMIT $5`, [workspaceId, from, now, filter, cap + 1])).rows
+      WHERE "workspaceId"=$1 AND "createdAt">$2 AND "createdAt"<=$3 AND ($4='all' OR category='security') AND ($6::text[] IS NULL OR category=ANY($6::text[]))
+      ORDER BY "createdAt" DESC,id DESC LIMIT $5`, [workspaceId, from, until, filter, cap + 1, scope.categories ?? null])).rows
     if (selected.length > cap) throw new AuditExportError('auditExportLimitExceeded', 413)
     const events = selected.map(view), records = auditExportRecords(events)
     const manifest: AuditExportManifest = { format: 'mikka-audit-export', version: 1, id: randomUUID(), workspaceId,
-      createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + EXPORT_TTL_MS).toISOString(), from: from.toISOString(), until: now.toISOString(),
-      filter, count: events.length, digest: auditDigest(records) }
+      createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + EXPORT_TTL_MS).toISOString(), from: from.toISOString(), until: until.toISOString(),
+      filter, ...(scope.categories ? { categories: scope.categories } : {}), count: events.length, digest: auditDigest(records) }
     await recordAudit(drizzle(app), { workspaceId, actor: { type: 'user', id: actorId, name: actor.name }, action: 'audit.exported',
       target: { type: 'audit_export', id: manifest.id }, metadata: { count: manifest.count, digest: manifest.digest } })
     await app.query('COMMIT')

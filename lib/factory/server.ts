@@ -1,3 +1,4 @@
+import { bindFactoryStoreWorkspace, bindFactoryQuestionsWorkspace, factoryTaskWorkspaceBoundary, factoryBackgroundReference } from './background-workspace';
 import { syncFactoryPresentation } from './stage-progress';
 import { createFactorySpecApproval } from './spec-approval';
 import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
@@ -10,7 +11,10 @@ import { FactoryError } from "./contract";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pool, withDatabaseClient } from "@/lib/db";
 import { issueForUser } from "@/lib/issue-access";
-import { lockCliAgentPolicy, lockCliRunPolicy } from "@/lib/agent-tool-approval/policy-store";
+import { issueTeamAccess } from "@/lib/issue-team-access";
+import { activeTaskWorkspaces, taskReaderScope } from "@/lib/task-workspace";
+import { factoryWorkspaceReader } from './workspace-reader';
+import { lockCliAgentPolicy, prelockCliRunPolicy } from "@/lib/agent-tool-approval/policy-store";
 import { createFactoryStore } from "./store";
 import { createFactoryHumanStore } from './human-store';
 import { createRetainedDeliverableObserver } from '../cloud-computer/retained-deliverable';
@@ -22,29 +26,41 @@ import { createFactoryCheckClaim, factoryCheckGates } from "./checks";
 import { createFactoryMonitor, createFactoryMonitorRunConsumer, monitorGate } from "./monitor";
 import { reconcileFactoryCheck } from "./reconcile-check";
 import { appendMonitorEvidence } from "./monitor-evidence";
-import { workspaceDb } from "@/lib/workspace-db";
-import { teamIssues } from "@/lib/db/team-schema";
-import { eq } from "drizzle-orm";
 import type { FactoryAuthorize } from "./store";
 import { configuredMonitorProbes } from "./monitor-probe";
 import { monitorWorkspacePartition } from "./monitor-fingerprint";
 import { createFactoryMonitorIssueLinks } from "./monitor-issue-links";
-import { readAuthorizedIssue } from "../github/user-access";
 
-// Preserve existing personal/workspace/team/deletion access rules on every operation.
-const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
-  // Reuse the held transaction: a second pool checkout here can deadlock
-  // concurrent operations when the application connection pool is full.
+// Resolve the effective human tenant; background work uses persisted task authority.
+const authorize: FactoryAuthorize = (userId, issueId, tx, lockedIssue) => withDatabaseClient(tx, async () => {
+  // The human entry has already pinned WS/member before this APP transaction.
+  // Canonical readers (including Enterprise) must reuse its APP connection.
+  if (lockedIssue) {
+    const reader = await factoryWorkspaceReader(userId);
+    const workspaceId = taskReaderScope(reader).workspaceId;
+    if (workspaceId) {
+      if (lockedIssue.id !== issueId || lockedIssue.deleted !== false || lockedIssue.ownershipState !== 'bound'
+        || lockedIssue.workspaceId !== workspaceId) return false;
+      // The store supplied its current APP issue snapshot. Recheck links and
+      // canonical authorization now; never reuse the route's preflight row.
+      const link = await issueTeamAccess(issueId, userId);
+      const allowed = await activeTaskWorkspaces(reader, workspaceId);
+      return allowed.some(workspace => workspace.id === workspaceId)
+        && (!link.linked || link.workspaceId === workspaceId);
+    }
+    return Boolean(await issueForUser(reader, issueId, false, drizzle(tx)));
+  }
   await tx.query("SELECT id FROM issues WHERE id=$1 FOR SHARE", [issueId]);
-  return Boolean(await issueForUser(userId, issueId, false, drizzle(tx)));
-};
+  return Boolean(await issueForUser(await factoryWorkspaceReader(userId), issueId, false, drizzle(tx)));
+});
 const humanGates = {
   ...factoryCheckGates,
   approval: approvalGate,
   publish: publishGate,
   monitor: monitorGate,
 };
-export const factoryStore = createFactoryStore(pool, authorize, humanGates, { onTransition: syncFactoryPresentation });
+const backgroundWorkspace = factoryTaskWorkspaceBoundary(pool, null);
+export const factoryStore = bindFactoryStoreWorkspace(pool, createFactoryStore(pool, authorize, humanGates, { onTransition: syncFactoryPresentation }), null);
 const humanStoreForBot = (botId: string | null) => createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: humanGates, onTransition: syncFactoryPresentation });
 export const factoryHumanStore = createFactoryHumanStore(pool, humanStoreForBot, automaticFactoryDispatch(pool),
   createRetainedDeliverableObserver(pool, (tx, scope) => humanStoreForBot(scope.botId).lockTask(tx, scope.ownerId, scope.taskId)));
@@ -73,21 +89,17 @@ export const factorySpecApproval = createFactorySpecApproval(pool, factoryHumanS
 export const factoryMerges = createFactoryMerges(pool, authorize, factoryHumanStore, githubMergeApi());
 export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);
 export const factoryMonitorWorkspaceKey: Parameters<typeof createFactoryMonitor>[3] = async (userId, issueId, tx) => {
-    const [link] = await workspaceDb
-      .select({ workspaceId: teamIssues.workspaceId })
-      .from(teamIssues)
-      .where(eq(teamIssues.issueId, issueId))
-      .limit(1);
     const {
       rows: [issue],
     } = await tx.query(
-      'SELECT i.scope,l."teamSyncId" FROM issues i LEFT JOIN linear_issue_links l ON l."issueId"=i.id WHERE i.id=$1',
+      'SELECT i.scope,i."workspaceId",l."teamSyncId" FROM issues i LEFT JOIN linear_issue_links l ON l."issueId"=i.id WHERE i.id=$1 AND i."ownershipState"=\'bound\'',
       [issueId],
     );
+    if (!issue?.workspaceId) throw new FactoryError('factoryNotFound');
     return monitorWorkspacePartition({
       userId,
       issueId,
-      workspaceId: link?.workspaceId ?? null,
+      workspaceId: issue.workspaceId,
       issueScope: issue.scope,
       linearTeamSyncId: issue.teamSyncId ?? null,
     });
@@ -99,12 +111,15 @@ export const factoryMonitor = createFactoryMonitor(
   factoryMonitorWorkspaceKey,
   appendMonitorEvidence,
   configuredMonitorProbes(process.env),
+  null,
+  backgroundWorkspace,
 );
-export const factoryMonitorIssueLinks = createFactoryMonitorIssueLinks(pool, authorize, readAuthorizedIssue);
+export const factoryMonitorIssueLinks = createFactoryMonitorIssueLinks(pool, authorize,
+  async (...args) => (await import('../github/user-access')).readAuthorizedIssue(...args));
 
 import { queueFactoryRun } from "@/lib/agent-runs";
 import { createFactoryDispatch, defaultFactoryDispatchAdapters } from "./dispatch";
-export const dispatchFactoryRun = createFactoryDispatch(
+const dispatchFactoryRunWithinWorkspace = createFactoryDispatch(
   pool,
   factoryStore,
   async (tx, userId, input, botId, context) => await queueCloudQuestionContinuation(tx,userId,input,botId,context) ?? await queueLocalQuestionContinuation(tx,userId,input,botId,context) ?? queueFactoryRun(tx, userId, input, botId, context),
@@ -113,6 +128,8 @@ export const dispatchFactoryRun = createFactoryDispatch(
     lockAdmission: async (tx,userId,input) => { await lockCliAgentPolicy(tx,userId,input.agentId,null); },
   },
 );
+export const dispatchFactoryRun: typeof dispatchFactoryRunWithinWorkspace = (...args) =>
+  backgroundWorkspace(args[0], factoryBackgroundReference(args[1], 'taskId'), () => dispatchFactoryRunWithinWorkspace(...args), args[2]);
 import { createFactoryQuestions, type QuestionSkillGuards } from "./questions/store";
 export const questionSkillAssignments: QuestionSkillGuards = {
   lockAnswer: async (userId,questionId,tx) => {
@@ -124,7 +141,7 @@ export const questionSkillAssignments: QuestionSkillGuards = {
     // Cloud claim and runtime maintenance acquire policy before task/run locks.
     if (cloud) await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`computer-policy:${cloud.workspaceId}`]);
     try {
-      await lockCliRunPolicy(tx,question.originRunId,userId);
+      await prelockCliRunPolicy(tx,question.originRunId,userId);
     } catch (error) {
       if (error instanceof Error && error.message === "agentPolicyUnavailable")
         throw new FactoryError("factoryNotFound");
@@ -150,7 +167,7 @@ export const questionSkillAssignments: QuestionSkillGuards = {
     }
   },
 };
-export const factoryQuestions = createFactoryQuestions(
+export const factoryQuestions = bindFactoryQuestionsWorkspace(pool, createFactoryQuestions(
   pool,
   authorize,
   factoryStore,
@@ -159,13 +176,16 @@ export const factoryQuestions = createFactoryQuestions(
   undefined,
   (userId,result)=>wakeCloudQuestionContinuation(pool,userId,result),
   (userId,scope)=>prepareCloudQuestionRecovery(pool,userId,scope),
-);
+), null);
 import { createFactoryReconciler } from "./reconcile";
 export const reconcileFactoryRuns = createFactoryReconciler(
   pool,
   factoryStore,
   factoryQuestions,
   {review:reconcileFactoryCheck,verify:reconcileFactoryCheck,monitor:createFactoryMonitorRunConsumer(factoryMonitor)},
+  null,
+  undefined,
+  backgroundWorkspace,
 );
 
 import { createExecutionClaim, createExecutionClaimGuard } from "./execution-claim";
@@ -179,13 +199,13 @@ export function factoryRoutingEnabled() {
 export function factoryForBot(botId: string | null) {
   if (!factoryRoutingEnabled())
     throw new FactoryError("factoryRoutingUnavailable");
-  return createFactoryStore(
+  return bindFactoryStoreWorkspace(pool, createFactoryStore(
     pool,
     async (owner, issue, tx) =>
       withDatabaseClient(tx, async () => Boolean(await issueForUser(owner, issue))),
     botId,
     { onTransition: syncFactoryPresentation },
-  );
+  ), botId);
 }
 /** References are host records, never model-supplied provenance or approval. */
 export async function factoryRequestSource(

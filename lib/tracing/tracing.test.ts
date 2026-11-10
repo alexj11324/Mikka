@@ -11,6 +11,7 @@ import type { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
 import type { Pool as PgPool } from 'pg'
 import { afterJob, cronJob } from '@/lib/background'
 import { describeSample, withDatabaseOperation } from '@/lib/db/egress-sample'
+import { manageDatabasePool } from '@/lib/db/pool-lifecycle'
 import { currentRoute, routeScope } from './labels'
 import { traceSampleRate, traceSettings } from './config'
 import { EXPORT_PAUSE_MS, SafeExporter, createPgInstrumentation, createTracerProvider } from './node'
@@ -106,7 +107,7 @@ describe('server tracing', () => {
     server = fakePostgres()
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
     const { port } = server.address() as AddressInfo
-    pool = new Pool({ connectionString: `postgres://mikka:${password}@127.0.0.1:${port}/mikka`, max: 1 })
+    pool = manageDatabasePool(new Pool({ connectionString: `postgres://mikka:${password}@127.0.0.1:${port}/mikka`, max: 1 }))
 
     const tracer = trace.getTracer('test')
     await tracer.startActiveSpan('GET', { kind: SpanKind.SERVER, attributes: { 'http.method': 'GET', 'http.target': `/mikka/v1/devices/dev_1/commands?token=${token}&email=${encodeURIComponent(email)}` } }, async root => {
@@ -158,6 +159,19 @@ describe('server tracing', () => {
       await cronJob('run-recovery', () => pool.query('select 5 as "cron_read"'))()
       root.end()
     })
+
+    // A busy pool hands the connection to the next request from the previous
+    // socket's callback. Both real PG query spans must still be children of
+    // their initiating request, even with ignoreConnectSpans enabled.
+    const held = await pool.connect()
+    const queued = ['/api/agent/sessions', '/actions/issues/poll'].map((route, index) =>
+      tracer.startActiveSpan(`queued-${index}`, { kind: SpanKind.SERVER }, async root => {
+        try { await withDatabaseOperation(route, () => pool.query(`select 1 as "queued_${index}"`)) }
+        finally { root.end() }
+      }))
+    assert.equal(pool.waitingCount, 2)
+    held.release()
+    await Promise.all(queued)
     await provider.forceFlush()
     spans = memory.getFinishedSpans()
     payload = JSON.stringify(spans.map(span => ({ name: span.name, attributes: span.attributes, events: span.events, status: span.status, links: span.links, resource: span.resource.attributes })))
@@ -197,6 +211,18 @@ describe('server tracing', () => {
     const root = spans.find(span => span.name === 'GET')!
     assert.equal(root.attributes['http.target'], '/mikka/v1/devices/dev_1/commands')
     assert.equal(root.attributes['mikka.route'], '/v1/devices/[deviceId]/commands')
+  })
+
+  test('queued queries retain their own request trace, parent and operation without connection spans', () => {
+    for (const [index, route] of ['/api/agent/sessions', '/actions/issues/poll'].entries()) {
+      const root = spans.find(span => span.name === `queued-${index}`)!
+      const statement = query(`select ? as "queued_${index}"`)
+      assert.ok(root && statement)
+      assert.equal(traceOf(statement), traceOf(root))
+      assert.equal(statement.parentSpanContext?.spanId, root.spanContext().spanId)
+      assert.equal(statement.attributes['mikka.route'], route)
+      assert.equal(spans.filter(span => traceOf(span) === traceOf(root)).length, 2, 'one request and one query, without extra connection or SQL work')
+    }
   })
 
   test("an after() job keeps its own route and continues the scheduling request's trace", () => {

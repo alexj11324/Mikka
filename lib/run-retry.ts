@@ -5,6 +5,7 @@
 // ended (error, timeout, a failed verify) is never retried here: running it
 // again could repeat its side effects, so it goes to the person.
 import { RUN_CHECKPOINT_RECOVERY_MAX_AGE_MS, type RunCheckpoint } from '@mikka/protocol/device'
+import { copyRunPrompt, protectedTaskEnd, type RunPromptSource, type CopiedRunPrompt } from './run-prompt-copy'
 
 /** The server upload clock is authoritative for recovery freshness. */
 export function checkpointRecoveryError(checkpoint: RunCheckpoint | null, now = new Date()): string | null {
@@ -38,10 +39,10 @@ export function retryNote(attempt: number): string {
 }
 
 /** The brief for the retry: the original one, with the note on what happened. */
-export function retryPrompt(prompt: string, attempt: number): string {
-  const base = prompt.split(`\n\n${RETRY_HEADING}`)[0]
-  const note = retryNote(attempt)
-  return `${base.slice(0, 100_000 - note.length - 2)}\n\n${note}`
+export function retryPrompt(prompt: string, attempt: number): string
+export function retryPrompt(prompt: RunPromptSource, attempt: number): CopiedRunPrompt
+export function retryPrompt(prompt: string | RunPromptSource, attempt: number): string | CopiedRunPrompt {
+  return continuedPrompt(prompt, retryNote(attempt), [RETRY_HEADING])
 }
 
 const QUOTA_HEADING = '## This run continues after a usage limit'
@@ -56,10 +57,10 @@ export function quotaContinuationNote(): string {
 }
 
 /** The continuation's brief: the original one, with that note instead of any earlier one. */
-export function quotaContinuationPrompt(prompt: string): string {
-  const base = prompt.split(`\n\n${RETRY_HEADING}`)[0].split(`\n\n${QUOTA_HEADING}`)[0]
-  const note = quotaContinuationNote()
-  return `${base.slice(0, 100_000 - note.length - 2)}\n\n${note}`
+export function quotaContinuationPrompt(prompt: string): string
+export function quotaContinuationPrompt(prompt: RunPromptSource): CopiedRunPrompt
+export function quotaContinuationPrompt(prompt: string | RunPromptSource): string | CopiedRunPrompt {
+  return continuedPrompt(prompt, quotaContinuationNote(), [RETRY_HEADING, QUOTA_HEADING])
 }
 
 const PROVIDER_HEADING = '## This run continues on the next preferred model'
@@ -73,10 +74,20 @@ export function providerContinuationNote(): string {
   ].join('\n\n')
 }
 
-export function providerContinuationPrompt(prompt: string): string {
-  const base = prompt.split(`\n\n${PROVIDER_HEADING}`)[0].split(`\n\n${RETRY_HEADING}`)[0].split(`\n\n${QUOTA_HEADING}`)[0]
-  const note = providerContinuationNote()
-  return `${base.slice(0, 100_000 - note.length - 2)}\n\n${note}`
+export function providerContinuationPrompt(prompt: string): string
+export function providerContinuationPrompt(prompt: RunPromptSource): CopiedRunPrompt
+export function providerContinuationPrompt(prompt: string | RunPromptSource): string | CopiedRunPrompt {
+  return continuedPrompt(prompt, providerContinuationNote(), [PROVIDER_HEADING, RETRY_HEADING, QUOTA_HEADING])
+}
+
+function continuedPrompt(source: string | RunPromptSource, note: string, headings: string[]): string | CopiedRunPrompt {
+  const prompt = typeof source === 'string' ? source : source.prompt
+  const end = typeof source === 'string' ? 0 : protectedTaskEnd(source)
+  let guidance = prompt.slice(end)
+  for (const heading of headings) guidance = guidance.split(`\n\n${heading}`)[0]
+  const base = prompt.slice(0, end) + guidance
+  const next = `${base.slice(0, 100_000 - note.length - 2)}\n\n${note}`
+  return typeof source === 'string' ? next : copyRunPrompt(source, next)
 }
 
 export type LostRunOutcome =

@@ -9,6 +9,14 @@
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
   workspace_not_found: [],
+  workspace_snapshot_unavailable: [],
+  workspace_snapshot_outdated: [],
+  workspace_review_conflict: [],
+  workspace_review_anchor_invalid: [],
+  workspace_review_unavailable: [],
+  workspace_review_delivery_uncertain: [],
+  workspace_review_github_unavailable: [],
+  workspace_review_github_forbidden: [],
   workspace_machine_unavailable: [],
   workspace_checkout_unavailable: [],
   workspace_path_unavailable: [],
@@ -31,6 +39,7 @@ export const USER_ERROR_CODES = {
   run_failed: [],
   task_secret_unavailable: ['invalid_capability', 'expired_capability', 'binding_mismatch', 'invalid_request', 'destination_denied', 'upstream_unavailable', 'response_blocked', 'limit_exceeded', 'configuration'],
 
+  governance_denied: ["access_denied", "seat_limit", "feature_unavailable", "last_owner", "workspace_attached", "billing_account_attached", "personal_workspace", "invalid_request", "template_limit", "not_found", "plan_changed"],
   installer_failed: ["node_required", "unsupported_os", "npm_permission", "npm_cache_permission", "cancelled", "timeout", "service_failed", "connection_failed", "command_failed"],
   model_tool_unavailable: [],
   cloud_not_connected: [],

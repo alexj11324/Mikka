@@ -1,6 +1,6 @@
 import 'server-only'
 import { runMayUseCredentialSql } from './personal-policy'
-import { infisicalWorkloadToken } from './infisical-workload'
+import { createSnapshotWorkloadTokenCache } from './infisical-workload'
 import type { Pool } from 'pg'
 import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import type { CredentialScope } from '../packages/daemon/src/subscription-worker-client'
@@ -13,7 +13,7 @@ export class AccessProjectionMissing extends CodedError {
 }
 
 export async function authorizedAccessName(database: Pick<Pool, 'query'>, scope: CredentialScope, use: { bindingId: string; consumerId: string; runId?: string }, revision: unknown,
-  member: (userId: string, workspaceId: string) => Promise<void> = async () => { throw new Error('subscription_access_unavailable') }, allowMissingProjection = false): Promise<string> {
+  member: (userId: string, workspaceId: string, borrowerId?: string) => Promise<void> = async () => { throw new Error('subscription_access_unavailable') }, allowMissingProjection = false): Promise<string> {
   const timingDone = currentSubscriptionWorkerTiming()?.phase('parentAccessAuthority')
   try {
     if (!Number.isSafeInteger(revision) || Number(revision) < 1) throw new Error('subscription_access_unavailable')
@@ -25,7 +25,7 @@ export async function authorizedAccessName(database: Pick<Pool, 'query'>, scope:
     // A teammate's run on a shared subscription: both must still be active members (workspace database).
     const runOwner = rows[0].runOwner
     if (typeof runOwner === 'string' && runOwner !== scope.ownerId) {
-      try { await member(runOwner, String(rows[0].workspaceId)); await member(scope.ownerId, String(rows[0].workspaceId)) }
+      try { await member(runOwner, String(rows[0].workspaceId)); await member(scope.ownerId, String(rows[0].workspaceId), runOwner) }
       catch (error) { throw new CodedError('subscription_access_unavailable', { detail: 'member_inactive', cause: error }) }
     }
     if (allowMissingProjection && row.state === 'connected' && (name === null || name === '')) throw new AccessProjectionMissing()
@@ -33,6 +33,8 @@ export async function authorizedAccessName(database: Pick<Pool, 'query'>, scope:
     return name
   } finally { timingDone?.() }
 }
+
+const snapshotTokens = createSnapshotWorkloadTokenCache()
 
 type SnapshotDetail = 'request_invalid' | 'identity_failed' | 'fetch_failed' | 'http_refused' | 'body_too_large' | 'body_invalid' | 'secret_invalid'
 const refused = (detail: SnapshotDetail | 'member_inactive', cause?: unknown) => new CodedError('subscription_access_unavailable', { detail, cause })
@@ -48,12 +50,16 @@ export async function subscriptionAccessSnapshot(options: {
   try {
     if (!/^mikka-byos-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.name) || !options.project || !options.environment || !options.path.startsWith('/')) throw refused('request_invalid')
     const fetcher = options.fetcher ?? fetch
-    const token = await infisicalWorkloadToken(options.origin, options.clientId, options.clientSecret, options.signal, fetcher).catch(error => { throw refused('identity_failed', error) })
+    const identity = await snapshotTokens.get(options.origin, options.clientId, options.clientSecret, options.signal, fetcher).catch(error => { throw refused('identity_failed', error) })
+    options.signal?.throwIfAborted()
     const url = new URL(`/api/v4/secrets/${options.name}`, options.origin)
     for (const [key, value] of Object.entries({ projectId: options.project, environment: options.environment, secretPath: options.path, type: 'shared', version: '1', viewSecretValue: 'true', expandSecretReferences: 'false', includeImports: 'false' })) url.searchParams.set(key, value)
     timingDone = currentSubscriptionWorkerTiming()?.phase('parentProjectionRead')
-    const response = await fetcher(url, { headers: { authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(12_000), ...(options.signal ? [options.signal] : [])]) }).catch(error => { throw refused('fetch_failed', error) })
-    if (!response.ok) throw refused('http_refused', { name: 'HttpStatus', code: response.status })
+    const response = await fetcher(url, { headers: { authorization: `Bearer ${identity.token}` }, redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(12_000), ...(options.signal ? [options.signal] : [])]) }).catch(error => { throw refused('fetch_failed', error) })
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) identity.invalidate()
+      throw refused('http_refused', { name: 'HttpStatus', code: response.status })
+    }
     const body = await response.text()
     if (Buffer.byteLength(body) > 262144) throw refused('body_too_large')
     let secret: { secretKey?: unknown; version?: unknown; secretValueHidden?: unknown; secretValue?: unknown } | undefined
