@@ -118,7 +118,10 @@ test('real HTTP claim carries policy, and its run gate creates no approvals (dec
   await pool.query(`INSERT INTO agents (id,"userId",harness,name) VALUES ($1,$2,'codex','Synthetic unstarted worker')`, [unstartedAgent,owner])
   // A worker alone has no workspace to authorize; the settings Bot binds it to the fixture workspace.
   const settingsBot = randomUUID()
-  await pool.query(`INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,'Synthetic settings Bot')`, [settingsBot,owner,workspaceId])
+  // `workspaceId` is scoped to the `before` hook; resolve the same fixture
+  // workspace here so the Bot points at the row the policy was written to.
+  const settingsWorkspaceId = await seedFixtureWorkspace(pool, owner)
+  await pool.query(`INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,'Synthetic settings Bot')`, [settingsBot,owner,settingsWorkspaceId])
   const beforeFirstRun = await settings('owner=1',{operation:'readAgent',agentId:unstartedAgent,botId:settingsBot})
   assert.equal(beforeFirstRun.status,200)
   const empty = await beforeFirstRun.json() as {revision:string}
