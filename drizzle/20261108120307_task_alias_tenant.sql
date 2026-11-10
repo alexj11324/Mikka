@@ -1,6 +1,10 @@
 -- APP: finish alias projection only from already proven Task/Run tenancy.
 -- The migration runner invokes this in bounded batches after P0 backfill,
 -- including tasks whose immutable identifier was issued by an earlier build.
+-- A fresh database reaches this file before task_workspace_ownership declares
+-- the tenant columns; the trigger below needs both names to exist.
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS "workspaceId" uuid;
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS "ownershipState" text NOT NULL DEFAULT 'pending';
 CREATE OR REPLACE FUNCTION reconcile_bound_task_identifier_aliases(task_ids uuid[])
 RETURNS TABLE (bound_aliases bigint, publication_aliases bigint)
 LANGUAGE plpgsql AS $$

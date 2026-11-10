@@ -1,6 +1,10 @@
 -- APP: issued task identifiers and historical aliases are not authorization.
 -- Split deployments only read WS team aliases through the server-side store.
 ALTER TABLE issues ADD COLUMN IF NOT EXISTS "issuedIdentifier" text;
+-- A fresh database reaches this file before task_workspace_ownership adds the
+-- tenant columns. Declare the nullable column here so the legacy-alias import
+-- below resolves issues."workspaceId"; the later migration adds its constraints.
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS "workspaceId" uuid;
 
 CREATE TABLE IF NOT EXISTS task_identifier_aliases (
   "issueId" uuid NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
