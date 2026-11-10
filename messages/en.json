@@ -4633,7 +4633,9 @@
       "all": "All",
       "documents": "Documents",
       "pages": "Web pages"
-    },
+    ,
+      "pullRequests": "Pull requests",
+      "media": "Screenshots and recordings"},
     "columns": {
       "name": "Name",
       "source": "Source",
@@ -4645,7 +4647,7 @@
     "empty": "No artifacts yet",
     "threadEntry": "Artifact · {count}",
     "folders": {
-      "sub": "Documents and pages the Bots and Agents handed over in tasks, by task.",
+      "sub": "Documents, pages, pull requests and screenshots the Bots and Agents handed over in tasks, by task.",
       "folders": "By task",
       "search": "Search tasks…",
       "noMatch": "No task matches “{query}”.",
@@ -5975,6 +5977,15 @@
     "share": "of {month}",
     "open": "Open",
     "runsCount": "{count, plural, one {# run} other {{formatted} runs}}"
+  },
+  "HostedShell": {
+    "newTab": "New tab",
+    "searchOrUrl": "Search or enter URL",
+    "tools": "Tools",
+    "noTools": "No tools yet",
+    "moreFor": "More for {name}",
+    "suggested": "Suggested",
+    "noSuggestions": "Nothing suggested right now"
   },
   "HostedSettings": {
     "back": "Back",

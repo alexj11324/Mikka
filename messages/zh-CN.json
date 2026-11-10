@@ -4633,7 +4633,9 @@
       "all": "全部",
       "documents": "文档",
       "pages": "网页"
-    },
+    ,
+      "pullRequests": "PR",
+      "media": "截图与录屏"},
     "columns": {
       "name": "名称",
       "source": "来源",
@@ -4645,7 +4647,7 @@
     "empty": "还没有 Artifact",
     "threadEntry": "Artifact · {count}",
     "folders": {
-      "sub": "Bot 和 Agent 在任务里交出的文档和网页，按任务分组。",
+      "sub": "Bot 和 Agent 在任务里交出的文档、网页、PR 和截图，按任务分组。",
       "folders": "按任务",
       "search": "搜索任务…",
       "noMatch": "没有和「{query}」匹配的任务。",
@@ -5975,6 +5977,15 @@
     "share": "占{month}",
     "open": "打开",
     "runsCount": "{count, plural, other {{formatted} 次}}"
+  },
+  "HostedShell": {
+    "newTab": "新标签页",
+    "searchOrUrl": "搜索或输入网址",
+    "tools": "工具",
+    "noTools": "还没有可用的工具",
+    "moreFor": "{name} 的更多操作",
+    "suggested": "推荐",
+    "noSuggestions": "暂时没有推荐"
   },
   "HostedSettings": {
     "back": "返回",
