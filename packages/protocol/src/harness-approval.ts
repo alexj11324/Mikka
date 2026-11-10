@@ -13,7 +13,6 @@
 //
 // This module keeps only what is genuinely about the harness: can this CLI
 // hand one tool call to a person and act on the answer?
-import { z } from 'zod'
 import type { RunPolicy } from './agent-policy'
 import type { Harness } from './harness'
 
@@ -80,12 +79,3 @@ export function runApprovalSupport(policy: RunPolicy, harness: string): 'require
   if (!policyRequiresApproval(policy)) return 'not_required'
   return harnessCanAsk(harness) ? 'required' : 'unsupported'
 }
-
-/** One run's approval state as the protocol reports it, never inferred. */
-export const runApprovalStateSchema = z.strictObject({
-  /** The policy actions this run's daemon asks about, sorted. */
-  asks: z.array(z.enum(GATE_EXPRESSIBLE_ACTIONS)),
-  /** The reported revision of the policy these asks came from. */
-  policyRevision: z.string().regex(/^[a-f0-9]{64}$/),
-})
-export type RunApprovalState = z.infer<typeof runApprovalStateSchema>

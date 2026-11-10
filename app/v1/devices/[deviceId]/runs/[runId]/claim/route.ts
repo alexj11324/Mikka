@@ -10,6 +10,7 @@ import { afterJob } from '@/lib/background'
 import { and, eq, isNull } from 'drizzle-orm'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { applyApprovalMode } from '@mikka/protocol/agent-policy'
+import { runApprovalSupport } from '@mikka/protocol/harness-approval'
 import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
@@ -195,7 +196,13 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   }
   if (device.kind === 'local' && (!repo.remoteUrl || !localExecutionHarnesses(device.harnesses).includes(harness))) return NextResponse.json({ error: 'Repository or execution harness unavailable.' }, { status: 409 })
-  if ((harness === 'codex' || harness === 'claude_code') && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval === true)) return NextResponse.json({ error: 'Run approval capability unavailable.' }, { status: 409 })
+  // A run that must ask is refused rather than run with the ask ignored: the
+  // harness needs a native per-call surface, and this daemon must report a
+  // live gate. A run that asks nothing needs neither, exactly as before
+  // approvals existed (decision 2026-11-01-2335).
+  const approvalSupport = runApprovalSupport(cliPolicy.policy, harness)
+  if (approvalSupport === 'unsupported') return NextResponse.json({ error: 'This harness cannot ask before a risky tool call.', code: 'runApprovalUnsupported' }, { status: 409 })
+  if (approvalSupport === 'required' && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval === true)) return NextResponse.json({ error: 'Run approval capability unavailable.' }, { status: 409 })
   // A run frozen on the person's API key goes only to a daemon that injects it; nothing is opened yet.
   const frozenKey = run.agentDefinition?.apiKey
   if (frozenKey && (subscription || pinned)) return NextResponse.json({ error: 'Run credential unavailable.' }, { status: 409 })

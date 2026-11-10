@@ -6,7 +6,6 @@ import {
   harnessToolApproval,
   policyAskActions,
   policyRequiresApproval,
-  runApprovalStateSchema,
   runApprovalSupport,
 } from "./harness-approval"
 import { applyApprovalMode, defaultRunPolicy, type RunPolicy } from "./agent-policy"
@@ -83,14 +82,5 @@ describe("claim-time support", () => {
     for (const harness of ["claude_code", "codex", "cursor", "mock"]) {
       expect(runApprovalSupport(defaultRunPolicy(), harness)).toBe("not_required")
     }
-  })
-
-  it("reports the asks and the revision it read them from", () => {
-    const revision = "a".repeat(64)
-    expect(runApprovalStateSchema.parse({ asks: ["install_dependency"], policyRevision: revision }))
-      .toEqual({ asks: ["install_dependency"], policyRevision: revision })
-    expect(runApprovalStateSchema.safeParse({ asks: ["install_dependency"], policyRevision: "not-a-revision" }).success).toBe(false)
-    // An action the gate cannot express is not reportable as an ask.
-    expect(runApprovalStateSchema.safeParse({ asks: ["network"], policyRevision: revision }).success).toBe(false)
   })
 })
