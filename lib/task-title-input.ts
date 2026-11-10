@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-/** The most characters a title the person types in the New task form may have: what a task's short title column holds. */
+/** The optional New task title limit. The full text is preserved; its derived navigation label has a smaller limit. */
 export const TASK_TITLE_MAX = 60
 
 /** A title typed in the New task form: one line, trimmed, 1 to TASK_TITLE_MAX characters. */
