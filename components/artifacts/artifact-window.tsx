@@ -14,6 +14,7 @@ import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
+import * as threadSlot from '@ui-slot/thread'
 import { FactoryArtifactAcceptance } from '@/components/workspace/factory-acceptance'
 import { useArtifactReview } from '@/components/workspace/artifact-review'
 import { closeArtifact, navigate, openArtifact, openThread } from '@/components/workspace/workspace-navigation'
@@ -75,7 +76,8 @@ export function ArtifactWindow({ artifactId }: { artifactId: string }) {
   if (!detail || (botId && !threadMade && !bots && !botsError)) return <ArtifactViewer {...shared} quotes={[]} canQuote={false}
     bot={{ name: '', avatar: <Skeleton className="size-5 rounded-full" /> }} chat={() => null} />
   if (threadMade) return <ArtifactViewer {...shared} quotes={[]} canQuote={false} title={reportTitle}
-    bot={{ name: thread ? thread.thread.detail?.name ?? tThreads('title') : '', avatar: null }}
+    // A layer's thread screen starts with the run's own card, which names the task: no name row above it.
+    bot={{ name: thread ? thread.thread.detail?.name ?? tThreads('title') : '', avatar: null, bare: !!(threadSlot as { ThreadScreen?: unknown }).ThreadScreen }}
     decision={detail.acceptanceTaskId && issueId ? ({ slots, ...view }) => <FactoryArtifactAcceptance taskId={detail.acceptanceTaskId!} issueId={issueId} artifactId={artifactId} {...view}
       review={{ slots, onRequestChanges: setChangeRequest, registerReject }} /> : undefined}
     chat={() => <IssueThreadPanel issueId={issueId} runId={runId!} onClose={closeArtifact} onOpenThread={openThread} bare

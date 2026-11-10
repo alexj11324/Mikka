@@ -103,6 +103,18 @@ function ReportCard({ artifact, taskId, onOpen }: { artifact: ArtifactSummary; t
   return <ArtifactCard artifact={artifact} onOpen={onOpen} title={title} meta={review.detail ? text.line(review.kind) : undefined} icon={<ArtifactIcon className="size-5" />} />
 }
 
+/**
+ * The Artifacts a finished thread handed over, for a layer's thread screen to list as its own chips: the same read as
+ * the cards, and a PR's acceptance report named as the PR (「PR #1288 …」). Reads nothing while `enabled` is false.
+ */
+export function useThreadArtifactItems(runId: string, enabled: boolean): { id: string; name: string }[] {
+  const text = useArtifactReviewText()
+  const { data } = useSWR(enabled ? ['run-artifacts', runId] : null, () => listRunArtifacts(runId))
+  const report = data?.find(item => item.acceptanceTaskId)
+  const review = useArtifactReview(report?.acceptanceTaskId, { hasArtifact: true, runSucceeded: true })
+  return (data ?? []).map(item => ({ id: item.id, name: item === report && review.number && review.pullRequest?.title ? text.title(review.number, review.pullRequest.title) : item.title }))
+}
+
 /** L3: under a finished thread's last message, the Artifacts it handed over, as cards. Shares the header button's read. */
 export function ThreadArtifactCards({ runId }: { runId: string }) {
   const { data } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId))

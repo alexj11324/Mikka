@@ -34,13 +34,13 @@ import { harnessLabel, type IssueThreadsRead } from './issue-threads'
 import * as threadSlot from '@ui-slot/thread'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
 import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
-import { navigate } from './workspace-navigation'
+import { navigate, openArtifact } from './workspace-navigation'
 import { ThreadHeader, ThreadStatusLine } from './thread-header'
 import { useRightColumnWiden } from './right-column-widen'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
-import { ThreadArtifactButton, ThreadArtifactCards } from './artifact-review'
+import { ThreadArtifactButton, ThreadArtifactCards, useThreadArtifactItems } from './artifact-review'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AcceptanceStateBadge, useAcceptanceTasks } from './factory-acceptance'
 import { FactoryAcceptancePane } from './factory-acceptance-pane'
@@ -340,6 +340,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const author = detail?.harness ? { id: detail.harness, name: harnessName(detail.harness), mark: <HarnessMark harness={detail.harness} /> } : undefined
   const at = (value: number | string | Date | undefined) => (value === undefined ? 0 : new Date(value).getTime()) || (data ? new Date(data.thread.createdAt).getTime() : Date.now())
   const entries: ThreadEntry[] = []
+  const finished = !!data && !active && (view?.status ?? data.thread.status) === 'succeeded'
+  // On a layer's screen the handed-over Artifacts are its own chips, not the cards drawn under the transcript.
+  const artifactItems = useThreadArtifactItems(runId, !!Screen && finished)
   if (Screen && data) {
     // The run's own rows read as one message until the person speaks; each person message starts the next.
     let open: Extract<ThreadEntry, { role: 'bot' }> | null = null
@@ -352,10 +355,16 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       open = { id: `${runId}:${id}`, role: 'bot', at: at(extra?.at), parts: [...parts], ...(author ? { author } : {}), ...extra }
       entries.push(open)
     }
-    // A later attempt's status line says nothing unless it is stopping (the thread-header slot): no empty row for it.
-    if (!attempt || attempt.first || stopRequested) bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
-      issueId={issueId} runId={runId} harness={detail?.harness ?? null} {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} /> }])
-    if (!attempt && data.thread.prompt.trim()) { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: data.thread.prompt.trim() }) }
+    // Where the conversation starts: the run as a card – its task, where it stands, who dispatched it, its Agent and
+    // machine – in the layer's own markup. A later attempt's says nothing unless it is stopping.
+    const taskTitle = attempt?.taskTitle ?? title
+    if (!attempt || attempt.first || stopRequested) bot('status', [{ kind: 'run', title: taskTitle, onOpen: onOpenTask ?? (issueId ? () => navigate({ issue: issueId }) : undefined),
+      line: { status: view?.status ?? data.thread.status, outcome: displayOutcome, stopping: stopRequested, waiting: question === 'waiting', startedAt: new Date(data.thread.createdAt).toISOString(), dispatchedBy: detail?.agentName || null,
+        issueId, runId, harness: detail?.harness ?? null, ...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {}) } }])
+    // The dispatch is a person's bubble only when it says more than the card's title already does.
+    const prompt = data.thread.prompt.trim()
+    const flat = (text: string) => text.replace(/\s+/g, ' ').trim()
+    if (!attempt && prompt && !flat(taskTitle).includes(flat(prompt))) { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: prompt }) }
     for (const item of items) {
       if (item.kind === 'person') { open = null; entries.push({ id: `${runId}:${item.id}`, role: 'person', at: at(item.at), text: item.text }); continue }
       const part: ThreadEntryPart = item.kind === 'agent' ? { kind: 'text', text: item.text, node: <div {...{ [QUOTE_SOURCE_ATTR]: '' }}><AgentMarkdown text={item.text} isStreaming={active} /></div> }
@@ -375,10 +384,10 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     const tail = <>
       {data.thread.quota?.switched.map(item => <ThreadQuotaSwitchLine key={item.runId} switched={item} />)}
       {modelFallback.map(item => <ThreadModelFallbackNotice key={item.runId} item={item} retry={item.state !== 'switched' && canRetry ? () => { void send(t('retry'), true) } : undefined} retrying={sending} />)}
-      {!active && (view?.status ?? data.thread.status) === 'succeeded' && <ThreadArtifactCards runId={runId} />}
       {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
     </>
-    if (data.thread.quota?.switched.length || modelFallback.length || (!active && (view?.status ?? data.thread.status) === 'succeeded') || data.thread.feedbackEligible) bot('tail', [{ kind: 'text', text: '', node: tail }])
+    if (data.thread.quota?.switched.length || modelFallback.length || data.thread.feedbackEligible) bot('tail', [{ kind: 'text', text: '', node: tail }])
+    if (artifactItems.length) bot('tail', [{ kind: 'artifacts', items: artifactItems, onOpen: openArtifact }])
     if (active && !items.length) bot('waiting', [], { streaming: true })
   }
   const entriesKey = entries.map(entry => `${entry.id}:${entry.role === 'bot' ? entry.parts.length : entry.text.length}`).join('|')

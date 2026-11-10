@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { RunSource } from '@/lib/coordinator/citations'
 import type { ChatComposerProps } from './chat-composer-contract'
+import type { ThreadStatusLineProps } from './thread-header-contract'
 
 /**
  * A conversation as one screen (docs/ui-overlay.md, slot `thread`): a Bot's chat, built by `CoordinatorChat` from the
@@ -36,6 +37,12 @@ export type ThreadEntryPart =
   | { kind: 'artifacts'; items: { id: string; name: string }[]; onOpen: (id: string) => void }
   /** Something failed: the words, with what can be done about it (retry, change model, sign in again). */
   | { kind: 'error'; text: string; actions?: ReactNode }
+  /**
+   * A thread's own run where its conversation starts: its task (or what it was asked) as the title, and where it
+   * stands, when it started, who dispatched it, its Agent and where it runs, as the thread-header slot's status line
+   * gets them. `onOpen` shows its task. A layer that knows no such part may skip it.
+   */
+  | { kind: 'run'; title: string; line: ThreadStatusLineProps; onOpen?: () => void }
 
 export type ThreadEntry =
   | {

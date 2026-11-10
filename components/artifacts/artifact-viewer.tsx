@@ -66,7 +66,8 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   onArtifactChange: (id: string) => void
   onClose: () => void
   /** The bot whose chat sits on the right. */
-  bot: { name: string; avatar: ReactNode }
+  /** `bare`: the chat names itself (a layer's thread screen starts with its task), so the column has no name row. */
+  bot: { name: string; avatar: ReactNode; bare?: boolean }
   /** Every quote sent from artifacts in this chat; this reader underlines its own. */
   quotes: readonly ArtifactQuote[]
   chat: (slot: ArtifactChatSlot) => ReactNode
@@ -217,10 +218,10 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
                 onQuote={element => { setQuote({ artifactId, version, kind: 'element', text: element.text || element.label, label: element.label, selector: element.selector }); setSelecting(false); setPane('chat') }} />}
         </main>
         <aside aria-label={bot.name} className={cn('w-full flex-col bg-sidebar md:flex md:w-[25rem] md:shrink-0', pane === 'chat' ? 'flex' : 'hidden')}>
-          <div className="flex h-12 shrink-0 items-center gap-2 px-4">
+          {!bot.bare && <div className="flex h-12 shrink-0 items-center gap-2 px-4">
             {bot.avatar}
             {bot.name ? <span className="truncate text-sm font-medium">{bot.name}</span> : <Skeleton className="h-4 w-40" />}
-          </div>
+          </div>}
           {chat({ quote, clearQuote: () => setQuote(null), activeArtifactId: artifactId, openArtifact: switchArtifact })}
         </aside>
       </div>
