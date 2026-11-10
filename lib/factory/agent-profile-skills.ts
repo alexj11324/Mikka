@@ -132,21 +132,28 @@ async function workspaceMembers(workspaceId: string, userIds: readonly string[])
   return new Set(rows.map(row => row.userId))
 }
 
-async function workspaceSkillAllowed(workspaceId: string, ownerId: string, skillId: string) {
-  try {
-    const { organizationResourceAllowed } = await import('@/lib/governance/resource-access')
-    return await organizationResourceAllowed(workspaceId, 'skill', skillId, ownerId)
-  } catch { return false }
-}
-
-/** Only a team workspace has an explicit-share model; a personal workspace
- * consists of its owner, so there is nothing to share to. */
-async function workspaceSkillCanShare(workspaceId: string) {
+/** One policy read and one approval read for every shared Skill in a
+ * workspace. The polled Profile list must not grow a query per Skill. */
+async function workspaceSkillsAllowed(workspaceId: string, skills: readonly { id: string; ownerId: string }[]): Promise<Set<string>> {
+  if (!skills.length) return new Set()
   try {
     const { workspacePool } = await import('@/lib/workspace-db')
-    const { rows: [row] } = await workspacePool.query<{ kind: string }>('SELECT kind FROM mikka_workspaces WHERE id=$1', [workspaceId])
-    return row?.kind === 'team'
-  } catch { return false }
+    const { workspaceResourcePolicy } = await import('@/lib/governance/resource-access')
+    const policy = await workspaceResourcePolicy(workspaceId, workspacePool)
+    if (!policy.organizationId) return new Set(skills.map(skill => skill.id))
+    // Sharing a Skill follows the same organization switch as a shared MCP connection.
+    const rule = policy.mcpSharing
+    if (rule === 'deny') return new Set()
+    const { rows } = await workspacePool.query<{ resourceId: string; ownerId: string; status: string }>(`select "resourceId","ownerId",status
+      from mikka_organization_resource_approvals
+      where "organizationId"=$1 and "workspaceId"=$2 and kind='skill' and "resourceId"=ANY($3::uuid[])`,
+      [policy.organizationId, workspaceId, skills.map(skill => skill.id)])
+    const approvals = new Map(rows.map(row => [`${row.ownerId}:${row.resourceId}`.toLowerCase(), row.status]))
+    return new Set(skills.filter(skill => {
+      const status = approvals.get(`${skill.ownerId}:${skill.id}`.toLowerCase())
+      return status !== 'denied' && (rule === 'allow' || status === 'approved')
+    }).map(skill => skill.id))
+  } catch { return new Set() }
 }
 
 /** One read of every selected source's current authorization. Content travels
@@ -177,13 +184,18 @@ export async function agentProfileSkillStates(query: ProfileQuery, scope: AgentP
       states.set(raw, row ? { available: true, kind: 'installed', source: 'workspace', row } : { available: false, reason: 'missing' })
     }
     const members = await workspaceMembers(scope.workspaceId, rows.map(row => row.userId))
-    for (const { raw, id } of workspace) {
+    const permitted = await workspaceSkillsAllowed(scope.workspaceId, rows.map(row => ({ id: row.id, ownerId: row.userId })))
+    for (const { raw } of workspace) {
       const state = states.get(raw)
       if (!state?.available || state.kind !== 'installed') continue
-      if (!members.has(state.row.userId) || !await workspaceSkillAllowed(scope.workspaceId, state.row.userId, id)) states.set(raw, { available: false, reason: 'forbidden' })
+      if (!members.has(state.row.userId) || !permitted.has(state.row.id)) states.set(raw, { available: false, reason: 'forbidden' })
     }
   }
   return states
+}
+
+function installedDigest(row: InstalledRow) {
+  return /^[0-9a-f]{64}$/i.test(row.sha256) ? row.sha256.toLowerCase() : createHash('sha256').update(row.body).digest('hex')
 }
 
 function installedSkill(id: string, source: 'personal' | 'workspace', row: InstalledRow): AgentProfileSkill {
@@ -191,8 +203,7 @@ function installedSkill(id: string, source: 'personal' | 'workspace', row: Insta
   if (!body || body.length > 20_000) throw new AgentProfileError('agentProfileSkillUnavailable', 400, { detail: 'invalid' })
   return {
     id, source, version: 1, name: row.name.trim().slice(0, 80) || id, description: skillDescription(body, row.name),
-    digest: /^[0-9a-f]{64}$/i.test(row.sha256) ? row.sha256.toLowerCase() : createHash('sha256').update(row.body).digest('hex'),
-    content: body, sourceRevision: row.sourceRevision.slice(0, 200),
+    digest: installedDigest(row), content: body, sourceRevision: row.sourceRevision.slice(0, 200),
   }
 }
 
@@ -225,31 +236,44 @@ export async function agentProfileSkillAvailability(query: ProfileQuery, scope: 
 /** The Settings catalogue: official, the owner's installations (including
  * disabled ones with their reason), and skills explicitly shared to this
  * workspace. Repository skills are discovered by the daemon from the task
- * checkout and are declared by name in the editor. */
+ * checkout and are declared by name in the editor.
+ * One statement reads both sources so the polled list stays at a fixed query
+ * count; the workspace kind rides along instead of a separate lookup. */
 export async function agentProfileSkillCatalog(query: ProfileQuery, scope: AgentProfileScope): Promise<AgentProfileSkillCatalogItem[]> {
   const items: AgentProfileSkillCatalogItem[] = agentProfileSkillsCatalog()
-  const { rows: personal } = await query.query<InstalledRow>(`SELECT ${PERSONAL_COLUMNS} FROM personal_skills WHERE user_id=$1 ORDER BY created_at,id`, [scope.ownerId])
-  const canShare = personal.length > 0 && await workspaceSkillCanShare(scope.workspaceId)
-  const sharedIds = new Set((await query.query<{ skillId: string }>(`SELECT skill_id AS "skillId" FROM personal_skill_workspace_shares WHERE workspace_id=$1`, [scope.workspaceId])).rows.map(row => row.skillId.toLowerCase()))
-  for (const row of personal) items.push({
-    id: `personal:${row.id}`, name: row.name.trim().slice(0, 80) || row.id, description: skillDescription(row.body, row.name),
-    version: 1, digest: /^[0-9a-f]{64}$/i.test(row.sha256) ? row.sha256.toLowerCase() : createHash('sha256').update(row.body).digest('hex'),
-    source: 'personal', available: row.enabled, ...(row.enabled ? {} : { reason: 'disabled' as const }),
-    shareable: canShare, shared: sharedIds.has(row.id.toLowerCase()),
-  })
-  const { rows: shared } = await query.query<InstalledRow>(`SELECT ${SHARED_COLUMNS} FROM personal_skill_workspace_shares g
-    JOIN personal_skills s ON s.id=g.skill_id WHERE g.workspace_id=$1 ORDER BY s.created_at,s.id`, [scope.workspaceId])
-  if (shared.length) {
-    const members = await workspaceMembers(scope.workspaceId, shared.map(row => row.userId))
-    for (const row of shared) {
-      const allowed = members.has(row.userId) && await workspaceSkillAllowed(scope.workspaceId, row.userId, row.id)
+  const { rows } = await query.query<InstalledRow & { shared: boolean; workspaceOnly: boolean; workspaceKind: string | null }>(`
+    SELECT s.id,s.name,s.user_id AS "userId",s.sha256,s.enabled,s.body,s.source_revision AS "sourceRevision",s.created_at,
+      (g.id IS NOT NULL) AS shared,false AS "workspaceOnly",
+      (SELECT w.kind FROM mikka_workspaces w WHERE w.id=$2) AS "workspaceKind"
+    FROM personal_skills s
+    LEFT JOIN personal_skill_workspace_shares g ON g.skill_id=s.id AND g.workspace_id=$2
+    WHERE s.user_id=$1
+    UNION ALL
+    SELECT s.id,s.name,s.user_id AS "userId",s.sha256,s.enabled,s.body,s.source_revision AS "sourceRevision",s.created_at,
+      true AS shared,true AS "workspaceOnly",null::text AS "workspaceKind"
+    FROM personal_skill_workspace_shares g JOIN personal_skills s ON s.id=g.skill_id
+    WHERE g.workspace_id=$2
+    ORDER BY created_at,id`, [scope.ownerId, scope.workspaceId])
+  // Only a team workspace has an explicit-share model; a personal one consists
+  // of its owner, so there is nothing to share to.
+  const canShare = rows.some(row => !row.workspaceOnly && row.workspaceKind === 'team')
+  const shared = rows.filter(row => row.workspaceOnly)
+  const members = shared.length ? await workspaceMembers(scope.workspaceId, shared.map(row => row.userId)) : new Set<string>()
+  const permitted = await workspaceSkillsAllowed(scope.workspaceId, shared.map(row => ({ id: row.id, ownerId: row.userId })))
+  for (const row of rows) {
+    const common = { name: row.name.trim().slice(0, 80) || row.id, description: skillDescription(row.body, row.name), version: 1, digest: installedDigest(row) }
+    if (!row.workspaceOnly) {
       items.push({
-        id: `workspace:${row.id}`, name: row.name.trim().slice(0, 80) || row.id, description: skillDescription(row.body, row.name),
-        version: 1, digest: /^[0-9a-f]{64}$/i.test(row.sha256) ? row.sha256.toLowerCase() : createHash('sha256').update(row.body).digest('hex'),
-        source: 'workspace', available: row.enabled && allowed, shared: true,
-        ...(row.enabled && allowed ? {} : { reason: row.enabled ? 'forbidden' as const : 'disabled' as const }),
+        id: `personal:${row.id}`, ...common, source: 'personal', available: row.enabled,
+        ...(row.enabled ? {} : { reason: 'disabled' as const }), shareable: canShare, shared: row.shared,
       })
+      continue
     }
+    const allowed = row.enabled && members.has(row.userId) && permitted.has(row.id)
+    items.push({
+      id: `workspace:${row.id}`, ...common, source: 'workspace', available: allowed, shared: true,
+      ...(allowed ? {} : { reason: row.enabled ? 'forbidden' as const : 'disabled' as const }),
+    })
   }
   return items
 }
