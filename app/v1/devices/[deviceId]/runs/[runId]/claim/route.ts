@@ -58,6 +58,7 @@ import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection, taskSecretSnapshot, type TaskSecretInjection } from '@/lib/secrets/runtime'
 import { issueTaskSecretAccess } from '@/lib/secrets/task-access'
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
+import { threadModeSchema, threadModeSupport } from '@mikka/protocol/thread-mode'
 import { executionMembersActive } from '@/lib/execution-identity'
 import { cloudStartupPhases, cloudStartupRunAttributes, cloudStartupSpan } from '@/lib/computer/startup-tracing'
 import { cloudStartupDiagnosticEnv } from '@/lib/computer/startup-diagnostics'
@@ -177,6 +178,12 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     return NextResponse.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 409 })
   }
   const harness = run.agentDefinition?.harness ?? agent.harness
+  // A mode the selected harness (or this daemon build) cannot enforce is
+  // refused here, never run without its enforcement (never fail-open).
+  const mode = threadModeSchema.parse(run.mode ?? 'execute')
+  if (threadModeSupport(harness, mode) !== 'enforced') return NextResponse.json({ error: 'This thread mode is not enforced on the selected harness.', code: 'threadModeUnsupported' }, { status: 409 })
+  if (mode !== 'execute' && !device.harnesses.find(info => info.harness === harness)?.threadModes?.includes(mode))
+    return NextResponse.json({ error: 'This daemon cannot enforce the thread mode. Upgrade it first.', code: 'threadModeUnsupported' }, { status: 409 })
   const pinned = run.agentDefinition?.subscription
   let subscription: Awaited<ReturnType<ReturnType<typeof subscriptionRuntime>['repository']['nativeBinding']>>
   try { subscription = deploymentSwitch('byos')
@@ -494,7 +501,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...(run.agentDefinition?.traceContext ? { traceContext: { ...run.agentDefinition.traceContext, runId } } : {}),
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl, expectedRepoRemote: repo.remoteUrl } : {}),
     ...(run.baseBranch ? { baseBranch: run.baseBranch } : {}), harness, prompt: current.prompt,
-    kind: current.kind, leaseExpiresAt, policyRevision: cliPolicy.revision,
+    kind: current.kind, mode, leaseExpiresAt, policyRevision: cliPolicy.revision,
     ...(runTestFixture(harness) ? { fixture: runTestFixture(harness) } : {}),
     ...(verifyCommand ? { verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),

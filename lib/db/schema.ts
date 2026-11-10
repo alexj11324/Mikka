@@ -56,6 +56,16 @@ export const issues = pgTable('issues', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc()),
   check('issues_short_title_compact', sql`mikka_issue_short_title_valid(${table.shortTitle})`)])
+/** One person's thread on one task (#1730). Each admitted run freezes `mode`;
+ * `version` fences a stale mode picker, never a running agent. */
+export const taskThreadModes = pgTable('task_thread_modes', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  mode: text('mode').$type<'plan' | 'execute' | 'ask'>().notNull().default('execute'),
+  version: integer('version').notNull().default(0),
+  updatedBy: text('updatedBy').notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.issueId] }), index('task_thread_modes_issue').on(table.issueId)])
 export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
   issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),
@@ -376,6 +386,8 @@ export const agentRuns = pgTable('agent_runs', {
   deviceTokenId: uuid('deviceTokenId'),
   machineAuthority: boolean('machineAuthority').notNull().default(false),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
+  /** The thread's frozen interaction mode (#1730); plan reads only, ask waits per risky step. */
+  mode: text('mode').$type<'plan' | 'execute' | 'ask'>().notNull().default('execute'),
   pauseReason: text('pauseReason').$type<'human_control' | 'quota_exhausted' | null>(),
   /** A run paused on `quota_exhausted`: when the CLI said the subscription's quota resets; null when it gave no time. */
   quotaResetsAt: timestamp('quotaResetsAt', { withTimezone: true }),

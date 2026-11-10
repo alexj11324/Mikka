@@ -45,6 +45,8 @@
     "./user-error-codes": "./src/user-error-codes.ts",
     "./quota": "./src/quota.ts",
     "./agent-policy": "./src/agent-policy.ts",
+    "./thread-mode": "./src/thread-mode.ts",
+    "./tool-approval": "./src/tool-approval.ts",
     "./policy-snapshot": "./src/policy-snapshot.ts",
     "./node-policy-snapshot": "./src/node-policy-snapshot.ts",
     "./api": "./src/api.ts",

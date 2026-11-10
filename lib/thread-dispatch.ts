@@ -36,6 +36,8 @@ export type ThreadDispatch<R extends { runId: string }> =
 export type TaskThreadRun = {
   id: string; status: string; stopRequestedAt: Date | null; agentId: string; deviceRepoId: string | null
   botId: string | null; remoteUrl: string | null; harness: string | null; readOnly: boolean
+  /** The mode this run froze; a dispatch that names none keeps the thread's own. */
+  mode: 'plan' | 'execute' | 'ask'
   allowLocalRecovery?: boolean
   cloud: { workspaceId: string; botId: string } | null
   stopReason: string | null; error: string | null; summary: string | null; lastReply: string | null
@@ -47,7 +49,7 @@ type Query = Pick<PoolClient, 'query'>
 export async function latestTaskRun(query: Query, userId: string, issueId: string): Promise<TaskThreadRun | null> {
   const { rows: [run] } = await query.query(`SELECT r.id,r.status,r."stopRequestedAt",r."agentId",r."deviceRepoId",r."botId",r."stopReason",r.error,
       r.report->>'summary' AS summary,r."lastReply",d."remoteUrl",
-      coalesce(r."agentDefinition"->>'harness',a.harness) AS harness,coalesce((r."agentDefinition"->>'readOnly')::boolean,false) AS "readOnly",
+      coalesce(r."agentDefinition"->>'harness',a.harness) AS harness,coalesce((r."agentDefinition"->>'readOnly')::boolean,false) AS "readOnly",r.mode,
       (r."agentDefinition"->>'allowLocalRecovery')='true' AS "allowLocalRecovery",
       b."workspaceId" AS "cloudWorkspaceId",b."botId" AS "cloudBotId"
     FROM agent_runs r JOIN agents a ON a.id=r."agentId"

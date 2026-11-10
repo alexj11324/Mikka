@@ -12,6 +12,8 @@ const catalogReads: unknown[][] = []
 const query = { query: async (sql: string, args: unknown[]) => {
   if (sql.startsWith('SELECT 1 FROM byos_connections')) { catalogReads.push(args); return { rowCount: (args[0] === 'bob' ? sharedCatalogOffers : catalogOffers) ? 1 : 0, rows: [] } }
   if (sql.startsWith('SELECT state,paused,epoch,quota')) return { rows: [{ state: 'connected', paused: false, epoch: '1', quota }] }
+  if (sql.startsWith('INSERT INTO task_thread_modes')) return { rows: [] }
+  if (sql.startsWith('SELECT mode,version FROM task_thread_modes')) return { rows: [{ mode: 'execute', version: 0 }] }
   throw new Error(`unexpected fixture query: ${sql}`)
 } } as unknown as Pick<Pool, 'query'>
 mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports: {
@@ -173,7 +175,7 @@ test('cloud queue freezes the explicitly selected key when another key also offe
   const fixture = cloudQueueFixture()
   await fixture.queue({ apiKeyId: selected.id })
   const inserted = fixture.calls.find(call => call.sql.startsWith('INSERT INTO agent_runs'))!
-  const frozen = JSON.parse(inserted.args[9] as string)
+  const frozen = JSON.parse(inserted.args[10] as string)
   assert.deepEqual(frozen.apiKey, { keyId: selected.id, model: subscription.modelId })
   assert.equal(frozen.executionIdentity.billingAccount.model.resourceId, selected.id)
   assert.equal(frozen.subscription, undefined)
@@ -185,7 +187,7 @@ test('cloud queue still permits an explicitly selected subscription to use its a
   const fixture = cloudQueueFixture()
   await fixture.queue({ subscriptionBindingId: subscription.id })
   const inserted = fixture.calls.find(call => call.sql.startsWith('INSERT INTO agent_runs'))!
-  const frozen = JSON.parse(inserted.args[9] as string)
+  const frozen = JSON.parse(inserted.args[10] as string)
   assert.deepEqual(frozen.apiKey, { keyId: id(4), model: subscription.modelId })
   assert.equal(frozen.executionIdentity.billingAccount.model.resourceId, id(4))
   assert.equal(frozen.subscription, undefined)

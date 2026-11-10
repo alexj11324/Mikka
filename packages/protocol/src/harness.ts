@@ -62,6 +62,11 @@ export const harnessInfoSchema = z.object({
   /** Run-scoped CLI approvals and policy-version checks are supported. */
   toolApproval: z.literal(true).optional(),
   /**
+   * Thread interaction modes this runner enforces (#1730). Absent on an
+   * older daemon: only Execute is admitted, never a mode it cannot enforce.
+   */
+  threadModes: z.array(z.enum(["plan", "execute", "ask"])).max(3).optional(),
+  /**
    * The CLI exists but `installed` stays false because the daemon cannot run it
    * in a sandbox. `missing` names the absent packages; empty means the machine
    * itself refused isolation. `reason` names a refusal the person can lift

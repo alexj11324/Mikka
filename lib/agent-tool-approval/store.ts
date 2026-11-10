@@ -6,7 +6,8 @@ import { runListChanged } from '@/lib/live/lists'
 
 /** No caller identity, policy, decision, or scope comes from the CLI. */
 export type DeviceActor = { userId: string; deviceId: string }
-export class ApprovalUnavailable extends Error { constructor(readonly revokeReason?: 'device_lost') { super('approvalUnavailable') } }
+export type ApprovalRevokeReason = 'device_lost' | 'policy_changed' | 'mode_not_ask' | 'expired' | 'not_pending'
+export class ApprovalUnavailable extends Error { constructor(readonly revokeReason?: ApprovalRevokeReason) { super('approvalUnavailable') } }
 
 export class AgentToolApprovalStore {
   constructor(private readonly pool: Pick<Pool, 'connect' | 'query'>, private readonly membership: CliMembershipGuard = realCliMembershipGuard) {}

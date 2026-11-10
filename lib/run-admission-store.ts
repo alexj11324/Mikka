@@ -19,6 +19,8 @@ import { taskIdentifiers, taskPrefixInput } from './task-identifier-server'
 import { publicationBranch } from './run-publication-policy'
 import { admitRepositoryTask, matchesRepositoryAdmission } from './repository-admission'
 import { lockCliAgentPolicy, lockCliTaskScope } from './agent-tool-approval/policy-store'
+import { freezeThreadMode, readThreadMode, ThreadModeConflict } from './thread-mode/store'
+import type { ThreadMode } from '@mikka/protocol/thread-mode'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
 import { dispatchFingerprint, type DispatchCredential, type DispatchInput } from './run-dispatch'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
@@ -31,6 +33,8 @@ import { copyRunPrompt } from './run-prompt-copy'
 export async function acceptLocalRun(input: {
   id: string; userId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string
   source?: 'mcp' | null; botId: string | null; prompt: string; /** Code-point task range; initial briefs start at zero. */ promptTaskStart?: number | null; promptTaskLength?: number | null; definition: WorkerDefinitionSnapshot; requestEventId?: string
+  /** An explicit thread-mode transition; absent inherits the thread's choice. */
+  mode?: ThreadMode
   dispatch?: DispatchInput & DispatchCredential; continuation?: boolean; sourceRunId?: string; profileSourceRunId?: string
   factoryContext?: { sourceEventId: string; attemptId: string }
 }, existing?: PoolClient): Promise<{ runId: string; status?: typeof agentRuns.$inferSelect.status; replayed?: boolean }> {
@@ -41,10 +45,15 @@ export async function acceptLocalRun(input: {
     const tx = db
     // The reason travels with the code so the caller acts on it instead of guessing (RUN_INVALID_REASONS).
     const invalid = (reason: RunInvalidReason) => new ActionFailureError('runInvalid', { reason })
-    const readOnly = input.definition.readOnly === true
+    const taskScope = await lockCliTaskScope(client, input.userId, input.issueId)
+    // What a replay must compare against without transitioning the thread:
+    // the explicit choice, else the thread's current one. The actual freeze
+    // happens after every replay return, so an old replay cannot revert a
+    // newer mode choice.
+    const expectedMode: ThreadMode = input.mode ?? (await readThreadMode(client, input.userId, input.issueId)).mode
+    const expectedReadOnly = input.definition.readOnly === true || expectedMode === 'plan'
     // The setters acquire these locks before reading runs or updating workers.
     // Internal hosts prelock the same policy before taking their domain locks.
-    const taskScope = await lockCliTaskScope(client, input.userId, input.issueId)
     await lockCliAgentPolicy(client, input.userId, input.agentId, input.botId, taskScope)
     const dispatchHash = input.dispatch?.requestKey ? dispatchFingerprint(input.dispatch) : null
     if (input.dispatch?.requestKey)
@@ -83,18 +92,13 @@ export async function acceptLocalRun(input: {
       ? await (await import('./factory/questions/execution-continuation')).questionExecutionQueueSource(client,
         { userId: input.userId, issueId: task.id, botId: input.botId, sourceRunId: input.sourceRunId }) : null
     const profileOriginRunId = await admitProfileSelection(client, { ownerId: input.userId, workspaceId: executionIdentity.workspaceId ?? '', issueId: task.id, harness: input.definition.harness, model: input.definition.model, apiKeyId: input.definition.apiKey?.keyId, subscriptionBindingId: input.definition.subscription?.bindingId, selection: input.definition.agentProfile, sourceRunId: questionSource ?? input.profileSourceRunId, factoryContext: input.factoryContext })
-    // A question's host receipt grants the same native execution. Its origin,
-    // child and wake receipt must keep the exact original definition digest.
-    const traceContext = captureTraceContext({ runId: input.id, threadId: input.sourceRunId ?? input.id, taskId: task.id, posthogDistinctId: input.userId })
-    const definition = { ...input.definition, ...(traceContext ? { traceContext } : {}), executionIdentity, ...(profileOriginRunId && !questionSource ? { profileOriginRunId } : {}) }
-    if (profileOriginRunId && !questionSource) definition.definitionDigest = workerDefinitionDigest(definition)
     const context = { workspaceId: task.workspaceId!, ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}) }
     const replayMatches = async (prior: typeof agentRuns.$inferSelect) => {
       await revalidateExecutionIdentity(client, prior)
       const accepted = prior.agentDefinition?.repositoryAdmission
-      const sameRun = prior.userId === input.userId && prior.botId === input.botId && prior.issueId === task.id && prior.deviceId === input.deviceId && prior.agentId === input.agentId && prior.deviceRepoId === repo.id
+      const sameRun = prior.mode === expectedMode && prior.userId === input.userId && prior.botId === input.botId && prior.issueId === task.id && prior.deviceId === input.deviceId && prior.agentId === input.agentId && prior.deviceRepoId === repo.id
       // A read-only run has no task branch to compare: it matches only another read-only run.
-      if (readOnly || prior.agentDefinition?.readOnly) return readOnly && prior.agentDefinition?.readOnly === true && !accepted && sameRun
+      if (expectedReadOnly || prior.agentDefinition?.readOnly) return expectedReadOnly && prior.agentDefinition?.readOnly === true && !accepted && sameRun
       const [publication] = await tx.select().from(runPublications).where(eq(runPublications.runId, prior.id)).limit(1)
       return prior.userId === input.userId && prior.botId === input.botId && prior.issueId === task.id && prior.deviceId === input.deviceId && prior.agentId === input.agentId && prior.deviceRepoId === repo.id &&
         publication?.userId === input.userId && publication.issueId === task.id && prior.workspaceId === task.workspaceId && publication.remoteKey === repo.repoPath &&
@@ -118,6 +122,22 @@ export async function acceptLocalRun(input: {
         return { runId: prior.id }
       }
     }
+    // The thread's mode freezes with the run: an explicit `mode` is a
+    // transition (refused while another run of this thread is still working),
+    // and no mode inherits the thread's current choice.
+    let mode: ThreadMode
+    try {
+      mode = await freezeThreadMode(client, { userId: input.userId, issueId: input.issueId, workspaceId: taskScope.workspaceId!, requested: input.mode })
+    } catch (error) {
+      if (error instanceof ThreadModeConflict) throw invalid(error.reason)
+      throw error
+    }
+    const readOnly = input.definition.readOnly === true || mode === 'plan'
+    // A question's host receipt grants the same native execution. Its origin,
+    // child and wake receipt must keep the exact original definition digest.
+    const traceContext = captureTraceContext({ runId: input.id, threadId: input.sourceRunId ?? input.id, taskId: task.id, posthogDistinctId: input.userId })
+    const definition = { ...input.definition, ...(mode === 'plan' && input.definition.readOnly !== true ? { readOnly: true as const } : {}), ...(traceContext ? { traceContext } : {}), executionIdentity, ...(profileOriginRunId && !questionSource ? { profileOriginRunId } : {}) }
+    if ((profileOriginRunId && !questionSource) || (mode === 'plan' && input.definition.readOnly !== true)) definition.definitionDigest = workerDefinitionDigest(definition)
     // A strict replay only reads the same accepted execution; it never
     // refreshes its receipt. Pushing needs no grant in Mikka (decision
     // 2026-11-02-1600): every run works with its owner's own GitHub
@@ -127,7 +147,7 @@ export async function acceptLocalRun(input: {
     const [active] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.userId, input.userId), eq(agentRuns.issueId, task.id), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]))).limit(1)
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
     if (readOnly) {
-      await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, ...copyRunPrompt({ ...input, promptTaskStart: input.promptTaskStart ?? 0 }), agentDefinition: definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
+      await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', mode, kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, ...copyRunPrompt({ ...input, promptTaskStart: input.promptTaskStart ?? 0 }), agentDefinition: definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
       await runListChanged(tx, input.id)
       await runChanged(tx, input.id)
       return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
@@ -143,7 +163,7 @@ export async function acceptLocalRun(input: {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'repository-branch:' + repo.repoPath + ':' + branch}, 0))`)
     const [collision] = await tx.select({ runId: runPublications.runId }).from(runPublications).where(and(eq(runPublications.remoteKey, repo.repoPath), eq(runPublications.branch, branch), ne(runPublications.issueId, task.id))).limit(1)
     if (collision) throw invalid('branchInUse')
-    await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, ...copyRunPrompt({ ...input, promptTaskStart: input.promptTaskStart ?? 0 }), agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
+    await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', mode, kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, ...copyRunPrompt({ ...input, promptTaskStart: input.promptTaskStart ?? 0 }), agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
     await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: repo.baseBranch, pushApproved: true })
     await runListChanged(tx, input.id)
     await runChanged(tx, input.id)

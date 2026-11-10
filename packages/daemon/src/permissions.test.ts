@@ -208,6 +208,22 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(settings.permissions?.deny).toContain("Bash(npm install:*)")
   })
 
+  it("names every risky Claude tool for Ask and denies Plan's changes and subagents (#1730)", () => {
+    const ask = claudePermissionRules(policy({}), "ask")
+    expect(ask.ask).toEqual(expect.arrayContaining(["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task", "Agent"]))
+    // Ask reaches the run-bound approval gate instead of denying the shell outright.
+    expect(ask.deny).not.toContain("Bash")
+    const planPolicy = { ...policy({}), readOnly: true }
+    const plan = claudePermissionRules(planPolicy, "plan")
+    expect(plan.deny).toEqual(expect.arrayContaining(["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task", "Agent"]))
+    expect(plan.ask).toEqual([])
+    expect(claudeSettings(policy({}), "ask").permissions).toEqual(ask)
+    expect(policyInstructions(planPolicy, "plan")[0]).toContain("Plan mode")
+    expect(policyInstructions(policy({}), "ask")[0]).toContain("Ask mode")
+    // Execute keeps the old rules exactly.
+    expect(policyInstructions(policy({}))).not.toContainEqual(expect.stringContaining("mode"))
+  })
+
   it("lets every Cursor tool call go ahead, git push included", async () => {
     const request = (command: string) =>
       ({

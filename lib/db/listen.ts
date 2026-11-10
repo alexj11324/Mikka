@@ -8,7 +8,9 @@ export const COORDINATOR_LEASE_CHANNEL = 'mikka_coordinator_lease'
 export const DEVICE_WORK_CHANNEL = 'mikka_device_work'
 /** App reply/scope and workspace membership triggers; ids only, delivered at commit. */
 export const MCP_REPLY_CHANNEL = 'mikka_mcp_reply'
-type Channel = typeof GROUP_TURN_STOP_CHANNEL | typeof COORDINATOR_LEASE_CHANNEL | typeof DEVICE_WORK_CHANNEL | typeof MCP_REPLY_CHANNEL
+/** One run's Ask-mode decision: payload is the approval id. */
+export const RUN_APPROVAL_CHANNEL = 'mikka_run_approval'
+type Channel = typeof GROUP_TURN_STOP_CHANNEL | typeof COORDINATOR_LEASE_CHANNEL | typeof DEVICE_WORK_CHANNEL | typeof MCP_REPLY_CHANNEL | typeof RUN_APPROVAL_CHANNEL
 
 /** Sent with the writer's transaction: PostgreSQL delivers it only on COMMIT.
  * NOTIFY works through the Neon pooler; only LISTEN needs a direct session. */

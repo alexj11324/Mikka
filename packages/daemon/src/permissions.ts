@@ -27,6 +27,7 @@ import {
   type PermissionDecision,
   type RunPolicy,
 } from "@mikka/protocol/agent-policy"
+import { threadModeInstructions, type ThreadMode } from "@mikka/protocol/thread-mode"
 
 
 export { PERMISSION_ACTIONS, PERMISSION_DEFAULTS }
@@ -132,7 +133,7 @@ const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
  * `git push` is the agent's own judgment, as with the person's own `gh auth
  * login` (decision 2026-11-02-1600): no rule withholds it.
  */
-export function claudePermissionRules(policy: RunPolicy): {
+export function claudePermissionRules(policy: RunPolicy, mode: ThreadMode = 'execute'): {
   allow: string[]
   ask: string[]
   deny: string[]
@@ -145,24 +146,42 @@ export function claudePermissionRules(policy: RunPolicy): {
   const decision = policy.readOnly
     ? "deny"
     : policy.permissions.install_dependency
+  // Ask mode names every risky built-in tool; the adapter's canUseTool gate
+  // asks the person for each one. Reads are not listed and run directly.
+  const ask = [
+    ...(decision === "ask" ? install : []),
+    ...(mode === "ask" ? ASK_TOOLS : []),
+  ]
+  // Plan mode also refuses a subagent that would otherwise inherit the run
+  // and could act with its own tool surface.
+  const plan = mode === "plan" || policy.readOnly
   return {
     allow: [],
-    ask: decision === "ask" ? install : [],
+    ask,
     deny: [
+      // A policy that withholds the native shell keeps denying it in every
+      // mode: Ask only adds oversight, and an approval can never widen the
+      // policy the run was admitted with.
       ...(!rawCliShellAvailable(policy) ? ['Bash','PowerShell','Monitor'] : []),
-      ...(policy.readOnly ? READ_ONLY_TOOLS : []),
+      ...(plan ? READ_ONLY_TOOLS : []),
+      ...(plan ? ['Task', 'Agent'] : []),
       ...(decision === "deny" ? install : []),
     ],
   }
 }
 
+/** Built-in tools that change the worktree or run a command; Ask mode names
+ * them so the harness reaches the run-bound approval gate. */
+const ASK_TOOLS = ["Bash", "PowerShell", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task", "Agent"]
+
 /** Tools that change the worktree, denied to a read-only run (ADR 0046). */
 const READ_ONLY_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"]
 
 /** What the agent is told about this run's permissions. */
-export function policyInstructions(policy: RunPolicy): string[] {
+export function policyInstructions(policy: RunPolicy, mode: ThreadMode = 'execute'): string[] {
   const { permissions } = policy
   const lines: string[] = []
+  lines.push(...threadModeInstructions(mode))
   if (policy.readOnly)
     lines.push(
       "- This is a read-only check: you may read the worktree but not change it. Report what you found through `submit`; do not fix anything yourself."

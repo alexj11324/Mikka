@@ -17,7 +17,8 @@ import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-
 // retrying cannot fix.
 import { z } from "zod"
 import { chatFileDownloadSchema, chatFileTransferSchema, CHAT_FILE_MAX_BYTES } from '@mikka/protocol/chat-attachments'
-import { ToolApprovalGate, type RunControlMode } from "./agents/tool-approval"
+import { ToolApprovalGate, type RunControlMode, type ToolApprovalRequest } from "./agents/tool-approval"
+import { toolApprovalStateSchema, type ToolApprovalState } from '@mikka/protocol/tool-approval'
 import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
@@ -206,7 +207,8 @@ export class HttpServerLink implements ServerLink {
         if (signal.aborted) return false
         try { check(); return true } catch { return false }
       },
-    }, this.runControlMode)
+      requestApproval: (runId, request, requestSignal) => this.requestToolApproval(assignment, request, requestSignal),
+    }, this.runControlMode, assignment.mode ?? 'execute')
     this.runControls.add(gate)
     const abort = () => gate.revoke()
     gate.onRevoke(() => { this.runControls.delete(gate); signal.removeEventListener('abort', abort) })
@@ -217,6 +219,34 @@ export class HttpServerLink implements ServerLink {
   async prepareRunMailbox(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
     return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: (url, init) => this.taskFetch(assignment.runId, 'mailbox_operation', url, init),
       headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })
+  }
+
+  /** One Ask request: store it under the run's frozen revision, wait for the
+   * person, and consume an approval exactly once. Any failure is a refusal. */
+  async requestToolApproval(assignment: RunAssignment, request: ToolApprovalRequest, signal: AbortSignal): Promise<'approved' | 'denied'> {
+    if (!assignment.policyRevision) return 'denied'
+    try {
+      let state = await this.postToolApproval(assignment.runId, {
+        operation: 'request', deviceId: assignment.deviceId, policyRevision: assignment.policyRevision,
+        requestId: request.requestId, harness: assignment.harness, method: request.method, tool: request.tool, input: request.input,
+      }, signal)
+      while (state.status === 'pending' && Date.now() < state.expiresAt && !signal.aborted)
+        state = await this.postToolApproval(assignment.runId, { operation: 'wait', deviceId: assignment.deviceId, approvalId: state.approvalId }, signal)
+      if (state.status !== 'approved') return 'denied'
+      // The approval is one-shot: consuming it before the tool runs means a
+      // retried native request must ask again, never replay the old answer.
+      const consumed = await this.postToolApproval(assignment.runId, { operation: 'consume', deviceId: assignment.deviceId, approvalId: state.approvalId }, signal)
+      return consumed.status === 'consumed' ? 'approved' : 'denied'
+    } catch {
+      return 'denied'
+    }
+  }
+
+  private async postToolApproval(runId: string, body: unknown, signal: AbortSignal): Promise<ToolApprovalState> {
+    // The wait route holds for 20 s; this bound leaves network headroom.
+    const response = await this.send('POST', `/v1/runs/${seg(runId)}/tool-approval`, body, this.credential, { timeoutMs: 30_000, signal })
+    if (!response.ok) throw new Error('toolApprovalUnavailable')
+    return toolApprovalStateSchema.parse(await response.json())
   }
   async claimCoordinator(deviceId: string, signal: AbortSignal) {
     const response = await this.send("POST",`/v1/devices/${seg(deviceId)}/coordinator`,{ operation: "claim" },this.credential,{ signal })

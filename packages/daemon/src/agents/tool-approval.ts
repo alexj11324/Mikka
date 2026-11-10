@@ -1,11 +1,23 @@
 // A run's live gate: whether the run may still act, and its revocation.
-// Agent CLIs ask nothing per tool or destination (decision 2026-11-01-2335:
-// Claude Code in bypassPermissions, Codex with approvals "never"); this gate
-// only stops a run whose lease, owner or policy is no longer live.
+// Agent CLIs in Execute mode ask nothing per tool or destination (decision
+// 2026-11-01-2335); Ask mode routes each risky native request through the
+// run-bound approval channel, and Plan mode allows no change at all.
+
+import type { ThreadMode } from '@mikka/protocol/thread-mode'
+import type { ToolApprovalMethod } from '@mikka/protocol/tool-approval'
+
+export interface ToolApprovalRequest {
+  requestId: string
+  method: ToolApprovalMethod
+  tool: string
+  input: Record<string, unknown>
+}
 
 export interface ToolApprovalHost {
   /** Must reflect current run lease, owner, and revocation state. */
   isLive(runId: string): boolean | Promise<boolean>
+  /** Ask the server to store and wait for one decision; absent fails closed. */
+  requestApproval?(runId: string, request: ToolApprovalRequest, signal: AbortSignal): Promise<'approved' | 'denied'>
 }
 
 /** How a gate learns that run control may have changed (#1212).
@@ -58,7 +70,7 @@ export class ToolApprovalGate {
   private pushed = false
   private mode: RunControlMode
   private readonly changes = new Set<() => void>()
-  constructor(readonly runId: string, private readonly host: ToolApprovalHost, mode: RunControlMode = 'legacy') { this.mode = mode }
+  constructor(readonly runId: string, private readonly host: ToolApprovalHost, mode: RunControlMode = 'legacy', readonly threadMode: ThreadMode = 'execute') { this.mode = mode }
   revoke(reason?: 'device_lost') {
     if (this.revoked) return
     this.reason = reason
@@ -86,6 +98,27 @@ export class ToolApprovalGate {
         .finally(() => { this.checking = undefined })
     }
     return this.checking
+  }
+
+  /**
+   * One risky native tool request. Execute keeps the existing live-run
+   * behavior; Plan refuses; Ask asks the server and waits for the person.
+   * A missing transport, a refused decision, a lost lease or an abort is a
+   * denial — never an allow.
+   */
+  async requestApproval(request: ToolApprovalRequest, signal?: AbortSignal): Promise<boolean> {
+    if (this.revoked) return false
+    if (this.threadMode === 'plan') return false
+    if (this.threadMode !== 'ask') return this.checkLive()
+    if (!await this.checkLive()) return false
+    if (!this.host.requestApproval) return false
+    const effective = signal ?? this.stop.signal
+    try {
+      const decision = await abortable(Promise.resolve().then(() => this.host.requestApproval!(this.runId, request, effective)), effective)
+      return decision === 'approved' && !this.revoked && await this.checkLive()
+    } catch {
+      return false
+    }
   }
 
   /** Switches how this gate learns of changes. Any switch checks again at

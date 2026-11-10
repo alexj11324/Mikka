@@ -12,6 +12,7 @@ import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } 
 // run's `CODEX_HOME`, so a follow-up run copies the earlier run's
 // `sessions` into its own before `thread/resume`.
 import { delimiter, dirname, isAbsolute, join, relative } from "node:path"
+import { randomUUID } from "node:crypto"
 import { mkdirSync } from "node:fs"
 import { daemonTracer, runIdHash } from "../tracing"
 import { CodexGenerationMetrics } from './generation-metrics'
@@ -335,6 +336,22 @@ export function codexItemChunks(
   }
 }
 
+/** What the person sees for one native approval: bounded text, never the
+ * whole RPC frame or a credential-shaped value the server cannot mask. */
+function approvalInput(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object') return {}
+  const record = value as Record<string, unknown>
+  const bounded = (text: string, max: number) => text.length > max ? `${text.slice(0, max)}…` : text
+  const out: Record<string, unknown> = {}
+  for (const key of ['command', 'cwd', 'reason', 'grantRoot'] as const) {
+    const field = record[key]
+    if (typeof field === 'string') out[key] = bounded(field, 2_000)
+    else if (Array.isArray(field) && field.every(part => typeof part === 'string'))
+      out[key] = field.slice(0, 100).map(part => bounded(part, 500))
+  }
+  return out
+}
+
 export class CodexAdapter implements AgentAdapter {
   readonly harness = "codex" as const
   readonly capabilities = { supportsInterject: true, supportsResume: true }
@@ -444,6 +461,7 @@ export class CodexAdapter implements AgentAdapter {
       mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
       kind: options.kind,
+      mode: options.mode,
       factoryCheck: options.factoryCheck,
       verifyCommand: options.verifyCommand,
       worktree: options.cwd,
@@ -645,8 +663,10 @@ export class CodexAdapter implements AgentAdapter {
         if (candidates.length !== 1) return {action:'decline'}
         const [itemId,item] = candidates[0]
         item.attempted = true // repeated native requests never mint another permit
-        // Nothing is asked per tool (decision 2026-11-01-2335); the run must still be live.
-        return await approval.checkLive() && !ending && !approval.revoked && call.turnId === activeTurn && pendingMcp.get(itemId) === item
+        // Execute accepts while the run is live; Ask waits for the person;
+        // Plan declines. The gate owns that decision.
+        const approved = await approval.requestApproval({ requestId: itemId, method: 'mcp_tool', tool: String(call.serverName ?? 'mcp tool'), input: {} })
+        return approved && !ending && !approval.revoked && call.turnId === activeTurn && pendingMcp.get(itemId) === item
           ? {action:'accept',content:{}} : {action:'decline'}
       }
       if (method === 'item/tool/call') {
@@ -685,9 +705,16 @@ export class CodexAdapter implements AgentAdapter {
         if (method === 'item/fileChange/requestApproval' && call.grantRoot != null) return { decision: 'cancel' }
         if (call.availableDecisions != null && (!Array.isArray(call.availableDecisions) || !call.availableDecisions.includes('accept'))) return { decision: 'cancel' }
         if (call.approvalId != null && (typeof call.approvalId !== 'string' || !call.approvalId)) return { decision: 'decline' }
-        // Approvals are "never"; a request that still arrives goes ahead while the run is live.
-        // Do not grant a session or policy amendment in place of one action.
-        return { decision: await options.toolApproval.checkLive() && !options.toolApproval.revoked && !ending && call.turnId === activeTurn ? 'accept' : 'decline' }
+        // Execute accepts while the run is live; Ask waits for the person to
+        // approve this exact command/file change; Plan never reaches here
+        // (Codex runs its native read-only sandbox).
+        const approved = await options.toolApproval.requestApproval({
+          requestId: typeof call.approvalId === 'string' ? call.approvalId : typeof call.itemId === 'string' ? call.itemId : randomUUID(),
+          method: method === 'item/fileChange/requestApproval' ? 'file_change' : 'command',
+          tool: method === 'item/fileChange/requestApproval' ? 'file change' : 'command',
+          input: approvalInput(call),
+        })
+        return { decision: approved && !ending && call.turnId === activeTurn ? 'accept' : 'decline' }
       }
       if (method === "item/permissions/requestApproval") return { permissions: {}, scope: "turn" }
       log.warn({ method }, "unhandled codex request; declining")
@@ -946,13 +973,21 @@ export class CodexAdapter implements AgentAdapter {
           throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error })
         }
       }
+      // Execute asks nothing and Codex's own sandbox is off (decision
+      // 2026-11-01-2335). Plan uses Codex's native read-only sandbox and never
+      // asks. Ask also starts read-only, but its native command and file-change
+      // approvals reach the run-bound gate: a denied write is asked for, never
+      // silently applied, and an approval grants that one exact action.
+      // A read-only policy alone keeps the historical thread config; only the
+      // explicit Plan mode changes Codex's native sandbox that way.
+      const threadMode = options.mode ?? "execute"
+      const planMode = threadMode === "plan"
+      const askMode = threadMode === "ask"
       const thread: Omit<ThreadResumeParams, 'threadId'> = {
         cwd: ctx.worktree,
         ...(adopted ? { config: adopted.threadConfig } : {}),
-        // Nothing is asked and Codex's own sandbox is off: the equivalent of
-        // `--dangerously-bypass-approvals-and-sandbox` (decision 2026-11-01-2335).
-        approvalPolicy: "never",
-        sandbox: "danger-full-access",
+        approvalPolicy: askMode ? "untrusted" : "never",
+        sandbox: planMode || askMode ? "read-only" : "danger-full-access",
         developerInstructions: ctx.instructions(),
         ...(options.model ? { model: options.model } : {}),
       }

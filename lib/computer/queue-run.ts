@@ -17,6 +17,8 @@ import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source
 import { cloudTaskTarget } from './cloud-task-target'
 import { runListChanged } from '@/lib/live/lists'
 import { runChanged } from '@/lib/live/panels'
+import { freezeThreadMode, readThreadMode, ThreadModeConflict } from '@/lib/thread-mode/store'
+import type { ThreadMode } from '@mikka/protocol/thread-mode'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
  * together so the cloud worker never observes an unbound queued run. The
@@ -48,6 +50,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   subscriptionBindingId?: string
   /** An investigation that changes nothing: read-only policy and no task branch. */
   readOnly?: boolean
+  /** An explicit thread-mode transition (#1730); absent inherits the thread. */
+  mode?: ThreadMode
   /** Internal host placement grant, never a model/tool argument. The current owner source can only narrow it. */
   allowLocalRecovery?: true
   sourceEventId?: string
@@ -79,10 +83,14 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const instructions = [target.instructions, input.agentProfile?.instructions, input.executionNote].filter(Boolean).join('\n\n')
     const { prompt, taskLength: promptTaskLength } = runPromptParts(input.title, input.body, instructions, input.note)
     if (digest) {
-      const priorRun = (await client.query(`SELECT r."userId",r."issueId",r."agentId",r."deviceId",r."deviceRepoId",r.prompt,r."agentDefinition",r."dispatchFingerprint",r."botId" AS "runBotId",b."botId",b."workspaceId"
+      const priorRun = (await client.query(`SELECT r."userId",r."issueId",r."agentId",r."deviceId",r."deviceRepoId",r.mode,r.prompt,r."agentDefinition",r."dispatchFingerprint",r."botId" AS "runBotId",b."botId",b."workspaceId"
         FROM agent_runs r LEFT JOIN computer_run_bindings b ON b."runId"=r.id WHERE r.id=$1`, [runId])).rows[0]
       if (priorRun) {
-        if (priorRun.userId !== actor.userId || priorRun.issueId !== input.issueId || priorRun.agentId !== input.agentId || priorRun.deviceId !== target.deviceId || priorRun.deviceRepoId !== input.deviceRepoId || priorRun.runBotId !== (input.withoutBot ? null : input.botId) || priorRun.botId !== input.botId || priorRun.workspaceId !== actor.workspaceId || priorRun.prompt !== prompt) throw new ComputerError(409, 'Task request changed')
+        // The replay's expected mode is the explicit choice, else the thread's
+        // current one. The transition itself happens only after every check
+        // that can reject this request.
+        const replayMode = input.mode ?? (await readThreadMode(client, actor.userId, input.issueId)).mode
+        if (priorRun.userId !== actor.userId || priorRun.issueId !== input.issueId || priorRun.agentId !== input.agentId || priorRun.deviceId !== target.deviceId || priorRun.deviceRepoId !== input.deviceRepoId || priorRun.runBotId !== (input.withoutBot ? null : input.botId) || priorRun.botId !== input.botId || priorRun.workspaceId !== actor.workspaceId || priorRun.mode !== replayMode || priorRun.prompt !== prompt) throw new ComputerError(409, 'Task request changed')
         if ((!priorRun.agentDefinition || priorRun.agentDefinition.harness !== target.harness || (priorRun.agentDefinition.parent?.executionId ?? null) !== (input.execution?.id ?? null))) throw new ComputerError(409,'Task request changed')
         if (priorRun.dispatchFingerprint ? priorRun.dispatchFingerprint !== selectionFingerprint : input.subscriptionBindingId && priorRun.agentDefinition.subscription?.bindingId !== input.subscriptionBindingId) throw new ComputerError(409, 'Task request changed')
         await revalidateExecutionIdentity(client, { ...priorRun, botId: priorRun.runBotId })
@@ -102,19 +110,30 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
     // The hosted runner starts a subscription run only on that subscription's own model: a different one is refused here, not at startup.
     if (subscription && subscription.modelId !== model) throw new ComputerError(409, 'Bot subscription unavailable')
-    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,modelDispatch:input.modelDispatch,agentProfile:input.agentProfile,policyCeiling:input.policyCeiling,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
+    // The thread's mode freezes with the run, as on a local admission. This
+    // runs after every check that can reject the dispatch, so a refused
+    // request creates no thread row.
+    let mode: ThreadMode
+    try {
+      mode = await freezeThreadMode(client, { userId: actor.userId, issueId: input.issueId, workspaceId: actor.workspaceId, requested: input.mode })
+    } catch (error) {
+      if (error instanceof ThreadModeConflict) throw new ComputerError(409, error.reason)
+      throw error
+    }
+    const readOnly = input.readOnly === true || mode === 'plan'
+    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,modelDispatch:input.modelDispatch,agentProfile:input.agentProfile,policyCeiling:input.policyCeiling,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly })
     frozen.executionIdentity = await freezeExecutionIdentity(client, { userId: actor.userId, botId: runBotId, deviceId: target.deviceId, agentDefinition: frozen }, undefined, actor.workspaceId)
     const profileOriginRunId = await admitProfileSelection(client, { ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: input.issueId, harness: target.harness, model: frozen.model, apiKeyId: frozen.apiKey?.keyId, subscriptionBindingId: frozen.subscription?.bindingId, selection: input.agentProfile, sourceRunId: input.threadRunId,
       ...(factoryContext ? { factoryContext } : {}) })
     if (profileOriginRunId) { frozen.profileOriginRunId = profileOriginRunId; frozen.definitionDigest = workerDefinitionDigest(frozen) }
     // A writable github.com run gets its task branch here, like a local run's (decision 2026-11-02-1600).
-    const github = input.readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1
+    const github = readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1
     const push = !github ? null : await (await import('./cloud-push')).admitCloudPush(client, { userId: actor.userId, issueId: input.issueId, agentId: input.agentId, deviceId: target.deviceId, deviceRepoId: input.deviceRepoId, ...(runBotId ? { workspaceId: actor.workspaceId } : {}), now: new Date() })
     const agentDefinition = push ? { ...frozen, repositoryAdmission: push.admission } : frozen
     const traceContext = captureTraceContext({ runId, threadId: input.threadRunId ?? runId, taskId: input.issueId, posthogDistinctId: actor.userId, ...(push?.publication.identifier ? { taskNumber: push.publication.identifier } : {}) })
     if (traceContext) agentDefinition.traceContext = traceContext
-    await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId","agentDefinition","dispatchFingerprint","promptTaskStart","promptTaskLength","workspaceId")
-      VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10,$11,0,$12,$13)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, target.baseBranch, prompt, runBotId,JSON.stringify(agentDefinition), digest ? selectionFingerprint : null, promptTaskLength, actor.workspaceId])
+    await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,mode,kind,"baseBranch",prompt,"botId","agentDefinition","dispatchFingerprint","promptTaskStart","promptTaskLength","workspaceId")
+      VALUES ($1,$2,$3,$4,$5,$6,'queued',$7,'implement',$8,$9,$10,$11,$12,0,$13,$14)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, mode, target.baseBranch, prompt, runBotId,JSON.stringify(agentDefinition), digest ? selectionFingerprint : null, promptTaskLength, actor.workspaceId])
     if (push) await client.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)`, [runId, push.publication.userId, push.publication.issueId, push.publication.scopeVersion, push.publication.issueTitle, push.publication.remoteUrl, push.publication.remoteKey, push.publication.identifier, push.publication.branch, push.publication.baseBranch])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])

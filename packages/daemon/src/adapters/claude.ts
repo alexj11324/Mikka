@@ -29,6 +29,7 @@ import { ClaudeGenerationMetrics } from './generation-metrics'
 import { prepareClaudeSession, ClaudeProjectSettingsNotClaimable, type ClaudePrewarmBinding, type ClaudePreparation } from './claude-prewarm'
 import { runRuntimeTimings } from '../run-runtime-timing'
 import type { Readable, Writable } from "node:stream"
+import type { ThreadMode } from "@mikka/protocol/thread-mode"
 
 import {
   query,
@@ -166,14 +167,26 @@ export function claudeProjectDirName(cwd: string): string {
  */
 export function claudeSettings(
   workspace?: RunPolicy,
+  mode: ThreadMode = 'execute',
 ): Settings {
   return {
     sandbox: { enabled: false },
-    permissions: claudePermissionRules(runPolicy(workspace)),
+    permissions: claudePermissionRules(runPolicy(workspace), mode),
     // Keep the issue marker last in PR bodies without changing commit attribution.
     attribution: { pr: "" },
   }
 }
+
+/** Built-in tools a Plan run may use without asking: they only read. */
+const PLAN_READ_TOOLS = new Set(["Read", "Glob", "Grep", "LS", "NotebookRead", "WebFetch", "WebSearch", "TodoWrite"])
+/** The host hand-in tools enforce the mode themselves; an app entry follows
+ * the same server-side app rules. Computer use has its own broker ask. */
+const isHostTool = (name: string) => name.startsWith("mcp__mikka__")
+const isComputerTool = (name: string) => name.startsWith("mcp__mikka_computer__")
+const isAppTool = (name: string) => name.startsWith("mcp__") && !name.startsWith("mcp__mikka")
+
+/** A local view of the SDK's canUseTool context; the SDK passes these fields. */
+type CanUseToolContext = { signal?: AbortSignal; toolUseID?: string; requestId?: string }
 
 /** Claude Code SDK messages as UI message chunks. */
 export function claudeChunks(message: SDKMessage): RunChunk[] {
@@ -462,9 +475,9 @@ function spawnBinary(binary?: string, oauthToken?: string) {
 
 function claudePrewarmOptionsKey(options: SessionOptions) {
   const { cwd, env, credential, github, apps, mcp, mcpHttpObservationUrl, machineEnvironment,
-    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume } = options
+    kind, mode, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume } = options
   return JSON.stringify({ cwd, env, credential, github, apps, mcp, mcpHttpObservationUrl, machineEnvironment,
-    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume,
+    kind, mode, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume,
     mailbox: options.mailbox?.tools })
 }
 
@@ -578,6 +591,7 @@ export class ClaudeAdapter implements AgentAdapter {
       mailboxEnabled: Boolean(options.mailbox),
       harness: "claude_code",
       kind: options.kind,
+      mode: options.mode,
       factoryCheck: options.factoryCheck,
       verifyCommand: options.verifyCommand,
       worktree: options.cwd,
@@ -707,7 +721,7 @@ export class ClaudeAdapter implements AgentAdapter {
         },
         settingSources: options.machineEnvironment ? ["user", "project", "local"] : [],
         settings: {
-          ...claudeSettings(options.policy),
+          ...claudeSettings(options.policy, options.mode),
           ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
         },
         mcpServers: {
@@ -722,9 +736,32 @@ export class ClaudeAdapter implements AgentAdapter {
           preset: "claude_code" as const,
           append: append,
         },
-        // Nothing is asked per tool (decision 2026-11-01-2335).
-        permissionMode: "bypassPermissions" as const,
-        allowDangerouslySkipPermissions: true,
+        // Execute asks nothing per tool (decision 2026-11-01-2335). Ask
+        // routes each risky built-in to the run-bound approval gate; Plan
+        // allows reads and the host hand-in only.
+        ...(options.mode === "ask" ? {
+          permissionMode: "default" as const,
+          canUseTool: async (name: string, args: Record<string, unknown>, context: CanUseToolContext) => {
+            if (PLAN_READ_TOOLS.has(name) || isHostTool(name) || isAppTool(name) || isComputerTool(name))
+              return { behavior: "allow" as const, updatedInput: args }
+            const approved = await approval.requestApproval({
+              requestId: context?.requestId ?? context?.toolUseID ?? randomUUID(),
+              method: "tool" as const, tool: name, input: args,
+            }, context?.signal)
+            return approved
+              ? { behavior: "allow" as const, updatedInput: args }
+              : { behavior: "deny" as const, message: "The person did not approve this operation." }
+          },
+        } : options.mode === "plan" ? {
+          permissionMode: "default" as const,
+          canUseTool: async (name: string, args: Record<string, unknown>) =>
+            PLAN_READ_TOOLS.has(name) || isHostTool(name) || isAppTool(name)
+              ? { behavior: "allow" as const, updatedInput: args }
+              : { behavior: "deny" as const, message: "Plan mode only reads; hand in a plan instead of changing anything." },
+        } : {
+          permissionMode: "bypassPermissions" as const,
+          allowDangerouslySkipPermissions: true,
+        }),
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
         ...(options.effort ? { effort: options.effort } : {}),

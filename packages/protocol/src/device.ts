@@ -19,6 +19,7 @@ import { z } from "zod"
 import { workspaceReadCommand } from './coding-workspace'
 
 import { modelNameSchema, runPolicySchema } from "./agent-policy"
+import { threadModeSchema } from "./thread-mode"
 import { signedPolicySnapshotSchema } from "./policy-snapshot"
 import { harnessInfoSchema, harnessSchema } from "./harness"
 import { quotaSnapshotSchema } from "./quota"
@@ -535,6 +536,12 @@ export const runAssignmentSchema = z.object({
    * a new session gets `prompt`, which already includes it.
    */
   followUp: z.string().max(100_000).optional(),
+  /**
+   * The thread's frozen interaction mode (#1730): plan reads only, ask waits
+   * for approval per risky step, execute is the policy's normal behavior.
+   * Absent from an older server: the daemon applies Execute.
+   */
+  mode: threadModeSchema.optional(),
   /**
    * The workspace's agent permissions and network allow-list (ADR 0028).
    * Absent from an older server: the daemon applies the ADR 0009 defaults.

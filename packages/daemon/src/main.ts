@@ -1,6 +1,7 @@
 import type { AnonymousCodexCandidate } from './anonymous-codex-spare'
 import type { AnonymousClaudeCandidate } from './anonymous-claude-spare'
 import { captureRunFailure } from "@mikka/protocol/run-failure"
+import { THREAD_MODES } from "@mikka/protocol/thread-mode"
 import { coordinatorCapable } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
@@ -640,14 +641,14 @@ export class Daemon {
     // A callback alone is insufficient: the host must own the enforcement
     // boundary and bind its lifetime to the run's authenticated gate.
     const supported = detected.filter((info) => this.adapters.has(info.harness))
-    this.harnesses = hosted ? supported.map(info => ({
-      ...info,
-      ...this.modelReports.get(info.harness),
+    this.harnesses = hosted ? supported.map(info => {
       // The run's live gate stops a revoked run; Codex also verifies its
-      // pinned interface at initialize.
-      toolApproval: this.supportsToolApproval(info),
-      coordinator: false,
-    })) : await Promise.all(supported.map(info => this.localHarnessReport(info)))
+      // pinned interface at initialize. Only a runner with that gate claims
+      // the thread modes it can actually enforce.
+      const toolApproval = this.supportsToolApproval(info)
+      return { ...info, ...this.modelReports.get(info.harness), toolApproval,
+        ...(toolApproval ? { threadModes: [...THREAD_MODES] } : {}), coordinator: false }
+    }) : await Promise.all(supported.map(info => this.localHarnessReport(info)))
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
     // A crash or kill skipped the run-end wipe; resumed runs get fresh credentials.
@@ -1099,8 +1100,9 @@ export class Daemon {
 
   /** Advertise only a checked local runner, replacing any old readiness or failure. */
   private async localHarnessReport(info: HarnessInfo): Promise<HarnessInfo> {
-    const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness),
-      toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info) }
+    const toolApproval = this.supportsToolApproval(info)
+    const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness), toolApproval,
+      ...(toolApproval ? { threadModes: [...THREAD_MODES] } : {}), coordinator: coordinatorCapable(info) }
     delete report.subscriptionBroker
     delete report.subscriptionModelCatalogue
     delete report.subscriptionPreflight

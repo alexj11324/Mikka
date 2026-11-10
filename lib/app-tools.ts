@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { OWN_INTEGRATIONS, TOOLKIT_SLUG } from '@/lib/composio-accounts'
 import type { ComposioAccountChoice } from '@/lib/composio-actions'
 import type { WriteJudge } from '@/lib/operations/write-judgment'
+import type { ThreadMode } from '@mikka/protocol/thread-mode'
 
 // Any app a person connected from the 插件 store, through the tools Composio
 // lists for that toolkit; nothing is written per app (decision 2026-10-31).
@@ -70,6 +71,8 @@ export type AppToolDeps = {
   propose: (call: AppToolCall, accountId: string | null) => Promise<unknown>
   /** An app with nothing to connect (Composio no-auth): its tools need no account. */
   noAuth?: (toolkit: string) => Promise<boolean>
+  /** A device thread's frozen mode (#1730): plan refuses writes, ask cards them. */
+  mode?: ThreadMode
 }
 
 const decision = z.enum(['allow', 'ask', 'deny'])
@@ -160,9 +163,14 @@ export async function callAppTool(deps: AppToolDeps, raw: unknown) {
   // The person's explicit setting wins; otherwise the Decisions API judges every call, reads included (readOnlyHint is one of its inputs).
   const setting = await deps.setting(toolSettingKey(tool.slug), toolkit)
   if (setting === 'deny') return { error: 'integrationActionDenied' }
+  const readOnlyTool = isReadOnlyTool(tool)
+  // A thread mode narrows every host path: Plan reads only; Ask turns every
+  // write into the person's card, whatever the stored setting allows.
+  if (deps.mode === 'plan' && !readOnlyTool) return { error: 'threadModePlanReadOnly' }
+  if (deps.mode === 'ask' && !readOnlyTool) return deps.propose(call, ready.accountId)
   const card = setting === 'ask' || (setting === null && await deps.judge({ action: toolSettingKey(tool.slug), tool: tool.slug, annotations: tool.tags, input: args }) === 'ask')
   if (card) return deps.propose(call, ready.accountId)
-  if (!isReadOnlyTool(tool)) return runRecorded(deps, call, ready.accountId)
+  if (!readOnlyTool) return runRecorded(deps, call, ready.accountId)
   try {
     const result = await deps.execute(call, ready.accountId)
     return result.successful ? { data: bounded(result.data) } : { error: result.error?.slice(0, 500) || 'integrationActionFailed' }
