@@ -235,8 +235,11 @@ Report findings in the issue before building on an assumption that failed.
   (`sleeping | waking | running | error`), lastActiveAt.
 - `bot_desktops`: workspaceId, botId (references `bots.id`; unique pair), display number, control
   (`agent | user | idle`), controlledBy (userId, nullable), lastActiveAt.
-- `thread_machines`: runId (unique), sandboxId, snapshotId, state
-  (`starting | running | paused | ended | error`), desktop (boolean),
+- `thread_machines`: runId (unique), sandboxId, snapshotId (the
+  template/image it was created from, never a filesystem snapshot),
+  filesystemSnapshotId / snapshotState / snapshotTakenAt (the task's own
+  restore image), state
+  (`starting | running | paused | restore | ended | error`), desktop (boolean),
   lastActiveAt.
 - `bot_subagents`: id, workspaceId, botId, task (one sentence, R-45), state
   (`queued | running | needs_you | done | failed | stopped`), step (the
