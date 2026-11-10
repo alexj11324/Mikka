@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "enabled": false,
-  "phase": "cache-live",
-  "expectedSha": null,
+  "enabled": true,
+  "phase": "ordinary-stop",
+  "expectedSha": "cc389d61e8a85206d17616e4326a660283a1b2bd",
   "fixtureRunKey": "acme-1506-20261106",
   "workspaceId": "0a700222-137b-4bca-b86d-a74b8fdffc21",
   "fixtureReceipt": "receipts/fixtures-ready-42286389783.json",
