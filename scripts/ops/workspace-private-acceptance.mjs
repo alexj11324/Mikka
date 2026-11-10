@@ -9,9 +9,9 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: 'f7230e8bd3c3e267e57f57fa51fd94647b7e7ea2',
-  tree: 'b426d99cb99a1fe9bead535b87b9cc79132a5c6b',
-  workerSha: '74a784f805ec89a72f80e8cc91ff514e761dae4c',
+  source: '6b0ee8cd5b9211b8d744a4d9d51914918d03466a',
+  tree: '3bb02ae48e62a2c430009537c975eb0b8e95939f',
+  workerSha: '638876d7e373115b084b8e56fe69cb437f342f47',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
     'package.json': '63d5e01a25c05d86d46c2e8f7f6129377358d981eabdafcf5a5a96dc644f6eca',
@@ -25,8 +25,8 @@ export const P0 = Object.freeze({
     'scripts/e2b/official-files.test.py': '9f5c3b13a0b219fa55570964139214fe89db36c76c3b58ba00313a587dade7d0',
     'scripts/e2b/cleanup-template-candidates.py': '893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d',
     'scripts/e2b/cleanup-template-candidates.test.py': '826a489c570a788ea018b6a6ce786fd3e71b41dc8d514cfd8a09e516f8bf84f1',
-    'scripts/e2b/workspace-ingress-acceptance.mjs': 'e28a551e6f14d38d4fcbd521ab1f20f09c895c3b5e9e18a8cb3f9ed9de8ae7f0',
-    'scripts/e2b/workspace-ingress-acceptance.test.mjs': '9b172bf3dd2f877d487a3b1f064c9fc548088d1b3f6a4ae0af7c560039c34043',
+    'scripts/e2b/workspace-ingress-acceptance.mjs': '4e9646a707cdac149141e26ac3c0f715cabb0f2a7f2fc549509c1d905e686c28',
+    'scripts/e2b/workspace-ingress-acceptance.test.mjs': '4ccf47c093c59cf7e32a5197dab36c045568f4474ff02ad961e2213a51067c08',
     'scripts/e2b/workspace-ingress-servers.py': '5c0c12ff3f5573f7a6032a359a372b2a4697b17e44501c7d175bd10c809c74b8',
     'scripts/e2b/workspace-terminal-acceptance.mjs': 'd6d9d535c393e179eca800a44e5dfed508b06135d8891a793af05d539fa8252c',
     'scripts/e2b/workspace-terminal-acceptance.test.mjs': '971003d90739338112ae83838abc218811818600dcebe7fdbdd46b5e2214dce3',
@@ -112,6 +112,10 @@ const IDENTITY_ERROR_TYPES = ['Error', 'TypeError', 'SyntaxError', 'CommandExitE
   'SandboxError', 'SandboxNotFoundError', 'SandboxNotRunningError', 'SandboxUnreachableError', 'FileNotFoundError',
   'NotFoundError', 'ServiceBusyError', 'RateLimitError', 'AuthenticationError', 'InvalidArgumentError',
   'NotEnoughSpaceError', 'TimeoutError', 'AbortError']
+const PREVIEW_ERRORS = ['invalid_scope', 'invalid_port', 'worktree_unavailable', 'port_limit',
+  'authorization_revoked', 'authorization_expired', 'server_stopped', 'control_unavailable',
+  'firewall_unsupported', 'firewall_unavailable', 'infrastructure_only', 'origin_limit']
+const PREVIEW_PROBE_OUTCOMES = ['timeout', 'connection_failed', 'http_error', 'pin_changed', 'invalid_status']
 const CLEANUP_OUTCOMES = ['creation_not_requested', 'no_creation_journal', 'creation_unconfirmed',
   'provider_already_absent', 'provider_kill_acknowledged_and_absent', 'provider_absence_not_confirmed', 'cleanup_failed']
 const FRAMEWORK_FLAGS = ['rawDenied', 'authenticatedHttp', 'assets', 'hotReload', 'crossSiteBootstrap', 'revoked', 'takeoverDenied']
@@ -499,12 +503,23 @@ function identityFailureEvidence(value) {
           && row.connectCode >= 1 && row.connectCode <= 16 ? row.connectCode : null }
     }), stderr: flags(value.stderr, ['gitDubiousOwnership', 'gitNotRepository', 'oversized']) }
 }
+function previewFailureEvidence(value) {
+  if (!value || !['unavailable', 'port_mismatch', 'control_error', 'invalid_reply'].includes(value.reply)) return null
+  const probes = Array.isArray(value.probes) ? value.probes : []
+  return { reply: value.reply, error: value.reply === 'control_error' ? one(value.error, PREVIEW_ERRORS, 'other') : null,
+    status: value.reply === 'control_error' && [400, 403, 404, 409, 429, 503].includes(value.status) ? value.status : null,
+    candidateCount: debugCount(value.candidateCount, 16), vanishedFds: debugCount(value.vanishedFds, 4096 * 1024),
+    processReadErrors: debugCount(value.processReadErrors, 4096), ...flags(value, ['budgetExpired']),
+    probes: probes.slice(0, 16).map(row => ({ outcome: one(row?.outcome, PREVIEW_PROBE_OUTCOMES, 'other'),
+      elapsedMs: debugCount(row?.elapsedMs, 25_000) })), truncated: value.truncated === true || probes.length > 16 }
+}
 function runtimeEvidence(row, kind) {
   return { kind, present: !!row, sourceCommit: SHA.test(row?.sourceCommit ?? '') ? row.sourceCommit : null,
     workerSha: SHA.test(row?.workerSha ?? '') ? row.workerSha : null, templateId: boundedId(row?.templateId), sandboxId: boundedId(row?.sandboxId),
     fixtureId: UUID.test(row?.fixtureId ?? '') ? row.fixtureId : null, stage: one(row?.stage, RUNTIME_STAGES),
     failure: row?.failure === undefined ? null : one(row.failure, RUNTIME_CODES, 'internal'), passed: row?.passed === true,
     identityDiagnostic: row?.stage === 'identity' ? identityFailureEvidence(row.identityDiagnostic) : null,
+    previewDiagnostic: ['next', 'vite'].includes(row?.stage) && row?.failure === 'preview' ? previewFailureEvidence(row.previewDiagnostic) : null,
     ...flags(row, ['productionTaskAuthorityTested', 'subscriptionsTested', 'agentRootIsolationProven', 'previewStopped']),
     frameworkVersions: Object.fromEntries(Object.entries(FRAMEWORK_VERSIONS).map(([key, version]) => [key, row?.frameworkVersions?.[key] === version ? version : null])),
     frameworkLockSha256: DIGEST.test(row?.frameworkLockSha256 ?? '') ? row.frameworkLockSha256 : null,

@@ -1021,3 +1021,66 @@ test('completed runtime needs the exact preview shutdown boolean and never copie
   const input = fixtureReceipts(), result = summarizeAcceptance(context, input)
   assert.equal(result.passed, true); assert.ok(result.cases.every(row => row.previewStopped === true))
 })
+
+test('Next and Vite prepare failures retain bounded probe evidence without changing failure or cleanup', () => {
+  for (const kind of kinds) for (const stage of ['next', 'vite']) {
+    const input = fixtureReceipts()
+    const diagnostic = { reply: 'unavailable', error: null, status: null, candidateCount: 1,
+      vanishedFds: 2, processReadErrors: 1, budgetExpired: false,
+      probes: [{ outcome: 'timeout', elapsedMs: 8001 }], truncated: false }
+    Object.assign(input.runtime[kind], { stage, failure: 'preview', passed: false, previewDiagnostic: diagnostic,
+      frameworks: stage === 'next' ? [] : input.runtime[kind].frameworks.slice(0, 1), terminal: undefined, previewStopped: undefined })
+    input.outcomes.acceptance = 'failure'
+    const result = summarizeAcceptance(context, input), row = result.cases.find(value => value.kind === kind)
+    assert.deepEqual(row.previewDiagnostic, diagnostic)
+    assert.equal(row.stage, stage); assert.equal(row.failure, 'preview'); assert.equal(row.runtimePassed, false)
+    assert.equal(row.frameworks.length, stage === 'next' ? 0 : 1)
+    assert.equal(row.terminal.passed, false); assert.equal(row.previewStopped, null)
+    assert.equal(result.passed, false); assert.equal(result.runtimeCleanupConfirmed, true); assert.equal(result.templateCleanupConfirmed, true)
+    assert.equal(result.cases.find(value => value.kind !== kind).runtimePassed, true)
+  }
+})
+
+test('preview diagnostic projection drops arbitrary reply data and bounds every numeric field and probe list', () => {
+  const privateText = 'synthetic-private-preview-path-host-pid-and-output'
+  const input = fixtureReceipts()
+  Object.assign(input.runtime.claude, { stage: 'next', failure: 'preview', passed: false, previewDiagnostic: {
+    reply: 'control_error', error: privateText, status: true, candidateCount: 17, vanishedFds: 4096 * 1024 + 1,
+    processReadErrors: -1, budgetExpired: privateText, message: privateText, path: privateText,
+    probes: Array.from({ length: 17 }, () => ({ outcome: privateText, elapsedMs: 25_001, host: privateText })),
+  } })
+  const result = summarizeAcceptance(context, input), diagnostic = result.cases[0].previewDiagnostic
+  assert.equal(result.passed, false); assert.equal(diagnostic.error, 'other'); assert.equal(diagnostic.status, null)
+  assert.deepEqual([diagnostic.candidateCount, diagnostic.vanishedFds, diagnostic.processReadErrors, diagnostic.budgetExpired], [null, null, null, null])
+  assert.equal(diagnostic.probes.length, 16); assert.equal(diagnostic.truncated, true)
+  assert.ok(diagnostic.probes.every(row => row.outcome === 'other' && row.elapsedMs === null))
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+  for (const [field, maximum] of [['candidateCount', 16], ['vanishedFds', 4096 * 1024], ['processReadErrors', 4096], ['elapsedMs', 25_000]]) {
+    for (const value of [0, maximum, maximum + 1, -1, true, '1', 1.5]) {
+      input.runtime.claude.previewDiagnostic = { reply: 'unavailable',
+        ...(field === 'elapsedMs' ? { probes: [{ outcome: 'timeout', elapsedMs: value }] } : { [field]: value }) }
+      const observed = summarizeAcceptance(context, input).cases[0].previewDiagnostic
+      assert.equal(field === 'elapsedMs' ? observed.probes[0].elapsedMs : observed[field], value === 0 || value === maximum ? value : null)
+    }
+  }
+})
+
+test('preview diagnostics belong only to preview failures and cannot grant runtime success', () => {
+  const input = fixtureReceipts(), diagnostic = { reply: 'control_error', error: 'server_stopped', status: 409,
+    candidateCount: null, vanishedFds: null, processReadErrors: null, budgetExpired: null, probes: [], truncated: false }
+  input.runtime.claude.previewDiagnostic = diagnostic
+  let result = summarizeAcceptance(context, input)
+  assert.equal(result.passed, true); assert.equal(result.cases[0].previewDiagnostic, null)
+  for (const [stage, failure] of [['identity', 'preview'], ['next', 'process'], ['pause_resume', 'preview']]) {
+    Object.assign(input.runtime.claude, { stage, failure, passed: false })
+    result = summarizeAcceptance(context, input)
+    assert.equal(result.passed, false); assert.equal(result.cases[0].previewDiagnostic, null)
+  }
+  Object.assign(input.runtime.claude, { stage: 'next', failure: 'preview' })
+  result = summarizeAcceptance(context, input)
+  assert.deepEqual(result.cases[0].previewDiagnostic, diagnostic); assert.equal(result.passed, false)
+  input.runtime.claude.previewDiagnostic.reply = 'synthetic-private-unknown-reply'
+  result = summarizeAcceptance(context, input)
+  assert.equal(result.cases[0].previewDiagnostic, null); assert.equal(result.passed, false)
+  assert.equal(result.runtimeCleanupConfirmed, true); assert.equal(result.templateCleanupConfirmed, true)
+})
