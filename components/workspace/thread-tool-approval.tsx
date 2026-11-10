@@ -44,8 +44,12 @@ export function ThreadApprovalCardsContent({ approvals, busy = null, failure = n
   </div>
 }
 
-/** The live list for one run; the panel places it above the composer. */
-export function ThreadApprovalCards({ runId, liveRunId, active }: { runId: string; liveRunId: string; active: boolean }) {
-  const { approvals, busy, failure, decide } = useToolApprovals(runId, liveRunId, active)
+/**
+ * The live list for the run executing now; the panel places it above the
+ * composer. It is bound to that run, never the thread's root: an answer starts
+ * a continuation, and the approvals it asks for hang off the continuation.
+ */
+export function ThreadApprovalCards({ runId, active }: { runId: string; active: boolean }) {
+  const { approvals, busy, failure, decide } = useToolApprovals(runId, active)
   return <ThreadApprovalCardsContent approvals={approvals} busy={busy} failure={failure} onDecide={(approvalId, decision) => { void decide(approvalId, decision) }} />
 }

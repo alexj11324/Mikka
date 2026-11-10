@@ -15,7 +15,14 @@ import { loadToolApprovals, nextToolApprovalDeadline, toolApprovalsKey, toolAppr
 
 export type ApprovalDecisionError = 'approvalAlreadyDecided' | 'approvalExpired' | 'approvalNoLongerApplies' | 'approvalUnavailable' | 'decideFailed'
 
-export function useToolApprovals(runId: string, liveRunId: string, active: boolean) {
+// The refusal codes the decision route may answer with; anything else is a
+// generic failure, never a code rendered as if the server had said it.
+const DECISION_ERRORS: readonly ApprovalDecisionError[] = ['approvalAlreadyDecided', 'approvalExpired', 'approvalNoLongerApplies', 'approvalUnavailable', 'decideFailed']
+const isDecisionError = (value: unknown): value is ApprovalDecisionError =>
+  typeof value === 'string' && (DECISION_ERRORS as readonly string[]).includes(value)
+
+/** The live approvals of one run — the run executing now, not the thread's root. */
+export function useToolApprovals(runId: string, active: boolean) {
   const key = toolApprovalsKey(runId)
   const liveKeys = toolApprovalsLiveKeys(runId)
   const { data: session, isPending } = authClient.useSession()
@@ -28,7 +35,7 @@ export function useToolApprovals(runId: string, liveRunId: string, active: boole
     revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false,
   })
   useLiveKey('pending_actions', viewer ? workspaceId ?? UNRESOLVED_APPROVAL_SCOPE : null, liveKeys, workspaceId, { deadline: nextToolApprovalDeadline(data) })
-  useLiveKey('run', liveRunId, liveKeys, null)
+  useLiveKey('run', runId, liveKeys, null)
   const [busy, setBusy] = useState<string | null>(null)
   const [failure, setFailure] = useState<ApprovalDecisionError | null>(null)
 
@@ -43,7 +50,7 @@ export function useToolApprovals(runId: string, liveRunId: string, active: boole
       })
       if (!response.ok) {
         const body = await response.json().catch(() => null) as { error?: unknown } | null
-        setFailure(typeof body?.error === 'string' ? body.error as ApprovalDecisionError : 'decideFailed')
+        setFailure(isDecisionError(body?.error) ? body.error : 'decideFailed')
         // A refused decision means the card no longer matches the server; reread.
         void mutate()
         return

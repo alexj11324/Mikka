@@ -25,7 +25,7 @@ export type ThreadHeaderProps = {
   place: ReactNode
   /** The acceptance state badge, for a Factory candidate; null otherwise. */
   acceptanceBadge: ReactNode
-  /** The mode control the panel renders (#1730): the owner's picker, or a read-only badge for another reader; null when the layer has none. */
+  /** The mode control the panel renders (#1730): the thread owner's picker; null when the layer has none. */
   mode?: ReactNode
   /** The execution identity (ThreadExecutionIdentity), for its owner; null otherwise. */
   identity: ReactNode
@@ -33,7 +33,12 @@ export type ThreadHeaderProps = {
   artifact: ReactNode
   /** 对话 / 验收 tabs when they share the header row; null otherwise. */
   tabs: ReactNode
-  /** The header wraps on a phone (a Factory candidate's tabs). */
+  /**
+   * The header may wrap when its own column is narrow (under 22rem ≈ 352 px):
+   * a Factory candidate's tabs, or the thread's mode control. The width is the
+   * column's, not the viewport's — a 1440 px window still opens a 320–360 px
+   * right column, where a viewport breakpoint never matches.
+   */
   wraps: boolean
   /**
    * ⤢: widen the right column the thread sits in, or put back the width it had (useRightColumnWiden);

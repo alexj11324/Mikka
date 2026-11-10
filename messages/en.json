@@ -4111,7 +4111,7 @@
       "unsupportedHarness": "This Agent cannot enforce that mode.",
       "daemonOutdated": "Mikka on this device needs an update before it can enforce that mode.",
       "unknownHarness": "This Agent's mode support is unknown.",
-      "missingHarness": "Waiting for this Agent's mode support.",
+      "missingHarness": "This Agent's mode support could not be read yet, so the mode cannot be switched.",
       "unsupportedSelected": "This Agent cannot enforce the stored mode. Switch to Execute.",
       "switchToExecute": "Switch to Execute",
       "locked": "This thread is running. The mode you pick after it ends applies to the next run.",

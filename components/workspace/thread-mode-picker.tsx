@@ -45,7 +45,12 @@ export function ThreadModePickerContent({ view, pending = false, onChange }: Thr
   </div>
 }
 
-/** The read-only mode badge a reader who cannot switch sees, and the picker's own frozen badge. */
+/**
+ * The frozen-mode badge. The picker draws its own copy. A reader who cannot
+ * switch — a teammate — is not wired to it yet: the thread read is owner-only
+ * (canReadThread), so the panel would never reach that branch (#1891 review).
+ * Wire it here once thread visibility widens, reading `IssueThread.mode`.
+ */
 export function ThreadModeBadge({ mode }: { mode: ThreadMode }) {
   const t = useTranslations('IssueThreads.mode')
   return <Badge variant="secondary" data-thread-mode-frozen="">{t('frozen', { mode: t(mode) })}</Badge>

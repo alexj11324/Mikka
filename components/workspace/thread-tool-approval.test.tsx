@@ -15,8 +15,17 @@ const copy = (namespace: string) => {
 }
 mock.module('next-intl', { namedExports: { useTranslations: copy } })
 
+// The wiring test below renders the component that owns the hook; every other
+// test renders the content directly. The stub records the run it was asked for.
+const asked: { runId: string; active: boolean }[] = []
+mock.module('@/hooks/use-tool-approvals', { namedExports: { useToolApprovals: (runId: string, active: boolean) => {
+  asked.push({ runId, active })
+  return { approvals: [approval({ runId })], busy: null, failure: null, mutate: async () => {}, decide: async () => {} }
+} } })
+
 let Content: typeof import('./thread-tool-approval')['ThreadApprovalCardsContent']
-before(async () => { ({ ThreadApprovalCardsContent: Content } = await import('./thread-tool-approval')) })
+let Cards: typeof import('./thread-tool-approval')['ThreadApprovalCards']
+before(async () => { ({ ThreadApprovalCardsContent: Content, ThreadApprovalCards: Cards } = await import('./thread-tool-approval')) })
 
 const now = Date.now()
 const approval = (over: Partial<ThreadApprovalView> = {}): ThreadApprovalView => ({
@@ -66,4 +75,16 @@ test('a decision in flight disables both buttons and a refusal is an alert', () 
 
 test('no cards and no failure draw nothing', () => {
   assert.equal(renderToStaticMarkup(<Content approvals={[]} />), '')
+})
+
+test('an answered question reads the continuation run’s approvals, not the root run’s', () => {
+  // Answering a question starts a continuation; its Ask requests hang off that
+  // run, so the card must be bound to the run executing now.
+  const liveRunId = '00000000-0000-4000-8000-0000000000cc'
+  const html = renderToStaticMarkup(<Cards runId={liveRunId} active />)
+  assert.deepEqual(asked.at(-1), { runId: liveRunId, active: true })
+  // What the continuation asked is what the person sees.
+  assert.match(html, /data-slot="thread-approvals"/)
+  assert.match(html, /data-approval="pending"/)
+  assert.match(html, /允许一次/)
 })

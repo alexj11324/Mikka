@@ -249,6 +249,11 @@
     "kind": "core",
     "env": {}
   },
+  "core-58": {
+    "command": "pnpm test:thread-mode-ui",
+    "kind": "core",
+    "env": {}
+  },
   "core-52": {
     "command": "pnpm check:agent-ui",
     "kind": "core",

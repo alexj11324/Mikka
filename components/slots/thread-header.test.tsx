@@ -26,8 +26,22 @@ test('the mode control has its own slot and a long title still truncates', () =>
   assert.doesNotMatch(plain, /data-slot="thread-mode-slot"/)
 })
 
-test('a narrow header may wrap the mode control onto its own row', () => {
+test('a narrow column wraps the mode control onto its own row', () => {
   const html = renderToStaticMarkup(<Header {...base} wraps mode={<span data-test-mode="">Ask</span>} />)
-  assert.match(html, /max-sm:h-auto max-sm:flex-wrap/)
-  assert.match(html, /max-sm:order-last max-sm:w-full/)
+  // The query is the column's own inline size: the header is a child of the
+  // container, because a container query cannot size its own container.
+  assert.match(html, /data-slot="thread-header-container"/)
+  assert.match(html, /@container\/thread-header/)
+  assert.match(html, /@max-\[22rem\]\/thread-header:flex-wrap/)
+  assert.match(html, /@max-\[22rem\]\/thread-header:h-auto/)
+  assert.match(html, /@max-\[22rem\]\/thread-header:order-last/)
+  assert.match(html, /@max-\[22rem\]\/thread-header:w-full/)
+  // A viewport unit here is the bug this guards: 320–360 px columns open in a
+  // 1440 px window, where a `max-sm:` header never wrapped. The measured
+  // 320/360 assertion is the browser spec, not this one.
+  assert.doesNotMatch(html, /max-sm:/)
+  // Without wraps the header stays one row; the mode control keeps its width.
+  const oneRow = renderToStaticMarkup(<Header {...base} mode={<span data-test-mode="">Ask</span>} />)
+  assert.doesNotMatch(oneRow, /@max-\[22rem\]\/thread-header:/)
+  assert.match(oneRow, /class="flex min-w-0 items-center shrink-0"/)
 })

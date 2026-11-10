@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register, watchRuntime, seedTask, openIssueFromSearch, openSearch } from './fixtures'
+import { test, expect, register, watchRuntime, seedTask, seedTeamWorkspace, openIssueFromSearch, openSearch } from './fixtures'
 
 function isolatedPool() {
   const connectionString = process.env.E2E_DATABASE_URL
@@ -11,7 +11,7 @@ function isolatedPool() {
 }
 
 // This fixture only touches CI's isolated disposable database, never a Preview or production DB.
-async function seedThreads(email: string, title: string) {
+async function seedThreads(email: string, title: string, workspaceId: string | null = null) {
   const pool = isolatedPool()
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
@@ -20,7 +20,7 @@ async function seedThreads(email: string, title: string) {
     await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Coordinator'])
     for (const [status, prompt, summary] of [['succeeded', 'Model the routing table', 'PR #95 merged'], ['running', 'Route group replies', null]] as const) {
       const runId = randomUUID()
-      await pool.query('INSERT INTO agent_runs (id, "userId", "issueId", "agentId", status, prompt, report) VALUES ($1, $2, $3, $4, $5, $6, $7)', [runId, user.id, issue.id, agentId, status, prompt, summary && JSON.stringify({ summary })])
+      await pool.query('INSERT INTO agent_runs (id, "userId", "issueId", "agentId", status, prompt, report, "workspaceId") VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [runId, user.id, issue.id, agentId, status, prompt, summary && JSON.stringify({ summary }), workspaceId])
       await pool.query('INSERT INTO run_chunks (id, "runId", seq, chunk) VALUES ($1, $2, 1, $3)', [randomUUID(), runId, JSON.stringify({ type: 'text-delta', id: runId, delta: `线程回复 for ${prompt}` })])
     }
     return issue.id
@@ -260,4 +260,39 @@ test('A failed thread offers 重试 beside its error', async ({ page }, testInfo
   const request = page.waitForRequest(request => request.method() === 'POST' && !!request.headers()['next-action'] && request.postData()?.includes(runId) === true && request.postData()?.includes('重试') === true)
   await retry.click()
   await request
+})
+
+// #1891 review: the header's narrow layout follows its own column, never the
+// viewport. A 1440 px window still opens a 320–360 px right column, so a
+// `max-sm:` header never wrapped there. Measured, not asserted from class names:
+// the column is forced to the two widths the review named.
+test('the thread header wraps by its column width at 320 and stays one row at 360', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  const { email } = await register(page)
+  const title = `Thread header width ${randomUUID()}`
+  await seedTask(page, title)
+  // The mode read needs the run's workspace and the reader's membership in it
+  // (app/api/threads/[runId]/mode); without them the header has no third item.
+  const workspaceId = await seedTeamWorkspace(page)
+  await seedThreads(email, title, workspaceId)
+  await openIssueFromSearch(page, title)
+  await page.getByRole('region', { name: /^线程/ }).getByRole('button', { name: '打开线程 Model the routing table', exact: true }).click()
+  const container = page.locator('[data-slot="thread-header-container"]')
+  await expect(container).toBeVisible()
+  await expect(page.locator('[data-slot="thread-mode-slot"]')).toBeVisible()
+  const header = container.locator('header')
+  const height = async () => Math.round((await header.boundingBox())?.height ?? 0)
+  const setColumn = (width: number) => container.evaluate((node, value) => {
+    // The container's own inline size is what the query reads.
+    node.style.width = `${value}px`
+    node.style.maxWidth = `${value}px`
+  }, width)
+  await setColumn(320)
+  // Narrower than 22rem: the mode control drops to a second row.
+  await expect.poll(height).toBeGreaterThan(60)
+  await setColumn(360)
+  // Wider than 22rem: the same header is one 48 px row again.
+  await expect.poll(height).toBe(48)
+  // The viewport never moved.
+  expect(await page.viewportSize()).toEqual({ width: 1440, height: 960 })
 })

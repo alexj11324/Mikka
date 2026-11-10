@@ -4111,7 +4111,7 @@
       "unsupportedHarness": "此 Agent 无法强制执行该模式。",
       "daemonOutdated": "设备上的 Mikka 需要更新后才能强制执行该模式。",
       "unknownHarness": "暂时无法确认此 Agent 支持哪些模式。",
-      "missingHarness": "正在确认此 Agent 支持的模式。",
+      "missingHarness": "暂时读不到这个 Agent 支持的模式，确认前不能切换。",
       "unsupportedSelected": "此 Agent 无法强制执行当前模式，请改为执行模式。",
       "switchToExecute": "改为执行",
       "locked": "线程运行中不可切换；结束后选择的模式会在下一轮生效。",

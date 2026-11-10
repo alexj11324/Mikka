@@ -14,7 +14,12 @@ export interface IssueThread {
   failureDetails?: CompactRunFailure | null
   id: string
   status: string
-  /** The mode this run froze (#1730); visible wherever the thread row is read, also to a teammate. */
+  /**
+   * The mode this run froze (#1730), visible wherever the thread row is read,
+   * also to a teammate. Not drawn yet: the panel's control is the owner's picker
+   * and a teammate's read-only badge waits for thread visibility to widen
+   * (ThreadModeBadge, #1891 review).
+   */
   mode?: ThreadMode
   /** How the run came out once it ended (R-52); null while running or not judged yet. */
   outcome?: string | null
