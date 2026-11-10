@@ -33,6 +33,7 @@ export const pollingAllowlist = {
   'components/workspace/issue-pull-request-link.tsx': db(web, 'a PR with no webhook of ours (linked by hand, or a repository without the app) is re-checked with GitHub every 5 min while visible; a run-delivered PR also re-reads on pull_request_status', 1),
   // Server: loops that re-query our database.
   'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops', 1),
+  'app/v1/runs/[runId]/tool-approval/route.ts': db(server, 'waitForDecision fallback timer only: waits on LISTEN for the owner decision (one re-read per NOTIFY, one final read at the deadline); a 5 s timer exists only when LISTEN is unavailable', 1),
   'lib/coordinator/group-turns.ts': db(server, 'untilStopped fallback only: 15 s for best-effort subscriptions or a failed reliable-push read, 1 s if LISTEN is unavailable', 1),
   'workflows/run-publication/workflow.ts': db(server, 'untilDone: publish and fail results retried with exponential backoff, 30 s doubling to a 10 min cap, until done (GitHub outage or another worker\'s lease; nothing to push)', 1),
   // Daemon: loops that call our server, which reads the database.
