@@ -14,7 +14,7 @@ import { Pool } from 'pg'
 import { dbUrl, seedUser, seedPersonalWorkspace, seedBot, seedIssue } from '../../tests/support/workspace-admin-db'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { templateModelsFixture } from '../../tests/support/template-models'
-import { addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence'
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import type { DecisionAnswer } from '../coordinator/decision'
 import type { OrderHarness } from '../model-order-plan'
@@ -2048,6 +2048,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await pool.query('UPDATE agent_runs SET status=\'succeeded\',"startedAt"=now(),"finishedAt"=now(),"sessionId"=$2,"stopReason"=\'submitted\',report=$3 WHERE id=$1',
       [runId, 'native-review-' + runId, { sourceCommit: reviewBaseSha, publish: { commit: reviewHeadSha, pushed: true },
         verify: { status: 'passed' }, summary: 'Completed repository candidate.', runtime: { observedModel: model[harness] } }])
+    // The factory handoff gate checks the candidate's producer run; this
+    // review-feedback fixture exercises the repair path, not evidence capture.
+    if (mode === 'factory') await addFactoryVisualEvidence(pool, runId)
     assert.ok((await pool.query('SELECT 1 FROM run_publications WHERE "runId"=$1 AND "remoteKey"=$2', [runId, repositoryKey])).rowCount,
       'the production queue freezes the repository admission and publication')
     if (mode === 'factory') {
@@ -2058,6 +2061,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal(current.stage, 'review', current.reason); assert.equal(current.status, 'pending', current.reason)
       const candidate = (await pool.query('SELECT * FROM factory_candidates WHERE id=$1', [current.candidateId])).rows[0]
       assert.equal(candidate.runId, runId); assert.equal(candidate.sha, reviewHeadSha); assert.equal(candidate.kind, 'repository')
+      // Same handoff gate as production: the producer must have ready visual
+      // evidence and a public receipt before repair feedback is dispatched.
+      await addFactoryPublicationEvidence(pool, f.task.id)
     }
     const scope = await ensureReviewScope(reviewDeps, who, runId, f.repoId)
     const files: DiffFileMetadata[] = proofFiles.map(file => {
