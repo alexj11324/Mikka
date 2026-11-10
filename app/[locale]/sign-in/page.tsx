@@ -11,7 +11,7 @@ import { isAcceptanceEnabled } from '@/lib/acceptance'
 import { auth, githubSignInEnabled, googleEnabled } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'
 import { COMPOSIO_AUTH_CALLBACK_PATH, oauthResumePath, safeAuthReturn } from '@/lib/auth-return'
-import { oauthAccountNotLinkedProvider } from '@/lib/auth-error'
+import { oauthAccountNotLinkedProvider, ssoRefusalHasOwnNotice } from '@/lib/auth-error'
 import { webAuthFlow } from '@/lib/web-connection/auth'
 import { officialWebCallback } from '@/lib/web-connection/policy'
 import { desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
@@ -39,8 +39,10 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   if (session?.user && !addAccount && oauthResume) redirect(oauthResume)
   if (session?.user && !addAccount && composioResume) redirect(next)
   // The return route sends a refused handoff here with oauth=failed: show that, never redirect back to it.
-  // A company SSO refusal comes back with sso=failed and its own error; the auth-sso slot shows it, so the generic
-  // OAuth notice stays off for that one.
+  // A company SSO refusal comes back with sso=failed and its own ENTERPRISE_* error; the auth-sso slot shows that
+  // notice, so the generic OAuth one stays off. The refusal decision below never depends on this display flag.
+  const ssoRefusal = ssoRefusalHasOwnNotice(query.sso, query.error)
+  const oauthFailed = query.oauth === 'failed' || (Boolean(query.error) && !ssoRefusal)
   const desktopRefused = Boolean((desktopFlow || webFlow) && query.oauth)
   // A desktop handoff with a web session shows the account first (AuthForm).
   if (session?.user && !addAccount && !desktopFlow && !webFlow) {
@@ -49,5 +51,5 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
     localeRedirect({ href: next, locale })
   }
   if (isAcceptanceEnabled() && !addAccount && !desktopFlow && !webFlow && !oauthResume && !composioResume && query.login !== '1' && !query.oauth && !query.continue && !query.error && !query.next) redirect('/api/acceptance')
-  return <>{!session?.user && <ClearUnauthenticatedReadCache />}<AuthForm emailEnabled={await emailSignInEnabled()} addAccount={addAccount} next={next} mode="sign-in" googleEnabled={googleEnabled} githubEnabled={await githubSignInEnabled()} oauthFailed={query.oauth === 'failed' || (Boolean(query.error) && query.sso !== 'failed')} continueGoogle={query.continue === 'google'} continueGitHub={query.continue === 'github'} oauthAccountNotLinked={oauthAccountNotLinkedProvider(query.error, query.provider)} continueComposio={Boolean(composioResume)} continueURL={oauthResume ? withBasePath(oauthResume) : composioResume} desktopFlow={desktopFlow} webFlow={webFlow} signedInAs={session?.user && (desktopFlow || webFlow) && !desktopRefused ? { name: session.user.name, email: session.user.email, image: session.user.image } : null} /></>
+  return <>{!session?.user && <ClearUnauthenticatedReadCache />}<AuthForm emailEnabled={await emailSignInEnabled()} addAccount={addAccount} next={next} mode="sign-in" googleEnabled={googleEnabled} githubEnabled={await githubSignInEnabled()} oauthFailed={oauthFailed} handoffRefused={desktopRefused} continueGoogle={query.continue === 'google'} continueGitHub={query.continue === 'github'} oauthAccountNotLinked={oauthAccountNotLinkedProvider(query.error, query.provider)} continueComposio={Boolean(composioResume)} continueURL={oauthResume ? withBasePath(oauthResume) : composioResume} desktopFlow={desktopFlow} webFlow={webFlow} signedInAs={session?.user && (desktopFlow || webFlow) && !desktopRefused ? { name: session.user.name, email: session.user.email, image: session.user.image } : null} /></>
 }
