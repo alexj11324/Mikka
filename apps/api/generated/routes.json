@@ -1707,6 +1707,37 @@
       "sourceHash": "a89ce5cce11e96b7588f0e84abd485dc5f09d9a58016a5631f21617f987b3aeb"
     },
     {
+      "path": "/mikka/api/runs/[runId]/actions",
+      "template": "/api/runs/[runId]/actions",
+      "source": "app/api/runs/[runId]/actions/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "maxDuration": 300,
+      "sourceHash": "47776e9f50be69cbf5eabfc0ce6546424823b64706bfe26a070185202f09ec51"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/actions/[executionId]",
+      "template": "/api/runs/[runId]/actions/[executionId]",
+      "source": "app/api/runs/[runId]/actions/[executionId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "12b4eb4ed1ca843dc6ede5a926e219983b29c3443e51bf30d28e75de2a8dda97"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/actions/[executionId]/cancel",
+      "template": "/api/runs/[runId]/actions/[executionId]/cancel",
+      "source": "app/api/runs/[runId]/actions/[executionId]/cancel/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "63ea2362b56872e14900a92243bfdcd5327a1abe0764ef1e7da10b692b3b758b"
+    },
+    {
       "path": "/mikka/api/runs/[runId]/evidence",
       "template": "/api/runs/[runId]/evidence",
       "source": "app/api/runs/[runId]/evidence/route.ts",
@@ -1865,7 +1896,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "c117f9998933e20bbd9ac0c602f5fa1b5381c717994e438663da5f771f7e39f5"
+      "sourceHash": "3dbb26c634a17d89496fb59171a2aa0da9cfbaa90c0e672ec9fe611a66765195"
     },
     {
       "path": "/mikka/api/skills",
@@ -2452,7 +2483,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "a4161f568a71d5a7ce69f244b25f86917a4054f535d0a2c96c431d94f37cad07"
+      "sourceHash": "4f8d667737699f4386b6ae840bb9bd89631ea45a0aee2a2d852a003baf1b8c55"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
