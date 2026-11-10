@@ -1,6 +1,6 @@
 {
   "schema": "issue1512.macos-restart-diagnostic-request.v1",
-  "enabled": true,
+  "enabled": false,
   "requestId": "20261110-5852-a1",
   "sourceCommit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
   "sourceTree": "42d33eb7faf77d7049607523599de9374e065660",
@@ -49,5 +49,15 @@
     "controllerCleanupCommandTimeoutMs": 10000
   },
   "interpretation": "This temporary overlay adds time between bootout and bootstrap. Non-reproduction does not establish a product fix; no diagnostic outcome replaces the formal Node22 acceptance.",
-  "closure": "After this single workflow reaches a terminal state, publish a normal closing commit that disables the job guards and sets enabled false; preserve receipts before closing the entry."
+  "closure": "After this single workflow reaches a terminal state, publish a normal closing commit that disables the job guards and sets enabled false; preserve receipts before closing the entry.",
+  "closedExecution": {
+    "runId": 42739939984,
+    "attempt": 1,
+    "head": "fd3862c99d2c23d25edecabdeb76e85b097571b8",
+    "completedAt": "2026-11-10T02:07:00Z",
+    "conclusion": "success",
+    "diagnosticOnly": true,
+    "formalProductFixProven": false,
+    "reason": "The one allowed actual fixture execution has completed. No further runs are authorized for this request."
+  }
 }
