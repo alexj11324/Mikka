@@ -301,6 +301,9 @@ export const runCheckpointSchema = z.object({
   takenAt: isoTime,
   /** The latest tree could not be checkpointed; it supersedes older patches. */
   unavailableReason: z.literal('too_large').optional(),
+  /** Full-source review proof is optional and independently validated. It is
+   * consumed in memory, never retained in recovery records or claim payloads. */
+  review: z.unknown().optional(),
 })
 export type RunCheckpoint = z.infer<typeof runCheckpointSchema>
 

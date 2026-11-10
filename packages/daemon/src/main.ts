@@ -102,6 +102,7 @@ import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
 import { readWorkspaceReceipt } from './coding-workspace/files'
+import { readWorkspaceDiffReceipt } from './coding-workspace/diff'
 import type { WorkspaceReadCommand } from '@mikka/protocol/coding-workspace'
 import { RepositoryCache } from "./repositories"
 import { prepareRunRepository } from './run-repository'
@@ -998,7 +999,14 @@ export class Daemon {
       this.workspaceReads.add(request.id)
       const reading = this.workspaceReads.size > 4
         ? Promise.resolve({ result: { ok: false as const, code: 'workspace_limit_exceeded' as const }, files: [] })
-        : readWorkspaceReceipt(request, this.journal.get(request.identity.runId))
+        : Promise.resolve().then(() => {
+          const entry = this.journal.get(request.identity.runId)
+          if (request.request.kind === 'diff_snapshot' || request.request.kind === 'diff_file') {
+            if (!entry) return { result: { ok: false as const, code: 'workspace_checkout_unavailable' as const }, files: [] }
+            return readWorkspaceDiffReceipt(request, entry, this.repository(entry.assignment).path)
+          }
+          return readWorkspaceReceipt(request, entry)
+        })
       // Stop commands keep their existing independent path while bounded file
       // IO runs. Neither content nor absolute paths enter the daemon logs.
       void reading.then(receipt => answer.call(this.options.link, deviceId, request.id, receipt, { expiresAt: request.expiresAt, signal: this.commandsAbort.signal }))

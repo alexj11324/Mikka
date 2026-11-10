@@ -91,10 +91,12 @@ export async function requestWorkspaceRead(database: Pool, membership: Workspace
 
 /** Called only inside withDeviceRoute, so its queries retain the credential fence. */
 export async function pendingWorkspaceReads(database: WorkspaceQuery, membership: WorkspaceQuery,
-  caller: { userId: string; tokenId: string }, deviceId: string, skip: readonly string[] = []): Promise<WorkspaceReadCommand[]> {
+  caller: { userId: string; tokenId: string }, deviceId: string, skip: readonly string[] = [], capabilities: { diff?: boolean } = {}): Promise<WorkspaceReadCommand[]> {
   const { rows } = await database.query<{ id: string; identity: WorkspaceReadCommand['identity']; request: WorkspaceReadRequest; expiresAt: Date }>(
     `SELECT id,identity,request,"expiresAt" FROM coding_workspace_requests WHERE "deviceId"=$1 AND "ownerId"=$2 AND "tokenId"=$3
-      AND result IS NULL AND "expiresAt">clock_timestamp() AND NOT(id=ANY($4::uuid[])) ORDER BY "createdAt" LIMIT 4`, [deviceId, caller.userId, caller.tokenId, skip])
+      AND result IS NULL AND "expiresAt">clock_timestamp() AND NOT(id=ANY($4::uuid[]))
+      AND ($5::boolean OR request->>'kind' NOT IN ('diff_snapshot','diff_file'))
+      ORDER BY "createdAt" LIMIT 4`, [deviceId, caller.userId, caller.tokenId, skip, capabilities.diff === true])
   const result: WorkspaceReadCommand[] = []
   for (const row of rows) {
     try {

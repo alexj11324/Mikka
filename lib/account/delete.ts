@@ -80,7 +80,8 @@ const IMMUTABLE_PREFIX = 'improvement_'
  * that points at a kept thread still goes: run tokens, computer bindings and
  * thread machines are their credentials and machines, not the thread.
  */
-const KEPT_THREAD_TABLES = ['run_messages', 'run_checkpoints', 'run_captures', 'run_publications', 'agent_tool_approvals'] as const
+const KEPT_THREAD_TABLES = ['run_messages', 'run_checkpoints', 'run_captures', 'run_publications', 'artifacts', 'agent_tool_approvals', 'coordinator_events',
+  'coding_workspace_bindings', 'coding_workspace_snapshots', 'coding_workspace_checkpoint_reviews'] as const
 const KEPT_FACTORY_TABLES = ['factory_evidence_reads', 'factory_approvals', 'factory_approval_controls',
   'factory_monitor_incidents', 'factory_monitor_observations', 'factory_merges', 'factory_deliverable_acceptances',
   'factory_questions', 'factory_spec_approvals'] as const

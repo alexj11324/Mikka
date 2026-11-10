@@ -7,7 +7,7 @@ import { extname, resolve } from 'node:path'
 import {
   CodingWorkspaceError, WORKSPACE_MAX_FILE_BYTES, WORKSPACE_MAX_PATHS, WORKSPACE_MAX_RESPONSE_BYTES,
   visibleWorkspacePath, workspaceReadCommand, type WorkspaceReadCommand,
-  type WorkspaceReadResult, type WorkspaceReadReceipt, type WorkspaceEntry, type SourceRevision, type WorkspaceFileSelection, type WorkspaceFileResult,
+  type WorkspaceReadResult, type WorkspaceReadReceipt, type WorkspaceEntry, type WorkingSourceRevision, type WorkspaceFileSelection, type WorkspaceFileResult,
 } from '@mikka/protocol/coding-workspace'
 import { remoteKey } from '@mikka/protocol/repository'
 import type { JournalEntry } from '../runs/journal'
@@ -18,9 +18,9 @@ const hash = (value: string | Buffer) => createHash('sha256').update(value).dige
 const denied = () => new CodingWorkspaceError('workspace_path_unavailable')
 // These paths remain forbidden even when Git tracks them. Dotfiles are opt-in.
 const safeDotfiles = new Set(['.gitignore', '.gitattributes', '.editorconfig', '.prettierignore', '.prettierrc', '.eslintrc', '.dockerignore'])
-type WorkspaceRoot = { path: string; handle: FileHandle; device: bigint; mountId: string; gitPath: string }
+export type WorkspaceRoot = { path: string; handle: FileHandle; device: bigint; mountId: string; gitPath: string }
 
-async function mountId(handle: FileHandle): Promise<string> {
+export async function mountId(handle: FileHandle): Promise<string> {
   const id = /^mnt_id:\s*(\d+)$/m.exec(await readFile(`/proc/self/fdinfo/${handle.fd}`, 'utf8'))?.[1]
   if (!id) throw new CodingWorkspaceError('workspace_unsupported')
   return id
@@ -41,7 +41,7 @@ async function git(root: WorkspaceRoot, args: string[], maxBuffer = 2 * 1024 * 1
 /** Linux: each segment is opened relative to an already-open directory. A
  * concurrent symlink/parent rename never makes the next lookup follow a new
  * absolute pathname. Other platforms fail closed until an equivalent exists. */
-async function safeFile<T>(root: WorkspaceRoot, path: string, use: (file: FileHandle) => Promise<T>): Promise<T> {
+export async function safeFile<T>(root: WorkspaceRoot, path: string, use: (file: FileHandle) => Promise<T>): Promise<T> {
   if (!visibleWorkspacePath(path) || !path) throw denied()
   const handles: FileHandle[] = []
   try {
@@ -74,7 +74,7 @@ async function safeFile<T>(root: WorkspaceRoot, path: string, use: (file: FileHa
 const textExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.jsonc', '.md', '.mdx', '.txt', '.csv', '.tsv', '.yaml', '.yml', '.toml', '.xml', '.html', '.css', '.scss', '.sass', '.less', '.sql', '.py', '.pyi', '.go', '.mod', '.sum', '.rs', '.java', '.kt', '.kts', '.swift', '.c', '.h', '.cpp', '.hpp', '.cs', '.rb', '.php', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd', '.vue', '.svelte', '.graphql', '.gql', '.proto', '.prisma', '.ex', '.exs', '.erl', '.hrl', '.clj', '.scala', '.r', '.rmd', '.jl', '.lua', '.pl', '.pm', '.dart', '.lock', '.ini', '.conf', '.cfg', '.rst', '.adoc', '.tex'])
 const textNames = /^(?:Dockerfile(?:\..*)?|Containerfile|Makefile|CMakeLists\.txt|README(?:\..*)?|LICENSE(?:\..*)?|NOTICE|Procfile|Gemfile|Rakefile|Justfile)$/i
 function isText(path: string) { return textExtensions.has(extname(path).toLowerCase()) || textNames.test(path.split('/').at(-1)!) || safeDotfiles.has(path.split('/').at(-1)!) }
-function revision(headSha: string, baseSha: string | undefined, content: string | Buffer): SourceRevision {
+function revision(headSha: string, baseSha: string | undefined, content: string | Buffer): WorkingSourceRevision {
   return { source: 'working', headSha, baseSha: baseSha && /^[a-f0-9]{40,64}$/.test(baseSha) ? baseSha : null, version: hash(content) }
 }
 
@@ -100,6 +100,7 @@ export async function readWorkspaceReceipt(command: WorkspaceReadCommand, entry:
     const parsed = input.data
     if (Date.parse(parsed.expiresAt) <= Date.now()) throw new CodingWorkspaceError('workspace_request_expired')
     const { identity, request } = parsed
+    if (request.kind === 'diff_snapshot' || request.kind === 'diff_file') throw new CodingWorkspaceError('workspace_unsupported')
     if (!entry?.worktree || entry.assignment.runId !== identity.runId || entry.assignment.deviceId !== identity.deviceId || entry.assignment.repoId !== identity.repoId)
       throw new CodingWorkspaceError('workspace_checkout_unavailable')
     const remote = entry.assignment.remoteUrl ?? entry.assignment.expectedRepoRemote

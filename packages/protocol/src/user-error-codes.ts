@@ -9,6 +9,14 @@
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
   workspace_not_found: [],
+  workspace_snapshot_unavailable: [],
+  workspace_snapshot_outdated: [],
+  workspace_review_conflict: [],
+  workspace_review_anchor_invalid: [],
+  workspace_review_unavailable: [],
+  workspace_review_delivery_uncertain: [],
+  workspace_review_github_unavailable: [],
+  workspace_review_github_forbidden: [],
   workspace_machine_unavailable: [],
   workspace_checkout_unavailable: [],
   workspace_path_unavailable: [],
