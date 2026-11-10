@@ -25,10 +25,10 @@ export async function inheritThreadAccess(query: Pick<PoolClient, 'query'>, inpu
   // copied grant list, keeps later revocation authoritative for every attempt.
   await query.query("SELECT set_config('mikka.acl_source','thread_continuation',true)")
   const changed = await query.query(`UPDATE resource_access_policies SET visibility='shared',
-      "parentKind"='thread',"parentId"=$5
-    WHERE kind='thread' AND id=$2 AND "ownerId"=$3 AND "workspaceId"=$4
-      AND EXISTS(SELECT 1 FROM resource_access_policies parent WHERE parent.kind='thread' AND parent.id=$5
-        AND parent."workspaceId"=$4 AND parent."ownerId"=$3)
-    RETURNING id`, [input.sourceRunId, input.newRunId, input.ownerId, input.workspaceId, source.parentId])
+      "parentKind"='thread',"parentId"=$4::uuid
+    WHERE kind='thread' AND id=$1::uuid AND "ownerId"=$2 AND "workspaceId"=$3::uuid
+      AND EXISTS(SELECT 1 FROM resource_access_policies parent WHERE parent.kind='thread' AND parent.id=$4::uuid
+        AND parent."workspaceId"=$3::uuid AND parent."ownerId"=$2)
+    RETURNING id`, [input.newRunId, input.ownerId, input.workspaceId, source.parentId])
   if (!changed.rowCount) throw new ActionFailureError('runNotFound')
 }

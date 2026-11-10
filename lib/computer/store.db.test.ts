@@ -107,6 +107,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
         ADD COLUMN "continuesRunId" uuid,ADD COLUMN "retryOf" uuid,ADD COLUMN "questionContinuation" jsonb;
       ALTER TABLE devices ADD COLUMN "removedAt" timestamptz`)
     for (const name of [
+      '20261101193000_thread_machine_task.sql',
       '20261027203647_mobile_push.sql',
       '20261030204835_workspace_secrets_env.sql',
       '20261110020010_resource_acl.sql',

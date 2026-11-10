@@ -6,6 +6,7 @@ import { openApiKeyForChat } from './model-api-keys'
 import type { HostedApiKeySnapshot } from './subscription-model-snapshot'
 import { observedModel } from './tracing/ai'
 import { estimateTokens } from './coordinator/context'
+import { ActionFailureError } from './action-error'
 
 type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
 
@@ -41,7 +42,7 @@ export async function resolveApiKeyChatModel(frozen: HostedApiKeySnapshot): Prom
           // provider usage or cost. Actual attempts also have a durable budget.
           const size = estimateTokens([...input.prompt as ModelMessage[],
             { role: 'user', content: JSON.stringify(input.tools ?? []) }])
-          if (size > 64_000) throw Error('shared_bot_input_capacity_exceeded')
+          if (size > 64_000) throw new ActionFailureError('botChatInputCapacityExceeded')
           const { reserveBotChatModelCall } = await import('./collaboration/bot-chat')
           const { stepIdentity } = await import('./model-call-timing')
           const budget = await reserveBotChatModelCall(frozen, await stepIdentity())

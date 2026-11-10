@@ -14,7 +14,7 @@ import { enterpriseWorkspaceAllowed } from '@/lib/enterprise/access'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { authorizedBotChat } from '@/lib/resource-access/chat'
-import { botChatResourceId, lockResourceAccess, readResourceCapabilities } from '@/lib/resource-access/store'
+import { lockResourceAccess, readResourceCapabilities } from '@/lib/resource-access/store'
 import { normalizeUserImages, type UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { sourcedEventMessage } from '@/lib/coordinator/message-safety'
@@ -119,7 +119,10 @@ export async function botChatContributionPolicy(reader: IssueReader, botId: stri
   if (!collaborative) return { collaborative, canReply: chat.viewerId === chat.ownerId }
   try {
     const model = await sharedModel(pool, chat.ownerId, chat.viewerId, botId, chat.workspaceId, randomUUID())
-    return { collaborative, canReply: true, modelName: model.modelSnapshot.modelId,
+    const { rows: [usage] } = await pool.query<{ exhausted: boolean }>(`SELECT count(*)>=$2::integer AS exhausted
+      FROM bot_chat_submission_authorities WHERE "organizationId"=$1 AND mode='reply'
+        AND "createdAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, [model.organizationId, model.budget.maxRepliesPerDay])
+    return { collaborative, canReply: !usage.exhausted, ...(usage.exhausted ? { reason: 'botChatDailyBudgetExceeded' } : {}), modelName: model.modelSnapshot.modelId,
       billingOrganizationId: model.organizationId, ...model.budget }
   } catch (error) {
     if (error instanceof ActionFailureError && error.code === 'executionModelUnknown')
@@ -138,9 +141,6 @@ export async function submitBotChatMessage(reader: IssueReader, botId: string,
   const chat = await authorizedBotChat(reader, botId, value.mode === 'reply' ? 'canSteer' : 'canComment')
   const principal = await requestPrincipal(reader, chat.workspaceId, options.humanSessionId)
   const actorReader = { id: principal.actorId, [tokenWorkspace]: chat.workspaceId, [enterprisePrincipal]: principal.principal }
-  // The attachment service supplies a fresh Actor + destination audience proof.
-  // Until that proof is present an opaque file marker grants no owner access.
-  if (splitChatFiles(value.text).files.length) throw new ActionFailureError('validationGeneric')
   const images = normalizeUserImages(value.images)
   const fingerprint = createHash('sha256').update(JSON.stringify({ actorId: principal.actorId,
     principalKind: principal.principalKind, principalId: principal.principalId, mode: value.mode, text: value.text, images })).digest('hex')
@@ -151,6 +151,10 @@ export async function submitBotChatMessage(reader: IssueReader, botId: string,
       const result = await withDatabaseClient(client, async () => {
         await lockResourceAccess(db, principal.actorId, chat.reference, value.mode === 'reply' ? 'canSteer' : 'canComment')
         await principalDeadline(client, principal.actorId, chat.workspaceId, principal)
+        if (splitChatFiles(value.text).files.length) {
+          const { validateChatFiles } = await import('@/lib/chat-attachments/store')
+          await validateChatFiles(actorReader, { kind: 'bot', id: botId }, value.text, client)
+        }
         const contextIsolation = await botChatOwnerExclusive(client, chat.ownerId, botId) ? 'private' : 'shared_clean'
         if (contextIsolation === 'private' && principal.actorId !== chat.ownerId) throw new ActionFailureError('workspaceAccessDenied')
         await assertCredentialSafeChat(principal.actorId, value, db)
@@ -169,7 +173,7 @@ export async function submitBotChatMessage(reader: IssueReader, botId: string,
           await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-chat-budget:${model.organizationId}`])
           const { rows: [usage] } = await client.query<{ count: string }>(`SELECT count(*)::text AS count FROM bot_chat_submission_authorities
             WHERE "organizationId"=$1 AND mode='reply' AND "createdAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, [model.organizationId])
-          if (Number(usage.count) >= model.budget.maxRepliesPerDay) throw new ActionFailureError('executionModelUnknown')
+          if (Number(usage.count) >= model.budget.maxRepliesPerDay) throw new ActionFailureError('botChatDailyBudgetExceeded')
         }
         await client.query(`INSERT INTO bot_chat_submission_authorities("eventId","ownerId","actorId","botId","workspaceId","principalKind","principalId",mode,
           "contextIsolation",fingerprint,"modelSnapshot","organizationId","modelPolicyRevision","maxModelCalls","maxOutputTokens","expiresAt")
@@ -294,7 +298,7 @@ export async function reserveBotChatModelCall(selection: HostedApiKeySnapshot, i
       const current = await liveBotChatAuthority(client, selection.collaborationEventId!, { ownerId: selection.ownerId, botId: selection.consumerId! })
       if (current.contextIsolation !== 'shared_clean' || !isDeepStrictEqual(current.modelSnapshot, selection)) throw unavailable()
       const { rows: [usage] } = await client.query<{ count: string }>('SELECT count(*)::text AS count FROM bot_chat_model_calls WHERE "eventId"=$1', [current.eventId])
-      if (Number(usage.count) >= current.maxModelCalls) throw unavailable()
+      if (Number(usage.count) >= current.maxModelCalls) throw new ActionFailureError('botChatModelCallBudgetExceeded')
       await client.query('INSERT INTO bot_chat_model_calls(id,"eventId","workflowId","stepId") VALUES($1,$2,$3,$4)',
         [randomUUID(), current.eventId, identity.workflowRunId ?? null, identity.stepId ?? null])
       return current

@@ -75,9 +75,9 @@ const displaySessionOf = (ownerId: string, botId: string, reader: IssueReader) =
   taskReaderScope(reader).userId === ownerId ? undefined : sql`mikka_bot_chat_execution_visible(${ownerId},${botId}::uuid,${coordinatorSessions.leaseHolder})`)
 const messageActor = sql<{ id: string; name: string } | null>`(select jsonb_build_object('id',a."actorId",'name',coalesce(u.name,''))
   from bot_chat_submission_authorities a left join "user" u on u.id=a."actorId"
-  where a."eventId"::text=${coordinatorMessages.message}#>>'{mikkaUserEvent,id}' and ${coordinatorMessages.message}->>'role'='user')`
+  where a."eventId"::text="coordinator_messages"."message"#>>'{mikkaUserEvent,id}' and "coordinator_messages"."message"->>'role'='user')`
 const eventActor = sql<{ id: string; name: string } | null>`(select jsonb_build_object('id',a."actorId",'name',coalesce(u.name,''))
-  from bot_chat_submission_authorities a left join "user" u on u.id=a."actorId" where a."eventId"=${coordinatorEvents.id})`
+  from bot_chat_submission_authorities a left join "user" u on u.id=a."actorId" where a."eventId"="coordinator_events"."id")`
 
 async function chatReader(userId: string, botId: string, viewer: IssueReader = userId): Promise<IssueReader> {
   const access = await (await import('@/lib/resource-access/chat')).authorizedBotChat(viewer, botId)

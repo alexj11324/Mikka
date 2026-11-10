@@ -287,7 +287,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
           images: parsed.data.images, submissionId: parsed.data.submissionId, mode: collaborationMode }, { humanSessionId })
         return { queued: result.queued, accepted: true as const }
       } catch (error) {
-        if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
+        if (error instanceof SubmissionConflictError) throw Object.assign(new ActionFailureError('submissionConflict'), { cause: error })
         throw error
       }
     }
@@ -296,7 +296,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
       try {
         const row = await (await import('@/lib/factory/agent-profile-store')).readProfileRow((await import('@/lib/db')).pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, bot.id) }, profile.data)
         if (row.archivedAt || !row.definition.enabled) throw new ActionFailureError('runInvalid')
-      } catch (error) { if (error instanceof AgentProfileError) throw new ActionFailureError('runInvalid'); throw error }
+      } catch (error) { if (error instanceof AgentProfileError) throw Object.assign(new ActionFailureError('runInvalid'), { cause: error }); throw error }
     }
     if (taskSubmission && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
     // A new task is handed to the Coordinator to create; with no Coordinator here, say so instead of queueing it silently.
@@ -312,7 +312,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     const retried = z.number().int().positive().optional().safeParse(retryOf)
     const message = withQuote(withNotes, quoted?.data)
     // Validate files before a retry holds its message row/connection; concurrent retries must not exhaust the pool.
-    if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch { throw new ActionFailureError('messageRequired') } }
+    if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch (error) { throw Object.assign(new ActionFailureError('messageRequired'), { cause: error }) } }
     const reader = { id: userId, [tokenWorkspace]: bot.workspaceId, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
     const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => actAs(reader, () => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, taskCreation:creation.data, profileId: profile.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) }))
     try {
@@ -321,7 +321,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
       else await record(db)
     }
     catch (error) {
-      if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
+      if (error instanceof SubmissionConflictError) throw Object.assign(new ActionFailureError('submissionConflict'), { cause: error })
       throw error
     }
     afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
@@ -358,7 +358,7 @@ export async function stopCoordinatorTurn(botId: string | null = null): Promise<
     const { requireResourceAccess } = await import('@/lib/resource-access/store')
     await requireResourceAccess(bot.reader, bot.reference, 'canSteer')
     const { stopChatTurn } = await import('@/lib/coordinator/stop-turn')
-    return { stopped: await stopChatTurn(bot.ownerId, bot.id) }
+    return { stopped: await stopChatTurn(bot.ownerId, bot.id, undefined, { reader: bot.reader, reference: bot.reference }) }
   })
 }
 
@@ -406,7 +406,7 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
         if (claimed) await suggestionInboxChanged(tx, userId, item.botId)
       })
     } catch (error) {
-      if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
+      if (error instanceof SubmissionConflictError) throw Object.assign(new ActionFailureError('submissionConflict'), { cause: error })
       throw error
     }
     afterJob('after:coordinator-wake', () => wakeCoordinator(userId))

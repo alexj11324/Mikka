@@ -250,7 +250,7 @@ export async function readChatFile(reader: IssueReader, id: string): Promise<Fil
   return withFileLease(reader,custody.workspaceId,async client=>{
     await lockFileCustodies(reader,[custody],'canReadContent',client)
     const {rows:[row]}=await client.query<FileRow>(`SELECT ${columns} FROM chat_attachments
-      WHERE id=$1 AND state='ready' AND "removedAt" IS NULL AND ("userId"=$2 OR "usedAt" IS NOT NULL)`,[id,userId])
+      WHERE id=$1 AND state='ready' AND "removedAt" IS NULL AND mikka_chat_attachment_visible(id,$2)`,[id,userId])
     if(!row)throw new ChatFileError('notFound')
     return row
   })
@@ -298,8 +298,9 @@ export async function readChatFileForRun(query: Pick<PoolClient,'query'>, input:
   await authorizeFileCustody(reader,custody,'canReadContent',query)
   const {rows:[file]}=await query.query<FileRow>(`SELECT ${columns} FROM chat_attachments a WHERE id=$1
     AND state='ready' AND "removedAt" IS NULL AND "usedAt" IS NOT NULL AND "workspaceId"=$2
+    AND mikka_chat_attachment_visible(id,$5)
     AND ($3::boolean OR mikka_chat_attachment_flows_to($2,"resourceKind","resourceId",'thread',$4))`,
-    [id,input.workspaceId,run.personal&&input.actorId===input.executionOwnerId,input.runId])
+    [id,input.workspaceId,run.personal&&input.actorId===input.executionOwnerId,input.runId,input.actorId])
   if(!file)throw new ChatFileError('notFound')
   return file
 }
@@ -339,7 +340,7 @@ export async function validateChatFiles(reader: IssueReader, scope: ChatFileScop
   if(refs.length>CHAT_FILE_MAX_COUNT)throw new ChatFileError('tooMany')
   const userId=taskReaderScope(reader).userId,query=executor??pool,custody=await resolveFileScope(scope,query)
   const {rows:identities}=await query.query<FileRow>(`SELECT ${custodyColumns} FROM chat_attachments
-    WHERE id=ANY($1::uuid[]) AND state='ready' AND "removedAt" IS NULL AND ("userId"=$2 OR "usedAt" IS NOT NULL)`,[refs.map(ref=>ref.id),userId])
+    WHERE id=ANY($1::uuid[]) AND state='ready' AND "removedAt" IS NULL AND mikka_chat_attachment_visible(id,$2)`,[refs.map(ref=>ref.id),userId])
   if(identities.length!==refs.length)throw new ChatFileError('notFound')
   const sources=identities.map(row=>fileCustody(row))
   if(sources.some(source=>source.workspaceId!==custody.workspaceId))throw new ChatFileError('notFound')
@@ -347,7 +348,7 @@ export async function validateChatFiles(reader: IssueReader, scope: ChatFileScop
     await lockFileCustodies(reader,[custody,...sources],'canReadContent',client)
     await authorizeFileCustody(reader,custody,'canComment',client)
     const {rows:files}=await client.query<FileRow>(`SELECT ${columns.replace('"inlineData",','')} FROM chat_attachments
-      WHERE id=ANY($1::uuid[]) AND state='ready' AND "removedAt" IS NULL AND ("userId"=$2 OR "usedAt" IS NOT NULL) ORDER BY id FOR UPDATE`,[refs.map(ref=>ref.id),userId])
+      WHERE id=ANY($1::uuid[]) AND state='ready' AND "removedAt" IS NULL AND mikka_chat_attachment_visible(id,$2) ORDER BY id FOR UPDATE`,[refs.map(ref=>ref.id),userId])
     if(files.length!==refs.length)throw new ChatFileError('notFound')
     let textSize=0
     for(const file of files) {

@@ -118,5 +118,5 @@ it('new servers reauthorize large bytes on the exact authenticated run route', a
     file.downloadUrl = `https://mikka.invalid${path}${suffix}`
     await expect(link.downloadChatFile(assignment, id, new AbortController().signal)).rejects.toThrow('origin')
   }
-  expect(reads).toBe(2, 'a server response cannot redirect device credentials to another path or query')
+  expect(reads, 'a server response cannot redirect device credentials to another path or query').toBe(2)
 })

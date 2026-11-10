@@ -13,7 +13,9 @@ import { logRuntimeRefreshFailure, readWorkerTail, saveWorkerTail, workerCommand
 const mask = (text: string) => text.replaceAll('sekret', '[secret:TOKEN]')
 // Admit only the parent-locked sandbox registration statement, not arbitrary CTEs.
 const sandboxRegistrationSql = `WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 FOR KEY SHARE)
-  UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp())
+  UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp()),
+    "resourceIsolation"=CASE WHEN $4 AND m."sandboxId" IS NULL AND m."deviceId" IS NULL AND m."resourceIsolation"='legacy_unknown'
+      THEN 'shared_clean' ELSE m."resourceIsolation" END
   FROM parent WHERE m."runId"=parent.id AND m."workerLeaseId"=$3 AND m.state<>'ended' RETURNING m."runId"`.replace(/\s+/g, ' ').trim()
 
 test('worker output reaches the server log line by line, masked, bounded and split across chunks', () => {

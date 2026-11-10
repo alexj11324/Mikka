@@ -85,7 +85,7 @@ dbTest('preferences read both optional owner rows in one statement without losin
     memoryEnabled: false, sendKey: 'modEnter' as const, personalInstructions: 'Synthetic owner preference',
     dailySuggestions: true,
   }
-  const shown = { ...stored, dailySuggestions: false, proactive: true }
+  const shown = { ...stored, dailySuggestions: false, proactive: true, privateByDefault: false }
   try {
     await withDatabaseClient(client, async () => {
       await client.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now()),($3,$3,$4,true,now(),now())',
@@ -168,7 +168,8 @@ dbTest('the Coordinator\'s and a Bot\'s turn prompt (preparePrompt) carry the sa
   const { preparePrompt } = await import('@/workflows/coordinator/steps')
   const botId = randomUUID()
   // The Coordinator is an ordinary bot row; its prompt keeps the Coordinator's rules.
-  const coordinator = (await seedCoordinator(people.alex)).botId
+  const { botId: coordinator, workspaceId } = await seedCoordinator(people.alex)
+  await m.db.insert(m.schema.bots).values({ id: botId, ownerId: people.alex, workspaceId, name: 'Private preference fixture' })
   await preferences.updatePreferences({ personalInstructions: 'Sign every reply with 🐧.' })
   for (const bot of [coordinator, botId]) {
     const { instructions } = await preparePrompt(people.alex, bot)

@@ -308,13 +308,17 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   if (snapshot?.contextIsolation === 'shared_clean') {
     const selection = snapshot.runtime.modelSelection
     if (selection?.type !== 'api_key' || !selection.collaborationEventId) throw new FatalError('sharedBotAuthorityRequired')
-    const { liveBotChatAuthority } = await import('@/lib/collaboration/bot-chat')
-    await liveBotChatAuthority(pool, selection.collaborationEventId, { ownerId: userId, botId })
+    const { liveBotChatAuthority, botChatActorReader } = await import('@/lib/collaboration/bot-chat')
+    const authority = await liveBotChatAuthority(pool, selection.collaborationEventId, { ownerId: userId, botId })
     const conversation = await store.loadSharedConversationForPrompt(userId, botId, selection.collaborationEventId)
+    const { chatFileContent } = await import('@/lib/chat-attachments/store')
+    const messages = await Promise.all(conversation.messages.map(async row => row.message.role === 'user' && typeof row.message.content === 'string'
+      ? { ...row, message: { ...row.message, content: await chatFileContent(botChatActorReader(authority), { kind: 'bot', id: botId }, row.message.content) } }
+      : row))
     const base = withCoordinatorPresentation(executionInstructions(snapshot))
     const context = 'This is a collaborative Bot conversation. Every visible member can read the reply and tool results. Use only the explicitly provided shared read tools. The organization connection and hard reply budget are frozen for this turn. Personal instructions, memory, subscriptions, devices and private app data are unavailable. Do not claim to have executed or changed resources that the available tools cannot access.'
     const prompt = promptWithCachedContext(base, context, '', '')
-    return { prompt: { ...prompt, messages: promptMessages(null, conversation.messages) }, contextMs: { execution: 0, personal: 0, github: 0 } }
+    return { prompt: { ...prompt, messages: promptMessages(null, messages) }, contextMs: { execution: 0, personal: 0, github: 0 } }
   }
   if (!await (await import('@/lib/collaboration/bot-chat')).botChatOwnerExclusive(pool, userId, botId))
     throw new FatalError('sharedBotAuthorityRequired')

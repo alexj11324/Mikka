@@ -1,30 +1,35 @@
 import { and, eq } from 'drizzle-orm'
 import { createHash } from 'node:crypto'
-import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { z } from 'zod'
 import { getRun } from 'workflow/api'
-import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
-import { db } from '@/lib/db'
+import { auth } from '@/lib/api-auth'
+import { db, pool } from '@/lib/db'
 import { awaitTurnHolder, TURN_START_WAIT_MS } from '@/lib/coordinator/turn-holder'
-import { bots, coordinatorSessions } from '@/lib/db/schema'
+import { coordinatorSessions } from '@/lib/db/schema'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 import { coordinatorTextStream, COORDINATOR_STREAM_PROJECTION_VERSION } from '@/lib/coordinator/stream-response'
 import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
 import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
+import { requestBotChat } from '@/lib/resource-access/request-chat'
+import { ActionFailureError } from '@/lib/action-error'
+import { botChatExecutionVisible } from '@/lib/collaboration/bot-chat-provenance'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 /** The turn about to take the chat with the person's message, woken by takeInbox's NOTIFY (lib/coordinator/turn-holder.ts). */
-async function waitForTurn(userId: string, botId: string) {
-  const [{ pool }, { COORDINATOR_LEASE_CHANNEL, nextNotification, openListener }, { hasPendingEvents }] = await Promise.all([import('@/lib/db'), import('@/lib/db/listen'), import('@/lib/coordinator/store')])
+async function waitForTurn(access: Awaited<ReturnType<typeof requestBotChat>>, authorize: () => Promise<void>) {
+  const { ownerId: userId, id: botId } = access
+  const [{ COORDINATOR_LEASE_CHANNEL, nextNotification, openListener }, { hasPendingEvents, chatView }] = await Promise.all([import('@/lib/db/listen'), import('@/lib/coordinator/store')])
   return awaitTurnHolder(botId, Date.now() + TURN_START_WAIT_MS, {
     read: async () => {
+      await authorize()
       const [row] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil }).from(coordinatorSessions)
         .where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, botId))).limit(1)
       if (coordinatorLeaseActive(row)) return { holder: row!.leaseHolder, waiting: true }
-      return { holder: null, waiting: await hasPendingEvents(userId, botId) }
+      return { holder: null, waiting: access.viewerId === userId ? await hasPendingEvents(userId, botId)
+        : (await chatView(userId, 1, botId, {}, access.reader)).working }
     },
     listen: () => openListener(pool, COORDINATOR_LEASE_CHANNEL),
     next: (listener, payload, ms) => nextNotification(listener, payload, ms),
@@ -39,30 +44,37 @@ async function handleGET(request: Request) {
   const params = new URL(request.url).searchParams
   const bot = z.uuid().nullable().safeParse(params.get('botId'))
   if (!bot.success) return Response.json({ error: 'validationGeneric' }, { status: 400 })
-  // No bot named: the Coordinator of the workspace this request is in (a token's own workspace).
-  const botId = await openChatBotId(session.user, bot.data)
-  if (bot.data) {
-    const [owned] = await db.select({ workspaceId: bots.workspaceId }).from(bots)
-      .where(and(eq(bots.id, bot.data), eq(bots.ownerId, session.user.id))).limit(1)
-    if (!owned || !apiWorkspaceAllowed(session, owned.workspaceId)) return Response.json({ error: 'notFound' }, { status: 404 })
+  const access = await requestBotChat(session.user, bot.data)
+  const botId = access.id
+  const authorize = async () => {
+    const fresh = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
+    if (!fresh || fresh.user.id !== session.user.id || fresh.session.id !== session.session.id) throw new ActionFailureError('authRequired')
+    const current = await requestBotChat(fresh.user, botId)
+    if (current.ownerId !== access.ownerId || current.workspaceId !== access.workspaceId) throw new ActionFailureError('botNotFound')
   }
   const [chat] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil }).from(coordinatorSessions)
-    .where(and(eq(coordinatorSessions.userId, session.user.id), eq(coordinatorSessions.botId, botId))).limit(1)
+    .where(and(eq(coordinatorSessions.userId, access.ownerId), eq(coordinatorSessions.botId, botId))).limit(1)
   // The request's run id is only a version check. The authenticated chat supplies authority.
   const expected = params.get('runId')
   let runId = coordinatorLeaseActive(chat) ? chat?.leaseHolder : null
   // Opened at send (`wait=1`): the message is in the inbox and its turn starts in a moment. Waiting here for it, woken
   // by the turn taking the chat, shows its first words as they come instead of after the chat's next read.
-  if (!runId && !expected && params.get('wait') === '1') runId = await waitForTurn(session.user.id, botId)
+  if (!runId && !expected && params.get('wait') === '1') runId = await waitForTurn(access, authorize)
   if (!runId?.startsWith('wrun_') || expected && expected !== runId) return new Response(null, { status: 204 })
-  const fingerprints = await credentialChatFingerprints(session.user.id)
-  const streamKey = createHash('sha256').update(JSON.stringify([runId, fingerprints, COORDINATOR_STREAM_PROJECTION_VERSION])).digest('hex')
+  const executionKey = runId
+  const authorizeExecution = async () => {
+    await authorize()
+    if (access.viewerId !== access.ownerId && !await botChatExecutionVisible(pool, { ownerId: access.ownerId, botId, executionKey })) throw new ActionFailureError('botNotFound')
+  }
+  await authorizeExecution()
+  const fingerprints = await credentialChatFingerprints(access.ownerId)
+  const streamKey = createHash('sha256').update(JSON.stringify([access.viewerId, access.workspaceId, runId, fingerprints, COORDINATOR_STREAM_PROJECTION_VERSION])).digest('hex')
   const offset = z.coerce.number().int().min(0).max(1_000_000).safeParse(params.get('after') ?? 0)
   if (!offset.success) return Response.json({ error: 'validationGeneric' }, { status: 400 })
   // A changed masking policy changes chunk boundaries: replay safely instead of skipping under a stale cursor.
   const after = request.headers.get('x-mikka-stream-key') === streamKey ? offset.data : 0
   const run = getRun<unknown>(runId)
-  const projection = coordinatorTextStream(session.user.id, fingerprints, {
+  const projection = coordinatorTextStream(access.ownerId, fingerprints, {
     onTiming: timing => console.info(JSON.stringify({ msg: 'coordinator_stream_projection_timing', ...timing })),
   })
   const reader = run.getReadable<CoordinatorWorkflowStreamPart>().pipeThrough(projection).getReader()
@@ -76,6 +88,9 @@ async function handleGET(request: Request) {
           const next = await reader.read()
           if (cancelled) return
           if (next.done) { controller.close(); return }
+          // A durable stream never keeps a revoked Session/PAT, stale ACL or
+          // private source alive. Check after the awaited chunk, before bytes.
+          await authorizeExecution()
           sequence++
           if (sequence <= after) continue
           controller.enqueue(encoder.encode(JSON.stringify({ ...next.value, sequence }) + '\n'))
@@ -83,6 +98,7 @@ async function handleGET(request: Request) {
         }
       } catch {
         projection.reportTerminal(2)
+        await reader.cancel('access-or-stream-ended').catch(() => undefined)
         if (!cancelled) {
           controller.enqueue(encoder.encode('{"type":"error"}\n'))
           controller.close()
@@ -101,4 +117,9 @@ async function handleGET(request: Request) {
   } })
 }
 
-export const GET = withRequestLog('/api/coordinator/stream', handleGET)
+export const GET = withRequestLog('/api/coordinator/stream', async request => {
+  try { return await handleGET(request) } catch (error) {
+    if (error instanceof ActionFailureError) return Response.json({ error: error.code }, { status: error.code === 'authRequired' ? 401 : 404 })
+    throw error
+  }
+})

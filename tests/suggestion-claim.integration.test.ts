@@ -115,11 +115,14 @@ check('two concurrent sends commit one event and both receive a receipt', async 
   assert.equal(callbacks.length, 2)
 })
 
-check('Artifact actions enforce real parent ACL, latest author, run filter and timestamps', async () => {
+// Artifact actions now load the real Workspace and personal-credential policy.
+// Exercise those on the fully migrated APP database, leaving only the injected
+// suggestion insert failure in its deliberately narrow transaction fixture.
+test('Artifact actions enforce real parent ACL, latest author, run filter and timestamps', async () => {
   const runId = randomUUID(), foreignRun = randomUUID(), mine = randomUUID(), foreign = randomUUID(), outside = randomUUID(), forged = randomUUID()
   for (const [userId, id] of [['owner', runId], ['foreign', foreignRun]]) {
     const agent = randomUUID()
-    await pool.query(`INSERT INTO agents (id,"userId",harness,name) VALUES ($1,$2,'codex','Fixture Agent')`, [agent, userId])
+    await pool.query(`INSERT INTO agents (id,"userId",harness,name) VALUES ($1,$2,'codex',$3)`, [agent, userId, `Fixture Agent ${agent}`])
     await pool.query('INSERT INTO agent_runs (id,"userId","agentId","workspaceId") VALUES ($1,$2,$3,$4)', [id, userId, agent, workspaces.get(userId)])
   }
   await pool.query(`INSERT INTO artifacts (id,"userId",kind,title,"runId","latestVersion","updatedAt","workspaceId") VALUES ($1,'owner','markdown','Real fixture document',$2,2,'2026-10-28T10:00:00Z',$5),($3,'foreign','html','Private fixture',$7,1,'2026-10-28T11:00:00Z',$6),($4,'owner','html','Other run',null,1,'2026-10-28T09:00:00Z',$5),($8,'foreign','html','Forged run reference',$2,1,'2026-10-28T12:00:00Z',$6)`, [mine, runId, foreign, outside, workspaces.get('owner'), workspaces.get('foreign'), foreignRun, forged])

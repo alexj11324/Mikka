@@ -45,6 +45,7 @@ test('real Postgres: personal ownership, encrypted auth, revocation, installatio
     await assert.rejects(store.updateSkill('peer', installed.id, false), /skillNotFound/)
     await assert.rejects(store.deleteSkill('peer', installed.id), /skillNotFound/)
     await pool.query(await readFile(new URL('../../drizzle/20261027181000_agent_kit.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261110020044_bot_transfer_history.sql', import.meta.url), 'utf8'))
     const kit = new AgentKitStore(pool), scope = { ownerId: 'owner', botId: null, workspaceId: null }
     // A deliberately narrow pre-existing definition is not rewritten by installations.
     const definition = { ...DEFAULT_AGENT_DEFINITION, tools: ['web_search'] as typeof DEFAULT_AGENT_DEFINITION.tools }

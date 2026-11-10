@@ -20,6 +20,14 @@ mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports
 mock.module(new URL('./computer/native-run-binding.ts', import.meta.url).href, { namedExports: {
   nativeRunBinding: async () => ({ ...subscription, workspaceId: id(2), consumerId: id(21), route: 'claude_code_cli' }),
 } })
+mock.module(new URL('./resource-access/creation-defaults.ts', import.meta.url).href, { namedExports: {
+  // Resource-default preferences are covered by resource-access.db.test.ts.
+  // These credential-selection cases explicitly start a private owner Thread.
+  prepareNewThreadVisibility: async (_query: unknown, ownerId: string, workspaceId: string) => {
+    assert.equal(ownerId, 'alice'); assert.equal(workspaceId, id(2))
+    return 'private'
+  },
+} })
 mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: {
   // These source-selection cases have no Profile. Import the full storage
   // boundary, but fail if they unexpectedly start Workspace authorization.
@@ -115,13 +123,29 @@ test('an exhausted shared subscription respects disabled paid fallback', async (
 })
 
 /** Real queue admission and credential selection; only storage reads/writes are replaced. */
-function cloudQueueFixture() {
+function cloudQueueFixture(taskAccess = true) {
   const calls: { sql: string; args: unknown[] }[] = []
   let released = false
   const client = {
     release() { released = true },
-    async query(sql: string, args: unknown[] = []) {
+    async query(statement: string | { text: string }, args: unknown[] = []) {
+      const sql = typeof statement === 'string' ? statement : statement.text
       calls.push({ sql, args })
+      if (sql.startsWith('with recursive ancestry as (')) {
+        assert.deepEqual(args.slice(0, 2), ['task', id(20)], 'only this fixture Task enters the ACL lock')
+        if (sql.includes('select p.kind,p.id from resource_access_policies')) {
+          assert.match(sql, /order by p\.kind,p\.id for share of p$/)
+          return { rows: taskAccess ? [{ kind: 'task', id: id(20) }] : [], rowCount: taskAccess ? 1 : 0 }
+        }
+        assert.match(sql, /mikka_resource_acl_allowed\('account',/)
+        assert.deepEqual(args.slice(2), ['alice', taskAccess ? [`task:${id(20)}`] : [],
+          JSON.stringify([{ kind: 'task', id: id(20), workspaceId: id(2), action: 'canSteer', position: 0 }])])
+        return { rows: taskAccess ? [{ allowed: true }] : [], rowCount: taskAccess ? 1 : 0 }
+      }
+      if (sql === 'SELECT mikka_resource_personal_resources_allowed($1,$2::uuid,$3) AS allowed') {
+        assert.deepEqual(args, ['task', id(20), 'alice'])
+        return { rows: [{ allowed: taskAccess }], rowCount: 1 }
+      }
       if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql.startsWith('SELECT pg_advisory_xact_lock') || sql.startsWith('INSERT INTO ')) return { rows: [], rowCount: 0 }
       if (sql.startsWith('SELECT m.')) return { rows: [{ deviceId: id(23), instructions: '', harness: 'claude_code', baseBranch: 'main' }], rowCount: 1 }
       // Keep real identity freezing in these queue tests: all resources belong
@@ -170,6 +194,13 @@ test('cloud queue rejects a selected key removed after preflight instead of free
   assert.equal(fixture.calls.some(call => call.sql.startsWith('INSERT INTO ')), false)
   assert.equal(fixture.calls.at(-1)?.sql, 'ROLLBACK')
   assert.equal(fixture.released(), true)
+})
+
+test('a credential selection cannot authorize a Task missing from its exact ACL scope', async () => {
+  const fixture = cloudQueueFixture(false)
+  await assert.rejects(fixture.queue({ apiKeyId: id(4) }), { code: 'issueNotFound' })
+  assert.equal(fixture.calls.some(call => call.sql.startsWith('SELECT k.') || call.sql.startsWith('INSERT INTO ')), false)
+  assert.equal(fixture.calls.at(-1)?.sql, 'ROLLBACK')
 })
 
 test('cloud queue freezes the explicitly selected key when another key also offers the model', async () => {
