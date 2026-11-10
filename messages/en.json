@@ -4907,6 +4907,14 @@
     "error": "Could not complete the request. Try again."
   },
   "FactoryAcceptance": {
+    "block": {
+      "reviewAndMerge": "Review the PR and merge",
+      "accept": "Accept",
+      "merging": "Merging…",
+      "openPane": "Open acceptance",
+      "noReport": "No acceptance report",
+      "criteria": "{passed} of {total} passed"
+    },
     "title": "Factory acceptance",
     "skillTitle": "Skill acceptance",
     "candidate": "Candidate",
@@ -5602,22 +5610,15 @@
     }
   },
   "FactoryFlow": {
-    "trail": {
-      "ask": {
-        "specReview": "Review the spec",
-        "question": "Answer the Bot's question",
-        "prReview": "Review the PR",
-        "prReviewNumber": "Review PR #{number}",
-        "blocked": "Unblock the task",
-        "failed": "Look at the failed task",
-        "result": "Acceptance results"
-      },
-      "done": "Done",
-      "running": "Working",
-      "waiting": "Needs you",
-      "failed": "Failed",
-      "pending": "Up next",
-      "approval": "Approval"
+    "block": {
+      "running": "{stage} in progress…",
+      "passed": "{count} passed",
+      "unverified": "{count} unverified",
+      "failed": "{count} not passed",
+      "checked": "{counts} (checked by the implementing agent)",
+      "review": "Review: {verdict} (advice only)",
+      "needsJudgment": "needs your judgment",
+      "openReport": "Open the acceptance report"
     },
     "acceptance": "Acceptance",
     "stages": {
@@ -6284,46 +6285,5 @@
     "content": "Content",
     "readFailed": "Unable to load {label}.",
     "refreshFailed": "Unable to refresh {label}. Previous content is shown."
-  },
-  "HostedAcceptance": {
-    "agent": "Factory",
-    "candidate": "Candidate",
-    "open": "Open",
-    "approved": "Approved",
-    "edited": "Approved with changes",
-    "rejected": "Sent back",
-    "state": {
-      "stopped": "Stopped",
-      "waiting": "Waiting on you",
-      "running": "Running",
-      "done": "Done"
-    },
-    "waiting": "Waiting on you",
-    "decided": "Decided",
-    "run": "State",
-    "more": "Full context",
-    "less": "Less context",
-    "stopped": "Stopped here",
-    "emptyTitle": "Nothing waits for you",
-    "previous": "Previous",
-    "next": "Next",
-    "of": "{index} of {total}",
-    "loading": "Loading",
-    "cases": {
-      "item": "Item",
-      "evidence": "Evidence",
-      "thread": "Thread",
-      "result": "Result",
-      "commit": "Commit",
-      "all": "All",
-      "passed": "Passed",
-      "unverified": "Unverified",
-      "failed": "Not passed",
-      "empty": "No items with this result"
-    },
-    "earlier": "earlier",
-    "moreSteps": "more",
-    "fewer": "Show fewer",
-    "untitled": "Untitled"
   }
 }

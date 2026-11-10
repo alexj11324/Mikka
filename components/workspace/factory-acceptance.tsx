@@ -97,11 +97,11 @@ function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () 
   const t = useTranslations('FactoryAcceptance')
   const { derived, check } = useAcceptance(task)
   const state = derived?.state
-  const Slot = acceptanceSlot.AcceptanceRow ?? null
-  // data-slot="item" keeps the 验收 heading over a layer's row, as over the open-source Item.
-  if (Slot) return <div data-slot="item" className="w-full min-w-0"><Slot taskId={task.id} title={task.isSkillCandidate ? t('skillTitle') : t('title')} reason={check?.status !== 'blocked' ? task.reason || null : null} onOpen={onOpen}
-    state={check ? { label: t(`checkState.${check.stage}.${check.status}`), tone: check.status === 'failed' || check.status === 'blocked' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info' }
-      : state ? { label: derived?.refusal ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate)), tone: tone(state) } : null} /></div>
+  const BlockSlot = acceptanceSlot.AcceptanceBlock ?? null
+  // data-slot="item" keeps the 验收 heading over a layer's block, as over the open-source Item.
+  if (BlockSlot) return <div data-slot="item" className="w-full min-w-0"><FactoryAcceptancePane task={task} onOpenPane={onOpen}
+    block={{ taskId: task.id, title: task.isSkillCandidate ? t('skillTitle') : t('title'), subject: null, state: null, status: null,
+      summary: check?.status !== 'blocked' ? task.reason || null : null, problem: null, primary: null, links: [], notices: [] }} /></div>
   return <div className="w-full max-w-[26.25rem]">
     <Item variant="muted">
       <ItemMedia variant="icon"><ClipboardCheck aria-hidden="true" /></ItemMedia>
@@ -121,7 +121,9 @@ function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () 
 /** A v2 task's block (decision 2026-11-04-2200); nothing until its snapshot says it follows that flow. */
 function FactoryFlowEntry({ task, onOpen, onOpenThread }: { task: FactoryTask; onOpen?: (task: FactoryTask) => void; onOpenThread?: (runId: string) => void }) {
   const { data: detail } = useFactoryTaskDetail(task.id)
-  return isFlowV2(detail) ? <FactoryFlowCard task={task} detail={detail} onOpen={onOpen && (() => onOpen(task))} onOpenThread={runId => onOpenThread?.(runId)} /> : null
+  // A layer's block adds the acceptance decision once there is a candidate to decide on (acceptance slot).
+  return isFlowV2(detail) ? <FactoryFlowCard task={task} detail={detail} onOpenThread={runId => onOpenThread?.(runId)}
+    renderBlock={task.candidateId ? block => <FactoryAcceptancePane task={task} block={block} onOpenThread={onOpenThread} onOpenPane={onOpen && (() => onOpen(task))} /> : undefined} /> : null
 }
 
 /** An older task's acceptance row; a v2 task has its own block instead. */
@@ -184,10 +186,6 @@ export function FactoryAcceptancePanel({ task, onClose, onOpenThread }: { task: 
   // the same owned task through checks and approval without retaining old props.
   const current = useAcceptanceTasks(task.issueId).allTasks.find(row => row.id === task.id) ?? task
   const title = current.isSkillCandidate ? t('skillTitle') : t('title')
-  // A layer's pane draws its own header with ✕ (acceptance slot).
-  if (acceptanceSlot.AcceptancePane) return <section aria-label={title} className="flex h-full min-h-0 flex-col">
-    <FactoryAcceptancePane task={current} onOpenThread={onOpenThread} onClose={onClose} />
-  </section>
   return <section aria-label={title} className="flex h-full min-h-0 flex-col">
     <header className="flex h-12 shrink-0 items-center gap-2 px-4">
       <ClipboardCheck aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />

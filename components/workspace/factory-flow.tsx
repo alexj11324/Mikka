@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { Ban, Check, CircleAlert, CircleX, ClipboardList, ExternalLink, FileCheck, GitMerge, GitPullRequest, MessageCircleQuestion, RefreshCw, TriangleAlert, type LucideIcon } from 'lucide-react'
@@ -19,7 +19,7 @@ import { RequestError, request } from '@/lib/factory/browser-request'
 import type { FactoryTask } from './factory-acceptance-pane'
 import { navigate, openArtifact } from './workspace-navigation'
 import * as acceptanceSlot from '@ui-slot/acceptance'
-import type { AcceptanceAction, AcceptanceFlowProps } from '@/components/slots/acceptance-contract'
+import type { AcceptanceAction, AcceptanceBlockProps } from '@/components/slots/acceptance-contract'
 
 /** The task snapshot, as the Factory detail route returns it: v2 marks itself in `route`, and each attempt names its run. */
 export type FactoryTaskDetail = AcceptanceDetail & { attempts?: { id: string; runId: string | null; stage: string }[] }
@@ -96,7 +96,8 @@ type Approval = { busy: boolean; error: (ApproveSpecFailure & { revision: number
  * retry after a lost answer returns the same receipt instead of a second
  * approval. New data arrives through the task's live key, never a timer.
  */
-export function FactoryFlowCard({ task, detail, onOpenThread, onOpen }: { task: FactoryTask; detail: FactoryTaskDetail | undefined; onOpenThread: (runId: string) => void; /** Opens the task's acceptance pane; only a layer's block offers it (acceptance slot). */ onOpen?: () => void }) {
+export function FactoryFlowCard({ task, detail, onOpenThread, renderBlock }: { task: FactoryTask; detail: FactoryTaskDetail | undefined; onOpenThread: (runId: string) => void
+  /** A layer's 验收 block (acceptance slot) for a task with a candidate: the caller adds the acceptance decision to what the flow says. */ renderBlock?: (block: AcceptanceBlockProps) => ReactNode }) {
   const t = useTranslations('FactoryFlow')
   const tAcceptance = useTranslations('FactoryAcceptance')
   const format = useFormatter()
@@ -141,9 +142,11 @@ export function FactoryFlowCard({ task, detail, onOpenThread, onOpen }: { task: 
     }
   }
 
-  const Slot = acceptanceSlot.AcceptanceFlow ?? null
-  if (Slot) return <Slot {...flowSlotProps({ task, flow, kind, specRunId, pr, prNumber, approval, shownError, words: { t, acceptance: tAcceptance, waiting: flow.needsYou?.since ? format.relativeTime(new Date(flow.needsYou.since), now) : null },
-    approve: () => { void approve(flow) }, onOpenThread, onOpen })} />
+  const BlockSlot = acceptanceSlot.AcceptanceBlock ?? null
+  if (BlockSlot) {
+    const block = flowBlockProps({ task, flow, kind, specRunId, pr, prNumber, approval, shownError, words: { t, acceptance: tAcceptance }, approve: () => { void approve(flow) }, onOpenThread })
+    return <>{renderBlock?.(block) ?? <BlockSlot {...block} />}</>
+  }
 
   return <div className="w-full max-w-[40rem]">
     <Item variant="muted" data-stage={flow.stage} data-needs-you={kind}>
@@ -179,64 +182,44 @@ export function FactoryFlowCard({ task, detail, onOpenThread, onOpen }: { task: 
   </div>
 }
 
-/** What the card shows, as the acceptance slot's data (docs/ui-overlay.md): the same stages, words and actions. */
-function flowSlotProps({ task, flow, kind, specRunId, pr, prNumber, approval, shownError, words, approve, onOpenThread, onOpen }: {
+/** What the card says, as a layer's 验收 block (acceptance slot): the one thing to do now, or what goes on. */
+function flowBlockProps({ task, flow, kind, specRunId, pr, prNumber, approval, shownError, words, approve, onOpenThread }: {
   task: FactoryTask; flow: FactoryFlow; kind: NeedsYouKind | undefined; specRunId: string | null; pr: string | null; prNumber: string | null
   approval: Approval; shownError: (ApproveSpecFailure & { revision: number }) | null
-  words: { t: ReturnType<typeof useTranslations<'FactoryFlow'>>; acceptance: ReturnType<typeof useTranslations<'FactoryAcceptance'>>; waiting: string | null }
-  approve: () => void; onOpenThread: (runId: string) => void; onOpen?: () => void
-}): AcceptanceFlowProps {
+  words: { t: ReturnType<typeof useTranslations<'FactoryFlow'>>; acceptance: ReturnType<typeof useTranslations<'FactoryAcceptance'>> }
+  approve: () => void; onOpenThread: (runId: string) => void
+}): AcceptanceBlockProps {
   const { t, acceptance } = words
   const accepted = flow.stage === 'completed' && flow.completion === 'accepted'
-  const done = flow.stage === 'completed'
-  const current = flow.stages.indexOf(flow.stage)
-  const stopped = flow.stage === 'cancelled' || kind === 'blocked' || kind === 'failed'
+  const running = !kind && (flow.stage === 'triage' || flow.stage === 'spec' || flow.stage === 'implement' || flow.stage === 'review')
   const counts = flow.acceptance?.counts
+  // Who checked what (decision 2026-11-04-2200): the implementing agent verifies; review's verdict is advice.
+  const checked = [
+    counts?.passed ? t('block.passed', { count: counts.passed }) : null,
+    counts?.unverified ? t('block.unverified', { count: counts.unverified }) : null,
+    counts?.failed ? t('block.failed', { count: counts.failed }) : null,
+  ].filter(Boolean).join(' · ')
   const verdict = flow.review?.currentCandidateReviewed ? flow.review.verdict : null
-  const substeps = [
-    ...(verdict === 'passed' || verdict === 'changes_requested' ? [{ id: 'review', title: acceptance(verdict === 'passed' ? 'reviewPassed' : 'reviewFailed'), state: 'done' as const }] : []),
-    ...(counts?.passed ? [{ id: 'passed', title: t('card.counts.passed', { count: counts.passed }), state: 'done' as const }] : []),
-    ...(counts?.unverified ? [{ id: 'unverified', title: t('card.counts.unverified', { count: counts.unverified }), state: 'pending' as const }] : []),
-    ...(counts?.failed ? [{ id: 'failed', title: t('card.counts.failed', { count: counts.failed }), state: 'done' as const }] : []),
-    ...(pr ? [{ id: 'pr', title: prNumber ? `#${prNumber}` : t('card.openPullRequest'), detail: flow.pullRequest?.state }] : []),
-  ]
-  const actions: AcceptanceAction[] = []
-  if (kind === 'spec_review') {
-    if (specRunId) actions.push({ id: 'open-spec', label: t('card.openSpec'), quiet: true, onSelect: () => onOpenThread(specRunId) })
-    actions.push({ id: 'approve-spec', label: shownError?.kind === 'unknown' ? t('card.retryApprove') : t('card.approveSpec'), primary: true, busy: approval.busy, disabled: approval.busy, onSelect: approve })
-  }
-  if (kind === 'question' && flow.botId) {
-    const botId = flow.botId
-    actions.push({ id: 'answer', label: t('card.answer'), primary: true, onSelect: () => navigate({ section: 'coordinator', bot: botId, issue: null }) })
-  }
-  if (flow.acceptance) {
-    const artifactId = flow.acceptance.artifactId
-    actions.push({ id: 'open-acceptance', label: prNumber ? t('card.viewPullRequest', { number: prNumber }) : t('card.openAcceptance'), primary: kind !== 'question', onSelect: () => openArtifact(artifactId) })
-  } else {
-    if (pr && kind === 'pr_review') actions.push({ id: 'open-pr', label: t('card.openPullRequest'), href: pr })
-    // Without an acceptance report the block opens the task's acceptance pane (the older tasks' 验收 row did the same).
-    if (onOpen && (task.candidateId || kind === 'pr_review' || ['review', 'handoff', 'completed'].includes(flow.stage)))
-      actions.push({ id: 'open-pane', label: t('card.openAcceptance'), primary: kind !== 'question' && kind !== 'spec_review', onSelect: onOpen })
-  }
-  const needsYou = flow.needsYou ? t(`card.needsYou.${flow.needsYou.kind}`) : null
+  const review = verdict ? t('block.review', { verdict: verdict === 'passed' ? acceptance('reviewPassed') : verdict === 'changes_requested' ? acceptance('reviewFailed') : t('block.needsJudgment') }) : null
+  const summary = [checked ? t('block.checked', { counts: checked }) : null, review].filter(Boolean).join(' · ') || null
+  const links: AcceptanceAction[] = []
+  if (kind === 'spec_review' && specRunId) links.push({ id: 'open-spec', label: t('card.openSpec'), onSelect: () => onOpenThread(specRunId) })
+  if (flow.acceptance) { const artifactId = flow.acceptance.artifactId; links.push({ id: 'open-report', label: t('block.openReport'), onSelect: () => openArtifact(artifactId) }) }
+  else if (pr && kind === 'pr_review') links.push({ id: 'open-pr', label: t('card.openPullRequest'), href: pr })
+  const botId = flow.botId
+  const primary: AcceptanceAction | null = kind === 'spec_review'
+    ? { id: 'approve-spec', label: shownError?.kind === 'unknown' ? t('card.retryApprove') : t('card.approveSpec'), busy: approval.busy, disabled: approval.busy, onSelect: approve }
+    : kind === 'question' && botId ? { id: 'answer', label: t('card.answer'), onSelect: () => navigate({ section: 'coordinator', bot: botId, issue: null }) } : null
   return {
     taskId: task.id,
     title: task.isSkillCandidate ? acceptance('skillTitle') : acceptance('title'),
-    state: { label: needsYou ?? (accepted ? acceptance('state.accepted') : t(`stages.${flow.stage}`)), tone: flowTone(flow) },
-    stages: flow.stages.map((stage, index) => ({
-      id: stage,
-      label: stage === 'completed' && accepted ? acceptance('state.accepted') : t(`stages.${stage}`),
-      state: done || index < current ? 'done' : index > current ? 'pending' : stopped ? 'failed' : kind ? 'waiting' : 'running',
-      gate: index === current && (kind === 'spec_review' || kind === 'pr_review'),
-      substeps: index === current && substeps.length ? substeps : undefined,
-    })),
-    waitingSince: words.waiting,
-    needsYou,
-    headline: kind === 'pr_review' ? (prNumber ? t('trail.ask.prReviewNumber', { number: prNumber }) : t('trail.ask.prReview'))
-      : kind ? t(`trail.ask.${kind === 'spec_review' ? 'specReview' : kind}`) : prNumber ? `PR #${prNumber}` : t('trail.ask.result'),
-    reason: (kind === 'blocked' || kind === 'failed') && task.reason ? task.reason : null,
-    error: shownError ? { text: t(`card.approveError.${approveSpecErrorKey(shownError)}` as 'card.approveError.unknown'), code: approveSpecErrorCode(shownError) } : null,
-    actions,
-    words: { done: t('trail.done'), running: t('trail.running'), waiting: needsYou ?? t('trail.waiting'), failed: t('trail.failed'), pending: t('trail.pending'), approval: t('trail.approval') },
+    subject: prNumber && pr ? { label: `PR #${prNumber}`, href: pr } : null,
+    state: { label: flow.needsYou ? t(`card.needsYou.${flow.needsYou.kind}`) : accepted ? acceptance('state.accepted') : t(`stages.${flow.stage}`), tone: flowTone(flow) },
+    status: running ? t('block.running', { stage: t(`stages.${flow.stage}`) }) : null,
+    summary: running ? null : summary,
+    problem: (kind === 'blocked' || kind === 'failed') && task.reason ? { text: task.reason } : null,
+    primary,
+    links,
+    notices: shownError ? [{ id: 'approve-error', text: t(`card.approveError.${approveSpecErrorKey(shownError)}` as 'card.approveError.unknown'), detail: approveSpecErrorCode(shownError) ?? undefined }] : [],
   }
 }

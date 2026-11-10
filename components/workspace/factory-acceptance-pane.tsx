@@ -13,14 +13,14 @@ import { useViewState } from '@/lib/hooks/view-state'
 import { cn } from '@/lib/utils'
 import type { PublicationEnvironment } from '@/lib/factory/vercel-target'
 import { acceptanceState, acceptanceStateKey, flowMergeAcceptance, mergeAcceptance, type AcceptanceMerge, type AcceptanceState } from '@/lib/factory/acceptance-state'
-import { flowTone } from '@/lib/factory/flow-client'
 import type { StatusTone } from '@/lib/status-appearance'
 import * as acceptanceSlot from '@ui-slot/acceptance'
-import type { AcceptanceAction, AcceptanceNotice, AcceptancePaneProps } from '@/components/slots/acceptance-contract'
-import { canReject, canSubmitReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
+import type { AcceptanceAction, AcceptanceBlockProps, AcceptanceNotice } from '@/components/slots/acceptance-contract'
+import { openArtifact } from './workspace-navigation'
+import { canReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
 import { evidenceEntries, orderEvidence, type EvidenceEntry } from '@/lib/factory/evidence-view'
 import { bareUrl, candidateCheckRetry, candidateCheckRetryConfirmed, candidateCheckState, candidateRecheck, candidateRecheckConfirmed, criterionGroups, pullNumber, resultRows, type AcceptanceDetail, type CriterionGroup, type ResultRow } from '@/lib/factory/acceptance-view'
-import { CriterionEvidence, EvidenceViewer, itemLabel } from './factory-evidence'
+import { CriterionEvidence, EvidenceViewer } from './factory-evidence'
 import { ApprovalBar } from './factory-approval-bar'
 import { RejectNote } from './factory-reject-note'
 import { PullRequestIcon } from './pull-request-icon'
@@ -193,9 +193,9 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
  * the decision bar pinned to the bottom. Approve, publish, reconcile, revoke
  * and send-back are the A1/A2 operations on the approval route.
  */
-export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, artifact, onClose }: { task: FactoryTask; onOpenThread?: (runId: string) => void; artifactBinding?: { candidateId: string; revision: number }; /** Inside the Artifact window (P1–P7b): the report, the header actions and 要求修改 in the thread's composer. */ artifact?: ArtifactReviewSlots; /** The panel's ✕, for a layer that draws the pane with its own header (acceptance slot). */ onClose?: () => void }) {
+export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, artifact, block, onOpenPane }: { task: FactoryTask; onOpenThread?: (runId: string) => void; artifactBinding?: { candidateId: string; revision: number }; /** Inside the Artifact window (P1–P7b): the report, the header actions and 要求修改 in the thread's composer. */ artifact?: ArtifactReviewSlots
+  /** A layer's 验收 block on the task page (acceptance slot): what the task already says; the pane adds its decision. */ block?: AcceptanceBlockProps; /** Opens this pane in full, for the block. */ onOpenPane?: () => void }) {
   const t = useTranslations('FactoryAcceptance')
-  const tFlow = useTranslations('FactoryFlow')
   const runErrorText = useRunErrorText()
   const tReview = useTranslations('ArtifactReview')
   const format = useFormatter()
@@ -397,112 +397,59 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
     onIndex={index => setViewing({ group: viewing.group, index })} onClose={() => setViewing(null)}
     readText={readText} sha={candidate?.sha ?? undefined} environment={envChip} /> : null
 
-  // A layer's 验收 (acceptance slot): the same values and actions, laid out by the layer. The Artifact window keeps this view.
-  const PaneSlot = acceptanceSlot.AcceptancePane ?? null
-  if (PaneSlot && !artifactBinding) {
-    const phase = ledgerError || evidenceError || detailError || (v2 && flowError) ? 'error'
-      : !detailLoaded || !ledger || (v2 && !flow) || ((v2 ? needsEvidence : task.stage === 'approval' || superseded) && !evidence && !evidenceMissing) ? 'loading' : 'ready'
+  // A layer's 验收 block (acceptance slot): the one action for now from this pane's own decision. Acceptance itself is
+  // the report's Artifact window (decision 2026-11-04-2200); without a report the full pane stays one click away.
+  const BlockSlot = acceptanceSlot.AcceptanceBlock ?? null
+  if (BlockSlot && block && !artifactBinding) {
+    const failed = ledgerError || evidenceError || detailError || (v2 && flowError)
+    const loading = !detailLoaded || !ledger || (v2 && !flow) || ((v2 ? needsEvidence : task.stage === 'approval' || superseded) && !evidence && !evidenceMissing)
+    if (failed || loading) return <BlockSlot {...block} notices={failed ? [{ id: 'load', text: t('loadError') }] : block.notices} />
     const refused = state === 'pending' && Boolean(refusal)
     const isDeliverable = candidate?.kind === 'report' || candidate?.kind === 'deliverable'
     const canApprove = task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(evidence && (pullRequestUrl || isDeliverable))
     const canPublish = Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)
     const showBar = Boolean(v2 && flow) || (!detail?.completionRecovery && !check && state !== 'unavailable')
-    const actions: AcceptanceAction[] = []
-    const publish = () => { const approval = active; if (!approval || !ledger) return; void run('publish', { binding: ledger.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action: approval.action, target: approval.target, targetEnvironment: approval.targetEnvironment }) }
-    const revokeAction: AcceptanceAction = { id: 'revoke', label: t('revoke'), quiet: true, disabled: busy, onSelect: () => { void revoke() } }
-    const publishAction: AcceptanceAction = { id: 'publish', label: t('publish'), primary: true, busy, disabled: busy, onSelect: publish }
-    if (detail?.completionRecovery) actions.push({ id: 'retry-completion', label: t('retry'), primary: true, busy, disabled: busy, onSelect: () => { void retryCompletion() } })
-    if (retryCheck) actions.push({ id: 'retry-check', label: t(retryCheck.stage === 'review' ? 'retryReview' : 'retryVerify'), primary: true, busy, disabled: busy, onSelect: () => { void retryCandidateCheck() } })
-    if (recheck) actions.push({ id: 'recheck', label: t('retryReview'), busy, disabled: busy, onSelect: () => { void retryCandidateCheck(true) } })
-    if (showBar) {
-      if (state === 'pending' && !refused && canReject(state, ledger?.capabilities?.reject === true)) actions.push({ id: 'reject', label: t('reject'), quiet: true, disabled: busy, onSelect: () => dispatchReject({ type: 'open' }) })
-      if ((state === 'merged' || refused) && pullRequestUrl) actions.push({ id: 'open-pr', label: t('openOnGitHub'), href: pullRequestUrl, primary: refused })
-      if (state === 'pending' && canApprove) actions.push(task.isSkillCandidate
-        ? { id: 'enable', label: t('enable'), primary: true, busy, disabled: busy, onSelect: () => { void approve() } }
-        : { id: 'accept', label: t(isDeliverable ? 'acceptDeliverable' : 'accept'), primary: !(refused && pullRequestUrl), busy, disabled: busy, onSelect: () => { void accept() } })
-      if (state === 'approved' || state === 'failed') actions.push(revokeAction, ...canPublish ? [publishAction] : [])
-      if (state === 'publishing' || state === 'checking') actions.push(revokeAction, { id: 'reconcile', label: t('reconcile'), primary: true, busy, disabled: busy, onSelect: () => { void reconcile() } })
-      if (state === 'live' && reference) actions.push({ id: 'reference', label: publication?.request?.targetEnvironment === 'production' ? t('production') : t('preview'), href: reference })
+    const reportId = v2 ? flow?.acceptance?.artifactId ?? null : null
+    const revokeLink: AcceptanceAction = { id: 'revoke', label: t('revoke'), disabled: busy, onSelect: () => { void revoke() } }
+    const github: AcceptanceAction | null = pullRequestUrl ? { id: 'open-pr', label: t('openOnGitHub'), href: pullRequestUrl } : null
+    const links = [...block.links]
+    let primary: AcceptanceAction | null = block.primary
+    let problem = block.problem
+    if (!primary) {
+      if (detail?.completionRecovery) primary = { id: 'retry-completion', label: t('retry'), busy, disabled: busy, onSelect: () => { void retryCompletion() } }
+      else if (retryCheck) primary = { id: 'retry-check', label: t(retryCheck.stage === 'review' ? 'retryReview' : 'retryVerify'), busy, disabled: busy, onSelect: () => { void retryCandidateCheck() } }
+      else if (recheck) primary = { id: 'recheck', label: t('retryReview'), busy, disabled: busy, onSelect: () => { void retryCandidateCheck(true) } }
+      else if (showBar) {
+        if (refused) primary = github
+        else if (state === 'merging') primary = { id: 'merging', label: t('block.merging'), busy: true, disabled: true }
+        else if (state === 'pending' && canApprove) primary = task.isSkillCandidate
+          ? { id: 'enable', label: t('enable'), busy, disabled: busy, onSelect: () => { void approve() } }
+          : reportId && !isDeliverable ? { id: 'review-merge', label: t('block.reviewAndMerge'), onSelect: () => openArtifact(reportId) }
+            : { id: 'accept', label: isDeliverable ? t('block.accept') : t('accept'), busy, disabled: busy, onSelect: () => { void accept() } }
+        else if (state === 'approved' || state === 'failed') { if (canPublish) primary = { id: 'publish', label: t('publish'), busy, disabled: busy, onSelect: () => { const approval = active; if (!approval || !ledger) return; void run('publish', { binding: ledger.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action: approval.action, target: approval.target, targetEnvironment: approval.targetEnvironment }) } }; links.push(revokeLink) }
+        else if (state === 'publishing' || state === 'checking') { primary = { id: 'reconcile', label: t('reconcile'), busy, disabled: busy, onSelect: () => { void reconcile() } }; links.push(revokeLink) }
+        else if (state === 'live' && reference) primary = { id: 'reference', label: publication?.request?.targetEnvironment === 'production' ? t('production') : t('preview'), href: reference }
+        else if (state === 'merged' && github) links.push(github)
+      }
     }
-    const notices: AcceptanceNotice[] = []
-    if (refused && refusal) notices.push({ id: 'refusal', tone: 'warning', text: `${t('cannotMerge')} · ${t(`mergeRefusal.${refusal}` as 'mergeRefusal.githubUnavailable')}` })
-    if (check?.status === 'blocked' && currentTask.reason) { const copy = runErrorText(currentTask.reason); notices.push({ id: 'blocked', tone: 'error', text: copy.message ?? t('blocked'), detail: copy.code ?? currentTask.reason }) }
-    if (!check && state === 'failed') notices.push({ id: 'publish-failed', tone: 'error', text: t('publishFailed') })
-    if (error) notices.push({ id: 'error', tone: 'error', text: t(ERROR_KEYS[error] ?? 'error') })
-    if (checkError && [retryCheck?.key, recheck?.key].includes(checkError.key)) notices.push({ id: 'check-error', tone: 'error', text: t(checkError.unknown ? 'checkRetryUnknown' : 'checkRetryFailed') })
-    if (recheck) notices.push({ id: 'recheck', tone: 'neutral', text: t('recheckDescription') })
-    const shown = (group: CriterionGroup) => group.title === null ? 'none' : group.passed === null ? 'unverified' : group.passed ? 'passed' : 'failed'
+    if (refused && refusal) problem = { text: `${t('cannotMerge')} · ${t(`mergeRefusal.${refusal}` as 'mergeRefusal.githubUnavailable')}` }
+    if (check?.status === 'blocked' && currentTask.reason) { const copy = runErrorText(currentTask.reason); problem = { text: copy.message ?? t('blocked'), detail: copy.code ?? currentTask.reason } }
+    // 退回修改 and the rest of the decision: with a report in its window (要求修改 is said in the conversation there), without one in the full pane.
+    const noReport = !reportId && (state === 'pending' || refused)
+    if (!reportId && onOpenPane) links.push({ id: 'open-pane', label: t('block.openPane'), onSelect: onOpenPane })
+    const notices: AcceptanceNotice[] = [...block.notices]
+    if (!check && state === 'failed') notices.push({ id: 'publish-failed', text: t('publishFailed') })
+    if (error) notices.push({ id: 'error', text: t(ERROR_KEYS[error] ?? 'error') })
+    if (checkError && [retryCheck?.key, recheck?.key].includes(checkError.key)) notices.push({ id: 'check-error', text: t(checkError.unknown ? 'checkRetryUnknown' : 'checkRetryFailed') })
+    const counted = !block.summary && criteria.length ? t('block.criteria', { passed: String(criteria.filter(group => group.passed).length), total: String(criteria.length) }) : null
+    const summary = [block.summary ?? counted, noReport ? t('block.noReport') : null].filter(Boolean).join(' · ') || null
     const pr = detail?.delivery?.pullRequest
     const prNumber = pr ? pullNumber(pr.url) : null
-    const sha = candidate?.sha ?? detail?.delivery?.candidateSha ?? undefined
-    const repository = candidate?.repository ?? detail?.delivery?.repository
-    const sourceEnvironment = candidate?.environment ?? detail?.delivery?.environment
-    const delivery = detail?.delivery
-    const runtime = task.isSkillCandidate ? t('internalSkill') : envChip ?? (sourceEnvironment?.startsWith('device:')
-      ? delivery?.machine?.name ?? delivery?.machineName ?? t(delivery?.machine?.kind === 'cloud' ? 'envChip.cloud' : 'envChip.device')
-      : sourceEnvironment)
-    const time = (iso: string) => format.dateTime(new Date(iso), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-    const badge = v2 && flow ? { label: flow.needsYou ? tFlow(`card.needsYou.${flow.needsYou.kind}`) : flow.stage === 'completed' && flow.completion === 'accepted' ? t('state.accepted') : tFlow(`stages.${flow.stage}`), tone: flowTone(flow) }
-      : check ? { label: t(`checkState.${check.stage}.${check.status}`), tone: (check.status === 'failed' || check.status === 'blocked' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info') as StatusTone }
-        : { label: derived.refusal ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate)), tone: acceptanceTone(state) }
-    const props: AcceptancePaneProps = {
-      taskId: task.id,
-      title: task.isSkillCandidate ? t('skillTitle') : t('title'),
-      phase, loadError: t('loadError'),
-      state: badge,
-      waiting: state === 'pending' && !check && !detail?.completionRecovery,
-      decision: { label: refused ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate)), tone: refused ? 'warning' : acceptanceTone(state) },
-      machine: delivery?.machine?.name ?? null,
-      candidate: [
-        ...pr ? [{ id: 'pr', label: t('pullRequest'), value: prNumber ? `#${prNumber}${pr.title ? ` ${pr.title}` : ''}` : pr.title ?? t('pullRequest'), href: pr.url }] : [],
-        ...sha ? [{ id: 'commit', label: t('commitLabel'), value: `${shortSha(sha)}${!pr && repository ? ` · ${repository}` : ''}`, mono: true, full: sha }] : [],
-        ...superseded?.candidate?.sha ? [{ id: 'superseded', label: t('commitLabel'), value: t('superseded', { sha: shortSha(superseded.candidate.sha) }), mono: true, full: superseded.candidate.sha }] : [],
-        ...delivery?.previewUrl ? [{ id: 'preview', label: t('previewLabel'), value: bareUrl(delivery.previewUrl), href: delivery.previewUrl }] : [],
-        ...runtime ? [{ id: 'environment', label: t('environmentLabel'), value: `${runtime}${!task.isSkillCandidate && delivery?.previewDatabaseBranch ? ` · Neon ${delivery.previewDatabaseBranch}` : ''}` }] : [],
-        ...task.isSkillCandidate ? [{ id: 'target', label: t('target'), value: 'mikka-builtin:run-report', mono: true }] : [],
-      ],
-      headline: pr?.title ?? repository ?? null,
-      criteriaTitle: criteria.length ? t('criteria') : t('evidence'),
-      criteriaCount: criteria.length ? `${criteria.filter(group => group.passed).length}/${criteria.length}` : null,
-      criteria: evidence ? groups.map((group, position) => ({
-        key: group.key,
-        title: group.title ?? t('otherEvidence'),
-        verdict: shown(group),
-        verdictLabel: group.title === null ? t('evidence') : group.passed === null ? t('inProgress') : t(group.passed ? 'passed' : 'notPassed'),
-        evidence: group.items.map(item => itemLabel(t, item)).join(' · '),
-        onOpen: group.items.length ? () => setViewing({ group: position, index: 0 }) : undefined,
-      })) : [],
-      criteriaEmpty: evidence ? (groups.length ? null : t('evidenceEmpty')) : null,
-      resultsTitle: t('results'),
-      results: results.map(row => {
-        const done = row.status === 'passed' || row.status === 'failed'
-        const runId = row.runId
-        return {
-          key: row.stage,
-          title: t(row.stage === 'review' ? 'review' : 'verify'),
-          status: done ? row.status as 'passed' | 'failed' : row.status === 'blocked' ? 'blocked' : 'running',
-          word: done ? t(RESULT_WORD[row.stage][row.status as 'passed' | 'failed']) : t(row.status === 'blocked' ? 'blocked' : 'inProgress'),
-          meta: row.stage === 'verify' ? (row.total ? `${row.passed}/${row.total}` : null) : row.total - row.passed > 0 ? t('opinions', { count: String(row.total - row.passed) }) : null,
-          sha: row.sha ? shortSha(row.sha) : null,
-          thread: t(row.stage === 'review' ? 'reviewThread' : 'verifyThread'),
-          onOpenThread: runId && onOpenThread ? () => onOpenThread(runId) : undefined,
-          sources: (row.commandSources ?? []).map(source => ({ key: `${source.runId}:${source.recoveryEventId}`, label: t('questionCommandSource'), at: time(source.observedAt),
-            onOpen: onOpenThread ? () => onOpenThread(source.runId) : undefined })),
-        }
-      }),
-      notices,
-      actions,
-      reject: {
-        open: reject.phase !== 'closed', title: t('reject'), label: t('rejectNote'), note: reject.note,
-        error: reject.phase === 'failed' ? t('rejectFailed') : null, submitting: reject.phase === 'submitting', canSubmit: canSubmitReject(reject),
-        cancel: t('cancel'), submit: reject.phase === 'submitting' ? t('rejecting') : reject.phase === 'failed' ? t('resubmit') : t('rejectSubmit'),
-        onEdit: note => dispatchReject({ type: 'edit', note }), onSubmit: () => { void sendBack() }, onCancel: () => dispatchReject({ type: 'cancel' }),
-      },
-      viewer,
-      onClose,
-      closeLabel: t('close'),
-    }
-    return <PaneSlot {...props} />
+    const subject = block.subject ?? (pr ? { label: prNumber ? `PR #${prNumber}` : pr.title ?? t('pullRequest'), href: pr.url }
+      : task.isSkillCandidate ? { label: t('internalSkill') } : isDeliverable && detail?.delivery?.repository ? { label: detail.delivery.repository } : null)
+    const badge = block.state ?? (check ? { label: t(`checkState.${check.stage}.${check.status}`), tone: (check.status === 'failed' || check.status === 'blocked' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info') as StatusTone }
+      : { label: refused ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate)), tone: acceptanceTone(state) })
+    return <BlockSlot {...block} subject={subject} state={badge} summary={block.status ? null : summary} problem={problem} primary={primary} links={links} notices={notices} />
   }
 
   if (ledgerError || evidenceError || detailError || (v2 && flowError)) return <FieldError className="px-6 py-6 text-xs">{t('loadError')}</FieldError>
