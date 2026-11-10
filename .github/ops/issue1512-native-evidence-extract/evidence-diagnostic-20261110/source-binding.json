@@ -1,0 +1,130 @@
+{
+  "schema": "mikka.issue1512.native-diagnostic-active-source-binding.v1",
+  "repository": "alexj11324/Mikka",
+  "source": {
+    "sha": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "tree": "23179d928269195860beaf27ad27786c7f5e7637",
+    "parents": [
+      "5f3598029033b83ee72c88ea6c49955205eecab2"
+    ],
+    "message": "ci: admit issue1512 native read diagnostic 6e1a5e12-269f-44be-9ef5-a05d6f5088c1"
+  },
+  "manifest": "40d8f92047dd4e61b9c1771bda028f537f15de01",
+  "overlay": "2bb50b7cc74c03c5e3898d956ddf43bd5155e141",
+  "review": "14642bffcb3c0428025865fe21eeb446d0bc5c65",
+  "bindings": 19,
+  "invariants": 21,
+  "changes": [
+    {
+      "path": ".github/issue1512-native-live-diagnostic.json",
+      "before": null,
+      "after": "40d8f92047dd4e61b9c1771bda028f537f15de01"
+    },
+    {
+      "path": ".github/workflows/issue1512-native-live-diagnostic.yml",
+      "before": null,
+      "after": "5b7ea8c83aabc154f51a7f205fae0deb4eacd326"
+    },
+    {
+      "path": "apps/desktop/src/main/index.ts",
+      "before": "61da70923e2109761919f8b4968c0cb701917ff3",
+      "after": "59b8685db01b9dfaf870e2cf21cba0ab2ff7bb13"
+    },
+    {
+      "path": "apps/desktop/src/preload/index.ts",
+      "before": "1e62cd5e98e17554733e75915d2d9f03e99f7826",
+      "after": "70fce399664dd440aa4a96cfa36b502f1e0957e4"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "before": "e7f6972a23519ae45e059038cd0c404789d44a98",
+      "after": "64038a0aaae11888d1b32ff0f21498612013dfeb"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "before": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "after": "ecd547d17c1a32cd360090621d22bc3e4e41d732"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "before": "8251fc9aa56103614d1ddff944668930d1da937c",
+      "after": "bb4b1a3e28514d6cfaf811568fb6b041a3191715"
+    },
+    {
+      "path": "apps/desktop/test/native-read-diagnostic.mjs",
+      "before": null,
+      "after": "a164a94125835b901f8ce47e9d8746f71c653cfe"
+    },
+    {
+      "path": "apps/desktop/test/native-read-diagnostic.test.mjs",
+      "before": null,
+      "after": "fa8636f058c1f61412d39a0f8d0d493fddd2a33a"
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "before": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+      "after": "1bdf18021a9c614549bd165f41555ccd0b527479"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "before": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+      "after": "8fd8ad5fc8324caa0e1734887ea77eea60765b93"
+    },
+    {
+      "path": "lib/coordinator/chat-read-client.ts",
+      "before": "c5588e067ff295cc81b5c3e35ea5307fbd94bf57",
+      "after": "668f6c2be742d2cccd25e416a73998d2baf2ed08"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-native-reads.d.mts",
+      "before": null,
+      "after": "c7e36b323dd04a52d9df4948a9ad503af4ae028f"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-native-reads.mjs",
+      "before": null,
+      "after": "6a9eed46a4062eeebc1b0f9984f0d6fe25d8dca7"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-read-collector.d.mts",
+      "before": null,
+      "after": "1a19642f991012cf2b9c9b23354e32bc5833a800"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-read-collector.mjs",
+      "before": null,
+      "after": "5d50d75c0ebef2eef6051a5a39a835877c6f8fa7"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "before": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "after": "5f43ea9f39d9354955fe60e390aa76665ce83f99"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "before": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "after": "39d63bd92fbc9ed4c0b568694b67df28a49c6e65"
+    },
+    {
+      "path": "scripts/ops/issue1512-native-live-diagnostic-guard.mjs",
+      "before": null,
+      "after": "dbb678d6d95ad2f1f025840b2ded2bd78bde803b"
+    },
+    {
+      "path": "scripts/ops/issue1512-native-live-diagnostic-guard.test.mjs",
+      "before": null,
+      "after": "ce2dbd3787e976e382e28fde6f19709dca54f06e"
+    }
+  ],
+  "failures": [],
+  "run": {
+    "id": 42757687653,
+    "attempt": 1,
+    "event": "push",
+    "headBranch": "ops/1512-native-live-diagnostic-20261110",
+    "headSha": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "jobId": 129635774633,
+    "status": "in_progress"
+  },
+  "readScope": "Metadata only. No original Actions job log or artifact downloaded."
+}

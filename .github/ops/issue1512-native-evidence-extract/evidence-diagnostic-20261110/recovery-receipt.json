@@ -1,0 +1,2023 @@
+{
+  "artifacts": [
+    {
+      "allMemberCrcPassed": true,
+      "bytes": 15307035,
+      "deliveryGetCount": 0,
+      "expectedZipBlob": "c49a4729c72a61bfddc2450e77bf01d41156869a",
+      "frozenGitGetCount": 1,
+      "id": 13736438755,
+      "members": [
+        {
+          "bytes": 52247,
+          "compressedBytes": 49188,
+          "crc32": "129c1906",
+          "name": "bundled-devices.png"
+        },
+        {
+          "bytes": 24446,
+          "compressedBytes": 21077,
+          "crc32": "5bbed2de",
+          "name": "bundled-sign-in-self-hosted.png"
+        },
+        {
+          "bytes": 22257,
+          "compressedBytes": 18881,
+          "crc32": "490e8abe",
+          "name": "bundled-sign-in.png"
+        },
+        {
+          "bytes": 14424,
+          "compressedBytes": 9022,
+          "crc32": "8ec2d7dd",
+          "name": "lifecycle-offline-cold-launch.png"
+        },
+        {
+          "bytes": 67379,
+          "compressedBytes": 62339,
+          "crc32": "b2d421ef",
+          "name": "lifecycle-offline-retained.png"
+        },
+        {
+          "bytes": 2814247,
+          "compressedBytes": 210952,
+          "crc32": "ceef6ef6",
+          "name": "lifecycle.json"
+        },
+        {
+          "bytes": 57637,
+          "compressedBytes": 52761,
+          "crc32": "d71b2aae",
+          "name": "parity/dark-all-threads-bundled.png"
+        },
+        {
+          "bytes": 58222,
+          "compressedBytes": 34998,
+          "crc32": "fd427ccb",
+          "name": "parity/dark-all-threads-diff.png"
+        },
+        {
+          "bytes": 57637,
+          "compressedBytes": 52761,
+          "crc32": "d71b2aae",
+          "name": "parity/dark-all-threads-hosted.png"
+        },
+        {
+          "bytes": 69667,
+          "compressedBytes": 64611,
+          "crc32": "0c67f8a1",
+          "name": "parity/dark-artifact-html-bundled.png"
+        },
+        {
+          "bytes": 52549,
+          "compressedBytes": 38326,
+          "crc32": "6dc295dc",
+          "name": "parity/dark-artifact-html-diff.png"
+        },
+        {
+          "bytes": 69672,
+          "compressedBytes": 64456,
+          "crc32": "c9710f3a",
+          "name": "parity/dark-artifact-html-hosted.png"
+        },
+        {
+          "bytes": 32215,
+          "compressedBytes": 26828,
+          "crc32": "98defd34",
+          "name": "parity/dark-artifact-library-bundled.png"
+        },
+        {
+          "bytes": 44692,
+          "compressedBytes": 19232,
+          "crc32": "bb7a25f4",
+          "name": "parity/dark-artifact-library-diff.png"
+        },
+        {
+          "bytes": 32215,
+          "compressedBytes": 26828,
+          "crc32": "98defd34",
+          "name": "parity/dark-artifact-library-hosted.png"
+        },
+        {
+          "bytes": 82623,
+          "compressedBytes": 77013,
+          "crc32": "21bea45b",
+          "name": "parity/dark-artifact-markdown-bundled.png"
+        },
+        {
+          "bytes": 69684,
+          "compressedBytes": 47592,
+          "crc32": "2bae6b58",
+          "name": "parity/dark-artifact-markdown-diff.png"
+        },
+        {
+          "bytes": 82623,
+          "compressedBytes": 77013,
+          "crc32": "21bea45b",
+          "name": "parity/dark-artifact-markdown-hosted.png"
+        },
+        {
+          "bytes": 54037,
+          "compressedBytes": 48863,
+          "crc32": "59311dd2",
+          "name": "parity/dark-board-bundled.png"
+        },
+        {
+          "bytes": 60014,
+          "compressedBytes": 34190,
+          "crc32": "c07eeb3a",
+          "name": "parity/dark-board-diff.png"
+        },
+        {
+          "bytes": 54037,
+          "compressedBytes": 48863,
+          "crc32": "59311dd2",
+          "name": "parity/dark-board-hosted.png"
+        },
+        {
+          "bytes": 55302,
+          "compressedBytes": 50897,
+          "crc32": "1c7b4852",
+          "name": "parity/dark-bot-computer-bundled.png"
+        },
+        {
+          "bytes": 59526,
+          "compressedBytes": 36334,
+          "crc32": "779d345f",
+          "name": "parity/dark-bot-computer-diff.png"
+        },
+        {
+          "bytes": 55302,
+          "compressedBytes": 50897,
+          "crc32": "1c7b4852",
+          "name": "parity/dark-bot-computer-hosted.png"
+        },
+        {
+          "bytes": 70311,
+          "compressedBytes": 65071,
+          "crc32": "ad58a2fe",
+          "name": "parity/dark-bot-details-bundled.png"
+        },
+        {
+          "bytes": 67501,
+          "compressedBytes": 46319,
+          "crc32": "86745c5a",
+          "name": "parity/dark-bot-details-diff.png"
+        },
+        {
+          "bytes": 70311,
+          "compressedBytes": 65071,
+          "crc32": "ad58a2fe",
+          "name": "parity/dark-bot-details-hosted.png"
+        },
+        {
+          "bytes": 50105,
+          "compressedBytes": 45256,
+          "crc32": "3548a010",
+          "name": "parity/dark-bot-prs-bundled.png"
+        },
+        {
+          "bytes": 55159,
+          "compressedBytes": 31707,
+          "crc32": "84939fa1",
+          "name": "parity/dark-bot-prs-diff.png"
+        },
+        {
+          "bytes": 50105,
+          "compressedBytes": 45256,
+          "crc32": "3548a010",
+          "name": "parity/dark-bot-prs-hosted.png"
+        },
+        {
+          "bytes": 54316,
+          "compressedBytes": 49550,
+          "crc32": "ed2e9bbf",
+          "name": "parity/dark-bot-thread-list-bundled.png"
+        },
+        {
+          "bytes": 56585,
+          "compressedBytes": 33536,
+          "crc32": "0a613ccb",
+          "name": "parity/dark-bot-thread-list-diff.png"
+        },
+        {
+          "bytes": 54316,
+          "compressedBytes": 49550,
+          "crc32": "ed2e9bbf",
+          "name": "parity/dark-bot-thread-list-hosted.png"
+        },
+        {
+          "bytes": 57872,
+          "compressedBytes": 53342,
+          "crc32": "a7aad75f",
+          "name": "parity/dark-bot-threads-bundled.png"
+        },
+        {
+          "bytes": 59703,
+          "compressedBytes": 36960,
+          "crc32": "22880bc7",
+          "name": "parity/dark-bot-threads-diff.png"
+        },
+        {
+          "bytes": 57872,
+          "compressedBytes": 53342,
+          "crc32": "a7aad75f",
+          "name": "parity/dark-bot-threads-hosted.png"
+        },
+        {
+          "bytes": 60175,
+          "compressedBytes": 55578,
+          "crc32": "f3108da4",
+          "name": "parity/dark-coordinator-computer-bundled.png"
+        },
+        {
+          "bytes": 61705,
+          "compressedBytes": 38688,
+          "crc32": "4c2cdc71",
+          "name": "parity/dark-coordinator-computer-diff.png"
+        },
+        {
+          "bytes": 60175,
+          "compressedBytes": 55578,
+          "crc32": "f3108da4",
+          "name": "parity/dark-coordinator-computer-hosted.png"
+        },
+        {
+          "bytes": 57739,
+          "compressedBytes": 53195,
+          "crc32": "aeb148a1",
+          "name": "parity/dark-coordinator-details-bundled.png"
+        },
+        {
+          "bytes": 59294,
+          "compressedBytes": 36163,
+          "crc32": "627ffcd3",
+          "name": "parity/dark-coordinator-details-diff.png"
+        },
+        {
+          "bytes": 57739,
+          "compressedBytes": 53195,
+          "crc32": "aeb148a1",
+          "name": "parity/dark-coordinator-details-hosted.png"
+        },
+        {
+          "bytes": 54691,
+          "compressedBytes": 50020,
+          "crc32": "20b9d437",
+          "name": "parity/dark-coordinator-prs-bundled.png"
+        },
+        {
+          "bytes": 57355,
+          "compressedBytes": 33774,
+          "crc32": "22f8fc2a",
+          "name": "parity/dark-coordinator-prs-diff.png"
+        },
+        {
+          "bytes": 54691,
+          "compressedBytes": 50020,
+          "crc32": "20b9d437",
+          "name": "parity/dark-coordinator-prs-hosted.png"
+        },
+        {
+          "bytes": 54909,
+          "compressedBytes": 50271,
+          "crc32": "830049be",
+          "name": "parity/dark-coordinator-threads-bundled.png"
+        },
+        {
+          "bytes": 57556,
+          "compressedBytes": 33978,
+          "crc32": "b13c00b5",
+          "name": "parity/dark-coordinator-threads-diff.png"
+        },
+        {
+          "bytes": 54909,
+          "compressedBytes": 50271,
+          "crc32": "830049be",
+          "name": "parity/dark-coordinator-threads-hosted.png"
+        },
+        {
+          "bytes": 49530,
+          "compressedBytes": 44644,
+          "crc32": "a47e6c76",
+          "name": "parity/dark-group-bundled.png"
+        },
+        {
+          "bytes": 54452,
+          "compressedBytes": 30525,
+          "crc32": "78394cff",
+          "name": "parity/dark-group-diff.png"
+        },
+        {
+          "bytes": 49530,
+          "compressedBytes": 44644,
+          "crc32": "a47e6c76",
+          "name": "parity/dark-group-hosted.png"
+        },
+        {
+          "bytes": 50429,
+          "compressedBytes": 45221,
+          "crc32": "412c6c50",
+          "name": "parity/dark-list-bundled.png"
+        },
+        {
+          "bytes": 53744,
+          "compressedBytes": 30563,
+          "crc32": "d1e94078",
+          "name": "parity/dark-list-diff.png"
+        },
+        {
+          "bytes": 50429,
+          "compressedBytes": 45221,
+          "crc32": "412c6c50",
+          "name": "parity/dark-list-hosted.png"
+        },
+        {
+          "bytes": 85869,
+          "compressedBytes": 82473,
+          "crc32": "043be6b0",
+          "name": "parity/dark-new-task-bundled.png"
+        },
+        {
+          "bytes": 57137,
+          "compressedBytes": 41393,
+          "crc32": "b4d55388",
+          "name": "parity/dark-new-task-diff.png"
+        },
+        {
+          "bytes": 85869,
+          "compressedBytes": 82473,
+          "crc32": "043be6b0",
+          "name": "parity/dark-new-task-hosted.png"
+        },
+        {
+          "bytes": 14582,
+          "compressedBytes": 9150,
+          "crc32": "990a94e0",
+          "name": "parity/dark-offline-bundled.png"
+        },
+        {
+          "bytes": 33572,
+          "compressedBytes": 6195,
+          "crc32": "744853f7",
+          "name": "parity/dark-offline-diff.png"
+        },
+        {
+          "bytes": 14582,
+          "compressedBytes": 9150,
+          "crc32": "990a94e0",
+          "name": "parity/dark-offline-hosted.png"
+        },
+        {
+          "bytes": 31547,
+          "compressedBytes": 26282,
+          "crc32": "8f19e176",
+          "name": "parity/dark-plugins-bundled.png"
+        },
+        {
+          "bytes": 41986,
+          "compressedBytes": 17677,
+          "crc32": "443d2440",
+          "name": "parity/dark-plugins-diff.png"
+        },
+        {
+          "bytes": 31547,
+          "compressedBytes": 26282,
+          "crc32": "8f19e176",
+          "name": "parity/dark-plugins-hosted.png"
+        },
+        {
+          "bytes": 27706,
+          "compressedBytes": 22688,
+          "crc32": "4b254dd7",
+          "name": "parity/dark-projects-bundled.png"
+        },
+        {
+          "bytes": 40298,
+          "compressedBytes": 16069,
+          "crc32": "32a167ac",
+          "name": "parity/dark-projects-diff.png"
+        },
+        {
+          "bytes": 27706,
+          "compressedBytes": 22688,
+          "crc32": "4b254dd7",
+          "name": "parity/dark-projects-hosted.png"
+        },
+        {
+          "bytes": 77058,
+          "compressedBytes": 71428,
+          "crc32": "b165a20d",
+          "name": "parity/dark-settings-account-bundled.png"
+        },
+        {
+          "bytes": 71813,
+          "compressedBytes": 50917,
+          "crc32": "25a6b6da",
+          "name": "parity/dark-settings-account-diff.png"
+        },
+        {
+          "bytes": 77051,
+          "compressedBytes": 71390,
+          "crc32": "6d81a59b",
+          "name": "parity/dark-settings-account-hosted.png"
+        },
+        {
+          "bytes": 61292,
+          "compressedBytes": 55134,
+          "crc32": "fea22c65",
+          "name": "parity/dark-settings-audit-bundled.png"
+        },
+        {
+          "bytes": 61949,
+          "compressedBytes": 39426,
+          "crc32": "4a1225d3",
+          "name": "parity/dark-settings-audit-diff.png"
+        },
+        {
+          "bytes": 61292,
+          "compressedBytes": 55134,
+          "crc32": "fea22c65",
+          "name": "parity/dark-settings-audit-hosted.png"
+        },
+        {
+          "bytes": 63173,
+          "compressedBytes": 56934,
+          "crc32": "9e605661",
+          "name": "parity/dark-settings-billing-bundled.png"
+        },
+        {
+          "bytes": 62997,
+          "compressedBytes": 40713,
+          "crc32": "c58aa222",
+          "name": "parity/dark-settings-billing-diff.png"
+        },
+        {
+          "bytes": 63173,
+          "compressedBytes": 56934,
+          "crc32": "9e605661",
+          "name": "parity/dark-settings-billing-hosted.png"
+        },
+        {
+          "bytes": 91540,
+          "compressedBytes": 84955,
+          "crc32": "9a4c7cc5",
+          "name": "parity/dark-settings-bot-permissions-bundled.png"
+        },
+        {
+          "bytes": 78756,
+          "compressedBytes": 57443,
+          "crc32": "85909093",
+          "name": "parity/dark-settings-bot-permissions-diff.png"
+        },
+        {
+          "bytes": 91540,
+          "compressedBytes": 84955,
+          "crc32": "9a4c7cc5",
+          "name": "parity/dark-settings-bot-permissions-hosted.png"
+        },
+        {
+          "bytes": 79504,
+          "compressedBytes": 73396,
+          "crc32": "e07f97f8",
+          "name": "parity/dark-settings-computers-bundled.png"
+        },
+        {
+          "bytes": 71558,
+          "compressedBytes": 49381,
+          "crc32": "d6dc4421",
+          "name": "parity/dark-settings-computers-diff.png"
+        },
+        {
+          "bytes": 79504,
+          "compressedBytes": 73396,
+          "crc32": "e07f97f8",
+          "name": "parity/dark-settings-computers-hosted.png"
+        },
+        {
+          "bytes": 60113,
+          "compressedBytes": 53950,
+          "crc32": "c3f0f7d4",
+          "name": "parity/dark-settings-connections-bundled.png"
+        },
+        {
+          "bytes": 61478,
+          "compressedBytes": 39287,
+          "crc32": "a9026891",
+          "name": "parity/dark-settings-connections-diff.png"
+        },
+        {
+          "bytes": 60115,
+          "compressedBytes": 53961,
+          "crc32": "036474c3",
+          "name": "parity/dark-settings-connections-hosted.png"
+        },
+        {
+          "bytes": 74141,
+          "compressedBytes": 68631,
+          "crc32": "685252bb",
+          "name": "parity/dark-settings-general-bundled.png"
+        },
+        {
+          "bytes": 70654,
+          "compressedBytes": 50008,
+          "crc32": "51adefec",
+          "name": "parity/dark-settings-general-diff.png"
+        },
+        {
+          "bytes": 74148,
+          "compressedBytes": 68685,
+          "crc32": "eb0e7672",
+          "name": "parity/dark-settings-general-hosted.png"
+        },
+        {
+          "bytes": 71640,
+          "compressedBytes": 65766,
+          "crc32": "d35f7f31",
+          "name": "parity/dark-settings-logins-bundled.png"
+        },
+        {
+          "bytes": 68327,
+          "compressedBytes": 46849,
+          "crc32": "00fc963e",
+          "name": "parity/dark-settings-logins-diff.png"
+        },
+        {
+          "bytes": 71640,
+          "compressedBytes": 65783,
+          "crc32": "6205ea51",
+          "name": "parity/dark-settings-logins-hosted.png"
+        },
+        {
+          "bytes": 77673,
+          "compressedBytes": 71352,
+          "crc32": "0fa5552b",
+          "name": "parity/dark-settings-members-bundled.png"
+        },
+        {
+          "bytes": 71062,
+          "compressedBytes": 48960,
+          "crc32": "268c0eae",
+          "name": "parity/dark-settings-members-diff.png"
+        },
+        {
+          "bytes": 77666,
+          "compressedBytes": 71294,
+          "crc32": "e9dadfe6",
+          "name": "parity/dark-settings-members-hosted.png"
+        },
+        {
+          "bytes": 65734,
+          "compressedBytes": 59480,
+          "crc32": "371b9076",
+          "name": "parity/dark-settings-memory-bundled.png"
+        },
+        {
+          "bytes": 64206,
+          "compressedBytes": 41666,
+          "crc32": "fb13f332",
+          "name": "parity/dark-settings-memory-diff.png"
+        },
+        {
+          "bytes": 65734,
+          "compressedBytes": 59480,
+          "crc32": "371b9076",
+          "name": "parity/dark-settings-memory-hosted.png"
+        },
+        {
+          "bytes": 112575,
+          "compressedBytes": 107260,
+          "crc32": "838285af",
+          "name": "parity/dark-settings-models-bundled.png"
+        },
+        {
+          "bytes": 89929,
+          "compressedBytes": 72102,
+          "crc32": "53d84c6d",
+          "name": "parity/dark-settings-models-diff.png"
+        },
+        {
+          "bytes": 112579,
+          "compressedBytes": 107304,
+          "crc32": "95a62aa3",
+          "name": "parity/dark-settings-models-hosted.png"
+        },
+        {
+          "bytes": 74162,
+          "compressedBytes": 68025,
+          "crc32": "5fa77180",
+          "name": "parity/dark-settings-notifications-bundled.png"
+        },
+        {
+          "bytes": 70804,
+          "compressedBytes": 49011,
+          "crc32": "2c68205b",
+          "name": "parity/dark-settings-notifications-diff.png"
+        },
+        {
+          "bytes": 74165,
+          "compressedBytes": 67965,
+          "crc32": "270941ea",
+          "name": "parity/dark-settings-notifications-hosted.png"
+        },
+        {
+          "bytes": 93141,
+          "compressedBytes": 87456,
+          "crc32": "cf374441",
+          "name": "parity/dark-settings-permissions-bundled.png"
+        },
+        {
+          "bytes": 80844,
+          "compressedBytes": 60439,
+          "crc32": "6632dfd1",
+          "name": "parity/dark-settings-permissions-diff.png"
+        },
+        {
+          "bytes": 93141,
+          "compressedBytes": 87456,
+          "crc32": "cf374441",
+          "name": "parity/dark-settings-permissions-hosted.png"
+        },
+        {
+          "bytes": 77324,
+          "compressedBytes": 71364,
+          "crc32": "321bd8ef",
+          "name": "parity/dark-settings-preferences-bundled.png"
+        },
+        {
+          "bytes": 71534,
+          "compressedBytes": 51292,
+          "crc32": "84f71614",
+          "name": "parity/dark-settings-preferences-diff.png"
+        },
+        {
+          "bytes": 77324,
+          "compressedBytes": 71364,
+          "crc32": "321bd8ef",
+          "name": "parity/dark-settings-preferences-hosted.png"
+        },
+        {
+          "bytes": 68095,
+          "compressedBytes": 62114,
+          "crc32": "97e90d8f",
+          "name": "parity/dark-settings-privacy-bundled.png"
+        },
+        {
+          "bytes": 65936,
+          "compressedBytes": 44587,
+          "crc32": "511bfdf9",
+          "name": "parity/dark-settings-privacy-diff.png"
+        },
+        {
+          "bytes": 68088,
+          "compressedBytes": 62142,
+          "crc32": "7e6e46ec",
+          "name": "parity/dark-settings-privacy-hosted.png"
+        },
+        {
+          "bytes": 66912,
+          "compressedBytes": 60889,
+          "crc32": "59273f68",
+          "name": "parity/dark-settings-secrets-bundled.png"
+        },
+        {
+          "bytes": 65264,
+          "compressedBytes": 43303,
+          "crc32": "ff419a23",
+          "name": "parity/dark-settings-secrets-diff.png"
+        },
+        {
+          "bytes": 66912,
+          "compressedBytes": 60889,
+          "crc32": "59273f68",
+          "name": "parity/dark-settings-secrets-hosted.png"
+        },
+        {
+          "bytes": 78741,
+          "compressedBytes": 72667,
+          "crc32": "3c293e80",
+          "name": "parity/dark-settings-security-bundled.png"
+        },
+        {
+          "bytes": 71896,
+          "compressedBytes": 51328,
+          "crc32": "e45ebf2e",
+          "name": "parity/dark-settings-security-diff.png"
+        },
+        {
+          "bytes": 78733,
+          "compressedBytes": 72621,
+          "crc32": "1e4e42fe",
+          "name": "parity/dark-settings-security-hosted.png"
+        },
+        {
+          "bytes": 71992,
+          "compressedBytes": 65576,
+          "crc32": "5fc689c4",
+          "name": "parity/dark-settings-teams-bundled.png"
+        },
+        {
+          "bytes": 67866,
+          "compressedBytes": 45042,
+          "crc32": "5e2deb55",
+          "name": "parity/dark-settings-teams-diff.png"
+        },
+        {
+          "bytes": 71995,
+          "compressedBytes": 65607,
+          "crc32": "ac2e1f39",
+          "name": "parity/dark-settings-teams-hosted.png"
+        },
+        {
+          "bytes": 77593,
+          "compressedBytes": 71924,
+          "crc32": "73e529e2",
+          "name": "parity/dark-settings-usage-bundled.png"
+        },
+        {
+          "bytes": 72491,
+          "compressedBytes": 51896,
+          "crc32": "4e121b0f",
+          "name": "parity/dark-settings-usage-diff.png"
+        },
+        {
+          "bytes": 77598,
+          "compressedBytes": 72023,
+          "crc32": "7eda61d7",
+          "name": "parity/dark-settings-usage-hosted.png"
+        },
+        {
+          "bytes": 17603,
+          "compressedBytes": 9704,
+          "crc32": "dc8efa7d",
+          "name": "parity/dark-shared-html-diff.png"
+        },
+        {
+          "bytes": 22732,
+          "compressedBytes": 16743,
+          "crc32": "88b099da",
+          "name": "parity/dark-shared-html-hosted.png"
+        },
+        {
+          "bytes": 35526,
+          "compressedBytes": 28968,
+          "crc32": "e4069b13",
+          "name": "parity/dark-shared-markdown-bundled.png"
+        },
+        {
+          "bytes": 22732,
+          "compressedBytes": 16743,
+          "crc32": "88b099da",
+          "name": "parity/dark-shared-html-bundled.png"
+        },
+        {
+          "bytes": 44295,
+          "compressedBytes": 17945,
+          "crc32": "e47037bc",
+          "name": "parity/dark-shared-markdown-diff.png"
+        },
+        {
+          "bytes": 35526,
+          "compressedBytes": 28968,
+          "crc32": "e4069b13",
+          "name": "parity/dark-shared-markdown-hosted.png"
+        },
+        {
+          "bytes": 12864,
+          "compressedBytes": 7104,
+          "crc32": "38cef644",
+          "name": "parity/dark-shared-missing-bundled.png"
+        },
+        {
+          "bytes": 32062,
+          "compressedBytes": 4554,
+          "crc32": "23c994ba",
+          "name": "parity/dark-shared-missing-diff.png"
+        },
+        {
+          "bytes": 12864,
+          "compressedBytes": 7104,
+          "crc32": "38cef644",
+          "name": "parity/dark-shared-missing-hosted.png"
+        },
+        {
+          "bytes": 24763,
+          "compressedBytes": 19594,
+          "crc32": "f9a9ac88",
+          "name": "parity/dark-sign-in-bundled.png"
+        },
+        {
+          "bytes": 40583,
+          "compressedBytes": 14544,
+          "crc32": "eae7c087",
+          "name": "parity/dark-sign-in-diff.png"
+        },
+        {
+          "bytes": 24763,
+          "compressedBytes": 19594,
+          "crc32": "f9a9ac88",
+          "name": "parity/dark-sign-in-hosted.png"
+        },
+        {
+          "bytes": 43847,
+          "compressedBytes": 38576,
+          "crc32": "6b1a00ff",
+          "name": "parity/dark-suggestions-bundled.png"
+        },
+        {
+          "bytes": 50761,
+          "compressedBytes": 28398,
+          "crc32": "03037a65",
+          "name": "parity/dark-suggestions-diff.png"
+        },
+        {
+          "bytes": 43847,
+          "compressedBytes": 38576,
+          "crc32": "6b1a00ff",
+          "name": "parity/dark-suggestions-hosted.png"
+        },
+        {
+          "bytes": 71284,
+          "compressedBytes": 65964,
+          "crc32": "c95f34a0",
+          "name": "parity/dark-task-bundled.png"
+        },
+        {
+          "bytes": 68220,
+          "compressedBytes": 47005,
+          "crc32": "079520dd",
+          "name": "parity/dark-task-diff.png"
+        },
+        {
+          "bytes": 71284,
+          "compressedBytes": 65964,
+          "crc32": "c95f34a0",
+          "name": "parity/dark-task-hosted.png"
+        },
+        {
+          "bytes": 86957,
+          "compressedBytes": 81217,
+          "crc32": "3223a6af",
+          "name": "parity/dark-task-thread-bundled.png"
+        },
+        {
+          "bytes": 75513,
+          "compressedBytes": 55204,
+          "crc32": "d1a0e97e",
+          "name": "parity/dark-task-thread-diff.png"
+        },
+        {
+          "bytes": 86957,
+          "compressedBytes": 81217,
+          "crc32": "3223a6af",
+          "name": "parity/dark-task-thread-hosted.png"
+        },
+        {
+          "bytes": 39332,
+          "compressedBytes": 33747,
+          "crc32": "feccba33",
+          "name": "parity/dark-team-home-bundled.png"
+        },
+        {
+          "bytes": 39332,
+          "compressedBytes": 33747,
+          "crc32": "feccba33",
+          "name": "parity/dark-team-home-hosted.png"
+        },
+        {
+          "bytes": 46175,
+          "compressedBytes": 22660,
+          "crc32": "0c89b052",
+          "name": "parity/dark-team-home-diff.png"
+        },
+        {
+          "bytes": 28707,
+          "compressedBytes": 23627,
+          "crc32": "35fc61b8",
+          "name": "parity/dark-team-projects-bundled.png"
+        },
+        {
+          "bytes": 28707,
+          "compressedBytes": 23627,
+          "crc32": "35fc61b8",
+          "name": "parity/dark-team-projects-hosted.png"
+        },
+        {
+          "bytes": 40916,
+          "compressedBytes": 16484,
+          "crc32": "79c8fd61",
+          "name": "parity/dark-team-projects-diff.png"
+        },
+        {
+          "bytes": 50429,
+          "compressedBytes": 45221,
+          "crc32": "412c6c50",
+          "name": "parity/dark-team-tasks-bundled.png"
+        },
+        {
+          "bytes": 53744,
+          "compressedBytes": 30563,
+          "crc32": "d1e94078",
+          "name": "parity/dark-team-tasks-diff.png"
+        },
+        {
+          "bytes": 71105,
+          "compressedBytes": 66157,
+          "crc32": "d67fd6cd",
+          "name": "parity/dark-thread-bundled.png"
+        },
+        {
+          "bytes": 66136,
+          "compressedBytes": 44932,
+          "crc32": "fac72a07",
+          "name": "parity/dark-thread-diff.png"
+        },
+        {
+          "bytes": 50429,
+          "compressedBytes": 45221,
+          "crc32": "412c6c50",
+          "name": "parity/dark-team-tasks-hosted.png"
+        },
+        {
+          "bytes": 71105,
+          "compressedBytes": 66157,
+          "crc32": "d67fd6cd",
+          "name": "parity/dark-thread-hosted.png"
+        },
+        {
+          "bytes": 60175,
+          "compressedBytes": 55578,
+          "crc32": "f3108da4",
+          "name": "parity/dark-workspace-link-bundled.png"
+        },
+        {
+          "bytes": 61705,
+          "compressedBytes": 38688,
+          "crc32": "4c2cdc71",
+          "name": "parity/dark-workspace-link-diff.png"
+        },
+        {
+          "bytes": 60175,
+          "compressedBytes": 55578,
+          "crc32": "f3108da4",
+          "name": "parity/dark-workspace-link-hosted.png"
+        },
+        {
+          "bytes": 58127,
+          "compressedBytes": 53283,
+          "crc32": "43f8515a",
+          "name": "parity/light-all-threads-bundled.png"
+        },
+        {
+          "bytes": 43591,
+          "compressedBytes": 32126,
+          "crc32": "d80c5876",
+          "name": "parity/light-all-threads-diff.png"
+        },
+        {
+          "bytes": 58127,
+          "compressedBytes": 53283,
+          "crc32": "43f8515a",
+          "name": "parity/light-all-threads-hosted.png"
+        },
+        {
+          "bytes": 71357,
+          "compressedBytes": 66049,
+          "crc32": "a3b6ec52",
+          "name": "parity/light-artifact-html-bundled.png"
+        },
+        {
+          "bytes": 48479,
+          "compressedBytes": 35880,
+          "crc32": "97382666",
+          "name": "parity/light-artifact-html-diff.png"
+        },
+        {
+          "bytes": 71357,
+          "compressedBytes": 66049,
+          "crc32": "a3b6ec52",
+          "name": "parity/light-artifact-html-hosted.png"
+        },
+        {
+          "bytes": 31953,
+          "compressedBytes": 26469,
+          "crc32": "46c330bc",
+          "name": "parity/light-artifact-library-bundled.png"
+        },
+        {
+          "bytes": 26829,
+          "compressedBytes": 16802,
+          "crc32": "7f0b7cbc",
+          "name": "parity/light-artifact-library-diff.png"
+        },
+        {
+          "bytes": 31953,
+          "compressedBytes": 26469,
+          "crc32": "46c330bc",
+          "name": "parity/light-artifact-library-hosted.png"
+        },
+        {
+          "bytes": 84031,
+          "compressedBytes": 78222,
+          "crc32": "8524c092",
+          "name": "parity/light-artifact-markdown-bundled.png"
+        },
+        {
+          "bytes": 55911,
+          "compressedBytes": 43819,
+          "crc32": "14a3e142",
+          "name": "parity/light-artifact-markdown-diff.png"
+        },
+        {
+          "bytes": 84031,
+          "compressedBytes": 78222,
+          "crc32": "8524c092",
+          "name": "parity/light-artifact-markdown-hosted.png"
+        },
+        {
+          "bytes": 54408,
+          "compressedBytes": 49272,
+          "crc32": "251a9b4b",
+          "name": "parity/light-board-bundled.png"
+        },
+        {
+          "bytes": 58897,
+          "compressedBytes": 32984,
+          "crc32": "1ae07113",
+          "name": "parity/light-board-diff.png"
+        },
+        {
+          "bytes": 54408,
+          "compressedBytes": 49272,
+          "crc32": "251a9b4b",
+          "name": "parity/light-board-hosted.png"
+        },
+        {
+          "bytes": 56381,
+          "compressedBytes": 51767,
+          "crc32": "be777050",
+          "name": "parity/light-bot-computer-bundled.png"
+        },
+        {
+          "bytes": 44365,
+          "compressedBytes": 32467,
+          "crc32": "96593948",
+          "name": "parity/light-bot-computer-diff.png"
+        },
+        {
+          "bytes": 71294,
+          "compressedBytes": 65904,
+          "crc32": "bbd25cc0",
+          "name": "parity/light-bot-details-bundled.png"
+        },
+        {
+          "bytes": 52069,
+          "compressedBytes": 41333,
+          "crc32": "9fef8a08",
+          "name": "parity/light-bot-details-diff.png"
+        },
+        {
+          "bytes": 71294,
+          "compressedBytes": 65904,
+          "crc32": "bbd25cc0",
+          "name": "parity/light-bot-details-hosted.png"
+        },
+        {
+          "bytes": 56381,
+          "compressedBytes": 51767,
+          "crc32": "be777050",
+          "name": "parity/light-bot-computer-hosted.png"
+        },
+        {
+          "bytes": 51183,
+          "compressedBytes": 46298,
+          "crc32": "5dd06090",
+          "name": "parity/light-bot-prs-bundled.png"
+        },
+        {
+          "bytes": 39414,
+          "compressedBytes": 28278,
+          "crc32": "7d2ea076",
+          "name": "parity/light-bot-prs-diff.png"
+        },
+        {
+          "bytes": 54794,
+          "compressedBytes": 49961,
+          "crc32": "91b10af2",
+          "name": "parity/light-bot-thread-list-bundled.png"
+        },
+        {
+          "bytes": 51183,
+          "compressedBytes": 46298,
+          "crc32": "5dd06090",
+          "name": "parity/light-bot-prs-hosted.png"
+        },
+        {
+          "bytes": 41354,
+          "compressedBytes": 30035,
+          "crc32": "2778d2a1",
+          "name": "parity/light-bot-thread-list-diff.png"
+        },
+        {
+          "bytes": 58977,
+          "compressedBytes": 54372,
+          "crc32": "090e04b8",
+          "name": "parity/light-bot-threads-bundled.png"
+        },
+        {
+          "bytes": 44426,
+          "compressedBytes": 33232,
+          "crc32": "ee6f0429",
+          "name": "parity/light-bot-threads-diff.png"
+        },
+        {
+          "bytes": 54794,
+          "compressedBytes": 49961,
+          "crc32": "91b10af2",
+          "name": "parity/light-bot-thread-list-hosted.png"
+        },
+        {
+          "bytes": 58977,
+          "compressedBytes": 54372,
+          "crc32": "090e04b8",
+          "name": "parity/light-bot-threads-hosted.png"
+        },
+        {
+          "bytes": 61016,
+          "compressedBytes": 56442,
+          "crc32": "8a7c1998",
+          "name": "parity/light-coordinator-computer-bundled.png"
+        },
+        {
+          "bytes": 47007,
+          "compressedBytes": 34485,
+          "crc32": "b7bc137b",
+          "name": "parity/light-coordinator-computer-diff.png"
+        },
+        {
+          "bytes": 61016,
+          "compressedBytes": 56442,
+          "crc32": "8a7c1998",
+          "name": "parity/light-coordinator-computer-hosted.png"
+        },
+        {
+          "bytes": 58781,
+          "compressedBytes": 54111,
+          "crc32": "b716d96d",
+          "name": "parity/light-coordinator-details-bundled.png"
+        },
+        {
+          "bytes": 43819,
+          "compressedBytes": 32486,
+          "crc32": "52fc42fb",
+          "name": "parity/light-coordinator-details-diff.png"
+        },
+        {
+          "bytes": 58781,
+          "compressedBytes": 54111,
+          "crc32": "b716d96d",
+          "name": "parity/light-coordinator-details-hosted.png"
+        },
+        {
+          "bytes": 55613,
+          "compressedBytes": 50911,
+          "crc32": "bff44eec",
+          "name": "parity/light-coordinator-prs-bundled.png"
+        },
+        {
+          "bytes": 42173,
+          "compressedBytes": 30452,
+          "crc32": "006f00ba",
+          "name": "parity/light-coordinator-prs-diff.png"
+        },
+        {
+          "bytes": 55613,
+          "compressedBytes": 50911,
+          "crc32": "bff44eec",
+          "name": "parity/light-coordinator-prs-hosted.png"
+        },
+        {
+          "bytes": 55810,
+          "compressedBytes": 51117,
+          "crc32": "53b0dc1c",
+          "name": "parity/light-coordinator-threads-bundled.png"
+        },
+        {
+          "bytes": 42337,
+          "compressedBytes": 30527,
+          "crc32": "bcc9ef29",
+          "name": "parity/light-coordinator-threads-diff.png"
+        },
+        {
+          "bytes": 55810,
+          "compressedBytes": 51117,
+          "crc32": "53b0dc1c",
+          "name": "parity/light-coordinator-threads-hosted.png"
+        },
+        {
+          "bytes": 50267,
+          "compressedBytes": 45445,
+          "crc32": "54a4344b",
+          "name": "parity/light-group-bundled.png"
+        },
+        {
+          "bytes": 38228,
+          "compressedBytes": 27386,
+          "crc32": "142e35d0",
+          "name": "parity/light-group-diff.png"
+        },
+        {
+          "bytes": 50267,
+          "compressedBytes": 45445,
+          "crc32": "54a4344b",
+          "name": "parity/light-group-hosted.png"
+        },
+        {
+          "bytes": 50843,
+          "compressedBytes": 45573,
+          "crc32": "1c21473f",
+          "name": "parity/light-list-bundled.png"
+        },
+        {
+          "bytes": 37916,
+          "compressedBytes": 28098,
+          "crc32": "e043a810",
+          "name": "parity/light-list-diff.png"
+        },
+        {
+          "bytes": 85894,
+          "compressedBytes": 82575,
+          "crc32": "b0674803",
+          "name": "parity/light-new-task-bundled.png"
+        },
+        {
+          "bytes": 50800,
+          "compressedBytes": 45569,
+          "crc32": "143692c6",
+          "name": "parity/light-list-hosted.png"
+        },
+        {
+          "bytes": 55166,
+          "compressedBytes": 38833,
+          "crc32": "4d3860b6",
+          "name": "parity/light-new-task-diff.png"
+        },
+        {
+          "bytes": 85894,
+          "compressedBytes": 82575,
+          "crc32": "b0674803",
+          "name": "parity/light-new-task-hosted.png"
+        },
+        {
+          "bytes": 14482,
+          "compressedBytes": 9111,
+          "crc32": "9cc918f0",
+          "name": "parity/light-offline-bundled.png"
+        },
+        {
+          "bytes": 33062,
+          "compressedBytes": 5967,
+          "crc32": "a7940b8d",
+          "name": "parity/light-offline-diff.png"
+        },
+        {
+          "bytes": 14482,
+          "compressedBytes": 9111,
+          "crc32": "9cc918f0",
+          "name": "parity/light-offline-hosted.png"
+        },
+        {
+          "bytes": 31653,
+          "compressedBytes": 26293,
+          "crc32": "e176e0ed",
+          "name": "parity/light-plugins-bundled.png"
+        },
+        {
+          "bytes": 23795,
+          "compressedBytes": 16023,
+          "crc32": "0f57b230",
+          "name": "parity/light-plugins-diff.png"
+        },
+        {
+          "bytes": 31653,
+          "compressedBytes": 26293,
+          "crc32": "e176e0ed",
+          "name": "parity/light-plugins-hosted.png"
+        },
+        {
+          "bytes": 21952,
+          "compressedBytes": 14231,
+          "crc32": "acb1c8ca",
+          "name": "parity/light-projects-diff.png"
+        },
+        {
+          "bytes": 27606,
+          "compressedBytes": 22532,
+          "crc32": "bb225a45",
+          "name": "parity/light-projects-hosted.png"
+        },
+        {
+          "bytes": 77001,
+          "compressedBytes": 71124,
+          "crc32": "c6c745fb",
+          "name": "parity/light-settings-account-bundled.png"
+        },
+        {
+          "bytes": 27606,
+          "compressedBytes": 22532,
+          "crc32": "bb225a45",
+          "name": "parity/light-projects-bundled.png"
+        },
+        {
+          "bytes": 76981,
+          "compressedBytes": 71178,
+          "crc32": "c0bd1b94",
+          "name": "parity/light-settings-account-hosted.png"
+        },
+        {
+          "bytes": 69975,
+          "compressedBytes": 51482,
+          "crc32": "97141114",
+          "name": "parity/light-settings-account-diff.png"
+        },
+        {
+          "bytes": 61291,
+          "compressedBytes": 54953,
+          "crc32": "59193c03",
+          "name": "parity/light-settings-audit-bundled.png"
+        },
+        {
+          "bytes": 61277,
+          "compressedBytes": 54797,
+          "crc32": "7b58c1ba",
+          "name": "parity/light-settings-audit-hosted.png"
+        },
+        {
+          "bytes": 61542,
+          "compressedBytes": 39011,
+          "crc32": "734ea2c8",
+          "name": "parity/light-settings-audit-diff.png"
+        },
+        {
+          "bytes": 63118,
+          "compressedBytes": 56720,
+          "crc32": "d42c099b",
+          "name": "parity/light-settings-billing-bundled.png"
+        },
+        {
+          "bytes": 62539,
+          "compressedBytes": 40664,
+          "crc32": "a57f62e7",
+          "name": "parity/light-settings-billing-diff.png"
+        },
+        {
+          "bytes": 63102,
+          "compressedBytes": 56656,
+          "crc32": "06680ce3",
+          "name": "parity/light-settings-billing-hosted.png"
+        },
+        {
+          "bytes": 90938,
+          "compressedBytes": 84313,
+          "crc32": "43e6b830",
+          "name": "parity/light-settings-bot-permissions-bundled.png"
+        },
+        {
+          "bytes": 78573,
+          "compressedBytes": 56987,
+          "crc32": "c4fa1f75",
+          "name": "parity/light-settings-bot-permissions-diff.png"
+        },
+        {
+          "bytes": 79317,
+          "compressedBytes": 73074,
+          "crc32": "33c0e617",
+          "name": "parity/light-settings-computers-bundled.png"
+        },
+        {
+          "bytes": 90934,
+          "compressedBytes": 84335,
+          "crc32": "b0da6d18",
+          "name": "parity/light-settings-bot-permissions-hosted.png"
+        },
+        {
+          "bytes": 71044,
+          "compressedBytes": 50380,
+          "crc32": "835d179e",
+          "name": "parity/light-settings-computers-diff.png"
+        },
+        {
+          "bytes": 79311,
+          "compressedBytes": 73015,
+          "crc32": "103743c3",
+          "name": "parity/light-settings-computers-hosted.png"
+        },
+        {
+          "bytes": 60040,
+          "compressedBytes": 53735,
+          "crc32": "ce0b3689",
+          "name": "parity/light-settings-connections-bundled.png"
+        },
+        {
+          "bytes": 60675,
+          "compressedBytes": 38551,
+          "crc32": "3cc9adc2",
+          "name": "parity/light-settings-connections-diff.png"
+        },
+        {
+          "bytes": 74136,
+          "compressedBytes": 68432,
+          "crc32": "364c39e1",
+          "name": "parity/light-settings-general-bundled.png"
+        },
+        {
+          "bytes": 60040,
+          "compressedBytes": 53735,
+          "crc32": "ce0b3689",
+          "name": "parity/light-settings-connections-hosted.png"
+        },
+        {
+          "bytes": 68943,
+          "compressedBytes": 50031,
+          "crc32": "949d743f",
+          "name": "parity/light-settings-general-diff.png"
+        },
+        {
+          "bytes": 71819,
+          "compressedBytes": 65527,
+          "crc32": "a6e4c679",
+          "name": "parity/light-settings-logins-bundled.png"
+        },
+        {
+          "bytes": 74114,
+          "compressedBytes": 68587,
+          "crc32": "679fd228",
+          "name": "parity/light-settings-general-hosted.png"
+        },
+        {
+          "bytes": 66835,
+          "compressedBytes": 47711,
+          "crc32": "c0642173",
+          "name": "parity/light-settings-logins-diff.png"
+        },
+        {
+          "bytes": 71819,
+          "compressedBytes": 65527,
+          "crc32": "a6e4c679",
+          "name": "parity/light-settings-logins-hosted.png"
+        },
+        {
+          "bytes": 77428,
+          "compressedBytes": 71063,
+          "crc32": "ceef6476",
+          "name": "parity/light-settings-members-bundled.png"
+        },
+        {
+          "bytes": 70851,
+          "compressedBytes": 49612,
+          "crc32": "e5eedead",
+          "name": "parity/light-settings-members-diff.png"
+        },
+        {
+          "bytes": 77418,
+          "compressedBytes": 71097,
+          "crc32": "d91f1dda",
+          "name": "parity/light-settings-members-hosted.png"
+        },
+        {
+          "bytes": 65704,
+          "compressedBytes": 59373,
+          "crc32": "9625dadc",
+          "name": "parity/light-settings-memory-bundled.png"
+        },
+        {
+          "bytes": 63741,
+          "compressedBytes": 42140,
+          "crc32": "3efd93d4",
+          "name": "parity/light-settings-memory-diff.png"
+        },
+        {
+          "bytes": 65683,
+          "compressedBytes": 59435,
+          "crc32": "d7f4aeea",
+          "name": "parity/light-settings-memory-hosted.png"
+        },
+        {
+          "bytes": 113580,
+          "compressedBytes": 108193,
+          "crc32": "38b13f7f",
+          "name": "parity/light-settings-models-bundled.png"
+        },
+        {
+          "bytes": 89315,
+          "compressedBytes": 71677,
+          "crc32": "1e639261",
+          "name": "parity/light-settings-models-diff.png"
+        },
+        {
+          "bytes": 73900,
+          "compressedBytes": 67493,
+          "crc32": "98b5abb6",
+          "name": "parity/light-settings-notifications-bundled.png"
+        },
+        {
+          "bytes": 113566,
+          "compressedBytes": 108277,
+          "crc32": "8ffc951c",
+          "name": "parity/light-settings-models-hosted.png"
+        },
+        {
+          "bytes": 68595,
+          "compressedBytes": 49199,
+          "crc32": "196c9a8d",
+          "name": "parity/light-settings-notifications-diff.png"
+        },
+        {
+          "bytes": 73905,
+          "compressedBytes": 67509,
+          "crc32": "921ee49c",
+          "name": "parity/light-settings-notifications-hosted.png"
+        },
+        {
+          "bytes": 93355,
+          "compressedBytes": 87411,
+          "crc32": "631b5c04",
+          "name": "parity/light-settings-permissions-bundled.png"
+        },
+        {
+          "bytes": 78513,
+          "compressedBytes": 60903,
+          "crc32": "b82732fa",
+          "name": "parity/light-settings-permissions-diff.png"
+        },
+        {
+          "bytes": 93355,
+          "compressedBytes": 87294,
+          "crc32": "f5c74961",
+          "name": "parity/light-settings-permissions-hosted.png"
+        },
+        {
+          "bytes": 77523,
+          "compressedBytes": 71458,
+          "crc32": "a5bfbaaf",
+          "name": "parity/light-settings-preferences-bundled.png"
+        },
+        {
+          "bytes": 70341,
+          "compressedBytes": 52245,
+          "crc32": "34a44308",
+          "name": "parity/light-settings-preferences-diff.png"
+        },
+        {
+          "bytes": 77539,
+          "compressedBytes": 71600,
+          "crc32": "095141c8",
+          "name": "parity/light-settings-preferences-hosted.png"
+        },
+        {
+          "bytes": 68007,
+          "compressedBytes": 61829,
+          "crc32": "f49a59a8",
+          "name": "parity/light-settings-privacy-bundled.png"
+        },
+        {
+          "bytes": 65053,
+          "compressedBytes": 45169,
+          "crc32": "bbd35c0a",
+          "name": "parity/light-settings-privacy-diff.png"
+        },
+        {
+          "bytes": 67025,
+          "compressedBytes": 60878,
+          "crc32": "4769c228",
+          "name": "parity/light-settings-secrets-bundled.png"
+        },
+        {
+          "bytes": 67988,
+          "compressedBytes": 61892,
+          "crc32": "a8d5a88c",
+          "name": "parity/light-settings-privacy-hosted.png"
+        },
+        {
+          "bytes": 64308,
+          "compressedBytes": 44232,
+          "crc32": "c4d6f021",
+          "name": "parity/light-settings-secrets-diff.png"
+        },
+        {
+          "bytes": 67023,
+          "compressedBytes": 60884,
+          "crc32": "4ab1dabd",
+          "name": "parity/light-settings-secrets-hosted.png"
+        },
+        {
+          "bytes": 78683,
+          "compressedBytes": 72570,
+          "crc32": "3f4ed0ec",
+          "name": "parity/light-settings-security-bundled.png"
+        },
+        {
+          "bytes": 70590,
+          "compressedBytes": 52066,
+          "crc32": "71a38cd3",
+          "name": "parity/light-settings-security-diff.png"
+        },
+        {
+          "bytes": 78689,
+          "compressedBytes": 72581,
+          "crc32": "76315eee",
+          "name": "parity/light-settings-security-hosted.png"
+        },
+        {
+          "bytes": 71656,
+          "compressedBytes": 65074,
+          "crc32": "4058ed03",
+          "name": "parity/light-settings-teams-bundled.png"
+        },
+        {
+          "bytes": 67650,
+          "compressedBytes": 45734,
+          "crc32": "96a55000",
+          "name": "parity/light-settings-teams-diff.png"
+        },
+        {
+          "bytes": 71670,
+          "compressedBytes": 65203,
+          "crc32": "5acf467b",
+          "name": "parity/light-settings-teams-hosted.png"
+        },
+        {
+          "bytes": 77837,
+          "compressedBytes": 71835,
+          "crc32": "61212d6f",
+          "name": "parity/light-settings-usage-bundled.png"
+        },
+        {
+          "bytes": 70349,
+          "compressedBytes": 52752,
+          "crc32": "834a34d0",
+          "name": "parity/light-settings-usage-diff.png"
+        },
+        {
+          "bytes": 77822,
+          "compressedBytes": 71798,
+          "crc32": "d8deb96c",
+          "name": "parity/light-settings-usage-hosted.png"
+        },
+        {
+          "bytes": 22673,
+          "compressedBytes": 16713,
+          "crc32": "9ff70f23",
+          "name": "parity/light-shared-html-bundled.png"
+        },
+        {
+          "bytes": 15834,
+          "compressedBytes": 9242,
+          "crc32": "011dd76a",
+          "name": "parity/light-shared-html-diff.png"
+        },
+        {
+          "bytes": 22673,
+          "compressedBytes": 16713,
+          "crc32": "9ff70f23",
+          "name": "parity/light-shared-html-hosted.png"
+        },
+        {
+          "bytes": 35280,
+          "compressedBytes": 28657,
+          "crc32": "b80f3393",
+          "name": "parity/light-shared-markdown-bundled.png"
+        },
+        {
+          "bytes": 23267,
+          "compressedBytes": 16871,
+          "crc32": "0ee8fddd",
+          "name": "parity/light-shared-markdown-diff.png"
+        },
+        {
+          "bytes": 35280,
+          "compressedBytes": 28711,
+          "crc32": "4bffe8f6",
+          "name": "parity/light-shared-markdown-hosted.png"
+        },
+        {
+          "bytes": 12808,
+          "compressedBytes": 7063,
+          "crc32": "767aa419",
+          "name": "parity/light-shared-missing-bundled.png"
+        },
+        {
+          "bytes": 10807,
+          "compressedBytes": 3992,
+          "crc32": "e7364b6d",
+          "name": "parity/light-shared-missing-diff.png"
+        },
+        {
+          "bytes": 12808,
+          "compressedBytes": 7063,
+          "crc32": "767aa419",
+          "name": "parity/light-shared-missing-hosted.png"
+        },
+        {
+          "bytes": 24849,
+          "compressedBytes": 19507,
+          "crc32": "2fda804e",
+          "name": "parity/light-sign-in-bundled.png"
+        },
+        {
+          "bytes": 20348,
+          "compressedBytes": 12513,
+          "crc32": "93e159ac",
+          "name": "parity/light-sign-in-diff.png"
+        },
+        {
+          "bytes": 24849,
+          "compressedBytes": 19507,
+          "crc32": "2fda804e",
+          "name": "parity/light-sign-in-hosted.png"
+        },
+        {
+          "bytes": 44258,
+          "compressedBytes": 39057,
+          "crc32": "105e41ca",
+          "name": "parity/light-suggestions-bundled.png"
+        },
+        {
+          "bytes": 33812,
+          "compressedBytes": 24684,
+          "crc32": "f0e290d9",
+          "name": "parity/light-suggestions-diff.png"
+        },
+        {
+          "bytes": 44259,
+          "compressedBytes": 39025,
+          "crc32": "3a1140cd",
+          "name": "parity/light-suggestions-hosted.png"
+        },
+        {
+          "bytes": 71560,
+          "compressedBytes": 66023,
+          "crc32": "cf96a215",
+          "name": "parity/light-task-bundled.png"
+        },
+        {
+          "bytes": 50151,
+          "compressedBytes": 40178,
+          "crc32": "f91d0b2e",
+          "name": "parity/light-task-diff.png"
+        },
+        {
+          "bytes": 71560,
+          "compressedBytes": 66023,
+          "crc32": "cf96a215",
+          "name": "parity/light-task-hosted.png"
+        },
+        {
+          "bytes": 87211,
+          "compressedBytes": 81345,
+          "crc32": "7dec6d78",
+          "name": "parity/light-task-thread-bundled.png"
+        },
+        {
+          "bytes": 60646,
+          "compressedBytes": 50796,
+          "crc32": "3b06a437",
+          "name": "parity/light-task-thread-diff.png"
+        },
+        {
+          "bytes": 87211,
+          "compressedBytes": 81345,
+          "crc32": "7dec6d78",
+          "name": "parity/light-task-thread-hosted.png"
+        },
+        {
+          "bytes": 39460,
+          "compressedBytes": 33933,
+          "crc32": "465f1c48",
+          "name": "parity/light-team-home-bundled.png"
+        },
+        {
+          "bytes": 28054,
+          "compressedBytes": 20682,
+          "crc32": "39803d8d",
+          "name": "parity/light-team-home-diff.png"
+        },
+        {
+          "bytes": 39460,
+          "compressedBytes": 33933,
+          "crc32": "465f1c48",
+          "name": "parity/light-team-home-hosted.png"
+        },
+        {
+          "bytes": 28585,
+          "compressedBytes": 23590,
+          "crc32": "f37bc1d5",
+          "name": "parity/light-team-projects-bundled.png"
+        },
+        {
+          "bytes": 22581,
+          "compressedBytes": 14785,
+          "crc32": "434647c1",
+          "name": "parity/light-team-projects-diff.png"
+        },
+        {
+          "bytes": 28585,
+          "compressedBytes": 23590,
+          "crc32": "f37bc1d5",
+          "name": "parity/light-team-projects-hosted.png"
+        },
+        {
+          "bytes": 50800,
+          "compressedBytes": 45569,
+          "crc32": "143692c6",
+          "name": "parity/light-team-tasks-bundled.png"
+        },
+        {
+          "bytes": 37891,
+          "compressedBytes": 28061,
+          "crc32": "42360c92",
+          "name": "parity/light-team-tasks-diff.png"
+        },
+        {
+          "bytes": 50800,
+          "compressedBytes": 45569,
+          "crc32": "143692c6",
+          "name": "parity/light-team-tasks-hosted.png"
+        },
+        {
+          "bytes": 72202,
+          "compressedBytes": 67122,
+          "crc32": "82c169f2",
+          "name": "parity/light-thread-bundled.png"
+        },
+        {
+          "bytes": 72202,
+          "compressedBytes": 67122,
+          "crc32": "82c169f2",
+          "name": "parity/light-thread-hosted.png"
+        },
+        {
+          "bytes": 55810,
+          "compressedBytes": 51117,
+          "crc32": "53b0dc1c",
+          "name": "parity/light-workspace-link-bundled.png"
+        },
+        {
+          "bytes": 51403,
+          "compressedBytes": 40769,
+          "crc32": "ea9384fa",
+          "name": "parity/light-thread-diff.png"
+        },
+        {
+          "bytes": 42337,
+          "compressedBytes": 30527,
+          "crc32": "bcc9ef29",
+          "name": "parity/light-workspace-link-diff.png"
+        },
+        {
+          "bytes": 55810,
+          "compressedBytes": 51117,
+          "crc32": "53b0dc1c",
+          "name": "parity/light-workspace-link-hosted.png"
+        },
+        {
+          "bytes": 118087,
+          "compressedBytes": 5128,
+          "crc32": "340f440b",
+          "name": "parity/parity.json"
+        },
+        {
+          "bytes": 3144,
+          "compressedBytes": 996,
+          "crc32": "caa5aec2",
+          "name": "smoke.json"
+        }
+      ],
+      "name": "desktop-native-evidence-2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+      "priorExtractionReceipt": "06612fdf8dc5987c01fab6eb4c715bbf6b7236d6",
+      "selected": [
+        {
+          "blob": "5ea6109ead93772b5ede58170cd20cce067c2be9",
+          "bytes": 2814247,
+          "crc32": "ceef6ef6",
+          "name": "lifecycle.json",
+          "sha256": "87a1db7e0046ff44627fedc61837d792e16e9ffa48cd0633e7bd61a74ba238a0"
+        },
+        {
+          "blob": "210a3cca0e1b160eb34d5af73d6f9feecd84d889",
+          "bytes": 3144,
+          "crc32": "caa5aec2",
+          "name": "smoke.json",
+          "sha256": "9ff0a3fa58e1289f024ec78af6825910e32fb1ae54648699b8694b0d4d0cae4e"
+        },
+        {
+          "blob": "5b8c8be371b7db738e4360e279d2f7b3621c77b5",
+          "bytes": 118087,
+          "crc32": "340f440b",
+          "name": "parity/parity.json",
+          "sha256": "9a8fea19605952ba900e98e310c4c50d87a498a4c5c41e12aff3903a95f66e8f"
+        }
+      ],
+      "sha256": "401f02cc60ab47d24e79d93f8535b3c7fd187b320882d0d74bc8ae7c960f6085",
+      "sourceApiGetCount": 0,
+      "zipBlob": "c49a4729c72a61bfddc2450e77bf01d41156869a",
+      "zipFrozenBeforeOpeningArchive": true,
+      "zipRefrozenThisRun": false,
+      "zipWasFrozenByPriorAdmission": true
+    },
+    {
+      "allMemberCrcPassed": true,
+      "bytes": 1597,
+      "deliveryGetCount": 0,
+      "expectedZipBlob": "5d50ea60dcf8c10b78b778b1bfb7669a10a4325f",
+      "frozenGitGetCount": 1,
+      "id": 13736463665,
+      "members": [
+        {
+          "bytes": 957,
+          "compressedBytes": 478,
+          "crc32": "76d6b87b",
+          "name": "mac-acceptance-package.json"
+        },
+        {
+          "bytes": 2868,
+          "compressedBytes": 823,
+          "crc32": "56923ecb",
+          "name": "native-crypto.json"
+        }
+      ],
+      "name": "desktop-package-evidence-2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+      "priorExtractionReceipt": "06612fdf8dc5987c01fab6eb4c715bbf6b7236d6",
+      "selected": [
+        {
+          "blob": "2e9286407ad7dedf0ad3def044183fa5801c1941",
+          "bytes": 2868,
+          "crc32": "56923ecb",
+          "name": "native-crypto.json",
+          "sha256": "96d1bfe5bcb8db6451879b13eff46eb4ec3dca4b05576534ce2da0ce35a1ca29"
+        },
+        {
+          "blob": "1743ede83f443d1c417a3a520e141b658675950f",
+          "bytes": 957,
+          "crc32": "76d6b87b",
+          "name": "mac-acceptance-package.json",
+          "sha256": "480c52ad57cde016d1f07d08f846ee3861a8da1106e1e9382be3f93fa00bac4d"
+        }
+      ],
+      "sha256": "d93790e7661d62a444c529192d99f0bb099f1746ea90509e51eaba42b83f5334",
+      "sourceApiGetCount": 0,
+      "zipBlob": "5d50ea60dcf8c10b78b778b1bfb7669a10a4325f",
+      "zipFrozenBeforeOpeningArchive": true,
+      "zipRefrozenThisRun": false,
+      "zipWasFrozenByPriorAdmission": true
+    }
+  ],
+  "binding": {
+    "admissionRef": "ops/1512-native-frozen-git-admission-20261110",
+    "admissionSha": "9c8e30134d466919a2c1078b5b3569337cc8c708",
+    "attempt": 1,
+    "controllerBlob": "c294ae7298a4d382dadd4356ca7a09fdf9e7c4a3",
+    "manifestBlob": "8fcddac768457d0df5d51fc3c459d41b2e852b7c",
+    "opsRun": 42760736569,
+    "opsSha": "9c8e30134d466919a2c1078b5b3569337cc8c708",
+    "opsTree": "c53f5d2965f888675f08fdee8a4b86a1b4bb4a52",
+    "python": "3.10.12",
+    "repository": "alexj11324/Mikka",
+    "source": {
+      "attempt": 1,
+      "base": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "checkout": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+      "head": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+      "job": 129635774633,
+      "originalJobLogBlob": "8942610168219cb6a39271345ce4ae2109712213",
+      "originalJobResponseBlob": "cb047bf4d57f050a982c87c4fb83540402c328a9",
+      "run": 42757687653,
+      "tree": "23179d928269195860beaf27ad27786c7f5e7637"
+    },
+    "startedAt": "2026-11-10T05:13:23.978100+00:00",
+    "workflowBlob": "fa3b56c9d08ca58bd3a534ddeb7fcf7a26f713c6"
+  },
+  "cleanup": {
+    "privateDirectoryRemoved": true
+  },
+  "finishedAt": "2026-11-10T05:13:29.610868+00:00",
+  "limits": {
+    "artifactDownloadsRetried": false,
+    "dependencyInstalls": 0,
+    "frozenGitRecovery": true,
+    "originalArtifactDownloads": 0,
+    "originalJsonParsed": false,
+    "persistentResourcesCreated": 0,
+    "productExecuted": false
+  },
+  "schema": "issue1512-native-original-extraction-v1",
+  "sourceJobMetadataBlob": "7855f3f488c465eb4c1377b49ccf3b09f8e90b94",
+  "sourcePrivacy": {
+    "fixture": "MIKKA_LOCAL_TEST_ACCOUNTS=1; localhost disposable PostgreSQL and API",
+    "frozenOriginalNativeLog": "8942610168219cb6a39271345ce4ae2109712213",
+    "nativeAudit": "passed: known credentials/cookies scanned; traces and recordings forbidden",
+    "packageAudit": "passed: closed credential-free canonical reports",
+    "productionAccess": false
+  },
+  "status": "passed"
+}

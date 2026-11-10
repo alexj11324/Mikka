@@ -1,0 +1,47 @@
+function verifySyntheticAnalyzer(run, protocol) {
+  let tick=0;
+  const make=(realm=[10,11],limit=4096)=>protocol.createReadDiagnostic({now:()=>++tick,timeOrigin:100000,realm,limit});
+  const projected=(raw,current,phase="fixture")=>({phase,mode:"bundled",launch:1,...protocol.reviewReadDiagnosticCollection(raw,current),raw,current});
+  const checks=[],cases=[];
+  const check=(name,pass,input,output)=>{
+    checks.push({name,pass:!!pass});
+    cases.push({name,input,output});
+    if(!pass)throw new Error(name);
+  };
+  const c=protocol.createReadDiagnosticCollector(),r=make();c.document();
+  r.record(2,10,20,30,1);r.record(10,11,10,4);r.record(11,11);r.record(6,12,2);r.record(4,10,3);r.record(12,13,3,12,1);r.record(13,13,11);r.record(14,13,200);r.record(7,10,2,2);r.record(9,10);r.record(8,10,1,2,1,0);
+  r.record(16,40,1,0);r.record(17,40,0,41,30,2,1);r.record(16,40,2,1);r.record(16,40,3,1);r.record(18,40,1,30,4,4,1,0,0,1);r.record(19,40,1,30,4,1,1);r.record(15,20,30,4,10,3,2,3);
+  r.record(2,14,20,30,5);r.record(10,15,14,4);r.record(11,15);r.record(6,16,6);r.record(4,14,7);r.record(12,17,4,16,1);r.record(13,17,15);r.record(16,40,4,1,8);r.record(14,17,200);r.record(7,14,6,6);r.record(9,14);r.record(8,14,1,6,1,0);r.record(15,20,30,4,14,4,6,7);r.record(15,20,30,4,14,10,6);
+  const one=projected(c.snapshot(),r.dump(2));
+  const data={revision:"synthetic-only",readDiagnostics:{version:1,records:[one]}};
+  const report=run(data,protocol);
+  check("exact IDs chain two actions/two requests/received barriers",report.issues.length===0&&report.realms[0].summary.reads===2&&report.realms[0].summary.physicalDispatches===2&&report.realms[0].reads.every(x=>x.receivedProofLinks[0].matchingReadRequestIds.length===1),data,report);
+  check("open cause1 and generation0 subscription retained",report.realms[0].fresh[0].matchingPriorInvalidationCauses[0]===1&&report.realms[0].channels[0].subscriptions[0].generation===0&&report.realms[0].channels[0].states[1].generation===1,data,report);
+  const repeatedInput={...data,readDiagnostics:{version:1,records:[one,one]}},repeated=run(repeatedInput,protocol);
+  check("repeated nondestructive view dedupes exact realm seq",repeated.realms.length===1&&repeated.realms[0].uniqueRows===one.realms[0].rows.length&&repeated.realms[0].summary.reads===2,repeatedInput,repeated);
+  r.record(15,20,30,4,14,11,6);r.record(15,20,30,4,14,12,6);r.record(15,20,30,4,14,7,99);r.record(15,20,30,4,14,13,100);
+  const fallInput={...data,readDiagnostics:{version:1,records:[projected(c.snapshot(),r.dump(2))]}},fall=run(fallInput,protocol);
+  check("F11 not double counted and F7/F13 use nextReadId",fall.realms[0].summary.revalidationDecisions===2&&fall.realms[0].fresh.at(-2).nextReadId===99&&fall.realms[0].fresh.at(-1).nextReadId===100,fallInput,fall);
+  const pending=make([12,13]);const pc=protocol.createReadDiagnosticCollector();pc.document();pending.record(2,1,2,3,1);pending.record(10,4,1,10);
+  const pendingInput={...data,readDiagnostics:{version:1,records:[projected(pc.snapshot(),pending.dump(2))]}},pendingOut=run(pendingInput,protocol);
+  check("pending remains uncompleted without fabricated dispatch",pendingOut.realms[0].summary.settledReads===0&&pendingOut.realms[0].summary.physicalDispatches===0&&pendingOut.issues.length===0,pendingInput,pendingOut);
+  const bad=JSON.parse(JSON.stringify(data));bad.readDiagnostics.records[0].raw.expectedDocuments=2;const loss=run(bad,protocol);
+  check("missing prior document preserved incomplete",loss.capture.incompleteRecords===1&&loss.records[0].reasons.includes(11)&&loss.issues.some(x=>x.kind==="projection-status-mismatch"),bad,loss);
+  const overflow=make([14,15],2);const oc=protocol.createReadDiagnosticCollector();oc.document();overflow.record(2,1,2,3,1);overflow.record(10,4,1,10);
+  const overInput={...data,readDiagnostics:{version:1,records:[projected(oc.snapshot(),overflow.dump(2))]}},over=run(overInput,protocol);
+  check("overflow remains incomplete",over.capture.incompleteRecords===1&&over.records[0].reasons.includes(9),overInput,over);
+  const wrong=JSON.parse(JSON.stringify(data));const freshRow=wrong.readDiagnostics.records[0].current.rows.find(x=>x[2]===15&&x[7]===3);freshRow[8]=5;
+  wrong.readDiagnostics.records[0]=projected(wrong.readDiagnostics.records[0].raw,wrong.readDiagnostics.records[0].current);const contradiction=run(wrong,protocol);
+  check("branch contradicting exact barrier is detected",contradiction.issues.some(x=>x.kind==="revalidate-branch-boundary-mismatch"),wrong,contradiction);
+  const missing=make([16,17]);const mc=protocol.createReadDiagnosticCollector();mc.document();missing.record(10,2,99,10);missing.record(12,3,10,0,1);missing.record(13,3,2);
+  const unknownInput={...data,readDiagnostics:{version:1,records:[projected(mc.snapshot(),missing.dump(2))]}},unknown=run(unknownInput,protocol);
+  check("missing target read association retained unknown",unknown.realms[0].unresolvedAssociations.some(x=>x.readId===99)&&unknown.realms[0].actions[0].readId===99,unknownInput,unknown);
+  const conflict=JSON.parse(JSON.stringify(data));
+  const conflictingView=JSON.parse(JSON.stringify(one));
+  conflictingView.current.rows.find(row=>row[2]===2)[6]=99;
+  Object.assign(conflictingView,protocol.reviewReadDiagnosticCollection(conflictingView.raw,conflictingView.current));
+  conflict.readDiagnostics.records=[one,conflictingView];
+  const blocked=run(conflict,protocol);
+  check("conflicting separately-valid prefixes block whole-realm causal derivation",blocked.issues.some(x=>x.kind==="conflicting-prefix-row")&&blocked.realms.length===1&&blocked.realms[0].analysisBlocked===true&&!Object.hasOwn(blocked.realms[0],"summary"),conflict,blocked);
+  return {checks,cases};
+}
