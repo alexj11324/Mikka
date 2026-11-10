@@ -176,7 +176,7 @@ export function WebCitation({ url, label }: { url: string; label: string | null 
  * The look of a thread named in a sentence (decision 2026-11-10): its title in the link colour, with no box, icon,
  * accent or state badge. Still the object chip's inline `span` button, so a long title wraps and the focus ring shows.
  */
-const runLinkClassName = 'mx-0 rounded-sm bg-transparent px-0 text-primary underline-offset-4 hover:bg-transparent hover:underline data-popup-open:bg-transparent data-popup-open:underline'
+const runLinkClassName = 'mx-0 rounded-sm bg-transparent px-0 text-object-chip-foreground underline-offset-4 hover:bg-transparent hover:underline data-popup-open:bg-transparent data-popup-open:underline'
 
 /**
  * A thread mentioned in a reply: its title alone, as a link (its task's title without the code, since the task has

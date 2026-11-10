@@ -119,7 +119,8 @@ test('a thread is its title as a link, no icon or badge, and opens the thread be
     assert.deepEqual(threadChips.map(chip => chip.textContent), ['Rebuild the shell', 'Rebuild the shell', 'Rebuild the shell'])
     for (const chip of threadChips) {
       assert.equal(chip.querySelector('svg, [role="img"], [data-thread-attention]'), null, 'no icon, dot or badge')
-      assert.match(chip.className, /text-primary/)
+      assert.match(chip.className, /text-object-chip-foreground/, 'thread titles use the existing citation link colour')
+      assert.doesNotMatch(chip.className, /(^| )text-primary( |$)/, 'hosted primary is body black, not the citation link colour')
       assert.match(chip.className, /bg-transparent/)
       assert.doesNotMatch(chip.className, /(^| )bg-object-chip( |$)/, 'no boxed fill')
       assert.match(chip.className, /focus-visible:ring-2/)
