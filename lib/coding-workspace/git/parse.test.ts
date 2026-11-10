@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { gitLogFormat, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from '../../../packages/daemon/src/coding-workspace/git-parse'
+import { gitLogArgs, gitLogFormat, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from '../../../packages/daemon/src/coding-workspace/git-parse'
 
 const sha = (letter: string) => letter.repeat(40)
 const head = sha('a'), base = sha('b')
@@ -47,6 +47,10 @@ test('git log parsing normalizes offsets and marks HEAD/base without inventing a
   assert.deepEqual(commits[1], { sha: second, parents: [], authorName: 'Grace', authorEmail: 'grace@example.invalid',
     authoredAt: '2026-11-09T08:00:00.000Z', committedAt: '2026-11-09T08:00:00.000Z', subject: 'Base change', head: false, base: true })
   assert.match(gitLogFormat, /%H%x00%P/)
+  // Git writes a newline before every record after the first unless `-z` asks
+  // for NUL separators, and the format must leave the separator to `-z`.
+  assert.ok(gitLogArgs(5, 0).includes('-z'))
+  assert.equal(gitLogFormat.endsWith('%s'), true)
 })
 
 test('history cursors are bound to the observed HEAD and bounded', () => {

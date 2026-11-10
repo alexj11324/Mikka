@@ -22,7 +22,7 @@ import { buildChildEnv } from '../env'
 import type { JournalEntry } from '../runs/journal'
 import { gitFor, missing, readWorkspaceRevertPreview, statFence } from './diff'
 import { mountId, safeFile, type WorkspaceRoot } from './files'
-import { gitLogFormat, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from './git-parse'
+import { gitLogArgs, historyCursor, parseGitLog, parseHistoryCursor, parsePorcelainV2 } from './git-parse'
 
 const digest = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 const oid = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/
@@ -255,8 +255,7 @@ async function readGitHistory(command: WorkspaceReadCommand, entry: JournalEntry
     const status = await observeStatus(git, opened.root, opened.parsed.identity, entry?.baseCommit ?? null, signal)
     const offset = parseHistoryCursor(request.cursor, status.commitSha)
     if (offset === null) throw conflict()
-    const raw = await git(['log', `--format=${gitLogFormat}`, '-n', String(Math.min(request.limit, WORKSPACE_GIT_MAX_COMMITS) + 1),
-      `--skip=${offset}`, '--no-decorate'], STATUS_BYTES)
+    const raw = await git(gitLogArgs(Math.min(request.limit, WORKSPACE_GIT_MAX_COMMITS) + 1, offset), STATUS_BYTES)
     const commits = parseGitLog(raw.toString('utf8'), { headSha: status.commitSha, baseSha: entry?.baseCommit ?? null })
     const history: GitHistory = gitHistorySchema.parse({ ok: true, identity: opened.parsed.identity, kind: 'git_history',
       observedAt: new Date().toISOString(), availability: 'online', revision: status.revision, commitSha: status.commitSha,

@@ -88,8 +88,17 @@ export function parsePorcelainV2(output: string): ParsedStatus {
   return { branch, entries: entries.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0) }
 }
 
-const commitFormat = '%H%x00%P%x00%an%x00%ae%x00%aI%x00%cI%x00%s%x00'
+// `git log -z` terminates every record with NUL and inserts nothing between
+// records. Without it Git writes a newline before each record after the first,
+// so the next SHA would parse as "\n<sha>". The format therefore must not carry
+// its own trailing separator.
+const commitFormat = '%H%x00%P%x00%an%x00%ae%x00%aI%x00%cI%x00%s'
 export const gitLogFormat = commitFormat
+/** The exact argv `parseGitLog` reads. Keeping it here lets a source-only test
+ * prove `-z` is present instead of only proving the parser accepts its output. */
+export function gitLogArgs(limit: number, offset: number) {
+  return ['log', '-z', `--format=${commitFormat}`, '-n', String(limit), `--skip=${offset}`, '--no-decorate']
+}
 
 /** Each commit is seven NUL-terminated fields. Dates are normalized to UTC so
  * the strict ISO wire schema never depends on the device's timezone. */
