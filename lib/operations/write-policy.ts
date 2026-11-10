@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { OperationError } from './write-error'
+import { permissionDecision } from './permission-precedence'
 
 const decision = z.enum(['allow', 'ask', 'deny'])
 const settings = z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), decision)
@@ -9,25 +10,26 @@ const settings = z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), decision)
  * without a judgment gets ask. */
 export type WriteFallback = 'allow' | 'ask'
 
-/** Resolve only host-owned permission configuration. Absence means the tool's
- * fallback. Invalid data is unavailable, never allow. Each layer can only
- * narrow the decision. */
+/** Resolve only host-owned permission configuration. Absence from every layer
+ * means the tool's fallback; a layer that does not name the action does not
+ * inject one. Invalid data is unavailable, never allow. Restrictive wins:
+ * deny > ask > allow, the same rule as the app tool path
+ * (lib/operations/permission-precedence.ts). */
 export function resolveWritePermission(action: string, layers: readonly unknown[], fallback: WriteFallback = 'ask'): 'allow' | 'ask' | 'deny' {
   if (!/^[a-z][a-z0-9_]{0,63}$/.test(action) || !layers.length) throw new OperationError('writePolicyUnavailable')
-  let result: 'allow' | 'ask' | 'deny' = 'allow'
+  const choices: Array<'allow' | 'ask' | 'deny'> = []
   for (const raw of layers) {
     const parsed = settings.safeParse(raw)
     if (!parsed.success) throw new OperationError('writePolicyUnavailable')
-    const choice = parsed.data[action] ?? fallback
-    if (choice === 'deny') return 'deny'
-    if (choice === 'ask') result = 'ask'
+    if (Object.hasOwn(parsed.data, action)) choices.push(parsed.data[action])
   }
-  return result
+  return permissionDecision(choices) ?? fallback
 }
 
-/** A missing workspace entry is no override; a present one may only narrow the agent choice. */
+/** The Bot's layer and the workspace's; a workspace Allow is a grant a Bot with
+ * no entry inherits, while a Bot ask/deny or a workspace ask/deny narrows it. */
 export function resolveScopedWritePermission(action: string, agent: unknown, workspace: unknown, fallback: WriteFallback = 'ask'): 'allow' | 'ask' | 'deny' {
   const parsed = settings.safeParse(workspace)
   if (!parsed.success) throw new OperationError('writePolicyUnavailable')
-  return Object.hasOwn(parsed.data, action) ? resolveWritePermission(action, [agent, parsed.data], fallback) : resolveWritePermission(action, [agent], fallback)
+  return resolveWritePermission(action, [agent, parsed.data], fallback)
 }

@@ -1,6 +1,6 @@
 import 'server-only'
 import { eq } from 'drizzle-orm'
-import { callAppTool, explicitSetting, listAppTools, type AppTool, type AppToolCall, type AppToolDeps, type AppToolExecution } from '@/lib/app-tools'
+import { appCallSetting, callAppTool, listAppTools, type AppTool, type AppToolCall, type AppToolDeps, type AppToolExecution } from '@/lib/app-tools'
 import { serverWriteJudge } from '@/lib/operations/write-judgment'
 import { resolveComposioAccount } from '@/lib/composio-actions'
 import { chosenComposioDefault } from '@/lib/composio-account-store'
@@ -33,7 +33,8 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
     execute: (call, accountId) => executeAppToolCall(client, userId, call, accountId),
     setting: async (tool, toolkit) => {
       // Unreadable settings name nothing; the Decisions judge then decides, not a fixed ask.
-      try { return explicitSetting(await readWriteSettingLayers(db, userId, botId), [tool, toolkit]) } catch { return null }
+      // The lookup covers the tool's slug, its app key and its legacy write action (send_slack_message).
+      try { return appCallSetting(await readWriteSettingLayers(db, userId, botId), tool, toolkit) } catch { return null }
     },
     judge: serverWriteJudge(userId, botId),
     recordStart: async (call, accountId) => {

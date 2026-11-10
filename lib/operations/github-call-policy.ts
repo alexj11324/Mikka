@@ -11,15 +11,24 @@ export type GitHubCallPolicyDeps = {
   layers?: (userId: string, botId: string | null) => Promise<SettingLayers>
 }
 
+/** `unavailable` is a distinct outcome: the policy could not be read, so it is
+ * neither an explicit deny nor an allow. Callers must not report it as a denial. */
+export type GitHubCallPolicy = 'allow' | 'deny' | 'unavailable'
+
 /** GitHub tools act with the person's own credential; an app-level deny blocks a call.
  * `github_tools` still lists names so the model can explain why it cannot act.
  * Settings that cannot be read fail closed: a database error or malformed stored
  * layer must never turn an explicit deny into an allow. */
-export async function githubCallAllowed(userId: string, botId: string | null, deps: GitHubCallPolicyDeps = {}): Promise<boolean> {
+export async function githubCallDecision(userId: string, botId: string | null, deps: GitHubCallPolicyDeps = {}): Promise<GitHubCallPolicy> {
   try {
     const layers = await (deps.layers ?? ((owner, bot) => readWriteSettingLayers(db, owner, bot)))(userId, botId)
-    return appCallAllowed(explicitSetting(layers, ['github']))
+    return appCallAllowed(explicitSetting(layers, ['github'])) ? 'allow' : 'deny'
   } catch {
-    return false
+    return 'unavailable'
   }
+}
+
+/** Boolean form for callers that treat an unreadable policy as not allowed. */
+export async function githubCallAllowed(userId: string, botId: string | null, deps: GitHubCallPolicyDeps = {}): Promise<boolean> {
+  return await githubCallDecision(userId, botId, deps) === 'allow'
 }

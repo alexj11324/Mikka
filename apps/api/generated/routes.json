@@ -191,6 +191,15 @@
       "sourceHash": "942486a5b184a947fedd5fccaf9f01231244c226d087f2cc277848a9fcf69c19"
     },
     {
+      "path": "/mikka/api/bots/[botId]/app-tools",
+      "template": "/api/bots/[botId]/app-tools",
+      "source": "app/api/bots/[botId]/app-tools/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "f423e367d98169aa3d6c776f92ecba4f82e0746cccdd5e2a7a622fc42c780a6b"
+    },
+    {
       "path": "/mikka/api/bots/[botId]/computer",
       "template": "/api/bots/[botId]/computer",
       "source": "app/api/bots/[botId]/computer/route.ts",

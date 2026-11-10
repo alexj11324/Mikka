@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { githubCallAllowed } from './github-call-policy'
+import { githubCallAllowed, githubCallDecision } from './github-call-policy'
 
 const policy = (agent: unknown, workspace: unknown) => async () => ({ agent, workspace })
 
@@ -27,6 +27,14 @@ test('an unreadable policy fails closed instead of turning a deny into an allow'
   assert.equal(await githubCallAllowed('owner', 'bot', { layers: policy({ github: 'maybe' }, {}) }), false)
   assert.equal(await githubCallAllowed('owner', 'bot', { layers: policy({}, { github: 'maybe' }) }), false)
   assert.equal(await githubCallAllowed('owner', 'bot', { layers: policy({ github: ['deny'] }, {}) }), false)
+})
+
+test('unreadable is distinct from an explicit deny, so the model can say it could not check', async () => {
+  assert.equal(await githubCallDecision('owner', 'bot', { layers: async () => { throw new Error('down') } }), 'unavailable')
+  assert.equal(await githubCallDecision('owner', 'bot', { layers: policy({}, { github: 'maybe' }) }), 'unavailable')
+  assert.equal(await githubCallDecision('owner', 'bot', { layers: policy({}, { github: 'deny' }) }), 'deny')
+  assert.equal(await githubCallDecision('owner', 'bot', { layers: policy({}, { github: 'allow' }) }), 'allow')
+  assert.equal(await githubCallDecision('owner', 'bot', { layers: async () => null }), 'allow')
 })
 
 test('the gate reads the caller’s own layer row for the named Bot', async () => {

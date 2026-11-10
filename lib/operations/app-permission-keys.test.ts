@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { WRITE_ACTIONS } from './write-schema'
 import { WRITE_TOOL_APPS } from '@/lib/app-policy/apps'
-import { appCallAllowed, appPermissionKeys, appPermissionValue, withAppPermission, withAppPermissions } from './app-permission-keys'
+import { appCallAllowed, appCallSettingKeys, appPermissionKeys, appPermissionValue, withAppPermission, withAppPermissions } from './app-permission-keys'
 
 test('only an explicit deny withholds an app call; ask stays callable where no card exists', () => {
   assert.equal(appCallAllowed('allow'), true)
@@ -31,6 +31,11 @@ test('one save covers every selected app, and a page save carries both keys', ()
   assert.deepEqual(withAppPermissions({ gmail: 'ask' }, ['slack', 'notion'], 'deny'),
     { gmail: 'ask', slack: 'deny', send_slack_message: 'deny', notion: 'deny', append_notion_paragraph: 'deny' })
   assert.deepEqual(withAppPermissions({ slack: 'deny', send_slack_message: 'deny' }, ['slack'], null), {})
+})
+
+test('a tool call consults its own slug and its app keys, with no duplicates', () => {
+  assert.deepEqual(appCallSettingKeys('slack_send_message', 'slack'), ['slack_send_message', 'slack', 'send_slack_message'])
+  assert.deepEqual(appCallSettingKeys('hubspot_create_contact', 'hubspot'), ['hubspot_create_contact', 'hubspot'])
 })
 
 test('every first-class write action is governed by its app key', () => {

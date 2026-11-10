@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createWritePolicySettings } from './write-policy-settings'
-import { githubCallAllowed } from './github-call-policy'
+import { githubCallAllowed, githubCallDecision } from './github-call-policy'
 import { appPermissionValue, withAppPermission } from './app-permission-keys'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 
@@ -104,6 +104,7 @@ test('workspace app permissions', { skip: !dbUrl }, async t => {
     // Clear the Bot layer so only the malformed workspace layer can decide the call.
     await pool.query('update agent_kit_heads set external_write_permissions=$3 where owner_id=$1 and bot_key=$2', [admin, bot, {}])
     await pool.query('update workspace_computer_policies set external_write_permissions=$2 where "workspaceId"=$1', [ws.id, { github: 'maybe' }])
+    assert.equal(await githubCallDecision(admin, bot), 'unavailable')
     assert.equal(await githubCallAllowed(admin, bot), false)
   })
 })

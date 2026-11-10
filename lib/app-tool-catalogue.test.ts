@@ -38,6 +38,16 @@ test('GitHub stops at the tool cap and marks the catalogue truncated', async () 
   assert.equal(catalogue.truncated, true)
 })
 
+test('GitHub reports truncation only when something remains past the cap', async () => {
+  const exact = Array.from({ length: 200 }, (_, index) => ({ name: `tool_${index}` }))
+  const withNext = await readAppToolCatalogue('caller', 'github', { githubPage: githubPage({ '': { tools: exact, nextCursor: 'more' } }) })
+  assert.equal(withNext.count, 200)
+  assert.equal(withNext.truncated, true, 'a next page at the cap means more remain')
+  const complete = await readAppToolCatalogue('caller', 'github', { githubPage: githubPage({ '': { tools: exact, nextCursor: null } }) })
+  assert.equal(complete.count, 200)
+  assert.equal(complete.truncated, false, 'exactly the cap with nothing after it is complete')
+})
+
 test('GitHub stops after twelve pages and reports truncation', async () => {
   let calls = 0
   const catalogue = await readAppToolCatalogue('caller', 'github', {
@@ -85,11 +95,24 @@ test('Composio catalogues keep only the app toolkit and map the read-only hint',
   ])
 })
 
-test('a Composio catalogue at the tool cap is marked truncated', async () => {
-  const tools: AppTool[] = Array.from({ length: 200 }, (_, index) => ({ slug: `SLACK_TOOL_${index}`, name: `Tool ${index}`, toolkit: { slug: 'slack' } }))
+test('a Composio catalogue past the tool cap is truncated; exactly the cap is complete', async () => {
+  const tools: AppTool[] = Array.from({ length: 201 }, (_, index) => ({ slug: `SLACK_TOOL_${index}`, name: `Tool ${index}`, toolkit: { slug: 'slack' } }))
   const catalogue = await readAppToolCatalogue('caller', 'slack', { composio: async () => tools })
   assert.equal(catalogue.count, 200)
   assert.equal(catalogue.truncated, true)
+  const complete = await readAppToolCatalogue('caller', 'slack', { composio: async () => tools.slice(0, 200) })
+  assert.equal(complete.count, 200)
+  assert.equal(complete.truncated, false)
+})
+
+test('a large page that matches few tools is not called truncated', async () => {
+  const tools: AppTool[] = [
+    { slug: 'SLACK_SEND_MESSAGE', name: 'Send', toolkit: { slug: 'slack' } },
+    ...Array.from({ length: 199 }, (_, index) => ({ slug: `GMAIL_TOOL_${index}`, name: `Mail ${index}`, toolkit: { slug: 'gmail' } })),
+  ]
+  const catalogue = await readAppToolCatalogue('caller', 'slack', { composio: async () => tools })
+  assert.equal(catalogue.count, 1)
+  assert.equal(catalogue.truncated, false)
 })
 
 test('Mikka’s own apps have no Composio catalogue and never call the provider', async () => {

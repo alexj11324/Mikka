@@ -53,6 +53,11 @@ export function withAppPermission(
   return next
 }
 
+/** The setting keys one app tool call consults: its own slug, its app key and its legacy action. */
+export function appCallSettingKeys(toolSlug: string, toolkit: string): string[] {
+  return [...new Set([toolSlug, ...appPermissionKeys(toolkit)])]
+}
+
 /** One save applies the same choice to every selected app, each on both keys. */
 export function withAppPermissions(
   permissions: Record<string, AppPermissionValue>,

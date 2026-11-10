@@ -50,19 +50,23 @@ async function githubCatalogue(userId: string, listPage: (userId: string, cursor
       tools.push({ name: tool.name, displayName: typeof tool.displayName === 'string' ? tool.displayName : tool.name, readOnly: tool.readOnly === true })
     }
     cursor = typeof result.nextCursor === 'string' && result.nextCursor.length > 0 ? result.nextCursor : undefined
-    if (!cursor || tools.length >= MAX_TOOLS) break
+    if (tools.length >= MAX_TOOLS) {
+      // A next page at the cap means more remain; extra entries on this page already set `truncated`.
+      if (cursor) truncated = true
+      break
+    }
+    if (!cursor) break
     if (page === GITHUB_PAGES - 1) truncated = true
   }
   return { tools, truncated }
 }
 
 function composioCatalogue(app: string, tools: AppTool[]): { tools: AppToolSummary[]; truncated: boolean } {
-  const selected = tools
-    .filter(tool => tool.toolkit?.slug === app && tool.slug.startsWith(`${app.toUpperCase()}_`))
-    .slice(0, MAX_TOOLS)
+  const matching = tools.filter(tool => tool.toolkit?.slug === app && tool.slug.startsWith(`${app.toUpperCase()}_`))
   return {
-    tools: selected.map(tool => ({ name: tool.slug, displayName: tool.name, readOnly: isReadOnlyTool(tool) })),
-    truncated: tools.length >= MAX_TOOLS,
+    tools: matching.slice(0, MAX_TOOLS).map(tool => ({ name: tool.slug, displayName: tool.name, readOnly: isReadOnlyTool(tool) })),
+    // The provider is asked for one past the cap, so this is the truth, not a guess from the page size.
+    truncated: matching.length > MAX_TOOLS,
   }
 }
 
@@ -88,7 +92,7 @@ export async function readAppToolCatalogue(
   const listed = deps.composio
     ? await deps.composio(app)
     : client
-      ? await (client.tools.getRawComposioTools({ toolkits: [app], limit: MAX_TOOLS }) as Promise<AppTool[]>)
+      ? await (client.tools.getRawComposioTools({ toolkits: [app], limit: MAX_TOOLS + 1 }) as Promise<AppTool[]>)
       : []
   const catalogued = composioCatalogue(app, listed)
   return {

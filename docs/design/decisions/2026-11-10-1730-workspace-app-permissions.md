@@ -20,7 +20,15 @@ What follows:
 - One app is one rule. Saving an app writes its toolkit key and, where one
   exists, the legacy first-class write action key (`send_slack_message` and
   the other `WRITE_ACTIONS`), so the workspace choice governs both
-  `call_app_tool` and the older write path.
+  `call_app_tool` and the older write path. A tool call consults its own slug,
+  the app key and the legacy action, so a deny stored only under the legacy
+  key still blocks the newer tool.
+- The workspace's Allow is a real grant, not an absence: an app set to Allow
+  runs directly, without the Decision API. Precedence is restrictive first: a
+  deny in the Bot's or the workspace's layer wins, then an ask; only when
+  neither restricts does an allow run the call. A Bot's ask/deny narrows a
+  workspace Allow, and a workspace ask/deny narrows a Bot Allow. Decision API
+  judgment applies only when no layer names the app (Default).
 - The page shows the provider's real catalogue, read lazily from
   `/api/bots/:botId/app-tools`: GitHub's hosted MCP tools (with their
   read-only hints) and Composio's tools for every other store app. The old
@@ -28,7 +36,11 @@ What follows:
   surface.
 - GitHub is direct allow by default and can be denied as an app. There is no
   approval card on `github_call`; `githubActionDenied` tells the model the
-  workspace blocked it. `github_tools` still lists names.
+  workspace blocked it, and `githubPolicyUnavailable` says the policy could
+  not be read. `github_tools` still lists names. The deny gates Mikka's direct
+  calls only: `find_repository`, `github_tools` discovery and a dispatched
+  Agent still use the person's own GitHub credential, so the page's line says
+  "direct" rather than "never".
 - The run policy on the same page is the workspace layer
   (`workspace_computer_policies.cli_run_policy`), not a Bot's layer. Existing
   per-Bot and per-worker layers still narrow it at execution; the page does
@@ -50,3 +62,6 @@ therefore see "allow" here while the other page still blocks the app, and the
 Coordinator is exempt on the other page but not in this page's GitHub gate.
 Reconciling or merging the two surfaces is a later decision; this ADR does not
 change enforcement.
+
+The app-tools catalogue route has no throttle or `maxDuration`. Bound it if it
+becomes provider-facing beyond the settings page.
