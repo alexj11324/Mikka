@@ -190,7 +190,7 @@ test('the deep link carries only opaque ids, prefixing origin and base path', ()
 })
 
 test('the deep link origin must be a bare http(s) origin', () => {
-  for (const origin of ['', 'https://app.example.com/mikka', 'file:///tmp/app', 'https://user:pass@app.example.com', 'https://app.example.com/?workspace=1']) {
+  for (const origin of ['', '/mikka', 'https://app.example.com/mikka', 'javascript:alert(1)', 'file:///tmp/app', 'https://user:pass@app.example.com', 'https://app.example.com/?workspace=1']) {
     assert.throws(
       () => linearRunDeepLink({ issueId: ISSUE, runId: RUN, origin, basePath: '' }),
       /origin/,
