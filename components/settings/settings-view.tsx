@@ -144,7 +144,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     // Admins only, as its read: anyone else (a link, a bookmark, a workspace where they are a member) is told so, and nothing is read.
     case 'audit': return workspaceId && !preview && team ? admin ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : <p role="status" className="text-sm text-muted-foreground">{t('audit.adminOnly')}</p> : waiting
     case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} personal={personal} /> : waiting
-    case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}{admin && <BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />}</> : waiting
+    case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}<BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} admin={admin} /></> : waiting
     // Bots of people who left are a team's (decision 2026-11-02-0203); they moved here with Bot 与 Agents' removal (2026-11-02-1400).
     case 'general': return <WorkspaceGeneral userKey={userKey ?? user.email} workspaceId={workspaceId} showArchived={Boolean(team && workspaceId && !preview)} />
     case 'computers': return null
